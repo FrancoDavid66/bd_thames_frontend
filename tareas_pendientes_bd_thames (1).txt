@@ -1,0 +1,36 @@
+Tareas pendientes — BD_THAMES
+Fecha: 2025-10-11
+
+1) Sección PÓLIZA
+- Selector de Compañía: reemplazar input por un <select> con todas las compañías.
+- Cuotas por Compañía: generar N cuotas según la duración (meses) definida por compañía.
+  * Ejemplos: Agrosalta → 6 meses/6 cuotas; RCE → 3 meses/3 cuotas.
+- Fecha de vencimiento automática: al cargar fecha_emisión, setear fecha_vencimiento = fecha_emisión + 1 mes
+  (mismo día; si no existe, usar último día del mes siguiente).
+- Cuotas sin precio fijo: crear cuotas sin monto (monto null/editable después).
+- Backend:
+  * Centralizar constante COMPAÑÍA → MESES (única fuente de verdad).
+  * Generar cuotas con cantidad = meses de duración.
+  * No exigir precio al crear cuotas.
+  * Calcular fechas de cada cuota mes a mes desde fecha_emision.
+
+2) Sección SOLICITUD
+- Responsable de la solicitud (obligatorio): antes de iniciar, pedir el nombre del responsable que carga la solicitud.
+  * Guardar en base de datos (campo responsable_nombre). Si existe modelo Empleado, opcional FK responsable_id.
+  * Mostrarlo en listados y permitir filtro por responsable.
+- VTV con vencimiento: al subir foto de VTV, pedir fecha de vencimiento (obligatoria) y guardarla junto a la imagen.
+- Registro con vencimiento: al subir foto del Registro, pedir fecha de vencimiento (obligatoria) y guardarla junto a la imagen.
+- UX de carga de documentos: en el modal, campos Imagen + Fecha de vencimiento; mostrar chip “vence el DD/MM/AAAA”;
+  validar en front que no se guarde sin fecha.
+
+3) UX / Animaciones (suaves tipo “Tinder”, cartoon-like, sin abrumar)
+- Usar framer-motion con variantes centralizadas (cards, listas, modales, páginas).
+- Listas/cards: aplicar listStagger + fadeInUp. Modales: scaleIn. Navegación: pageRight. Botones: pressable/hoverLift.
+- Gestos swipe opcional en tarjetas (approve/reject) con feedback suave.
+- Accesibilidad: respetar “reduce motion” (Tailwind motion-reduce:*). Duraciones cortas (180–240 ms).
+
+Datos que necesito para completar la implementación
+- Listado completo de compañías (nombres exactos para el selector).
+- Duración en meses por compañía:
+  * Ya definidos: Agrosalta = 6, RCE = 3.
+  * Falta definir: (ATM, Digna, Equidad, Federación Patronal, Providencia, NRE, etc.).

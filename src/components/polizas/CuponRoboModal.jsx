@@ -1,0 +1,277 @@
+// src/components/polizas/CuponRoboModal.jsx
+import { useState, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { AnimatePresence, motion } from "framer-motion";
+import dayjs from "dayjs";
+import toast from "react-hot-toast";
+import { HiX, HiCalendar, HiCheckCircle } from "react-icons/hi";
+import { createCuponRobo } from "../../store/slices/cuponesRoboSlice";
+
+const ESTADOS = [
+  { value: "PENDIENTE", label: "Pendiente" },
+  { value: "PAGADA", label: "Pagada" },
+  { value: "VENCIDA", label: "Vencida" },
+];
+
+export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
+  const dispatch = useDispatch();
+  const creating = useSelector((s) => s.cuponesRobo?.creating);
+
+  const [month, setMonth] = useState("");
+  const [estado, setEstado] = useState("PENDIENTE");
+
+  // 🆕 Metadata de pago
+  const [pagoFecha, setPagoFecha] = useState("");
+  const [medioCobro, setMedioCobro] = useState("");
+  const [notas, setNotas] = useState("");
+  const [fotoUrl, setFotoUrl] = useState("");
+
+  const isPagada = useMemo(() => estado === "PAGADA", [estado]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!polizaId) {
+      toast.error("Falta la póliza.");
+      return;
+    }
+    if (!month) {
+      toast.error("Elegí un mes.");
+      return;
+    }
+
+    const start = dayjs(`${month}-01`);
+    if (!start.isValid()) {
+      toast.error("Mes inválido.");
+      return;
+    }
+
+    const periodo_desde = start.format("YYYY-MM-DD");
+    const periodo_hasta = start.endOf("month").format("YYYY-MM-DD");
+
+    const payload = {
+      polizaId,
+      periodo_desde,
+      periodo_hasta,
+      estado,
+    };
+
+    // Solo si el cupón ya nace como PAGADA mandamos metadata de pago
+    if (isPagada) {
+      if (pagoFecha) {
+        const iso = dayjs(pagoFecha).isValid()
+          ? dayjs(pagoFecha).toISOString()
+          : null;
+        if (iso) payload.fecha_pago = iso;
+      }
+      if (medioCobro.trim()) {
+        payload.medio_cobro = medioCobro.trim();
+      }
+      if (notas.trim()) {
+        payload.notas = notas.trim();
+      }
+      if (fotoUrl.trim()) {
+        payload.foto_url = fotoUrl.trim();
+      }
+    }
+
+    try {
+      await dispatch(createCuponRobo(payload)).unwrap();
+      // Reset
+      setMonth("");
+      setEstado("PENDIENTE");
+      setPagoFecha("");
+      setMedioCobro("");
+      setNotas("");
+      setFotoUrl("");
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleClose = () => {
+    if (creating) return;
+    onClose?.();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-950/95 p-6 shadow-2xl"
+            initial={{ scale: 0.9, opacity: 0, y: 16 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 16 }}
+          >
+            {/* Cerrar */}
+            <button
+              type="button"
+              onClick={handleClose}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-neutral-50 disabled:opacity-50"
+              disabled={creating}
+            >
+              <HiX className="h-4 w-4" />
+            </button>
+
+            {/* Header */}
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/20 text-primary-300">
+                <HiCalendar className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-50">
+                  Nuevo cupón de robo
+                </h2>
+                <p className="text-xs text-neutral-400">
+                  Seleccioná el mes, el estado inicial y, si ya está pagado, los
+                  datos del pago.
+                </p>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Mes */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-neutral-300">
+                  Mes del cupón
+                </label>
+                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2">
+                  <HiCalendar className="h-4 w-4 text-neutral-500" />
+                  <input
+                    type="month"
+                    className="flex-1 bg-transparent text-xs text-neutral-50 outline-none"
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  El período se calcula del 1 al último día del mes elegido.
+                </p>
+              </div>
+
+              {/* Estado */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-neutral-300">
+                  Estado inicial
+                </label>
+                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2">
+                  <HiCheckCircle className="h-4 w-4 text-neutral-500" />
+                  <select
+                    className="flex-1 bg-transparent text-xs text-neutral-50 outline-none"
+                    value={estado}
+                    onChange={(e) => setEstado(e.target.value)}
+                  >
+                    {ESTADOS.map((opt) => (
+                      <option
+                        key={opt.value}
+                        value={opt.value}
+                        className="bg-neutral-900 text-neutral-50"
+                      >
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 🆕 Bloque de datos de pago (solo si estado = PAGADA) */}
+              {isPagada && (
+                <div className="space-y-3 rounded-2xl border border-primary-500/20 bg-primary-500/5 px-3 py-3">
+                  <p className="text-[11px] text-primary-200">
+                    Completá los datos del pago para dejar el cupón bien
+                    registrado.
+                  </p>
+
+                  {/* Fecha/hora de pago */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-200">
+                      Fecha y hora de pago
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      value={pagoFecha}
+                      onChange={(e) => setPagoFecha(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Medio / billetera */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-200">
+                      Medio / billetera usada
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      placeholder="Ej: Alias MP Manu, Ualá Leo, etc."
+                      value={medioCobro}
+                      onChange={(e) => setMedioCobro(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Foto del cupón */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-200">
+                      Foto del cupón (URL)
+                    </label>
+                    <input
+                      type="url"
+                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      placeholder="Pegá la URL de la imagen si la tenés"
+                      value={fotoUrl}
+                      onChange={(e) => setFotoUrl(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Notas */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-200">
+                      Notas internas
+                    </label>
+                    <textarea
+                      rows={2}
+                      className="w-full resize-none rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      placeholder="Detalle corto del pago, referencia, etc."
+                      value={notas}
+                      onChange={(e) => setNotas(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="inline-flex items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-neutral-300 hover:bg-white/5 disabled:opacity-60"
+                  disabled={creating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-primary-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span>Guardar cupón</span>
+                  {creating && (
+                    <span className="h-3 w-3 animate-spin rounded-full border border-neutral-900 border-t-transparent" />
+                  )}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

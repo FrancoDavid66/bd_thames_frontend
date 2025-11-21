@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@font-face {
+    font-family: 'MiFuentePersonalizada';
+    src: url('./assets/fonts/MiFuente.woff2') format('woff2'),
+         url('./assets/fonts/MiFuente.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+    font-family: 'MiFuentePersonalizada', sans-serif;
+    background-color: #2f3b4d; /* Color oscuro neutro */
+    color: #f2f2f2; /* Texto claro */
+}
