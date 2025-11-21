@@ -23,13 +23,17 @@ const shell =
   "rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md shadow-xl shadow-black/20";
 
 const badgeByEstado = {
+  // Visual: AL_DIA y PENDIENTE comparten estilo "amarillo"
   PENDIENTE: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
+  AL_DIA: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
   PAGADA: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
   VENCIDA: "bg-rose-500/15 text-rose-300 border border-rose-500/30",
 };
 
 const labelByEstado = {
+  // Este texto casi no se usará ya, pero lo dejamos por compatibilidad
   PENDIENTE: "Pendiente",
+  AL_DIA: "Al día",
   PAGADA: "Pagada",
   VENCIDA: "Vencida",
 };
@@ -127,7 +131,8 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
               Cuponeras de robo
             </h3>
             <p className="text-[11px] text-neutral-400">
-              Cada casillero representa un mes de cobertura de robo.
+              Cada casillero representa un mes de cobertura de robo. Verde = pagado,
+              rosa = vencido, amarillo = al día.
             </p>
           </div>
         </div>
@@ -173,15 +178,23 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
               .map((cupon) => {
                 const baseEstado = (cupon.estado || "PENDIENTE").toUpperCase();
                 const isPagada = baseEstado === "PAGADA";
+
+                const hoy = dayjs();
+                const tieneVto = !!cupon.fecha_vencimiento;
                 const isVencida =
                   !isPagada &&
-                  cupon.fecha_vencimiento &&
-                  dayjs(cupon.fecha_vencimiento).isBefore(dayjs(), "day");
+                  tieneVto &&
+                  dayjs(cupon.fecha_vencimiento).isBefore(hoy, "day");
+
+                // 💡 Lógica nueva:
+                // - PAGADA  → "Pagada"
+                // - no pagada + vencida → "Vencida"
+                // - no pagada + NO vencida → "Al día"
                 const visualEstado = isPagada
                   ? "PAGADA"
                   : isVencida
                   ? "VENCIDA"
-                  : "PENDIENTE";
+                  : "AL_DIA";
 
                 const badgeClass =
                   badgeByEstado[visualEstado] ||
@@ -205,7 +218,8 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                     ? "border-emerald-500/40 bg-emerald-950/40"
                     : visualEstado === "VENCIDA"
                     ? "border-rose-500/40 bg-rose-950/40"
-                    : "border-white/10 bg-neutral-950/60";
+                    : // AL_DIA → tono intermedio (amarillo)
+                      "border-amber-500/40 bg-amber-950/40";
 
                 return (
                   <motion.div
@@ -225,17 +239,19 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                           {visualEstado === "PAGADA" && (
                             <HiBadgeCheck className="h-3 w-3" />
                           )}
-                          {visualEstado === "PENDIENTE" && (
+                          {visualEstado === "AL_DIA" && (
                             <HiClock className="h-3 w-3" />
                           )}
                           {visualEstado === "VENCIDA" && (
                             <HiExclamationCircle className="h-3 w-3" />
                           )}
-                          <span>{labelByEstado[visualEstado] || visualEstado}</span>
+                          <span>
+                            {labelByEstado[visualEstado] || visualEstado}
+                          </span>
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-400">
+                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-200">
                         {cupon.periodo_desde && cupon.periodo_hasta && (
                           <span>
                             {dayjs(cupon.periodo_desde).format("DD/MM/YYYY")} –{" "}
@@ -243,7 +259,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                           </span>
                         )}
                         {cupon.fecha_vencimiento && (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-neutral-300">
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-neutral-100">
                             Vence:{" "}
                             {dayjs(cupon.fecha_vencimiento).format(
                               "DD/MM/YYYY"

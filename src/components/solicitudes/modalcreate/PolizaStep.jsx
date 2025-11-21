@@ -5,13 +5,15 @@ import { motion } from "framer-motion";
 /**
  * Props:
  * - poliza, setPoliza
- * - sinNumero, setSinNumero
+ * - sinNumero, setSinNumero   ← ya no se usan, pero se mantienen en la firma por compatibilidad
  * - companias: Array<string|{id,nombre}>
  * - coberturas: Array<string|{id,nombre}> (pueden venir como enums tipo A_GRUA)
  * - variants (opcional)
  */
 
-const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"].map((x) => ({ id: x, nombre: x }));
+const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"].map(
+  (x) => ({ id: x, nombre: x })
+);
 const OFICINAS = [
   { id: "1", nombre: "5 esquinas (1)" },
   { id: "2", nombre: "axion (2)" },
@@ -19,7 +21,17 @@ const OFICINAS = [
 ];
 
 // Coberturas por defecto (orden oficial)
-const DEFAULT_COBERTURAS = ["A", "A + GRUA", "B", "B1", "C", "C1", "C TOTAL", "C FRANQUICIA"];
+// ✅ Cambios: C1 → C+ | C TOTAL → C MÁXIMA
+const DEFAULT_COBERTURAS = [
+  "A",
+  "A + GRUA",
+  "B",
+  "B1",
+  "C",
+  "C+",
+  "C MÁXIMA",
+  "C FRANQUICIA",
+];
 
 /* ===== cobertura: enum ↔ humano ===== */
 const ENUM_TO_HUMAN = {
@@ -28,8 +40,8 @@ const ENUM_TO_HUMAN = {
   B: "B",
   B1: "B1",
   C: "C",
-  C1: "C1",
-  C_TOTAL: "C TOTAL",
+  C1: "C+",
+  C_TOTAL: "C MÁXIMA",
   C_FRANQUICIA: "C FRANQUICIA",
 };
 function toHumanCoverage(v) {
@@ -54,7 +66,9 @@ function ymdLocal(d) {
   return `${y}-${m}-${day}`;
 }
 function parseYMDLocal(s) {
-  const [y, m, d] = String(s || "").split("-").map(Number);
+  const [y, m, d] = String(s || "")
+    .split("-")
+    .map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d, 12, 0, 0, 0);
 }
@@ -79,8 +93,8 @@ function addMonthsLocal(ymd, months) {
 export default function PolizaStep({
   poliza = {},
   setPoliza = () => {},
-  sinNumero,
-  setSinNumero,
+  sinNumero, // ya no usado
+  setSinNumero, // ya no usado
   companias = [],
   coberturas = DEFAULT_COBERTURAS,
   variants,
@@ -88,7 +102,10 @@ export default function PolizaStep({
   // Set inicial de fecha_emision si falta
   useEffect(() => {
     if (!poliza?.fecha_emision) {
-      setPoliza((prev = {}) => ({ ...prev, fecha_emision: ymdLocal(new Date()) }));
+      setPoliza((prev = {}) => ({
+        ...prev,
+        fecha_emision: ymdLocal(new Date()),
+      }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -104,12 +121,18 @@ export default function PolizaStep({
   const coberturasOpts = useMemo(() => {
     const provided = Array.isArray(coberturas) ? coberturas : [];
     const provHuman = provided.map((op) => {
-      const id = typeof op === "string" ? op : op?.id ?? op?.nombre ?? "";
+      const id =
+        typeof op === "string" ? op : op?.id ?? op?.nombre ?? "";
       const human = toHumanCoverage(id);
       return { id: human, nombre: human };
     });
-    const merged = [...provHuman, ...DEFAULT_COBERTURAS.map((h) => ({ id: h, nombre: h }))];
-    const order = new Map(DEFAULT_COBERTURAS.map((h, i) => [h, i]));
+    const merged = [
+      ...provHuman,
+      ...DEFAULT_COBERTURAS.map((h) => ({ id: h, nombre: h })),
+    ];
+    const order = new Map(
+      DEFAULT_COBERTURAS.map((h, i) => [h, i])
+    );
     const seen = new Set();
     const dedup = merged.filter((o) => {
       const key = String(o.id).trim();
@@ -192,53 +215,29 @@ export default function PolizaStep({
           <Select
             label="Compañía"
             value={poliza?.compania || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, compania: v }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({ ...prev, compania: v }))
+            }
             options={companias}
           />
 
-          <div className="grid gap-1">
-            <Input
-              label={
-                <span className="flex items-center justify-between">
-                  <span>Número de póliza</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !sinNumero;
-                      setSinNumero(next);
-                      if (next && !(poliza?.numero_poliza || "").trim()) {
-                        const temp = genSNNumber(poliza?.patente);
-                        setPoliza((prev = {}) => ({ ...prev, numero_poliza: temp }));
-                      }
-                    }}
-                    className={`text-xs px-2 py-1 rounded-lg border transition ${
-                      sinNumero
-                        ? "bg-emerald-300/90 text-[#0b0f1e] border-emerald-200 hover:brightness-105"
-                        : "bg-white/10 text-white border-white/20 hover:bg-white/20"
-                    }`}
-                    title={sinNumero ? "Usar número definitivo" : "Marcar como sin número (temporal)"}
-                  >
-                    {sinNumero ? "Con número" : "Sin número"}
-                  </button>
-                </span>
-              }
-              value={poliza?.numero_poliza || ""}
-              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, numero_poliza: v }))}
-            />
-            {sinNumero && <span className="text-[11px] text-emerald-200">Se usará un número <b>temporal</b>.</span>}
-          </div>
+          {/* Número de póliza eliminado: ahora lo genera siempre el backend */}
 
           <Select
             label="Cobertura"
             value={poliza?.cobertura || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, cobertura: v }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({ ...prev, cobertura: v }))
+            }
             options={coberturasOpts}
           />
 
           <Select
             label="Oficina"
             value={poliza?.oficina || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, oficina: v }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({ ...prev, oficina: v }))
+            }
             options={OFICINAS}
           />
         </div>
@@ -255,46 +254,87 @@ export default function PolizaStep({
               <li key={it}>{it}</li>
             ))}
           </ul>
-          {requisitos.note ? <p className="mt-2 text-white/70 text-xs">{requisitos.note}</p> : null}
+          {requisitos.note ? (
+            <p className="mt-2 text-white/70 text-xs">{requisitos.note}</p>
+          ) : null}
         </div>
 
         <div className="grid md:grid-cols-2 gap-3 mt-3">
           <Input
             label="Patente"
             value={poliza?.patente || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, patente: v.toUpperCase() }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({
+                ...prev,
+                patente: v.toUpperCase(),
+              }))
+            }
             autoCapitalize="characters"
           />
           <Select
             label="Tipo de vehículo"
             value={poliza?.tipo || "Auto"}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, tipo: v }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({ ...prev, tipo: v }))
+            }
             options={TIPOS_VEHICULO}
           />
-          <Input label="Marca" value={poliza?.marca || ""} onChange={(v) => setPoliza((prev = {}) => ({ ...prev, marca: v }))} />
-          <Input label="Modelo" value={poliza?.modelo || ""} onChange={(v) => setPoliza((prev = {}) => ({ ...prev, modelo: v }))} />
+          <Input
+            label="Marca"
+            value={poliza?.marca || ""}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({ ...prev, marca: v }))
+            }
+          />
+          <Input
+            label="Modelo"
+            value={poliza?.modelo || ""}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({ ...prev, modelo: v }))
+            }
+          />
           <Input
             label="Año"
             value={poliza?.anio || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, anio: v.replace(/\D/g, "") }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({
+                ...prev,
+                anio: v.replace(/\D/g, ""),
+              }))
+            }
             inputMode="numeric"
           />
           <Input
             label="Fecha de emisión"
             type="date"
             value={poliza?.fecha_emision || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, fecha_emision: v }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({
+                ...prev,
+                fecha_emision: v,
+              }))
+            }
           />
           <Input
             label="Primer vencimiento"
             type="date"
             value={poliza?.primer_vencimiento || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, primer_vencimiento: v }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({
+                ...prev,
+                primer_vencimiento: v,
+              }))
+            }
           />
           <Input
             label="Días a vencer (meta interna)"
             value={poliza?.dias_a_vencer ?? 30}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, dias_a_vencer: v.replace(/\D/g, "") }))}
+            onChange={(v) =>
+              setPoliza((prev = {}) => ({
+                ...prev,
+                dias_a_vencer: v.replace(/\D/g, ""),
+              }))
+            }
             inputMode="numeric"
           />
         </div>
@@ -311,9 +351,15 @@ function Toggle({ label, checked, onChange }) {
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex w-12 h-7 rounded-full transition ${checked ? "bg-emerald-300" : "bg-white/20"}`}
+        className={`relative inline-flex w-12 h-7 rounded-full transition ${
+          checked ? "bg-emerald-300" : "bg-white/20"
+        }`}
       >
-        <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${checked ? "translate-x-5" : ""}`} />
+        <span
+          className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+            checked ? "translate-x-5" : ""
+          }`}
+        />
       </button>
     </label>
   );
@@ -346,14 +392,18 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
       />
-      {helper ? <span className="mt-1 block text-xs text-white/65">{helper}</span> : null}
+      {helper ? (
+        <span className="mt-1 block text-xs text-white/65">{helper}</span>
+      ) : null}
     </label>
   );
 }
 
 function Select({ label, value, onChange, options = [], className = "" }) {
   const normalized = Array.isArray(options)
-    ? options.map((op) => (typeof op === "string" ? { id: op, nombre: op } : op))
+    ? options.map((op) =>
+        typeof op === "string" ? { id: op, nombre: op } : op
+      )
     : [];
   return (
     <label className={`text-sm ${className}`}>
@@ -368,26 +418,19 @@ function Select({ label, value, onChange, options = [], className = "" }) {
         >
           <option value="">— Seleccionar —</option>
           {normalized.map((op) => (
-            <option key={op.id} value={op.id} className="bg-[#0f1324] text-white">
+            <option
+              key={op.id}
+              value={op.id}
+              className="bg-[#0f1324] text-white"
+            >
               {op.nombre || op.id}
             </option>
           ))}
         </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">▾</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">
+          ▾
+        </span>
       </div>
     </label>
   );
-}
-
-/* ===== Helpers ===== */
-function genSNNumber(patente = "") {
-  const base = String(patente || "SN").replace(/[^A-Z0-9]/gi, "").slice(0, 8).toUpperCase();
-  const ts = new Date();
-  const stamp =
-    ts.getFullYear().toString() +
-    String(ts.getMonth() + 1).padStart(2, "0") +
-    String(ts.getDate()).padStart(2, "0") +
-    String(ts.getHours()).padStart(2, "0") +
-    String(ts.getMinutes()).padStart(2, "0");
-  return `SN-${base || "TEMP"}-${stamp}`;
 }

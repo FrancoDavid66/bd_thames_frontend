@@ -1,8 +1,36 @@
 // src/services/solicitudes.js
 // Servicio para Solicitudes + Documentos + Empleados (catálogo)
 
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8000/api")
-  .replace(/\/+$/, "");
+/* ===================== URL helpers ===================== */
+function normalizeBase(raw) {
+  if (!raw) return "";
+  let base = String(raw).trim();
+  base = base.replace(/\s+$/g, "").replace(/\/+$/g, "");
+  base = base.replace(/\/api$/i, ""); // saco /api si vino incluido
+  try {
+    const u = new URL(base);
+    const isHttp = u.protocol === "http:";
+    const isLocal = /^http:\/\/(localhost|127(\.\d+){0,3}|.*\.local)(:\d+)?$/i.test(base);
+    if (typeof window !== "undefined" && window.location.protocol === "https:" && isHttp && !isLocal) {
+      u.protocol = "https:";
+      base = u.toString().replace(/\/+$/g, "");
+    }
+  } catch {
+    // ignore base rara
+  }
+  return base;
+}
+
+const ENV_BASE =
+  (typeof import.meta !== "undefined" &&
+    import.meta?.env?.VITE_API_URL &&
+    String(import.meta.env.VITE_API_URL).trim()) ||
+  "";
+
+const ROOT = normalizeBase(ENV_BASE);
+// 👇 Acá unificamos: siempre /api como prefijo
+const API_BASE = ROOT ? `${ROOT}/api` : "/api";
+
 const API  = `${API_BASE}/solicitudes`;
 const DOCS = `${API_BASE}/documentos`;
 const EMP  = `${API_BASE}/empleados`;

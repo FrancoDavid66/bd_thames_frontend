@@ -13,7 +13,7 @@ function normalizeBase(raw) {
       u.protocol = "https:";
       base = u.toString().replace(/\/+$/g, "");
     }
-  } catch {/* ignore bad base */}
+  } catch {/* ignore bad base */ }
   return base;
 }
 
@@ -80,11 +80,17 @@ async function jsonOrThrow(res, opName = "") {
     err.status = res.status;
     err.url = res.url;
     err.op = opName;
-    try { err.requestId = res.headers?.get?.("X-Request-Id") || res.headers?.get?.("x-request-id") || null; } catch {}
+    try {
+      err.requestId = res.headers?.get?.("X-Request-Id") || res.headers?.get?.("x-request-id") || null;
+    } catch { }
 
     if (import.meta?.env?.DEV) {
       console.error(`[API] ${opName || "request"} failed`, {
-        status: res.status, url: res.url, msg, data: err.payload, requestId: err.requestId,
+        status: res.status,
+        url: res.url,
+        msg,
+        data: err.payload,
+        requestId: err.requestId,
       });
     }
     throw err;
@@ -136,11 +142,11 @@ function normalizeFotosResponse(data) {
 }
 
 /* ===================== Endpoints base ===================== */
-const SOL_BASE       = joinUrl(API_BASE, "solicitudes");
-const DOCS_BASE      = joinUrl(API_BASE, "documentos");
-const EMP_BASE       = joinUrl(API_BASE, "empleados");
-const POL_BASE       = joinUrl(API_BASE, "polizas");
-const POL_DOCS_BASE  = joinUrl(POL_BASE, "documentos");
+const SOL_BASE = joinUrl(API_BASE, "solicitudes");
+const DOCS_BASE = joinUrl(API_BASE, "documentos");
+const EMP_BASE = joinUrl(API_BASE, "empleados");
+const POL_BASE = joinUrl(API_BASE, "polizas");
+const POL_DOCS_BASE = joinUrl(POL_BASE, "documentos");
 const POL_FOTOS_BASE = joinUrl(POL_BASE, "fotos");
 
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
@@ -171,7 +177,9 @@ export const SolicitudesAPI = {
     });
     return jsonOrThrow(r, "solicitudes.patch");
   },
-  async update(id, payload) { return this.patch(id, payload); },
+  async update(id, payload) {
+    return this.patch(id, payload);
+  },
   async remove(id) {
     const r = await fetch(`${SOL_BASE}/${id}/`, { method: "DELETE", headers: { Accept: "application/json" } });
     if (r.status === 204) return true;
@@ -213,12 +221,16 @@ export const SolicitudesAPI = {
     return jsonOrThrow(r, "polizas.getById");
   },
   async listPolizaDocumentos(polizaId, params = {}) {
-    const r = await fetch(`${POL_DOCS_BASE}/${qsFrom({ poliza: polizaId, ...params })}`, { headers: { Accept: "application/json" } });
+    const r = await fetch(`${POL_DOCS_BASE}/${qsFrom({ poliza: polizaId, ...params })}`, {
+      headers: { Accept: "application/json" },
+    });
     const data = await jsonOrThrow(r, "polizas.listDocumentos");
     return normalizeDocsResponse(data);
   },
   async listPolizaFotos(polizaId, params = {}) {
-    const r = await fetch(`${POL_FOTOS_BASE}/${qsFrom({ poliza: polizaId, ...params })}`, { headers: { Accept: "application/json" } });
+    const r = await fetch(`${POL_FOTOS_BASE}/${qsFrom({ poliza: polizaId, ...params })}`, {
+      headers: { Accept: "application/json" },
+    });
     const data = await jsonOrThrow(r, "polizas.listFotos");
     return normalizeFotosResponse(data);
   },
@@ -270,7 +282,9 @@ export const SolicitudesAPI = {
     const r = await fetch(`${SOL_BASE}/resumen/`, { headers: { Accept: "application/json" } });
     return jsonOrThrow(r, "solicitudes.resumen");
   },
-  comprobantePngUrl(id) { return `${SOL_BASE}/${id}/comprobante_png/`; },
+  comprobantePngUrl(id) {
+    return `${SOL_BASE}/${id}/comprobante_png/`;
+  },
   async descargarComprobantePng(id) {
     const r = await fetch(`${SOL_BASE}/${id}/comprobante_png/`, { method: "GET" });
     if (!r.ok) {

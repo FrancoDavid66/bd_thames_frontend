@@ -56,7 +56,14 @@ const ClientesPage = () => {
 
   // Traemos “todo” (page 1 con page_size grande) y dejamos que la tabla pagina en LOCAL
   useEffect(() => {
-    dispatch(fetchClientes({ page: 1, page_size: FETCH_ALL_PAGE_SIZE, search, estado }));
+    dispatch(
+      fetchClientes({
+        page: 1,
+        page_size: FETCH_ALL_PAGE_SIZE,
+        search,
+        estado,
+      })
+    );
   }, [dispatch, search, estado]);
 
   // Modales locales
@@ -65,8 +72,9 @@ const ClientesPage = () => {
   const [modalCrearAbierto, setModalCrearAbierto] = React.useState(false);
 
   return (
-    <AnimatedDiv className="p-8 space-y-6 bg-gray-800 text-white rounded-lg shadow-xl">
-      <AnimatedDiv className="flex items-center justify-between mb-6">
+    <AnimatedDiv className="h-full flex flex-col p-8 bg-gray-800 text-white rounded-lg shadow-xl">
+      {/* Header fijo */}
+      <AnimatedDiv className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold">
           Clientes Registrados ({totalMostrado})
         </h1>
@@ -79,48 +87,67 @@ const ClientesPage = () => {
         </motion.button>
       </AnimatedDiv>
 
-      <ClientesFilter
-        onFilterText={handleBuscar}
-        onFilterEstado={handleFiltrarEstado}
-      />
+      {/* Filtros fijos arriba */}
+      <div className="mb-4">
+        <ClientesFilter
+          onFilterText={handleBuscar}
+          onFilterEstado={handleFiltrarEstado}
+        />
+      </div>
 
-      {status === 'loading' && <p className="text-blue-400">Cargando clientes...</p>}
+      {/* Contenido scrollable */}
+      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+        {status === 'loading' && (
+          <p className="text-blue-400">Cargando clientes...</p>
+        )}
 
-      {status === 'failed' && (
-        <AnimatedDiv className="text-red-500 flex items-center gap-2">
-          <p>Error al cargar clientes.</p>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            onClick={() =>
-              dispatch(fetchClientes({ page: 1, page_size: FETCH_ALL_PAGE_SIZE, search, estado }))
-            }
-            className="text-blue-400 underline"
-          >
-            Reintentar
-          </motion.button>
-        </AnimatedDiv>
-      )}
+        {status === 'failed' && (
+          <AnimatedDiv className="text-red-500 flex items-center gap-2">
+            <p>Error al cargar clientes.</p>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              onClick={() =>
+                dispatch(
+                  fetchClientes({
+                    page: 1,
+                    page_size: FETCH_ALL_PAGE_SIZE,
+                    search,
+                    estado,
+                  })
+                )
+              }
+              className="text-blue-400 underline"
+            >
+              Reintentar
+            </motion.button>
+          </AnimatedDiv>
+        )}
 
-      {status === 'succeeded' && clientes.length > 0 && (
-        <>
-          {/* MODO LOCAL: no pasamos page/total/onPageChange, la tabla pagina sola */}
-          <ClientesTable
-            clientes={clientes}
-            showFooter={true}
-          />
-        </>
-      )}
+        {status === 'succeeded' && clientes.length > 0 && (
+          <>
+            {/* MODO LOCAL: no pasamos page/total/onPageChange, la tabla pagina sola */}
+            <ClientesTable clientes={clientes} showFooter={true} />
+          </>
+        )}
 
-      {status === 'succeeded' && clientes.length === 0 && (
-        <p className="text-gray-400">No hay clientes que coincidan con la búsqueda.</p>
-      )}
+        {status === 'succeeded' && clientes.length === 0 && (
+          <p className="text-gray-400">
+            No hay clientes que coincidan con la búsqueda.
+          </p>
+        )}
+      </div>
 
+      {/* Modales */}
       <ConfirmModal
         isOpen={!!clienteAEliminar}
         onClose={() => setClienteAEliminar(null)}
-        nombre={`${clienteAEliminar?.nombre ?? ''} ${clienteAEliminar?.apellido ?? ''}`}
+        nombre={`${clienteAEliminar?.nombre ?? ''} ${
+          clienteAEliminar?.apellido ?? ''
+        }`}
         onConfirm={() =>
-          dispatch(deleteCliente(clienteAEliminar.id)).finally(() => setClienteAEliminar(null))
+          dispatch(deleteCliente(clienteAEliminar.id)).finally(() =>
+            setClienteAEliminar(null)
+          )
         }
       />
 
@@ -135,7 +162,14 @@ const ClientesPage = () => {
         isOpen={modalCrearAbierto}
         onClose={() => setModalCrearAbierto(false)}
         onSuccess={() =>
-          dispatch(fetchClientes({ page: 1, page_size: FETCH_ALL_PAGE_SIZE, search, estado }))
+          dispatch(
+            fetchClientes({
+              page: 1,
+              page_size: FETCH_ALL_PAGE_SIZE,
+              search,
+              estado,
+            })
+          )
         }
       />
     </AnimatedDiv>

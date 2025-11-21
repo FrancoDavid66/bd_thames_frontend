@@ -40,7 +40,10 @@ function addMonthsLocal(ymd, months) {
   return ymdLocal(new Date(y2, m2, day2, 12, 0, 0, 0));
 }
 
-const rmDiacritics = (s = "") => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const rmDiacritics = (s = "") =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+// ✅ Mapeo humano → enum (incluye nuevas etiquetas C+ / C MÁXIMA)
 const COBERTURA_MAP = {
   A: "A",
   "A + GRUA": "A_GRUA",
@@ -48,27 +51,22 @@ const COBERTURA_MAP = {
   B1: "B1",
   C: "C",
   C1: "C1",
+  "C1": "C1",
+  "C+": "C1",
+  "C +": "C1",
   "C TOTAL": "C_TOTAL",
+  "C TOTAL ": "C_TOTAL",
+  "C MAXIMA": "C_TOTAL",
+  "C MÁXIMA": "C_TOTAL",
   "C FRANQUICIA": "C_FRANQUICIA",
   "C FRANQUISCIA": "C_FRANQUICIA",
 };
+
 const normalizeCobertura = (v = "") => {
   const k = String(v).trim().toUpperCase();
   if (COBERTURA_MAP[k]) return COBERTURA_MAP[k];
   return k.replace(/\s+/g, "_").replace(/__+/g, "_");
 };
-
-function genSNNumber(patente = "") {
-  const base = String(patente || "SN").replace(/[^A-Z0-9]/gi, "").slice(0, 8).toUpperCase();
-  const ts = new Date();
-  const stamp =
-    ts.getFullYear().toString() +
-    String(ts.getMonth() + 1).padStart(2, "0") +
-    String(ts.getDate()).padStart(2, "0") +
-    String(ts.getHours()).padStart(2, "0") +
-    String(ts.getMinutes()).padStart(2, "0");
-  return `SN-${base || "TEMP"}-${stamp}`;
-}
 
 const COMPANY_CUOTAS_DEFAULT = {
   agrosalta: 6,
@@ -81,10 +79,12 @@ const COMPANY_CUOTAS_DEFAULT = {
 };
 
 function firstFieldErrors(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+  if (!payload || typeof payload !== "object" || Array.isArray(payload))
+    return [];
   const out = [];
   Object.entries(payload).forEach(([k, v]) => {
-    if (k === "detail" || k === "message" || k === "error" || k === "detalle") return;
+    if (k === "detail" || k === "message" || k === "error" || k === "detalle")
+      return;
     const txt =
       Array.isArray(v) ? v.join(" ")
       : typeof v === "string" ? v
@@ -176,7 +176,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     dias_a_vencer: 30,
     generar_cuotas_ahora: true,
   });
-  const [sinNumero, setSinNumero] = useState(false);
+  const [sinNumero, setSinNumero] = useState(false); // compat, pero ya no se exige número
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -213,7 +213,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
   // ==== Fechas / cuotas ====
   useEffect(() => {
     if (!poliza.fecha_emision) return;
-    setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
+    setPoliza((s) => ({
+      ...s,
+      primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1),
+    }));
   }, [poliza.fecha_emision]);
 
   useEffect(() => {
@@ -221,14 +224,18 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     if (!raw || tocoCantidadCuotas) return;
     const key = rmDiacritics(raw).toLowerCase();
     const cant = COMPANY_CUOTAS_DEFAULT[key];
-    if (cant) setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(cant) }));
+    if (cant)
+      setPoliza((s) => ({
+        ...s,
+        cantidad_cuotas_override: String(cant),
+      }));
   }, [poliza.compania, tocoCantidadCuotas]);
 
   // ==== Validación solo de datos de póliza (para habilitar paso 2) ====
   const baseErrors = useMemo(() => {
     const e = {};
     if (!poliza.compania.trim()) e.compania = "Requerido";
-    if (!sinNumero && !poliza.numero_poliza.trim()) e.numero_poliza = "Requerido";
+    // ⛔️ YA NO exigimos número de póliza: lo genera el backend
     if (!poliza.cobertura.trim()) e.cobertura = "Requerido";
     if (!poliza.oficina.trim()) e.oficina = "Requerido";
     if (!poliza.patente.trim()) e.patente = "Requerido";
@@ -239,7 +246,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     if (!poliza.fecha_emision) e.fecha_emision = "Requerido";
     // ⛔️ Ya NO exigimos precio_cuota, porque puede ir 0 / default en backend
     return e;
-  }, [poliza, sinNumero]);
+  }, [poliza]);
 
   const canGoToFotos = useMemo(
     () => Object.keys(baseErrors).length === 0,
@@ -285,9 +292,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
   // ==== Validación global para SUBMIT (datos + fotos/docs) ====
   const canSubmit = useMemo(
     () =>
-      !saving &&
-      Object.keys(baseErrors).length === 0 &&
-      !docsFotosError,
+      !saving && Object.keys(baseErrors).length === 0 && !docsFotosError,
     [baseErrors, docsFotosError, saving]
   );
 
@@ -338,10 +343,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
       const payload = {
         cliente_id: Number(clienteId),
         compania: poliza.compania.trim(),
-        numero_poliza:
-          sinNumero && !poliza.numero_poliza.trim()
-            ? genSNNumber(poliza.patente)
-            : poliza.numero_poliza.trim(),
+
+        // ✅ Si viene número, lo mandamos. Si no, dejamos que el backend lo genere.
+        numero_poliza: poliza.numero_poliza.trim() || undefined,
+
         cobertura: normalizeCobertura(poliza.cobertura),
         oficina: poliza.oficina.trim(),
         patente: poliza.patente.trim().toUpperCase(),
@@ -352,7 +357,8 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
 
         // ⬇️ Si hay precio cargado, lo mandamos; si no, dejamos que el backend lo ponga en 0 / default
         precio_cuota:
-          poliza.generar_cuotas_ahora && String(poliza.precio_cuota).trim()
+          poliza.generar_cuotas_ahora &&
+          String(poliza.precio_cuota).trim()
             ? Number(poliza.precio_cuota)
             : undefined,
 
@@ -432,8 +438,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
         raw?.poliza?.cuotas?.[0]?.id ??
         null;
 
-      const polizaIdResp = raw?.id ?? raw?.poliza_id ?? raw?.poliza?.id ?? null;
-      const clienteIdResp = raw?.cliente_id ?? (clienteId ? Number(clienteId) : null);
+      const polizaIdResp =
+        raw?.id ?? raw?.poliza_id ?? raw?.poliza?.id ?? null;
+      const clienteIdResp =
+        raw?.cliente_id ?? (clienteId ? Number(clienteId) : null);
 
       toast.success("Póliza creada y asociada al cliente");
 
@@ -448,7 +456,11 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
 
       onClose?.();
     } catch (e) {
-      console.error("[PolizaCreateModal] Error creando póliza:", e?.message, e?.payload);
+      console.error(
+        "[PolizaCreateModal] Error creando póliza:",
+        e?.message,
+        e?.payload
+      );
       const msg = e?.message || "No se pudo crear la póliza";
       const lines = firstFieldErrors(e?.payload);
       if (lines.length) lines.slice(0, 6).forEach((ln) => toast.error(ln));
@@ -471,8 +483,19 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     const src =
       Array.isArray(coberturas) && coberturas.length
         ? coberturas
-        : ["A", "A + GRUA", "B", "B1", "C", "C1", "C TOTAL", "C FRANQUICIA"];
-    const asObjects = src.map((op) => (typeof op === "string" ? { id: op, nombre: op } : op));
+        : [
+            "A",
+            "A + GRUA",
+            "B",
+            "B1",
+            "C",
+            "C+",
+            "C MÁXIMA",
+            "C FRANQUICIA",
+          ];
+    const asObjects = src.map((op) =>
+      typeof op === "string" ? { id: op, nombre: op } : op
+    );
     const seen = new Set();
     const out = [];
     for (const op of asObjects) {
@@ -510,7 +533,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                   Nueva póliza
                 </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Paso {step} de 2 · {step === 1 ? "Datos de póliza y vehículo" : "Fotos y documentación"}
+                  Paso {step} de 2 ·{" "}
+                  {step === 1
+                    ? "Datos de póliza y vehículo"
+                    : "Fotos y documentación"}
                 </p>
               </div>
               <button
@@ -585,7 +611,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
             <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between gap-3">
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {step === 1 && !canGoToFotos && (
-                  <span>Completá los datos básicos de la póliza para continuar con las fotos.</span>
+                  <span>
+                    Completá los datos básicos de la póliza para continuar con
+                    las fotos.
+                  </span>
                 )}
                 {step === 2 && docsFotosError && (
                   <span>{docsFotosError}</span>
@@ -597,7 +626,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                   type="button"
                   onClick={() => !saving && onClose?.()}
                   disabled={saving}
-                  className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
+                  className="px-4 py-2 rounded-xl bg-black/5 dark:bg:white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
                 >
                   Cancelar
                 </button>
@@ -607,7 +636,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     type="button"
                     onClick={() => setStep(1)}
                     disabled={saving}
-                    className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
+                    className="px-4 py-2 rounded-xl bg-black/5 dark:bg:white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
                   >
                     Volver a datos
                   </button>
@@ -618,7 +647,9 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     type="button"
                     onClick={() => {
                       if (!canGoToFotos) {
-                        toast.error("Completá los datos de la póliza antes de seguir");
+                        toast.error(
+                          "Completá los datos de la póliza antes de seguir"
+                        );
                         return;
                       }
                       setStep(2);

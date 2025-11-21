@@ -13,15 +13,38 @@ const TEXT = "#111827";          // slate-900
 const MUTED_BG = "#FBEFF3";      // fondo muy claro con tinte bordó
 
 /* Utils */
-const safe = (v, d = "—") => (v === null || v === undefined || v === "" ? d : String(v));
+const safe = (v, d = "—") =>
+  v === null || v === undefined || v === "" ? d : String(v);
+
+/**
+ * Formatea fechas SIN romper por timezone.
+ * - Si viene "YYYY-MM-DD" → la formatea a "DD/MM/YYYY" manualmente (sin Date).
+ * - Si viene Date o algo raro → intenta construir un Date y devolver DD/MM/YYYY.
+ */
 const fmtDate = (d) => {
+  if (!d) return "—";
   try {
-    const dt = d ? new Date(d) : null;
-    return dt ? dt.toLocaleDateString("es-AR") : "—";
+    if (typeof d === "string") {
+      const dateStr = d.slice(0, 10); // soporta "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm..."
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const [yyyy, mm, dd] = parts;
+        if (yyyy && mm && dd) {
+          return `${dd.padStart(2, "0")}/${mm.padStart(2, "0")}/${yyyy}`;
+        }
+      }
+    }
+    const dt = d instanceof Date ? d : new Date(d);
+    if (Number.isNaN(dt.getTime())) return "—";
+    const day = String(dt.getDate()).padStart(2, "0");
+    const month = String(dt.getMonth() + 1).padStart(2, "0");
+    const year = dt.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return "—";
   }
 };
+
 const fmtMoney = (n) => {
   try {
     const num = Number(n || 0);
@@ -176,7 +199,9 @@ const FacturaCuotaPDF = ({ cliente, poliza, cuota }) => {
   const fechaPago = fmtDate(cuota.fecha_pago);
 
   const subtotal = Number(
-    cuota.subtotal !== undefined && cuota.subtotal !== null ? cuota.subtotal : cuota.monto || 0
+    cuota.subtotal !== undefined && cuota.subtotal !== null
+      ? cuota.subtotal
+      : cuota.monto || 0
   );
   const recargo = Number(cuota.recargo || 0);
   const descuento = Number(cuota.descuento || 0);
@@ -191,7 +216,9 @@ const FacturaCuotaPDF = ({ cliente, poliza, cuota }) => {
         {/* Encabezado con subtítulo solicitado */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>FACTURA</Text>
-          <Text style={styles.headerSubtitle}>Factura por servicios jurídicos y seguros</Text>
+          <Text style={styles.headerSubtitle}>
+            Factura por servicios jurídicos y seguros
+          </Text>
         </View>
 
         {/* Bloque destacado de vencimiento */}

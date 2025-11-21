@@ -55,20 +55,23 @@ function addMonthsLocal(ymd,months){
 
 // ===== Slots
 // Papeles del vehículo (para UI)
+// A (RC pura): cédula frente requerida, dorso opcional
 const DOC_SLOT_RC = [
   { key:"CEDULA_VERDE_FRENTE", label:"Cédula verde (frente)"},
-  // (antes incluía más, ahora RC puro solo muestra esta)
+  { key:"CEDULA_VERDE_DORSO",  label:"Cédula verde (dorso)"},
 ];
 
-// Para A + GRÚA (cedula frente + VTV)
+// Para A + GRÚA (cédula frente + VTV; dorso opcional)
 const DOC_SLOT_A_GRUA = [
   { key:"CEDULA_VERDE_FRENTE", label:"Cédula verde (frente)"},
+  { key:"CEDULA_VERDE_DORSO",  label:"Cédula verde (dorso)"},
   { key:"VTV",                 label:"VTV"},
 ];
 
-// Full (otras coberturas): lista amplia
+// Full (otras coberturas): lista amplia, con dorso
 const DOC_SLOT_FULL = [
   { key:"CEDULA_VERDE_FRENTE", label:"Cédula verde (frente)"},
+  { key:"CEDULA_VERDE_DORSO",  label:"Cédula verde (dorso)"},
   { key:"TITULO",              label:"Título del vehículo"},
   { key:"OBLEA_GNC",           label:"Oblea GNC"},
   { key:"VTV",                 label:"VTV"},
@@ -115,12 +118,6 @@ function normalizaTelefonoAR(raw){
   if(d.startsWith("0")) d=d.slice(1);
   if(d.startsWith("15") && d.length>=10) d=d.slice(2);
   return d;
-}
-function genSNNumber(patente=""){
-  const base=String(patente||"SN").replace(/[^A-Z0-9]/gi,"").slice(0,8).toUpperCase();
-  const ts=new Date();
-  const stamp=ts.getFullYear().toString()+String(ts.getMonth()+1).padStart(2,"0")+String(ts.getDate()).padStart(2,"0")+String(ts.getHours()).padStart(2,"0")+String(ts.getMinutes()).padStart(2,"0");
-  return `SN-${base||"TEMP"}-${stamp}`;
 }
 
 /* =====================  Componente  ===================== */
@@ -228,7 +225,7 @@ export default function CreateSolicitudModal({
     const e={};
     if (polizaModo==="existente"){ if(!String(polizaId).trim()) e.polizaId="ID requerido"; return e; }
     if(!poliza.compania.trim()) e.compania="Requerido";
-    if(!sinNumero && !poliza.numero_poliza.trim()) e.numero_poliza="Requerido";
+    // ❌ YA NO exigimos número de póliza desde el front; lo genera el backend
     if(!poliza.cobertura.trim()) e.cobertura="Requerido";
     if(!poliza.oficina.trim()) e.oficina="Requerido";
     if(!poliza.patente.trim()) e.patente="Requerido";
@@ -238,7 +235,7 @@ export default function CreateSolicitudModal({
     if(!poliza.primer_vencimiento) e.primer_vencimiento="Requerido";
     // ❌ Ya no obligamos precio_cuota para generar cuotas
     return e;
-  },[polizaModo, poliza, sinNumero]);
+  },[polizaModo, poliza]); // sinNumero ya no influye en errores
 
   const responsableOk = Boolean(String(responsableId).trim());
   const canNext1 = Object.keys(paso1Errors).length===0;
@@ -315,12 +312,12 @@ export default function CreateSolicitudModal({
       if (polizaModo==="existente"){
         payload.poliza = { modo:"existente", id:Number(polizaId) };
       } else {
-        let numero = poliza.numero_poliza.trim();
-        if (sinNumero && !numero) numero = genSNNumber(poliza.patente);
+        // ⬇️ Ya no generamos número en el front ni lo mandamos:
+        // el backend (modelo Poliza) lo genera automáticamente.
         payload.poliza = {
           modo:"nueva",
           compania: poliza.compania.trim(),
-          numero_poliza: numero,
+          // numero_poliza: se omite → lo genera el backend
           cobertura: normalizeCobertura(poliza.cobertura),
           oficina: poliza.oficina.trim(),
           patente: poliza.patente.trim().toUpperCase(),
@@ -498,7 +495,7 @@ export default function CreateSolicitudModal({
             </h3>
             <div className="flex items-center gap-2">
               {Boolean(String(responsableId).trim()) && (
-                <span className="hidden lg:inline-flex items-center gap-2 text-[11px] px-2 py-1 rounded-lg border border-white/15 text:white/90 bg-white/5">
+                <span className="hidden lg:inline-flex items-center gap-2 text-[11px] px-2 py-1 rounded-lg border border-white/15 text:white/90 bg:white/5">
                   <HiUser className="opacity-80" />
                   <b>Responsable:</b> #{responsableId}
                   <button type="button" onClick={()=>setAskResponsable(true)} className="ml-1 text-white/90 underline underline-offset-2 hover:text-white" title="Cambiar responsable">
@@ -507,7 +504,7 @@ export default function CreateSolicitudModal({
                 </span>
               )}
               <button ref={closeBtnRef} onClick={()=> !saving && onClose?.()} disabled={saving} className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg:white/10 hover:bg-white/20 disabled:opacity-50 transition" aria-label="Cerrar">
-                <HiX className="text-lg text-white" />
+                <HiX className="text-lg text:white" />
               </button>
             </div>
           </div>
@@ -554,6 +551,7 @@ export default function CreateSolicitudModal({
                   sinNumero={sinNumero} setSinNumero={setSinNumero}
                   companias={companias} coberturas={coberturasOpts}
                   setTocoCantidadCuotas={setTocoCantidadCuotas}
+                  cuotasPreview={cuotasPreview}
                 />
               </motion.div>
             )}

@@ -21,16 +21,15 @@ const http = axios.create({
 });
 
 const badgeByEstado = {
-  PENDIENTE:
-    "bg-amber-500/15 text-amber-300 border border-amber-500/30",
-  PAGADA:
-    "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
-  VENCIDA:
-    "bg-rose-500/15 text-rose-300 border border-rose-500/30",
+  PENDIENTE: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
+  AL_DIA: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
+  PAGADA: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
+  VENCIDA: "bg-rose-500/15 text-rose-300 border border-rose-500/30",
 };
 
 const labelByEstado = {
   PENDIENTE: "Pendiente",
+  AL_DIA: "Al día",
   PAGADA: "Pagada",
   VENCIDA: "Vencida",
 };
@@ -51,23 +50,51 @@ function formatPeriodo(c) {
   return `${desde.format("MM/YYYY")} – ${hasta.format("MM/YYYY")}`;
 }
 
-function getRowTone(c) {
-  const estado = (c?.estado || "").toUpperCase();
-  if (estado !== "PENDIENTE") return "";
+// 👇 Normalizamos el estado visual igual que en el panel de cuponeras
+function getVisualEstado(c) {
+  const baseEstado = (c?.estado || "").toUpperCase();
+
+  // Pagada siempre es pagada
+  if (baseEstado === "PAGADA") return "PAGADA";
 
   const hoy = dayjs().startOf("day");
+
+  if (!c?.fecha_vencimiento) {
+    // Sin vencimiento: lo tratamos como al día
+    return "AL_DIA";
+  }
+
+  const vto = dayjs(c.fecha_vencimiento);
+  if (!vto.isValid()) {
+    // Si el vto viene raro, devolvemos el estado original o PENDIENTE
+    return baseEstado || "PENDIENTE";
+  }
+
+  const diff = vto.diff(hoy, "day");
+  if (diff < 0) {
+    return "VENCIDA";
+  }
+
+  // No pagada + no vencida => AL_DIA
+  return "AL_DIA";
+}
+
+// 🎨 Tono de fila según vencimiento
+function getRowTone(c) {
+  const visual = getVisualEstado(c);
+  const hoy = dayjs().startOf("day");
+
   if (!c.fecha_vencimiento) return "";
 
   const vto = dayjs(c.fecha_vencimiento);
   if (!vto.isValid()) return "";
 
   const diff = vto.diff(hoy, "day");
-  if (diff < 0) {
-    // vencido
+
+  if (visual === "VENCIDA") {
     return "bg-rose-500/5";
   }
-  if (diff <= 7) {
-    // por vencer <= 7 días
+  if (visual === "AL_DIA" && diff <= 7 && diff >= 0) {
     return "bg-amber-500/5";
   }
   return "";
@@ -85,31 +112,37 @@ export default function CuponerasPage() {
   const stats = useMemo(() => {
     const hoy = dayjs().startOf("day");
     let total = 0;
-    let totalPendientes = 0;
+    let totalPendientes = 0; // 🔁 ahora significa "AL DÍA" (no pagado y no vencido)
     let porVencer7 = 0;
     let vencidas = 0;
 
     for (const c of cupones || []) {
       total += 1;
-      const estado = (c.estado || "").toUpperCase();
-      if (estado === "PAGADA") continue;
+      const visual = getVisualEstado(c);
+
+      if (visual === "PAGADA") continue;
 
       const vto = c.fecha_vencimiento ? dayjs(c.fecha_vencimiento) : null;
-      if (estado === "PENDIENTE") {
+
+      if (visual === "VENCIDA") {
+        vencidas += 1;
+        continue;
+      }
+
+      if (visual === "AL_DIA") {
         totalPendientes += 1;
         if (vto && vto.isValid()) {
           const diff = vto.diff(hoy, "day");
-          if (diff < 0) vencidas += 1;
-          else if (diff <= 7) porVencer7 += 1;
+          if (diff <= 7 && diff >= 0) {
+            porVencer7 += 1;
+          }
         }
-      } else if (estado === "VENCIDA") {
-        vencidas += 1;
       }
     }
 
     return {
       total,
-      totalPendientes,
+      totalPendientes, // = cupones vigentes al día
       porVencer7,
       vencidas,
     };
@@ -180,9 +213,7 @@ export default function CuponerasPage() {
             className="inline-flex items-center gap-2 rounded-full bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800/40 text-white px-4 py-2 text-sm font-medium shadow-sm shadow-sky-900/40 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
           >
             <HiRefresh
-              className={`h-4 w-4 ${
-                loading ? "animate-spin" : ""
-              }`}
+              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
             />
             {loading ? "Actualizando..." : "Actualizar"}
           </button>
@@ -206,13 +237,13 @@ export default function CuponerasPage() {
           </div>
         </motion.div>
 
-        {/* Pendientes */}
+        {/* Al día (no pagados y no vencidos) */}
         <motion.div
           layout
           className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 shadow-sm shadow-emerald-900/40 p-4 flex flex-col gap-1"
         >
           <span className="text-xs uppercase tracking-[0.15em] text-emerald-300">
-            Pendientes
+            Al día (no pagados)
           </span>
           <div className="flex items-center justify-between mt-1">
             <span className="text-2xl font-semibold text-emerald-200">
@@ -328,12 +359,16 @@ export default function CuponerasPage() {
               )}
 
               {cupones.map((c) => {
-                const estado = (c.estado || "").toUpperCase();
+                const visual = getVisualEstado(c);
                 const badgeClass =
-                  badgeByEstado[estado] ||
+                  badgeByEstado[visual] ||
                   "bg-slate-500/15 text-slate-200 border border-slate-500/30";
-                const label = labelByEstado[estado] || estado || "—";
+                const label = labelByEstado[visual] || visual || "—";
                 const tone = getRowTone(c);
+
+                let Icon = HiClock;
+                if (visual === "PAGADA") Icon = HiBadgeCheck;
+                if (visual === "VENCIDA") Icon = HiExclamation;
 
                 return (
                   <tr
@@ -377,7 +412,7 @@ export default function CuponerasPage() {
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${badgeClass}`}
                       >
-                        <HiBadgeCheck className="h-3 w-3" />
+                        <Icon className="h-3 w-3" />
                         <span className="uppercase tracking-[0.18em]">
                           {label}
                         </span>

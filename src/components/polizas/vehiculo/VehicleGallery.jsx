@@ -124,6 +124,32 @@ const byNewest = (a, b) => {
   return Number(b?.id || 0) - Number(a?.id || 0);
 };
 
+/* ====== Mapeo de tipos a labels humanos (lado → conductor / acompañante) ====== */
+function mapTipoLabel(t) {
+  switch (t) {
+    case "LATERAL_IZQ":
+      return "Lado conductor";
+    case "LATERAL_DER":
+      return "Lado acompañante";
+    case "PATENTE":
+      return "Patente";
+    case "FRENTE":
+      return "Frente";
+    case "TRASERA":
+      return "Parte trasera";
+    case "INTERIOR":
+      return "Interior";
+    case "TUBO_GNC":
+      return "Tubo GNC";
+    case "VIN":
+      return "VIN";
+    case "OTRA":
+      return "Otra";
+    default:
+      return t ? t.replace("_", " ") : "";
+  }
+}
+
 export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }) {
   const dispatch = useDispatch();
 
@@ -204,7 +230,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
             poliza: polizaId,
             url: data.secure_url,
             public_id: data.public_id || "",
-            tipo: tipoFoto, // 🔹 acá viaja "TUBO_GNC" si lo elegís en el select
+            tipo: tipoFoto, // 🔹 acá viaja "LATERAL_IZQ" / "LATERAL_DER" pero se muestra como conductor/acompañante
           });
 
           nuevos.push(created);
@@ -323,7 +349,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
                 active={filtro === t}
                 onClick={() => setFiltro(t)}
               >
-                {t.replace("_", " ")} · {counts[t] || 0}
+                {mapTipoLabel(t)} · {counts[t] || 0}
               </SegBtn>
             ))}
           </div>
@@ -336,7 +362,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
             >
               {["TODOS", ...TIPO_FOTO].map((t) => (
                 <option key={t} value={t}>
-                  {t.replace("_", " ")} · {counts[t] || 0}
+                  {t === "TODOS" ? "Todos" : mapTipoLabel(t)} · {counts[t] || 0}
                 </option>
               ))}
             </select>
@@ -354,7 +380,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
               <div className="text-xs text-white/80">
                 Serán guardadas como:{" "}
                 <span className="px-1.5 py-0.5 rounded bg-white/10 border border-white/10">
-                  {tipoFoto}
+                  {mapTipoLabel(tipoFoto)}
                 </span>
               </div>
             </div>
@@ -367,7 +393,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
               >
                 {TIPO_FOTO.map((t) => (
                   <option key={t} value={t}>
-                    {t}
+                    {mapTipoLabel(t)}
                   </option>
                 ))}
               </select>
@@ -488,7 +514,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
                   </div>
 
                   <div className="mt-2 text-[11px] text-white/80">
-                    {f.tipo?.replace("_", " ") || "OTRA"} ·{" "}
+                    {mapTipoLabel(f.tipo) || "OTRA"} ·{" "}
                     {f.subido_en
                       ? dayjs(f.subido_en).format("DD/MM/YYYY HH:mm")
                       : "—"}
@@ -548,7 +574,7 @@ export default function VehicleGallery({ polizaId, currentPerfilUrl, onChanged }
 
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/90">
                 <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
-                  {current.tipo?.replace("_", " ") || "OTRA"}
+                  {mapTipoLabel(current.tipo) || "OTRA"}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
                   {current.subido_en

@@ -64,6 +64,33 @@ function isHttpUrl(u) {
   return s.startsWith("http://") || s.startsWith("https://");
 }
 
+/* ====== Label helpers (lado → conductor / acompañante, cédula frente/dorso) ====== */
+function mapFotoLabel(key, fallback) {
+  switch (key) {
+    case "LATERAL_IZQ":
+      return "Lado conductor";
+    case "LATERAL_DER":
+      return "Lado acompañante";
+    case "FRENTE":
+      return "Frente";
+    case "TRASERA":
+      return "Parte trasera";
+    default:
+      return fallback || pretty(key);
+  }
+}
+
+function mapDocLabel(key, fallback) {
+  switch (key) {
+    case "CEDULA_VERDE_FRENTE":
+      return "Cédula verde (frente)";
+    case "CEDULA_VERDE_DORSO":
+      return "Cédula verde (dorso)";
+    default:
+      return fallback || pretty(key);
+  }
+}
+
 export default function ImagenesDocsStep({
   MAX_FOTOS = 0,
   fotoSlotDefs = [],
@@ -196,8 +223,8 @@ export default function ImagenesDocsStep({
             <span>
               Faltan cargar:{" "}
               {[
-                ...missingDocs.map((k) => `Doc: ${pretty(k)}`),
-                ...missingFotos.map((k) => `Foto: ${pretty(k)}`),
+                ...missingDocs.map((k) => `Doc: ${mapDocLabel(k)}`),
+                ...missingFotos.map((k) => `Foto: ${mapFotoLabel(k)}`),
               ].join(", ")}
             </span>
           </div>
@@ -224,7 +251,7 @@ export default function ImagenesDocsStep({
             return (
               <DocSlotCard
                 key={key}
-                label={label}
+                label={mapDocLabel(key, label)}
                 value={v}
                 required={required}
                 onRemove={() =>
@@ -255,7 +282,7 @@ export default function ImagenesDocsStep({
               return (
                 <FotoSlotCard
                   key={key}
-                  label={label}
+                  label={mapFotoLabel(key, label)}
                   value={v}
                   required={required}
                   onRemove={() =>
