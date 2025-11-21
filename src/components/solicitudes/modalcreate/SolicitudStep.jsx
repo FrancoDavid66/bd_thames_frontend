@@ -17,22 +17,30 @@ export default function SolicitudStep({
   setSolicitud = () => {},
 }) {
   return (
-    <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3">
+    <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
       <legend className="px-1 text-white/85 text-sm">Solicitud</legend>
 
-      <div className="grid md:grid-cols-2 gap-3">
+      <div className="grid gap-3 md:grid-cols-2">
         {/* Responsable */}
-        <div>
-          <span className="block text-white/80 mb-1">Responsable</span>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-2 text-xs px-2 py-1 rounded-lg border border-white/15 text-white/90 bg-white/5">
+        <div className="space-y-1.5">
+          <span className="block text-white/80 text-sm">Responsable</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border border-white/15 text-white/90 bg-white/5">
               <HiUser className="opacity-80" />
-              {responsableNombre || "—"}
+              <span className="max-w-[180px] sm:max-w-[220px] truncate">
+                {responsableNombre || "—"}
+              </span>
             </span>
             <button
               type="button"
               onClick={onCambiarResponsable}
-              className="text-xs text-white/80 underline underline-offset-2 hover:text-white"
+              className="
+                inline-flex items-center justify-center
+                text-xs px-3 py-1.5 rounded-lg
+                bg-white/5 border border-white/10
+                text-white/80 hover:bg-white/10 hover:text-white
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+              "
               title="Cambiar responsable"
             >
               Cambiar

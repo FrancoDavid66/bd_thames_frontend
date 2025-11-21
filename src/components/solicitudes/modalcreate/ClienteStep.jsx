@@ -2,11 +2,10 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { HiIdentification, HiTrash, HiUpload } from "react-icons/hi";
-import toast from "react-hot-toast";
 
 /* ===================== UI bits locales ===================== */
 function Note({ children }) {
-  return <p className="mt-2 text-xs md:text-[13px] text-white/70">{children}</p>;
+  return <p className="mt-1.5 text-xs md:text-[13px] text-white/70">{children}</p>;
 }
 function Input({
   label,
@@ -33,7 +32,7 @@ function Input({
         autoCapitalize={autoCapitalize}
         pattern={pattern}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
       />
       {helper ? <span className="mt-1 block text-xs text-white/65">{helper}</span> : null}
     </label>
@@ -47,7 +46,7 @@ function Textarea({ label, value, onChange, className = "" }) {
         rows={4}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-3 outline-none focus:ring-4 ring-rose-200/30 text-white placeholder:text-white/40 transition"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 md:py-3 outline-none focus:ring-4 ring-rose-200/30 text-white placeholder:text-white/40 transition resize-none"
       />
     </label>
   );
@@ -57,7 +56,7 @@ function RadioPill({ checked, onChange, label }) {
     <button
       type="button"
       onClick={onChange}
-      className={`px-3 py-2 md:py-1.5 rounded-xl border text-sm transition ${
+      className={`px-3 py-1.5 rounded-xl border text-xs sm:text-sm transition ${
         checked
           ? "bg-gradient-to-br from-violet-200 to-indigo-200 text-[#0b0f1e] border-white/40"
           : "bg-white/5 text-white border-white/10 hover:bg-white/10"
@@ -67,9 +66,19 @@ function RadioPill({ checked, onChange, label }) {
     </button>
   );
 }
-function FotoSlot({ label, slot, onFile, onRemove, required, accept = "image/*", capture = false }) {
+function FotoSlot({
+  label,
+  slot,
+  onFile,
+  onRemove,
+  required,
+  accept = "image/*",
+  capture = false,
+}) {
   const has = !!slot?.url;
-  const isPdf = slot?.mime === "application/pdf" || (slot?.url || "").toLowerCase().endsWith(".pdf");
+  const isPdf =
+    slot?.mime === "application/pdf" ||
+    (slot?.url || "").toLowerCase().endsWith(".pdf");
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -94,14 +103,20 @@ function FotoSlot({ label, slot, onFile, onRemove, required, accept = "image/*",
       <div className="aspect-video rounded-lg overflow-hidden border border-white/10 bg-black/20 flex items-center justify-center">
         {has ? (
           isPdf ? (
-            <a href={slot.url} target="_blank" rel="noreferrer" className="text-xs underline text-white/90" title="Abrir PDF">
+            <a
+              href={slot.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs underline text-white/90"
+              title="Abrir PDF"
+            >
               Ver PDF
             </a>
           ) : (
             <img src={slot.url} alt={label} className="w-full h-full object-cover" />
           )
         ) : (
-          <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-br from-violet-200 to-indigo-200 text-[#0b0f1e] font-semibold text-sm border border-white/20 hover:brightness-105">
+          <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-br from-violet-200 to-indigo-200 text-[#0b0f1e] font-semibold text-xs sm:text-sm border border-white/20 hover:brightness-105">
             <HiUpload /> Cargar / Sacar
             <input
               type="file"
@@ -130,7 +145,8 @@ export function normalizaTelefonoAR(raw) {
   if (d.startsWith("15") && d.length >= 10) d = d.slice(2);
   return d;
 }
-const guessMime = (name = "") => (name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+const guessMime = (name = "") =>
+  name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg";
 
 /* ===================== Componente ===================== */
 /**
@@ -171,37 +187,38 @@ export default function ClienteStep({
     return e;
   }, [clienteModo, clienteId, cliente]);
 
- // 👉 Reemplazá esta función dentro de ClienteStep
-const handleUploadToSlot = async (file, key) => {
-  if (!file) return;
-  try {
-    // 1) Delegamos 100% en el padre (CreateSolicitudModal)
-    //    El padre sube a Cloudinary, setea el estado y devuelve el objeto subido.
-    await onUploadDNI?.(file, key);
-
-    // 2) NO hacer fallback a URL.createObjectURL (blob:) ni toasts acá.
-    //    Si por algo querés tener un backup, hacelo solo si el padre
-    //    te devuelve un objeto 'res' SIN url http/https, pero lo normal
-    //    es que el padre te deje el estado bien seteado.
-  } catch (e) {
-    console.error(e);
-    // No toasteamos acá para evitar doble toast.
-  }
-};
-
+  // 👉 función delegada al padre (CreateSolicitudModal) para subir a Cloudinary
+  const handleUploadToSlot = async (file, key) => {
+    if (!file) return;
+    try {
+      await onUploadDNI?.(file, key);
+      // Nada de blobs locales ni toasts acá:
+      // el padre se encarga de setear dniSlots con la URL final.
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
-    <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
+    <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
       <legend className="px-1 text-white/85 text-sm">Cliente</legend>
 
       {/* Toggle modo (responsive) */}
-      <div className="flex gap-2 mb-3">
-        <RadioPill checked={clienteModo === "nuevo"} onChange={() => setClienteModo("nuevo")} label="Nuevo" />
-        <RadioPill checked={clienteModo === "existente"} onChange={() => setClienteModo("existente")} label="Existente" />
+      <div className="flex flex-wrap gap-2 mb-3">
+        <RadioPill
+          checked={clienteModo === "nuevo"}
+          onChange={() => setClienteModo("nuevo")}
+          label="Nuevo"
+        />
+        <RadioPill
+          checked={clienteModo === "existente"}
+          onChange={() => setClienteModo("existente")}
+          label="Existente"
+        />
       </div>
 
       {clienteModo === "existente" ? (
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input
             label={`ID de cliente ${errors.clienteId ? "— (requerido)" : ""}`}
             value={clienteId}
@@ -215,8 +232,8 @@ const handleUploadToSlot = async (file, key) => {
         </div>
       ) : (
         <>
-          {/* Form responsive: 1 col en mobile, 2 col en md+ */}
-          <div className="grid md:grid-cols-2 gap-3">
+          {/* Form responsive: 1 col en mobile, 2 col en sm+ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label={`Nombre ${errors.nombre ? "— (requerido)" : ""}`}
               value={cliente.nombre}
@@ -259,7 +276,7 @@ const handleUploadToSlot = async (file, key) => {
               autoComplete="address-level2"
             />
             <Textarea
-              className="md:col-span-2"
+              className="sm:col-span-2"
               label="Dirección"
               value={cliente.direccion}
               onChange={(v) => setCliente((s) => ({ ...s, direccion: v }))}
@@ -270,9 +287,9 @@ const handleUploadToSlot = async (file, key) => {
           <div className="mt-3 md:mt-4 rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
             <div className="flex items-center gap-2 text-white/80 mb-2">
               <HiIdentification />
-              <span>Documentación (DNI)</span>
+              <span className="text-sm">Documentación (DNI)</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {TIPO_DNI_SLOTS.map(({ key, label }) => (
                 <FotoSlot
                   key={key}
@@ -281,7 +298,12 @@ const handleUploadToSlot = async (file, key) => {
                   accept="image/*"
                   capture={true}
                   onFile={(file) => handleUploadToSlot(file, key)}
-                  onRemove={() => setDniSlots((s) => ({ ...s, [key]: null }))}
+                  onRemove={() =>
+                    setDniSlots((s) => ({
+                      ...s,
+                      [key]: null,
+                    }))
+                  }
                 />
               ))}
             </div>

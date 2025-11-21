@@ -19,7 +19,7 @@ import CuentasCobroModal from "../components/pagos/CuentasCobroModal";
 import RecorditoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
 import {
   fetchMediosCobro,
-  enviarRecorditoriosCuotas,
+  enviarRecordatoriosCuotas,
 } from "../store/slices/pagosSlice";
 
 function StatCard({ icon: Icon, label, value, hint, tone = "indigo", delay = 0 }) {
@@ -139,9 +139,9 @@ export default function PagosPage() {
 
         const payload = medio_cobro_id != null ? { medio_cobro_id } : {};
 
-        const action = await dispatch(enviarRecorditoriosCuotas(payload));
+        const action = await dispatch(enviarRecordatoriosCuotas(payload));
 
-        if (enviarRecorditoriosCuotas.fulfilled.match(action)) {
+        if (enviarRecordatoriosCuotas.fulfilled.match(action)) {
           const { enviados, procesadas, hoy } = action.payload || {};
           toast.success(
             `Recordatorios enviados: ${enviados ?? 0} de ${procesadas ?? 0} (base: ${
@@ -166,159 +166,156 @@ export default function PagosPage() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-gray-900 text-white flex">
-      {/* Contenedor scrollable de toda la sección Pagos */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <div className="px-6 pt-6">
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-primary-500/15 ring-1 ring-primary-400/40 flex items-center justify-center">
-                <HiSearch className="w-5 h-5 text-primary-300" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold">Pagos</h1>
-                <p className="text-sm text-gray-300">
-                  Cobros de cuotas, recibos y control de vencimientos
-                </p>
-              </div>
+    <div className="min-h-[calc(100vh-64px)] bg-gray-900 text-white">
+      {/* Header */}
+      <div className="px-6 pt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-primary-500/15 ring-1 ring-primary-400/40 flex items-center justify-center">
+              <HiSearch className="w-5 h-5 text-primary-300" />
             </div>
-
-            <div className="hidden md:flex items-center gap-2">
-              <div className="flex items-center gap-2 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-gray-300">
-                <span className="text-sm">
-                  🔎 Buscá por nombre, patente o modelo
-                </span>
-              </div>
-
-              {/* Botón: abre modal de Cuentas/Billeteras */}
-              <button
-                onClick={() => setOpenConfig(true)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-sm hover:bg-gray-900 transition shadow-sm"
-                title="Cuentas y Billeteras"
-              >
-                <HiCog className="w-5 h-5" />
-                Cuentas y Billeteras
-              </button>
-
-              {/* Botón: abre modal de Recordatorios */}
-              <button
-                onClick={() => setOpenRecordatorios(true)}
-                disabled={sendingRecordatorios}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs md:text-sm text-emerald-100 hover:bg-emerald-500/20 hover:border-emerald-300/60 transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {sendingRecorditorios ? (
-                  <span className="inline-block w-3 h-3 border-2 border-emerald-200/40 border-t-emerald-300 rounded-full animate-spin" />
-                ) : (
-                  <HiSpeakerphone className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Recordatorios cuotas</span>
-                <span className="sm:hidden">Recordatorios</span>
-              </button>
-
-              {polizas.length > 0 && (
-                <button
-                  onClick={limpiarBusqueda}
-                  className="inline-flex items-center gap-1 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-sm hover:brightness-105 transition shadow-sm"
-                >
-                  <HiX className="w-4 h-4" />
-                  Limpiar
-                </button>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Ayuda rápida */}
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, delay: 0.1 }}
-            className="mt-3 rounded-2xl bg-gray-900/50 border border-gray-800 px-4 py-2 text-xs text-gray-300"
-          >
-            <span className="font-semibold text-gray-100">Ayuda rápida:</span>{" "}
-            <span className="font-semibold">Cuentas y Billeteras</span> sirve para crear y
-            editar tus cuentas de cobro.{" "}
-            <span className="font-semibold">Recordatorios cuotas</span> sirve para elegir un
-            alias y mandar los WhatsApp masivos.
-          </motion.div>
-
-          {/* KPIs */}
-          {cuotas.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-              <StatCard
-                icon={HiSparkles}
-                label="Cuotas"
-                value={totalCuotas}
-                tone="indigo"
-                delay={0.0}
-              />
-              <StatCard
-                icon={HiClock}
-                label="Pendientes"
-                value={totalPendientes}
-                tone="amber"
-                delay={0.08}
-              />
-              <StatCard
-                icon={HiBadgeCheck}
-                label="Pagadas"
-                value={totalPagadas}
-                tone="emerald"
-                delay={0.16}
-              />
-            </div>
-          )}
-
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="mt-5"
-          >
-            <PagosSearch onBuscar={handleBuscar} />
-          </motion.div>
-        </div>
-
-        {/* Resultado */}
-        <div className="px-6 pb-10 mt-5">
-          {cuotas.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="rounded-2xl border border-dashed border-gray-700 bg-gray-900/40 p-10 text-center shadow-sm"
-            >
-              <p className="text-gray-300">
-                Iniciá una búsqueda para ver cuotas. Probá con{" "}
-                <span className="font-semibold text-white">
-                  nombre, apellido, patente o modelo
-                </span>{" "}
-                ✨
+            <div>
+              <h1 className="text-xl font-bold">Pagos</h1>
+              <p className="text-sm text-gray-300">
+                Cobros de cuotas, recibos y control de vencimientos
               </p>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="rounded-2xl bg-gray-900/50 border border-gray-800 ring-1 ring-gray-800/70 shadow-sm p-4"
+            </div>
+          </div>
+
+          <div className="hidden md:flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-gray-300">
+              <span className="text-sm">
+                🔎 Buscá por nombre, patente o modelo
+              </span>
+            </div>
+
+            {/* Botón: abre modal de Cuentas/Billeteras */}
+            <button
+              onClick={() => setOpenConfig(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-sm hover:bg-gray-900 transition shadow-sm"
+              title="Cuentas y Billeteras"
             >
-              <PagosList
-                cuotas={cuotas}
-                actualizarCuotas={actualizarCuotas}
-                ocultarPagadas={false}
-                cuentasMercadoPago={mpCuentas}
-                billeterasVirtuales={billeteras}
-                mediosCobro={mediosCobro}
-              />
-            </motion.div>
-          )}
-        </div>
+              <HiCog className="w-5 h-5" />
+              Cuentas y Billeteras
+            </button>
+
+            {/* Botón: abre modal de Recordatorios */}
+            <button
+              onClick={() => setOpenRecordatorios(true)}
+              disabled={sendingRecordatorios}
+              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs md:text-sm text-emerald-100 hover:bg-emerald-500/20 hover:border-emerald-300/60 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {sendingRecordatorios ? (
+                <span className="inline-block w-3 h-3 border-2 border-emerald-200/40 border-t-emerald-300 rounded-full animate-spin" />
+              ) : (
+                <HiSpeakerphone className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">Recordatorios cuotas</span>
+              <span className="sm:hidden">Recordatorios</span>
+            </button>
+
+            {polizas.length > 0 && (
+              <button
+                onClick={limpiarBusqueda}
+                className="inline-flex items-center gap-1 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-sm hover:brightness-105 transition shadow-sm"
+              >
+                <HiX className="w-4 h-4" />
+                Limpiar
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Ayuda rápida */}
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: 0.1 }}
+          className="mt-3 rounded-2xl bg-gray-900/50 border border-gray-800 px-4 py-2 text-xs text-gray-300"
+        >
+          <span className="font-semibold text-gray-100">Ayuda rápida:</span>{" "}
+          <span className="font-semibold">Cuentas y Billeteras</span> sirve para crear y
+          editar tus cuentas de cobro.{" "}
+          <span className="font-semibold">Recordatorios cuotas</span> sirve para elegir un
+          alias y mandar los WhatsApp masivos.
+        </motion.div>
+
+        {/* KPIs */}
+        {cuotas.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+            <StatCard
+              icon={HiSparkles}
+              label="Cuotas"
+              value={totalCuotas}
+              tone="indigo"
+              delay={0.0}
+            />
+            <StatCard
+              icon={HiClock}
+              label="Pendientes"
+              value={totalPendientes}
+              tone="amber"
+              delay={0.08}
+            />
+            <StatCard
+              icon={HiBadgeCheck}
+              label="Pagadas"
+              value={totalPagadas}
+              tone="emerald"
+              delay={0.16}
+            />
+          </div>
+        )}
+
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="mt-5"
+        >
+          <PagosSearch onBuscar={handleBuscar} />
+        </motion.div>
+      </div>
+
+      {/* Resultado */}
+      <div className="px-6 pb-10 mt-5">
+        {cuotas.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="rounded-2xl border border-dashed border-gray-700 bg-gray-900/40 p-10 text-center shadow-sm"
+          >
+            <p className="text-gray-300">
+              Iniciá una búsqueda para ver cuotas. Probá con{" "}
+              <span className="font-semibold text-white">
+                nombre, apellido, patente o modelo
+              </span>{" "}
+              ✨
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="rounded-2xl bg-gray-900/50 border border-gray-800 ring-1 ring-gray-800/70 shadow-sm p-4"
+          >
+            <PagosList
+              cuotas={cuotas}
+              actualizarCuotas={actualizarCuotas}
+              ocultarPagadas={false}
+              cuentasMercadoPago={mpCuentas}
+              billeterasVirtuales={billeteras}
+              mediosCobro={mediosCobro}
+            />
+          </motion.div>
+        )}
       </div>
 
       {/* Modal CRUD general de cuentas/billeteras */}

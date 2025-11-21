@@ -27,10 +27,18 @@ function slug(s) {
     .toLowerCase();
 }
 function buildSolicitudFilename(s) {
-  const apellido = s?.titular_apellido || s?.cliente_apellido || s?.apellido || s?.cliente?.apellido || "";
-  const nombre = s?.titular_nombre || s?.cliente_nombre || s?.nombre || s?.cliente?.nombre || "";
+  const apellido =
+    s?.titular_apellido ||
+    s?.cliente_apellido ||
+    s?.apellido ||
+    s?.cliente?.apellido ||
+    "";
+  const nombre =
+    s?.titular_nombre || s?.cliente_nombre || s?.nombre || s?.cliente?.nombre || "";
   const compania = s?.compania_preferida || s?.compania || "";
-  const parts = ["solicitud", apellido, nombre, compania].filter(Boolean).map(slug);
+  const parts = ["solicitud", apellido, nombre, compania]
+    .filter(Boolean)
+    .map(slug);
   const base = parts.join("_") || `solicitud_${slug(s?.id || "")}`;
   return `${base}.png`;
 }
@@ -60,7 +68,9 @@ export default function SolicitudesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (() => {
     const t = searchParams.get("tab");
-    return ["proceso", "pendiente_alta", "pendiente_envio", "terminadas"].includes(t || "")
+    return ["proceso", "pendiente_alta", "pendiente_envio", "terminadas"].includes(
+      t || ""
+    )
       ? t
       : "proceso";
   })();
@@ -84,7 +94,10 @@ export default function SolicitudesPage() {
       setItems(norm);
       // 🔔 emitir counters para Sidebar
       const { alta, envio } = computeCounters(norm);
-      solicitudesRealtime.emitLocal({ type: "solicitudes.counters", data: { alta, envio } });
+      solicitudesRealtime.emitLocal({
+        type: "solicitudes.counters",
+        data: { alta, envio },
+      });
     } catch (e) {
       toast.error(e.message || "Error al cargar");
     } finally {
@@ -107,7 +120,11 @@ export default function SolicitudesPage() {
   // Sincronizar tab con la URL (?tab=...)
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t && t !== tab && ["proceso", "pendiente_alta", "pendiente_envio", "terminadas"].includes(t)) {
+    if (
+      t &&
+      t !== tab &&
+      ["proceso", "pendiente_alta", "pendiente_envio", "terminadas"].includes(t)
+    ) {
       setTab(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,7 +206,10 @@ export default function SolicitudesPage() {
       setItems((prev) => {
         const next = (prev || []).filter((x) => x.id !== s.id);
         const { alta, envio } = computeCounters(next);
-        solicitudesRealtime.emitLocal({ type: "solicitudes.counters", data: { alta, envio } });
+        solicitudesRealtime.emitLocal({
+          type: "solicitudes.counters",
+          data: { alta, envio },
+        });
         return next;
       });
       toast.success("Solicitud eliminada");
@@ -202,9 +222,14 @@ export default function SolicitudesPage() {
     try {
       const upd = await solicitudesApi.terminar(s.id);
       setItems((prev) => {
-        const next = (prev || []).map((x) => (x.id === s.id ? { ...upd, tareas: getTareas(upd) } : x));
+        const next = (prev || []).map((x) =>
+          x.id === s.id ? { ...upd, tareas: getTareas(upd) } : x
+        );
         const { alta, envio } = computeCounters(next);
-        solicitudesRealtime.emitLocal({ type: "solicitudes.counters", data: { alta, envio } });
+        solicitudesRealtime.emitLocal({
+          type: "solicitudes.counters",
+          data: { alta, envio },
+        });
         return next;
       });
       toast.success("Solicitud movida a Terminadas.");
@@ -223,9 +248,14 @@ export default function SolicitudesPage() {
 
     // Optimista + emitir counters
     setItems((prevItems) => {
-      const next = (prevItems || []).map((x) => (x.id === s.id ? { ...x, tareas: nextTareas } : x));
+      const next = (prevItems || []).map((x) =>
+        x.id === s.id ? { ...x, tareas: nextTareas } : x
+      );
       const { alta, envio } = computeCounters(next);
-      solicitudesRealtime.emitLocal({ type: "solicitudes.counters", data: { alta, envio } });
+      solicitudesRealtime.emitLocal({
+        type: "solicitudes.counters",
+        data: { alta, envio },
+      });
       return next;
     });
 
@@ -238,9 +268,14 @@ export default function SolicitudesPage() {
     } catch (e) {
       // Revertimos + re-emitimos counters
       setItems((prevItems) => {
-        const next = (prevItems || []).map((x) => (x.id === s.id ? { ...x, tareas: prev } : x));
+        const next = (prevItems || []).map((x) =>
+          x.id === s.id ? { ...x, tareas: prev } : x
+        );
         const { alta, envio } = computeCounters(next);
-        solicitudesRealtime.emitLocal({ type: "solicitudes.counters", data: { alta, envio } });
+        solicitudesRealtime.emitLocal({
+          type: "solicitudes.counters",
+          data: { alta, envio },
+        });
         return next;
       });
       toast.error(e.message || "No se pudo guardar la tarea");
@@ -251,150 +286,177 @@ export default function SolicitudesPage() {
     <PageTransition>
       <section
         className="
-        relative -mt-2 -mx-2 px-2 pt-2
-        pb-[calc(env(safe-area-inset-bottom,0)+120px)] lg:pb-8
-        min-h-[calc(100vh-4rem)]
-        overflow-hidden
-        bg-[#0b0f19]
-      "
-      >
-        {/* Header sticky */}
-        <div
-          className="
-          sticky top-0 z-20
-          -mx-2 px-2
-          border-b border-white/10
-          bg-[#0b0f19]/90 backdrop-blur
+          min-h-[calc(100vh-4rem)]
+          bg-[#0b0f19]
+          text-white
+          flex flex-col
         "
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
-        >
-          <div className="flex items-center justify-between py-2">
-            <motion.div
-              className="flex items-center gap-3"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35 }}
+      >
+        {/* Contenedor scrollable principal (tipo chat) */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header sticky + toolbar */}
+          <div
+            className="
+              sticky top-0 z-20
+              border-b border-white/10
+              bg-[#0b0f19]/90 backdrop-blur
+            "
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
+          >
+            <div className="px-3 sm:px-4 lg:px-6">
+              <div className="flex items-center justify-between py-2">
+                <motion.div
+                  className="flex items-center gap-3"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35 }}
+                >
+                  <span className="p-2 rounded-xl bg-white/10 border border-white/10">
+                    <HiShieldCheck className="w-5 h-5 text-white" />
+                  </span>
+                  <h1 className="text-base sm:text-lg font-semibold text-white">
+                    Solicitudes de Seguro
+                  </h1>
+                </motion.div>
+
+                {/* Acciones rápidas */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => cargar({ silent: true })}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 text-white disabled:opacity-60"
+                    title="Actualizar"
+                    aria-label="Actualizar"
+                    disabled={refreshing}
+                  >
+                    <HiRefresh className={refreshing ? "animate-spin" : ""} />
+                    <span className="hidden md:inline">
+                      {refreshing ? "Actualizando…" : "Actualizar"}
+                    </span>
+                  </button>
+
+                  {/* CTA principal (desktop) */}
+                  <motion.button
+                    type="button"
+                    onClick={() => setCreating(true)}
+                    title="Crear nueva solicitud"
+                    className="
+                      hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl
+                      text-black font-semibold
+                      bg-amber-400 border border-amber-300
+                      hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/40
+                    "
+                    initial="initial"
+                    whileHover="hover"
+                    whileTap="tap"
+                    variants={pressable}
+                  >
+                    <HiPlus className="text-xl" /> Nueva solicitud
+                  </motion.button>
+
+                  {/* Toolbar mobile toggle */}
+                  <button
+                    className="sm:hidden inline-flex items-center px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs"
+                    onClick={() => setToolbarOpen((v) => !v)}
+                    aria-expanded={toolbarOpen}
+                    aria-controls="toolbar-secundaria"
+                    title="Mostrar/Ocultar filtros"
+                  >
+                    {toolbarOpen ? "Ocultar" : "Filtros"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Toolbar secundaria */}
+            <div
+              id="toolbar-secundaria"
+              className={`${toolbarOpen ? "block" : "hidden"} sm:block pb-3`}
             >
-              <span className="p-2 rounded-xl bg-white/10 border border-white/10">
-                <HiShieldCheck className="w-5 h-5 text-white" />
-              </span>
-              <h1 className="text-base sm:text-lg font-semibold text-white">
-                Solicitudes de Seguro
-              </h1>
-            </motion.div>
+              <div className="px-3 sm:px-4 lg:px-6">
+                <div className="flex flex-col lg:flex-row gap-2">
+                  {/* Tabs de estado */}
+                  <div className="inline-flex rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                    {[
+                      { id: "proceso", label: "En proceso" },
+                      {
+                        id: "pendiente_alta",
+                        label: `Pendiente alta (${counts.alta})`,
+                      },
+                      {
+                        id: "pendiente_envio",
+                        label: `Pendiente envío (${counts.envio})`,
+                      },
+                      { id: "terminadas", label: "Terminadas" },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => cambiarTab(t.id)}
+                        className={`px-3 py-2 text-xs sm:text-sm transition-colors ${
+                          tab === t.id
+                            ? "bg-white/20 text-white"
+                            : "bg-white/10 text-white/70 hover:text-white"
+                        }`}
+                        title={t.label}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
 
-            {/* Acciones rápidas */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => cargar({ silent: true })}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 text-white disabled:opacity-60"
-                title="Actualizar"
-                aria-label="Actualizar"
-                disabled={refreshing}
-              >
-                <HiRefresh className={refreshing ? "animate-spin" : ""} />
-                <span className="hidden md:inline">
-                  {refreshing ? "Actualizando…" : "Actualizar"}
-                </span>
-              </button>
-
-              {/* CTA principal */}
-              <motion.button
-                type="button"
-                onClick={() => setCreating(true)}
-                title="Crear nueva solicitud"
-                className="
-                hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl
-                text-black font-semibold
-                bg-amber-400 border border-amber-300
-                hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/40
-              "
-                initial="initial"
-                whileHover="hover"
-                whileTap="tap"
-                variants={pressable}
-              >
-                <HiPlus className="text-xl" /> Nueva solicitud
-              </motion.button>
-
-              {/* Toolbar mobile */}
-              <button
-                className="sm:hidden inline-flex items-center px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white"
-                onClick={() => setToolbarOpen((v) => !v)}
-                aria-expanded={toolbarOpen}
-                aria-controls="toolbar-secundaria"
-                title="Mostrar/Ocultar filtros"
-              >
-                {toolbarOpen ? "Ocultar" : "Filtros"}
-              </button>
+                  {/* Búsqueda */}
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar por cliente / DNI / patente / código…"
+                    className="
+                      flex-1 px-3 py-2 rounded-xl bg-white/10 border border-white/10
+                      text-white text-xs sm:text-sm placeholder-white/50
+                    "
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Toolbar secundaria */}
+          {/* Contenido scrollable: KPIs + Lista */}
           <div
-            id="toolbar-secundaria"
-            className={`${toolbarOpen ? "block" : "hidden"} sm:block pb-3`}
+            className="
+              flex-1 overflow-y-auto
+              px-3 sm:px-4 lg:px-6
+              pt-3
+              pb-[calc(env(safe-area-inset-bottom,0px)+120px)]
+            "
           >
-            <div className="flex flex-col lg:flex-row gap-2">
-              {/* Tabs de estado */}
-              <div className="inline-flex rounded-xl overflow-hidden border border-white/10 bg-white/5">
-                {[
-                  { id: "proceso", label: "En proceso" },
-                  { id: "pendiente_alta", label: `Pendiente alta (${counts.alta})` },
-                  { id: "pendiente_envio", label: `Pendiente envío (${counts.envio})` },
-                  { id: "terminadas", label: "Terminadas" },
-                ].map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => cambiarTab(t.id)}
-                    className={`px-3 py-2 text-sm transition-colors ${
-                      tab === t.id
-                        ? "bg-white/20 text-white"
-                        : "bg-white/10 text-white/70 hover:text-white"
-                    }`}
-                    title={t.label}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+            {/* KPIs */}
+            <MotionList
+              as="div"
+              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-4"
+            >
+              <MotionListItem as="div" className="xl:col-span-2">
+                <Kpi label="Activas" value={kpis.activas} />
+              </MotionListItem>
+              <MotionListItem as="div" className="xl:col-span-2">
+                <Kpi label="Terminadas" value={kpis.terminadas} icon={<HiBadgeCheck />} />
+              </MotionListItem>
+              <MotionListItem as="div" className="xl:col-span-2">
+                <Kpi label="Total" value={kpis.total} />
+              </MotionListItem>
+            </MotionList>
 
-              {/* Búsqueda */}
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por cliente / DNI / patente / código…"
-                className="flex-1 px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-sm placeholder-white/50"
-              />
-            </div>
+            {/* Lista */}
+            <SolicitudesList
+              key={`sols-${tab}-${search}`}
+              items={filtrados}
+              loading={loading}
+              refreshing={refreshing}
+              onComprobante={comprobante}
+              onEliminar={eliminar}
+              onRefrescar={() => cargar({ silent: true })}
+              onTerminar={terminar}
+              onToggleTarea={toggleTarea}
+            />
           </div>
         </div>
-
-        {/* KPIs */}
-        <MotionList as="div" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 my-4">
-          <MotionListItem as="div" className="xl:col-span-2">
-            <Kpi label="Activas" value={kpis.activas} />
-          </MotionListItem>
-          <MotionListItem as="div" className="xl:col-span-2">
-            <Kpi label="Terminadas" value={kpis.terminadas} icon={<HiBadgeCheck />} />
-          </MotionListItem>
-          <MotionListItem as="div" className="xl:col-span-2">
-            <Kpi label="Total" value={kpis.total} />
-          </MotionListItem>
-        </MotionList>
-
-        {/* Lista */}
-        <SolicitudesList
-          key={`sols-${tab}-${search}`}
-          items={filtrados}
-          loading={loading}
-          refreshing={refreshing}
-          onComprobante={comprobante}
-          onEliminar={eliminar}
-          onRefrescar={() => cargar({ silent: true })}
-          onTerminar={terminar}
-          onToggleTarea={toggleTarea}
-        />
 
         {/* FAB móvil */}
         {!creating && (
@@ -403,12 +465,12 @@ export default function SolicitudesPage() {
             onClick={() => setCreating(true)}
             aria-label="Nueva solicitud"
             className="
-            lg:hidden fixed right-5 z-[80]
-            w-14 h-14 rounded-2xl
-            flex items-center justify-center
-            text-black bg-amber-400 border border-amber-300
-            hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/40
-          "
+              lg:hidden fixed right-5 z-[80]
+              w-14 h-14 rounded-2xl
+              flex items-center justify-center
+              text-black bg-amber-400 border border-amber-300
+              hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/40
+            "
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 84px)" }}
             initial="initial"
             whileHover="hover"
@@ -430,7 +492,6 @@ export default function SolicitudesPage() {
             }}
             companias={companias}
             coberturas={coberturas}
-            // Podés pasar skipResponsableGate / initialResponsableId si querés
           />
         )}
       </section>

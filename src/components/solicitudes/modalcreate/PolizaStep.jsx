@@ -121,8 +121,7 @@ export default function PolizaStep({
   const coberturasOpts = useMemo(() => {
     const provided = Array.isArray(coberturas) ? coberturas : [];
     const provHuman = provided.map((op) => {
-      const id =
-        typeof op === "string" ? op : op?.id ?? op?.nombre ?? "";
+      const id = typeof op === "string" ? op : op?.id ?? op?.nombre ?? "";
       const human = toHumanCoverage(id);
       return { id: human, nombre: human };
     });
@@ -130,9 +129,7 @@ export default function PolizaStep({
       ...provHuman,
       ...DEFAULT_COBERTURAS.map((h) => ({ id: h, nombre: h })),
     ];
-    const order = new Map(
-      DEFAULT_COBERTURAS.map((h, i) => [h, i])
-    );
+    const order = new Map(DEFAULT_COBERTURAS.map((h, i) => [h, i]));
     const seen = new Set();
     const dedup = merged.filter((o) => {
       const key = String(o.id).trim();
@@ -208,10 +205,11 @@ export default function PolizaStep({
       exit="exit"
       className="space-y-3"
     >
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3">
+      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4">
         <legend className="px-1 text-white/85 text-sm">Póliza</legend>
 
-        <div className="grid md:grid-cols-2 gap-3">
+        {/* Datos principales: 1 col en mobile, 2 en sm+ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select
             label="Compañía"
             value={poliza?.compania || ""}
@@ -243,13 +241,13 @@ export default function PolizaStep({
         </div>
 
         {/* Reglas dinámicas por cobertura (guía) */}
-        <div className="mt-3 rounded-xl border border-white/10 p-3 bg-white/[.05]">
+        <div className="mt-3 rounded-xl border border-white/10 p-3 sm:p-4 bg-white/[.05]">
           <div
-            className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#0b0f1e] bg-gradient-to-br ${requisitos.color} mb-2`}
+            className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] sm:text-xs font-medium text-[#0b0f1e] bg-gradient-to-br ${requisitos.color} mb-2`}
           >
             {requisitos.title}
           </div>
-          <ul className="list-disc pl-5 text-white/90 text-sm space-y-1">
+          <ul className="list-disc pl-5 text-white/90 text-xs sm:text-sm space-y-1">
             {requisitos.items.map((it) => (
               <li key={it}>{it}</li>
             ))}
@@ -259,7 +257,8 @@ export default function PolizaStep({
           ) : null}
         </div>
 
-        <div className="grid md:grid-cols-2 gap-3 mt-3">
+        {/* Datos del vehículo + fechas: responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
           <Input
             label="Patente"
             value={poliza?.patente || ""}
@@ -390,7 +389,7 @@ function Input({
         autoCapitalize={autoCapitalize}
         pattern={pattern}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
       />
       {helper ? (
         <span className="mt-1 block text-xs text-white/65">{helper}</span>
@@ -412,7 +411,7 @@ function Select({ label, value, onChange, options = [], className = "" }) {
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-xl border border-white/10 px-3 py-3 pr-9 outline-none focus:ring-4 ring-violet-200/30 text-white appearance-none transition"
+          className="w-full rounded-xl border border-white/10 px-3 py-2.5 md:py-3 pr-9 outline-none focus:ring-4 ring-violet-200/30 text-white appearance-none transition"
           style={{ backgroundColor: "#141827" }}
           data-theme="dark"
         >

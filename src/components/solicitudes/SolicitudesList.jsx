@@ -80,7 +80,7 @@ export default function SolicitudesList({
   onEliminar,
   onRefrescar,
   onToggleTarea, // Si viene, los toggles ejecutan callback; si no, quedan “inertes”
-  onTerminar,    // NUEVO: callback para terminar solicitud
+  onTerminar, // callback para terminar solicitud
   enableSwipe = false, // 🔒 deshabilitado por requerimiento
 }) {
   const prefersReducedMotion = useReducedMotion();
@@ -94,7 +94,7 @@ export default function SolicitudesList({
             <p className="text-sm md:text-base">No hay solicitudes para mostrar.</p>
             <motion.button
               type="button"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 border border-white/10 px-4 py-3 md:px-4 md:py-2.5 text-white text-sm md:text=[13px]"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 border border-white/10 px-4 py-3 md:px-4 md:py-2.5 text-white text-sm md:text-[13px]"
               onClick={() => onRefrescar?.()}
               variants={pressable}
               initial="initial"
@@ -212,8 +212,13 @@ function SolicitudCard({
     </motion.button>
   );
 
-  const puedeEliminar = s && ["BORRADOR", "TERMINADA", "CANCELADA"].includes(s.estado);
-  const puedeTerminar = typeof onTerminar === "function" && s?.estado !== "TERMINADA" && tareas.alta_compania && tareas.enviar_poliza;
+  const puedeEliminar =
+    s && ["BORRADOR", "TERMINADA", "CANCELADA"].includes(s.estado);
+  const puedeTerminar =
+    typeof onTerminar === "function" &&
+    s?.estado !== "TERMINADA" &&
+    tareas.alta_compania &&
+    tareas.enviar_poliza;
 
   return (
     <div
@@ -223,7 +228,11 @@ function SolicitudCard({
         rounded-2xl border bg-white/[0.06]
         p-4 sm:p-5 text-white transition
         min-h-[232px] md:min-h-[248px]
-        ${highlight ? "border-amber-300 ring-2 ring-amber-300/50" : "border-white/12 hover:border-white/20"}
+        ${
+          highlight
+            ? "border-amber-300 ring-2 ring-amber-300/50"
+            : "border-white/12 hover:border-white/20"
+        }
       `}
     >
       {/* Header */}
@@ -232,17 +241,22 @@ function SolicitudCard({
           <div className="flex items-center gap-2.5 flex-wrap">
             <EstadoBadge estado={s?.estado || "BORRADOR"} />
             <Chip icon={HiCollection}>#{s?.codigo || s?.id}</Chip>
-            {s?.poliza_fase ? <Chip icon={HiShieldCheck}>Póliza: {s.poliza_fase}</Chip> : null}
+            {s?.poliza_fase ? (
+              <Chip icon={HiShieldCheck}>Póliza: {s.poliza_fase}</Chip>
+            ) : null}
             {s?.cliente_estado ? (
-              <Chip icon={s.cliente_estado === "COMPLETO" ? HiCheckCircle : HiXCircle}>
+              <Chip
+                icon={s.cliente_estado === "COMPLETO" ? HiCheckCircle : HiXCircle}
+              >
                 Cliente: {s.cliente_estado}
               </Chip>
             ) : null}
           </div>
 
           <div className="mt-2 text-[13px] md:text-sm text-white/85 truncate">
-            {s?.cliente_nombre || "—"} · {s?.vehiculo_marca || ""} {s?.vehiculo_modelo || ""}{" "}
-            {s?.vehiculo_anio || ""} · {s?.vehiculo_patente || ""}
+            {s?.cliente_nombre || "—"} · {s?.vehiculo_marca || ""}{" "}
+            {s?.vehiculo_modelo || ""} {s?.vehiculo_anio || ""} ·{" "}
+            {s?.vehiculo_patente || ""}
           </div>
         </div>
       </div>
@@ -287,7 +301,9 @@ function SolicitudCard({
       <div className="mt-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-white/70">Tareas pendientes</span>
-          <span className="text-xs text-white/70">{hechas}/{total} completadas</span>
+          <span className="text-xs text-white/70">
+            {hechas}/{total} completadas
+          </span>
         </div>
         <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
           <div
@@ -296,21 +312,38 @@ function SolicitudCard({
           />
         </div>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Toggle k="alta_compania" label="Dar de alta en compañía" done={tareas.alta_compania} />
-          <Toggle k="enviar_poliza" label="Enviar póliza al cliente" done={tareas.enviar_poliza} />
+          <Toggle
+            k="alta_compania"
+            label="Dar de alta en compañía"
+            done={tareas.alta_compania}
+          />
+          <Toggle
+            k="enviar_poliza"
+            label="Enviar póliza al cliente"
+            done={tareas.enviar_poliza}
+          />
         </div>
       </div>
 
       {/* Acciones */}
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {puedeTerminar ? (
-          <MotionBtn onClick={() => onTerminar?.(s)} tone="ok" title="Marcar como terminada">
+          <MotionBtn
+            onClick={() => onTerminar?.(s)}
+            tone="ok"
+            title="Marcar como terminada"
+          >
             <HiCheck className="text-lg md:text-base" /> Marcar terminada
           </MotionBtn>
         ) : (
           <div className="hidden sm:block" />
         )}
-        <MotionBtn onClick={() => onEliminar?.(s)} tone="danger" title="Eliminar solicitud">
+        <MotionBtn
+          onClick={() => onEliminar?.(s)}
+          tone="danger"
+          title="Eliminar solicitud"
+          disabled={!puedeEliminar}
+        >
           <HiTrash className="text-lg md:text-base" /> Eliminar
         </MotionBtn>
       </div>
@@ -319,10 +352,11 @@ function SolicitudCard({
 }
 
 /* Botón — dark sólido, mayor touch target (≥44px) */
-function MotionBtn({ children, onClick, title, tone = "neutral" }) {
+function MotionBtn({ children, onClick, title, tone = "neutral", disabled }) {
   const palettes = {
     ok: "bg-emerald-600/20 text-emerald-100 border border-emerald-500/30 hover:bg-emerald-600/30",
-    danger: "bg-rose-600/20 text-rose-100 border border-rose-500/30 hover:bg-rose-600/30",
+    danger:
+      "bg-rose-600/20 text-rose-100 border border-rose-500/30 hover:bg-rose-600/30",
     neutral:
       "bg-white/10 text-white border border-white/10 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
   };
@@ -330,7 +364,10 @@ function MotionBtn({ children, onClick, title, tone = "neutral" }) {
     <motion.button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg text-[13px] md:text-[13px] px-4 py-3 md:px-3 md:py-2 h-12 md:h-10 ${palettes[tone]}`}
+      disabled={disabled}
+      className={`w-full inline-flex items-center justify-center gap-2 rounded-lg text-[13px] md:text-[13px] px-4 py-3 md:px-3 md:py-2 h-12 md:h-10 ${
+        palettes[tone]
+      } disabled:opacity-50 disabled:cursor-not-allowed`}
       title={title}
       variants={pressable}
       initial="initial"

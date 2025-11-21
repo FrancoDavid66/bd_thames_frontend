@@ -150,8 +150,9 @@ function ResponsableSelect({
   };
 
   const baseBtn =
-    "relative w-full sm:w-56 h-10 text-left inline-flex items-center justify-between gap-2 px-3 rounded-xl border text-sm " +
-    "bg-white/10 border-white/10 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 " +
+    "relative w-full sm:w-56 h-10 text-left inline-flex items-center justify-between gap-2 px-3 rounded-xl border " +
+    "bg-white/10 border-white/10 text-xs sm:text-sm text-white hover:bg-white/20 " +
+    "focus:outline-none focus:ring-2 focus:ring-white/30 " +
     "disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
@@ -195,7 +196,7 @@ function ResponsableSelect({
                     onChange(String(emp.id));
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 text-sm transition
+                  className={`w-full text-left px-3 py-2 text-xs sm:text-sm transition
                     ${isSel ? "bg-white/20 text-white" : "text-white/90"}
                     ${isHi && !isSel ? "bg-white/10" : ""}
                     hover:bg-white/15`}
@@ -218,7 +219,7 @@ function ResponsableSelect({
 export default function SolicitudCard({
   s,
   clienteEstado: clienteEstadoProp, // "BORRADOR" | "COMPLETO" (opcional)
-  polizaFase: polizaFaseProp,       // "PRELIMINAR" | "DEFINITIVA" (opcional)
+  polizaFase: polizaFaseProp, // "PRELIMINAR" | "DEFINITIVA" (opcional)
   onEmitir,
   onComprobante,
   onDocs,
@@ -366,7 +367,7 @@ export default function SolicitudCard({
           <div className="text-white font-semibold truncate">
             {s?.cliente_nombre || "—"}
           </div>
-          <div className="text-white/70 text-sm truncate">
+          <div className="text-white/70 text-xs sm:text-sm truncate">
             {s?.vehiculo_marca || "—"} {s?.vehiculo_modelo || ""} ·{" "}
             {s?.vehiculo_patente || "—"}
           </div>
@@ -491,7 +492,7 @@ export default function SolicitudCard({
             </Btn>
 
             {/* Asignación */}
-            <div className="ml-auto w-72 sm:w-auto min-w-[16rem] sm:min-w-0 mt-2 sm:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+            <div className="ml-auto w-full sm:w-auto min-w-[16rem] sm:min-w-0 mt-2 sm:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
               <ResponsableSelect
                 empleados={empleados}
                 value={empSel}
@@ -579,7 +580,7 @@ function Btn({
   className = "",
 }) {
   const base =
-    "inline-flex items-center gap-2 px-3 py-2 h-10 rounded-xl border text-sm transition";
+    "inline-flex items-center gap-2 px-3 py-2 h-10 rounded-xl border text-xs sm:text-sm transition whitespace-nowrap";
   const tones = {
     default: "bg-white/10 border-white/10 hover:bg-white/20 text-white",
     danger: "bg-red-500/20 border-red-500/30 hover:bg-red-500/30 text-red-50",

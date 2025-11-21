@@ -1,7 +1,13 @@
 // src/components/solicitudes/modalcreate/ImagenesDocsStep.jsx
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { HiPhotograph, HiDocumentText, HiX, HiCheckCircle, HiExclamationCircle } from "react-icons/hi";
+import {
+  HiPhotograph,
+  HiDocumentText,
+  HiX,
+  HiCheckCircle,
+  HiExclamationCircle,
+} from "react-icons/hi";
 import toast from "react-hot-toast";
 
 /**
@@ -44,14 +50,11 @@ const REQUIRED_BY_RULE = {
 
 // Inferencia básica si no viene coverageRuleKey
 function inferRuleKey(fotoSlotDefs = [], docSlotDefs = []) {
-  // Si no hay slots de fotos: podría ser A o un setup incompleto.
-  // Si además el set de docs contiene VTV => asumimos A_GRUA mal configurado (fotos faltan).
   const docKeys = new Set(docSlotDefs.map((d) => d.key));
   if (!fotoSlotDefs.length) {
     if (docKeys.has("VTV")) return "A_GRUA";
     return "A";
   }
-  // Si hay 4 lados en fotos, suena a A_GRUA/OTRAS; no sabemos cuál → OTRAS
   const fotoKeys = new Set(fotoSlotDefs.map((f) => f.key));
   const sides = ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"];
   const hasSides = sides.every((k) => fotoKeys.has(k));
@@ -138,7 +141,9 @@ export default function ImagenesDocsStep({
         .filter(([, v]) => v?.url)
         .map(([k]) => k)
     );
-    return rule.docs.filter((k) => !have.has(k) && docSlotDefs.some((d) => d.key === k));
+    return rule.docs.filter(
+      (k) => !have.has(k) && docSlotDefs.some((d) => d.key === k)
+    );
   }, [docSlots, docSlotDefs, rule.docs]);
 
   const missingFotos = useMemo(() => {
@@ -147,7 +152,9 @@ export default function ImagenesDocsStep({
         .filter(([, v]) => v?.url)
         .map(([k]) => k)
     );
-    return rule.fotos.filter((k) => !have.has(k) && fotoSlotDefs.some((f) => f.key === k));
+    return rule.fotos.filter(
+      (k) => !have.has(k) && fotoSlotDefs.some((f) => f.key === k)
+    );
   }, [fotoSlots, fotoSlotDefs, rule.fotos]);
 
   const ruleRequiresPhotosButHidden =
@@ -168,17 +175,19 @@ export default function ImagenesDocsStep({
       }
     }
 
-    // Enviamos al uploader externo (Cloudinary). No sabemos public_id antes.
     const doUpload = type === "foto" ? onUploadFotoVehiculo : onUploadDocVehiculo;
     try {
       await doUpload(file, key);
       // El padre setea (url/public_id) en el slot.
-      // Como dedupe depende del post-upload (public_id), validamos con un micro-delay.
+      // Como dedupe depende del post-upload, validamos con un micro-delay.
       setTimeout(() => {
         const slotMap = type === "foto" ? fotoSlots : docSlots;
         const value = slotMap?.[key];
-        if (value && (isDuplicate(value) && !sameSlotOnly(value, key, type, fotoSlots, docSlots))) {
-          // Si el duplicado está en otro slot, revertimos el actual.
+        if (
+          value &&
+          isDuplicate(value) &&
+          !sameSlotOnly(value, key, type, fotoSlots, docSlots)
+        ) {
           if (type === "foto") {
             setFotoSlots((prev) => ({ ...prev, [key]: null }));
           } else {
@@ -209,7 +218,7 @@ export default function ImagenesDocsStep({
       className="space-y-3"
     >
       {/* Banner de requisitos */}
-      <div className="rounded-2xl border border-white/10 bg-white/[.06] p-3">
+      <div className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
         <div
           className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#0b0f1e] bg-gradient-to-br ${rule.color} mb-2`}
         >
@@ -232,19 +241,20 @@ export default function ImagenesDocsStep({
 
         {ruleRequiresPhotosButHidden && (
           <div className="mt-2 text-xs text-amber-200/90">
-            ⚠ Esta cobertura requiere fotos del vehículo (frente, laterales, trasera), pero no están habilitadas aquí.
-            Revisá la configuración de la pantalla o la cobertura seleccionada.
+            ⚠ Esta cobertura requiere fotos del vehículo (frente, laterales,
+            trasera), pero no están habilitadas aquí. Revisá la configuración de
+            la pantalla o la cobertura seleccionada.
           </div>
         )}
       </div>
 
       {/* Documentos del vehículo */}
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3">
+      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
         <legend className="px-1 text-white/85 text-sm flex items-center gap-2">
           <HiDocumentText /> Documentos
         </legend>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {docSlotDefs.map(({ key, label }) => {
             const v = docSlots?.[key] || null;
             const required = rule.docs.includes(key);
@@ -265,17 +275,17 @@ export default function ImagenesDocsStep({
       </fieldset>
 
       {/* Fotos del vehículo */}
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3">
+      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
         <legend className="px-1 text-white/85 text-sm flex items-center gap-2">
           <HiPhotograph /> Fotos del vehículo
         </legend>
 
         {fotoSlotDefs.length === 0 ? (
-          <p className="text-white/70 text-sm">
+          <p className="mt-2 text-white/70 text-sm">
             No hay campos de fotos habilitados para esta cobertura.
           </p>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {fotoSlotDefs.map(({ key, label }) => {
               const v = fotoSlots?.[key] || null;
               const required = rule.fotos.includes(key);
@@ -308,7 +318,9 @@ export default function ImagenesDocsStep({
 /* ===================== Cards ===================== */
 function DocSlotCard({ label, value, required, onPick, onRemove }) {
   const filled = Boolean(value?.url);
-  const isPdf = String(value?.mime || "").includes("pdf") || /\.pdf$/i.test(value?.url || "");
+  const isPdf =
+    String(value?.mime || "").includes("pdf") ||
+    /\.pdf$/i.test(value?.url || "");
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -356,8 +368,11 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
             className="hidden"
             onChange={onPick}
           />
-          <div className="h-28 rounded-lg border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition grid place-items-center text-white/70 text-sm cursor-pointer">
-            Subir archivo
+          <div className="h-28 rounded-lg border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition grid place-items-center text-white/70 text-xs sm:text-sm cursor-pointer px-3 text-center">
+            <div className="flex flex-col items-center gap-1">
+              <HiDocumentText className="text-base opacity-80" />
+              <span>Subir archivo</span>
+            </div>
           </div>
         </label>
       )}
@@ -401,9 +416,18 @@ function FotoSlotCard({ label, value, required, onPick, onRemove }) {
         </div>
       ) : (
         <label className="block">
-          <input type="file" accept="image/*" className="hidden" onChange={onPick} />
-          <div className="h-28 rounded-lg border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition grid place-items-center text-white/70 text-sm cursor-pointer">
-            Subir foto
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={onPick}
+          />
+          <div className="h-28 rounded-lg border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition grid place-items-center text-white/70 text-xs sm:text-sm cursor-pointer px-3 text-center">
+            <div className="flex flex-col items-center gap-1">
+              <HiPhotograph className="text-base opacity-80" />
+              <span>Subir foto</span>
+            </div>
           </div>
         </label>
       )}

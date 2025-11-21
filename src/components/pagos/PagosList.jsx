@@ -75,6 +75,7 @@ const fmtMoney = (n) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(n || 0));
+
 const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "—");
 
 export default function PagosList({
@@ -170,7 +171,7 @@ export default function PagosList({
         Resultados
       </div>
 
-      {/* Lista tipo cards oscuras (scrollable) */}
+      {/* Lista tipo cards oscuras — con scroll */}
       <div className="max-h-[60vh] overflow-y-auto">
         <ul role="list" className={`divide-y ${PALETTE.divider}`}>
           {items.map((cuota, idx) => {
