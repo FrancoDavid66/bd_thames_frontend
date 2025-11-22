@@ -1,4 +1,4 @@
-/* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos */
+/* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos, full-width móvil */
 import { useDispatch } from "react-redux";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -163,16 +163,24 @@ export default function PagosList({
   }
 
   return (
-    <div className={`rounded-3xl border ${PALETTE.basePanel} overflow-hidden`}>
+    <div
+      className={`
+        w-full
+        ${PALETTE.basePanel}
+        rounded-none sm:rounded-3xl
+        border-t border-b sm:border
+        overflow-hidden
+      `}
+    >
       {/* Encabezado */}
       <div
-        className={`px-6 py-4 text-sm uppercase tracking-wide border-b border-neutral-900 ${PALETTE.header}`}
+        className={`px-4 sm:px-6 py-3 sm:py-4 text-sm uppercase tracking-wide border-b border-neutral-900 ${PALETTE.header}`}
       >
         Resultados
       </div>
 
-      {/* Lista tipo cards oscuras — con scroll */}
-      <div className="max-h-[60vh] overflow-y-auto">
+      {/* Lista tipo cards oscuras — scroll solo en desktop */}
+      <div className="max-h-none md:max-h-[60vh] overflow-y-visible md:overflow-y-auto">
         <ul role="list" className={`divide-y ${PALETTE.divider}`}>
           {items.map((cuota, idx) => {
             const venc = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
@@ -195,7 +203,8 @@ export default function PagosList({
             const pol = cuota?.poliza || {};
             const cliente = pol?.cliente || {};
             const nombreCompleto =
-              [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || "Cliente";
+              [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") ||
+              "Cliente";
             const patente = (pol?.patente || "").toUpperCase();
             const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
             const observacion = (
@@ -221,7 +230,7 @@ export default function PagosList({
 
                 {/* Tarjeta oscura con borde acentuado */}
                 <div
-                  className={`mx-3 my-3 rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
+                  className={`mx-0 sm:mx-3 my-2 sm:my-3 rounded-none sm:rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
                 >
                   <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
                     {/* Izquierda */}
@@ -292,15 +301,15 @@ export default function PagosList({
                     </div>
 
                     {/* Derecha: monto + acciones */}
-                    <div className="flex flex-col items-end gap-3">
-                      <p className="text-3xl font-extrabold tracking-tight text-neutral-50">
+                    <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
+                      <p className="text-3xl font-extrabold tracking-tight text-neutral-50 text-right w-full">
                         $ {fmtMoney(cuota.monto)}
                       </p>
 
-                      <div className="flex items-center gap-2 md:gap-3">
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full">
                         <button
                           onClick={() => abrirDetalle(cuota)}
-                          className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center gap-2`}
+                          className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto`}
                           title="Ver más información"
                           aria-label="Ver más información"
                         >
@@ -313,7 +322,7 @@ export default function PagosList({
                             onClick={() =>
                               setObsAbiertaId(obsActiva ? null : cuota.id)
                             }
-                            className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center gap-2 transition`}
+                            className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-2 transition w-full sm:w-auto`}
                             title={
                               obsActiva ? "Ocultar observación" : "Ver observación"
                             }
@@ -328,7 +337,7 @@ export default function PagosList({
                         {!cuota.pagado && (
                           <button
                             onClick={() => abrirPagar(cuota)}
-                            className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center gap-2`}
+                            className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto`}
                             title="Registrar pago"
                           >
                             <HiCash className="w-5 h-5" />
@@ -343,13 +352,13 @@ export default function PagosList({
                             cuota={cuota}
                             tone="neutral"
                             label="Factura"
-                            className="mt-0"
+                            className="mt-0 w-full sm:w-auto"
                           />
                         )}
 
                         <EnviarFacturaWhatsapp cuota={cuota}>
                           <button
-                            className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center gap-2`}
+                            className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto`}
                             title="Enviar por WhatsApp"
                           >
                             <HiDeviceMobile className="w-5 h-5" />

@@ -1,4 +1,4 @@
-/* src/pages/PagosPage.jsx — Tema oscuro + KPIs + modales separados */
+/* src/pages/PagosPage.jsx — Tema oscuro + KPIs + layout móvil full-width */
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
@@ -168,7 +168,7 @@ export default function PagosPage() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-900 text-white">
       {/* Header */}
-      <div className="px-6 pt-6">
+      <div className="px-4 sm:px-6 pt-6">
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -283,7 +283,7 @@ export default function PagosPage() {
       </div>
 
       {/* Resultado */}
-      <div className="px-6 pb-10 mt-5">
+      <div className="px-4 sm:px-6 pb-24 mt-5">
         {cuotas.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
@@ -304,7 +304,7 @@ export default function PagosPage() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
-            className="rounded-2xl bg-gray-900/50 border border-gray-800 ring-1 ring-gray-800/70 shadow-sm p-4"
+            className="rounded-2xl bg-gray-900/50 border border-gray-800 ring-1 ring-gray-800/70 shadow-sm overflow-hidden"
           >
             <PagosList
               cuotas={cuotas}
