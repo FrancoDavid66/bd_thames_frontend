@@ -64,9 +64,6 @@ export default function PolizaDetails() {
   }, [navigate]);
 
   // 🔔 Refresco automático cuando una solicitud se asocia y el backend copia medios
-  // Eventos esperados desde el front de "solicitudes":
-  //   window.dispatchEvent(new CustomEvent("solicitud:asociada", { detail: { poliza_id, focusTab: "vehiculo" } }));
-  //   window.dispatchEvent(new CustomEvent("poliza:media_importada", { detail: { poliza_id, focusTab: "documentos" } }));
   useEffect(() => {
     const refreshAll = async (targetId, focusTab) => {
       console.groupCollapsed("[DBG] PolizaDetails.refreshAll");
@@ -174,11 +171,11 @@ export default function PolizaDetails() {
 
   if (loadStatus === "loading" || !poliza) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-10 w-1/2 bg-gray-800 rounded" />
-          <div className="h-8 w-1/3 bg-gray-800 rounded" />
-          <div className="h-64 w-full bg-gray-900 rounded" />
+          <div className="h-8 sm:h-10 w-2/3 sm:w-1/2 bg-gray-800 rounded" />
+          <div className="h-6 sm:h-8 w-1/2 sm:w-1/3 bg-gray-800 rounded" />
+          <div className="h-52 sm:h-64 w-full bg-gray-900 rounded" />
         </div>
       </div>
     );
@@ -186,16 +183,16 @@ export default function PolizaDetails() {
 
   if (loadStatus === "failed") {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-6 text-red-400">
-        <div className="text-lg font-semibold mb-2">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 text-red-400">
+        <div className="text-base sm:text-lg font-semibold mb-2">
           No se pudo cargar la póliza
         </div>
-        <div className="text-sm opacity-80">
+        <div className="text-xs sm:text-sm opacity-80">
           {String(loadError || "Error desconocido")}
         </div>
         <button
           onClick={() => dispatch(fetchPolizaPorId(polizaId))}
-          className="mt-4 px-3 py-2 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-100"
+          className="mt-4 px-3 py-2 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-100 text-sm"
         >
           Reintentar
         </button>
@@ -204,7 +201,7 @@ export default function PolizaDetails() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
       <PolizaHeader
         poliza={poliza}
         onBack={onBack}
@@ -212,36 +209,40 @@ export default function PolizaDetails() {
         onRenovarClick={() => setOpenRenovar(true)}
       />
 
-      <div className="mt-6 border-b border-gray-800">
-        <nav className="-mb-px flex flex-wrap gap-4 text-sm">
-          {[
-            ["resumen", "Resumen"],
-            ["vehiculo", "Vehículo / papeles"],
-            ["gruas", "Grúas"],
-            ["cuotas", "Cuotas"],
-            // 🆕 nuevo tab
-            ["cuponeras", "Cuponeras robo"],
-            ["historial", "Historial"],
-            ["notas", "Notas"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => changeTab(key)}
-              className={`px-3 py-2 border-b-2 ${
-                tab === key
-                  ? "border-primary-400 text-primary-400"
-                  : "border-transparent text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+      {/* Tabs: scroll horizontal en mobile */}
+      <div className="mt-5 sm:mt-6 border-b border-gray-800">
+        <div className="overflow-x-auto">
+          <nav className="-mb-px flex min-w-max flex-row gap-2 sm:gap-4 text-xs sm:text-sm px-1 sm:px-0">
+            {[
+              ["resumen", "Resumen"],
+              ["vehiculo", "Vehículo / papeles"],
+              ["gruas", "Grúas"],
+              ["cuotas", "Cuotas"],
+              // 🆕 nuevo tab
+              ["cuponeras", "Cuponeras robo"],
+              ["historial", "Historial"],
+              ["notas", "Notas"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => changeTab(key)}
+                className={`whitespace-nowrap px-2.5 sm:px-3 py-2 border-b-2 text-xs sm:text-sm transition-colors ${
+                  tab === key
+                    ? "border-primary-400 text-primary-400"
+                    : "border-transparent text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
-      <div className="mt-6 space-y-6">
+      {/* Contenido de tabs */}
+      <div className="mt-5 sm:mt-6 space-y-4 sm:space-y-6">
         {tab === "resumen" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
             <PolizaResumenSection
               poliza={poliza}
               polizaId={polizaId}
@@ -256,7 +257,7 @@ export default function PolizaDetails() {
 
         {/* ✅ Unificado: Vehículo + Papeles (fotos + documentos) */}
         {tab === "vehiculo" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
             <VehiculoDocsPanel
               key={`veh-${refreshTick}`}
               poliza={poliza}
@@ -272,20 +273,20 @@ export default function PolizaDetails() {
         )}
 
         {tab === "gruas" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
             <GruasPanel poliza={poliza} />
           </div>
         )}
 
         {tab === "cuotas" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
             <CuotasPanel poliza={poliza} polizaId={polizaId} />
           </div>
         )}
 
         {/* 🆕 Tab Cuponeras robo */}
         {tab === "cuponeras" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
             <CuponesRoboPanel
               poliza={poliza}
               polizaId={polizaId}
@@ -295,13 +296,13 @@ export default function PolizaDetails() {
         )}
 
         {tab === "historial" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
             <PolizaHistoriaPanel polizaId={poliza.id} />
           </div>
         )}
 
         {tab === "notas" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 text-sm text-gray-300">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5 sm:p-6 text-xs sm:text-sm text-gray-300">
             Próximamente: notas internas por póliza.
           </div>
         )}

@@ -176,7 +176,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     dias_a_vencer: 30,
     generar_cuotas_ahora: true,
   });
-  const [sinNumero, setSinNumero] = useState(false); // compat, pero ya no se exige número
+  const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -235,7 +235,6 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
   const baseErrors = useMemo(() => {
     const e = {};
     if (!poliza.compania.trim()) e.compania = "Requerido";
-    // ⛔️ YA NO exigimos número de póliza: lo genera el backend
     if (!poliza.cobertura.trim()) e.cobertura = "Requerido";
     if (!poliza.oficina.trim()) e.oficina = "Requerido";
     if (!poliza.patente.trim()) e.patente = "Requerido";
@@ -244,7 +243,6 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     if (!String(poliza.anio).trim()) e.anio = "Requerido";
     if (!poliza.primer_vencimiento) e.primer_vencimiento = "Requerido";
     if (!poliza.fecha_emision) e.fecha_emision = "Requerido";
-    // ⛔️ Ya NO exigimos precio_cuota, porque puede ir 0 / default en backend
     return e;
   }, [poliza]);
 
@@ -332,10 +330,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
       const payload = {
         cliente_id: Number(clienteId),
         compania: poliza.compania.trim(),
-
-        // ✅ Si viene número, lo mandamos. Si no, dejamos que el backend lo genere.
         numero_poliza: poliza.numero_poliza.trim() || undefined,
-
         cobertura: normalizeCobertura(poliza.cobertura),
         oficina: poliza.oficina.trim(),
         patente: poliza.patente.trim().toUpperCase(),
@@ -343,25 +338,19 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
         modelo: poliza.modelo.trim(),
         anio: Number(poliza.anio),
         tipo: poliza.tipo || "Auto",
-
-        // ⬇️ Si hay precio cargado, lo mandamos; si no, dejamos que el backend lo ponga en 0 / default
         precio_cuota:
           poliza.generar_cuotas_ahora &&
           String(poliza.precio_cuota).trim()
             ? Number(poliza.precio_cuota)
             : undefined,
-
         cantidad_cuotas_override: poliza.cantidad_cuotas_override
           ? Number(poliza.cantidad_cuotas_override)
           : undefined,
         generar_cuotas_ahora: !!poliza.generar_cuotas_ahora,
         regenerar_cuotas: false,
-
         fecha_emision: fechaEmision,
         primer_vencimiento: poliza.primer_vencimiento,
         dias_a_vencer: Number(poliza.dias_a_vencer) || 30,
-
-        // compat backend
         primer_pago: fechaEmision,
         fecha_vencimiento: fechaVencimientoFinal,
       };
@@ -469,10 +458,6 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
       }
       return;
     }
-
-    // Si querés, podés dejar un toast informativo:
-    // if (docsFotosError) toast((t) => docsFotosError, { icon: "⚠️" });
-
     await createPoliza();
   };
 
@@ -481,7 +466,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    setStep(1); // siempre empieza en datos
+    setStep(1);
     return () => (document.body.style.overflow = prev);
   }, [isOpen]);
 
@@ -517,13 +502,13 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/50 px-2 sm:px-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-[95%] max-w-5xl overflow-hidden"
+            className="relative bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-xl w-full sm:w-[95%] sm:max-w-5xl max-h-[100vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
             initial={{ scale: 0.96, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
@@ -533,12 +518,12 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
             aria-label="Crear póliza"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/95 dark:bg-gray-900/95 backdrop-blur">
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
                   Nueva póliza
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                   Paso {step} de 2 ·{" "}
                   {step === 1
                     ? "Datos de póliza y vehículo"
@@ -549,14 +534,14 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                 ref={closeBtnRef}
                 onClick={() => !saving && onClose?.()}
                 disabled={saving}
-                className="h-10 px-3 rounded-lg bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-50"
+                className="h-9 sm:h-10 px-3 rounded-lg bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-50 text-xs sm:text-sm"
               >
                 Cerrar
               </button>
             </div>
 
-            {/* Cuerpo */}
-            <div className="px-4 py-4 space-y-4">
+            {/* Cuerpo (scroll interno) */}
+            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4">
               {step === 1 && (
                 <PolizaStep
                   polizaModo={"nueva"}
@@ -574,16 +559,16 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
               )}
 
               {step === 2 && (
-                <div className="mt-2 rounded-2xl border border-gray-200/10 bg-[#0b0f1e] text-white p-3">
+                <div className="mt-1 sm:mt-2 rounded-2xl border border-gray-200/10 bg-[#0b0f1e] text-white p-3 sm:p-4">
                   {/* Mini resumen arriba para contexto */}
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-300">
-                    <span>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs text-gray-300">
+                    <span className="truncate">
                       Cobertura:{" "}
                       <strong className="font-semibold">
                         {poliza.cobertura || "-"}
                       </strong>
                     </span>
-                    <span>
+                    <span className="truncate">
                       Patente:{" "}
                       <strong className="font-semibold">
                         {poliza.patente?.toUpperCase() || "-"}
@@ -605,7 +590,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                   />
 
                   {docsFotosError && (
-                    <p className="mt-2 text-sm text-amber-300">
+                    <p className="mt-2 text-[11px] sm:text-sm text-amber-300">
                       {docsFotosError} (se puede crear igual).
                     </p>
                   )}
@@ -613,26 +598,24 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
               )}
             </div>
 
-            {/* Footer */}
-            <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between gap-3">
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+            {/* Footer fijo dentro del modal */}
+            <div className="shrink-0 px-3 sm:px-4 py-3 border-t border-white/10 bg-white/95 dark:bg-gray-900/95 backdrop-blur flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
+              <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
                 {step === 1 && !canGoToFotos && (
                   <span>
                     Completá los datos básicos de la póliza para continuar con
                     las fotos.
                   </span>
                 )}
-                {step === 2 && docsFotosError && (
-                  <span>{docsFotosError}</span>
-                )}
+                {step === 2 && docsFotosError && <span>{docsFotosError}</span>}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => !saving && onClose?.()}
                   disabled={saving}
-                  className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
+                  className="px-3 sm:px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-[12px] sm:text-sm text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
                 >
                   Cancelar
                 </button>
@@ -642,7 +625,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     type="button"
                     onClick={() => setStep(1)}
                     disabled={saving}
-                    className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
+                    className="px-3 sm:px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-[12px] sm:text-sm text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
                   >
                     Volver a datos
                   </button>
@@ -661,7 +644,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                       setStep(2);
                     }}
                     disabled={!canGoToFotos || saving}
-                    className="px-4 py-2 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
+                    className="px-3 sm:px-4 py-2 rounded-xl text-[12px] sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
                   >
                     Continuar a fotos
                   </button>
@@ -672,7 +655,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     type="button"
                     onClick={onSubmit}
                     disabled={!canSubmit}
-                    className="px-4 py-2 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
+                    className="px-3 sm:px-4 py-2 rounded-xl text-[12px] sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
                   >
                     {saving ? "Creando…" : "Crear póliza"}
                   </button>
