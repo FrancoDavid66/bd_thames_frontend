@@ -790,7 +790,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 exit={{ opacity: 0 }}
                 className="text-sm text-white/60"
               >
-                No hay documentos cargados para esta póliza.
+                No hay documentos cargados para esta póliza. 
               </motion.div>
             )}
           </AnimatePresence>
