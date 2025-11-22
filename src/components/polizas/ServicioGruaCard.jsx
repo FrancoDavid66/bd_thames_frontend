@@ -30,7 +30,9 @@ function Pill({ children, tone = "neutral", icon: Icon }) {
     neutral: "bg-gray-500/20 text-gray-300 ring-1 ring-gray-500/20",
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${tones[tone]}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${tones[tone]}`}
+    >
       {Icon ? <Icon className="w-4 h-4" /> : null}
       {children}
     </span>
@@ -43,7 +45,11 @@ function Row({ label, value, help, action }) {
       <span className="text-xs text-gray-400">{label}</span>
       <span className="text-sm font-medium text-gray-100 text-right">
         {value ?? "—"}
-        {help ? <span className="block text-[11px] font-normal text-gray-400">{help}</span> : null}
+        {help ? (
+          <span className="block text-[11px] font-normal text-gray-400">
+            {help}
+          </span>
+        ) : null}
         {action ? <div className="mt-1">{action}</div> : null}
       </span>
     </div>
@@ -63,7 +69,9 @@ function fmt(d) {
 
 export default function ServicioGruaCard({ polizaId }) {
   const dispatch = useDispatch();
-  const { list: planes, loading: planesLoading } = useSelector((s) => s.gruas?.planes || { list: [], loading: false });
+  const { list: planes, loading: planesLoading } = useSelector(
+    (s) => s.gruas?.planes || { list: [], loading: false }
+  );
 
   const [data, setData] = useState(null);
   const [status, setStatus] = useState("idle");
@@ -71,7 +79,9 @@ export default function ServicioGruaCard({ polizaId }) {
 
   const [assocOpen, setAssocOpen] = useState(false);
   const [planSel, setPlanSel] = useState("");
-  const [fechaAct, setFechaAct] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaAct, setFechaAct] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [autoImport, setAutoImport] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -110,14 +120,30 @@ export default function ServicioGruaCard({ polizaId }) {
   const adh = data?.adhesion || null;
   const op = data?.operable || null;
   const stats = data?.stats || null;
-  const contrato = adh?.contrato || { firmado: false, firmado_en: null, archivo_url: "" };
+  const contrato = adh?.contrato || {
+    firmado: false,
+    firmado_en: null,
+    archivo_url: "",
+  };
 
   const estadoBadge = useMemo(() => {
-    if (!adh) return { text: "SIN ADHESIÓN", tone: "neutral", icon: HiInformationCircle };
-    if (adh.estado === "ACTIVA") return { text: "ACTIVA", tone: "success", icon: HiCheckCircle };
-    if (adh.estado === "PAUSADA") return { text: "PAUSADA", tone: "warn", icon: HiClock };
-    if (adh.estado === "CANCELADA") return { text: "CANCELADA", tone: "danger", icon: HiXCircle };
-    return { text: adh.estado || "—", tone: "neutral", icon: HiInformationCircle };
+    if (!adh)
+      return {
+        text: "SIN ADHESIÓN",
+        tone: "neutral",
+        icon: HiInformationCircle,
+      };
+    if (adh.estado === "ACTIVA")
+      return { text: "ACTIVA", tone: "success", icon: HiCheckCircle };
+    if (adh.estado === "PAUSADA")
+      return { text: "PAUSADA", tone: "warn", icon: HiClock };
+    if (adh.estado === "CANCELADA")
+      return { text: "CANCELADA", tone: "danger", icon: HiXCircle };
+    return {
+      text: adh.estado || "—",
+      tone: "neutral",
+      icon: HiInformationCircle,
+    };
   }, [adh]);
 
   const resumenPills = useMemo(() => {
@@ -130,13 +156,27 @@ export default function ServicioGruaCard({ polizaId }) {
           : { text: "Con restricciones", tone: "warn", icon: HiClock }
       );
       const car = adh.fecha_carencia_fin ? new Date(adh.fecha_carencia_fin) : null;
-      if (car && car > today) pills.push({ text: `Carencia hasta ${car.toLocaleDateString()}`, tone: "warn" });
-      const reh = adh.rehabilitar_desde ? new Date(adh.rehabilitar_desde) : null;
-      if (reh && reh > today) pills.push({ text: `Rehabilita ${reh.toLocaleDateString()}`, tone: "warn" });
+      if (car && car > today)
+        pills.push({
+          text: `Carencia hasta ${car.toLocaleDateString()}`,
+          tone: "warn",
+        });
+      const reh = adh.rehabilitar_desde
+        ? new Date(adh.rehabilitar_desde)
+        : null;
+      if (reh && reh > today)
+        pills.push({
+          text: `Rehabilita ${reh.toLocaleDateString()}`,
+          tone: "warn",
+        });
       const km = adh?.plan?.km_incluidos ?? 0;
       pills.push({ text: `${km} km incluidos (I+V)`, tone: "info" });
     } else {
-      pills.push({ text: "Activá la asistencia", tone: "neutral", icon: HiInformationCircle });
+      pills.push({
+        text: "Activá la asistencia",
+        tone: "neutral",
+        icon: HiInformationCircle,
+      });
     }
     return pills;
   }, [adh, op]);
@@ -175,7 +215,10 @@ export default function ServicioGruaCard({ polizaId }) {
       dispatch(fetchAdhesionesByPoliza(polizaId));
       await reloadResumen();
     } catch (e) {
-      const msg = e?.payload?.detail || e?.message || "No se pudo asociar la grúa.";
+      const msg =
+        e?.payload?.detail ||
+        e?.message ||
+        "No se pudo asociar la grúa.";
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -184,15 +227,22 @@ export default function ServicioGruaCard({ polizaId }) {
 
   async function onBaja() {
     if (!adh?.id) return;
-    const ok = window.confirm("¿Dar de baja (cancelar) el servicio de grúa para esta póliza?");
+    const ok = window.confirm(
+      "¿Dar de baja (cancelar) el servicio de grúa para esta póliza?"
+    );
     if (!ok) return;
     setBajando(true);
     try {
-      await GruasAPI.cancelarAdhesion(adh.id, "Baja manual desde tarjeta");
+      await GruasAPI.cancelarAdhesion(
+        adh.id,
+        "Baja manual desde tarjeta"
+      );
       toast.success("Adhesión dada de baja.");
       await reloadResumen();
     } catch (e) {
-      toast.error(e?.message || "No se pudo dar de baja la adhesión.");
+      toast.error(
+        e?.message || "No se pudo dar de baja la adhesión."
+      );
     } finally {
       setBajando(false);
     }
@@ -206,12 +256,18 @@ export default function ServicioGruaCard({ polizaId }) {
           <span className="rounded-lg bg-gray-800 p-2 ring-1 ring-gray-700">
             <HiTruck className="h-5 w-5 text-yellow-400" />
           </span>
-          <h3 className="text-sm font-semibold text-gray-100">Servicio de Grúa</h3>
+          <h3 className="text-sm font-semibold text-gray-100">
+            Servicio de Grúa
+          </h3>
         </div>
         <div className="flex items-center gap-2">
-          <Pill tone={estadoBadge.tone} icon={estadoBadge.icon}>{estadoBadge.text}</Pill>
+          <Pill tone={estadoBadge.tone} icon={estadoBadge.icon}>
+            {estadoBadge.text}
+          </Pill>
           {adh && !contrato?.firmado && (
-            <Pill tone="warn" icon={HiDocumentText}>Contrato faltante</Pill>
+            <Pill tone="warn" icon={HiDocumentText}>
+              Contrato faltante
+            </Pill>
           )}
         </div>
       </div>
@@ -248,24 +304,48 @@ export default function ServicioGruaCard({ polizaId }) {
             <div className="rounded-lg border border-gray-800 bg-gray-950 p-3">
               <Row
                 label="Plan"
-                value={adh ? `${adh?.plan?.nombre || "—"} · ${planKm} km` : "—"}
-                help={adh ? "Kilómetros totales incluidos (ida+vuelta)" : undefined}
+                value={
+                  adh
+                    ? `${adh?.plan?.nombre || "—"} · ${planKm} km`
+                    : "—"
+                }
+                help={
+                  adh
+                    ? "Kilómetros totales incluidos (ida+vuelta)"
+                    : undefined
+                }
               />
               <Row
                 label="Carencia hasta"
                 value={fmt(adh?.fecha_carencia_fin)}
-                help={adh?.fecha_carencia_fin ? "Luego de esa fecha, el servicio opera (si no hay mora/suspensión)" : undefined}
+                help={
+                  adh?.fecha_carencia_fin
+                    ? "Luego de esa fecha, el servicio opera (si no hay mora/suspensión)"
+                    : undefined
+                }
               />
               <Row
                 label="Rehabilita desde"
                 value={fmt(adh?.rehabilitar_desde)}
-                help={adh?.rehabilitar_desde ? "Aplica si hubo suspensión por mora" : undefined}
+                help={
+                  adh?.rehabilitar_desde
+                    ? "Aplica si hubo suspensión por mora"
+                    : undefined
+                }
               />
-              <Row label="Operable" value={adh ? (op?.ok ? "Sí" : "No") : "—"} help={op?.motivo} />
+              <Row
+                label="Operable"
+                value={adh ? (op?.ok ? "Sí" : "No") : "—"}
+                help={op?.motivo}
+              />
               <Row
                 label="Contrato"
                 value={contrato?.firmado ? "Firmado" : "Faltante"}
-                help={contrato?.firmado ? `Firmado el ${fmt(contrato.firmado_en)}` : "Subilo desde la sección de grúas"}
+                help={
+                  contrato?.firmado
+                    ? `Firmado el ${fmt(contrato.firmado_en)}`
+                    : "Subilo desde la sección de grúas"
+                }
                 action={
                   contrato?.archivo_url ? (
                     <a
@@ -274,14 +354,16 @@ export default function ServicioGruaCard({ polizaId }) {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-primary-300 hover:underline"
                     >
-                      Ver/Descargar <HiExternalLink className="w-3.5 h-3.5" />
+                      Ver/Descargar{" "}
+                      <HiExternalLink className="w-3.5 h-3.5" />
                     </a>
                   ) : (
                     <Link
                       to={manageUrl}
                       className="inline-flex items-center gap-1 text-primary-300 hover:underline"
                     >
-                      Subir ahora <HiLink className="w-3.5 h-3.5" />
+                      Subir ahora{" "}
+                      <HiLink className="w-3.5 h-3.5" />
                     </Link>
                   )
                 }
@@ -293,30 +375,53 @@ export default function ServicioGruaCard({ polizaId }) {
                 label="Última solicitud"
                 value={
                   stats?.ultima_solicitud
-                    ? `#${stats.ultima_solicitud.id} · ${fmt(stats.ultima_solicitud.fecha)}`
+                    ? `#${stats.ultima_solicitud.id} · ${fmt(
+                        stats.ultima_solicitud.fecha
+                      )}`
                     : "—"
                 }
                 help={
                   stats?.ultima_solicitud
                     ? [
-                        stats.ultima_solicitud.proveedor ? `Prov.: ${stats.ultima_solicitud.proveedor}` : null,
-                        stats.ultima_solicitud.km_totales != null ? `Km: ${Number(stats.ultima_solicitud.km_totales).toFixed(2)}` : null,
-                        stats.ultima_solicitud.copago_cliente != null ? `Copago: $${Number(stats.ultima_solicitud.copago_cliente).toFixed(2)}` : null,
+                        stats.ultima_solicitud.proveedor
+                          ? `Prov.: ${stats.ultima_solicitud.proveedor}`
+                          : null,
+                        stats.ultima_solicitud.km_totales != null
+                          ? `Km: ${Number(
+                              stats.ultima_solicitud.km_totales
+                            ).toFixed(2)}`
+                          : null,
+                        stats.ultima_solicitud.copago_cliente != null
+                          ? `Copago: $${Number(
+                              stats.ultima_solicitud.copago_cliente
+                            ).toFixed(2)}`
+                          : null,
                       ]
                         .filter(Boolean)
                         .join(" · ")
                     : undefined
                 }
               />
-              <Row label="Total solicitudes" value={stats?.total_solicitudes ?? 0} />
-              <Row label="Últimos 12 meses" value={stats?.en_12_meses ?? 0} />
-              <Row label="Km totales acumulados" value={Number(stats?.km_totales || 0).toFixed(2)} />
+              <Row
+                label="Total solicitudes"
+                value={stats?.total_solicitudes ?? 0}
+              />
+              <Row
+                label="Últimos 12 meses"
+                value={stats?.en_12_meses ?? 0}
+              />
+              <Row
+                label="Km totales acumulados"
+                value={Number(stats?.km_totales || 0).toFixed(2)}
+              />
             </div>
           </div>
 
-          {/* Ayuda */}
+          {/* Ayuda - REGLA NUEVA DE FOTOS (4 LADOS) */}
           <div className="text-[11px] text-gray-400">
-            Recordá subir fotos <b>PATENTE</b> y <b>ENTORNO</b> al solicitar el servicio.
+            Al pedir el servicio, acordate de cargar las fotos obligatorias del
+            vehículo para grúa:{" "}
+            <b>FRENTE, LATERAL IZQ, LATERAL DER y TRASERA</b> (4 lados).
           </div>
 
           {/* Panel de Asociación (visible solo sin adhesión) */}
@@ -341,18 +446,25 @@ export default function ServicioGruaCard({ polizaId }) {
                         onChange={(e) => setPlanSel(e.target.value)}
                         className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-gray-100"
                       >
-                        {planesLoading && <option value="">Cargando...</option>}
-                        {!planesLoading && planes.length === 0 && <option value="">— sin planes —</option>}
+                        {planesLoading && (
+                          <option value="">Cargando...</option>
+                        )}
+                        {!planesLoading && planes.length === 0 && (
+                          <option value="">— sin planes —</option>
+                        )}
                         {planes.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.nombre} · ${Number(p.precio_mensual || 0).toFixed(2)}
+                            {p.nombre} · $
+                            {Number(p.precio_mensual || 0).toFixed(2)}
                           </option>
                         ))}
                       </select>
                     </label>
 
                     <label className="flex flex-col text-sm">
-                      <span className="mb-1 text-gray-300">Fecha de activación</span>
+                      <span className="mb-1 text-gray-300">
+                        Fecha de activación
+                      </span>
                       <input
                         type="date"
                         value={fechaAct}
@@ -365,10 +477,14 @@ export default function ServicioGruaCard({ polizaId }) {
                       <input
                         type="checkbox"
                         checked={autoImport}
-                        onChange={(e) => setAutoImport(e.target.checked)}
+                        onChange={(e) =>
+                          setAutoImport(e.target.checked)
+                        }
                         className="h-4 w-4"
                       />
-                      <span className="text-gray-300">Auto-importar fotos de PATENTE (si faltan)</span>
+                      <span className="text-gray-300">
+                        Auto-importar fotos de PATENTE (si faltan)
+                      </span>
                     </label>
                   </div>
 

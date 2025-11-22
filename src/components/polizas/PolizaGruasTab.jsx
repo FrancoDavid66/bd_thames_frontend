@@ -29,15 +29,22 @@ const TipoFotoAdhesionOpts = [
 
 const pill = (text, tone = "gray") => {
   const map = {
-    green: "bg-emerald-600/20 text-emerald-300 border-emerald-600/40",
-    yellow: "bg-yellow-600/20 text-yellow-200 border-yellow-600/40",
-    red: "bg-red-600/20 text-red-300 border-red-600/40",
-    gray: "bg-gray-600/20 text-gray-200 border-gray-600/40",
-    blue: "bg-blue-600/20 text-blue-200 border-blue-600/40",
+    green:
+      "bg-emerald-500/10 text-emerald-300 border-emerald-500/40",
+    yellow:
+      "bg-amber-500/10 text-amber-200 border-amber-500/40",
+    red:
+      "bg-red-500/10 text-red-300 border-red-500/40",
+    gray:
+      "bg-gray-500/10 text-gray-200 border-gray-500/40",
+    blue:
+      "bg-sky-500/10 text-sky-200 border-sky-500/40",
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${map[tone]}`}>
-      <span className="h-2 w-2 rounded-full bg-current" />
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${map[tone]}`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {text}
     </span>
   );
@@ -67,12 +74,17 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
         setLoading(true);
         const [plansResp, adhResp, solResp] = await Promise.all([
           GruasAPI.getPlanes(),
-          polizaId ? GruasAPI.getAdhesionesPorPoliza(polizaId) : Promise.resolve([]),
-          polizaId ? GruasAPI.getSolicitudesPorPoliza(polizaId) : Promise.resolve([]),
+          polizaId
+            ? GruasAPI.getAdhesionesPorPoliza(polizaId)
+            : Promise.resolve([]),
+          polizaId
+            ? GruasAPI.getSolicitudesPorPoliza(polizaId)
+            : Promise.resolve([]),
         ]);
         if (!mounted) return;
         setPlanes(Array.isArray(plansResp) ? plansResp : []);
-        const adh = Array.isArray(adhResp) && adhResp.length ? adhResp[0] : null;
+        const adh =
+          Array.isArray(adhResp) && adhResp.length ? adhResp[0] : null;
         setAdhesion(adh);
         setSolicitudes(Array.isArray(solResp) ? solResp : []);
       } catch (e) {
@@ -92,9 +104,11 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
     if (adhesion.estado !== "ACTIVA") return false;
     const hoy = dayjs().startOf("day");
     const carOk =
-      !adhesion.fecha_carencia_fin || dayjs(adhesion.fecha_carencia_fin).isSameOrBefore(hoy, "day");
+      !adhesion.fecha_carencia_fin ||
+      dayjs(adhesion.fecha_carencia_fin).isSameOrBefore(hoy, "day");
     const moraOk =
-      !adhesion.rehabilitar_desde || dayjs(adhesion.rehabilitar_desde).isSameOrBefore(hoy, "day");
+      !adhesion.rehabilitar_desde ||
+      dayjs(adhesion.rehabilitar_desde).isSameOrBefore(hoy, "day");
     return carOk && moraOk;
   }, [adhesion]);
 
@@ -128,21 +142,29 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
     return (
       <div className="p-4">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-800 rounded w-1/2" />
-          <div className="h-24 bg-gray-800 rounded" />
-          <div className="h-48 bg-gray-800 rounded" />
+          <div className="h-7 bg-gray-800/80 rounded w-1/2" />
+          <div className="h-20 bg-gray-900/80 rounded" />
+          <div className="h-40 bg-gray-900/80 rounded" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Asistencia de Grúa</h2>
+    <div className="space-y-5">
+      {/* Header compacto */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-50">
+            Asistencia de Grúa
+          </h2>
+          <p className="text-xs text-gray-400">
+            Activación, fotos de adhesión y últimas solicitudes de esta póliza.
+          </p>
+        </div>
         <Link
           to="/gruas"
-          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm"
+          className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-sky-700"
         >
           Ir al módulo de Grúas
         </Link>
@@ -150,25 +172,42 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
 
       {adhesion ? (
         <>
+          {/* Card principal de estado */}
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3"
+            className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-4"
           >
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-sm text-gray-400">Estado</div>
-              {adhesion.estado === "ACTIVA" && pill("Activa", "green")}
-              {adhesion.estado === "PAUSADA" && pill("Pausada", "yellow")}
-              {adhesion.estado === "CANCELADA" && pill("Cancelada", "red")}
-              {operable ? pill("Operable", "blue") : pill("No operable (carencia/suspensión)", "yellow")}
+            {/* Estado + chips */}
+            <div className="flex flex-wrap items-center gap-2 justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-wide text-gray-400">
+                  Estado de la adhesión
+                </span>
+                {adhesion.estado === "ACTIVA" && pill("Activa", "green")}
+                {adhesion.estado === "PAUSADA" && pill("Pausada", "yellow")}
+                {adhesion.estado === "CANCELADA" && pill("Cancelada", "red")}
+                {operable
+                  ? pill("Operable", "blue")
+                  : pill("No operable (carencia / suspensión)", "yellow")}
+              </div>
+              <span className="text-[11px] text-gray-400">
+                ID adhesión:{" "}
+                <span className="text-gray-200 font-medium">
+                  #{adhesion.id}
+                </span>
+              </span>
             </div>
 
-            <div className="grid md:grid-cols-4 gap-3 text-sm">
+            {/* Datos clave en 2 filas para que no sature */}
+            <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <Info label="Plan" value={adhesion.plan_display || "-"} />
               <Info
                 label="Activación"
                 value={
-                  adhesion.fecha_activacion ? dayjs(adhesion.fecha_activacion).format("DD/MM/YYYY") : "-"
+                  adhesion.fecha_activacion
+                    ? dayjs(adhesion.fecha_activacion).format("DD/MM/YYYY")
+                    : "-"
                 }
               />
               <Info
@@ -188,10 +227,30 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
                 }
               />
             </div>
+          </motion.div>
 
-            {/* Fotos adhesión */}
-            <div className="mt-2">
-              <h3 className="text-base font-semibold mb-2">Fotos registradas (adhesión)</h3>
+          {/* Sección de fotos + quick upload */}
+          <div className="grid gap-4 lg:grid-cols-[2fr,1.1fr]">
+            {/* Fotos existentes */}
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4"
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-50">
+                    Fotos registradas
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Galería de imágenes asociadas a esta adhesión.
+                  </p>
+                </div>
+                <span className="inline-flex items-center justify-center rounded-full bg-gray-800 px-2.5 py-1 text-[11px] text-gray-300">
+                  {(adhesion?.fotos_adhesion?.length || 0)} fotos
+                </span>
+              </div>
+
               {adhesion?.fotos_adhesion?.length ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {adhesion.fotos_adhesion.map((f) => (
@@ -200,27 +259,48 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
                       href={f.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="group block rounded-lg overflow-hidden border border-gray-700 bg-gray-800"
+                      className="group block overflow-hidden rounded-xl border border-gray-800 bg-gray-900/80"
                     >
                       <img
                         src={f.url}
                         alt={f.tipo}
-                        className="w-full h-36 object-cover group-hover:opacity-90"
+                        className="h-32 w-full object-cover transition-transform duration-150 group-hover:scale-[1.02]"
                       />
-                      <div className="px-2 py-1 text-xs text-gray-300">{f.tipo}</div>
+                      <div className="flex items-center justify-between px-2 py-1.5 text-[11px] text-gray-200">
+                        <span className="truncate">{f.tipo}</span>
+                      </div>
                     </a>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400">No hay fotos cargadas.</div>
+                <div className="mt-2 rounded-xl border border-dashed border-gray-700 bg-gray-900/60 px-3 py-4 text-center text-sm text-gray-400">
+                  No hay fotos cargadas todavía.
+                </div>
               )}
+            </motion.div>
 
-              {/* Agregar una foto (rápido) */}
-              <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2">
+            {/* Quick uploader compacto */}
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4 space-y-3"
+            >
+              <h3 className="text-sm font-semibold text-gray-50">
+                Agregar foto rápida
+              </h3>
+              <p className="text-[11px] text-gray-400">
+                Cargá una imagen puntual (patente, frente, lateral, etc.) sin
+                pasar por el flujo completo.
+              </p>
+
+              <div className="space-y-2">
+                <label className="block text-xs text-gray-300 mb-1">
+                  Tipo de foto
+                </label>
                 <select
                   value={quickTipo}
                   onChange={(e) => setQuickTipo(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm"
+                  className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30"
                 >
                   {TipoFotoAdhesionOpts.map((o) => (
                     <option key={o.v} value={o.v}>
@@ -228,85 +308,134 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
                     </option>
                   ))}
                 </select>
-                <label className="relative inline-flex items-center justify-center px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm cursor-pointer hover:bg-gray-750">
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="relative inline-flex flex-1 items-center justify-center rounded-xl border border-dashed border-gray-700 bg-gray-900/60 px-3 py-2 text-xs text-gray-200 cursor-pointer hover:border-emerald-500/60 hover:bg-gray-900">
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setQuickFile(e.target.files?.[0] || null)}
+                    onChange={(e) =>
+                      setQuickFile(e.target.files?.[0] || null)
+                    }
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
-                  <HiPhotograph className="w-5 h-5 mr-2" />
-                  Seleccionar foto
+                  <HiPhotograph className="mr-2 h-4 w-4" />
+                  {quickFile ? quickFile.name : "Seleccionar foto"}
                 </label>
+
                 <button
                   disabled={!quickFile || subiendoQuick}
                   onClick={subirFotoAdhesion}
-                  className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-60"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
-                  {subiendoQuick ? "Subiendo..." : "Agregar foto"}
+                  {subiendoQuick ? "Subiendo…" : "Agregar foto"}
                 </button>
               </div>
+
+              <p className="text-[11px] text-gray-400">
+                Sugerencia: asegurate de que la{" "}
+                <b>patente se vea clara</b> en al menos una de las fotos.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Solicitudes recientes */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4"
+          >
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-50">
+                  Solicitudes de esta póliza
+                </h3>
+                <p className="text-[11px] text-gray-400">
+                  Solo se muestran las últimas 5 para mantener la vista limpia.
+                </p>
+              </div>
+              <span className="inline-flex items-center justify-center rounded-full bg-gray-900 px-2.5 py-1 text-[11px] text-gray-300">
+                {solicitudes?.length || 0}{" "}
+                {solicitudes?.length === 1 ? "solicitud" : "solicitudes"}
+              </span>
             </div>
 
-            {/* Solicitudes recientes */}
-            <div className="mt-4">
-              <h3 className="text-base font-semibold mb-2">Solicitudes de esta póliza</h3>
-              {solicitudes?.length ? (
-                <div className="space-y-2">
-                  {solicitudes.slice(0, 5).map((s) => (
-                    <div
-                      key={s.id}
-                      className="rounded-lg border border-gray-800 bg-gray-950 p-3 text-sm"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">Solicitud #{s.id}</div>
-                        <div>
-                          {pill(
-                            s.estado,
-                            s.estado === "COMPLETADA"
-                              ? "green"
-                              : s.estado === "CANCELADA"
-                              ? "red"
-                              : "gray"
-                          )}
+            {solicitudes?.length ? (
+              <div className="space-y-2">
+                {solicitudes.slice(0, 5).map((s) => (
+                  <div
+                    key={s.id}
+                    className="rounded-xl border border-gray-800 bg-gray-900/80 p-3 text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs font-semibold text-gray-50">
+                          Solicitud #{s.id}
                         </div>
+                        {pill(
+                          s.estado,
+                          s.estado === "COMPLETADA"
+                            ? "green"
+                            : s.estado === "CANCELADA"
+                            ? "red"
+                            : "gray"
+                        )}
                       </div>
-                      <div className="grid md:grid-cols-3 gap-2 mt-1">
+                      <div className="grid gap-1 text-[11px] text-gray-300 sm:grid-cols-3">
                         <Info label="Motivo" value={mapMotivo(s.motivo)} mini />
                         <Info
                           label="Fecha"
-                          value={dayjs(s.fecha_solicitud).format("DD/MM/YYYY HH:mm")}
+                          value={dayjs(s.fecha_solicitud).format(
+                            "DD/MM/YYYY HH:mm"
+                          )}
                           mini
                         />
-                        <Info label="Origen" value={s.origen || "-"} mini />
+                        <Info
+                          label="Origen"
+                          value={s.origen || "-"}
+                          mini
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-400">Sin solicitudes aún.</div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-2 rounded-xl border border-dashed border-gray-700 bg-gray-900/60 px-3 py-4 text-center text-sm text-gray-400">
+                Sin solicitudes de grúa registradas para esta póliza.
+              </div>
+            )}
           </motion.div>
         </>
       ) : (
         // CTA para activar (abre modal guiado)
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-gray-800 bg-gray-900 p-4"
+          className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-3"
         >
-          <div className="flex items-center gap-2 text-gray-200">
-            <HiInformationCircle className="w-5 h-5 text-yellow-400" />
-            <p className="text-sm">
-              Activá la asistencia de grúa para esta póliza. Carencia de <b>15 días</b> desde la activación.
-              Servicio L–S <b>08:00–20:00</b>. Límite <b>100 km</b> (ida+vuelta). Tope de uso <b>1/mes</b>, <b>2/6 meses</b>.
-            </p>
+          <div className="flex items-start gap-2 text-gray-200">
+            <div className="mt-0.5">
+              <HiInformationCircle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="space-y-1 text-sm">
+              <p>
+                Activá la asistencia de grúa para esta póliza. Carencia de{" "}
+                <b>15 días</b> desde la activación. Servicio L–S{" "}
+                <b>08:00–20:00</b>. Límite <b>100 km</b> (ida+vuelta). Tope de
+                uso <b>1/mes</b>, <b>2/6 meses</b>.
+              </p>
+              <p className="text-xs text-gray-400">
+                Podés subir todas las fotos requeridas en un flujo guiado en 2
+                pasos.
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
+          <div className="pt-1">
             <button
               onClick={() => setShowActivate(true)}
-              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
+              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
               Activar grúa
             </button>
@@ -336,8 +465,16 @@ export default function PolizaGruasTab({ polizaId: propPolizaId, poliza }) {
 function Info({ label, value, mini = false }) {
   return (
     <div>
-      <div className={`text-gray-400 ${mini ? "text-xs" : "text-sm"}`}>{label}</div>
-      <div className={mini ? "text-xs" : ""}>{value || "-"}</div>
+      <div
+        className={`text-gray-400 ${
+          mini ? "text-[11px]" : "text-xs"
+        }`}
+      >
+        {label}
+      </div>
+      <div className={mini ? "text-[11px] text-gray-100" : "text-sm text-gray-100"}>
+        {value || "-"}
+      </div>
     </div>
   );
 }
@@ -360,12 +497,21 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
   const [busy, setBusy] = useState(false);
 
   // Paso 1: datos
-  const [planId, setPlanId] = useState(planes?.[0]?.id ? String(planes[0].id) : "");
-  const [fechaActivacion, setFechaActivacion] = useState(dayjs().format("YYYY-MM-DD")); // ✅ obligatoria
+  const [planId, setPlanId] = useState(
+    planes?.[0]?.id ? String(planes[0].id) : ""
+  );
+  const [fechaActivacion, setFechaActivacion] = useState(
+    dayjs().format("YYYY-MM-DD")
+  ); // ✅ obligatoria
   const [carenciaDias, setCarenciaDias] = useState(15); // ✅ control numérico “15 días”
   const carenciaFin = useMemo(() => {
     const base = fechaActivacion ? dayjs(fechaActivacion) : dayjs();
-    return base.add(Number.isFinite(+carenciaDias) ? +carenciaDias : 15, "day").format("DD/MM/YYYY");
+    return base
+      .add(
+        Number.isFinite(+carenciaDias) ? +carenciaDias : 15,
+        "day"
+      )
+      .format("DD/MM/YYYY");
   }, [fechaActivacion, carenciaDias]);
 
   // Paso 2: fotos (multi-carga hasta 8)
@@ -397,7 +543,8 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
     setQueue((prev) => [...prev, ...next]);
   };
 
-  const removeFromQueue = (i) => setQueue((prev) => prev.filter((_, idx) => idx !== i));
+  const removeFromQueue = (i) =>
+    setQueue((prev) => prev.filter((_, idx) => idx !== i));
 
   const onDrop = (e) => {
     e.preventDefault();
@@ -456,21 +603,26 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={busy ? undefined : onClose}
+      />
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-900 shadow-xl"
+          className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold">Activar asistencia de grúa</span>
+              <span className="text-sm font-semibold text-gray-50">
+                Activar asistencia de grúa
+              </span>
               <Stepper step={step} />
             </div>
             <button
-              className="p-2 rounded-lg hover:bg-gray-800"
+              className="p-2 rounded-lg hover:bg-gray-900"
               onClick={busy ? undefined : onClose}
               aria-label="Cerrar"
             >
@@ -487,73 +639,93 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
                   initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 16 }}
-                  className="grid md:grid-cols-2 gap-4"
+                  className="grid gap-4 md:grid-cols-2"
                 >
                   <div className="space-y-3">
-                    <label className="block text-sm text-gray-300">Plan</label>
-                    <select
-                      value={planId}
-                      onChange={(e) => setPlanId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
-                    >
-                      {planes.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre} — {p.km_incluidos} km incluidos
-                        </option>
-                      ))}
-                    </select>
-
                     <div>
-                      <label className="block text-sm text-gray-300 mb-1">
-                        Fecha de activación <span className="text-red-400">*</span>
+                      <label className="block text-xs text-gray-300 mb-1">
+                        Plan
                       </label>
-                      <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <select
+                        value={planId}
+                        onChange={(e) => setPlanId(e.target.value)}
+                        className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30"
+                      >
+                        {planes.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} — {p.km_incluidos} km incluidos
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs text-gray-300 mb-1">
+                        Fecha de activación{" "}
+                        <span className="text-red-400">*</span>
+                      </label>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                         <input
                           type="date"
                           required
                           value={fechaActivacion}
                           onChange={(e) => setFechaActivacion(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                          className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30"
                         />
-                        {/* Control de carencia (días) con botón 15 */}
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
                             min={0}
                             value={carenciaDias}
-                            onChange={(e) => setCarenciaDias(parseInt(e.target.value || "0", 10))}
-                            className="w-20 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm"
+                            onChange={(e) =>
+                              setCarenciaDias(
+                                parseInt(e.target.value || "0", 10)
+                              )
+                            }
+                            className="w-20 rounded-xl border border-gray-700 bg-gray-900 px-2 py-2 text-xs text-gray-100 outline-none"
                             title="Carencia en días"
                           />
                           <button
                             type="button"
                             onClick={() => setCarenciaDias(15)}
-                            className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm hover:bg-gray-750"
-                            title="Usar 15 días"
+                            className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-200 hover:bg-gray-850"
                           >
                             15 días
                           </button>
                         </div>
                       </div>
-                      <p className="mt-1 text-xs text-gray-400">
-                        Fin de carencia: <b>{carenciaFin}</b> (se calcula según la fecha y los días de carencia).
+                      <p className="text-[11px] text-gray-400">
+                        Fin de carencia estimado:{" "}
+                        <b className="text-gray-100">{carenciaFin}</b>.
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-2">
-                      <HiCheckCircle className="w-4 h-4 text-emerald-400" />
-                      Horario: L–S 08:00–20:00 · Límite: 100 km (ida+vuelta).
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
+                      <HiCheckCircle className="h-4 w-4 text-emerald-400" />
+                      <span>
+                        Horario: L–S 08:00–20:00 · Límite: 100 km (ida+vuelta).
+                      </span>
                     </div>
                   </div>
 
                   {/* Ayuda visual */}
-                  <div className="rounded-xl border border-gray-800 bg-gray-950 p-3">
-                    <h4 className="text-sm font-semibold mb-2">¿Qué necesitás?</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-sm text-gray-300">
-                      <li>Seleccionar el plan correcto.</li>
-                      <li>Elegir la <b>fecha de activación</b> (obligatoria).</li>
-                      <li>El sistema calculará el <b>fin de carencia</b>.</li>
-                      <li>En el próximo paso subís las <b>fotos del vehículo</b>.</li>
+                  <div className="rounded-2xl border border-gray-800 bg-gray-900/80 p-3">
+                    <h4 className="mb-2 text-sm font-semibold text-gray-50">
+                      Paso 1 · Configuración
+                    </h4>
+                    <ul className="list-disc space-y-1 pl-4 text-[12px] text-gray-300">
+                      <li>Elegí el plan que corresponde a la póliza.</li>
+                      <li>
+                        Definí la <b>fecha de activación</b>.
+                      </li>
+                      <li>
+                        Podés ajustar la <b>carencia en días</b> (por defecto
+                        15).
+                      </li>
+                      <li>
+                        En el próximo paso vas a cargar las{" "}
+                        <b>fotos del vehículo</b>.
+                      </li>
                     </ul>
                   </div>
                 </motion.div>
@@ -563,20 +735,24 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
                   initial={{ opacity: 0, x: 16 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -16 }}
+                  className="space-y-3"
                 >
-                  <h4 className="text-sm font-semibold mb-2">Fotos del vehículo (adhesión)</h4>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Cargá varias imágenes a la vez (hasta 8). Debe haber al menos una de <b>PATENTE</b>.
+                  <h4 className="text-sm font-semibold text-gray-50">
+                    Paso 2 · Fotos del vehículo
+                  </h4>
+                  <p className="text-[11px] text-gray-400">
+                    Cargá varias imágenes a la vez (hasta 8). Es obligatorio
+                    incluir al menos una de <b>PATENTE</b>.
                   </p>
 
-                  {/* Área dropzone + botón didáctico */}
+                  {/* Área dropzone + botón */}
                   <div
                     onDrop={onDrop}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                     }}
-                    className="rounded-xl border-2 border-dashed border-gray-700 bg-gray-950 p-4 text-center"
+                    className="rounded-2xl border-2 border-dashed border-gray-700 bg-gray-950/80 p-4 text-center"
                   >
                     <input
                       ref={inputRef}
@@ -589,34 +765,42 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
                     <button
                       type="button"
                       onClick={() => inputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm hover:bg-gray-750"
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-100 hover:bg-gray-850"
                     >
-                      <HiUpload className="w-5 h-5" />
+                      <HiUpload className="h-5 w-5" />
                       Seleccionar fotos
                     </button>
-                    <div className="mt-2 text-xs text-gray-400">
-                      o arrastrá y soltá aquí tus imágenes
+                    <div className="mt-2 text-[11px] text-gray-400">
+                      o arrastrá y soltá las imágenes aquí
                     </div>
                   </div>
 
                   {/* Cola de archivos */}
                   {queue.length > 0 && (
-                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                       {queue.map((f, idx) => (
                         <div
                           key={idx}
-                          className="rounded-lg overflow-hidden border border-gray-700 bg-gray-800"
+                          className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/80"
                         >
-                          <img src={f.preview} alt={f.name} className="w-full h-36 object-cover" />
-                          <div className="p-2 text-xs flex items-center justify-between gap-2">
+                          <img
+                            src={f.preview}
+                            alt={f.name}
+                            className="h-32 w-full object-cover"
+                          />
+                          <div className="flex items-center gap-2 p-2 text-[11px]">
                             <select
                               value={f.tipo}
                               onChange={(e) =>
                                 setQueue((prev) =>
-                                  prev.map((it, i) => (i === idx ? { ...it, tipo: e.target.value } : it))
+                                  prev.map((it, i) =>
+                                    i === idx
+                                      ? { ...it, tipo: e.target.value }
+                                      : it
+                                  )
                                 )
                               }
-                              className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1"
+                              className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-2 py-1 outline-none"
                             >
                               {TipoFotoAdhesionOpts.map((o) => (
                                 <option key={o.v} value={o.v}>
@@ -626,10 +810,10 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
                             </select>
                             <button
                               onClick={() => removeFromQueue(idx)}
-                              className="text-red-300 hover:text-red-200 ml-2"
+                              className="ml-1 text-red-300 hover:text-red-200"
                               title="Quitar"
                             >
-                              <HiX className="w-4 h-4" />
+                              <HiX className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -642,29 +826,33 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800">
+          <div className="flex items-center justify-between border-t border-gray-800 px-4 py-3">
             <button
-              className="inline-flex items-center gap-1 px-3 py-2 text-sm rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-750"
+              className="inline-flex items-center gap-1 rounded-xl bg-gray-900 px-3 py-2 text-sm text-gray-100 hover:bg-gray-850"
               onClick={step === 1 ? onClose : () => setStep(1)}
               disabled={busy}
             >
-              {step === 1 ? <HiX className="w-4 h-4" /> : <HiChevronLeft className="w-4 h-4" />}
+              {step === 1 ? (
+                <HiX className="h-4 w-4" />
+              ) : (
+                <HiChevronLeft className="h-4 w-4" />
+              )}
               {step === 1 ? "Cancelar" : "Atrás"}
             </button>
 
             <div className="flex items-center gap-2">
               {step === 1 ? (
                 <button
-                  className="inline-flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                  className="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
                   onClick={() => setStep(2)}
                   disabled={!fechaActivacion || !planId || busy}
                 >
                   Siguiente
-                  <HiChevronRight className="w-4 h-4" />
+                  <HiChevronRight className="h-4 w-4" />
                 </button>
               ) : (
                 <button
-                  className="inline-flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                   onClick={activar}
                   disabled={busy || queue.length === 0}
                 >
@@ -681,9 +869,17 @@ function ActivateModal({ open, onClose, planes, polizaId, onActivated }) {
 
 function Stepper({ step }) {
   return (
-    <div className="ml-2 flex items-center gap-2">
-      <div className={`h-2 w-10 rounded-full ${step >= 1 ? "bg-blue-500" : "bg-gray-700"}`} />
-      <div className={`h-2 w-10 rounded-full ${step >= 2 ? "bg-blue-500" : "bg-gray-700"}`} />
+    <div className="ml-2 flex items-center gap-1">
+      <div
+        className={`h-1.5 w-8 rounded-full ${
+          step >= 1 ? "bg-sky-500" : "bg-gray-700"
+        }`}
+      />
+      <div
+        className={`h-1.5 w-8 rounded-full ${
+          step >= 2 ? "bg-sky-500" : "bg-gray-700"
+        }`}
+      />
     </div>
   );
 }

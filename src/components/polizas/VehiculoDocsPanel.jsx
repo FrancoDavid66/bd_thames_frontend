@@ -44,8 +44,8 @@ const LABELS = {
   INTERIOR: "Interior",
   RUEDA_AUXILIO: "Rueda de auxilio",
   OBLEA_GNC: "Oblea GNC",
-  TUBO_GNC: "Equipo/Tubo GNC",      // 🔹 clave nueva
-  EQUIPO_GNC: "Equipo/Tubo GNC",    // compat viejo
+  TUBO_GNC: "Equipo/Tubo GNC", // 🔹 clave nueva
+  EQUIPO_GNC: "Equipo/Tubo GNC", // compat viejo
   PATENTE: "Patente",
   CEDULA_VERDE: "Cédula verde",
   CEDULA_VERDE_FRENTE: "Cédula verde (frente)",
@@ -316,8 +316,13 @@ export default function VehiculoDocsPanel({ polizaId }) {
     setLoading(true);
     try {
       try {
-        const { poliza, documentos, fotos } = await PolizasAPI.refreshPack(polizaId);
-        const { fotos: f, documentos: d } = consolidate(fotos || [], documentos || []);
+        const { poliza, documentos, fotos } = await PolizasAPI.refreshPack(
+          polizaId
+        );
+        const { fotos: f, documentos: d } = consolidate(
+          fotos || [],
+          documentos || []
+        );
         setPoliza(poliza || null);
         setFotos(f);
         setDocumentos(d);
@@ -330,11 +335,15 @@ export default function VehiculoDocsPanel({ polizaId }) {
       const [p, docsRaw, fotosRaw] = await Promise.all([
         PolizasAPI.getById(polizaId).catch(() => null),
         PolizasAPI.getDocumentos(polizaId).catch(() => ({ results: [] })),
-        PolizasAPI.getFotosVehiculo({ poliza: polizaId }).catch(() => ({ results: [] })),
+        PolizasAPI.getFotosVehiculo({ poliza: polizaId }).catch(() => ({
+          results: [],
+        })),
       ]);
 
       const docsArr = Array.isArray(docsRaw) ? docsRaw : docsRaw?.results || [];
-      const fotosArr = Array.isArray(fotosRaw) ? fotosRaw : fotosRaw?.results || [];
+      const fotosArr = Array.isArray(fotosRaw)
+        ? fotosRaw
+        : fotosRaw?.results || [];
 
       const { fotos: f, documentos: d } = consolidate(fotosArr, docsArr);
       setPoliza(p || null);
@@ -497,7 +506,10 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 className="grid grid-cols-2 md:grid-cols-3 gap-2"
               >
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="aspect-video rounded-lg bg-white/10 animate-pulse" />
+                  <div
+                    key={i}
+                    className="aspect-video rounded-lg bg-white/10 animate-pulse"
+                  />
                 ))}
               </motion.div>
             ) : (
@@ -593,7 +605,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                           loading="lazy"
                         />
                       </a>
-                      <div className="absolute inset-0 flex items=end justify-between bg-gradient-to-t from-black/50 via-black/0 to-black/0 opacity-0 hover:opacity-100 transition">
+                      <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/50 via-black/0 to-black/0 opacity-0 hover:opacity-100 transition">
                         <figcaption className="px-2 py-1 text-xs">
                           <span
                             className="inline-block max-w-[10rem] truncate"
@@ -674,7 +686,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 {/* Imagenes como miniaturas */}
                 {docsAgrupados.imgDocs.length > 0 && (
                   <div>
-                    <div className="mb-1 text-xs text.white/60">Imágenes</div>
+                    <div className="mb-1 text-xs text-white/60">Imágenes</div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                       {docsAgrupados.imgDocs.map((d) => (
                         <figure
@@ -731,7 +743,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                             href={d.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-white/10 hover:bg.white/20"
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-white/10 hover:bg-white/20"
                             title="Abrir"
                           >
                             <HiExternalLink /> Abrir
