@@ -110,13 +110,18 @@ function RenovarPolizaNumeroModal({ open, onClose, polizaId, numeroActual, onSuc
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200]">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-md shadow-2xl">
-          <div className="p-4 border-b border-white/10">
-            <h3 className="text-white text-lg font-semibold">Renovar póliza</h3>
-            <p className="text-white/70 text-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-lg rounded-2xl bg-gradient-to-br from-sky-500/40 via-slate-900 to-black p-[1px] shadow-2xl shadow-black/60">
+        <div className="rounded-2xl bg-slate-950">
+          <div className="border-b border-white/10 px-4 py-3">
+            <h3 className="text-white text-base sm:text-lg font-semibold">
+              Renovar póliza
+            </h3>
+            <p className="text-white/70 text-xs sm:text-sm mt-1">
               Ingresá el <b>nuevo número de póliza</b>. Si lo dejás vacío, el
               sistema puede asignarlo automáticamente (según backend).
             </p>
@@ -132,7 +137,7 @@ function RenovarPolizaNumeroModal({ open, onClose, polizaId, numeroActual, onSuc
                 value={nuevoNumero}
                 onChange={(e) => setNuevoNumero(e.target.value)}
                 placeholder={sugerido || "Ej: 12-345678-R2025"}
-                className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 ring-sky-400/30"
+                className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-sky-400/60"
               />
               <p className="mt-1 text-[11px] text-white/60">
                 Actual: <span className="font-mono">{numeroActual || "—"}</span>
@@ -140,17 +145,17 @@ function RenovarPolizaNumeroModal({ open, onClose, polizaId, numeroActual, onSuc
             </div>
           </div>
 
-          <div className="p-4 border-t border-white/10 flex items-center justify-end gap-2">
+          <div className="border-t border-white/10 px-4 py-3 flex flex-col sm:flex-row sm:justify-end gap-2">
             <button
               onClick={onClose}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm border border-white/10 transition-colors cursor-pointer w-full sm:w-auto"
             >
               <HiX className="w-4 h-4" /> Cancelar
             </button>
             <button
               onClick={handleSubmit}
               disabled={busy}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs sm:text-sm transition-colors cursor-pointer disabled:opacity-60 w-full sm:w-auto"
             >
               {busy ? (
                 <HiRefresh className="w-4 h-4 animate-spin" />
@@ -200,7 +205,16 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
       const updated = await dispatch(pagarCuota({ cuotaId: cuota.id, data: payload })).unwrap();
       // Optimista: reflejar el cambio en la lista local
       setRows((prev) =>
-        prev.map((c) => (c.id === cuota.id ? { ...c, ...updated, pagado: true, fecha_pago: updated?.fecha_pago || payload.fecha_pago } : c))
+        prev.map((c) =>
+          c.id === cuota.id
+            ? {
+                ...c,
+                ...updated,
+                pagado: true,
+                fecha_pago: updated?.fecha_pago || payload.fecha_pago,
+              }
+            : c
+        )
       );
       toast.success(`Cuota #${cuota.cuota_nro} marcada como pagada`);
     } catch (e) {
@@ -217,16 +231,20 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
   const [openRenovar, setOpenRenovar] = useState(false);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-950/90 p-4 sm:p-5 shadow-lg shadow-black/40">
       {/* Header + CTA Renovar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <div className="text-xs text-white/70">Sección</div>
-          <h3 className="text-lg font-semibold text-white">Cuotas</h3>
+          <div className="text-[11px] uppercase tracking-wide text-white/60">
+            Sección
+          </div>
+          <h3 className="text-lg sm:text-xl font-semibold text-white">
+            Cuotas
+          </h3>
         </div>
         <button
           onClick={() => setOpenRenovar(true)}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm px-3 py-2 transition-colors cursor-pointer"
           title="Generar una nueva póliza con sus cuotas"
         >
           <HiRefresh className="w-4 h-4" />
@@ -236,24 +254,26 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
 
       {/* Resumen */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded bg-gray-900 border border-gray-800 p-3">
-          <div className="text-xs text-gray-400">Total</div>
-          <div className="text-xl font-semibold text-white">{resumen.total}</div>
+        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
+          <div className="text-[11px] text-neutral-400">Total</div>
+          <div className="text-xl font-semibold text-white">
+            {resumen.total}
+          </div>
         </div>
-        <div className="rounded bg-gray-900 border border-gray-800 p-3">
-          <div className="text-xs text-gray-400">Pagadas</div>
+        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
+          <div className="text-[11px] text-neutral-400">Pagadas</div>
           <div className="text-xl font-semibold text-emerald-400">
             {resumen.pagadas}
           </div>
         </div>
-        <div className="rounded bg-gray-900 border border-gray-800 p-3">
-          <div className="text-xs text-gray-400">Pendientes</div>
-          <div className="text-xl font-semibold text-yellow-300">
+        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
+          <div className="text-[11px] text-neutral-400">Pendientes</div>
+          <div className="text-xl font-semibold text-amber-300">
             {resumen.pendientes}
           </div>
         </div>
-        <div className="rounded bg-gray-900 border border-gray-800 p-3">
-          <div className="text-xs text-gray-400">Vencidas</div>
+        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
+          <div className="text-[11px] text-neutral-400">Vencidas</div>
           <div className="text-xl font-semibold text-red-400">
             {resumen.vencidas}
           </div>
@@ -261,24 +281,29 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
       </div>
 
       {/* Lista de cuotas con acción de pago */}
-      <div className="divide-y divide-gray-800 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-950/70 divide-y divide-neutral-800">
         {rows.map((cuota) => {
           const estado = estadoCuota(cuota);
           const isBusy = !!busyIds[cuota.id];
           return (
-            <div key={cuota.id} className="p-4 bg-gray-900">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="text-sm text-gray-400">Cuota</div>
+            <div
+              key={cuota.id}
+              className="p-4 sm:p-5 bg-neutral-950 hover:bg-neutral-900/90 transition-colors"
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                {/* Izquierda: título + badge */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-xs text-neutral-400">Cuota</div>
                   <div className="text-lg font-semibold text-white">
                     #{cuota.cuota_nro}
                   </div>
                   {estadoCuotaBadge(estado)}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                {/* Centro: datos */}
+                <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm md:min-w-[320px]">
                   <div>
-                    <div className="text-gray-400">Vencimiento</div>
+                    <div className="text-neutral-400">Vencimiento</div>
                     <div className="font-medium text-white">
                       {cuota?.fecha_vencimiento
                         ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY")
@@ -286,13 +311,13 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-400">Monto</div>
+                    <div className="text-neutral-400">Monto</div>
                     <div className="font-medium text-white">
                       {currency(cuota?.monto ?? cuota?.importe)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-400">Pago</div>
+                    <div className="text-neutral-400">Pago</div>
                     <div className="font-medium text-white">
                       {cuota?.pagado
                         ? dayjs(cuota?.fecha_pago).isValid()
@@ -303,10 +328,10 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
                   </div>
                 </div>
 
-                {/* Acción: marcar como pagada */}
-                <div className="flex items-center">
+                {/* Derecha: acción */}
+                <div className="flex md:justify-end">
                   {cuota?.pagado ? (
-                    <span className="inline-flex items-center gap-2 rounded-lg border border-emerald-700/40 bg-emerald-700/20 px-3 py-2 text-sm text-emerald-200">
+                    <span className="inline-flex w-full md:w-auto items-center justify-center gap-2 rounded-lg border border-emerald-700/40 bg-emerald-700/20 px-3 py-2 text-xs sm:text-sm text-emerald-200">
                       <HiCheck className="h-4 w-4" />
                       Pagada
                     </span>
@@ -315,7 +340,7 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
                       type="button"
                       disabled={isBusy}
                       onClick={() => handleMarcarPagada(cuota)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-sm border border-emerald-500/60 disabled:opacity-60"
+                      className="inline-flex w-full md:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs sm:text-sm border border-emerald-500/60 disabled:opacity-60"
                       title="Marcar esta cuota como pagada"
                     >
                       {isBusy ? (

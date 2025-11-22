@@ -121,18 +121,18 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
   return (
     <div className={shell}>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-500/20 text-primary-300">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-primary-500/20 text-primary-300 shrink-0">
             <HiShieldCheck className="h-4 w-4" />
           </div>
-          <div>
-            <h3 className="text-xs font-semibold text-neutral-50">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-semibold text-neutral-50">
               Cuponeras de robo
             </h3>
-            <p className="text-[11px] text-neutral-400">
-              Cada casillero representa un mes de cobertura de robo. Verde = pagado,
-              rosa = vencido, amarillo = al día.
+            <p className="text-[11px] leading-snug text-neutral-400 max-w-md">
+              Cada casillero representa un mes de cobertura de robo. Verde =
+              pagado, rosa = vencido, amarillo = al día.
             </p>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
         <button
           type="button"
           onClick={() => polizaId && dispatch(fetchCuponesRobo(polizaId))}
-          className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-neutral-300 hover:bg-white/10"
+          className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/10"
         >
           <HiRefresh className="mr-1 h-3 w-3" />
           Refrescar
@@ -148,7 +148,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
       </div>
 
       {/* Contenido */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-3 space-y-3">
         {loading && (
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/70 px-3 py-2 text-[11px] text-neutral-300">
             <span className="h-3 w-3 animate-spin rounded-full border border-neutral-600 border-t-transparent" />
@@ -157,8 +157,8 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
         )}
 
         {!loading && cupones.length === 0 && (
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-white/15 bg-neutral-950/60 px-3 py-3 text-[11px] text-neutral-400">
-            <HiClock className="h-4 w-4 text-neutral-500" />
+          <div className="flex items-start gap-2 rounded-xl border border-dashed border-white/15 bg-neutral-950/60 px-3 py-3 text-[11px] text-neutral-400">
+            <HiClock className="mt-0.5 h-4 w-4 text-neutral-500" />
             <span>
               Todavía no hay cupones de robo para esta póliza. Se generan en base a
               las cuotas de la póliza.
@@ -225,11 +225,11 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                   <motion.div
                     key={cupon.id}
                     layout
-                    className={`flex flex-col gap-3 rounded-xl border px-3 py-2 md:flex-row md:items-stretch ${cardTone}`}
+                    className={`flex flex-col gap-3 rounded-xl border px-3 py-2 sm:px-4 sm:py-3 md:flex-row md:items-stretch ${cardTone}`}
                   >
                     {/* Columna izquierda: datos del cupón */}
-                    <div className="flex flex-1 flex-col gap-1">
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-1 flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-medium text-neutral-50">
                           {formatPeriodo(cupon)}
                         </span>
@@ -251,9 +251,9 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-200">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-neutral-200">
                         {cupon.periodo_desde && cupon.periodo_hasta && (
-                          <span>
+                          <span className="rounded-full bg-white/5 px-2 py-0.5 border border-white/10">
                             {dayjs(cupon.periodo_desde).format("DD/MM/YYYY")} –{" "}
                             {dayjs(cupon.periodo_hasta).format("DD/MM/YYYY")}
                           </span>
@@ -303,23 +303,23 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                             <img
                               src={cupon.foto_url}
                               alt="Cupón de robo"
-                              className="h-32 w-full object-cover md:h-36"
+                              className="h-28 w-full object-cover sm:h-32 md:h-36"
                             />
                           </div>
                         ) : (
-                          <div className="flex h-32 w-full items-center justify-center rounded-xl border border-dashed border-white/15 bg-neutral-950/70 text-[11px] text-neutral-500 md:h-36">
+                          <div className="flex h-28 w-full items-center justify-center rounded-xl border border-dashed border-white/15 bg-neutral-950/70 text-[11px] text-neutral-500 sm:h-32 md:h-36">
                             Sin comprobante adjunto
                           </div>
                         )}
                       </div>
 
                       {/* Botón de acción */}
-                      <div className="flex flex-wrap items-center justify-end gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2 w-full">
                         <button
                           type="button"
                           onClick={() => handleClickUpload(cupon)}
                           disabled={uploading || updating}
-                          className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex w-full sm:w-auto items-center justify-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {uploading || updating ? (
                             <span className="h-3 w-3 animate-spin rounded-full border border-neutral-900 border-t-transparent" />
@@ -335,7 +335,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                           href={cupon.foto_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[10px] text-sky-300 hover:text-sky-200"
+                          className="inline-flex items-center gap-1 text-[10px] text-sky-300 hover:text-sky-200 mt-0.5"
                         >
                           <HiPhotograph className="h-3 w-3" />
                           Ver en tamaño completo

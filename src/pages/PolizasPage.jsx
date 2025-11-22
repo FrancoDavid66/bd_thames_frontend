@@ -303,25 +303,33 @@ export default function PolizasPage() {
           {"enviados" in data && (
             <div className="rounded-lg bg-gray-900 p-3">
               <div className="text-gray-400">Enviados</div>
-              <div className="text-lg font-semibold">{Number(data.enviados || 0)}</div>
+              <div className="text-lg font-semibold">
+                {Number(data.enviados || 0)}
+              </div>
             </div>
           )}
           {"fallidos" in data && (
             <div className="rounded-lg bg-gray-900 p-3">
               <div className="text-gray-400">Fallidos</div>
-              <div className="text-lg font-semibold">{Number(data.fallidos || 0)}</div>
+              <div className="text-lg font-semibold">
+                {Number(data.fallidos || 0)}
+              </div>
             </div>
           )}
           {seleccionadas !== null && (
             <div className="rounded-lg bg-gray-900 p-3">
               <div className="text-gray-400">Pólizas seleccionadas</div>
-              <div className="text-lg font-semibold">{Number(seleccionadas || 0)}</div>
+              <div className="text-lg font-semibold">
+                {Number(seleccionadas || 0)}
+              </div>
             </div>
           )}
           {procesadas !== null && (
             <div className="rounded-lg bg-gray-900 p-3">
               <div className="text-gray-400">Pólizas procesadas</div>
-              <div className="text-lg font-semibold">{Number(procesadas || 0)}</div>
+              <div className="text-lg font-semibold">
+                {Number(procesadas || 0)}
+              </div>
             </div>
           )}
         </div>
@@ -336,7 +344,9 @@ export default function PolizasPage() {
               {Object.entries(buckets).map(([key, val]) => (
                 <div key={key} className="flex items-center justify-between">
                   <span className="text-gray-400">{key}</span>
-                  <span className="font-mono text-gray-100">{Number(val || 0)}</span>
+                  <span className="font-mono text-gray-100">
+                    {Number(val || 0)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -362,7 +372,10 @@ export default function PolizasPage() {
                 </thead>
                 <tbody>
                   {detalle.map((row, i) => (
-                    <tr key={i} className="border-b border-gray-800 last:border-0">
+                    <tr
+                      key={i}
+                      className="border-b border-gray-800 last:border-0"
+                    >
                       <td className="py-1 pr-2">{row?.poliza_id ?? "-"}</td>
                       <td className="py-1 pr-2">{row?.cliente ?? "-"}</td>
                       <td className="py-1 pr-2">{row?.patente ?? "-"}</td>
@@ -392,202 +405,226 @@ export default function PolizasPage() {
   };
 
   return (
-    <div className="rounded-lg bg-gray-900 p-4 text-white">
-      {/* Toolbar superior */}
-      <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight">Pólizas</h1>
+    <div className="rounded-2xl bg-gradient-to-br from-neutral-800/80 via-neutral-950 to-black p-[1px] text-white shadow-xl shadow-black/40">
+      <div className="rounded-2xl bg-gray-950/95 p-4 sm:p-5 space-y-4">
+        {/* Toolbar superior */}
+        <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight">
+            Pólizas
+          </h1>
 
-        <button
-          onClick={abrirConfirmacion}
-          disabled={status === "loading" || sending || total === 0}
-          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition
+          <button
+            onClick={abrirConfirmacion}
+            disabled={status === "loading" || sending || total === 0}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium transition w-full sm:w-auto
             ${
               total > 0 && !sending && status !== "loading"
                 ? "bg-emerald-500 text-white hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                : "bg-gray-800 text-gray-400 cursor-not-allowed"
             }`}
-          title="Envía por WhatsApp el estado de cuotas a todos los asegurados del resultado actual (todas las páginas)"
-        >
-          <HiChatAlt2 className="h-5 w-5" />
-          <span>Enviar estado de cuotas</span>
-          {total > 0 ? (
-            <span className="ml-2 rounded bg-black/20 px-2 py-0.5 text-xs">{total}</span>
-          ) : null}
-        </button>
-      </div>
+            title="Envía por WhatsApp el estado de cuotas a todos los asegurados del resultado actual (todas las páginas)"
+          >
+            <HiChatAlt2 className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span>Enviar estado de cuotas</span>
+            {total > 0 ? (
+              <span className="ml-2 rounded bg-black/20 px-2 py-0.5 text-[11px]">
+                {total}
+              </span>
+            ) : null}
+          </button>
+        </div>
 
-      {/* Filtros */}
-      <PolizaFilter
-        // valores actuales
-        searchValue={search}
-        estadoActual={estado}
-        estadoFinancieroActual={estado_financiero}
-        companiaActual={compania}
-        clienteActual={cliente}
-        patenteActual={patente}
-        soloActivas={!!solo_activas}
-        orderingActual={ordering}
-        pageSize={pageSize}
-        totalFiltradas={total}
-        modoActual={modo}
-        // handlers
-        onSearchChange={onSearchChange}
-        onEstadoChange={onEstadoChange}
-        onEstadoFinancieroChange={onEstadoFinancieroChange}
-        onCompaniaChange={onCompaniaChange}
-        onClienteChange={onClienteChange}
-        onPatenteChange={onPatenteChange}
-        onSoloActivasChange={onSoloActivasChange}
-        onModoChange={onModoChange}
-        onPageSizeChange={onPageSizeChange}
-        onOrderingChange={onOrderingChange}
-        // NUEVOS: handlers de vencimiento
-        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
-        onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
-        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
-        onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
-        onClearVencimientoFilters={onClearVencimiento}
-        // resúmenes (cuotas = página actual; pólizas = GLOBAL por KPIs)
-        resumenCuotas={resumenCuotas}
-        resumenPolizas={resumenPolizas}
-      />
-
-      <div className="mt-3 text-sm text-gray-300">
-        Mostrando {list.length} de {total} pólizas (página {page})
-      </div>
-
-      <div className="mt-3">
-        <PolizaTable
-          polizas={list}
-          status={status}
-          page={page}
+        {/* Filtros */}
+        <PolizaFilter
+          // valores actuales
+          searchValue={search}
+          estadoActual={estado}
+          estadoFinancieroActual={estado_financiero}
+          companiaActual={compania}
+          clienteActual={cliente}
+          patenteActual={patente}
+          soloActivas={!!solo_activas}
+          orderingActual={ordering}
           pageSize={pageSize}
-          total={total}
-          onPageChange={onPageChange}
+          totalFiltradas={total}
+          modoActual={modo}
+          // handlers
+          onSearchChange={onSearchChange}
+          onEstadoChange={onEstadoChange}
+          onEstadoFinancieroChange={onEstadoFinancieroChange}
+          onCompaniaChange={onCompaniaChange}
+          onClienteChange={onClienteChange}
+          onPatenteChange={onPatenteChange}
+          onSoloActivasChange={onSoloActivasChange}
+          onModoChange={onModoChange}
           onPageSizeChange={onPageSizeChange}
           onOrderingChange={onOrderingChange}
-          ordering={ordering}
+          // NUEVOS: handlers de vencimiento
+          onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
+          onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
+          onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
+          onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
+          onClearVencimientoFilters={onClearVencimiento}
+          // resúmenes (cuotas = página actual; pólizas = GLOBAL por KPIs)
+          resumenCuotas={resumenCuotas}
+          resumenPolizas={resumenPolizas}
         />
-      </div>
 
-      {/* 🧩 Sección: Vehículo & Documentos */}
-      <div className="mt-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm text-gray-300">Vehículo & Documentos de:</div>
-          <select
-            value={polizaIdVehiculo || ""}
-            onChange={(e) => setPolizaIdVehiculo(e.target.value)}
-            className="rounded border border-gray-700 bg-gray-800 px-3 py-2 text-sm"
-          >
-            <option value="">— seleccionar póliza de esta página —</option>
-            {list.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} ·{" "}
-                {p.numero_poliza ||
-                  p.patente ||
-                  `${(p?.cliente?.apellido || "")} ${
-                    p?.cliente?.nombre || ""
-                  }`.trim() ||
-                  "Póliza"}
-              </option>
-            ))}
-          </select>
+        <div className="mt-1 text-xs sm:text-sm text-gray-300">
+          Mostrando {list.length} de {total} pólizas (página {page})
+        </div>
+
+        <div className="mt-2 sm:mt-3">
+          <PolizaTable
+            polizas={list}
+            status={status}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+            onOrderingChange={onOrderingChange}
+            ordering={ordering}
+          />
+        </div>
+
+        {/* 🧩 Sección: Vehículo & Documentos */}
+        <div className="mt-5 space-y-2">
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
+            <div className="text-xs sm:text-sm text-gray-300">
+              Vehículo & Documentos de:
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <select
+                value={polizaIdVehiculo || ""}
+                onChange={(e) => setPolizaIdVehiculo(e.target.value)}
+                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs sm:text-sm flex-1"
+              >
+                <option value="">
+                  — seleccionar póliza de esta página —
+                </option>
+                {list.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    #{p.id} ·{" "}
+                    {p.numero_poliza ||
+                      p.patente ||
+                      `${(p?.cliente?.apellido || "")} ${
+                        p?.cliente?.nombre || ""
+                      }`.trim() ||
+                      "Póliza"}
+                  </option>
+                ))}
+              </select>
+              {polizaIdVehiculo && (
+                <Link
+                  to={`/polizas/${polizaIdVehiculo}?tab=vehiculo`}
+                  className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-xs sm:text-sm hover:bg-indigo-700 w-full sm:w-auto"
+                >
+                  Ver detalle
+                </Link>
+              )}
+            </div>
+          </div>
+
           {polizaIdVehiculo && (
-            <Link
-              to={`/polizas/${polizaIdVehiculo}?tab=vehiculo`}
-              className="rounded bg-indigo-600 px-3 py-2 text-sm hover:bg-indigo-700"
-            >
-              Ver detalle
-            </Link>
+            <div className="mt-1 rounded-xl border border-gray-800 bg-gray-950/70 p-3">
+              <VehiculoDocsPanel polizaId={Number(polizaIdVehiculo)} />
+            </div>
           )}
         </div>
 
-        {polizaIdVehiculo && (
-          <div className="mt-3 rounded-lg border border-gray-800 bg-gray-950/60 p-3">
-            <VehiculoDocsPanel polizaId={Number(polizaIdVehiculo)} />
+        {/* 🧩 Sección: Cuponeras de robo */}
+        <div className="mt-5 space-y-2">
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
+            <div className="text-xs sm:text-sm text-gray-300">
+              Cuponeras de robo de:
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <select
+                value={polizaIdCupones || ""}
+                onChange={(e) => setPolizaIdCupones(e.target.value)}
+                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs sm:text-sm flex-1"
+              >
+                <option value="">
+                  — seleccionar póliza de esta página —
+                </option>
+                {list.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    #{p.id} ·{" "}
+                    {p.numero_poliza ||
+                      p.patente ||
+                      `${(p?.cliente?.apellido || "")} ${
+                        p?.cliente?.nombre || ""
+                      }`.trim() ||
+                      "Póliza"}
+                  </option>
+                ))}
+              </select>
+              {polizaIdCupones && (
+                <Link
+                  to={`/polizas/${polizaIdCupones}?tab=cupones_robo`}
+                  className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-3 py-2 text-xs sm:text-sm hover:bg-purple-700 w-full sm:w-auto"
+                >
+                  Ver detalle
+                </Link>
+              )}
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* 🧩 Sección: Cuponeras de robo */}
-      <div className="mt-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm text-gray-300">Cuponeras de robo de:</div>
-          <select
-            value={polizaIdCupones || ""}
-            onChange={(e) => setPolizaIdCupones(e.target.value)}
-            className="rounded border border-gray-700 bg-gray-800 px-3 py-2 text-sm"
-          >
-            <option value="">— seleccionar póliza de esta página —</option>
-            {list.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} ·{" "}
-                {p.numero_poliza ||
-                  p.patente ||
-                  `${(p?.cliente?.apellido || "")} ${
-                    p?.cliente?.nombre || ""
-                  }`.trim() ||
-                  "Póliza"}
-              </option>
-            ))}
-          </select>
           {polizaIdCupones && (
-            <Link
-              to={`/polizas/${polizaIdCupones}?tab=cupones_robo`}
-              className="rounded bg-purple-600 px-3 py-2 text-sm hover:bg-purple-700"
-            >
-              Ver detalle
-            </Link>
+            <div className="mt-1 rounded-xl border border-gray-800 bg-gray-950/70 p-3">
+              <CuponesRoboPanel
+                polizaId={Number(polizaIdCupones)}
+                cupones={selectedPolizaCupones?.cupones_robo}
+              />
+            </div>
           )}
         </div>
 
-        {polizaIdCupones && (
-          <div className="mt-3 rounded-lg border border-gray-800 bg-gray-950/60 p-3">
-            <CuponesRoboPanel
-              polizaId={Number(polizaIdCupones)}
-              cupones={selectedPolizaCupones?.cupones_robo}
-            />
+        {/* 🧩 Panel rápido de grúa */}
+        <div className="mt-5 space-y-2">
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
+            <div className="text-xs sm:text-sm text-gray-300">
+              Servicio de grúa de:
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <select
+                value={polizaIdPanel || ""}
+                onChange={(e) => setPolizaIdPanel(e.target.value)}
+                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs sm:text-sm flex-1"
+              >
+                <option value="">
+                  — seleccionar póliza de esta página —
+                </option>
+                {list.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    #{p.id} ·{" "}
+                    {p.numero_poliza ||
+                      p.patente ||
+                      `${(p?.cliente?.apellido || "")} ${
+                        p?.cliente?.nombre || ""
+                      }`.trim() ||
+                      "Póliza"}
+                  </option>
+                ))}
+              </select>
+              {polizaIdPanel && (
+                <Link
+                  to={`/polizas/${polizaIdPanel}?tab=gruas`}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-xs sm:text-sm hover:bg-blue-700 w-full sm:w-auto"
+                >
+                  Gestionar en detalle
+                </Link>
+              )}
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* 🧩 Panel rápido de grúa */}
-      <div className="mt-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm text-gray-300">Servicio de grúa de:</div>
-          <select
-            value={polizaIdPanel || ""}
-            onChange={(e) => setPolizaIdPanel(e.target.value)}
-            className="rounded border border-gray-700 bg-gray-800 px-3 py-2 text-sm"
-          >
-            <option value="">— seleccionar póliza de esta página —</option>
-            {list.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} ·{" "}
-                {p.numero_poliza ||
-                  p.patente ||
-                  `${(p?.cliente?.apellido || "")} ${
-                    p?.cliente?.nombre || ""
-                  }`.trim() ||
-                  "Póliza"}
-              </option>
-            ))}
-          </select>
           {polizaIdPanel && (
-            <Link
-              to={`/polizas/${polizaIdPanel}?tab=gruas`}
-              className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-700"
-            >
-              Gestionar en detalle
-            </Link>
+            <div className="mt-1 rounded-xl border border-gray-800 bg-gray-950/70 p-3">
+              <ServicioGruaCard polizaId={Number(polizaIdPanel)} />
+            </div>
           )}
         </div>
-
-        {polizaIdPanel && (
-          <div className="mt-3 rounded-lg border border-gray-800 bg-gray-950/60 p-3">
-            <ServicioGruaCard polizaId={Number(polizaIdPanel)} />
-          </div>
-        )}
       </div>
 
       {/* Modal de confirmación de envío masivo */}
@@ -680,8 +717,8 @@ export default function PolizasPage() {
               <DetalleRespuesta data={resultadoBackend} />
             </div>
 
-            <div className="flex items-center justify-between border-t border-gray-800 bg-gray-950/60 px-4 py-3 text-xs">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-gray-800 bg-gray-950/60 px-4 py-3 text-xs">
+              <div className="flex items-center gap-2">
                 <label className="inline-flex items-center gap-1">
                   <input
                     type="checkbox"
@@ -695,25 +732,25 @@ export default function PolizasPage() {
                 </label>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <button
                   onClick={cerrarModalEnvio}
                   disabled={sending}
-                  className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full sm:w-auto rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cerrar
                 </button>
                 <button
                   onClick={() => ejecutarEnvioMasivo(enviarDeVerdad)}
                   disabled={sending}
-                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium
+                  className={`w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium
                     ${
                       sending
                         ? "bg-emerald-700 text-gray-100 opacity-80"
                         : "bg-emerald-500 text-white hover:bg-emerald-400"
                     }`}
                 >
-                  <HiChatAlt2 className="h-5 w-5" />
+                  <HiChatAlt2 className="h-4 w-4" />
                   {sending
                     ? enviarDeVerdad
                       ? "Enviando..."

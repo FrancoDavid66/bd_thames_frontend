@@ -1,7 +1,12 @@
 // src/components/polizas/CuotasSection.jsx
 import { HiRefresh, HiChevronRight } from "react-icons/hi";
 
-export default function CuotasSection({ resumen, onOpenDetalle, onOpenRenovar, onOpen }) {
+export default function CuotasSection({
+  resumen,
+  onOpenDetalle,
+  onOpenRenovar,
+  onOpen,
+}) {
   // Back-compat: si te quedaron llamados con onOpen, lo uso como "ver detalle"
   const openDetalle = onOpenDetalle || onOpen;
 
@@ -9,27 +14,35 @@ export default function CuotasSection({ resumen, onOpenDetalle, onOpenRenovar, o
   const progreso = r.total ? Math.round((r.pagadas / r.total) * 100) : 0;
 
   const Card = ({ label, value, className = "" }) => (
-    <div className={`rounded-xl bg-gray-900/80 border border-gray-800 p-4 shadow-lg shadow-black/10 ${className}`}>
-      <div className="text-sm text-gray-400">{label}</div>
-      <div className="text-2xl font-bold text-white mt-0.5">{value}</div>
+    <div
+      className={`rounded-xl bg-gray-900/80 border border-gray-800 p-4 shadow-lg shadow-black/10 ${className}`}
+    >
+      <div className="text-xs sm:text-sm text-gray-400">{label}</div>
+      <div className="text-xl sm:text-2xl font-bold text-white mt-0.5">
+        {value}
+      </div>
     </div>
   );
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-md shadow-xl shadow-black/20 p-4">
+    <section className="rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-md shadow-xl shadow-black/20 p-4 sm:p-5">
       {/* Header + acciones */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div>
-          <div className="text-xs text-white/70">Sección</div>
-          <h3 className="text-lg font-semibold text-white">Cuotas</h3>
+          <div className="text-[11px] text-white/70 uppercase tracking-wide">
+            Sección
+          </div>
+          <h3 className="text-lg sm:text-xl font-semibold text-white">
+            Cuotas
+          </h3>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto items-stretch sm:items-center gap-2">
           {/* Botón primario: Renovar póliza */}
           <button
             type="button"
             onClick={onOpenRenovar}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+            className="inline-flex justify-center items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer w-full sm:w-auto"
             title="Generar una nueva póliza con sus cuotas"
           >
             <HiRefresh className="w-4 h-4" />
@@ -41,7 +54,7 @@ export default function CuotasSection({ resumen, onOpenDetalle, onOpenRenovar, o
             <button
               type="button"
               onClick={openDetalle}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10 transition-colors cursor-pointer"
+              className="inline-flex justify-center items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10 transition-colors cursor-pointer w-full sm:w-auto"
               title="Ver detalle de cuotas"
             >
               Ver detalle
@@ -52,15 +65,27 @@ export default function CuotasSection({ resumen, onOpenDetalle, onOpenRenovar, o
       </div>
 
       {/* KPIs */}
-      <div className="grid md:grid-cols-4 gap-4 mt-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-4">
         <Card label="Cuotas" value={r.total} />
-        <Card label="Pagadas" value={r.pagadas} className="ring-1 ring-emerald-500/20" />
-        <Card label="Pendientes" value={r.pendientes} className="ring-1 ring-amber-500/20" />
-        <Card label="Vencidas" value={r.vencidas} className="ring-1 ring-rose-500/20" />
+        <Card
+          label="Pagadas"
+          value={r.pagadas}
+          className="ring-1 ring-emerald-500/20"
+        />
+        <Card
+          label="Pendientes"
+          value={r.pendientes}
+          className="ring-1 ring-amber-500/20"
+        />
+        <Card
+          label="Vencidas"
+          value={r.vencidas}
+          className="ring-1 ring-rose-500/20"
+        />
 
         {/* Progreso */}
-        <div className="md:col-span-4">
-          <div className="flex items-center justify-between text-xs text-white/70 mb-1">
+        <div className="col-span-2 md:col-span-4">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs text-white/70 mb-1">
             <span>Progreso de pago</span>
             <span>{progreso}%</span>
           </div>

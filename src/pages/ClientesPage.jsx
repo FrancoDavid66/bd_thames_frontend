@@ -1,8 +1,8 @@
 // src/pages/ClientesPage.jsx
-import { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { motion } from 'framer-motion';
-import React from 'react';
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { motion } from "framer-motion";
+import React from "react";
 
 import {
   fetchClientes,
@@ -10,15 +10,15 @@ import {
   updateCliente,
   setSearch,
   setEstado,
-} from '../store/slices/clientesSlice';
+} from "../store/slices/clientesSlice";
 
-import ClientesFilter from '../components/clientes/ClientesFilter';
-import ClientesTable from '../components/clientes/ClientesTable';
+import ClientesFilter from "../components/clientes/ClientesFilter";
+import ClientesTable from "../components/clientes/ClientesTable";
 
-import ConfirmModal from '../components/comunes/ConfirmModal';
-import ClienteEditModal from '../components/clientes/ClienteEditModal';
-import ClienteCreateModal from '../components/clientes/ClienteCreateModal';
-import { FaPlus } from 'react-icons/fa';
+import ConfirmModal from "../components/comunes/ConfirmModal";
+import ClienteEditModal from "../components/clientes/ClienteEditModal";
+import ClienteCreateModal from "../components/clientes/ClienteCreateModal";
+import { FaPlus } from "react-icons/fa";
 
 const AnimatedDiv = ({ children, className }) => (
   <motion.div
@@ -39,12 +39,13 @@ const ClientesPage = () => {
   const {
     clientes = [],
     count = 0,
-    search = '',
-    estado = 'todos',
+    search = "",
+    estado = "todos",
     status,
   } = useSelector((state) => state.clientes);
 
-  const totalMostrado = Number.isFinite(count) && count > 0 ? count : clientes.length;
+  const totalMostrado =
+    Number.isFinite(count) && count > 0 ? count : clientes.length;
 
   const handleBuscar = (texto) => {
     dispatch(setSearch(texto));
@@ -72,40 +73,48 @@ const ClientesPage = () => {
   const [modalCrearAbierto, setModalCrearAbierto] = React.useState(false);
 
   return (
-    <AnimatedDiv className="h-full flex flex-col p-8 bg-gray-800 text-white rounded-lg shadow-xl">
-      {/* Header fijo */}
-      <AnimatedDiv className="flex items-center justify-between mb-4">
-        <h1 className="text-3xl font-bold">
-          Clientes Registrados ({totalMostrado})
+    <AnimatedDiv className="h-full w-full flex flex-col bg-gray-900 text-white rounded-xl sm:rounded-2xl shadow-xl px-4 py-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      {/* Header + botón (responsive) */}
+      <AnimatedDiv className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl sm:text-3xl font-bold leading-tight">
+          Clientes Registrados{" "}
+          <span className="text-sm sm:text-base font-normal text-gray-400">
+            ({totalMostrado})
+          </span>
         </h1>
         <motion.button
-          whileHover={{ scale: 1.05 }}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => setModalCrearAbierto(true)}
-          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow-md"
+          className="inline-flex items-center justify-center gap-2 w-full sm:w-auto h-11 sm:h-10 px-4 rounded-lg bg-emerald-500 text-sm sm:text-base font-medium text-white hover:bg-emerald-600 active:bg-emerald-700 shadow-md shadow-emerald-500/20"
         >
-          <FaPlus /> Nuevo Cliente
+          <FaPlus className="text-sm" />
+          <span>Nuevo Cliente</span>
         </motion.button>
       </AnimatedDiv>
 
-      {/* Filtros fijos arriba */}
-      <div className="mb-4">
+      {/* Filtros arriba, con algo de separación en mobile */}
+      <div className="mb-3 sm:mb-4">
         <ClientesFilter
           onFilterText={handleBuscar}
           onFilterEstado={handleFiltrarEstado}
         />
       </div>
 
-      {/* Contenido scrollable */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-        {status === 'loading' && (
-          <p className="text-blue-400">Cargando clientes...</p>
+      {/* Contenido scrollable tipo “chat” */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 sm:pr-2 pb-4">
+        {status === "loading" && (
+          <p className="text-blue-400 text-sm sm:text-base">
+            Cargando clientes...
+          </p>
         )}
 
-        {status === 'failed' && (
-          <AnimatedDiv className="text-red-500 flex items-center gap-2">
+        {status === "failed" && (
+          <AnimatedDiv className="text-red-400 flex flex-col sm:flex-row sm:items-center gap-2 text-sm sm:text-base">
             <p>Error al cargar clientes.</p>
             <motion.button
-              whileHover={{ scale: 1.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() =>
                 dispatch(
                   fetchClientes({
@@ -116,22 +125,22 @@ const ClientesPage = () => {
                   })
                 )
               }
-              className="text-blue-400 underline"
+              className="self-start sm:self-auto inline-flex items-center text-xs sm:text-sm text-blue-300 hover:text-blue-200 underline underline-offset-2"
             >
               Reintentar
             </motion.button>
           </AnimatedDiv>
         )}
 
-        {status === 'succeeded' && clientes.length > 0 && (
+        {status === "succeeded" && clientes.length > 0 && (
           <>
             {/* MODO LOCAL: no pasamos page/total/onPageChange, la tabla pagina sola */}
             <ClientesTable clientes={clientes} showFooter={true} />
           </>
         )}
 
-        {status === 'succeeded' && clientes.length === 0 && (
-          <p className="text-gray-400">
+        {status === "succeeded" && clientes.length === 0 && (
+          <p className="text-gray-400 text-sm sm:text-base">
             No hay clientes que coincidan con la búsqueda.
           </p>
         )}
@@ -141,8 +150,8 @@ const ClientesPage = () => {
       <ConfirmModal
         isOpen={!!clienteAEliminar}
         onClose={() => setClienteAEliminar(null)}
-        nombre={`${clienteAEliminar?.nombre ?? ''} ${
-          clienteAEliminar?.apellido ?? ''
+        nombre={`${clienteAEliminar?.nombre ?? ""} ${
+          clienteAEliminar?.apellido ?? ""
         }`}
         onConfirm={() =>
           dispatch(deleteCliente(clienteAEliminar.id)).finally(() =>

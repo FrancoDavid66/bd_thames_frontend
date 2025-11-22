@@ -2,13 +2,28 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-/** Base URL robusta:
- * - Usa VITE_API_URL si existe
- * - Si no, cae a '/api/'
- * - Garantiza la barra final
+/**
+ * Base URL robusta para clientes:
+ * - Si hay VITE_API_URL:
+ *    - Si ya termina en /api o /api/, se usa tal cual.
+ *    - Si no, se le agrega /api/.
+ * - Si NO hay VITE_API_URL, fallback a "/api/" (comportamiento clásico).
  */
-const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
-const BASE = RAW_BASE.endsWith("/") ? RAW_BASE : `${RAW_BASE}/`;
+const RAW_ENV = (import.meta.env?.VITE_API_URL || "").toString().trim();
+
+const buildBaseURL = () => {
+  if (RAW_ENV) {
+    // limpiamos barras del final
+    const trimmed = RAW_ENV.replace(/\/+$/, "");
+    const endsWithApi = trimmed.endsWith("/api");
+    const withApi = endsWithApi ? trimmed : `${trimmed}/api`;
+    return `${withApi}/`;
+  }
+  // fallback clásico
+  return "/api/";
+};
+
+const BASE = buildBaseURL();
 
 // Instancia axios consistente
 const http = axios.create({
@@ -22,7 +37,10 @@ const http = axios.create({
 // ✅ Acepta y envía page_size al backend
 export const fetchClientes = createAsyncThunk(
   "clientes/fetchClientes",
-  async ({ page = 1, page_size, search = "", estado = "todos" }, { rejectWithValue }) => {
+  async (
+    { page = 1, page_size, search = "", estado = "todos" },
+    { rejectWithValue }
+  ) => {
     try {
       const params = { page, search };
       if (page_size) params.page_size = page_size;
@@ -32,7 +50,9 @@ export const fetchClientes = createAsyncThunk(
       // data = { results, count, next, previous }
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || "Error al obtener clientes");
+      return rejectWithValue(
+        error.response?.data || "Error al obtener clientes"
+      );
     }
   }
 );
@@ -45,7 +65,9 @@ export const createCliente = createAsyncThunk(
       const { data } = await http.post("clientes/", payload);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || "Error al crear cliente");
+      return rejectWithValue(
+        error.response?.data || "Error al crear cliente"
+      );
     }
   }
 );
@@ -59,7 +81,9 @@ export const updateCliente = createAsyncThunk(
       const { data } = await http.patch(`clientes/${id}/`, partial);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message || "Error al actualizar cliente");
+      return rejectWithValue(
+        error.response?.data || error.message || "Error al actualizar cliente"
+      );
     }
   }
 );
@@ -72,7 +96,9 @@ export const deleteCliente = createAsyncThunk(
       await http.delete(`clientes/${id}/`);
       return { id };
     } catch (error) {
-      return rejectWithValue(error.response?.data || "Error al eliminar cliente");
+      return rejectWithValue(
+        error.response?.data || "Error al eliminar cliente"
+      );
     }
   }
 );
@@ -87,7 +113,9 @@ export const pagarCuota = createAsyncThunk(
       const { data } = await http.patch(`cuotas/${cuotaId}/pagar/`, payload);
       return { cuotaId, ...data };
     } catch (error) {
-      return rejectWithValue(error.response?.data || "Error al pagar la cuota");
+      return rejectWithValue(
+        error.response?.data || "Error al pagar la cuota"
+      );
     }
   }
 );
@@ -142,7 +170,9 @@ const clientesSlice = createSlice({
         state.count += 1;
       })
       .addCase(updateCliente.fulfilled, (state, action) => {
-        const idx = state.clientes.findIndex((c) => c.id === action.payload.id);
+        const idx = state.clientes.findIndex(
+          (c) => c.id === action.payload.id
+        );
         if (idx !== -1) state.clientes[idx] = action.payload;
       })
       .addCase(deleteCliente.fulfilled, (state, action) => {

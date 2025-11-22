@@ -29,7 +29,7 @@ function LoadingButton({ onClick, loading, children, className = "", disabled, i
     <button
       onClick={onClick}
       disabled={loading || disabled}
-      className={`px-3 py-1.5 rounded-lg inline-flex items-center gap-2 disabled:opacity-50 ${className}`}
+      className={`px-3 py-1.5 rounded-lg inline-flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${className}`}
     >
       {loading ? (
         <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -242,26 +242,28 @@ export default function GruasPanel({ polizaId }) {
   // UI
   // =======================
   return (
-    <section className="rounded-xl border border-neutral-400/20 bg-neutral-200/10 p-4">
-      <header className="flex items-center justify-between gap-3">
+    <section className="rounded-2xl border border-neutral-400/20 bg-neutral-900/60 p-4 sm:p-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <span className="p-2 rounded-xl bg-neutral-200/20 border border-neutral-400/20">
             <HiOutlinePhotograph className="w-5 h-5 text-primary-400" />
           </span>
           <div>
-            <div className="text-sm font-semibold text-neutral-100">Grúa / Asistencia</div>
+            <div className="text-sm font-semibold text-neutral-100">
+              Grúa / Asistencia
+            </div>
             <div className="text-xs text-neutral-400">
               Reutiliza fotos de la galería (no hace falta re-subir).
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
           <LoadingButton
             onClick={load}
             loading={loading}
             icon={HiRefresh}
-            className="bg-neutral-200/20 text-neutral-100 border border-neutral-400/20 hover:bg-neutral-200/30"
+            className="bg-neutral-200/20 text-neutral-100 border border-neutral-400/20 hover:bg-neutral-200/30 w-full sm:w-auto"
           >
             Actualizar
           </LoadingButton>
@@ -272,7 +274,7 @@ export default function GruasPanel({ polizaId }) {
             loading={false}
             icon={HiLink}
             disabled={!polizaNum}
-            className="bg-emerald-600 text-white hover:opacity-90"
+            className="bg-emerald-600 text-white hover:opacity-90 w-full sm:w-auto"
           >
             Asociar grúa
           </LoadingButton>
@@ -283,7 +285,7 @@ export default function GruasPanel({ polizaId }) {
               onClick={importarDesdeGaleria}
               loading={importando}
               icon={HiCloudDownload}
-              className="bg-primary-400 text-neutral-900 font-semibold hover:opacity-90"
+              className="bg-primary-400 text-neutral-900 font-semibold hover:opacity-90 w-full sm:w-auto"
             >
               Importar 4 desde galería
             </LoadingButton>
@@ -299,34 +301,44 @@ export default function GruasPanel({ polizaId }) {
         )}
 
         {loading ? (
-          <div className="h-24 animate-pulse rounded bg-neutral-200/20" />
+          <div className="h-24 animate-pulse rounded-2xl bg-neutral-800/60" />
         ) : !adhesion ? (
           <div className="text-sm text-neutral-300">
-            No hay adhesión activa/vigente para esta póliza. Usá <b>“Asociar grúa”</b> para
-            vincular el servicio (se intentará auto-importar <b>4 PATENTE</b> desde galería).
+            No hay adhesión activa/vigente para esta póliza. Usá{" "}
+            <b>“Asociar grúa”</b> para vincular el servicio (se intentará auto-importar{" "}
+            <b>4 PATENTE</b> desde galería).
           </div>
         ) : (
           <>
             {/* ===== Banner grande de activación / estado ===== */}
-            <div className="rounded-2xl border border-neutral-400/20 bg-neutral-900/60 p-4">
+            <div className="rounded-2xl border border-neutral-400/20 bg-neutral-950/70 p-4">
               {carenciaRestante > 0 ? (
                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
                   <div>
                     <div className="text-[11px] uppercase tracking-wide text-amber-300/90">
                       Activación programada
                     </div>
-                    <div className="mt-1 text-3xl md:text-4xl font-extrabold text-amber-300">
-                      Se activa en <span className="text-4xl md:text-5xl">{carenciaRestante}</span> día{carenciaRestante === 1 ? "" : "s"}
+                    <div className="mt-1 text-2xl sm:text-3xl md:text-4xl font-extrabold text-amber-300">
+                      Se activa en{" "}
+                      <span className="text-3xl sm:text-4xl md:text-5xl">
+                        {carenciaRestante}
+                      </span>{" "}
+                      día{carenciaRestante === 1 ? "" : "s"}
                     </div>
                     <div className="mt-1 text-sm text-neutral-300">
-                      Fecha de inicio de servicio: <b>{fmtDate(servicioActivoDesde)}</b>
+                      Fecha de inicio de servicio:{" "}
+                      <b>{fmtDate(servicioActivoDesde)}</b>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Pill ok={!!operable?.ok} text={operable?.ok ? "Operable ahora" : "Con restricciones"} />
+                  <div className="flex items-start md:items-center gap-2">
+                    <Pill
+                      ok={!!operable?.ok}
+                      text={operable?.ok ? "Operable ahora" : "Con restricciones"}
+                    />
                     {!operable?.ok && operable?.motivo && (
                       <span className="text-xs text-yellow-300 inline-flex items-center gap-1">
-                        <HiExclamationCircle className="w-4 h-4" /> {operable.motivo}
+                        <HiExclamationCircle className="w-4 h-4" />{" "}
+                        {operable.motivo}
                       </span>
                     )}
                   </div>
@@ -337,18 +349,22 @@ export default function GruasPanel({ polizaId }) {
                     <div className="text-[11px] uppercase tracking-wide text-emerald-300/90">
                       Servicio activo
                     </div>
-                    <div className="mt-1 text-3xl md:text-4xl font-extrabold text-emerald-300">
+                    <div className="mt-1 text-2xl sm:text-3xl md:text-4xl font-extrabold text-emerald-300">
                       Operativo para usar
                     </div>
                     <div className="mt-1 text-sm text-neutral-300">
                       Activo desde: <b>{fmtDate(servicioActivoDesde)}</b>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Pill ok={!!operable?.ok} text={operable?.ok ? "Operable ahora" : "Con restricciones"} />
+                  <div className="flex items-start md:items-center gap-2">
+                    <Pill
+                      ok={!!operable?.ok}
+                      text={operable?.ok ? "Operable ahora" : "Con restricciones"}
+                    />
                     {!operable?.ok && operable?.motivo && (
                       <span className="text-xs text-yellow-300 inline-flex items-center gap-1">
-                        <HiExclamationCircle className="w-4 h-4" /> {operable.motivo}
+                        <HiExclamationCircle className="w-4 h-4" />{" "}
+                        {operable.motivo}
                       </span>
                     )}
                   </div>
@@ -358,41 +374,62 @@ export default function GruasPanel({ polizaId }) {
 
             {/* ===== Datos clave compactos ===== */}
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-neutral-400/20 bg-neutral-200/10 p-3">
+              <div className="rounded-xl border border-neutral-400/20 bg-neutral-900/60 p-3">
                 <div className="text-xs text-neutral-400">Plan</div>
                 <div className="text-sm font-semibold text-neutral-100">
-                  {adhesion?.plan?.nombre || "—"} · {adhesion?.plan?.km_incluidos ?? 0} km
+                  {adhesion?.plan?.nombre || "—"} ·{" "}
+                  {adhesion?.plan?.km_incluidos ?? 0} km
                 </div>
                 <div className="mt-1 text-xs text-neutral-400">
-                  Costo km adicional: {adhesion?.plan?.costo_km_adicional != null ? `$${Number(adhesion.plan.costo_km_adicional).toFixed(2)}` : "—"}
+                  Costo km adicional:{" "}
+                  {adhesion?.plan?.costo_km_adicional != null
+                    ? `$${Number(
+                        adhesion.plan.costo_km_adicional
+                      ).toFixed(2)}`
+                    : "—"}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-neutral-300">
                   <div>
                     <div className="text-neutral-400">Carencia hasta</div>
-                    <div className="font-medium">{fmtDate(adhesion?.fecha_carencia_fin)}</div>
+                    <div className="font-medium">
+                      {fmtDate(adhesion?.fecha_carencia_fin)}
+                    </div>
                   </div>
                   <div>
                     <div className="text-neutral-400">Rehabilita desde</div>
-                    <div className="font-medium">{fmtDate(adhesion?.rehabilitar_desde)}</div>
+                    <div className="font-medium">
+                      {fmtDate(adhesion?.rehabilitar_desde)}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-neutral-400/20 bg-neutral-200/10 p-3">
+              <div className="rounded-xl border border-neutral-400/20 bg-neutral-900/60 p-3">
                 <div className="text-xs text-neutral-400">Uso del servicio</div>
                 <div className="mt-1 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded border border-neutral-400/20 bg-neutral-900/40 p-2">
-                    <div className="text-[11px] text-neutral-400">Total solicitudes</div>
-                    <div className="text-lg font-bold text-neutral-100">{stats?.total_solicitudes ?? 0}</div>
+                  <div className="rounded border border-neutral-400/20 bg-neutral-950/60 p-2">
+                    <div className="text-[11px] text-neutral-400">
+                      Total solicitudes
+                    </div>
+                    <div className="text-lg font-bold text-neutral-100">
+                      {stats?.total_solicitudes ?? 0}
+                    </div>
                   </div>
-                  <div className="rounded border border-neutral-400/20 bg-neutral-900/40 p-2">
-                    <div className="text-[11px] text-neutral-400">Últ. 12 meses</div>
-                    <div className="text-lg font-bold text-neutral-100">{stats?.en_12_meses ?? 0}</div>
+                  <div className="rounded border border-neutral-400/20 bg-neutral-950/60 p-2">
+                    <div className="text-[11px] text-neutral-400">
+                      Últ. 12 meses
+                    </div>
+                    <div className="text-lg font-bold text-neutral-100">
+                      {stats?.en_12_meses ?? 0}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-neutral-300">
                   {stats?.ultima_solicitud ? (
-                    <>Última: #{stats.ultima_solicitud.id} · {fmtDate(stats.ultima_solicitud.fecha)}</>
+                    <>
+                      Última: #{stats.ultima_solicitud.id} ·{" "}
+                      {fmtDate(stats.ultima_solicitud.fecha)}
+                    </>
                   ) : (
                     <>Sin solicitudes previas</>
                   )}
@@ -401,16 +438,21 @@ export default function GruasPanel({ polizaId }) {
             </div>
 
             {/* ===== Contrato ===== */}
-            <div className="mt-4 rounded-lg border border-neutral-400/20 bg-neutral-200/10 p-3">
-              <div className="flex items-center justify-between">
+            <div className="mt-4 rounded-xl border border-neutral-400/20 bg-neutral-900/70 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <span className="p-1.5 rounded-lg bg-neutral-200/20 border border-neutral-400/20">
                     <HiDocumentText className="w-4 h-4 text-primary-300" />
                   </span>
-                  <div className="text-sm font-medium text-neutral-100">Contrato de adhesión</div>
+                  <div className="text-sm font-medium text-neutral-100">
+                    Contrato de adhesión
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Pill ok={!!contrato?.firmado} text={contrato?.firmado ? "Firmado" : "Faltante"} />
+                  <Pill
+                    ok={!!contrato?.firmado}
+                    text={contrato?.firmado ? "Firmado" : "Faltante"}
+                  />
                   <LoadingButton
                     onClick={openContrato}
                     loading={false}
@@ -422,10 +464,12 @@ export default function GruasPanel({ polizaId }) {
                 </div>
               </div>
 
-              <div className="mt-2 flex items-center justify-between text-xs">
+              <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs">
                 <div className="text-neutral-300">
                   {contrato?.firmado_en ? (
-                    <>Firmado el <b>{fmtDate(contrato.firmado_en)}</b></>
+                    <>
+                      Firmado el <b>{fmtDate(contrato.firmado_en)}</b>
+                    </>
                   ) : (
                     <>Aún no registrado</>
                   )}
@@ -437,7 +481,8 @@ export default function GruasPanel({ polizaId }) {
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 text-primary-300 hover:underline"
                   >
-                    Ver/Descargar <HiExternalLink className="w-3.5 h-3.5" />
+                    Ver/Descargar{" "}
+                    <HiExternalLink className="w-3.5 h-3.5" />
                   </a>
                 ) : (
                   <span className="text-neutral-500">Sin archivo</span>
@@ -458,14 +503,16 @@ export default function GruasPanel({ polizaId }) {
 
             {/* ===== Fotos ===== */}
             <div className="mt-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm font-medium text-neutral-100">
                   Fotos vinculadas a la adhesión
                 </div>
                 <div className="text-xs text-neutral-400">
                   PATENTE: <b>{fotosPatente.length}</b> / 4{" "}
                   {faltanPatente > 0 && (
-                    <span className="text-amber-300">· faltan {faltanPatente}</span>
+                    <span className="text-amber-300">
+                      · faltan {faltanPatente}
+                    </span>
                   )}
                 </div>
               </div>
@@ -475,10 +522,14 @@ export default function GruasPanel({ polizaId }) {
                   {fotos.map((f) => (
                     <div
                       key={f.id}
-                      className="rounded overflow-hidden border border-neutral-400/20 bg-neutral-200/10"
+                      className="rounded-xl overflow-hidden border border-neutral-400/20 bg-neutral-900/70"
                     >
                       <div className="aspect-video bg-neutral-900">
-                        <img src={f.url} alt={f.tipo} className="w-full h-full object-cover" />
+                        <img
+                          src={f.url}
+                          alt={f.tipo}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="p-2 text-xs text-neutral-300 flex items-center justify-between">
                         <div className="font-semibold">{f.tipo || "OTRA"}</div>
@@ -493,7 +544,8 @@ export default function GruasPanel({ polizaId }) {
                 </div>
               ) : (
                 <div className="mt-2 text-sm text-neutral-400">
-                  Aún no hay fotos vinculadas. Usá <b>“Importar 4 desde galería”</b>.
+                  Aún no hay fotos vinculadas. Usá{" "}
+                  <b>“Importar 4 desde galería”</b>.
                 </div>
               )}
             </div>
@@ -503,23 +555,30 @@ export default function GruasPanel({ polizaId }) {
 
       {/* Modal Asociar */}
       {modalMode === "asociar" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
-          <div className="relative w-[95%] max-w-md rounded-xl bg-neutral-900 text-white border border-neutral-800 shadow-2xl p-4">
-            <div className="font-semibold mb-3">Asociar grúa a la póliza</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={closeModal}
+          />
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-neutral-900 text-white border border-neutral-800 shadow-2xl p-4">
+            <div className="font-semibold mb-3">
+              Asociar grúa a la póliza
+            </div>
             <div className="space-y-3">
-              <label className="text-sm text-neutral-300">Plan</label>
-              <select
-                value={planSel}
-                onChange={(e) => setPlanSel(e.target.value)}
-                className="w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-              >
-                {(planes || []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} · {p.km_incluidos} km
-                  </option>
-                ))}
-              </select>
+              <label className="text-sm text-neutral-300">
+                Plan
+                <select
+                  value={planSel}
+                  onChange={(e) => setPlanSel(e.target.value)}
+                  className="mt-1 w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+                >
+                  {(planes || []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} · {p.km_incluidos} km
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               {!planes.length && (
                 <div className="text-xs text-amber-300">
@@ -528,20 +587,21 @@ export default function GruasPanel({ polizaId }) {
               )}
 
               <p className="text-xs text-neutral-400">
-                Se intentará <b>auto-importar 4 fotos de PATENTE</b> desde la galería de la póliza.
+                Se intentará <b>auto-importar 4 fotos de PATENTE</b> desde la
+                galería de la póliza.
               </p>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
                 <button
                   onClick={closeModal}
-                  className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800"
+                  className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-sm w-full sm:w-auto"
                 >
                   Cancelar
                 </button>
                 <LoadingButton
                   onClick={submitModal}
                   loading={loading}
-                  className="bg-blue-600 text-white hover:opacity-90"
+                  className="bg-blue-600 text-white hover:opacity-90 w-full sm:w-auto"
                 >
                   Asociar
                 </LoadingButton>
@@ -553,23 +613,30 @@ export default function GruasPanel({ polizaId }) {
 
       {/* Modal Subir Contrato */}
       {contratoOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={closeContrato} />
-          <div className="relative w-[95%] max-w-md rounded-xl bg-neutral-900 text-white border border-neutral-800 shadow-2xl p-4">
-            <div className="font-semibold mb-3">Subir contrato de adhesión</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={closeContrato}
+          />
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-neutral-900 text-white border border-neutral-800 shadow-2xl p-4">
+            <div className="font-semibold mb-3">
+              Subir contrato de adhesión
+            </div>
             <div className="space-y-3">
               <div className="text-xs text-neutral-400">
-                Podés subir un archivo <b>(imagen o PDF)</b> o pegar una URL directa al contrato.
-                Si cargás ambas, se prioriza el archivo.
+                Podés subir un archivo <b>(imagen o PDF)</b> o pegar una URL
+                directa al contrato. Si cargás ambas, se prioriza el archivo.
               </div>
 
-              <label className="text-sm text-neutral-300">Archivo</label>
-              <label className="block">
+              <label className="text-sm text-neutral-300">
+                Archivo
                 <input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => setContratoFile(e.target.files?.[0] || null)}
-                  className="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded file:border file:border-neutral-600 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700"
+                  onChange={(e) =>
+                    setContratoFile(e.target.files?.[0] || null)
+                  }
+                  className="mt-1 w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded file:border file:border-neutral-600 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700"
                 />
               </label>
               {contratoFile && (
@@ -578,30 +645,32 @@ export default function GruasPanel({ polizaId }) {
                 </div>
               )}
 
-              <label className="text-sm text-neutral-300">o URL del contrato</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={contratoURL}
-                  onChange={(e) => setContratoURL(e.target.value)}
-                  className="flex-1 rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-                />
-                <HiExternalLink className="w-4 h-4 text-neutral-500" />
-              </div>
+              <label className="text-sm text-neutral-300">
+                o URL del contrato
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={contratoURL}
+                    onChange={(e) => setContratoURL(e.target.value)}
+                    className="flex-1 rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+                  />
+                  <HiExternalLink className="w-4 h-4 text-neutral-500" />
+                </div>
+              </label>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
                 <button
                   onClick={closeContrato}
-                  className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800"
+                  className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-sm w-full sm:w-auto"
                 >
                   Cancelar
                 </button>
-              <LoadingButton
+                <LoadingButton
                   onClick={subirContrato}
                   loading={subiendoContrato}
                   icon={HiUpload}
-                  className="bg-emerald-600 text-white hover:opacity-90"
+                  className="bg-emerald-600 text-white hover:opacity-90 w-full sm:w-auto"
                 >
                   Guardar contrato
                 </LoadingButton>

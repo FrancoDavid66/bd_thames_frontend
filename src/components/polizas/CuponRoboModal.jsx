@@ -98,13 +98,13 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-950/95 p-6 shadow-2xl"
+            className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-950/95 p-5 sm:p-6 shadow-2xl"
             initial={{ scale: 0.9, opacity: 0, y: 16 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 16 }}
@@ -120,15 +120,15 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
             </button>
 
             {/* Header */}
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/20 text-primary-300">
+            <div className="mb-5 flex flex-col sm:flex-row sm:items-center gap-3 pr-8">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/20 text-primary-300 shrink-0">
                 <HiCalendar className="h-5 w-5" />
               </div>
-              <div>
+              <div className="space-y-1">
                 <h2 className="text-sm font-semibold text-neutral-50">
                   Nuevo cupón de robo
                 </h2>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-neutral-400 leading-snug">
                   Seleccioná el mes, el estado inicial y, si ya está pagado, los
                   datos del pago.
                 </p>
@@ -182,9 +182,9 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
                 </div>
               </div>
 
-              {/* 🆕 Bloque de datos de pago (solo si estado = PAGADA) */}
+              {/* Bloque de datos de pago (solo si estado = PAGADA) */}
               {isPagada && (
-                <div className="space-y-3 rounded-2xl border border-primary-500/20 bg-primary-500/5 px-3 py-3">
+                <div className="space-y-3 rounded-2xl border border-primary-500/25 bg-primary-500/5 px-3 py-3">
                   <p className="text-[11px] text-primary-200">
                     Completá los datos del pago para dejar el cupón bien
                     registrado.
@@ -197,7 +197,7 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
                     </label>
                     <input
                       type="datetime-local"
-                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none focus:ring-2 focus:ring-primary-400/40"
                       value={pagoFecha}
                       onChange={(e) => setPagoFecha(e.target.value)}
                     />
@@ -210,7 +210,7 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
                     </label>
                     <input
                       type="text"
-                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none focus:ring-2 focus:ring-primary-400/40"
                       placeholder="Ej: Alias MP Manu, Ualá Leo, etc."
                       value={medioCobro}
                       onChange={(e) => setMedioCobro(e.target.value)}
@@ -224,7 +224,7 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
                     </label>
                     <input
                       type="url"
-                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      className="w-full rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none focus:ring-2 focus:ring-primary-400/40"
                       placeholder="Pegá la URL de la imagen si la tenés"
                       value={fotoUrl}
                       onChange={(e) => setFotoUrl(e.target.value)}
@@ -238,7 +238,7 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
                     </label>
                     <textarea
                       rows={2}
-                      className="w-full resize-none rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none"
+                      className="w-full resize-none rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-50 outline-none focus:ring-2 focus:ring-primary-400/40"
                       placeholder="Detalle corto del pago, referencia, etc."
                       value={notas}
                       onChange={(e) => setNotas(e.target.value)}
@@ -248,11 +248,11 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
               )}
 
               {/* Acciones */}
-              <div className="mt-4 flex items-center justify-end gap-2">
+              <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="inline-flex items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-neutral-300 hover:bg-white/5 disabled:opacity-60"
+                  className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-neutral-300 hover:bg-white/5 disabled:opacity-60"
                   disabled={creating}
                 >
                   Cancelar
@@ -260,7 +260,7 @@ export default function CuponRoboModal({ isOpen, onClose, polizaId }) {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-primary-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-primary-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span>Guardar cupón</span>
                   {creating && (

@@ -253,7 +253,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     [baseErrors]
   );
 
-  // ==== Validación de docs/fotos según cobertura ====
+  // ==== Validación de docs/fotos según cobertura (solo aviso visual) ====
   const docsFotosError = useMemo(() => {
     let requiredDocs = [];
     let requiredFotos = [];
@@ -289,11 +289,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     return `Faltan cargar ${parts.join(" y ")}`;
   }, [coberturaNorm, DOC_SLOTS, FOTO_SLOTS, docSlots, fotoSlots]);
 
-  // ==== Validación global para SUBMIT (datos + fotos/docs) ====
+  // ==== Validación global para SUBMIT (NO bloquea por fotos/docs) ====
   const canSubmit = useMemo(
-    () =>
-      !saving && Object.keys(baseErrors).length === 0 && !docsFotosError,
-    [baseErrors, docsFotosError, saving]
+    () => !saving && Object.keys(baseErrors).length === 0,
+    [baseErrors, saving]
   );
 
   // ==== Upload helpers (Cloudinary) ====
@@ -319,18 +318,8 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
       setDocSlots((s) => ({ ...s, [key]: val }))
     );
 
-  // ==== Submit ====
-  const onSubmit = async () => {
-    if (!canSubmit) {
-      if (Object.keys(baseErrors).length) {
-        toast.error("Revisá los datos de la póliza");
-      } else if (docsFotosError) {
-        toast.error(docsFotosError);
-      } else {
-        toast.error("No se puede crear la póliza");
-      }
-      return;
-    }
+  // ==== Lógica central de creación ====
+  const createPoliza = async () => {
     if (!clienteId) return toast.error("Falta clienteId para asociar la póliza");
 
     try {
@@ -470,6 +459,23 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     }
   };
 
+  // ==== Submit (sin ConfirmModal, solo visual) ====
+  const onSubmit = async () => {
+    if (!canSubmit) {
+      if (Object.keys(baseErrors).length) {
+        toast.error("Revisá los datos de la póliza");
+      } else {
+        toast.error("No se puede crear la póliza");
+      }
+      return;
+    }
+
+    // Si querés, podés dejar un toast informativo:
+    // if (docsFotosError) toast((t) => docsFotosError, { icon: "⚠️" });
+
+    await createPoliza();
+  };
+
   // Bloquear scroll fondo + reset de paso al abrir
   useEffect(() => {
     if (!isOpen) return;
@@ -543,7 +549,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                 ref={closeBtnRef}
                 onClick={() => !saving && onClose?.()}
                 disabled={saving}
-                className="h-10 px-3 rounded-lg bg-black/5 dark:bg-white/10 text-gray-800 dark:text:white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-50"
+                className="h-10 px-3 rounded-lg bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-50"
               >
                 Cerrar
               </button>
@@ -599,8 +605,8 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                   />
 
                   {docsFotosError && (
-                    <p className="mt-2 text-sm text-rose-300">
-                      {docsFotosError}
+                    <p className="mt-2 text-sm text-amber-300">
+                      {docsFotosError} (se puede crear igual).
                     </p>
                   )}
                 </div>
@@ -626,7 +632,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                   type="button"
                   onClick={() => !saving && onClose?.()}
                   disabled={saving}
-                  className="px-4 py-2 rounded-xl bg-black/5 dark:bg:white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
+                  className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
                 >
                   Cancelar
                 </button>
@@ -636,7 +642,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     type="button"
                     onClick={() => setStep(1)}
                     disabled={saving}
-                    className="px-4 py-2 rounded-xl bg-black/5 dark:bg:white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
+                    className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
                   >
                     Volver a datos
                   </button>
@@ -666,7 +672,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     type="button"
                     onClick={onSubmit}
                     disabled={!canSubmit}
-                    className="px-4 py-2 rounded-xl text:white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
+                    className="px-4 py-2 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
                   >
                     {saving ? "Creando…" : "Crear póliza"}
                   </button>

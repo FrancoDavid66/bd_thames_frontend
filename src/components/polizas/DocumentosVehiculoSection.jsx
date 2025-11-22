@@ -82,7 +82,7 @@ function PreviewModal({ doc, onClose }) {
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[100] grid place-items-center bg-black/70 backdrop-blur"
+        className="fixed inset-0 z-[100] grid place-items-center bg-black/70 backdrop-blur p-3 sm:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -93,9 +93,9 @@ function PreviewModal({ doc, onClose }) {
           initial={{ opacity: 0, scale: 0.98, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.98, y: 8 }}
-          className="w-[94%] h-[88vh] max-w-5xl rounded-2xl border border-white/10 bg-[#0b0f1e] shadow-2xl overflow-hidden flex flex-col"
+          className="w-full h-[85vh] max-w-5xl rounded-2xl border border-white/10 bg-[#0b0f1e] shadow-2xl overflow-hidden flex flex-col"
         >
-          <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
+          <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-b border-white/10 bg-white/5">
             <div className="min-w-0">
               <h3 className="text-white font-semibold truncate">{title}</h3>
               <p className="text-xs text-white/60 truncate">
@@ -143,8 +143,8 @@ function PreviewModal({ doc, onClose }) {
             )}
 
             {!isImg && !isPdf && (
-              <div className="h-full w-full grid place-items-center">
-                <div className="text-center text-white/80">
+              <div className="h-full w-full grid place-items-center px-4">
+                <div className="text-center text-white/80 max-w-sm">
                   <HiDocumentText className="text-4xl mx-auto mb-2" />
                   <p className="mb-3 text-sm">
                     Este tipo de archivo no se puede previsualizar aquí.
@@ -205,9 +205,12 @@ export default function DocumentosVehiculoSection({ polizaId }) {
     } catch (e) {
       if (DEBUG) console.error("[Documentos] wrapper API error → fallback", e);
       try {
-        const r = await fetch(`/api/polizas/documentos/?poliza=${encodeURIComponent(polizaId)}`, {
-          credentials: "include",
-        });
+        const r = await fetch(
+          `/api/polizas/documentos/?poliza=${encodeURIComponent(polizaId)}`,
+          {
+            credentials: "include",
+          }
+        );
         const text = await r.text();
         if (!r.ok) throw new Error(`GET documentos ${r.status}: ${text}`);
         const json = text ? JSON.parse(text) : [];
@@ -405,57 +408,59 @@ export default function DocumentosVehiculoSection({ polizaId }) {
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
-      className={`w-full rounded-2xl border border-white/10 bg-white/[.06] p-6 shadow-xl shadow-black/25 transition-colors ${
+      className={`w-full rounded-2xl border border-white/10 bg-white/[.06] p-4 sm:p-6 shadow-xl shadow-black/25 transition-colors ${
         dragOver ? "ring-2 ring-amber-300/40 bg-amber-300/5" : ""
       }`}
     >
       {/* Header */}
-      <header className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <Title icon={<HiFolderOpen className="w-5 h-5 text-amber-300" />}>
           Documentos del vehículo
         </Title>
 
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto sm:min-w-[220px]">
             <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por nombre o URL…"
-              className="pl-9 pr-3 py-2 rounded-xl bg-white/10 border border-white/10 text-sm outline-none focus:ring-2 ring-amber-300/30 min-w-[220px] text-white"
+              className="pl-9 pr-3 py-2 rounded-xl bg-white/10 border border-white/10 text-sm outline-none focus:ring-2 ring-amber-300/30 w-full text-white"
             />
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setSoloConArchivos((s) => !s)}
-            className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border transition ${
-              soloConArchivos
-                ? "bg-amber-400/20 border-amber-300"
-                : "bg-white/10 border-white/10 hover:bg-white/20"
-            }`}
-            title={soloConArchivos ? "Mostrar todos" : "Solo con archivos"}
-            aria-label="Filtrar por tipos con archivos"
-          >
-            <HiViewGrid
-              className={soloConArchivos ? "text-amber-300" : "text-white/80"}
-            />
-          </motion.button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setSoloConArchivos((s) => !s)}
+              className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border transition ${
+                soloConArchivos
+                  ? "bg-amber-400/20 border-amber-300"
+                  : "bg-white/10 border-white/10 hover:bg-white/20"
+              }`}
+              title={soloConArchivos ? "Mostrar todos" : "Solo con archivos"}
+              aria-label="Filtrar por tipos con archivos"
+            >
+              <HiViewGrid
+                className={soloConArchivos ? "text-amber-300" : "text-white/80"}
+              />
+            </motion.button>
 
-          <motion.button
-            whileTap={{ rotate: 25, scale: 0.95 }}
-            onClick={cargarLista}
-            className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition"
-            title="Actualizar"
-            aria-label="Actualizar"
-          >
-            <HiRefresh className="w-5 h-5 text-white/90" />
-          </motion.button>
+            <motion.button
+              whileTap={{ rotate: 25, scale: 0.95 }}
+              onClick={cargarLista}
+              className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition"
+              title="Actualizar"
+              aria-label="Actualizar"
+            >
+              <HiRefresh className="w-5 h-5 text-white/90" />
+            </motion.button>
+          </div>
 
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={openUploader}
-            className="ml-1 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/90 hover:bg-amber-500 text-neutral-900 text-sm font-semibold"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-amber-500/90 hover:bg-amber-500 text-neutral-900 text-sm font-semibold w-full sm:w-auto"
           >
             <HiUpload className="text-base" />
             Subir documento
@@ -494,9 +499,12 @@ export default function DocumentosVehiculoSection({ polizaId }) {
 
       {/* Galería */}
       {loading ? (
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-40 rounded-xl bg-white/5 border border-white/10 animate-pulse" />
+            <div
+              key={i}
+              className="h-40 rounded-xl bg-white/5 border border_white/10 animate-pulse"
+            />
           ))}
         </div>
       ) : vis.length === 0 ? (
@@ -505,7 +513,7 @@ export default function DocumentosVehiculoSection({ polizaId }) {
           un archivo sobre esta sección.
         </div>
       ) : (
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           <AnimatePresence initial={false}>
             {vis.map((d) => {
               const img = isImageMime(d?.mime || d?.nombre || d?.url);
@@ -521,9 +529,20 @@ export default function DocumentosVehiculoSection({ polizaId }) {
                   exit={{ opacity: 0, scale: 0.98 }}
                   className="group relative rounded-xl border border-white/10 bg-white/5 overflow-hidden"
                 >
-                  <a href={d.url} target="_blank" rel="noreferrer" title={title} className="block">
+                  <a
+                    href={d.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={title}
+                    className="block"
+                  >
                     {img ? (
-                      <img src={d.url} alt={title} className="w-full h-40 object-cover" loading="lazy" />
+                      <img
+                        src={d.url}
+                        alt={title}
+                        className="w-full h-40 object-cover"
+                        loading="lazy"
+                      />
                     ) : (
                       <div className="w-full h-40 grid place-items-center bg-gradient-to-br from-neutral-900 to-neutral-800">
                         <div className="flex flex-col items-center text-white/80">
@@ -567,7 +586,9 @@ export default function DocumentosVehiculoSection({ polizaId }) {
                       <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-white/80">
                         {label}
                       </span>
-                      <span className="truncate text-[11px] text-white/60">{title}</span>
+                      <span className="truncate text-[11px] text-white/60">
+                        {title}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
@@ -584,7 +605,7 @@ export default function DocumentosVehiculoSection({ polizaId }) {
       <AnimatePresence>
         {uploaderOpen && (
           <motion.div
-            className="fixed inset-0 z-[95] grid place-items-center bg-black/60 backdrop-blur"
+            className="fixed inset-0 z-[95] grid place-items-center bg-black/60 backdrop-blur p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -595,7 +616,7 @@ export default function DocumentosVehiculoSection({ polizaId }) {
               initial={{ opacity: 0, scale: 0.98, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: 8 }}
-              className="w-[92%] max-w-lg rounded-2xl border border-white/10 bg-[#0f0c28] p-5 shadow-2xl"
+              className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0f0c28] p-5 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-white font-semibold">Subir documento</h4>
@@ -610,7 +631,9 @@ export default function DocumentosVehiculoSection({ polizaId }) {
 
               <div className="grid gap-3">
                 <label className="text-sm">
-                  <span className="block text-white/85 mb-1">Tipo de documento</span>
+                  <span className="block text-white/85 mb-1">
+                    Tipo de documento
+                  </span>
                   <select
                     value={uploaderTipo}
                     onChange={(e) => setUploaderTipo(e.target.value)}
@@ -618,7 +641,11 @@ export default function DocumentosVehiculoSection({ polizaId }) {
                     style={{ backgroundColor: "#141827" }}
                   >
                     {TIPOS_UI.map((t) => (
-                      <option key={t.key} value={t.key} className="bg-[#0f1324] text-white">
+                      <option
+                        key={t.key}
+                        value={t.key}
+                        className="bg-[#0f1324] text-white"
+                      >
                         {t.label}
                       </option>
                     ))}
@@ -626,8 +653,10 @@ export default function DocumentosVehiculoSection({ polizaId }) {
                 </label>
 
                 <label className="text-sm">
-                  <span className="block text-white/85 mb-1">Archivo (1 por vez)</span>
-                <input
+                  <span className="block text-white/85 mb-1">
+                    Archivo (1 por vez)
+                  </span>
+                  <input
                     ref={uploaderFileRef}
                     type="file"
                     accept={uploaderAccept}
@@ -640,11 +669,11 @@ export default function DocumentosVehiculoSection({ polizaId }) {
                 </label>
               </div>
 
-              <div className="mt-4 flex items-center justify-end gap-2">
+              <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
                 <button
                   onClick={() => setUploaderOpen(false)}
                   disabled={uploaderBusy}
-                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm text-white disabled:opacity-60"
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm text-white disabled:opacity-60 w-full sm:w-auto"
                 >
                   Cancelar
                 </button>
@@ -652,7 +681,7 @@ export default function DocumentosVehiculoSection({ polizaId }) {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => doUploadWithTipo(uploaderFile, uploaderTipo)}
                   disabled={uploaderBusy || !uploaderFile || !uploaderTipo}
-                  className="px-4 py-2 rounded-2xl bg-gradient-to-br from-amber-200 to-yellow-200 text-[#0b0f1e] font-semibold shadow hover:brightness-105 disabled:opacity-60"
+                  className="px-4 py-2 rounded-2xl bg-gradient-to-br from-amber-200 to-yellow-200 text-[#0b0f1e] font-semibold shadow hover:brightness-105 disabled:opacity-60 w-full sm:w-auto"
                 >
                   {uploaderBusy ? "Subiendo…" : "Subir"}
                 </motion.button>
