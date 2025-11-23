@@ -1,5 +1,5 @@
 // src/components/pagos/EnviarFacturaWhatsapp.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { HiShare } from "react-icons/hi";
 import FacturaCuotaPDF from "./FacturaCuotaPDF";
@@ -31,6 +31,25 @@ function toWhatsappPhoneAR(raw) {
   return null;
 }
 
+/* Hook: true si la pantalla es tablet/celu (<= 1024px aprox) */
+function useIsTabletOrMobile(breakpoint = 1024) {
+  const [isSmall, setIsSmall] = useState(() => {
+    if (typeof window === "undefined") return true; // por si SSR, mostramos
+    return window.innerWidth <= breakpoint;
+  });
+
+  useEffect(() => {
+    function handleResize() {
+      setIsSmall(window.innerWidth <= breakpoint);
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [breakpoint]);
+
+  return isSmall;
+}
+
 function isMobileDevice() {
   if (typeof navigator === "undefined") return false;
   return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(
@@ -43,9 +62,15 @@ export default function EnviarFacturaWhatsapp({
   cliente: clienteProp,
   poliza: polizaProp,
   className = "",
-  mensajePersonalizado, // opcional
+  mensajePersonalizado, // ya no lo usamos, pero lo dejo por compatibilidad
 }) {
   const [sending, setSending] = useState(false);
+  const isTabletOrMobile = useIsTabletOrMobile(); // 👈 solo mostramos en tablet/celu
+
+  // Si NO es tablet/celu, no renderizamos el botón
+  if (!isTabletOrMobile) {
+    return null;
+  }
 
   // Intentamos resolver cliente y póliza desde la cuota para mantener compatibilidad
   const poliza = polizaProp || cuota?.poliza;
@@ -77,24 +102,7 @@ export default function EnviarFacturaWhatsapp({
 
       const file = new File([blob], nombre, { type: "application/pdf" });
 
-      // Datos para el mensaje
-      const nombreCliente =
-        cliente?.nombre ||
-        cliente?.nombre_apellido ||
-        cliente?.razon_social ||
-        cliente?.apellido_nombre;
-
-      const saludo = nombreCliente ? `Hola ${nombreCliente}, ` : "Hola, ";
-
-      const baseMsg =
-        mensajePersonalizado ||
-        `te envío el recibo de la cuota ${cuota?.cuota_nro} de la póliza de ${
-          poliza?.patente || poliza?.dominio
-        }.`;
-
-      const mensajeCompleto = `${saludo}${baseMsg}`;
-
-      // Teléfono del cliente
+      // Teléfono del cliente (fuente original)
       const telefonoCliente =
         cliente?.telefono ||
         cliente?.celular ||
@@ -104,7 +112,13 @@ export default function EnviarFacturaWhatsapp({
 
       const waPhone = toWhatsappPhoneAR(telefonoCliente);
 
-      // 🔁 COPIAR SIEMPRE EL NÚMERO AL PORTAPAPELES (PC y CELU)
+      // Texto del mensaje = SOLO el número original del cliente (sin saludo)
+      const displayPhone =
+        (telefonoCliente && String(telefonoCliente).trim()) ||
+        waPhone ||
+        "";
+
+      // Copiar SIEMPRE el número normalizado al portapapeles si existe
       if (waPhone && navigator.clipboard && navigator.clipboard.writeText) {
         try {
           await navigator.clipboard.writeText(waPhone);
@@ -116,7 +130,7 @@ export default function EnviarFacturaWhatsapp({
 
       const mobile = isMobileDevice();
 
-      // 2) En CELULAR: usar Web Share con el PDF adjunto
+      // 2) En CELULAR: usar Web Share con el PDF adjunto y texto = número
       if (
         mobile &&
         typeof navigator !== "undefined" &&
@@ -126,7 +140,7 @@ export default function EnviarFacturaWhatsapp({
         await navigator.share({
           files: [file],
           title: nombre,
-          text: mensajeCompleto,
+          text: displayPhone, // 👈 solo el número
         });
         setSending(false);
         return;
@@ -134,7 +148,7 @@ export default function EnviarFacturaWhatsapp({
 
       // 3) Fallback (PC o navegadores sin Web Share):
       //    - Descargamos el PDF
-      //    - Abrimos WhatsApp con el mensaje de texto (número ya está en clipboard)
+      //    - Abrimos WhatsApp con el mensaje = número del cliente
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -145,7 +159,7 @@ export default function EnviarFacturaWhatsapp({
       URL.revokeObjectURL(url);
 
       if (waPhone) {
-        const waText = encodeURIComponent(mensajeCompleto);
+        const waText = encodeURIComponent(displayPhone); // 👈 solo número
         const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${waText}`;
         window.open(waUrl, "_blank", "noopener,noreferrer");
       } else {
