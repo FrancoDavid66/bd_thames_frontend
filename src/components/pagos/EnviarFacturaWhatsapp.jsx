@@ -104,6 +104,16 @@ export default function EnviarFacturaWhatsapp({
 
       const waPhone = toWhatsappPhoneAR(telefonoCliente);
 
+      // 🔁 COPIAR SIEMPRE EL NÚMERO AL PORTAPAPELES (PC y CELU)
+      if (waPhone && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(waPhone);
+          console.log("Número copiado al portapapeles:", waPhone);
+        } catch (e) {
+          console.warn("No se pudo copiar al portapapeles:", e);
+        }
+      }
+
       const mobile = isMobileDevice();
 
       // 2) En CELULAR: usar Web Share con el PDF adjunto
@@ -124,8 +134,7 @@ export default function EnviarFacturaWhatsapp({
 
       // 3) Fallback (PC o navegadores sin Web Share):
       //    - Descargamos el PDF
-      //    - Copiamos el número al portapapeles (si existe)
-      //    - Abrimos WhatsApp con el mensaje de texto
+      //    - Abrimos WhatsApp con el mensaje de texto (número ya está en clipboard)
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -134,16 +143,6 @@ export default function EnviarFacturaWhatsapp({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-
-      // Copiar número al portapapeles
-      if (waPhone && navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(waPhone);
-          console.log("Número copiado al portapapeles:", waPhone);
-        } catch (e) {
-          console.warn("No se pudo copiar al portapapeles:", e);
-        }
-      }
 
       if (waPhone) {
         const waText = encodeURIComponent(mensajeCompleto);
