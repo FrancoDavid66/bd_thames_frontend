@@ -24,9 +24,18 @@ function toWhatsappPhoneAR(raw) {
   const digits = String(raw || "").replace(/\D+/g, "");
   if (!digits) return null;
   if (digits.length === 10) return `549${digits}`;
-  if (digits.startsWith("54") && !digits.startsWith("549")) return `549${digits.slice(2)}`;
+  if (digits.startsWith("54") && !digits.startsWith("549")) {
+    return `549${digits.slice(2)}`;
+  }
   if (digits.startsWith("549")) return digits;
   return null;
+}
+
+function isMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(
+    navigator.userAgent || ""
+  );
 }
 
 export default function EnviarFacturaWhatsapp({
@@ -41,7 +50,11 @@ export default function EnviarFacturaWhatsapp({
   // Intentamos resolver cliente y póliza desde la cuota para mantener compatibilidad
   const poliza = polizaProp || cuota?.poliza;
   const cliente =
-    clienteProp || cuota?.cliente || poliza?.cliente || cuota?.titular || cuota?.asegurado;
+    clienteProp ||
+    cuota?.cliente ||
+    poliza?.cliente ||
+    cuota?.titular ||
+    cuota?.asegurado;
 
   const handleShare = async () => {
     if (!cuota || !poliza || !cliente) {
@@ -53,7 +66,9 @@ export default function EnviarFacturaWhatsapp({
       setSending(true);
 
       // 1) Generar el PDF en memoria
-      const doc = <FacturaCuotaPDF cliente={cliente} poliza={poliza} cuota={cuota} />;
+      const doc = (
+        <FacturaCuotaPDF cliente={cliente} poliza={poliza} cuota={cuota} />
+      );
       const blob = await pdf(doc).toBlob();
 
       const nombre = `Factura_Cuota_${slug(cuota?.cuota_nro)}_${slug(
@@ -62,24 +77,55 @@ export default function EnviarFacturaWhatsapp({
 
       const file = new File([blob], nombre, { type: "application/pdf" });
 
-      // Mensaje sugerido
+      // Datos para el mensaje
+      const nombreCliente =
+        cliente?.nombre ||
+        cliente?.nombre_apellido ||
+        cliente?.razon_social ||
+        cliente?.apellido_nombre;
+
+      const saludo = nombreCliente ? `Hola ${nombreCliente}, ` : "Hola, ";
+
       const baseMsg =
         mensajePersonalizado ||
-        `Factura por servicios jurídicos y seguros – Cuota ${cuota?.cuota_nro} (${poliza?.patente || poliza?.dominio}).`;
+        `te envío el recibo de la cuota ${cuota?.cuota_nro} de la póliza de ${
+          poliza?.patente || poliza?.dominio
+        }.`;
 
-      // 2) Si el navegador soporta compartir archivos (móviles)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      const mensajeCompleto = `${saludo}${baseMsg}`;
+
+      // Teléfono del cliente
+      const telefonoCliente =
+        cliente?.telefono ||
+        cliente?.celular ||
+        poliza?.cliente?.telefono ||
+        poliza?.cliente?.celular ||
+        cuota?.telefono;
+
+      const waPhone = toWhatsappPhoneAR(telefonoCliente);
+
+      const mobile = isMobileDevice();
+
+      // 2) En CELULAR: usar Web Share con el PDF adjunto
+      if (
+        mobile &&
+        typeof navigator !== "undefined" &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] })
+      ) {
         await navigator.share({
           files: [file],
           title: nombre,
-          text: baseMsg,
+          text: mensajeCompleto,
         });
+        setSending(false);
         return;
       }
 
-      // 3) Fallback (desktop):
-      //    - Descargamos el PDF.
-      //    - Abrimos WhatsApp Web con el mensaje prellenado.
+      // 3) Fallback (PC o navegadores sin Web Share):
+      //    - Descargamos el PDF
+      //    - Copiamos el número al portapapeles (si existe)
+      //    - Abrimos WhatsApp con el mensaje de texto
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -89,26 +135,28 @@ export default function EnviarFacturaWhatsapp({
       a.remove();
       URL.revokeObjectURL(url);
 
-      // Intento de abrir WhatsApp con el teléfono del cliente si existe
-      const telefonoCliente =
-        cliente?.telefono ||
-        cliente?.celular ||
-        poliza?.cliente?.telefono ||
-        poliza?.cliente?.celular ||
-        cuota?.telefono;
+      // Copiar número al portapapeles
+      if (waPhone && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(waPhone);
+          console.log("Número copiado al portapapeles:", waPhone);
+        } catch (e) {
+          console.warn("No se pudo copiar al portapapeles:", e);
+        }
+      }
 
-      const waPhone = toWhatsappPhoneAR(telefonoCliente);
-      const waText = encodeURIComponent(
-        baseMsg + " Te adjunto el PDF que acabo de descargar."
-      );
-      const waUrl = waPhone
-        ? `https://api.whatsapp.com/send?phone=${waPhone}&text=${waText}`
-        : `https://api.whatsapp.com/send?text=${waText}`;
-
-      window.open(waUrl, "_blank", "noopener,noreferrer");
+      if (waPhone) {
+        const waText = encodeURIComponent(mensajeCompleto);
+        const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${waText}`;
+        window.open(waUrl, "_blank", "noopener,noreferrer");
+      } else {
+        alert(
+          "No se encontró un teléfono válido del cliente. El PDF igual se descargó; podés adjuntarlo manualmente."
+        );
+      }
     } catch (err) {
-      console.error("Error al compartir por WhatsApp:", err);
-      alert("No se pudo compartir por WhatsApp. Intentá de nuevo.");
+      console.error("Error al preparar la factura para WhatsApp:", err);
+      alert("No se pudo preparar la factura. Intentá de nuevo.");
     } finally {
       setSending(false);
     }
