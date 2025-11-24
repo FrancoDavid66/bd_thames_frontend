@@ -97,11 +97,19 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const p = Object.fromEntries(payload.map((x) => [x.dataKey, x.value]));
   return (
-    <div className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-md shadow px-3 py-2 text-xs">
+    <div className="bg-zinc-950/95 border border-zinc-800 text-zinc-50 rounded-xl shadow-lg px-3 py-2 text-[11px]">
       <div className="font-semibold mb-1">{label}</div>
-      <div>Ingresos: ${currencyAR(p.ingresos)}</div>
-      <div>Egresos: ${currencyAR(p.egresos)}</div>
-      <div>Balance: ${currencyAR(p.balance)}</div>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-emerald-300">
+          Ingresos: ${currencyAR(p.ingresos)}
+        </span>
+        <span className="text-rose-300">
+          Egresos: ${currencyAR(p.egresos)}
+        </span>
+        <span className="text-sky-300">
+          Balance: ${currencyAR(p.balance)}
+        </span>
+      </div>
     </div>
   );
 };
@@ -128,78 +136,111 @@ const BalanceChart = ({
   }, [data]);
 
   return (
-    <div className={`bg-white dark:bg-zinc-800 p-4 rounded-lg shadow mb-6 ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-zinc-800 dark:text-white">
-          📊 Ingresos vs Egresos {range === "12m" ? "por mes" : "por día"}
-        </h3>
-        <div className="flex rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700">
-          <button
-            type="button"
-            onClick={() => setRange("7d")}
-            className={`px-3 py-1 text-sm ${
-              range === "7d"
-                ? "bg-blue-600 text-white"
-                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100"
-            }`}
-          >
-            7 días
-          </button>
-          <button
-            type="button"
-            onClick={() => setRange("30d")}
-            className={`px-3 py-1 text-sm ${
-              range === "30d"
-                ? "bg-blue-600 text-white"
-                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100"
-            }`}
-          >
-            30 días
-          </button>
-          <button
-            type="button"
-            onClick={() => setRange("12m")}
-            className={`px-3 py-1 text-sm ${
-              range === "12m"
-                ? "bg-blue-600 text-white"
-                : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100"
-            }`}
-          >
-            12 meses
-          </button>
+    <div
+      className={`bg-zinc-950/80 border border-zinc-900 rounded-3xl px-4 py-3 sm:px-5 sm:py-4 shadow-lg shadow-black/25 mb-6 ${className}`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-sky-500/80 via-sky-500/40 to-emerald-400/60 flex items-center justify-center text-lg">
+            <span>📊</span>
+          </div>
+          <div className="flex flex-col">
+            <h3 className="text-sm sm:text-base font-semibold text-zinc-50">
+              Ingresos vs egresos{" "}
+              <span className="text-[11px] text-zinc-400">
+                {range === "12m" ? "por mes" : "por día"}
+              </span>
+            </h3>
+            <p className="text-[11px] text-zinc-500">
+              Visualizá la evolución en el tiempo
+            </p>
+          </div>
+        </div>
+
+        {/* Selector de rango tipo pill */}
+        <div className="flex w-full sm:w-auto">
+          <div className="flex flex-1 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-1 text-[11px] sm:text-xs">
+            <button
+              type="button"
+              onClick={() => setRange("7d")}
+              className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+                range === "7d"
+                  ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              7 días
+            </button>
+            <button
+              type="button"
+              onClick={() => setRange("30d")}
+              className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+                range === "30d"
+                  ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              30 días
+            </button>
+            <button
+              type="button"
+              onClick={() => setRange("12m")}
+              className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+                range === "12m"
+                  ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              12 meses
+            </button>
+          </div>
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <ComposedChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" stroke="#a1a1aa" />
-          <YAxis
-            tickFormatter={(v) => `$${currencyAR(v)}`}
-            domain={[yMin, "auto"]}
-            width={80}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend />
-          {/* Barras (mismos colores que el resto) */}
-          <Bar dataKey="ingresos" name="Ingresos" fill="#16a34a" />
-          <Bar dataKey="egresos" name="Egresos" fill="#dc2626" />
-          {/* Línea de balance */}
-          <Line
-            type="monotone"
-            dataKey="balance"
-            name="Balance"
-            stroke="#2563eb"
-            strokeWidth={2}
-            dot={false}
-          />
-          {/* Línea 0 para referencia */}
-          <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" />
-        </ComposedChart>
-      </ResponsiveContainer>
+      <div className="h-[220px] sm:h-[280px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#27272f" />
+            <XAxis
+              dataKey="label"
+              stroke="#a1a1aa"
+              tick={{ fontSize: 10, fill: "#a1a1aa" }}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tickFormatter={(v) => `$${currencyAR(v)}`}
+              domain={[yMin, "auto"]}
+              width={72}
+              tick={{ fontSize: 10, fill: "#a1a1aa" }}
+              stroke="#52525b"
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend
+              wrapperStyle={{
+                fontSize: 10,
+                color: "#e5e5e5",
+              }}
+            />
+            {/* Barras */}
+            <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" />
+            <Bar dataKey="egresos" name="Egresos" fill="#f97373" />
+            {/* Línea de balance */}
+            <Line
+              type="monotone"
+              dataKey="balance"
+              name="Balance"
+              stroke="#38bdf8"
+              strokeWidth={2}
+              dot={false}
+            />
+            {/* Línea 0 para referencia */}
+            <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
 
       {!data?.length && (
-        <div className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+        <div className="text-center text-xs sm:text-sm text-zinc-500 mt-2">
           Sin datos para el rango seleccionado.
         </div>
       )}

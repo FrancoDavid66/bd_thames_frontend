@@ -1,3 +1,4 @@
+// src/components/balanzes/EnviarBalanceDiarioButton.jsx
 import { useEffect } from "react";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
@@ -20,6 +21,7 @@ const EnviarBalanceDiarioButton = ({
   const mensajeEnviado = useSelector((s) => s.balance.mensajeEnviado);
 
   const handleEnviar = () => {
+    if (envioStatus === "loading") return; // evita doble click
     const hoyAR = fecha || dayjs().format("YYYY-MM-DD"); // enviamos fecha explícita
     dispatch(enviarBalanceWhatsapp({ fecha: hoyAR, destinatario }));
   };
@@ -45,12 +47,29 @@ const EnviarBalanceDiarioButton = ({
       aria-busy={isLoading}
       aria-live="polite"
       title="Enviar resumen de ingresos/egresos por WhatsApp"
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl font-semibold shadow-sm text-neutral-100 transition
-        ${isLoading ? "bg-neutral-400 cursor-not-allowed opacity-90" : "bg-primary-500 hover:bg-primary-600"}
-        ${className}`}
+      className={`
+        inline-flex items-center justify-center gap-2
+        h-11 px-4 sm:px-5 rounded-2xl
+        text-xs sm:text-sm font-semibold tracking-wide
+        shadow-md shadow-emerald-500/30
+        border border-emerald-300/60
+        text-white
+        transition
+        focus:outline-none focus:ring-2 focus:ring-emerald-400/80 focus:ring-offset-2 focus:ring-offset-zinc-900
+        ${
+          isLoading
+            ? "bg-emerald-700 cursor-not-allowed opacity-80"
+            : "bg-emerald-500 hover:bg-emerald-400"
+        }
+        ${className}
+      `}
     >
-      <HiPaperAirplane className={isLoading ? "opacity-80" : ""} />
-      {isLoading ? "Enviando..." : "Enviar balance diario"}
+      <HiPaperAirplane
+        className={`text-sm sm:text-base ${
+          isLoading ? "animate-pulse opacity-90" : ""
+        }`}
+      />
+      {isLoading ? "Enviando…" : "Enviar balance por WhatsApp"}
     </button>
   );
 };

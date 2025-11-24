@@ -76,11 +76,14 @@ function exportToExcel({ ingresos = [], egresos = [], fileName }) {
   XLSX.utils.book_append_sheet(wb, wsEgresos, "Egresos");
 
   // Resumen
-  XLSX.utils.book_append_sheet(wb, buildResumenSheet(ingresos, egresos), "Resumen");
+  XLSX.utils.book_append_sheet(
+    wb,
+    buildResumenSheet(ingresos, egresos),
+    "Resumen"
+  );
 
   const name =
-    fileName ||
-    `Balance_${dayjs().format("YYYY-MM-DD_HHmm")}.xlsx`;
+    fileName || `Balance_${dayjs().format("YYYY-MM-DD_HHmm")}.xlsx`;
 
   const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   const blob = new Blob([wbout], {
@@ -99,29 +102,47 @@ const BalanceExportPanel = ({
   const disabled = (ingresos?.length ?? 0) + (egresos?.length ?? 0) === 0;
 
   return (
-    <div className={`bg-white dark:bg-zinc-800 p-4 rounded-lg shadow mb-6 ${className}`}>
-      <h3 className="text-lg font-semibold mb-3 text-zinc-800 dark:text-white">
-        📤 Exportar balance
-      </h3>
+    <div
+      className={`bg-zinc-950/80 border border-zinc-900 rounded-3xl px-4 py-3 sm:px-5 sm:py-4 shadow-lg shadow-black/25 mb-6 ${className}`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Header + descripción */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-sky-500/80 via-sky-500/40 to-emerald-400/60 flex items-center justify-center text-lg">
+            <span>📤</span>
+          </div>
+          <div className="flex flex-col">
+            <h3 className="text-sm sm:text-base font-semibold text-zinc-50">
+              Exportar balance
+            </h3>
+            <p className="text-[11px] text-zinc-500 max-w-xs">
+              Genera un archivo <span className="font-semibold">.xlsx</span>{" "}
+              con ingresos, egresos y un resumen de totales.
+            </p>
+          </div>
+        </div>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => exportToExcel({ ingresos, egresos, fileName })}
-          className={`px-4 py-2 rounded text-white transition ${
-            disabled
-              ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-          title={disabled ? "No hay datos para exportar" : "Exportar a Excel (.xlsx)"}
-        >
-          Exportar a Excel (.xlsx)
-        </button>
-
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          Se exportan las filas visibles de Ingresos y Egresos. Incluye hoja “Resumen”.
-        </span>
+        {/* Botón */}
+        <div className="flex items-center sm:justify-end">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => exportToExcel({ ingresos, egresos, fileName })}
+            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition ${
+              disabled
+                ? "bg-sky-500/25 text-sky-100/70 cursor-not-allowed"
+                : "bg-sky-500 text-white hover:bg-sky-600 active:scale-[0.99]"
+            }`}
+            title={
+              disabled
+                ? "No hay datos para exportar"
+                : "Exportar a Excel (.xlsx)"
+            }
+          >
+            <span className="text-base">⬇️</span>
+            <span>Exportar a Excel</span>
+          </button>
+        </div>
       </div>
     </div>
   );

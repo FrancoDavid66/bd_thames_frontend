@@ -33,7 +33,8 @@ export default function CategoriaSelect({
   const [localCats, setLocalCats] = useState(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -43,7 +44,12 @@ export default function CategoriaSelect({
   const opciones = useMemo(() => {
     const fromIngresos = (ingresos || []).map((i) => i?.categoria);
     const fromEgresos = (egresos || []).map((e) => e?.categoria);
-    const merged = uniqClean([...fromIngresos, ...fromEgresos, ...localCats, value]);
+    const merged = uniqClean([
+      ...fromIngresos,
+      ...fromEgresos,
+      ...localCats,
+      value,
+    ]);
     return merged;
   }, [ingresos, egresos, localCats, value]);
 
@@ -85,51 +91,59 @@ export default function CategoriaSelect({
 
   return (
     <div className={className}>
-      <label className="block text-sm mb-1">{label}{required ? " *" : ""}</label>
+      <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400">
+        {label}
+        {required ? " *" : ""}
+      </label>
 
       {!creando ? (
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <select
             value={value || ""}
             onChange={handleSelect}
             required={required}
-            className="w-full p-2 border rounded bg-white dark:bg-zinc-800 text-zinc-800 dark:text-white"
+            className="w-full px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs sm:text-sm text-zinc-50 focus:outline-none focus:ring-1 focus:ring-sky-400"
           >
-            <option value="" disabled>{opciones.length ? "Seleccionar…" : "Sin opciones"}</option>
+            <option value="" disabled>
+              {opciones.length ? "Seleccionar…" : "Sin opciones"}
+            </option>
             {opciones.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
             ))}
             <option value="__new__">➕ Nueva categoría…</option>
           </select>
           <button
             type="button"
             onClick={() => setCreando(true)}
-            className="px-3 py-2 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+            className="px-3 py-2 rounded-2xl bg-zinc-900 border border-zinc-800 text-[11px] sm:text-xs text-zinc-100 hover:bg-zinc-800 whitespace-nowrap"
             title="Crear nueva categoría"
           >
             Agregar
           </button>
         </div>
       ) : (
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             autoFocus
             value={nueva}
             onChange={(e) => setNueva(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCrear()}
             placeholder="Nombre de la nueva categoría"
-            className="w-full p-2 border rounded bg-white dark:bg-zinc-800 text-zinc-800 dark:text-white"
+            className="w-full px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs sm:text-sm text-zinc-50 focus:outline-none focus:ring-1 focus:ring-emerald-400"
           />
           <button
             type="button"
             onClick={handleCrear}
-            className="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+            className="px-3 py-2 rounded-2xl bg-emerald-500 text-[11px] sm:text-xs text-white hover:bg-emerald-600 whitespace-nowrap"
           >
             Guardar
           </button>
           <button
             type="button"
             onClick={handleCancel}
-            className="px-3 py-2 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+            className="px-3 py-2 rounded-2xl bg-zinc-900 border border-zinc-800 text-[11px] sm:text-xs text-zinc-100 hover:bg-zinc-800 whitespace-nowrap"
           >
             Cancelar
           </button>
