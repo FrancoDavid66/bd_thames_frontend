@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HiMenu, HiX } from "react-icons/hi";
-
+import logo_thames from '../../assets/logos/logo_thames.svg'
 /**
  * Navbar fijo arriba, con hamburguesa para abrir/cerrar el sidebar en mobile.
  * En desktop agrega padding-left cuando el sidebar está abierto para que no se solape.

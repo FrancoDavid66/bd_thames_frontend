@@ -74,15 +74,20 @@ function App() {
     String(import.meta?.env?.VITE_PROBE_COUNTERS || "true").toLowerCase() ===
     "true";
 
+  // 🔗 Base de la API para probar /solicitudes/counters en backend
   const API_BASE = useMemo(() => {
-    const base = (
-      import.meta?.env?.VITE_API_URL || window.__API_URL__ || ""
-    )
-      .toString()
-      .trim();
-    if (!base) return ""; // permite proxy /api
+    const raw =
+      (import.meta?.env?.VITE_API_BASE &&
+        String(import.meta.env.VITE_API_BASE).trim()) ||
+      (import.meta?.env?.VITE_API_URL &&
+        String(import.meta.env.VITE_API_URL).trim()) ||
+      (window.__API_URL__ || "");
+
+    const base = raw.toString().trim();
+    if (!base) return ""; // permite proxy /api en dev
     return base.endsWith("/") ? base : `${base}/`;
   }, []);
+
   const EXPLICIT_COUNTERS_URL = useMemo(() => {
     const url = (import.meta?.env?.VITE_COUNTERS_URL || "").toString().trim();
     return url || null;
@@ -129,8 +134,6 @@ function App() {
     // 2) Si PROBE_COUNTERS está activo (por defecto true), probamos rutas conocidas.
     if (!PROBE_COUNTERS) return;
 
-    // ⬇️⬇️⬇️ AQUÍ EL CAMBIO: solo probamos endpoints de *solicitudes*,
-    // dejamos de probar /api/notificaciones/counters para evitar el 404.
     const candidates = [
       API_BASE ? `${API_BASE}solicitudes/counters` : null,
       "/api/solicitudes/counters",
@@ -162,7 +165,9 @@ function App() {
   // ====== Cuponeras: fetch de counters propio ======
   const fetchCuponerasCounters = async () => {
     try {
-      const rawBase = (import.meta?.env?.VITE_API_URL || "/api/")
+      const rawBase = (import.meta?.env?.VITE_API_BASE ||
+        import.meta?.env?.VITE_API_URL ||
+        "/api/")
         .toString()
         .trim();
       const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;

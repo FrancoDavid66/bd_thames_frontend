@@ -18,6 +18,7 @@ import {
   FaTicketAlt, // ← icono para Cuponeras
 } from "react-icons/fa";
 import ThemeToggle from "./ThemeToggle";
+import logo_thames from "../../assets/logos/logo_thames.svg";
 
 // Bloqueadas por ahora
 const DISABLED_PATHS = [
@@ -84,8 +85,13 @@ export default function Sidebar({
         aria-label="Menú principal"
       >
         <div className="relative">
-          <div className="text-2xl font-bold text-center py-4 border-b border-blue-700 dark:border-gray-800">
-            RC+ Admin
+          {/* Header con logo */}
+          <div className="flex items-center justify-center py-4 border-b border-blue-700 dark:border-gray-800">
+            <img
+              src={logo_thames}
+              alt="Thames"
+              className="h-8 w-auto"
+            />
           </div>
 
           {/* Botón cerrar (solo mobile) */}
