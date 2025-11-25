@@ -5,14 +5,14 @@ import {
   FaUsers,
   FaFileAlt,
   FaMoneyCheckAlt,
-  FaDatabase, // ← nuevo
+  FaDatabase, // icono para Balanzes
 } from "react-icons/fa";
 
 const tabs = [
   { to: "/", label: "Inicio", icon: FaHome },
   { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
   { to: "/clientes", label: "Clientes", icon: FaUsers },
-  { to: "/asegurados", label: "Asegurados", icon: FaDatabase }, // ← agregado
+  { to: "/balanzes", label: "Balanzes", icon: FaDatabase }, // ← cambiado
   { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
   { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
 ];
@@ -42,7 +42,10 @@ export default function MobileTopBar() {
                 }`
               }
             >
-              <span className="inline-flex items-center justify-center h-6 w-6 rounded-md" aria-hidden="true">
+              <span
+                className="inline-flex items-center justify-center h-6 w-6 rounded-md"
+                aria-hidden="true"
+              >
                 <Icon />
               </span>
               <span className="leading-none">{label}</span>
