@@ -1,6 +1,6 @@
 // src/store/solicitudesSlice.js
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { solicitudesApi } from '../services/solicitudes';
+import { solicitudesApi } from '../../services/solicitudes';
 
 export const fetchSolicitudes = createAsyncThunk('solicitudes/fetchAll', async () => {
   return await solicitudesApi.listar();

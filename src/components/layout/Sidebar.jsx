@@ -20,7 +20,13 @@ import {
 import ThemeToggle from "./ThemeToggle";
 
 // Bloqueadas por ahora
-const DISABLED_PATHS = ["/geo", "/propiedades", "/alquileres"];
+const DISABLED_PATHS = [
+  "/geo",
+  "/propiedades",
+  "/alquileres",
+  "/siniestros",
+  "/gruas",
+];
 
 const navItems = [
   { to: "/", label: "Inicio", icon: <FaHome /> },
@@ -29,12 +35,12 @@ const navItems = [
   { to: "/polizas", label: "Pólizas", icon: <FaFileAlt /> },
   { to: "/pagos", label: "Pagos", icon: <FaMoneyCheckAlt /> },
   { to: "/cuponeras", label: "Cuponeras", icon: <FaTicketAlt /> },
+  { to: "/balanzes", label: "Balanzes", icon: <FaBalanceScale /> },
   { to: "/siniestros", label: "Siniestros", icon: <FaCarCrash /> },
   { to: "/gruas", label: "Grúas", icon: <FaTruck /> },
   { to: "/geo", label: "Geo", icon: <FaMapMarkedAlt /> },
   { to: "/propiedades", label: "Propiedades", icon: <FaBuilding /> },
   { to: "/alquileres", label: "Alquileres", icon: <FaBuilding /> },
-  { to: "/balanzes", label: "Balanzes", icon: <FaBalanceScale /> },
 ];
 
 export default function Sidebar({
@@ -59,12 +65,11 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Overlay para mobile */}
+      {/* Overlay para mobile (ya NO cierra al hacer click afuera) */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-[1px] lg:hidden z-40"
           aria-hidden="true"
-          onClick={onClose}
         />
       )}
 
@@ -136,7 +141,6 @@ export default function Sidebar({
               <NavLink
                 key={item.to}
                 to={item.to}
-                onClick={onClose /* cerrar al navegar en mobile */}
                 title={itemTitle}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-2 rounded transition-colors duration-200 ${
