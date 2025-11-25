@@ -5,11 +5,17 @@ import toast from "react-hot-toast";
 import { sendAdminCuponRoboPagado } from "../../services/notifications/cuponesRobo";
 
 /** Base URL robusta (igual que polizasSlice):
- * - Usa VITE_API_URL si existe
+ * - Usa VITE_API_URL o VITE_API_BASE si existen
  * - Si no, cae a '/api/'
  * - Garantiza la barra final
  */
-const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
+const RAW_BASE = (
+  import.meta.env?.VITE_API_URL ||
+  import.meta.env?.VITE_API_BASE ||
+  "/api/"
+)
+  .toString()
+  .trim();
 const BASE = RAW_BASE.endsWith("/") ? RAW_BASE : `${RAW_BASE}/`;
 
 const http = axios.create({
@@ -265,7 +271,10 @@ const cuponesRoboSlice = createSlice({
         state.error =
           action.payload || "No se pudieron obtener los contadores de cuponeras.";
         // no muestro toast acá para no molestar en background
-        console.warn("[CuponesRobo] Error en fetchCuponerasCounters", action.payload);
+        console.warn(
+          "[CuponesRobo] Error en fetchCuponerasCounters",
+          action.payload
+        );
       });
 
     // ---- createCuponRobo ----

@@ -16,6 +16,8 @@ import CuponesRoboPanel from "../components/polizas/CuponesRoboPanel";
 import {
   fetchPolizas,
   fetchPolizasKpis,
+  enviarMensajesEstadoCuotas,
+  selectResumenCuotas,
   setPage,
   setPageSize,
   setSearch,
@@ -27,19 +29,16 @@ import {
   setSoloActivas,
   setOrdering,
   setModo,
-  // NUEVOS (filtros de vencimiento)
   setFechaVencimientoDesde,
   setFechaVencimientoHasta,
   setVencidasUltimosDias,
   setVencidasMasDeDias,
   clearVencimientoFilters,
-  // thunk de envío / reporte
-  enviarMensajesEstadoCuotas,
 } from "../store/slices/polizasSlice";
 
-// --------- Helper local (solo para resumen por cuotas en UI) ----------
-function estadoPorCuotas(poliza) {
-  const cuotas = Array.isArray(poliza?.cuotas) ? poliza.cuotas : [];
+/* -------- Helper de estado por cuotas (para resumenCuotas local si hace falta) -------- */
+const estadoPorCuotas = (poliza) => {
+  const cuotas = poliza?.cuotas || [];
   const impagas = cuotas.filter((c) => !c.pagado);
   if (impagas.length === 0) return "al_dia";
 
@@ -62,7 +61,7 @@ function estadoPorCuotas(poliza) {
     return "vencidas";
   }
   return Math.abs(diffDays) <= 7 ? "por_vencer" : "al_dia";
-}
+};
 
 export default function PolizasPage() {
   const dispatch = useDispatch();
@@ -70,20 +69,21 @@ export default function PolizasPage() {
 
   const {
     list = [],
+    poliza: polizaSeleccionada = null,
     status = "idle",
-    page,
-    pageSize,
-    total,
-    // filtros
-    search,
-    estado,
-    estado_financiero,
-    compania,
-    cliente,
-    patente,
-    solo_activas,
-    ordering,
-    modo,
+    error = null,
+    page = 1,
+    pageSize = 100,
+    total = 0,
+    search = "",
+    estado = "todos",
+    estado_financiero = "todos",
+    compania = "",
+    cliente = "",
+    patente = "",
+    solo_activas = false,
+    ordering = "-id",
+    modo = "polizas",
     // NUEVOS filtros de vencimiento
     fecha_vencimiento_desde,
     fecha_vencimiento_hasta,
@@ -93,16 +93,16 @@ export default function PolizasPage() {
     kpis = {},
   } = useSelector((s) => s.polizas || {});
 
+  const resumenCuotasDesdeSlice = useSelector(selectResumenCuotas);
+
   // --------- 1) Cargar filtros iniciales desde la URL (una sola vez) ----------
   useEffect(() => {
     const qpCliente = searchParams.get("cliente") || searchParams.get("cliente_id");
     const qpPatente = searchParams.get("patente");
     const qpCompania = searchParams.get("compania");
     const qpModo = searchParams.get("modo"); // "polizas" | "cuotas"
-
-    // Filtros de vencimiento (si vienen en URL)
-    const qpDesde = searchParams.get("fecha_vencimiento_desde");
-    const qpHasta = searchParams.get("fecha_vencimiento_hasta");
+    const qpDesde = searchParams.get("desde");
+    const qpHasta = searchParams.get("hasta");
     const qpUltimos = searchParams.get("vencidas_ultimos_dias");
     const qpMasDe = searchParams.get("vencidas_mas_de_dias");
 
@@ -146,8 +146,14 @@ export default function PolizasPage() {
     dispatch(fetchPolizasKpis());
   }, [dispatch, search, compania, cliente, patente, solo_activas]);
 
-  // --------- 4) Resúmenes para chips ----------
+  // --------- 4) Resúmenes ---------
   const resumenCuotas = useMemo(() => {
+    // Si el slice ya trae un resumen calculado, lo usamos
+    if (resumenCuotasDesdeSlice && typeof resumenCuotasDesdeSlice === "object") {
+      return resumenCuotasDesdeSlice;
+    }
+
+    // Fallback local sobre la lista (modo cuotas)
     const base = {
       todos: 0,
       al_dia: 0,
@@ -163,7 +169,7 @@ export default function PolizasPage() {
       base[k] = (base[k] || 0) + 1;
     }
     return base;
-  }, [list]);
+  }, [list, resumenCuotasDesdeSlice]);
 
   const resumenPolizas = useMemo(
     () => ({
@@ -187,105 +193,78 @@ export default function PolizasPage() {
   const onCompaniaChange = (val) => dispatch(setCompania(val));
   const onClienteChange = (val) => dispatch(setCliente(val));
   const onPatenteChange = (val) => dispatch(setPatente(val));
-  const onSoloActivasChange = (val) => dispatch(setSoloActivas(!!val));
+  const onSoloActivasChange = (val) => dispatch(setSoloActivas(val));
   const onOrderingChange = (val) => dispatch(setOrdering(val));
-  const onModoChange = (val) => dispatch(setModo(val));
+  const onModoChange = (val) => dispatch(setModo(val || "polizas"));
 
-  // NUEVOS: handlers de vencimiento
-  const onFechaVencimientoDesdeChange = (val) => dispatch(setFechaVencimientoDesde(val));
-  const onFechaVencimientoHastaChange = (val) => dispatch(setFechaVencimientoHasta(val));
-  const onVencidasUltimosDiasChange = (n) => dispatch(setVencidasUltimosDias(n));
-  const onVencidasMasDeDiasChange = (n) => dispatch(setVencidasMasDeDias(n));
+  const onPageChange = (newPage) => dispatch(setPage(newPage));
+  const onPageSizeChange = (size) => dispatch(setPageSize(size));
+
+  // Filtros vencimiento
+  const onFechaVencimientoDesdeChange = (val) =>
+    dispatch(setFechaVencimientoDesde(val || ""));
+  const onFechaVencimientoHastaChange = (val) =>
+    dispatch(setFechaVencimientoHasta(val || ""));
+  const onVencidasUltimosDiasChange = (val) =>
+    dispatch(setVencidasUltimosDias(val || ""));
+  const onVencidasMasDeDiasChange = (val) =>
+    dispatch(setVencidasMasDeDias(val || ""));
   const onClearVencimiento = () => dispatch(clearVencimientoFilters());
 
-  const onPageChange = (p) => dispatch(setPage(p));
-  const onPageSizeChange = (ps) => dispatch(setPageSize(ps));
+  // --------- 6) Paneles laterales (docs, grúa, cuponeras) ----------
+  const [showDocs, setShowDocs] = useState(false);
+  const [showGrua, setShowGrua] = useState(false);
+  const [showCupones, setShowCupones] = useState(false);
 
-  // --------- 6) Panel de Grúa ----------
-  const [polizaIdPanel, setPolizaIdPanel] = useState("");
+  const polizaActual = polizaSeleccionada || list[0] || null;
+  const polizaIdActual = polizaActual?.id || null;
 
-  // 🆕 --------- 6.b) Panel Vehículo & Documentos ----------
-  const [polizaIdVehiculo, setPolizaIdVehiculo] = useState("");
-
-  // 🆕 --------- 6.c) Panel Cuponeras de robo ----------
-  const [polizaIdCupones, setPolizaIdCupones] = useState("");
-
-  const selectedPolizaCupones =
-    polizaIdCupones && list.find((p) => p.id === Number(polizaIdCupones));
-
-  // --------- 7) Estado para envío masivo ----------
-  const [showConfirmEnvio, setShowConfirmEnvio] = useState(false);
+  // --------- 7) Envío de estado de cuotas (diagnóstico / WhatsApp) ----------
   const [sending, setSending] = useState(false);
-  const [envioResumen, setEnvioResumen] = useState(null);
-  const [resultadoBackend, setResultadoBackend] = useState(null);
-  const [enviarDeVerdad, setEnviarDeVerdad] = useState(false);
+  const [previewOnly, setPreviewOnly] = useState(true);
+  const [confirmEnvio, setConfirmEnvio] = useState(false);
+  const [envioResult, setEnvioResult] = useState(null);
 
-  const filtrosVigentes = {
-    search,
-    estado,
-    estado_financiero,
-    compania,
-    cliente,
-    patente,
-    solo_activas,
-    ordering,
-    modo,
-    fecha_vencimiento_desde,
-    fecha_vencimiento_hasta,
-    vencidas_ultimos_dias,
-    vencidas_mas_de_dias,
-  };
-
-  const abrirConfirmacion = () => {
-    if (!total || total <= 0) {
-      toast("No hay pólizas en el resultado para notificar.", { icon: "ℹ️" });
-      return;
-    }
-    setResultadoBackend(null);
-    setEnvioResumen(null);
-    setEnviarDeVerdad(false);
-    setShowConfirmEnvio(true);
-  };
-
-  const ejecutarEnvioMasivo = async (real = false) => {
+  const handleEnviarEstadoCuotas = async () => {
     try {
       setSending(true);
-      const action = await dispatch(
+      setEnvioResult(null);
+      const filtros = {
+        page,
+        page_size: pageSize,
+        search,
+        estado,
+        estado_financiero,
+        compania,
+        cliente,
+        patente,
+        solo_activas,
+        ordering,
+        modo,
+        fecha_vencimiento_desde,
+        fecha_vencimiento_hasta,
+        vencidas_ultimos_dias,
+        vencidas_mas_de_dias,
+      };
+      const res = await dispatch(
         enviarMensajesEstadoCuotas({
-          filtros: filtrosVigentes,
-          preview: !real,
+          filtros,
+          preview: previewOnly,
         })
+      ).unwrap();
+      setEnvioResult(res);
+      toast.success(
+        previewOnly
+          ? "Diagnóstico generado (sin enviar mensajes)."
+          : "Mensajes enviados / procesados."
       );
-      if (enviarMensajesEstadoCuotas.fulfilled.match(action)) {
-        const data = action.payload || {};
-        setResultadoBackend(data);
-        setEnvioResumen({
-          enviados: Number(data.enviados || 0),
-          fallidos: Number(data.fallidos || 0),
-          seleccionadas: Number(data.seleccionadas || 0),
-          procesadas: Number(data.procesadas || 0),
-        });
-        toast.success(
-          real
-            ? "Mensajes enviados (ver detalle abajo)."
-            : "Diagnóstico generado (solo reporte, sin enviar)."
-        );
-      } else {
-        throw new Error(action.payload || "Error en el envío");
-      }
     } catch (err) {
       console.error(err);
-      toast.error(
-        err?.message || "No se pudo enviar/diagnosticar los mensajes de cuotas."
-      );
+      toast.error("Error al procesar el estado de cuotas.");
     } finally {
       setSending(false);
+      setConfirmEnvio(false);
     }
-  };
-
-  const cerrarModalEnvio = () => {
-    if (sending) return;
-    setShowConfirmEnvio(false);
   };
 
   const DetalleRespuesta = ({ data }) => {
@@ -301,103 +280,73 @@ export default function PolizasPage() {
         {/* Resumen superior */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           {"enviados" in data && (
-            <div className="rounded-lg bg-gray-900 p-3">
-              <div className="text-gray-400">Enviados</div>
-              <div className="text-lg font-semibold">
-                {Number(data.enviados || 0)}
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
+                Mensajes enviados
+              </div>
+              <div className="text-lg font-semibold text-emerald-200">
+                {data.enviados ?? 0}
               </div>
             </div>
           )}
           {"fallidos" in data && (
-            <div className="rounded-lg bg-gray-900 p-3">
-              <div className="text-gray-400">Fallidos</div>
-              <div className="text-lg font-semibold">
-                {Number(data.fallidos || 0)}
+            <div className="rounded-lg bg-rose-500/10 border border-rose-500/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-rose-300/80">
+                Fallidos
               </div>
-            </div>
-          )}
-          {seleccionadas !== null && (
-            <div className="rounded-lg bg-gray-900 p-3">
-              <div className="text-gray-400">Pólizas seleccionadas</div>
-              <div className="text-lg font-semibold">
-                {Number(seleccionadas || 0)}
-              </div>
-            </div>
-          )}
-          {procesadas !== null && (
-            <div className="rounded-lg bg-gray-900 p-3">
-              <div className="text-gray-400">Pólizas procesadas</div>
-              <div className="text-lg font-semibold">
-                {Number(procesadas || 0)}
+              <div className="text-lg font-semibold text-rose-200">
+                {data.fallidos ?? 0}
               </div>
             </div>
           )}
         </div>
 
-        {/* Buckets */}
+        {/* Buckets (si vienen) */}
         {buckets && (
-          <div className="rounded-lg bg-gray-900 p-3 text-xs">
-            <div className="mb-1 text-sm font-semibold text-gray-200">
-              Detalle por bucket
-            </div>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {Object.entries(buckets).map(([key, val]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-gray-400">{key}</span>
-                  <span className="font-mono text-gray-100">
-                    {Number(val || 0)}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] sm:text-xs">
+            {Object.entries(buckets).map(([k, v]) => (
+              <div
+                key={k}
+                className="rounded-lg border border-gray-700/70 bg-gray-900/80 px-3 py-2"
+              >
+                <div className="font-semibold text-gray-200">{k}</div>
+                <div className="text-gray-400">{v}</div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Detalle por póliza (si viene) */}
+        {/* Detalle por póliza (opcional) */}
         {detalle && (
-          <div className="rounded-lg bg-gray-900 p-3 text-xs">
-            <div className="mb-1 text-sm font-semibold text-gray-200">
+          <div className="mt-3">
+            <div className="mb-1 text-[11px] uppercase tracking-wide text-gray-400">
               Detalle por póliza
             </div>
-            <div className="max-h-60 overflow-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead className="border-b border-gray-700 text-gray-400">
-                  <tr>
-                    <th className="py-1 pr-2">Póliza</th>
-                    <th className="py-1 pr-2">Cliente</th>
-                    <th className="py-1 pr-2">Patente</th>
-                    <th className="py-1 pr-2">Estado</th>
-                    <th className="py-1 pr-2">Mensaje</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detalle.map((row, i) => (
-                    <tr
-                      key={i}
-                      className="border-b border-gray-800 last:border-0"
-                    >
-                      <td className="py-1 pr-2">{row?.poliza_id ?? "-"}</td>
-                      <td className="py-1 pr-2">{row?.cliente ?? "-"}</td>
-                      <td className="py-1 pr-2">{row?.patente ?? "-"}</td>
-                      <td className="py-1 pr-2">{row?.estado ?? "-"}</td>
-                      <td className="py-1 pr-2 text-gray-300">
-                        {row?.detalle || row?.error || "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <pre className="max-h-64 overflow-auto rounded-lg bg-black/40 p-3 text-[10px] text-gray-200">
+              {JSON.stringify(detalle, null, 2)}
+            </pre>
           </div>
         )}
 
-        {/* Fallback: mostrar crudo si no hay campos conocidos */}
-        {!detalle && !buckets && (
-          <div className="rounded-lg bg-gray-900 p-3">
-            <div className="mb-2 text-sm font-semibold">Respuesta cruda</div>
-            <pre className="max-h-64 overflow-auto text-xs">
-              {JSON.stringify(data, null, 2)}
-            </pre>
+        {/* Seleccionadas / procesadas */}
+        {(seleccionadas !== null || procesadas !== null) && (
+          <div className="mt-2 text-[11px] text-gray-400">
+            {seleccionadas !== null && (
+              <span className="mr-4">
+                Seleccionadas:{" "}
+                <span className="font-semibold text-gray-200">
+                  {seleccionadas}
+                </span>
+              </span>
+            )}
+            {procesadas !== null && (
+              <span>
+                Procesadas:{" "}
+                <span className="font-semibold text-gray-200">
+                  {procesadas}
+                </span>
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -405,24 +354,48 @@ export default function PolizasPage() {
   };
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-neutral-800/80 via-neutral-950 to-black p-[1px] text-white shadow-xl shadow-black/40">
-      <div className="rounded-2xl bg-gray-950/95 p-4 sm:p-5 space-y-4">
-        {/* Toolbar superior */}
-        <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-lg sm:text-xl font-semibold tracking-tight">
-            Pólizas
-          </h1>
-
+    <div className="space-y-4 sm:space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Pólizas</h1>
+          <p className="text-sm text-gray-400">
+            Gestión de pólizas, cuotas y estado de mora.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={abrirConfirmacion}
-            disabled={status === "loading" || sending || total === 0}
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium transition w-full sm:w-auto
-            ${
-              total > 0 && !sending && status !== "loading"
-                ? "bg-emerald-500 text-white hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                : "bg-gray-800 text-gray-400 cursor-not-allowed"
-            }`}
-            title="Envía por WhatsApp el estado de cuotas a todos los asegurados del resultado actual (todas las páginas)"
+            type="button"
+            onClick={() => setShowDocs((v) => !v)}
+            className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-100 hover:bg-indigo-500/20"
+            disabled={!polizaIdActual}
+          >
+            {polizaIdActual ? "Ver Docs / Fotos" : "Docs (seleccione póliza)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowGrua((v) => !v)}
+            className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20"
+            disabled={!polizaIdActual}
+          >
+            {polizaIdActual ? "Servicio de grúa" : "Grúa (seleccione póliza)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCupones((v) => !v)}
+            className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
+            disabled={!polizaIdActual}
+          >
+            {polizaIdActual ? "Cuponeras de robo" : "Cuponeras (seleccione póliza)"}
+          </button>
+
+          {/* Botón enviar estado de cuotas */}
+          <button
+            type="button"
+            onClick={() => setConfirmEnvio(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:bg-sky-500/20 disabled:opacity-60"
+            disabled={sending || total === 0}
+            title="Enviar estado de cuotas de las pólizas filtradas"
           >
             <HiChatAlt2 className="h-4 w-4 sm:h-5 sm:w-5" />
             <span>Enviar estado de cuotas</span>
@@ -433,333 +406,202 @@ export default function PolizasPage() {
             ) : null}
           </button>
         </div>
-
-        {/* Filtros */}
-        <PolizaFilter
-          // valores actuales
-          searchValue={search}
-          estadoActual={estado}
-          estadoFinancieroActual={estado_financiero}
-          companiaActual={compania}
-          clienteActual={cliente}
-          patenteActual={patente}
-          soloActivas={!!solo_activas}
-          orderingActual={ordering}
-          pageSize={pageSize}
-          totalFiltradas={total}
-          modoActual={modo}
-          // handlers
-          onSearchChange={onSearchChange}
-          onEstadoChange={onEstadoChange}
-          onEstadoFinancieroChange={onEstadoFinancieroChange}
-          onCompaniaChange={onCompaniaChange}
-          onClienteChange={onClienteChange}
-          onPatenteChange={onPatenteChange}
-          onSoloActivasChange={onSoloActivasChange}
-          onModoChange={onModoChange}
-          onPageSizeChange={onPageSizeChange}
-          onOrderingChange={onOrderingChange}
-          // NUEVOS: handlers de vencimiento
-          onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
-          onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
-          onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
-          onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
-          onClearVencimientoFilters={onClearVencimiento}
-          // resúmenes (cuotas = página actual; pólizas = GLOBAL por KPIs)
-          resumenCuotas={resumenCuotas}
-          resumenPolizas={resumenPolizas}
-        />
-
-        <div className="mt-1 text-xs sm:text-sm text-gray-300">
-          Mostrando {list.length} de {total} pólizas (página {page})
-        </div>
-
-        <div className="mt-2 sm:mt-3">
-          <PolizaTable
-            polizas={list}
-            status={status}
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={onPageChange}
-            onPageSizeChange={onPageSizeChange}
-            onOrderingChange={onOrderingChange}
-            ordering={ordering}
-          />
-        </div>
-
-        {/* 🧩 Sección: Vehículo & Documentos */}
-        <div className="mt-5 space-y-2">
-          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
-            <div className="text-xs sm:text-sm text-gray-300">
-              Vehículo & Documentos de:
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <select
-                value={polizaIdVehiculo || ""}
-                onChange={(e) => setPolizaIdVehiculo(e.target.value)}
-                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs sm:text-sm flex-1"
-              >
-                <option value="">
-                  — seleccionar póliza de esta página —
-                </option>
-                {list.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    #{p.id} ·{" "}
-                    {p.numero_poliza ||
-                      p.patente ||
-                      `${(p?.cliente?.apellido || "")} ${
-                        p?.cliente?.nombre || ""
-                      }`.trim() ||
-                      "Póliza"}
-                  </option>
-                ))}
-              </select>
-              {polizaIdVehiculo && (
-                <Link
-                  to={`/polizas/${polizaIdVehiculo}?tab=vehiculo`}
-                  className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-xs sm:text-sm hover:bg-indigo-700 w-full sm:w-auto"
-                >
-                  Ver detalle
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {polizaIdVehiculo && (
-            <div className="mt-1 rounded-xl border border-gray-800 bg-gray-950/70 p-3">
-              <VehiculoDocsPanel polizaId={Number(polizaIdVehiculo)} />
-            </div>
-          )}
-        </div>
-
-        {/* 🧩 Sección: Cuponeras de robo */}
-        <div className="mt-5 space-y-2">
-          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
-            <div className="text-xs sm:text-sm text-gray-300">
-              Cuponeras de robo de:
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <select
-                value={polizaIdCupones || ""}
-                onChange={(e) => setPolizaIdCupones(e.target.value)}
-                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs sm:text-sm flex-1"
-              >
-                <option value="">
-                  — seleccionar póliza de esta página —
-                </option>
-                {list.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    #{p.id} ·{" "}
-                    {p.numero_poliza ||
-                      p.patente ||
-                      `${(p?.cliente?.apellido || "")} ${
-                        p?.cliente?.nombre || ""
-                      }`.trim() ||
-                      "Póliza"}
-                  </option>
-                ))}
-              </select>
-              {polizaIdCupones && (
-                <Link
-                  to={`/polizas/${polizaIdCupones}?tab=cupones_robo`}
-                  className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-3 py-2 text-xs sm:text-sm hover:bg-purple-700 w-full sm:w-auto"
-                >
-                  Ver detalle
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {polizaIdCupones && (
-            <div className="mt-1 rounded-xl border border-gray-800 bg-gray-950/70 p-3">
-              <CuponesRoboPanel
-                polizaId={Number(polizaIdCupones)}
-                cupones={selectedPolizaCupones?.cupones_robo}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* 🧩 Panel rápido de grúa */}
-        <div className="mt-5 space-y-2">
-          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
-            <div className="text-xs sm:text-sm text-gray-300">
-              Servicio de grúa de:
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <select
-                value={polizaIdPanel || ""}
-                onChange={(e) => setPolizaIdPanel(e.target.value)}
-                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs sm:text-sm flex-1"
-              >
-                <option value="">
-                  — seleccionar póliza de esta página —
-                </option>
-                {list.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    #{p.id} ·{" "}
-                    {p.numero_poliza ||
-                      p.patente ||
-                      `${(p?.cliente?.apellido || "")} ${
-                        p?.cliente?.nombre || ""
-                      }`.trim() ||
-                      "Póliza"}
-                  </option>
-                ))}
-              </select>
-              {polizaIdPanel && (
-                <Link
-                  to={`/polizas/${polizaIdPanel}?tab=gruas`}
-                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-xs sm:text-sm hover:bg-blue-700 w-full sm:w-auto"
-                >
-                  Gestionar en detalle
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {polizaIdPanel && (
-            <div className="mt-1 rounded-xl border border-gray-800 bg-gray-950/70 p-3">
-              <ServicioGruaCard polizaId={Number(polizaIdPanel)} />
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Modal de confirmación de envío masivo */}
-      {showConfirmEnvio && (
+      {/* Filtros */}
+      <PolizaFilter
+        // valores actuales
+        searchValue={search}
+        estadoActual={estado}
+        estadoFinancieroActual={estado_financiero}
+        companiaActual={compania}
+        clienteActual={cliente}
+        patenteActual={patente}
+        soloActivas={!!solo_activas}
+        orderingActual={ordering}
+        pageSize={pageSize}
+        totalFiltradas={total}
+        modoActual={modo}
+        // handlers
+        onSearchChange={onSearchChange}
+        onEstadoChange={onEstadoChange}
+        onEstadoFinancieroChange={onEstadoFinancieroChange}
+        onCompaniaChange={onCompaniaChange}
+        onClienteChange={onClienteChange}
+        onPatenteChange={onPatenteChange}
+        onSoloActivasChange={onSoloActivasChange}
+        onModoChange={onModoChange}
+        onPageSizeChange={onPageSizeChange}
+        onOrderingChange={onOrderingChange}
+        // NUEVOS: handlers de vencimiento
+        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
+        onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
+        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
+        onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
+        onClearVencimientoFilters={onClearVencimiento}
+        // resúmenes (cuotas = página actual; pólizas = GLOBAL por KPIs)
+        resumenCuotas={resumenCuotas}
+        resumenPolizas={resumenPolizas}
+        kpis={kpis}
+      />
+
+      <div className="mt-1 text-xs sm:text-sm text-gray-300">
+        Mostrando {list.length} de {total} pólizas (página {page})
+      </div>
+
+      {/* Tabla principal */}
+      <div className="mt-2 sm:mt-3">
+        <PolizaTable
+          polizas={list}
+          status={status}
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          ordering={ordering}
+          onOrderingChange={onOrderingChange}
+          modo={modo}
+        />
+      </div>
+
+      {/* Panel lateral: Docs / Fotos vehículo */}
+      {showDocs && polizaIdActual && (
+        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">
+              Docs & Fotos del vehículo
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowDocs(false)}
+              className="text-xs text-gray-400 hover:text-gray-200"
+            >
+              Cerrar
+            </button>
+          </div>
+          <VehiculoDocsPanel polizaId={polizaIdActual} />
+        </div>
+      )}
+
+      {/* Panel lateral: Servicio de grúa */}
+      {showGrua && polizaActual && (
+        <div className="mt-6 rounded-2xl border border-emerald-600/40 bg-emerald-950/40 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-emerald-100">
+              Servicio de grúa
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowGrua(false)}
+              className="text-xs text-emerald-300/80 hover:text-emerald-100"
+            >
+              Cerrar
+            </button>
+          </div>
+          <ServicioGruaCard poliza={polizaActual} />
+        </div>
+      )}
+
+      {/* Panel lateral: Cuponeras de robo */}
+      {showCupones && polizaIdActual && (
+        <div className="mt-6 rounded-2xl border border-amber-600/40 bg-amber-950/40 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-amber-100">
+              Cuponeras de robo
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowCupones(false)}
+              className="text-xs text-amber-300/80 hover:text-amber-100"
+            >
+              Cerrar
+            </button>
+          </div>
+          <CuponesRoboPanel polizaId={polizaIdActual} />
+        </div>
+      )}
+
+      {/* Modal de confirmación / resultado de envío de estado de cuotas */}
+      {confirmEnvio && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-gray-900 shadow-xl">
-            <div className="border-b border-gray-800 px-4 py-3">
-              <h2 className="text-sm font-semibold text-gray-100">
-                Enviar estado de cuotas por WhatsApp
-              </h2>
-              <p className="mt-1 text-xs text-gray-400">
-                Se enviará un mensaje a cada asegurado de las pólizas que cumplen los
-                filtros actuales. Podés probar primero en modo “solo reporte”.
-              </p>
+          <div className="max-w-lg w-full rounded-2xl bg-gray-900 border border-gray-700 p-4 sm:p-5 text-sm text-gray-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-white">
+                  Enviar estado de cuotas
+                </h2>
+                <p className="mt-1 text-xs sm:text-sm text-gray-300">
+                  Se enviará un resumen de estado de cuotas a los clientes de
+                  las pólizas actualmente filtradas. Podés generar primero un
+                  reporte de prueba (sin enviar) o enviar de verdad.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmEnvio(false)}
+                className="text-xs text-gray-400 hover:text-gray-200"
+              >
+                Cerrar
+              </button>
             </div>
 
-            <div className="px-4 py-3 text-sm text-gray-200">
-              <div className="mb-2">
-                <div className="text-xs uppercase tracking-wide text-gray-400">
-                  Resumen del filtro actual
-                </div>
-                <div className="mt-1 rounded-lg bg-gray-950/70 p-2 text-xs text-gray-300">
-                  <div>
-                    <span className="font-semibold text-gray-100">
-                      Pólizas en resultado:
-                    </span>{" "}
-                    {total}
-                  </div>
-                  <div className="mt-1">
-                    <span className="text-gray-400">Estado:</span> {estado}
-                    {" · "}
-                    <span className="text-gray-400">Financiero:</span>{" "}
-                    {estado_financiero}
-                    {" · "}
-                    <span className="text-gray-400">Modo:</span> {modo}
-                  </div>
-                  {(fecha_vencimiento_desde || fecha_vencimiento_hasta) && (
-                    <div className="mt-1">
-                      <span className="text-gray-400">Vencimiento entre:</span>{" "}
-                      {fecha_vencimiento_desde || "—"} {" y "}
-                      {fecha_vencimiento_hasta || "—"}
-                    </div>
-                  )}
-                  {(vencidas_ultimos_dias || vencidas_mas_de_dias) && (
-                    <div className="mt-1">
-                      <span className="text-gray-400">Vencidas:</span>{" "}
-                      {vencidas_ultimos_dias &&
-                        `últimos ${vencidas_ultimos_dias} días `}
-                      {vencidas_mas_de_dias &&
-                        `más de ${vencidas_mas_de_dias} días`}
-                    </div>
-                  )}
-                </div>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
+                <span className="text-gray-300">
+                  Pólizas filtradas actualmente:
+                </span>
+                <span className="font-semibold text-emerald-300">
+                  {total}
+                </span>
               </div>
 
-              {envioResumen && (
-                <div className="mb-2 rounded-lg bg-gray-950/60 p-2 text-xs">
-                  <div className="mb-1 text-xs font-semibold text-gray-200">
-                    Resultado del último proceso
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                    <div>
-                      <div className="text-gray-400">Seleccionadas</div>
-                      <div className="font-mono text-gray-50">
-                        {envioResumen.seleccionadas}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-gray-400">Procesadas</div>
-                      <div className="font-mono text-gray-50">
-                        {envioResumen.procesadas}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-gray-400">Enviados</div>
-                      <div className="font-mono text-emerald-400">
-                        {envioResumen.enviados}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-gray-400">Fallidos</div>
-                      <div className="font-mono text-rose-400">
-                        {envioResumen.fallidos}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <DetalleRespuesta data={resultadoBackend} />
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-gray-800 bg-gray-950/60 px-4 py-3 text-xs">
-              <div className="flex items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={enviarDeVerdad}
-                    onChange={(e) => setEnviarDeVerdad(e.target.checked)}
-                    className="h-3 w-3 rounded border-gray-600 bg-gray-900 text-emerald-500 focus:ring-emerald-500"
-                  />
-                  <span className="text-gray-300">
-                    Enviar de verdad (si no, solo genera reporte)
-                  </span>
+              <div className="flex items-center gap-2 text-xs sm:text-sm">
+                <input
+                  id="previewOnly"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-sky-500"
+                  checked={previewOnly}
+                  onChange={(e) => setPreviewOnly(e.target.checked)}
+                />
+                <label
+                  htmlFor="previewOnly"
+                  className="text-gray-300 select-none"
+                >
+                  Solo generar reporte (no enviar mensajes)
                 </label>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <button
-                  onClick={cerrarModalEnvio}
-                  disabled={sending}
-                  className="w-full sm:w-auto rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Cerrar
-                </button>
-                <button
-                  onClick={() => ejecutarEnvioMasivo(enviarDeVerdad)}
-                  disabled={sending}
-                  className={`w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium
-                    ${
-                      sending
-                        ? "bg-emerald-700 text-gray-100 opacity-80"
-                        : "bg-emerald-500 text-white hover:bg-emerald-400"
-                    }`}
-                >
-                  <HiChatAlt2 className="h-4 w-4" />
-                  {sending
-                    ? enviarDeVerdad
-                      ? "Enviando..."
-                      : "Generando reporte..."
-                    : enviarDeVerdad
-                    ? "Enviar de verdad"
-                    : "Probar (solo reporte)"}
-                </button>
-              </div>
+              {envioResult && (
+                <div className="mt-3 rounded-lg border border-gray-700 bg-gray-950/70 p-3">
+                  <DetalleRespuesta data={envioResult} />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmEnvio(false)}
+                className="rounded-lg border border-gray-600 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-100 hover:bg-gray-700"
+                disabled={sending}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleEnviarEstadoCuotas}
+                className="inline-flex items-center gap-2 rounded-lg border border-sky-500 bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-sky-500 disabled:opacity-60"
+                disabled={sending}
+              >
+                {sending
+                  ? previewOnly
+                    ? "Generando reporte..."
+                    : "Enviando..."
+                  : previewOnly
+                  ? "Generar reporte"
+                  : "Enviar de verdad"}
+              </button>
             </div>
           </div>
         </div>
