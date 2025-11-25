@@ -129,12 +129,11 @@ function App() {
     // 2) Si PROBE_COUNTERS está activo (por defecto true), probamos rutas conocidas.
     if (!PROBE_COUNTERS) return;
 
+    // ⬇️⬇️⬇️ AQUÍ EL CAMBIO: solo probamos endpoints de *solicitudes*,
+    // dejamos de probar /api/notificaciones/counters para evitar el 404.
     const candidates = [
-      `${API_BASE}notificaciones/counters`,
-      `${API_BASE}solicitudes/counters`,
-      "/api/notificaciones/counters",
+      API_BASE ? `${API_BASE}solicitudes/counters` : null,
       "/api/solicitudes/counters",
-      "/notificaciones/counters",
       "/solicitudes/counters",
     ].filter(Boolean);
 
@@ -331,7 +330,10 @@ function App() {
           </AnimatePresence>
         </motion.main>
 
-        <MobileTopBar />
+        <MobileTopBar
+          solPendienteAlta={solPendienteAlta}
+          solPendienteEnvio={solPendienteEnvio}
+        />
       </motion.div>
     </div>
   );
