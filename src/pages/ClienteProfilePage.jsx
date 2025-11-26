@@ -33,6 +33,7 @@ const ClienteProfilePage = () => {
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
   const [modalCrearPolizaAbierto, setModalCrearPolizaAbierto] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   useEffect(() => {
     if (!cliente) dispatch(fetchClientes({ page: 1 }));
@@ -49,12 +50,16 @@ const ClienteProfilePage = () => {
   };
 
   const handleBorrarCliente = async () => {
+    if (!cliente || eliminando) return;
     try {
+      setEliminando(true);
       await dispatch(deleteCliente(cliente.id)).unwrap();
-      toast.success('Cliente eliminado');
+      // Dejamos el toast de éxito centralizado en la lista de clientes
       navigate('/clientes');
     } catch {
       toast.error('No se pudo eliminar');
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -125,6 +130,8 @@ const ClienteProfilePage = () => {
         onClose={() => setModalEliminarAbierto(false)}
         nombre={`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()}
         onConfirm={handleBorrarCliente}
+        // opcional: si ConfirmModal lo usa, puede deshabilitar el botón
+        confirmDisabled={eliminando}
       />
     </motion.div>
   );

@@ -323,6 +323,7 @@ export default function CuponerasPage() {
           </span>
         </div>
 
+        {/* ⬅️ volvemos a sólo scroll horizontal */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/80 dark:bg-slate-900/90 border-b border-slate-200/70 dark:border-slate-800">

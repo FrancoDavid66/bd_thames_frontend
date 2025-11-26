@@ -1,4 +1,4 @@
-/* src/components/pagos/FacturaCuotaPDF.jsx — SIN dirección ni teléfono del titular */
+// src/components/pagos/FacturaCuotaPDF.jsx
 import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 
 /* Tamaño A4 (una sola hoja) en puntos */
@@ -55,6 +55,43 @@ const fmtMoney = (n) => {
   } catch {
     return "AR$ 0,00";
   }
+};
+
+/** Normaliza una fecha a número YYYYMMDD para poder comparar fácil */
+const toYMDNumber = (d) => {
+  if (!d) return null;
+  try {
+    if (typeof d === "string") {
+      const dateStr = d.slice(0, 10);
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const [yyyy, mm, dd] = parts;
+        const y = Number(yyyy);
+        const m = Number(mm);
+        const day = Number(dd);
+        if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(day)) {
+          return y * 10000 + m * 100 + day;
+        }
+      }
+    }
+    const dt = d instanceof Date ? d : new Date(d);
+    if (Number.isNaN(dt.getTime())) return null;
+    const y = dt.getFullYear();
+    const m = dt.getMonth() + 1;
+    const day = dt.getDate();
+    return y * 10000 + m * 100 + day;
+  } catch {
+    return null;
+  }
+};
+
+/** Determina si la cuota se pagó después del vencimiento */
+const isPagoAtrasado = (cuota) => {
+  if (!cuota || !cuota.pagado) return false;
+  const v = toYMDNumber(cuota.fecha_vencimiento);
+  const p = toYMDNumber(cuota.fecha_pago);
+  if (v == null || p == null) return false;
+  return p > v;
 };
 
 const styles = StyleSheet.create({
@@ -179,6 +216,17 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     backgroundColor: "#FCF7F9",
   },
+
+  /* Leyenda por pago atrasado */
+  lateNotice: {
+    marginTop: 16,
+    paddingHorizontal: 4,
+  },
+  lateNoticeText: {
+    fontSize: 9,
+    color: PRIMARY_DARK,
+    textAlign: "center",
+  },
 });
 
 const FacturaCuotaPDF = ({ cliente, poliza, cuota }) => {
@@ -209,6 +257,8 @@ const FacturaCuotaPDF = ({ cliente, poliza, cuota }) => {
     cuota.total !== undefined && cuota.total !== null
       ? Number(cuota.total)
       : subtotal + recargo - descuento;
+
+  const pagoAtrasado = isPagoAtrasado(cuota);
 
   return (
     <Document>
@@ -295,6 +345,16 @@ const FacturaCuotaPDF = ({ cliente, poliza, cuota }) => {
             <Text>{fmtMoney(total)}</Text>
           </View>
         </View>
+
+        {/* Leyenda por pago atrasado */}
+        {pagoAtrasado && (
+          <View style={styles.lateNotice}>
+            <Text style={styles.lateNoticeText}>
+              Por haber abonado el seguro en forma atrasada, la cobertura se
+              restablecerá en 2 días hábiles.
+            </Text>
+          </View>
+        )}
       </Page>
     </Document>
   );

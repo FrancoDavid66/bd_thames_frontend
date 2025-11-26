@@ -288,7 +288,8 @@ function App() {
       />
 
       <motion.div
-        className={`flex-1 min-h-screen transition-all duration-300 ${
+        // ⬇️ IMPORTANTE: lo volvemos columna y dejamos que el main sea el área scrolleable
+        className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${
           sidebarOpen ? "lg:ml-64" : ""
         }`}
         initial={{ opacity: 0 }}
@@ -298,7 +299,8 @@ function App() {
         <Navbar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
         <motion.main
-          className="px-4 sm:px-6 md:px-8 pt-16 pb-20 lg:pb-8"
+          // ⬇️ ESTA ES EL ÁREA SCROLLEABLE
+          className="flex-1 px-4 sm:px-6 md:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -30, opacity: 0 }}

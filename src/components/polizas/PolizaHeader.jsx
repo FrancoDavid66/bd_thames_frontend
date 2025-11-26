@@ -87,10 +87,10 @@ export default function PolizaHeader({
         {poliza?.id && (
           <button
             onClick={onRenovarClick}
-            className="px-3 py-1.5 rounded-full bg-primary-400 text-black text-xs sm:text-sm font-semibold hover:opacity-90 transition"
+            className="inline-flex items-center justify-center bg-amber-700 rounded-full px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-primary-400 hover:bg-primary-300 active:scale-[0.97] shadow-md shadow-primary-500/30 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-400/70 focus:ring-offset-1 focus:ring-offset-gray-900"
             title="Renovar póliza (crea nueva versión con cuotas nuevas)"
           >
-            Renovar póliza
+            🔄 Renovar póliza
           </button>
         )}
       </div>

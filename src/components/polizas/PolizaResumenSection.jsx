@@ -221,10 +221,14 @@ const upper = (s) => (typeof s === "string" ? s.toUpperCase() : s);
 /* ===================== estilos locales (botón / link) ===================== */
 const btnBase =
   "inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold cursor-pointer select-none transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:ring-offset-1 focus:ring-offset-gray-900";
+
+/* 👉 más contraste: fondo visible y texto blanco */
 const btnPrimary =
-  "bg-primary-400 text-black hover:bg-primary-300 active:scale-[0.98]";
+  "bg-primary-400 text-white hover:bg-primary-300 active:scale-[0.98] shadow-sm";
+
 const btnSecondary =
-  "bg-gray-800 text-gray-100 border border-gray-700 hover:bg-gray-750 active:scale-[0.98]";
+  "bg-white/5 text-white border border-white/15 hover:bg-white/10 active:scale-[0.98]";
+
 const linkHover = "hover:text-primary-200";
 
 /* ===================== Component ===================== */

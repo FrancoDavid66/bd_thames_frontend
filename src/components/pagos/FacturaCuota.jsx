@@ -1,4 +1,4 @@
-/* src/components/pagos/FacturaCuota.jsx — Reemplaza TODO el archivo con esta versión */
+// src/components/pagos/FacturaCuota.jsx — Reemplaza TODO el archivo con esta versión
 import React from "react";
 import dayjs from "dayjs";
 import {
@@ -46,8 +46,21 @@ const fmtDate = (d) => {
   }
 };
 
+/** Determina si la cuota se pagó después del vencimiento */
+const isPagoAtrasado = (cuota) => {
+  if (!cuota || !cuota.pagado) return false;
+  const { fecha_vencimiento, fecha_pago } = cuota;
+  if (!fecha_vencimiento || !fecha_pago) return false;
+  const v = dayjs(fecha_vencimiento).startOf("day");
+  const p = dayjs(fecha_pago).startOf("day");
+  if (!v.isValid() || !p.isValid()) return false;
+  return p.isAfter(v);
+};
+
 export default function FacturaCuota({ cliente, poliza, cuota }) {
   if (!cliente || !poliza || !cuota) return null;
+
+  const pagoAtrasado = isPagoAtrasado(cuota);
 
   return (
     <div className="max-w-3xl mx-auto rounded-2xl border border-neutral-300/20 bg-neutral-500 text-neutral-100 shadow print:bg-white print:text-black print:border-none print:shadow-none">
@@ -205,6 +218,14 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
             </div>
           </div>
         </section>
+
+        {/* Aviso por pago atrasado */}
+        {pagoAtrasado && (
+          <div className="rounded-lg border border-amber-400/60 bg-amber-500/10 text-amber-100 text-xs px-4 py-3 text-center print:border-amber-500/80 print:text-amber-900 print:bg-transparent">
+            Por haber abonado el seguro en forma atrasada, la cobertura se
+            restablecerá en 2 días hábiles.
+          </div>
+        )}
 
         {/* Footer */}
         <div className="text-center text-xs text-neutral-200/70 print:text-neutral-600">
