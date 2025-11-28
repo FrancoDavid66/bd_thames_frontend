@@ -18,6 +18,24 @@ import { MotionList, MotionListItem } from "../../ux/motion/MotionList";
 import { pressable, listItem } from "../../ux/motion/variants";
 // (Se elimina SwipeCard para evitar acciones de swipe)
 
+// 🏢 Oficinas fijas (mismo mapa que en la Page)
+const OFICINAS = [
+  { id: "1", nombre: "5 esquinas (1)" },
+  { id: "2", nombre: "axion (2)" },
+  { id: "3", nombre: "kilometro 39 (3)" },
+];
+
+function getOficinaNombre(valor) {
+  if (!valor && valor !== 0) return null;
+  const raw = String(valor);
+  const byId = OFICINAS.find((o) => o.id === raw);
+  if (byId) return byId.nombre;
+  const byNombre = OFICINAS.find(
+    (o) => o.nombre.toLowerCase() === raw.toLowerCase()
+  );
+  return byNombre ? byNombre.nombre : raw;
+}
+
 /** Formatea fecha ISO a dd/mm/yyyy hh:mm */
 function fmtDate(iso) {
   if (!iso) return "-";
@@ -162,6 +180,8 @@ function SolicitudCard({
   const anchorId = String(s?.id ?? "");
   const vence = s?.fin ? fmtDate(s.fin) : null;
 
+  const oficinaLabel = getOficinaNombre(s?.oficina);
+
   // Normalizamos tareas (visuales; si no viene callback quedan sin acción)
   const tareas = {
     alta_compania: Boolean(s?.tareas?.alta_compania ?? s?.alta_compania ?? false),
@@ -251,6 +271,8 @@ function SolicitudCard({
                 Cliente: {s.cliente_estado}
               </Chip>
             ) : null}
+            {/* 🏢 Oficina */}
+            {oficinaLabel ? <Chip>Oficina: {oficinaLabel}</Chip> : null}
           </div>
 
           <div className="mt-2 text-[13px] md:text-sm text-white/85 truncate">

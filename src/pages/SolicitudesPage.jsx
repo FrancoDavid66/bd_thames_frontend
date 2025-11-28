@@ -17,6 +17,13 @@ import { pressable } from "../ux/motion/variants";
 // 🔔 realtime front-only (BroadcastChannel + polling)
 import { solicitudesRealtime } from "../services/notifications/solicitudes.js";
 
+// 🏢 Oficinas fijas
+const OFICINAS = [
+  { id: "1", nombre: "5 esquinas (1)" },
+  { id: "2", nombre: "axion (2)" },
+  { id: "3", nombre: "kilometro 39 (3)" },
+];
+
 /* Helpers (para un futuro “Resumen” PNG) */
 function slug(s) {
   return String(s || "")
@@ -58,6 +65,34 @@ function computeCounters(list = []) {
   return { alta, envio };
 }
 
+// 🔍 helper robusto para matchear la oficina
+function matchOficinaFilter(value, filter) {
+  if (!filter || filter === "TODAS") return true;
+  if (value === null || value === undefined) return false;
+
+  const raw = String(value).trim().toLowerCase();
+  const f = String(filter).trim().toLowerCase();
+
+  const selected =
+    OFICINAS.find((o) => o.id === filter) ||
+    OFICINAS.find((o) => o.nombre.toLowerCase() === f);
+
+  if (!selected) {
+    // fallback: comparamos directo
+    return raw === f || raw.includes(f);
+  }
+
+  const id = selected.id.toLowerCase();
+  const name = selected.nombre.toLowerCase();
+
+  return (
+    raw === id ||
+    raw === name ||
+    raw.includes(id) ||
+    raw.includes(name)
+  );
+}
+
 export default function SolicitudesPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -79,31 +114,38 @@ export default function SolicitudesPage() {
   const [search, setSearch] = useState("");
   const [toolbarOpen, setToolbarOpen] = useState(false);
 
+  // 🔎 filtro por oficina (por ID: "1", "2", "3" o "TODAS")
+  const [oficinaFilter, setOficinaFilter] = useState("TODAS");
+
   const { companias, coberturas } = useCatalogos();
 
   // Cargar
   const cargar = async (opts = { silent: false }) => {
-    const { silent } = opts || {};
-    silent ? setRefreshing(true) : setLoading(true);
-    try {
-      const list = await solicitudesApi.listar({});
-      const norm = (Array.isArray(list) ? list : []).map((s) => ({
-        ...s,
-        tareas: getTareas(s),
-      }));
-      setItems(norm);
-      // 🔔 emitir counters para Sidebar
-      const { alta, envio } = computeCounters(norm);
-      solicitudesRealtime.emitLocal({
-        type: "solicitudes.counters",
-        data: { alta, envio },
-      });
-    } catch (e) {
-      toast.error(e.message || "Error al cargar");
-    } finally {
-      silent ? setRefreshing(false) : setLoading(false);
-    }
-  };
+  const { silent } = opts || {};
+  silent ? setRefreshing(true) : setLoading(true);
+  try {
+    const list = await solicitudesApi.listar({});
+
+    // 👀 LOG ACÁ
+    console.log("SOLICITUDES RAW >>>", list);
+
+    const norm = (Array.isArray(list) ? list : []).map((s) => ({
+      ...s,
+      tareas: getTareas(s),
+    }));
+    setItems(norm);
+    const { alta, envio } = computeCounters(norm);
+    solicitudesRealtime.emitLocal({
+      type: "solicitudes.counters",
+      data: { alta, envio },
+    });
+  } catch (e) {
+    toast.error(e.message || "Error al cargar");
+  } finally {
+    silent ? setRefreshing(false) : setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     cargar({ silent: false });
@@ -168,6 +210,7 @@ export default function SolicitudesPage() {
       arr = arr.filter((s) => s?.estado !== "TERMINADA");
     }
 
+    // 🔎 filtro por texto
     const q = search.trim().toLowerCase();
     if (q) {
       arr = arr.filter(
@@ -178,10 +221,16 @@ export default function SolicitudesPage() {
           String(s?.codigo || "").toLowerCase().includes(q)
       );
     }
+
+    // 🏢 filtro por oficina (ID o nombre)
+    if (oficinaFilter && oficinaFilter !== "TODAS") {
+      arr = arr.filter((s) => matchOficinaFilter(s?.oficina, oficinaFilter));
+    }
+
     const ts = (s) => new Date(s?.actualizado_en || s?.creado_en || 0).getTime();
     arr.sort((a, b) => ts(b) - ts(a));
     return arr;
-  }, [itemsConTarea, tab, search]);
+  }, [itemsConTarea, tab, search, oficinaFilter]);
 
   const kpis = useMemo(() => {
     const { activas, terminadas, total } = counts;
@@ -403,16 +452,41 @@ export default function SolicitudesPage() {
                     ))}
                   </div>
 
-                  {/* Búsqueda */}
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por cliente / DNI / patente / código…"
-                    className="
-                      flex-1 px-3 py-2 rounded-xl bg-white/10 border border-white/10
-                      text-white text-xs sm:text-sm placeholder-white/50
-                    "
-                  />
+                  {/* Búsqueda + filtro por oficina */}
+                  <div className="flex flex-1 gap-2">
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar por cliente / DNI / patente / código…"
+                      className="
+                        flex-1 px-3 py-2 rounded-xl bg-white/10 border border-white/10
+                        text-white text-xs sm:text-sm placeholder-white/50
+                      "
+                    />
+
+                    <select
+                      value={oficinaFilter}
+                      onChange={(e) => setOficinaFilter(e.target.value)}
+                      className="
+                        px-3 py-2 rounded-xl bg-white/10 border border-white/10
+                        text-white text-xs sm:text-sm
+                      "
+                      title="Filtrar por oficina"
+                    >
+                      <option value="TODAS" className="bg-[#0b0f19] text-white">
+                        Todas las oficinas
+                      </option>
+                      {OFICINAS.map((of) => (
+                        <option
+                          key={of.id}
+                          value={of.id}
+                          className="bg-[#0b0f19] text-white"
+                        >
+                          {of.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -445,7 +519,7 @@ export default function SolicitudesPage() {
 
             {/* Lista */}
             <SolicitudesList
-              key={`sols-${tab}-${search}`}
+              key={`sols-${tab}-${search}-${oficinaFilter}`}
               items={filtrados}
               loading={loading}
               refreshing={refreshing}
@@ -510,7 +584,7 @@ function Kpi({ label, value, icon }) {
       <div className="p-[1px]">
         <div className="rounded-2xl p-4 text-center bg-white/[0.06]">
           <div className="mx-auto mb-2 h-1.5 w-24 rounded-full bg-white/20" />
-          <div className="flex items-center justify-center gap-2 text-2xl font-bold text-white">
+          <div className="flex items-center justify-center gap-2 text-2xl font-bold text:white">
             {icon ? <span className="text-white/80">{icon}</span> : null}
             <span>{value}</span>
           </div>
