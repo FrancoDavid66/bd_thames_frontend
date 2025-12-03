@@ -31,7 +31,6 @@ const badgeByEstado = {
 };
 
 const labelByEstado = {
-  // Este texto casi no se usará ya, pero lo dejamos por compatibilidad
   PENDIENTE: "Pendiente",
   AL_DIA: "Al día",
   PAGADA: "Pagada",
@@ -84,6 +83,50 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
     if (!file || !uploadTarget) return;
 
     const cuponId = uploadTarget.id;
+
+    // 👉 Pedimos el monto del seguro (egreso)
+    let monto = null;
+    try {
+      const defaultMonto =
+        uploadTarget.monto !== null && uploadTarget.monto !== undefined
+          ? String(uploadTarget.monto)
+          : "";
+      const raw = window.prompt(
+        "Monto del seguro (egreso a la compañía) para este cupón:",
+        defaultMonto
+      );
+
+      if (raw === null) {
+        setUploadTarget(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      const normalized = raw.replace(",", ".").trim();
+      if (!normalized) {
+        toast.error("Debes ingresar un monto para registrar el pago.");
+        setUploadTarget(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      const parsed = Number(normalized);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        toast.error("Monto inválido. Ingresá un número mayor a cero.");
+        setUploadTarget(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      monto = parsed;
+    } catch (err) {
+      console.error(err);
+      toast.error("Ocurrió un error al leer el monto.");
+      setUploadTarget(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     try {
       setUploadingById((prev) => ({ ...prev, [cuponId]: true }));
 
@@ -96,12 +139,12 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
         actualizarEstadoCuponRobo({
           id: cuponId,
           polizaId,
-          estado: "PAGADA", // al subir comprobante, se marca pagada
+          estado: "PAGADA",
           foto_url: secure_url,
           foto_public_id: public_id,
+          monto,
         })
       ).unwrap();
-      // El toast + mail lo maneja el slice
     } catch (error) {
       console.error(error);
       toast.error("No se pudo subir la foto del cupón.");
@@ -112,9 +155,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
         return clone;
       });
       setUploadTarget(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -160,8 +201,8 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
           <div className="flex items-start gap-2 rounded-xl border border-dashed border-white/15 bg-neutral-950/60 px-3 py-3 text-[11px] text-neutral-400">
             <HiClock className="mt-0.5 h-4 w-4 text-neutral-500" />
             <span>
-              Todavía no hay cupones de robo para esta póliza. Se generan en base a
-              las cuotas de la póliza.
+              Todavía no hay cupones de robo para esta póliza. Se generan en
+              base a las cuotas de la póliza.
             </span>
           </div>
         )}
@@ -186,10 +227,6 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                   tieneVto &&
                   dayjs(cupon.fecha_vencimiento).isBefore(hoy, "day");
 
-                // 💡 Lógica nueva:
-                // - PAGADA  → "Pagada"
-                // - no pagada + vencida → "Vencida"
-                // - no pagada + NO vencida → "Al día"
                 const visualEstado = isPagada
                   ? "PAGADA"
                   : isVencida
@@ -204,7 +241,10 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                 const uploading = !!uploadingById?.[cupon.id];
 
                 const tienePagoMeta =
-                  !!cupon.fecha_pago || !!cupon.medio_cobro || !!cupon.foto_url;
+                  !!cupon.fecha_pago ||
+                  !!cupon.medio_cobro ||
+                  !!cupon.foto_url ||
+                  cupon.monto != null;
 
                 const btnLabel =
                   visualEstado === "PAGADA"
@@ -218,8 +258,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                     ? "border-emerald-500/40 bg-emerald-950/40"
                     : visualEstado === "VENCIDA"
                     ? "border-rose-500/40 bg-rose-950/40"
-                    : // AL_DIA → tono intermedio (amarillo)
-                      "border-amber-500/40 bg-amber-950/40";
+                    : "border-amber-500/40 bg-amber-950/40";
 
                 return (
                   <motion.div
@@ -267,25 +306,43 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                           </span>
                         )}
 
-                        {/* Meta de pago cuando está pagada */}
+                        {/* 💥 CHIP DE PAGO MÁS GRANDE */}
                         {visualEstado === "PAGADA" && tienePagoMeta && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-200">
-                            <HiBadgeCheck className="h-3 w-3" />
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-100">
+                            <HiBadgeCheck className="h-4 w-4" />
                             <span>
                               Pagado
                               {cupon.fecha_pago && (
                                 <>
                                   {" "}
                                   el{" "}
-                                  {dayjs(cupon.fecha_pago).format(
-                                    "DD/MM/YYYY HH:mm"
-                                  )}
+                                  <strong>
+                                    {dayjs(cupon.fecha_pago).format(
+                                      "DD/MM/YYYY HH:mm"
+                                    )}
+                                  </strong>
                                 </>
                               )}
                               {cupon.medio_cobro && (
                                 <>
                                   {" "}
                                   · {cupon.medio_cobro}
+                                </>
+                              )}
+                              {cupon.monto != null && (
+                                <>
+                                  {" "}
+                                  ·{" "}
+                                  <strong>
+                                    $
+                                    {Number(cupon.monto).toLocaleString(
+                                      "es-AR",
+                                      {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      }
+                                    )}
+                                  </strong>
                                 </>
                               )}
                             </span>
@@ -296,7 +353,6 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
 
                     {/* Columna derecha: preview + botón */}
                     <div className="flex w-full flex-col items-end gap-2 md:w-64">
-                      {/* Preview grande a la derecha */}
                       <div className="w-full">
                         {cupon.foto_url ? (
                           <div className="relative w-full overflow-hidden rounded-xl border border-emerald-500/40 bg-black/40">
@@ -313,7 +369,6 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                         )}
                       </div>
 
-                      {/* Botón de acción */}
                       <div className="flex flex-wrap items-center justify-end gap-2 w-full">
                         <button
                           type="button"

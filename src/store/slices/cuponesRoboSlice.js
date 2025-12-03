@@ -108,13 +108,14 @@ export const createCuponRobo = createAsyncThunk(
 export const actualizarEstadoCuponRobo = createAsyncThunk(
   "cuponesRobo/updateEstado",
   async (
-    { id, polizaId, estado, foto_url, foto_public_id },
+    { id, polizaId, estado, foto_url, foto_public_id, monto },
     { rejectWithValue }
   ) => {
     try {
       const payload = { estado: (estado || "").toUpperCase() };
       if (foto_url) payload.foto_url = foto_url;
       if (foto_public_id) payload.foto_public_id = foto_public_id;
+      if (monto != null) payload.monto = monto; // 💰 enviamos el monto al backend
 
       const res = await http.patch(`polizas/cupones-robo/${id}/`, payload);
       const cupon = res.data;

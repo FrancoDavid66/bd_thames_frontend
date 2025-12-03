@@ -109,6 +109,10 @@ export default function CuponerasPage() {
   // 🔎 texto del buscador (póliza, patente, asegurado, DNI)
   const [search, setSearch] = useState("");
 
+  // 🔁 filtro elegido en los KPIs
+  // ALL | AL_DIA | POR_VENCER_7 | VENCIDA
+  const [filter, setFilter] = useState("ALL");
+
   const stats = useMemo(() => {
     const hoy = dayjs().startOf("day");
     let total = 0;
@@ -147,6 +151,35 @@ export default function CuponerasPage() {
       vencidas,
     };
   }, [cupones]);
+
+  // 🧮 lista filtrada según la tarjeta seleccionada
+  const filteredCupones = useMemo(() => {
+    const hoy = dayjs().startOf("day");
+    if (filter === "ALL") return cupones;
+
+    return (cupones || []).filter((c) => {
+      const visual = getVisualEstado(c);
+
+      if (filter === "AL_DIA") {
+        return visual === "AL_DIA";
+      }
+
+      if (filter === "POR_VENCER_7") {
+        if (visual !== "AL_DIA") return false;
+        if (!c.fecha_vencimiento) return false;
+        const vto = dayjs(c.fecha_vencimiento);
+        if (!vto.isValid()) return false;
+        const diff = vto.diff(hoy, "day");
+        return diff >= 0 && diff <= 7;
+      }
+
+      if (filter === "VENCIDA") {
+        return visual === "VENCIDA";
+      }
+
+      return true;
+    });
+  }, [cupones, filter]);
 
   const loadCupones = async (term = "") => {
     setLoading(true);
@@ -187,6 +220,8 @@ export default function CuponerasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  const hasAny = cupones.length > 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -220,12 +255,19 @@ export default function CuponerasPage() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs (ahora son filtros clickeables) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total */}
-        <motion.div
+        <motion.button
+          type="button"
           layout
-          className="rounded-2xl border border-slate-200/50 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 shadow-sm shadow-slate-900/40 p-4 flex flex-col gap-1"
+          onClick={() => setFilter("ALL")}
+          className={`text-left rounded-2xl border border-slate-200/50 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 shadow-sm shadow-slate-900/40 p-4 flex flex-col gap-1 cursor-pointer select-none transition
+            ${
+              filter === "ALL"
+                ? "ring-2 ring-sky-400/60 shadow-md"
+                : "hover:-translate-y-0.5 hover:shadow-md"
+            }`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
             Total cuponeras
@@ -235,12 +277,19 @@ export default function CuponerasPage() {
               {stats.total}
             </span>
           </div>
-        </motion.div>
+        </motion.button>
 
         {/* Al día (no pagados y no vencidos) */}
-        <motion.div
+        <motion.button
+          type="button"
           layout
-          className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 shadow-sm shadow-emerald-900/40 p-4 flex flex-col gap-1"
+          onClick={() => setFilter("AL_DIA")}
+          className={`text-left rounded-2xl border border-emerald-500/20 bg-emerald-500/5 shadow-sm shadow-emerald-900/40 p-4 flex flex-col gap-1 cursor-pointer select-none transition
+            ${
+              filter === "AL_DIA"
+                ? "ring-2 ring-emerald-400/70 shadow-md"
+                : "hover:-translate-y-0.5 hover:shadow-md"
+            }`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-emerald-300">
             Al día (no pagados)
@@ -251,12 +300,19 @@ export default function CuponerasPage() {
             </span>
             <HiBadgeCheck className="h-6 w-6 text-emerald-300" />
           </div>
-        </motion.div>
+        </motion.button>
 
         {/* Por vencer en 7 días */}
-        <motion.div
+        <motion.button
+          type="button"
           layout
-          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 shadow-sm shadow-amber-900/40 p-4 flex flex-col gap-1"
+          onClick={() => setFilter("POR_VENCER_7")}
+          className={`text-left rounded-2xl border border-amber-500/25 bg-amber-500/10 shadow-sm shadow-amber-900/40 p-4 flex flex-col gap-1 cursor-pointer select-none transition
+            ${
+              filter === "POR_VENCER_7"
+                ? "ring-2 ring-amber-300/80 shadow-md"
+                : "hover:-translate-y-0.5 hover:shadow-md"
+            }`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-amber-200">
             Por vencer (≤ 7 días)
@@ -267,12 +323,19 @@ export default function CuponerasPage() {
             </span>
             <HiClock className="h-6 w-6 text-amber-200" />
           </div>
-        </motion.div>
+        </motion.button>
 
         {/* Vencidas */}
-        <motion.div
+        <motion.button
+          type="button"
           layout
-          className="rounded-2xl border border-rose-500/25 bg-rose-500/10 shadow-sm shadow-rose-900/40 p-4 flex flex-col gap-1"
+          onClick={() => setFilter("VENCIDA")}
+          className={`text-left rounded-2xl border border-rose-500/25 bg-rose-500/10 shadow-sm shadow-rose-900/40 p-4 flex flex-col gap-1 cursor-pointer select-none transition
+            ${
+              filter === "VENCIDA"
+                ? "ring-2 ring-rose-300/80 shadow-md"
+                : "hover:-translate-y-0.5 hover:shadow-md"
+            }`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-rose-200">
             Vencidas
@@ -283,7 +346,7 @@ export default function CuponerasPage() {
             </span>
             <HiExclamation className="h-6 w-6 text-rose-200" />
           </div>
-        </motion.div>
+        </motion.button>
       </div>
 
       {/* Buscador */}
@@ -323,7 +386,7 @@ export default function CuponerasPage() {
           </span>
         </div>
 
-        {/* ⬅️ volvemos a sólo scroll horizontal */}
+        {/* ⬅️ sólo scroll horizontal */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/80 dark:bg-slate-900/90 border-b border-slate-200/70 dark:border-slate-800">
@@ -348,18 +411,22 @@ export default function CuponerasPage() {
                 </tr>
               )}
 
-              {!loading && cupones.length === 0 && !error && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-slate-500 dark:text-slate-400 text-sm"
-                  >
-                    No hay cuponeras registradas.
-                  </td>
-                </tr>
-              )}
+              {!loading &&
+                filteredCupones.length === 0 &&
+                !error && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-6 text-center text-slate-500 dark:text-slate-400 text-sm"
+                    >
+                      {hasAny
+                        ? "No hay cuponeras que coincidan con el filtro actual."
+                        : "No hay cuponeras registradas."}
+                    </td>
+                  </tr>
+                )}
 
-              {cupones.map((c) => {
+              {filteredCupones.map((c) => {
                 const visual = getVisualEstado(c);
                 const badgeClass =
                   badgeByEstado[visual] ||
