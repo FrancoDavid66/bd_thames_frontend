@@ -66,7 +66,8 @@ const PALETTE = {
     dot: "bg-rose-400",
   },
 
-  neutralBtn: "bg-neutral-800 hover:bg-neutral-700 text-neutral-100 border-neutral-700",
+  neutralBtn:
+    "bg-neutral-800 hover:bg-neutral-700 text-neutral-100 border-neutral-700",
   actionBtn: "bg-indigo-400 hover:bg-indigo-500 text-indigo-950",
 };
 
@@ -91,6 +92,9 @@ export default function PagosList({
   const [obsAbiertaId, setObsAbiertaId] = useState(null);
   const [detalleAbierto, setDetalleAbierto] = useState(null);
 
+  // datos para el modal de confirmación visual
+  const [confirmData, setConfirmData] = useState(null);
+
   const items = useMemo(() => {
     const base = Array.isArray(cuotas) ? cuotas : [];
     return ocultarPagadas ? base.filter((c) => !c.pagado) : base;
@@ -101,13 +105,39 @@ export default function PagosList({
   const abrirDetalle = (cuota) => setDetalleAbierto(cuota);
   const cerrarDetalle = () => setDetalleAbierto(null);
 
-  const confirmarPago = async (datos) => {
+  // Paso 1: desde ModalFormaPago armamos datos y abrimos el modal de confirmación
+  const confirmarPago = (datos) => {
     if (!cuotaSeleccionada) return;
+
+    const cuota = cuotaSeleccionada;
+    const monto = Number(datos.monto ?? cuota.monto);
+    const pol = cuota.poliza || {};
+    const numeroPoliza =
+      pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "-";
+
+    setConfirmData({
+      datos,
+      cuota,
+      monto,
+      numeroPoliza,
+      cuotaNro: cuota.cuota_nro,
+    });
+
+    // cerramos el modal de forma de pago para que se vea solo el de confirmación
+    cerrarPagar();
+  };
+
+  // Paso 2: ejecutar el pago realmente después de confirmar
+  const ejecutarPagoConfirmado = async () => {
+    if (!confirmData) return;
+
+    const { datos, cuota, monto } = confirmData;
+
     const payload = {
-      id: cuotaSeleccionada.id,
+      id: cuota.id,
       metodo: datos.metodo,
       forma_pago: datos.forma_pago,
-      monto: Number(datos.monto ?? cuotaSeleccionada.monto),
+      monto,
       fecha_pago: datos.fecha_pago,
       observaciones: datos.observaciones,
     };
@@ -116,18 +146,33 @@ export default function PagosList({
     if (datos.destino_cuenta) payload.destino_cuenta = datos.destino_cuenta;
 
     try {
-      const cuotaActualizada = await dispatch(marcarCuotaComoPagada(payload)).unwrap();
+      const cuotaActualizada = await dispatch(
+        marcarCuotaComoPagada(payload)
+      ).unwrap();
       toast.success("Cuota marcada como pagada");
       const conObs = {
         ...cuotaActualizada,
         observaciones_pago: (datos.observaciones || "").trim(),
       };
-      cerrarPagar();
+      setConfirmData(null);
       actualizarCuotas?.([conObs]);
       if (conObs.observaciones_pago) setObsAbiertaId(conObs.id);
     } catch (e) {
       console.error(e);
       toast.error("No se pudo registrar el pago");
+    }
+  };
+
+  const handleCancelarConfirm = () => {
+    if (!confirmData) {
+      setConfirmData(null);
+      return;
+    }
+    const { cuota } = confirmData;
+    setConfirmData(null);
+    // reabrimos el modal de forma de pago para corregir el monto
+    if (cuota) {
+      setCuotaSeleccionada(cuota);
     }
   };
 
@@ -142,7 +187,9 @@ export default function PagosList({
       pol.compania?.nombre ||
       pol.compania ||
       ""
-    ).toString().trim();
+    )
+      .toString()
+      .trim();
     const cobertura = (pol.cobertura || "").toString().trim();
     const total = Array.isArray(pol.cuotas) ? pol.cuotas.length : null;
     const cuotaTxt =
@@ -183,7 +230,9 @@ export default function PagosList({
       <div className="max-h-none md:max-h-[60vh] overflow-y-visible md:overflow-y-auto">
         <ul role="list" className={`divide-y ${PALETTE.divider}`}>
           {items.map((cuota, idx) => {
-            const venc = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
+            const venc = cuota.fecha_vencimiento
+              ? dayjs(cuota.fecha_vencimiento)
+              : null;
             const dias = venc ? venc.diff(dayjs(), "day") : null;
 
             const state = cuota.pagado
@@ -208,7 +257,9 @@ export default function PagosList({
             const patente = (pol?.patente || "").toUpperCase();
             const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
             const observacion = (
-              (cuota.observaciones_pago || cuota.ultima_observacion_pago || "") || ""
+              (cuota.observaciones_pago ||
+                cuota.ultima_observacion_pago ||
+                "") || ""
             )
               .toString()
               .trim();
@@ -219,7 +270,11 @@ export default function PagosList({
                 key={cuota.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut", delay: idx * 0.015 }}
+                transition={{
+                  duration: 0.2,
+                  ease: "easeOut",
+                  delay: idx * 0.015,
+                }}
                 className="relative"
               >
                 {/* Línea de estado */}
@@ -292,7 +347,9 @@ export default function PagosList({
                           <div className="flex items-start gap-2">
                             <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
                             <div className="text-sm whitespace-pre-wrap break-words">
-                              <span className="font-semibold">Observaciones: </span>
+                              <span className="font-semibold">
+                                Observaciones:{" "}
+                              </span>
                               {observacion}
                             </div>
                           </div>
@@ -324,7 +381,9 @@ export default function PagosList({
                             }
                             className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-2 transition w-full sm:w-auto`}
                             title={
-                              obsActiva ? "Ocultar observación" : "Ver observación"
+                              obsActiva
+                                ? "Ocultar observación"
+                                : "Ver observación"
                             }
                           >
                             <HiExclamationCircle className="w-5 h-5" />
@@ -392,6 +451,89 @@ export default function PagosList({
         pagoCuota={datosNoti?.cuotaTxt || ""}
       />
 
+      {/* Modal de confirmación de pago (oscuro, monto grande) */}
+      <AnimatePresence>
+        {confirmData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[65] flex items-center justify-center"
+          >
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={handleCancelarConfirm}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 12 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              className="relative z-[66] w-[min(420px,92vw)] rounded-2xl border border-neutral-800 bg-neutral-950 px-6 py-6 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <h3 className="text-lg font-semibold text-neutral-50">
+                  Confirmar pago
+                </h3>
+                <button
+                  onClick={handleCancelarConfirm}
+                  className="h-9 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 inline-flex items-center gap-2 text-sm"
+                >
+                  <HiX className="w-5 h-5" />
+                  <span className="hidden sm:inline">Cancelar</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm text-neutral-300">
+                  Vas a pagar la cuota{" "}
+                  <span className="font-semibold">
+                    #{confirmData.cuotaNro ?? "?"}
+                  </span>{" "}
+                  de la póliza{" "}
+                  <span className="font-semibold">
+                    {confirmData.numeroPoliza}
+                  </span>
+                  .
+                </p>
+
+                <div className="mt-2 mb-4 text-center">
+                  <p className="text-xs uppercase tracking-[0.18em] text-neutral-400 mb-1">
+                    Importe a pagar
+                  </p>
+                  <p className="text-4xl sm:text-5xl font-extrabold tracking-tight text-emerald-400">
+                    $ {fmtMoney(confirmData.monto)}
+                  </p>
+                </div>
+
+                <p className="text-xs text-neutral-400">
+                  Revisá que el monto sea correcto antes de confirmar. Si hay
+                  un error podés volver al formulario y ajustarlo.
+                </p>
+              </div>
+
+              <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <button
+                  onClick={handleCancelarConfirm}
+                  className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 text-sm"
+                >
+                  Volver y corregir
+                </button>
+                <button
+                  onClick={ejecutarPagoConfirmado}
+                  className="h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm inline-flex items-center justify-center gap-2"
+                >
+                  <HiCash className="w-5 h-5" />
+                  Confirmar pago
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Modal “Más info” (oscuro) */}
       <AnimatePresence>
         {detalleAbierto && (
@@ -442,7 +584,9 @@ export default function PagosList({
                 const clienteId = cli?.id;
                 const dni = (cli?.dni_cuit_cuil || "").toString().trim();
                 const patente = (pol?.patente || "").toUpperCase();
-                const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
+                const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(
+                  " "
+                );
                 const cobertura = (pol?.cobertura || "").toString().trim();
                 const compania = (
                   pol?.compania_nombre ||
@@ -515,7 +659,9 @@ export default function PagosList({
                         <div className="flex items-start gap-2">
                           <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
                           <div className="whitespace-pre-wrap break-words">
-                            <span className="font-semibold">Observaciones: </span>
+                            <span className="font-semibold">
+                              Observaciones:{" "}
+                            </span>
                             {(c?.observaciones_pago ||
                               c?.ultima_observacion_pago ||
                               ""

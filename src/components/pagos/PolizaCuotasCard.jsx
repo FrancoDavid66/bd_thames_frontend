@@ -2,8 +2,14 @@
 import { useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
-import { motion } from "framer-motion";
-import { HiCash, HiBadgeCheck, HiClock, HiDocumentText } from "react-icons/hi";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  HiCash,
+  HiBadgeCheck,
+  HiClock,
+  HiDocumentText,
+  HiX,
+} from "react-icons/hi";
 
 import { registrarPagoYBalance } from "../../utils/pagos/registrarPagoYBalance";
 import DescargarFactura from "./DescargarFactura";
@@ -49,15 +55,18 @@ const P = {
 };
 
 const fmtMoney = (n) =>
-  new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-    Number(n || 0)
-  );
+  new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(n || 0));
 
 /* ====== Badge de estado (pastel) ====== */
 function EstadoBadge({ pagado, fecha_vencimiento }) {
   if (pagado) {
     return (
-      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${P.paid.chipBg} ${P.paid.chipTxt} ${P.paid.chipBd}`}>
+      <span
+        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${P.paid.chipBg} ${P.paid.chipTxt} ${P.paid.chipBd}`}
+      >
         <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-white/50 ring-1 ring-black/10">
           <HiBadgeCheck className="w-4 h-4" />
         </span>
@@ -79,7 +88,9 @@ function EstadoBadge({ pagado, fecha_vencimiento }) {
     }
   }
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${style.chipBg} ${style.chipTxt} ${style.chipBd}`}>
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${style.chipBg} ${style.chipTxt} ${style.chipBd}`}
+    >
       <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-white/50 ring-1 ring-black/10">
         <HiClock className="w-4 h-4" />
       </span>
@@ -94,27 +105,56 @@ export default function PolizaCuotasCard({ poliza }) {
   const [cuotaSeleccionada, setCuotaSeleccionada] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // datos para el modal de confirmación visual
+  const [confirmData, setConfirmData] = useState(null);
+
   const abrirModal = (cuota) => {
     setCuotaSeleccionada(cuota);
     setModalOpen(true);
   };
 
-  const confirmarPago = async (datos) => {
+  // 1) Desde ModalFormaPago abrimos nuestro modal de confirmación
+  const confirmarPago = (datos) => {
     if (!cuotaSeleccionada) return;
 
+    const cuota = cuotaSeleccionada;
+    const monto = Number(datos.monto ?? cuota.monto);
+    const numeroPoliza =
+      poliza?.numero_poliza ||
+      poliza?.numero ||
+      poliza?.nro_poliza ||
+      poliza?.n_poliza ||
+      "-";
+
+    setConfirmData({
+      datos,
+      cuota,
+      monto,
+      numeroPoliza,
+      cuotaNro: cuota.cuota_nro,
+    });
+
+    // cerramos el modal de forma de pago para que se vea solo el de confirmación
+    setModalOpen(false);
+  };
+
+  // 2) Ejecutar el pago después de confirmar
+  const ejecutarPagoConfirmado = async () => {
+    if (!confirmData) return;
+
+    const { datos, cuota, monto } = confirmData;
     const formaPago = datos.metodo || datos.forma_pago || "efectivo";
-    const monto = Number(datos.monto ?? cuotaSeleccionada.monto);
 
     await registrarPagoYBalance({
       dispatch,
-      cuota: cuotaSeleccionada,
+      cuota,
       poliza,
       formaPago,
       monto,
       onSuccess: () => {
         setCuotasLocal((prev) =>
           prev.map((c) =>
-            c.id === cuotaSeleccionada.id
+            c.id === cuota.id
               ? {
                   ...c,
                   pagado: true,
@@ -125,26 +165,56 @@ export default function PolizaCuotasCard({ poliza }) {
               : c
           )
         );
+        setConfirmData(null);
         setModalOpen(false);
       },
     });
   };
 
+  const handleCancelarConfirm = () => {
+    if (!confirmData) {
+      setConfirmData(null);
+      return;
+    }
+    const { cuota } = confirmData;
+    setConfirmData(null);
+    // si cancela, reabrimos el modal de forma de pago para corregir
+    if (cuota) {
+      setCuotaSeleccionada(cuota);
+      setModalOpen(true);
+    }
+  };
+
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={P.card}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={P.card}
+    >
       {/* Encabezado */}
       <div className="flex items-start md:items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center justify-center rounded-3xl w-12 h-12 shadow ${P.headerIcon}`} title="Pagos">
+          <span
+            className={`inline-flex items-center justify-center rounded-3xl w-12 h-12 shadow ${P.headerIcon}`}
+            title="Pagos"
+          >
             <HiCash className="w-7 h-7" />
           </span>
           <div className="leading-tight">
             <h3 className={`text-xl font-extrabold ${P.title}`}>
-              {poliza?.marca} {poliza?.modelo} <span className="opacity-70">({poliza?.patente})</span>
+              {poliza?.marca} {poliza?.modelo}{" "}
+              <span className="opacity-70">({poliza?.patente})</span>
             </h3>
             <p className={`text-sm ${P.subtitle}`}>
-              Póliza: <span className="font-semibold">{poliza?.numero_poliza || "—"}</span>{" "}
-              • Cobertura: <span className="font-semibold">{poliza?.cobertura || "—"}</span>
+              Póliza:{" "}
+              <span className="font-semibold">
+                {poliza?.numero_poliza || "—"}
+              </span>{" "}
+              • Cobertura:{" "}
+              <span className="font-semibold">
+                {poliza?.cobertura || "—"}
+              </span>
             </p>
             {poliza?.cliente && (
               <p className={`text-sm ${P.subtitle}`}>
@@ -162,7 +232,9 @@ export default function PolizaCuotasCard({ poliza }) {
       <ul className="mt-5 space-y-3">
         {cuotasLocal.map((cuota, i) => {
           const hoy = dayjs().startOf("day");
-          const fv = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
+          const fv = cuota.fecha_vencimiento
+            ? dayjs(cuota.fecha_vencimiento)
+            : null;
           const isOverdue = !cuota.pagado && fv && fv.isBefore(hoy);
           const S = cuota.pagado ? P.paid : isOverdue ? P.overdue : P.pending;
 
@@ -171,22 +243,39 @@ export default function PolizaCuotasCard({ poliza }) {
               key={cuota.id}
               initial={{ opacity: 0, y: 10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.22, delay: i * 0.03, ease: "easeOut" }}
+              transition={{
+                duration: 0.22,
+                delay: i * 0.03,
+                ease: "easeOut",
+              }}
               className={`rounded-2xl border p-4 shadow-sm ${S.rowBg} ${S.rowBd} ${S.rowTxt}`}
             >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div className="space-y-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
-                    <EstadoBadge pagado={!!cuota.pagado} fecha_vencimiento={cuota.fecha_vencimiento} />
+                    <EstadoBadge
+                      pagado={!!cuota.pagado}
+                      fecha_vencimiento={cuota.fecha_vencimiento}
+                    />
                     <p className="font-bold">
-                      Cuota #{cuota.cuota_nro} • <span className="text-base">$ {fmtMoney(cuota.monto)}</span>
+                      Cuota #{cuota.cuota_nro} •{" "}
+                      <span className="text-base">
+                        $ {fmtMoney(cuota.monto)}
+                      </span>
                     </p>
                   </div>
                   <p>
                     Vencimiento:{" "}
-                    {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY") : "—"}
+                    {cuota.fecha_vencimiento
+                      ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY")
+                      : "—"}
                   </p>
-                  {cuota.pagado && cuota.fecha_pago && <p>Pagado el: {dayjs(cuota.fecha_pago).format("DD/MM/YYYY")}</p>}
+                  {cuota.pagado && cuota.fecha_pago && (
+                    <p>
+                      Pagado el:{" "}
+                      {dayjs(cuota.fecha_pago).format("DD/MM/YYYY")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -231,10 +320,15 @@ export default function PolizaCuotasCard({ poliza }) {
 
       {/* Nota inferior */}
       <div className="mt-4 flex items-center gap-2 text-xs text-neutral-700">
-        <span className={`inline-block px-2 py-1 rounded-full border ${P.tip}`}>✨ tip</span>
+        <span
+          className={`inline-block px-2 py-1 rounded-full border ${P.tip}`}
+        >
+          ✨ tip
+        </span>
         Podés registrar pagos parciales desde el modal y dejar una nota.
       </div>
 
+      {/* Modal de forma de pago */}
       {modalOpen && cuotaSeleccionada && (
         <ModalFormaPago
           isOpen={modalOpen}
@@ -244,6 +338,89 @@ export default function PolizaCuotasCard({ poliza }) {
           title={`Pagar cuota #${cuotaSeleccionada?.cuota_nro}`}
         />
       )}
+
+      {/* Modal de confirmación visual — número grande, centrado */}
+      <AnimatePresence>
+        {confirmData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center"
+          >
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={handleCancelarConfirm}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 8 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="relative z-[61] w-[min(420px,92vw)] rounded-2xl border border-neutral-200 bg-white px-6 py-6 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Confirmar pago
+                </h3>
+                <button
+                  onClick={handleCancelarConfirm}
+                  className="h-9 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-700 inline-flex items-center gap-2 text-sm"
+                >
+                  <HiX className="w-5 h-5" />
+                  <span className="hidden sm:inline">Cancelar</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm text-neutral-700">
+                  Vas a pagar la cuota{" "}
+                  <span className="font-semibold">
+                    #{confirmData.cuotaNro ?? "?"}
+                  </span>{" "}
+                  de la póliza{" "}
+                  <span className="font-semibold">
+                    {confirmData.numeroPoliza}
+                  </span>
+                  .
+                </p>
+
+                <div className="mt-2 mb-4 text-center">
+                  <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-1">
+                    Importe a pagar
+                  </p>
+                  <p className="text-4xl sm:text-5xl font-extrabold tracking-tight text-emerald-500">
+                    $ {fmtMoney(confirmData.monto)}
+                  </p>
+                </div>
+
+                <p className="text-xs text-neutral-500">
+                  Revisá que el monto sea correcto antes de confirmar. Si hay un
+                  error podés volver al formulario y ajustarlo.
+                </p>
+              </div>
+
+              <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <button
+                  onClick={handleCancelarConfirm}
+                  className="h-10 px-4 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-700 text-sm"
+                >
+                  Volver y corregir
+                </button>
+                <button
+                  onClick={ejecutarPagoConfirmado}
+                  className="h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm inline-flex items-center justify-center gap-2"
+                >
+                  <HiCash className="w-5 h-5" />
+                  Confirmar pago
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 import { HiUser, HiOutlinePhotograph, HiDocumentDownload } from "react-icons/hi";
+import { Link } from "react-router-dom";
 
 /* ===================== Animations ===================== */
 const containerVariants = {
@@ -177,9 +178,10 @@ function getCuotasStats(poliza) {
     .map((c) => dayjs(c.fecha_pago));
   let ultimaFechaPago = null;
   if (fechas.length) {
-    ultimaFechaPago = fechas.reduce((max, d) =>
-      max === null || d.isAfter(max) ? d : max
-    , null);
+    ultimaFechaPago = fechas.reduce(
+      (max, d) => (max === null || d.isAfter(max) ? d : max),
+      null
+    );
   }
   return { total, pagadas, progresoPct, saldoPendiente, ultimaFechaPago };
 }
@@ -361,6 +363,9 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
     upper(pick(poliza?.patente, poliza?.dominio, poliza?.matricula))
   );
 
+  /* ---- ID de cliente para navegar al perfil ---- */
+  const clienteId = poliza?.cliente_id ?? c?.id ?? null;
+
   return (
     <motion.div
       variants={containerVariants}
@@ -532,14 +537,14 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
               </div>
             </div>
 
-            {c.id ? (
-              <a
-                href={`/clientes/${c.id}`}
+            {clienteId ? (
+              <Link
+                to={`/clientes/${clienteId}`}
                 className={`${btnBase} ${btnSecondary} ${linkHover}`}
                 title="Ver perfil del cliente"
               >
                 👤 Ver cliente
-              </a>
+              </Link>
             ) : null}
           </div>
         </Card>
