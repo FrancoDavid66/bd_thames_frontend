@@ -42,6 +42,14 @@ export const fetchPolizasKpis = createAsyncThunk(
         cliente,
         patente,
         solo_activas,
+        estado,
+        estado_financiero,
+        modo,
+        // Filtros de vencimiento:
+        fecha_vencimiento_desde,
+        fecha_vencimiento_hasta,
+        vencidas_ultimos_dias,
+        vencidas_mas_de_dias,
       } = getState().polizas;
 
       const params = {};
@@ -50,6 +58,30 @@ export const fetchPolizasKpis = createAsyncThunk(
       if (cliente) params.cliente = cliente;
       if (patente) params.patente = patente;
       if (solo_activas) params.solo_activas = 1;
+
+      const isPolizas = (modo ?? "polizas") === "polizas";
+
+      // Filtros “operativos” y de vencimiento solo en modo polizas
+      if (isPolizas) {
+        if (estado && estado !== "todos") {
+          params.estado = estado;
+        }
+        if (estado_financiero && estado_financiero !== "todos") {
+          params.estado_financiero = estado_financiero;
+        }
+        if (fecha_vencimiento_desde) {
+          params.fecha_vencimiento_desde = fecha_vencimiento_desde;
+        }
+        if (fecha_vencimiento_hasta) {
+          params.fecha_vencimiento_hasta = fecha_vencimiento_hasta;
+        }
+        if (vencidas_ultimos_dias) {
+          params.vencidas_ultimos_dias = Number(vencidas_ultimos_dias);
+        }
+        if (vencidas_mas_de_dias) {
+          params.vencidas_mas_de_dias = Number(vencidas_mas_de_dias);
+        }
+      }
 
       const res = await http.get("polizas/kpis/", { params });
       return res.data;
@@ -96,16 +128,24 @@ export const fetchPolizas = createAsyncThunk(
         params.estado = estado;
       }
       // Buckets financieros sólo en modo polizas
-      if (estado_financiero && estado_financiero !== "todos" && (modo ?? "polizas") === "polizas") {
+      if (
+        estado_financiero &&
+        estado_financiero !== "todos" &&
+        (modo ?? "polizas") === "polizas"
+      ) {
         params.estado_financiero = estado_financiero;
       }
 
       // Filtros de vencimiento sólo en modo polizas
       if ((modo ?? "polizas") === "polizas") {
-        if (fecha_vencimiento_desde) params.fecha_vencimiento_desde = fecha_vencimiento_desde;
-        if (fecha_vencimiento_hasta) params.fecha_vencimiento_hasta = fecha_vencimiento_hasta;
-        if (vencidas_ultimos_dias) params.vencidas_ultimos_dias = Number(vencidas_ultimos_dias);
-        if (vencidas_mas_de_dias) params.vencidas_mas_de_dias = Number(vencidas_mas_de_dias);
+        if (fecha_vencimiento_desde)
+          params.fecha_vencimiento_desde = fecha_vencimiento_desde;
+        if (fecha_vencimiento_hasta)
+          params.fecha_vencimiento_hasta = fecha_vencimiento_hasta;
+        if (vencidas_ultimos_dias)
+          params.vencidas_ultimos_dias = Number(vencidas_ultimos_dias);
+        if (vencidas_mas_de_dias)
+          params.vencidas_mas_de_dias = Number(vencidas_mas_de_dias);
       }
 
       const res = await http.get("polizas/", { params });
@@ -217,7 +257,9 @@ export const enviarMensajesEstadoCuotas = createAsyncThunk(
       const res = await http.post("polizas/enviar-mensajes-cuotas/", body);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || "Error al enviar/diagnosticar mensajes");
+      return rejectWithValue(
+        err.response?.data || "Error al enviar/diagnosticar mensajes"
+      );
     }
   }
 );
@@ -619,9 +661,15 @@ export const selectResumenCuotas = (s) => {
 };
 
 // 🔔 Selectores de diagnóstico/resultado de envío
-export const selectEnvioMensajesResumen = (s) => s.polizas.envioMensajesResumen || null;
-export const selectEnvioMensajesBuckets = (s) => s.polizas.envioMensajesBuckets || null;
-export const selectEnvioMensajesDiagnostico = (s) => s.polizas.envioMensajesDiagnostico || null;
-export const selectEnvioMensajesPayload = (s) => s.polizas.envioMensajesPayload || null;
-export const selectEnvioMensajesSeleccionadas = (s) => s.polizas.envioMensajesSeleccionadas || 0;
-export const selectEnvioMensajesProcesadas = (s) => s.polizas.envioMensajesProcesadas || 0;
+export const selectEnvioMensajesResumen = (s) =>
+  s.polizas.envioMensajesResumen || null;
+export const selectEnvioMensajesBuckets = (s) =>
+  s.polizas.envioMensajesBuckets || null;
+export const selectEnvioMensajesDiagnostico = (s) =>
+  s.polizas.envioMensajesDiagnostico || null;
+export const selectEnvioMensajesPayload = (s) =>
+  s.polizas.envioMensajesPayload || null;
+export const selectEnvioMensajesSeleccionadas = (s) =>
+  s.polizas.envioMensajesSeleccionadas || 0;
+export const selectEnvioMensajesProcesadas = (s) =>
+  s.polizas.envioMensajesProcesadas || 0;
