@@ -65,15 +65,17 @@ const EgresoEditModal = ({ isOpen, onClose, egreso }) => {
     const montoNum = parseFloat(form.monto || "0");
     if (!montoNum || montoNum <= 0) return;
 
+    // Armamos el payload igual que en el create:
+    // - si no hay fecha, NO mandamos el campo (evitamos null → 400)
     const payload = {
       descripcion: form.descripcion,
       monto: montoNum,
       categoria: form.categoria,
-      fecha: form.fecha || null,
       forma_pago: form.forma_pago,
       billetera:
         form.forma_pago === "VIRTUAL" ? form.billetera || null : null,
       observaciones: form.observaciones || "",
+      ...(form.fecha ? { fecha: form.fecha } : {}),
     };
 
     dispatch(updateEgreso({ id: egreso.id, ...payload }));

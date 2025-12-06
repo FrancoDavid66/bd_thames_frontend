@@ -27,10 +27,31 @@ const readLS = (k, fallback) => {
   }
 };
 
+const writeLS = (k, arr) => {
+  try {
+    localStorage.setItem(k, JSON.stringify(uniqClean(arr)));
+  } catch {
+    // ignore
+  }
+};
+
+// 🔹 Normalizar categorías "largas" de pagos automáticos
+const normalizarCategoria = (raw) => {
+  const v = (raw ?? "").toString().trim();
+  if (!v) return "";
+  const lower = v.toLowerCase();
+
+  // Todo lo que venga como "Pago de cuota de XXX" lo juntamos en una sola
+  if (lower.startsWith("pago de cuota de")) {
+    return "Pago de seguro";
+  }
+
+  return v;
+};
+
 export default function IngresoCreateModal({ isOpen, onClose }) {
   const dispatch = useDispatch();
-  const ingresos = useSelector((s) => s.ingresos?.list || []);
-  const egresos = useSelector((s) => s.egresos?.list || []);
+  const { ingresos, egresos } = useSelector((s) => s.balance || {});
 
   const [form, setForm] = useState({
     monto: "",
@@ -61,25 +82,34 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
     setTimeout(() => montoRef.current?.focus(), 60);
   }, [isOpen]);
 
-  /* Sugerencias (lectura local, no se editan aquí) */
-  const [localCats, setLocalCats] = useState([]);
-  const [localWallets, setLocalWallets] = useState([]);
-  useEffect(() => {
-    if (!isOpen) return;
-    setLocalCats(readLS(STORAGE_CATS, []));
-    setLocalWallets(readLS(STORAGE_WALLETS, []));
-  }, [isOpen]);
+  /* Sugerencias (lectura local) */
+  const [localCats, setLocalCats] = useState(() =>
+    readLS(STORAGE_CATS, []).map(normalizarCategoria)
+  );
+  const [localWallets] = useState(() =>
+    readLS(STORAGE_WALLETS, [])
+  );
 
-  const catOpciones = useMemo(() => {
-    const fromIngresos = ingresos.map((i) => i?.categoria);
-    const fromEgresos = egresos.map((e) => e?.categoria);
-    return uniqClean([
-      ...fromIngresos,
-      ...fromEgresos,
-      ...localCats,
-      form.categoria,
-    ]);
-  }, [ingresos, egresos, localCats, form.categoria]);
+  /* Derivadas de historial (NORMALIZADAS) */
+  const fromIngresos = useMemo(
+    () => uniqClean((ingresos || []).map((i) => normalizarCategoria(i.categoria))),
+    [ingresos]
+  );
+  const fromEgresos = useMemo(
+    () => uniqClean((egresos || []).map((e) => normalizarCategoria(e.categoria))),
+    [egresos]
+  );
+
+  const categoriaOpciones = useMemo(
+    () =>
+      uniqClean([
+        ...fromIngresos,
+        ...fromEgresos,
+        ...localCats,
+        normalizarCategoria(form.categoria),
+      ]),
+    [fromIngresos, fromEgresos, localCats, form.categoria]
+  );
 
   const walletOpciones = useMemo(
     () => uniqClean([...localWallets, form.billetera]),
@@ -125,9 +155,42 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
   const handleSubmit = async (ev) => {
     ev.preventDefault();
     if (!validate()) return;
+
+    const montoNum = Number(form.monto || 0);
+    if (!montoNum || montoNum <= 0) return;
+
+    const categoriaNormalizada = normalizarCategoria(form.categoria);
+
+    // Payload limpio con valores por defecto
+    const payload = {
+      monto: montoNum,
+      fecha: form.fecha || dayjs().format("YYYY-MM-DD"),
+      forma_pago: form.forma_pago,
+      billetera:
+        form.forma_pago === "VIRTUAL"
+          ? form.billetera || "Sin especificar"
+          : "",
+      categoria: categoriaNormalizada || "Sin categoría",
+      descripcion:
+        (form.descripcion || "").trim() ||
+        `Ingreso ${categoriaNormalizada || ""}`.trim() ||
+        "Ingreso",
+      pagado_por: (form.pagado_por || "").trim() || "No especificado",
+    };
+
     try {
       setSubmitting(true);
-      await dispatch(createIngreso(form));
+      await dispatch(createIngreso(payload));
+
+      // Guardamos la categoría normalizada en localStorage para sugerencias
+      if (categoriaNormalizada) {
+        setLocalCats((prev) => {
+          const next = uniqClean([...prev, categoriaNormalizada]);
+          writeLS(STORAGE_CATS, next);
+          return next;
+        });
+      }
+
       onClose?.();
       setForm({
         monto: "",
@@ -159,7 +222,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
         className="space-y-5 text-zinc-800 dark:text-white"
       >
         {/* Monto / Fecha */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs sm:text-sm mb-1">
               Monto *
@@ -172,9 +235,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
               min="0"
               value={form.monto}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-                errors.monto ? "border-red-500" : ""
-              }`}
+              className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
               placeholder="0,00"
             />
             {errors.monto && (
@@ -187,13 +248,11 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
             </label>
             <input
               ref={fechaRef}
-              type="date"
               name="fecha"
+              type="date"
               value={form.fecha}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-                errors.fecha ? "border-red-500" : ""
-              }`}
+              className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
             />
             {errors.fecha && (
               <p className="text-xs text-red-500 mt-1">{errors.fecha}</p>
@@ -201,65 +260,62 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Forma de pago + Billetera si aplica */}
-        <div>
-          <label className="block text-xs sm:text-sm font-medium mb-2">
-            Forma de pago
-          </label>
-          <div className="inline-flex rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700">
+        {/* Forma de pago */}
+        <div className="space-y-2">
+          <p className="block text-xs sm:text-sm mb-1">Forma de pago *</p>
+          <div className="inline-flex rounded-full bg-zinc-100 dark:bg-zinc-900 p-1">
             <button
               type="button"
               onClick={() => setFormaPago("EFECTIVO")}
-              className={`px-3 py-1.5 text-xs sm:text-sm ${
+              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                 form.forma_pago === "EFECTIVO"
-                  ? "bg-green-600 text-white"
-                  : "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                  ? "bg-emerald-500 text-white"
+                  : "text-zinc-600 dark:text-zinc-300"
               }`}
             >
-              Efectivo
+              Efectivo / Caja
             </button>
             <button
               type="button"
               onClick={() => setFormaPago("VIRTUAL")}
-              className={`px-3 py-1.5 text-xs sm:text-sm ${
+              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                 form.forma_pago === "VIRTUAL"
-                  ? "bg-blue-600 text-white"
-                  : "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                  ? "bg-emerald-500 text-white"
+                  : "text-zinc-600 dark:text-zinc-300"
               }`}
             >
               Virtual
             </button>
           </div>
-
-          {form.forma_pago === "VIRTUAL" && (
-            <div className="mt-3">
-              <label className="block text-xs sm:text-sm mb-1">
-                Billetera / Cuenta destino *
-              </label>
-              <input
-                ref={billeRef}
-                name="billetera"
-                value={form.billetera}
-                onChange={handleChange}
-                list="wallet-suggestions"
-                placeholder="Ej: MP de Manu / Brubank de Candela"
-                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-                  errors.billetera ? "border-red-500" : ""
-                }`}
-              />
-              <datalist id="wallet-suggestions">
-                {walletOpciones.map((opt) => (
-                  <option key={opt} value={opt} />
-                ))}
-              </datalist>
-              {errors.billetera && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.billetera}
-                </p>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Billetera (si es virtual) */}
+        {form.forma_pago === "VIRTUAL" && (
+          <div>
+            <label className="block text-xs sm:text-sm mb-1">
+              Billetera / Cuenta *
+            </label>
+            <input
+              ref={billeRef}
+              name="billetera"
+              list="billetera-opciones"
+              value={form.billetera}
+              onChange={handleChange}
+              placeholder="Ej: Mercado Pago, Cuenta banco…"
+              className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
+            />
+            <datalist id="billetera-opciones">
+              {walletOpciones.map((w) => (
+                <option key={w} value={w} />
+              ))}
+            </datalist>
+            {errors.billetera && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.billetera}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Categoría */}
         <div>
@@ -269,17 +325,15 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
           <input
             ref={catRef}
             name="categoria"
+            list="categoria-opciones"
             value={form.categoria}
             onChange={handleChange}
-            list="cat-suggestions"
-            placeholder="Escribí o elegí una categoría"
-            className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-              errors.categoria ? "border-red-500" : ""
-            }`}
+            placeholder="Ej: Pago de seguro, Servicios, Honorarios…"
+            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
           />
-          <datalist id="cat-suggestions">
-            {catOpciones.map((opt) => (
-              <option key={opt} value={opt} />
+          <datalist id="categoria-opciones">
+            {categoriaOpciones.map((c) => (
+              <option key={c} value={c} />
             ))}
           </datalist>
           {errors.categoria && (
@@ -322,8 +376,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2 rounded-lg text-sm bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-700"
-            disabled={submitting}
+            className="w-full sm:w-auto px-4 py-2 rounded-lg text-sm bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
           >
             Cancelar
           </button>
