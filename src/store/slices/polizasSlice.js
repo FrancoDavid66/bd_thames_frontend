@@ -661,6 +661,9 @@ export const selectResumenCuotas = (s) => {
 };
 
 // 🔔 Selectores de diagnóstico/resultado de envío
+export const selectEnvioMensajesStatus = (s) =>
+  s.polizas.envioMensajesStatus || "idle";
+
 export const selectEnvioMensajesResumen = (s) =>
   s.polizas.envioMensajesResumen || null;
 export const selectEnvioMensajesBuckets = (s) =>
