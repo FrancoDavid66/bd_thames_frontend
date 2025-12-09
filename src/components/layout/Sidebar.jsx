@@ -16,13 +16,14 @@ import {
   FaClipboardList,
   FaTimes,
   FaTicketAlt, // ← icono para Cuponeras
+  FaChartBar, // ← icono para Competencia
 } from "react-icons/fa";
 import ThemeToggle from "./ThemeToggle";
 import logo_thames from "../../assets/logos/logo_thames.svg";
 
 // Bloqueadas por ahora
 const DISABLED_PATHS = [
-  "/geo",
+  // "/geo", ← Geo ahora habilitado
   "/propiedades",
   "/alquileres",
   "/siniestros",
@@ -33,6 +34,7 @@ const navItems = [
   { to: "/", label: "Inicio", icon: <FaHome /> },
   { to: "/solicitudes", label: "Solicitudes", icon: <FaClipboardList /> },
   { to: "/clientes", label: "Clientes", icon: <FaUsers /> },
+  { to: "/competencia", label: "Competencia", icon: <FaChartBar /> },
   { to: "/polizas", label: "Pólizas", icon: <FaFileAlt /> },
   { to: "/pagos", label: "Pagos", icon: <FaMoneyCheckAlt /> },
   { to: "/cuponeras", label: "Cuponeras", icon: <FaTicketAlt /> },

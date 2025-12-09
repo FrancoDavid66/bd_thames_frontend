@@ -316,7 +316,12 @@ export default function PolizaFilter({
       <div className="mt-1 flex flex-wrap gap-2">
         {botones.map(({ key, label }) => {
           const active = estadoActual === key;
-          const count = resumen?.[key] ?? undefined;
+          const count =
+            modoActual === "cuotas" && key === "todos"
+              ? typeof totalFiltradas === "number"
+                ? totalFiltradas
+                : resumen?.todos
+              : resumen?.[key] ?? undefined;
           return (
             <button
               key={key}

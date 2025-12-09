@@ -37,10 +37,7 @@ export const fetchTodasLasCuotas = createAsyncThunk(
  * Acepta:
  *  - forma_pago ("efectivo" | "transferencia")  [opcional]
  *  - metodo ("efectivo" | "transferencia" | "mercado_pago" | "tarjeta")  [opcional]
- *  - monto (Decimal), fecha_pago (YYYY-MM-DD), observaciones  [opcionales]
- *  - medio_cobro_id  [opcional]
- *  - destino_tipo ("mercado_pago" | "billetera_virtual") [opcional]
- *  - destino_cuenta  [opcional] (alias/etiqueta para tracking del medio)
+ *  - monto, fecha_pago, observaciones, medio_cobro_id, destino_tipo, destino_cuenta  [opcionales]
  */
 export const marcarCuotaComoPagada = createAsyncThunk(
   "pagos/marcarCuotaComoPagada",
@@ -96,12 +93,13 @@ export const enviarAlertas = createAsyncThunk(
 /** 🔔 Enviar recordatorios de cuotas vía app `notificaciones` */
 export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
+  // payload puede traer: { alias, medio_cobro_id, oficina }
   async (payload = {}, { rejectWithValue }) => {
     try {
-      // payload puede traer: { alias, medio_cobro_id }
       const body = compact({
         alias: payload.alias,
         medio_cobro_id: payload.medio_cobro_id,
+        oficina: payload.oficina, // se envía la oficina al backend
       });
 
       // Backend: POST /api/notificaciones/cuotas/enviar-recordatorios/
@@ -118,7 +116,7 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
         errores = [],
       } = data || {};
 
-      // Lo mapeo a lo que espera PagosPage.jsx
+      // Lo mapeo a lo que usa el front (PagosPage / modal)
       return {
         hoy,
         procesadas: cuotas_procesadas,
@@ -133,12 +131,29 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
   }
 );
 
+/** 📜 Historial de recordatorios enviados (GET /notificaciones/cuotas/historial/) */
+export const fetchHistorialRecordatorios = createAsyncThunk(
+  "pagos/fetchHistorialRecordatorios",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get(
+        API("notificaciones/cuotas/historial/")
+      );
+      return unwrap(data);
+    } catch (error) {
+      return rejectWithValue(
+        error?.response?.data || "Error al obtener historial de recordatorios"
+      );
+    }
+  }
+);
+
 /** Buscar pólizas por texto (nombre, patente, modelo…) */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
   async (query, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(API(`polizas/`), {
+      const { data } = await axios.get(API("polizas/"), {
         params: { search: query },
       });
       return unwrap(data);
@@ -149,7 +164,7 @@ export const fetchPolizas = createAsyncThunk(
 );
 
 /**
- * Registrar un ingreso en balanzes (POST /ingresos/)
+ * Registrar un ingreso en balances (POST /ingresos/)
  * Nota: al pagar una cuota ya NO hace falta (se genera por signal de backend).
  */
 export const registrarIngreso = createAsyncThunk(
@@ -248,6 +263,7 @@ export const eliminarMedioCobro = createAsyncThunk(
 const initialState = {
   status: "idle",
   error: null,
+
   polizas: [],
   cuotas: [],
   cuotasAVencer: [],
@@ -256,6 +272,11 @@ const initialState = {
   mediosCobro: [],
   mpCuentas: [], // strings listos para <select> en ModalFormaPago
   billeteras: [], // strings listos para <select>
+
+  // Historial de recordatorios de cuotas
+  historialRecordatorios: [],
+  historialRecordatoriosStatus: "idle",
+  historialRecordatoriosError: null,
 };
 
 function recomputeMedioNombres(state) {
@@ -333,6 +354,20 @@ const pagosSlice = createSlice({
       .addCase(enviarRecordatoriosCuotas.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload;
+      })
+
+      // --- Historial de recordatorios ---
+      .addCase(fetchHistorialRecordatorios.pending, (state) => {
+        state.historialRecordatoriosStatus = "loading";
+        state.historialRecordatoriosError = null;
+      })
+      .addCase(fetchHistorialRecordatorios.fulfilled, (state, action) => {
+        state.historialRecordatoriosStatus = "succeeded";
+        state.historialRecordatorios = action.payload || [];
+      })
+      .addCase(fetchHistorialRecordatorios.rejected, (state, action) => {
+        state.historialRecordatoriosStatus = "failed";
+        state.historialRecordatoriosError = action.payload;
       })
 
       // --- Buscar pólizas ---

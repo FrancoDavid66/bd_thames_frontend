@@ -25,6 +25,8 @@ import SolicitudesPage from "./pages/SolicitudesPage";
 import GruasPage from "./pages/GruasPage";
 // CUPONERAS
 import CuponerasPage from "./pages/CuponerasPage";
+// COMPETENCIA
+import CompetenciaPage from "./pages/CompetenciaPage";
 
 // 🔔 Realtime counters (front-only BroadcastChannel)
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
@@ -323,7 +325,13 @@ function App() {
               {/* Cuponeras */}
               <Route path="/cuponeras" element={<CuponerasPage />} />
 
-              <Route path="/geo" element={<Navigate to="/" />} />
+              {/* Geo habilitado */}
+              <Route path="/geo" element={<GeoPage />} />
+
+              {/* Competencia */}
+              <Route path="/competencia" element={<CompetenciaPage />} />
+
+              {/* Propiedades / Alquileres aún bloqueadas */}
               <Route path="/propiedades" element={<Navigate to="/" />} />
               <Route path="/alquileres" element={<Navigate to="/" />} />
               <Route path="/alquileres/:id" element={<Navigate to="/" />} />

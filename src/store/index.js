@@ -18,6 +18,9 @@ import gruasReducer from './slices/gruasSlice';
 import aseguradosReducer from './slices/aseguradosSlice';
 import cuponesRoboReducer from "./slices/cuponesRoboSlice";
 
+// 👇 NUEVO: slice de Competencia
+// Archivo: src/store/slices/competenciaSlice.js
+import competenciaReducer from "./slices/competenciaSlice";
 
 export const store = configureStore({
   reducer: {
@@ -36,7 +39,8 @@ export const store = configureStore({
     // 👇 clave que usas en useSelector((s) => s.asegurados)
     asegurados: aseguradosReducer,
     cuponesRobo: cuponesRoboReducer,
-
+    // 👇 ahora podés usar useSelector((s) => s.competencia)
+    competencia: competenciaReducer,
   },
 });
 

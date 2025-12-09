@@ -1,111 +1,81 @@
-import { useState } from 'react'
-import { FaEdit, FaTrash } from 'react-icons/fa'
+// src/components/geo/GeoTable.jsx
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 const GeoTable = ({ geoItems, onEdit, onDelete }) => {
-  const [tipoFiltro, setTipoFiltro] = useState('todos')
-  const [busquedaNombre, setBusquedaNombre] = useState('')
-  const [estadoFiltro, setEstadoFiltro] = useState('todos')
-
-  const tiposUnicos = ['todos', ...new Set(geoItems.map((item) => item.tipo))]
-
-  const itemsFiltrados = geoItems.filter((item) => {
-    const coincideTipo = tipoFiltro === 'todos' || item.tipo === tipoFiltro
-    const coincideNombre =
-      item.nombre.toLowerCase().includes(busquedaNombre.toLowerCase())
-    const coincideEstado =
-      estadoFiltro === 'todos' ||
-      (estadoFiltro === 'activos' && item.activa) ||
-      (estadoFiltro === 'inactivos' && !item.activa)
-
-    return coincideTipo && coincideNombre && coincideEstado
-  })
+  // ✅ Normalizar siempre a array y filtrar elementos inválidos
+  const itemsList = (
+    Array.isArray(geoItems)
+      ? geoItems
+      : geoItems
+      ? Object.values(geoItems)
+      : []
+  ).filter((item) => item && item.id != null);
 
   return (
-    <div className="space-y-4">
-      {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-grey">
-        <div className="flex flex-col">
-          <label className="text-sm font-medium mb-1">Filtrar por tipo:</label>
-          <select
-            value={tipoFiltro}
-            onChange={(e) => setTipoFiltro(e.target.value)}
-            className="p-2 border border-gray-700 rounded bg-gray-900 text-white"
-          >
-            {tiposUnicos.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {tipo === 'todos' ? 'Todos' : tipo.charAt(0).toUpperCase() + tipo.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col">
-          <label className="text-sm font-medium mb-1">Buscar por nombre:</label>
-          <input
-            type="text"
-            value={busquedaNombre}
-            onChange={(e) => setBusquedaNombre(e.target.value)}
-            placeholder="Ej: Axion"
-            className="p-2 border border-gray-700 rounded bg-gray-900 text-white"
-          />
-        </div>
-
-        <div className="flex flex-col">
-          <label className="text-sm font-medium mb-1">Filtrar por estado:</label>
-          <select
-            value={estadoFiltro}
-            onChange={(e) => setEstadoFiltro(e.target.value)}
-            className="p-2 border border-gray-700 rounded bg-gray-900 text-white"
-          >
-            <option value="todos">Todos</option>
-            <option value="activos">Activos</option>
-            <option value="inactivos">Inactivos</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Tabla */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm text-left border border-gray-700 bg-gray-900 text-white">
-          <thead className="bg-gray-800 text-gray-200">
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+        <table className="min-w-full text-sm text-left text-gray-200">
+          <thead className="bg-slate-900/80 text-xs uppercase text-gray-400">
             <tr>
-              <th className="p-2">Tipo</th>
-              <th className="p-2">Nombre</th>
-              <th className="p-2">Descripción</th>
-              <th className="p-2">Ubicación</th>
-              <th className="p-2">Activa</th>
-              <th className="p-2 text-right">Acciones</th>
+              <th className="px-4 py-2">Tipo</th>
+              <th className="px-4 py-2">Nombre</th>
+              <th className="px-4 py-2">Dirección / Nota</th>
+              <th className="px-4 py-2">Coordenadas</th>
+              <th className="px-4 py-2">Activa</th>
+              <th className="px-4 py-2 text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-700">
-            {itemsFiltrados.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-800">
-                <td className="p-2 capitalize">{item.tipo}</td>
-                <td className="p-2">{item.nombre}</td>
-                <td className="p-2">{item.descripcion}</td>
-                <td className="p-2 text-xs text-gray-400">
+          <tbody className="divide-y divide-slate-800">
+            {itemsList.length === 0 && (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-4 py-4 text-center text-xs text-gray-400"
+                >
+                  No hay ubicaciones cargadas todavía.
+                </td>
+              </tr>
+            )}
+
+            {itemsList.map((item) => (
+              <tr
+                key={item.id}
+                className="hover:bg-slate-900/70 transition-colors"
+              >
+                <td className="px-4 py-2 capitalize">{item.tipo}</td>
+                <td className="px-4 py-2 font-medium">{item.nombre}</td>
+                <td className="px-4 py-2 text-xs text-gray-300">
+                  {item.direccion || item.nota || "-"}
+                </td>
+                <td className="px-4 py-2 text-xs text-gray-400">
                   {item.latitud}, {item.longitud}
                 </td>
-                <td className="p-2">
+                <td className="px-4 py-2">
                   {item.activa ? (
-                    <span className="text-green-400 font-medium">Sí</span>
+                    <span className="text-emerald-400 font-medium">Sí</span>
                   ) : (
-                    <span className="text-red-400 font-medium">No</span>
+                    <span className="text-rose-400 font-medium">No</span>
                   )}
                 </td>
-                <td className="p-2 text-right flex gap-2 justify-end">
-                  <button
-                    onClick={() => onEdit(item)}
-                    className="text-blue-400 hover:text-blue-300"
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => onDelete(item)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    <FaTrash />
-                  </button>
+                <td className="px-4 py-2">
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onEdit && onEdit(item)}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-200 transition-colors text-xs"
+                      title="Editar"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete && onDelete(item)}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-400 hover:text-rose-200 transition-colors text-xs"
+                      title="Eliminar"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -113,7 +83,7 @@ const GeoTable = ({ geoItems, onEdit, onDelete }) => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default GeoTable
+export default GeoTable;

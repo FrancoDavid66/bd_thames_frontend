@@ -40,7 +40,7 @@ export default function Navbar({
 
         {/* Título o branding */}
         <div className="flex-1 text-center select-none">
-          <h1 className="text-sm sm:text-base font-semibold tracking-wide">THAMES APP 1.2</h1>
+          <h1 className="text-sm sm:text-base font-semibold tracking-wide">THAMES APP 2.0</h1>
         </div>
 
         {/* Lado derecho vacío (dejado por si en el futuro agregamos usuario, etc.) */}

@@ -33,8 +33,9 @@ const ClienteEditModal = ({ isOpen, onClose, onSave, cliente }) => {
     }
   };
 
+  // 👇 DNI/CUIT YA NO ES OBLIGATORIO
   const isRequired = (key) =>
-    ["nombre", "apellido", "dni_cuit_cuil", "telefono"].includes(key);
+    ["nombre", "apellido", "telefono"].includes(key);
 
   return (
     <AnimatePresence>

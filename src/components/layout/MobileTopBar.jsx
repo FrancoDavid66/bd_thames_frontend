@@ -1,3 +1,4 @@
+// src/components/layout/MobileTopBar.jsx
 import { NavLink } from "react-router-dom";
 import {
   FaHome,
@@ -6,13 +7,17 @@ import {
   FaFileAlt,
   FaMoneyCheckAlt,
   FaDatabase, // icono para Balanzes
+  FaMapMarkedAlt, // icono para Geo
+  FaChartBar, // icono para Competencia
 } from "react-icons/fa";
 
 const tabs = [
   { to: "/", label: "Inicio", icon: FaHome },
   { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
   { to: "/clientes", label: "Clientes", icon: FaUsers },
-  { to: "/balanzes", label: "Balanzes", icon: FaDatabase }, // ← cambiado
+  { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
+  { to: "/competencia", label: "Competencia", icon: FaChartBar },
+  { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
   { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
   { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
 ];
@@ -53,9 +58,7 @@ export default function MobileTopBar({
               >
                 <span
                   className={`inline-flex items-center justify-center h-6 w-6 rounded-md ${
-                    isSolicitudes && solTotal > 0
-                      ? "relative"
-                      : ""
+                    isSolicitudes && solTotal > 0 ? "relative" : ""
                   }`}
                   aria-hidden="true"
                 >

@@ -11,15 +11,16 @@ import {
   HiCog,
   HiSpeakerphone,
 } from "react-icons/hi";
-import toast from "react-hot-toast";
 
 import PagosSearch from "../components/pagos/PagosSearch";
 import PagosList from "../components/pagos/PagosList";
 import CuentasCobroModal from "../components/pagos/CuentasCobroModal";
-import RecorditoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
+import RecordatoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
+import HistorialRecordatorios from "../components/pagos/HistorialRecordatorios";
 import {
   fetchMediosCobro,
   enviarRecordatoriosCuotas,
+  fetchHistorialRecordatorios, // 👈 nombre igual que en el slice
 } from "../store/slices/pagosSlice";
 
 function StatCard({ icon: Icon, label, value, hint, tone = "indigo", delay = 0 }) {
@@ -72,13 +73,26 @@ export default function PagosPage() {
   const billeteras = useSelector((s) => s.pagos?.billeteras || []);
   const mediosCobro = useSelector((s) => s.pagos?.mediosCobro || []);
 
+  // Historial de recordatorios (lista + estado)
+  const historialItems = useSelector(
+    (s) => s.pagos?.historialRecordatorios || []
+  );
+  const historialStatus = useSelector(
+    (s) => s.pagos?.historialRecordatoriosStatus || "idle"
+  );
+  const historialLoading = historialStatus === "loading";
+
   const [polizas, setPolizas] = useState([]);
   const [openConfig, setOpenConfig] = useState(false);
   const [openRecordatorios, setOpenRecordatorios] = useState(false);
   const [sendingRecordatorios, setSendingRecordatorios] = useState(false);
 
+  // pestaña activa: "pagos" | "historial"
+  const [activeTab, setActiveTab] = useState("pagos");
+
   useEffect(() => {
     dispatch(fetchMediosCobro({ activo: true }));
+    dispatch(fetchHistorialRecordatorios());
   }, [dispatch]);
 
   const cuotas = useMemo(
@@ -132,38 +146,41 @@ export default function PagosPage() {
     });
   }, []);
 
+  // onEnviar desde el modal: recibe medio_cobro_id y oficina
+  // y devuelve el JSON: { hoy, procesadas, enviados, errores }
   const handleEnviarRecordatoriosCuotas = useCallback(
-    async (medio_cobro_id) => {
+    async (medio_cobro_id, oficina) => {
+      setSendingRecordatorios(true);
       try {
-        setSendingRecordatorios(true);
-
-        const payload = medio_cobro_id != null ? { medio_cobro_id } : {};
+        const payload = {
+          ...(medio_cobro_id != null ? { medio_cobro_id } : {}),
+          ...(oficina ? { oficina } : {}),
+        };
 
         const action = await dispatch(enviarRecordatoriosCuotas(payload));
 
         if (enviarRecordatoriosCuotas.fulfilled.match(action)) {
-          const { enviados, procesadas, hoy } = action.payload || {};
-          toast.success(
-            `Recordatorios enviados: ${enviados ?? 0} de ${procesadas ?? 0} (base: ${
-              hoy ?? "hoy"
-            })`
-          );
-        } else {
-          const errorMsg =
-            action.payload ||
-            action.error?.message ||
-            "No se pudieron enviar los recordatorios";
-          toast.error(errorMsg);
+          return action.payload || {};
         }
+
+        const errorMsg =
+          action.payload ||
+          action.error?.message ||
+          "No se pudieron enviar los recordatorios";
+        throw new Error(errorMsg);
       } catch (e) {
         console.error("[NOTIFICACIONES][cuotas] Error:", e);
-        toast.error("Error inesperado al enviar recordatorios");
+        throw e;
       } finally {
         setSendingRecordatorios(false);
       }
     },
     [dispatch]
   );
+
+  const handleRefreshHistorial = useCallback(() => {
+    dispatch(fetchHistorialRecordatorios());
+  }, [dispatch]);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-900 text-white">
@@ -197,7 +214,7 @@ export default function PagosPage() {
             {/* Botón: abre modal de Cuentas/Billeteras */}
             <button
               onClick={() => setOpenConfig(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-sm hover:bg-gray-900 transition shadow-sm"
+              className="inline-flex items-center gap-2 cursor-pointer rounded-2xl bg-gray-900/40 border border-gray-800 px-3 py-2 text-sm hover:bg-gray-900 transition shadow-sm"
               title="Cuentas y Billeteras"
             >
               <HiCog className="w-5 h-5" />
@@ -208,7 +225,7 @@ export default function PagosPage() {
             <button
               onClick={() => setOpenRecordatorios(true)}
               disabled={sendingRecordatorios}
-              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs md:text-sm text-emerald-100 hover:bg-emerald-500/20 hover:border-emerald-300/60 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 cursor-pointer rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs md:text-sm text-emerald-100 hover:bg-emerald-500/20 hover:border-emerald-300/60 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {sendingRecordatorios ? (
                 <span className="inline-block w-3 h-3 border-2 border-emerald-200/40 border-t-emerald-300 rounded-full animate-spin" />
@@ -242,79 +259,123 @@ export default function PagosPage() {
           <span className="font-semibold">Cuentas y Billeteras</span> sirve para crear y
           editar tus cuentas de cobro.{" "}
           <span className="font-semibold">Recordatorios cuotas</span> sirve para elegir un
-          alias y mandar los WhatsApp masivos.
+          alias, una oficina y mandar los WhatsApp masivos.
         </motion.div>
 
-        {/* KPIs */}
-        {cuotas.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-            <StatCard
-              icon={HiSparkles}
-              label="Cuotas"
-              value={totalCuotas}
-              tone="indigo"
-              delay={0.0}
-            />
-            <StatCard
-              icon={HiClock}
-              label="Pendientes"
-              value={totalPendientes}
-              tone="amber"
-              delay={0.08}
-            />
-            <StatCard
-              icon={HiBadgeCheck}
-              label="Pagadas"
-              value={totalPagadas}
-              tone="emerald"
-              delay={0.16}
-            />
+        {/* Tabs de navegación mejorados */}
+        <div className="mt-4">
+          <div className="flex w-full max-w-md rounded-2xl bg-gray-900/80 border border-gray-700 p-1 text-xs sm:text-sm">
+            <button
+              type="button"
+              onClick={() => setActiveTab("pagos")}
+              className={`flex-1 px-3 sm:px-4 py-1.5 rounded-xl  transition text-center ${
+                activeTab === "pagos"
+                  ? "bg-primary-500 text-gray-900 shadow "
+                  : "bg-transparent text-gray-200 hover:bg-gray-800/80 cursor-pointer"
+              }`}
+            >
+              Cobros y cuotas
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("historial")}
+              className={`flex-1 px-3 sm:px-4 py-1.5 rounded-xl transition text-center  ${
+                activeTab === "historial"
+                  ? "bg-primary-500 text-gray-900 shadow"
+                  : "bg-transparent text-gray-200 hover:bg-gray-800/80 cursor-pointer"
+              }`}
+            >
+              Historial de recordatorios
+            </button>
           </div>
-        )}
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="mt-5"
-        >
-          <PagosSearch onBuscar={handleBuscar} />
-        </motion.div>
+        {/* KPIs + buscador solo en pestaña "pagos" */}
+        {activeTab === "pagos" && (
+          <>
+            {cuotas.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                <StatCard
+                  icon={HiSparkles}
+                  label="Cuotas"
+                  value={totalCuotas}
+                  tone="indigo"
+                  delay={0.0}
+                />
+                <StatCard
+                  icon={HiClock}
+                  label="Pendientes"
+                  value={totalPendientes}
+                  tone="amber"
+                  delay={0.08}
+                />
+                <StatCard
+                  icon={HiBadgeCheck}
+                  label="Pagadas"
+                  value={totalPagadas}
+                  tone="emerald"
+                  delay={0.16}
+                />
+              </div>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="mt-5"
+            >
+              <PagosSearch onBuscar={handleBuscar} />
+            </motion.div>
+          </>
+        )}
       </div>
 
-      {/* Resultado */}
-      <div className="px-4 sm:px-6 pb-24 mt-5">
-        {cuotas.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="rounded-2xl border border-dashed border-gray-700 bg-gray-900/40 p-10 text-center shadow-sm"
-          >
-            <p className="text-gray-300">
-              Iniciá una búsqueda para ver cuotas. Probá con{" "}
-              <span className="font-semibold text-white">
-                nombre, apellido, patente o modelo
-              </span>{" "}
-              ✨
-            </p>
-          </motion.div>
+      {/* Contenido principal: pestañas */}
+      <div className="px-4 sm:px-6 mt-5 pb-24">
+        {activeTab === "pagos" ? (
+          // TAB PAGOS
+          <>
+            {cuotas.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="rounded-2xl border border-dashed border-gray-700 bg-gray-900/40 p-10 text-center shadow-sm"
+              >
+                <p className="text-gray-300">
+                  Iniciá una búsqueda para ver cuotas. Probá con{" "}
+                  <span className="font-semibold text-white">
+                    nombre, apellido, patente o modelo
+                  </span>{" "}
+                  ✨
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="rounded-2xl bg-gray-900/50 border border-gray-800 ring-1 ring-gray-800/70 shadow-sm overflow-hidden"
+              >
+                <PagosList
+                  cuotas={cuotas}
+                  actualizarCuotas={actualizarCuotas}
+                  ocultarPagadas={false}
+                  cuentasMercadoPago={mpCuentas}
+                  billeterasVirtuales={billeteras}
+                  mediosCobro={mediosCobro}
+                />
+              </motion.div>
+            )}
+          </>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="rounded-2xl bg-gray-900/50 border border-gray-800 ring-1 ring-gray-800/70 shadow-sm overflow-hidden"
-          >
-            <PagosList
-              cuotas={cuotas}
-              actualizarCuotas={actualizarCuotas}
-              ocultarPagadas={false}
-              cuentasMercadoPago={mpCuentas}
-              billeterasVirtuales={billeteras}
-              mediosCobro={mediosCobro}
-            />
-          </motion.div>
+          // TAB HISTORIAL
+          <HistorialRecordatorios
+            items={historialItems}
+            loading={historialLoading}
+            onRefresh={handleRefreshHistorial}
+          />
         )}
       </div>
 
@@ -326,15 +387,12 @@ export default function PagosPage() {
       />
 
       {/* Modal para elegir medio y enviar recordatorios */}
-      <RecorditoriosCuotasModal
+      <RecordatoriosCuotasModal
         isOpen={openRecordatorios}
         onClose={() => setOpenRecordatorios(false)}
         mediosCobro={mediosCobro}
         sending={sendingRecordatorios}
-        onEnviar={async (medioId) => {
-          await handleEnviarRecordatoriosCuotas(medioId);
-          setOpenRecordatorios(false);
-        }}
+        onEnviar={handleEnviarRecordatoriosCuotas}
       />
     </div>
   );
