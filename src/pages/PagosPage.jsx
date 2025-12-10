@@ -1,518 +1,443 @@
-/* src/pages/PolizasPage.jsx — Versión COMPLETA con panel/cuasi-tab de cuponeras de robo */
-import { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { Link, useSearchParams } from "react-router-dom";
-import toast from "react-hot-toast";
-import { HiChatAlt2 } from "react-icons/hi";
+/* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos) */
 
-import PolizaTable from "../components/polizas/PolizaTable";
-import PolizaFilter from "../components/polizas/PolizaFilter";
-import ServicioGruaCard from "../components/polizas/ServicioGruaCard";
-/* 🆕 Panel unificado de imágenes/documentos del vehículo */
-import VehiculoDocsPanel from "../components/polizas/VehiculoDocsPanel";
-/* 🆕 Panel de cuponeras de robo */
-import CuponesRoboPanel from "../components/polizas/CuponesRoboPanel";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { motion } from "framer-motion";
+import dayjs from "dayjs";
+import "dayjs/locale/es";
+import {
+  HiBadgeCheck,
+  HiClock,
+  HiSearch,
+  HiX,
+  HiSparkles,
+  HiCog,
+  HiSpeakerphone,
+  HiEyeOff,
+} from "react-icons/hi";
+
+import PagosSearch from "../components/pagos/PagosSearch";
+import PagosList from "../components/pagos/PagosList";
+import CuotasAlertas from "../components/pagos/CuotasAlertas";
+import CuentasCobroModal from "../components/pagos/CuentasCobroModal";
+import RecordatoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
+import HistorialRecordatorios from "../components/pagos/HistorialRecordatorios";
 
 import {
-  fetchPolizas,
-  fetchPolizasKpis,
-  enviarMensajesEstadoCuotas,
-  selectResumenCuotas,
-  setPage,
-  setPageSize,
-  setSearch,
-  setEstado,
-  setEstadoFinanciero,
-  setCompania,
-  setCliente,
-  setPatente,
-  setSoloActivas,
-  setOrdering,
-  setModo,
-  setFechaVencimientoDesde,
-  setFechaVencimientoHasta,
-  setVencidasUltimosDias,
-  setVencidasMasDeDias,
-  clearVencimientoFilters,
-  selectEnvioMensajesStatus,
-  selectEnvioMensajesResumen,
-  selectEnvioMensajesBuckets,
-  selectEnvioMensajesDiagnostico,
-  selectEnvioMensajesPayload,
-  selectEnvioMensajesSeleccionadas,
-  selectEnvioMensajesProcesadas,
-} from "../store/slices/polizasSlice";
+  fetchMediosCobro,
+  enviarRecordatoriosCuotas,
+  fetchHistorialRecordatorios,
+} from "../store/slices/pagosSlice";
 
-/* ---- Helper para clasificar pólizas por cuotas (para filtros y resumen en modo "cuotas") ---- */
-const estadoPorCuotas = (poliza) => {
-  const cuotas = poliza?.cuotas || [];
-  const impagas = cuotas.filter((c) => !c.pagado);
-  if (impagas.length === 0) return "al_dia";
+dayjs.locale("es");
 
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const fechas = impagas
-    .filter((c) => c?.fecha_vencimiento)
-    .map((c) => new Date(c.fecha_vencimiento))
-    .sort((a, b) => a - b);
-
-  if (!fechas.length) return "vencidas";
-
-  const proxima = fechas[0];
-  const diffDays = Math.floor((hoy - proxima) / 86400000);
-  if (diffDays === 0) return "vence_hoy";
-  if (diffDays > 0) {
-    if (diffDays <= 7) return "vencida_7";
-    if (diffDays <= 30) return "vencida_30";
-    return "vencidas";
-  }
-  return Math.abs(diffDays) <= 7 ? "por_vencer" : "al_dia";
-};
-
-export default function PolizasPage() {
+const PagosPage = () => {
   const dispatch = useDispatch();
-  const [searchParams] = useSearchParams();
+
+  // Tabs: "pagos" | "historial"
+  const [tab, setTab] = useState("pagos");
+
+  // Modales
+  const [showCuentasModal, setShowCuentasModal] = useState(false);
+  const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
+
+  // Estado local de cuotas (resultado de la búsqueda)
+  const [cuotas, setCuotas] = useState([]);
+  const [ocultarPagadas, setOcultarPagadas] = useState(false);
+
+  // Estado para el envío masivo de recordatorios
+  const [sendingRecordatorios, setSendingRecordatorios] = useState(false);
+
+  // Estado global desde Redux (slice pagos)
+  const {
+    mediosCobro = [],
+    mpCuentas = [],
+    billeteras = [],
+    historialRecordatorios = [],
+    historialRecordatoriosStatus = "idle",
+  } = useSelector((state) => state.pagos || {});
+
+  const loadingHistorial = historialRecordatoriosStatus === "loading";
+
+  /* ================== EFFECTS ================== */
+
+  // Carga de medios de cobro al entrar a la página
+  useEffect(() => {
+    dispatch(fetchMediosCobro({ activo: true }));
+  }, [dispatch]);
+
+  // Cuando cambiamos a la pestaña "historial", cargamos el historial
+  const handleChangeTab = useCallback(
+    (nuevoTab) => {
+      setTab(nuevoTab);
+      if (nuevoTab === "historial") {
+        dispatch(fetchHistorialRecordatorios());
+      }
+    },
+    [dispatch]
+  );
+
+  /* ================== HANDLERS ================== */
+
+  // PagosSearch -> nos devuelve una lista de pólizas; las aplanamos en cuotas
+  const handleBuscarPolizas = useCallback((polizas) => {
+    const lista = Array.isArray(polizas) ? polizas : [];
+    const nuevasCuotas = [];
+
+    lista.forEach((pol) => {
+      const cuotasPol = Array.isArray(pol.cuotas) ? pol.cuotas : [];
+      cuotasPol.forEach((c) => {
+        nuevasCuotas.push({ ...c, poliza: pol });
+      });
+    });
+
+    setCuotas(nuevasCuotas);
+  }, []);
+
+  // PagosList -> al marcar pagada una cuota, actualizamos el array local
+  const handleActualizarCuotas = useCallback((actualizadas = []) => {
+    if (!Array.isArray(actualizadas) || actualizadas.length === 0) return;
+
+    setCuotas((prev) => {
+      const prevList = Array.isArray(prev) ? prev : [];
+      const map = new Map();
+
+      actualizadas.forEach((item) => {
+        if (item?.cuotaActualizada?.id) {
+          map.set(item.cuotaActualizada.id, {
+            ...item.cuotaActualizada,
+            observaciones_pago:
+              item.observaciones_pago ?? item.cuotaActualizada.observaciones_pago,
+          });
+        } else if (item?.id) {
+          map.set(item.id, item);
+        }
+      });
+
+      if (map.size === 0) return prevList;
+
+      return prevList.map((c) => {
+        const upd = map.get(c.id);
+        return upd ? { ...c, ...upd } : c;
+      });
+    });
+  }, []);
+
+  const handleOpenCuentas = useCallback(() => {
+    setShowCuentasModal(true);
+  }, []);
+  const handleCloseCuentas = useCallback(() => {
+    setShowCuentasModal(false);
+  }, []);
+
+  const handleOpenRecordatorios = useCallback(() => {
+    setShowRecordatoriosModal(true);
+  }, []);
+  const handleCloseRecordatorios = useCallback(() => {
+    setShowRecordatoriosModal(false);
+  }, []);
+
+  const handleRefreshHistorial = useCallback(() => {
+    dispatch(fetchHistorialRecordatorios());
+  }, [dispatch]);
+
+  // Llamada que usa el modal de recordatorios para disparar el thunk enviarRecordatoriosCuotas
+  const handleEnviarRecordatorios = useCallback(
+    async (medioCobroId, oficina) => {
+      setSendingRecordatorios(true);
+      try {
+        const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
+        const alias = medio ? medio.etiqueta || medio.valor : undefined;
+
+        const result = await dispatch(
+          enviarRecordatoriosCuotas({
+            medio_cobro_id: medioCobroId || undefined,
+            alias,
+            oficina,
+          })
+        ).unwrap();
+
+        // el modal espera que devolvamos { hoy, procesadas, enviados, errores }
+        return result;
+      } catch (err) {
+        console.error("[PagosPage] Error enviando recordatorios:", err);
+        throw err;
+      } finally {
+        setSendingRecordatorios(false);
+      }
+    },
+    [dispatch, mediosCobro]
+  );
+
+  /* ================== KPIs ================== */
 
   const {
-    list = [],
-    poliza: polizaSeleccionada = null,
-    status = "idle",
-    error = null,
-    page = 1,
-    pageSize = 100,
-    total = 0,
-    search = "",
-    estado = "todos",
-    estado_financiero = "todos",
-    compania = "",
-    cliente = "",
-    patente = "",
-    solo_activas = false,
-    ordering = "-id",
-    modo = "polizas",
-    // NUEVOS filtros de vencimiento
-    fecha_vencimiento_desde,
-    fecha_vencimiento_hasta,
-    vencidas_ultimos_dias,
-    vencidas_mas_de_dias,
-    // KPIs (para chips de mora y totales globales)
-    kpis = {},
-  } = useSelector((s) => s.polizas || {});
-
-  const resumenCuotasDesdeSlice = useSelector(selectResumenCuotas);
-
-  // --------- 1) Cargar filtros iniciales desde la URL (una sola vez) ----------
-  useEffect(() => {
-    const qpCliente = searchParams.get("cliente") || searchParams.get("cliente_id");
-    const qpPatente = searchParams.get("patente");
-    const qpCompania = searchParams.get("compania");
-    const qpModo = searchParams.get("modo"); // "polizas" | "cuotas"
-    const qpDesde = searchParams.get("desde");
-    const qpHasta = searchParams.get("hasta");
-    const qpUltimos = searchParams.get("vencidas_ultimos_dias");
-    const qpMasDe = searchParams.get("vencidas_mas_de_dias");
-
-    if (qpCliente) dispatch(setCliente(String(qpCliente)));
-    if (qpPatente) dispatch(setPatente(String(qpPatente)));
-    if (qpCompania) dispatch(setCompania(String(qpCompania)));
-    if (qpModo && (qpModo === "polizas" || qpModo === "cuotas")) dispatch(setModo(qpModo));
-
-    if (qpDesde) dispatch(setFechaVencimientoDesde(qpDesde));
-    if (qpHasta) dispatch(setFechaVencimientoHasta(qpHasta));
-    if (qpUltimos) dispatch(setVencidasUltimosDias(qpUltimos));
-    if (qpMasDe) dispatch(setVencidasMasDeDias(qpMasDe));
-
-    dispatch(setPage(1));
-  }, [dispatch, searchParams]);
-
-  // --------- 2) Efectos para cargar pólizas y KPIs ----------
-  useEffect(() => {
-    dispatch(fetchPolizas());
-  }, [
-    dispatch,
-    page,
-    pageSize,
-    search,
-    estado,
-    estado_financiero,
-    compania,
-    cliente,
-    patente,
-    solo_activas,
-    ordering,
-    modo,
-    fecha_vencimiento_desde,
-    fecha_vencimiento_hasta,
-    vencidas_ultimos_dias,
-    vencidas_mas_de_dias,
-  ]);
-
-  useEffect(() => {
-    dispatch(fetchPolizasKpis());
-  }, [
-    dispatch,
-    search,
-    compania,
-    cliente,
-    patente,
-    solo_activas,
-    estado,
-    estado_financiero,
-    modo,
-    fecha_vencimiento_desde,
-    fecha_vencimiento_hasta,
-    vencidas_ultimos_dias,
-    vencidas_mas_de_dias,
-  ]);
-
-  // --------- 3) Resúmenes locales (fallback) para modo "cuotas" ---------
-  const resumenCuotas = useMemo(() => {
-    // Si el slice ya trae un resumen calculado, lo usamos
-    if (resumenCuotasDesdeSlice && typeof resumenCuotasDesdeSlice === "object") {
-      return resumenCuotasDesdeSlice;
-    }
-
-    // Fallback local sobre la lista (modo cuotas)
-    const base = {
-      todos: 0,
-      al_dia: 0,
-      por_vencer: 0,
-      vence_hoy: 0,
-      vencida_7: 0,
-      vencida_30: 0,
+    totalCuotas,
+    alDia,
+    porVencer,
+    venceHoy,
+    vencidas,
+  } = useMemo(() => {
+    const hoy = dayjs().startOf("day");
+    const stats = {
+      totalCuotas: 0,
+      alDia: 0,
+      porVencer: 0,
+      venceHoy: 0,
       vencidas: 0,
     };
-    for (const p of list) {
-      base.todos += 1;
-      const k = estadoPorCuotas(p);
-      base[k] = (base[k] || 0) + 1;
-    }
-    return base;
-  }, [list, resumenCuotasDesdeSlice]);
 
-  const resumenPolizas = useMemo(
-    () => ({
-      activas_al_dia: kpis.activas_al_dia ?? 0,
-      activas_mora_1_30: kpis.activas_mora_1_30 ?? 0,
-      activas_mora_31_60: kpis.activas_mora_31_60 ?? 0,
-      activas_mora_61_90: kpis.activas_mora_61_90 ?? 0,
-      activas_mora_90_mas: kpis.activas_mora_90_mas ?? 0,
-      vencidas: kpis.vencidas ?? 0,
-      canceladas: kpis.canceladas ?? 0,
-      finalizadas: kpis.finalizadas ?? 0,
-      total: kpis.total ?? 0,
-    }),
-    [kpis]
+    (cuotas || []).forEach((c) => {
+      stats.totalCuotas += 1;
+
+      if (c.pagado) {
+        stats.alDia += 1;
+        return;
+      }
+
+      if (!c.fecha_vencimiento) {
+        stats.porVencer += 1;
+        return;
+      }
+
+      const fv = dayjs(c.fecha_vencimiento).startOf("day");
+      if (!fv.isValid()) return;
+
+      if (fv.isBefore(hoy)) stats.vencidas += 1;
+      else if (fv.isSame(hoy)) stats.venceHoy += 1;
+      else stats.porVencer += 1;
+    });
+
+    return stats;
+  }, [cuotas]);
+
+  const kpis = useMemo(
+    () => [
+      {
+        label: "Cuotas",
+        value: totalCuotas,
+        icon: HiBadgeCheck,
+        hint: "Total cuotas en los resultados",
+      },
+      {
+        label: "Al día",
+        value: alDia,
+        icon: HiSparkles,
+        hint: "Cuotas pagadas",
+      },
+      {
+        label: "Por vencer",
+        value: porVencer,
+        icon: HiClock,
+        hint: "Vencen próximamente",
+      },
+      {
+        label: "Vence hoy",
+        value: venceHoy,
+        icon: HiSearch,
+        hint: "Con vencimiento hoy",
+      },
+      {
+        label: "Vencidas",
+        value: vencidas,
+        icon: HiX,
+        hint: "Atrasadas",
+      },
+    ],
+    [totalCuotas, alDia, porVencer, venceHoy, vencidas]
   );
 
-  /* 🔍 NUEVO: lista filtrada por estado de cuotas cuando el modo es "cuotas"
-     - Si modo = "cuotas" y el chip seleccionado no es "todos",
-       filtramos usando estadoPorCuotas(poliza).
-     - En cualquier otro caso, usamos la lista tal cual viene del backend.
-  */
-  const listFiltrada = useMemo(() => {
-    if (modo === "cuotas" && estado && estado !== "todos") {
-      return list.filter((p) => estadoPorCuotas(p) === estado);
-    }
-    return list;
-  }, [list, modo, estado]);
-
-  // --------- 5) Handlers de filtros ----------
-  const onSearchChange = (val) => dispatch(setSearch(val));
-  const onEstadoChange = (val) => dispatch(setEstado(val));
-  const onEstadoFinancieroChange = (val) => dispatch(setEstadoFinanciero(val));
-  const onCompaniaChange = (val) => dispatch(setCompania(val));
-  const onClienteChange = (val) => dispatch(setCliente(val));
-  const onPatenteChange = (val) => dispatch(setPatente(val));
-  const onSoloActivasChange = (val) => dispatch(setSoloActivas(val));
-  const onOrderingChange = (val) => dispatch(setOrdering(val));
-  const onModoChange = (val) => dispatch(setModo(val || "polizas"));
-
-  const onPageChange = (newPage) => dispatch(setPage(newPage));
-  const onPageSizeChange = (size) => dispatch(setPageSize(size));
-
-  // Filtros vencimiento
-  const onFechaVencimientoDesdeChange = (val) =>
-    dispatch(setFechaVencimientoDesde(val || ""));
-  const onFechaVencimientoHastaChange = (val) =>
-    dispatch(setFechaVencimientoHasta(val || ""));
-  const onVencidasUltimosDiasChange = (val) =>
-    dispatch(setVencidasUltimosDias(val || ""));
-  const onVencidasMasDeDiasChange = (val) =>
-    dispatch(setVencidasMasDeDias(val || ""));
-  const onClearVencimiento = () => dispatch(clearVencimientoFilters());
-
-  // --------- 6) Paneles laterales (docs, grúa, cuponeras) ----------
-  const [showDocs, setShowDocs] = useState(false);
-  const [showGrua, setShowGrua] = useState(false);
-  const [showCupones, setShowCupones] = useState(false);
-
-  const polizaIdActual = polizaSeleccionada?.id ?? null;
-
-  // --------- 7) Envío de mensajes estado de cuotas ----------
-  const envioStatus = useSelector(selectEnvioMensajesStatus);
-  const envioResumen = useSelector(selectEnvioMensajesResumen);
-  const envioBuckets = useSelector(selectEnvioMensajesBuckets);
-  const envioDiag = useSelector(selectEnvioMensajesDiagnostico);
-  const envioPayload = useSelector(selectEnvioMensajesPayload);
-  const envioSeleccionadas = useSelector(selectEnvioMensajesSeleccionadas);
-  const envioProcesadas = useSelector(selectEnvioMensajesProcesadas);
-
-  const [previewOnly, setPreviewOnly] = useState(true);
-
-  const handleEnviarMensajes = async () => {
-    try {
-      await dispatch(
-        enviarMensajesEstadoCuotas({
-          preview_only: previewOnly ? 1 : 0,
-          modo,
-        })
-      ).unwrap();
-      toast.success(
-        previewOnly
-          ? "Reporte de mensajes generado (preview)."
-          : "Mensajes enviados correctamente."
-      );
-    } catch (err) {
-      console.error(err);
-      toast.error("Error al enviar/generar el reporte de mensajes.");
-    }
-  };
-
-  const hayPolizas = list.length > 0;
+  /* ================== RENDER ================== */
 
   return (
-    <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4 text-gray-100">
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold sm:text-2xl">Pólizas</h1>
-          <p className="text-xs text-gray-400 sm:text-sm">
-            Búsqueda avanzada por cliente, patente, compañía, estado y mora.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to="/clientes"
-            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs sm:text-sm hover:bg-gray-800"
-          >
-            Ver clientes
-          </Link>
-          <Link
-            to="/solicitudes"
-            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs sm:text-sm hover:bg-gray-800"
-          >
-            Ver solicitudes
-          </Link>
-        </div>
-      </div>
-
-      {/* Filtros / barra superior */}
-      <PolizaFilter
-        searchValue={search}
-        onSearchChange={onSearchChange}
-        estadoActual={estado}
-        onEstadoChange={onEstadoChange}
-        estadoFinancieroActual={estado_financiero}
-        onEstadoFinancieroChange={onEstadoFinancieroChange}
-        pageSize={pageSize}
-        onPageSizeChange={onPageSizeChange}
-        totalFiltradas={total}
-        modoActual={modo}
-        onModoChange={onModoChange}
-        resumenCuotas={resumenCuotas}
-        resumenPolizas={resumenPolizas}
-        kpis={kpis}
-        fechaVencimientoDesde={fecha_vencimiento_desde}
-        fechaVencimientoHasta={fecha_vencimiento_hasta}
-        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
-        onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
-        vencidasUltimosDias={vencidas_ultimos_dias}
-        vencidasMasDeDias={vencidas_mas_de_dias}
-        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
-        onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
-        onClearVencimientoFilters={onClearVencimiento}
-      />
-
-      <div className="mt-1 text-xs sm:text-sm text-gray-300">
-        {/* usamos listFiltrada para que el texto coincida con lo que se ve en la tabla */}
-        Mostrando {listFiltrada.length} de {total} pólizas (página {page})
-      </div>
-
-      {/* Tabla principal */}
-      <div className="mt-2 sm:mt-3">
-        <PolizaTable
-          polizas={listFiltrada}
-          status={status}
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={onPageChange}
-          onPageSizeChange={onPageSizeChange}
-          ordering={ordering}
-          onOrderingChange={onOrderingChange}
-          modo={modo}
-        />
-      </div>
-
-      {/* Panel lateral: Docs / Fotos vehículo */}
-      {showDocs && polizaIdActual && (
-        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
-              Docs & Fotos del vehículo
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowDocs(false)}
-              className="text-xs text-gray-400 hover:text-gray-200"
-            >
-              Cerrar
-            </button>
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight flex items-center gap-2">
+              <span>Pagos y recordatorios</span>
+              <span className="inline-flex items-center rounded-full bg-primary-500/10 text-primary-300 text-xs px-2 py-0.5 border border-primary-500/30">
+                <HiSparkles className="mr-1" />
+                <span>Panel operativo</span>
+              </span>
+            </h1>
+            <p className="text-slate-400 text-sm sm:text-base mt-1">
+              Administrá cuotas, medios de cobro y envíos de recordatorios desde
+              un solo lugar.
+            </p>
           </div>
-          <VehiculoDocsPanel polizaId={polizaIdActual} />
-        </div>
-      )}
 
-      {/* Panel lateral: Servicio de grúa para la póliza seleccionada */}
-      {showGrua && polizaSeleccionada && (
-        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
-              Servicio de grúa
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowGrua(false)}
-              className="text-xs text-gray-400 hover:text-gray-200"
-            >
-              Cerrar
-            </button>
-          </div>
-          <ServicioGruaCard poliza={polizaSeleccionada} />
-        </div>
-      )}
-
-      {/* Panel lateral: Cuponeras de robo */}
-      {showCupones && polizaSeleccionada && (
-        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
-              Cuponeras de robo
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowCupones(false)}
-              className="text-xs text-gray-400 hover:text-gray-200"
-            >
-              Cerrar
-            </button>
-          </div>
-          <CuponesRoboPanel poliza={polizaSeleccionada} />
-        </div>
-      )}
-
-      {/* Bloque de envío de mensajes estado de cuotas */}
-      <div className="mt-8 rounded-2xl border border-emerald-700/60 bg-emerald-950/40 p-4 text-sm text-emerald-50">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
-              <HiChatAlt2 />
-            </span>
-            <div>
-              <div className="text-sm font-semibold">
-                Enviar recordatorio de estado de cuotas
+            <motion.button
+              type="button"
+              onClick={handleOpenCuentas}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-800/70 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-slate-200 shadow-sm hover:bg-slate-700/80 cursor-pointer"
+            >
+              <HiCog className="text-base sm:text-lg" />
+              <span>Medios de cobro</span>
+            </motion.button>
+
+            {/* Botón Enviar recordatorios - verde tipo WhatsApp */}
+            <motion.button
+              type="button"
+              onClick={handleOpenRecordatorios}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.96 }}
+              className="inline-flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80"
+              style={{ backgroundColor: "#25D366" }}
+            >
+              <HiSpeakerphone className="text-base sm:text-lg" />
+              <span>
+                {sendingRecordatorios
+                  ? "Enviando recordatorios..."
+                  : "Enviar recordatorios"}
+              </span>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4 sm:mb-4">
+          {kpis.map(({ label, value, icon: Icon, hint }) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-2.5 sm:px-4 sm:py-3 flex flex-col justify-between shadow-[0_0_18px_rgba(15,23,42,0.75)]"
+            >
+              <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">
+                  {label}
+                </span>
+                <Icon className="text-slate-400 text-sm sm:text-base" />
               </div>
-              <div className="text-xs text-emerald-200/80">
-                Usa los filtros de arriba (modo &quot;Cuotas&quot;) para definir el
-                universo a analizar antes de enviar.
+              <div className="flex items-baseline justify-between">
+                <span className="text-lg sm:text-2xl font-semibold tabular-nums">
+                  {value}
+                </span>
+                <span className="text-[0.6rem] sm:text-[0.7rem] text-slate-500">
+                  {hint}
+                </span>
               </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Tabs navegación */}
+        <div className="mb-3 sm:mb-4">
+          <div className="inline-flex p-1 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-[0_0_18px_rgba(15,23,42,0.85)]">
+            <button
+              type="button"
+              onClick={() => handleChangeTab("pagos")}
+              className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                tab === "pagos"
+                  ? "bg-slate-800 text-slate-50"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              <HiBadgeCheck className="text-sm sm:text-base" />
+              <span>Pagos y cuotas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleChangeTab("historial")}
+              className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                tab === "historial"
+                  ? "bg-slate-800 text-slate-50"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              <HiClock className="text-sm sm:text-base" />
+              <span>Historial de recordatorios</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Contenido según tab */}
+        {tab === "pagos" ? (
+          <motion.div
+            key="tab-pagos"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3 sm:space-y-4"
+          >
+            {/* Alertas de cuotas por vencer / vencidas */}
+            <CuotasAlertas />
+
+            {/* Buscador + toggle ocultar pagadas */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4 space-y-3">
+              <PagosSearch onBuscar={handleBuscarPolizas} />
+
+              <button
+                type="button"
+                onClick={() => setOcultarPagadas((v) => !v)}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer"
+              >
+                <span
+                  className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    ocultarPagadas
+                      ? "bg-slate-200 border-slate-100"
+                      : "border-slate-500"
+                  }`}
+                >
+                  {ocultarPagadas && (
+                    <span className="w-2 h-2 rounded bg-slate-900" />
+                  )}
+                </span>
+                <HiEyeOff className="w-4 h-4 opacity-70" />
+                <span>Ocultar cuotas pagadas</span>
+              </button>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 rounded border-emerald-500 bg-transparent text-emerald-500"
-                checked={previewOnly}
-                onChange={(e) => setPreviewOnly(e.target.checked)}
+
+            {/* Lista de cuotas / pólizas */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">
+              <PagosList
+                cuotas={cuotas}
+                actualizarCuotas={handleActualizarCuotas}
+                ocultarPagadas={ocultarPagadas}
+                cuentasMercadoPago={mpCuentas}
+                billeterasVirtuales={billeteras}
+                mediosCobro={mediosCobro}
               />
-              <span>Solo preview (no enviar)</span>
-            </label>
-            <button
-              type="button"
-              onClick={handleEnviarMensajes}
-              disabled={envioStatus === "loading" || !hayPolizas}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800/70"
-            >
-              {envioStatus === "loading" ? (
-                <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              ) : (
-                <HiChatAlt2 className="h-4 w-4" />
-              )}
-              {envioStatus === "loading"
-                ? previewOnly
-                  ? "Generando reporte..."
-                  : "Enviando..."
-                : previewOnly
-                ? "Generar reporte"
-                : "Enviar de verdad"}
-            </button>
-          </div>
-        </div>
-
-        {/* Diagnóstico / resumen del envío */}
-        {envioResumen && (
-          <div className="mt-2 grid gap-2 text-xs text-emerald-100 sm:grid-cols-2">
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
-              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-                Resumen
-              </div>
-              <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                {JSON.stringify(envioResumen, null, 2)}
-              </pre>
             </div>
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
-              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-                Buckets
-              </div>
-              <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                {JSON.stringify(envioBuckets, null, 2)}
-              </pre>
-            </div>
-            {envioDiag && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-                  Diagnóstico
-                </div>
-                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                  {JSON.stringify(envioDiag, null, 2)}
-                </pre>
-              </div>
-            )}
-            {envioPayload && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-                  Payload enviado
-                </div>
-                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                  {JSON.stringify(envioPayload, null, 2)}
-                </pre>
-              </div>
-            )}
-            {(envioSeleccionadas || envioProcesadas) && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-                  Conteo
-                </div>
-                <div className="mt-1 text-[11px]">
-                  Seleccionadas: {envioSeleccionadas} · Procesadas: {envioProcesadas}
-                </div>
-              </div>
-            )}
-          </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="tab-historial"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4"
+          >
+            <HistorialRecordatorios
+              items={historialRecordatorios}
+              loading={loadingHistorial}
+              onRefresh={handleRefreshHistorial}
+            />
+          </motion.div>
         )}
       </div>
+
+      {/* Modales */}
+      <CuentasCobroModal
+        open={showCuentasModal}
+        onClose={handleCloseCuentas}
+        mpCuentas={mpCuentas}
+        billeteras={billeteras}
+        mediosCobro={mediosCobro}
+      />
+
+      <RecordatoriosCuotasModal
+        isOpen={showRecordatoriosModal}
+        onClose={handleCloseRecordatorios}
+        mediosCobro={mediosCobro}
+        sending={sendingRecordatorios}
+        onEnviar={handleEnviarRecordatorios}
+      />
     </div>
   );
-}
+};
+
+export default PagosPage;

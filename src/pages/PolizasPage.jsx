@@ -34,9 +34,16 @@ import {
   setVencidasUltimosDias,
   setVencidasMasDeDias,
   clearVencimientoFilters,
+  selectEnvioMensajesStatus,
+  selectEnvioMensajesResumen,
+  selectEnvioMensajesBuckets,
+  selectEnvioMensajesDiagnostico,
+  selectEnvioMensajesPayload,
+  selectEnvioMensajesSeleccionadas,
+  selectEnvioMensajesProcesadas,
 } from "../store/slices/polizasSlice";
 
-/* -------- Helper de estado por cuotas (para resumenCuotas local si hace falta) -------- */
+/* ---- Helper para clasificar pólizas por cuotas (para filtros y resumen en modo "cuotas") ---- */
 const estadoPorCuotas = (poliza) => {
   const cuotas = poliza?.cuotas || [];
   const impagas = cuotas.filter((c) => !c.pagado);
@@ -119,7 +126,7 @@ export default function PolizasPage() {
     dispatch(setPage(1));
   }, [dispatch, searchParams]);
 
-  // --------- 2) Fetch de pólizas cuando cambie cualquier filtro/paginación ----------
+  // --------- 2) Efectos para cargar pólizas y KPIs ----------
   useEffect(() => {
     dispatch(fetchPolizas());
   }, [
@@ -141,12 +148,25 @@ export default function PolizasPage() {
     vencidas_mas_de_dias,
   ]);
 
-  // --------- 3) KPIs ----------
   useEffect(() => {
     dispatch(fetchPolizasKpis());
-  }, [dispatch, search, compania, cliente, patente, solo_activas]);
+  }, [
+    dispatch,
+    search,
+    compania,
+    cliente,
+    patente,
+    solo_activas,
+    estado,
+    estado_financiero,
+    modo,
+    fecha_vencimiento_desde,
+    fecha_vencimiento_hasta,
+    vencidas_ultimos_dias,
+    vencidas_mas_de_dias,
+  ]);
 
-  // --------- 4) Resúmenes ---------
+  // --------- 3) Resúmenes locales (fallback) para modo "cuotas" ---------
   const resumenCuotas = useMemo(() => {
     // Si el slice ya trae un resumen calculado, lo usamos
     if (resumenCuotasDesdeSlice && typeof resumenCuotasDesdeSlice === "object") {
@@ -186,6 +206,18 @@ export default function PolizasPage() {
     [kpis]
   );
 
+  /* 🔍 NUEVO: lista filtrada por estado de cuotas cuando el modo es "cuotas"
+     - Si modo = "cuotas" y el chip seleccionado no es "todos",
+       filtramos usando estadoPorCuotas(poliza).
+     - En cualquier otro caso, usamos la lista tal cual viene del backend.
+  */
+  const listFiltrada = useMemo(() => {
+    if (modo === "cuotas" && estado && estado !== "todos") {
+      return list.filter((p) => estadoPorCuotas(p) === estado);
+    }
+    return list;
+  }, [list, modo, estado]);
+
   // --------- 5) Handlers de filtros ----------
   const onSearchChange = (val) => dispatch(setSearch(val));
   const onEstadoChange = (val) => dispatch(setEstado(val));
@@ -216,243 +248,101 @@ export default function PolizasPage() {
   const [showGrua, setShowGrua] = useState(false);
   const [showCupones, setShowCupones] = useState(false);
 
-  const polizaActual = polizaSeleccionada || list[0] || null;
-  const polizaIdActual = polizaActual?.id || null;
+  const polizaIdActual = polizaSeleccionada?.id ?? null;
 
-  // --------- 7) Envío de estado de cuotas (diagnóstico / WhatsApp) ----------
-  const [sending, setSending] = useState(false);
+  // --------- 7) Envío de mensajes estado de cuotas ----------
+  const envioStatus = useSelector(selectEnvioMensajesStatus);
+  const envioResumen = useSelector(selectEnvioMensajesResumen);
+  const envioBuckets = useSelector(selectEnvioMensajesBuckets);
+  const envioDiag = useSelector(selectEnvioMensajesDiagnostico);
+  const envioPayload = useSelector(selectEnvioMensajesPayload);
+  const envioSeleccionadas = useSelector(selectEnvioMensajesSeleccionadas);
+  const envioProcesadas = useSelector(selectEnvioMensajesProcesadas);
+
   const [previewOnly, setPreviewOnly] = useState(true);
-  const [confirmEnvio, setConfirmEnvio] = useState(false);
-  const [envioResult, setEnvioResult] = useState(null);
 
-  const handleEnviarEstadoCuotas = async () => {
+  const handleEnviarMensajes = async () => {
     try {
-      setSending(true);
-      setEnvioResult(null);
-      const filtros = {
-        page,
-        page_size: pageSize,
-        search,
-        estado,
-        estado_financiero,
-        compania,
-        cliente,
-        patente,
-        solo_activas,
-        ordering,
-        modo,
-        fecha_vencimiento_desde,
-        fecha_vencimiento_hasta,
-        vencidas_ultimos_dias,
-        vencidas_mas_de_dias,
-      };
-      const res = await dispatch(
+      await dispatch(
         enviarMensajesEstadoCuotas({
-          filtros,
-          preview: previewOnly,
+          preview_only: previewOnly ? 1 : 0,
+          modo,
         })
       ).unwrap();
-      setEnvioResult(res);
       toast.success(
         previewOnly
-          ? "Diagnóstico generado (sin enviar mensajes)."
-          : "Mensajes enviados / procesados."
+          ? "Reporte de mensajes generado (preview)."
+          : "Mensajes enviados correctamente."
       );
     } catch (err) {
       console.error(err);
-      toast.error("Error al procesar el estado de cuotas.");
-    } finally {
-      setSending(false);
-      setConfirmEnvio(false);
+      toast.error("Error al enviar/generar el reporte de mensajes.");
     }
   };
 
-  const DetalleRespuesta = ({ data }) => {
-    if (!data) return null;
-
-    const detalle = Array.isArray(data?.detalle) ? data.detalle : null;
-    const buckets = data?.buckets || null;
-    const seleccionadas = data?.seleccionadas ?? null;
-    const procesadas = data?.procesadas ?? null;
-
-    return (
-      <div className="mt-4 space-y-3">
-        {/* Resumen superior */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          {"enviados" in data && (
-            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/40 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-                Mensajes enviados
-              </div>
-              <div className="text-lg font-semibold text-emerald-200">
-                {data.enviados ?? 0}
-              </div>
-            </div>
-          )}
-          {"fallidos" in data && (
-            <div className="rounded-lg bg-rose-500/10 border border-rose-500/40 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-rose-300/80">
-                Fallidos
-              </div>
-              <div className="text-lg font-semibold text-rose-200">
-                {data.fallidos ?? 0}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Buckets (si vienen) */}
-        {buckets && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] sm:text-xs">
-            {Object.entries(buckets).map(([k, v]) => (
-              <div
-                key={k}
-                className="rounded-lg border border-gray-700/70 bg-gray-900/80 px-3 py-2"
-              >
-                <div className="font-semibold text-gray-200">{k}</div>
-                <div className="text-gray-400">{v}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Detalle por póliza (opcional) */}
-        {detalle && (
-          <div className="mt-3">
-            <div className="mb-1 text-[11px] uppercase tracking-wide text-gray-400">
-              Detalle por póliza
-            </div>
-            <pre className="max-h-64 overflow-auto rounded-lg bg-black/40 p-3 text-[10px] text-gray-200">
-              {JSON.stringify(detalle, null, 2)}
-            </pre>
-          </div>
-        )}
-
-        {/* Seleccionadas / procesadas */}
-        {(seleccionadas !== null || procesadas !== null) && (
-          <div className="mt-2 text-[11px] text-gray-400">
-            {seleccionadas !== null && (
-              <span className="mr-4">
-                Seleccionadas:{" "}
-                <span className="font-semibold text-gray-200">
-                  {seleccionadas}
-                </span>
-              </span>
-            )}
-            {procesadas !== null && (
-              <span>
-                Procesadas:{" "}
-                <span className="font-semibold text-gray-200">
-                  {procesadas}
-                </span>
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const hayPolizas = list.length > 0;
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4 text-gray-100">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Pólizas</h1>
-          <p className="text-sm text-gray-400">
-            Gestión de pólizas, cuotas y estado de mora.
+          <h1 className="text-xl font-semibold sm:text-2xl">Pólizas</h1>
+          <p className="text-xs text-gray-400 sm:text-sm">
+            Búsqueda avanzada por cliente, patente, compañía, estado y mora.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowDocs((v) => !v)}
-            className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-100 hover:bg-indigo-500/20"
-            disabled={!polizaIdActual}
+          <Link
+            to="/clientes"
+            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs sm:text-sm hover:bg-gray-800"
           >
-            {polizaIdActual ? "Ver Docs / Fotos" : "Docs (seleccione póliza)"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowGrua((v) => !v)}
-            className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20"
-            disabled={!polizaIdActual}
+            Ver clientes
+          </Link>
+          <Link
+            to="/solicitudes"
+            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs sm:text-sm hover:bg-gray-800"
           >
-            {polizaIdActual ? "Servicio de grúa" : "Grúa (seleccione póliza)"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCupones((v) => !v)}
-            className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
-            disabled={!polizaIdActual}
-          >
-            {polizaIdActual ? "Cuponeras de robo" : "Cuponeras (seleccione póliza)"}
-          </button>
-
-          {/* Botón enviar estado de cuotas */}
-          <button
-            type="button"
-            onClick={() => setConfirmEnvio(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:bg-sky-500/20 disabled:opacity-60"
-            disabled={sending || total === 0}
-            title="Enviar estado de cuotas de las pólizas filtradas"
-          >
-            <HiChatAlt2 className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span>Enviar estado de cuotas</span>
-            {total > 0 ? (
-              <span className="ml-2 rounded bg-black/20 px-2 py-0.5 text-[11px]">
-                {total}
-              </span>
-            ) : null}
-          </button>
+            Ver solicitudes
+          </Link>
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros / barra superior */}
       <PolizaFilter
-        // valores actuales
         searchValue={search}
+        onSearchChange={onSearchChange}
         estadoActual={estado}
+        onEstadoChange={onEstadoChange}
         estadoFinancieroActual={estado_financiero}
-        companiaActual={compania}
-        clienteActual={cliente}
-        patenteActual={patente}
-        soloActivas={!!solo_activas}
-        orderingActual={ordering}
+        onEstadoFinancieroChange={onEstadoFinancieroChange}
         pageSize={pageSize}
+        onPageSizeChange={onPageSizeChange}
         totalFiltradas={total}
         modoActual={modo}
-        // handlers
-        onSearchChange={onSearchChange}
-        onEstadoChange={onEstadoChange}
-        onEstadoFinancieroChange={onEstadoFinancieroChange}
-        onCompaniaChange={onCompaniaChange}
-        onClienteChange={onClienteChange}
-        onPatenteChange={onPatenteChange}
-        onSoloActivasChange={onSoloActivasChange}
         onModoChange={onModoChange}
-        onPageSizeChange={onPageSizeChange}
-        onOrderingChange={onOrderingChange}
-        // NUEVOS: handlers de vencimiento
-        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
-        onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
-        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
-        onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
-        onClearVencimientoFilters={onClearVencimiento}
-        // resúmenes (cuotas = página actual; pólizas = GLOBAL por KPIs)
         resumenCuotas={resumenCuotas}
         resumenPolizas={resumenPolizas}
         kpis={kpis}
+        fechaVencimientoDesde={fecha_vencimiento_desde}
+        fechaVencimientoHasta={fecha_vencimiento_hasta}
+        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange}
+        onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
+        vencidasUltimosDias={vencidas_ultimos_dias}
+        vencidasMasDeDias={vencidas_mas_de_dias}
+        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange}
+        onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
+        onClearVencimientoFilters={onClearVencimiento}
       />
 
       <div className="mt-1 text-xs sm:text-sm text-gray-300">
-        Mostrando {list.length} de {total} pólizas (página {page})
+        {/* usamos listFiltrada para que el texto coincida con lo que se ve en la tabla */}
+        Mostrando {listFiltrada.length} de {total} pólizas (página {page})
       </div>
 
       {/* Tabla principal */}
       <div className="mt-2 sm:mt-3">
         <PolizaTable
-          polizas={list}
+          polizas={listFiltrada}
           status={status}
           page={page}
           pageSize={pageSize}
@@ -484,128 +374,145 @@ export default function PolizasPage() {
         </div>
       )}
 
-      {/* Panel lateral: Servicio de grúa */}
-      {showGrua && polizaActual && (
-        <div className="mt-6 rounded-2xl border border-emerald-600/40 bg-emerald-950/40 p-4">
+      {/* Panel lateral: Servicio de grúa para la póliza seleccionada */}
+      {showGrua && polizaSeleccionada && (
+        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-emerald-100">
+            <h2 className="text-lg font-semibold text-white">
               Servicio de grúa
             </h2>
             <button
               type="button"
               onClick={() => setShowGrua(false)}
-              className="text-xs text-emerald-300/80 hover:text-emerald-100"
+              className="text-xs text-gray-400 hover:text-gray-200"
             >
               Cerrar
             </button>
           </div>
-          <ServicioGruaCard poliza={polizaActual} />
+          <ServicioGruaCard poliza={polizaSeleccionada} />
         </div>
       )}
 
       {/* Panel lateral: Cuponeras de robo */}
-      {showCupones && polizaIdActual && (
-        <div className="mt-6 rounded-2xl border border-amber-600/40 bg-amber-950/40 p-4">
+      {showCupones && polizaSeleccionada && (
+        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-amber-100">
+            <h2 className="text-lg font-semibold text-white">
               Cuponeras de robo
             </h2>
             <button
               type="button"
               onClick={() => setShowCupones(false)}
-              className="text-xs text-amber-300/80 hover:text-amber-100"
+              className="text-xs text-gray-400 hover:text-gray-200"
             >
               Cerrar
             </button>
           </div>
-          <CuponesRoboPanel polizaId={polizaIdActual} />
+          <CuponesRoboPanel poliza={polizaSeleccionada} />
         </div>
       )}
 
-      {/* Modal de confirmación / resultado de envío de estado de cuotas */}
-      {confirmEnvio && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-w-lg w-full rounded-2xl bg-gray-900 border border-gray-700 p-4 sm:p-5 text-sm text-gray-100">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base sm:text-lg font-semibold text-white">
-                  Enviar estado de cuotas
-                </h2>
-                <p className="mt-1 text-xs sm:text-sm text-gray-300">
-                  Se enviará un resumen de estado de cuotas a los clientes de
-                  las pólizas actualmente filtradas. Podés generar primero un
-                  reporte de prueba (sin enviar) o enviar de verdad.
-                </p>
+      {/* Bloque de envío de mensajes estado de cuotas */}
+      <div className="mt-8 rounded-2xl border border-emerald-700/60 bg-emerald-950/40 p-4 text-sm text-emerald-50">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
+              <HiChatAlt2 />
+            </span>
+            <div>
+              <div className="text-sm font-semibold">
+                Enviar recordatorio de estado de cuotas
               </div>
-              <button
-                type="button"
-                onClick={() => setConfirmEnvio(false)}
-                className="text-xs text-gray-400 hover:text-gray-200"
-              >
-                Cerrar
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
-                <span className="text-gray-300">
-                  Pólizas filtradas actualmente:
-                </span>
-                <span className="font-semibold text-emerald-300">
-                  {total}
-                </span>
+              <div className="text-xs text-emerald-200/80">
+                Usa los filtros de arriba (modo &quot;Cuotas&quot;) para definir el
+                universo a analizar antes de enviar.
               </div>
-
-              <div className="flex items-center gap-2 text-xs sm:text-sm">
-                <input
-                  id="previewOnly"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-sky-500"
-                  checked={previewOnly}
-                  onChange={(e) => setPreviewOnly(e.target.checked)}
-                />
-                <label
-                  htmlFor="previewOnly"
-                  className="text-gray-300 select-none"
-                >
-                  Solo generar reporte (no enviar mensajes)
-                </label>
-              </div>
-
-              {envioResult && (
-                <div className="mt-3 rounded-lg border border-gray-700 bg-gray-950/70 p-3">
-                  <DetalleRespuesta data={envioResult} />
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmEnvio(false)}
-                className="rounded-lg border border-gray-600 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-100 hover:bg-gray-700"
-                disabled={sending}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleEnviarEstadoCuotas}
-                className="inline-flex items-center gap-2 rounded-lg border border-sky-500 bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-sky-500 disabled:opacity-60"
-                disabled={sending}
-              >
-                {sending
-                  ? previewOnly
-                    ? "Generando reporte..."
-                    : "Enviando..."
-                  : previewOnly
-                  ? "Generar reporte"
-                  : "Enviar de verdad"}
-              </button>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 rounded border-emerald-500 bg-transparent text-emerald-500"
+                checked={previewOnly}
+                onChange={(e) => setPreviewOnly(e.target.checked)}
+              />
+              <span>Solo preview (no enviar)</span>
+            </label>
+            <button
+              type="button"
+              onClick={handleEnviarMensajes}
+              disabled={envioStatus === "loading" || !hayPolizas}
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800/70"
+            >
+              {envioStatus === "loading" ? (
+                <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <HiChatAlt2 className="h-4 w-4" />
+              )}
+              {envioStatus === "loading"
+                ? previewOnly
+                  ? "Generando reporte..."
+                  : "Enviando..."
+                : previewOnly
+                ? "Generar reporte"
+                : "Enviar de verdad"}
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Diagnóstico / resumen del envío */}
+        {envioResumen && (
+          <div className="mt-2 grid gap-2 text-xs text-emerald-100 sm:grid-cols-2">
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
+              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
+                Resumen
+              </div>
+              <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                {JSON.stringify(envioResumen, null, 2)}
+              </pre>
+            </div>
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
+              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
+                Buckets
+              </div>
+              <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                {JSON.stringify(envioBuckets, null, 2)}
+              </pre>
+            </div>
+            {envioDiag && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
+                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
+                  Diagnóstico
+                </div>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                  {JSON.stringify(envioDiag, null, 2)}
+                </pre>
+              </div>
+            )}
+            {envioPayload && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
+                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
+                  Payload enviado
+                </div>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                  {JSON.stringify(envioPayload, null, 2)}
+                </pre>
+              </div>
+            )}
+            {(envioSeleccionadas || envioProcesadas) && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
+                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
+                  Conteo
+                </div>
+                <div className="mt-1 text-[11px]">
+                  Seleccionadas: {envioSeleccionadas} · Procesadas: {envioProcesadas}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
