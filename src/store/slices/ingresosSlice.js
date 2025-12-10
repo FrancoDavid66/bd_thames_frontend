@@ -13,7 +13,9 @@ export const fetchIngresos = createAsyncThunk(
       const res = await axios.get(`${BASE_URL}ingresos/?page=${page}`);
       return res.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Error al obtener los ingresos');
+      return rejectWithValue(
+        error.response?.data || 'Error al obtener los ingresos'
+      );
     }
   }
 );
@@ -27,7 +29,32 @@ export const createIngreso = createAsyncThunk(
       toast.success('Ingreso creado correctamente.');
       return res.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Error al crear el ingreso');
+      const status = error.response?.status;
+      const backendData = error.response?.data;
+
+      // 🔍 Log detallado para ver EXACTAMENTE qué se queja el backend
+      console.error('Error al crear el ingreso /api/ingresos/:', {
+        status,
+        data: backendData,
+      });
+
+      let message = 'Error al crear el ingreso';
+      if (backendData && typeof backendData === 'object') {
+        const detalles = Object.entries(backendData)
+          .map(([field, msgs]) => {
+            if (Array.isArray(msgs)) {
+              return `${field}: ${msgs.join(' | ')}`;
+            }
+            return `${field}: ${msgs}`;
+          })
+          .join(' — ');
+        if (detalles) {
+          message = `Error al crear el ingreso: ${detalles}`;
+        }
+      }
+
+      toast.error(message);
+      return rejectWithValue(backendData || message);
     }
   }
 );
@@ -41,7 +68,9 @@ export const updateIngreso = createAsyncThunk(
       toast.success('Ingreso actualizado correctamente.');
       return res.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Error al actualizar el ingreso');
+      return rejectWithValue(
+        error.response?.data?.message || 'Error al actualizar el ingreso'
+      );
     }
   }
 );
@@ -55,7 +84,9 @@ export const deleteIngreso = createAsyncThunk(
       toast.success('Ingreso eliminado correctamente.');
       return id;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Error al eliminar el ingreso');
+      return rejectWithValue(
+        error.response?.data?.message || 'Error al eliminar el ingreso'
+      );
     }
   }
 );
@@ -83,7 +114,7 @@ const ingresosSlice = createSlice({
         state.next = action.payload.next;
         state.previous = action.payload.previous;
         state.count = action.payload.count;
-        state.currentPage = (action.meta?.arg?.page) || 1;
+        state.currentPage = action.meta?.arg?.page || 1;
         state.error = null;
       })
       .addCase(fetchIngresos.rejected, (state, action) => {
@@ -102,7 +133,9 @@ const ingresosSlice = createSlice({
       })
       // Actualizar ingreso
       .addCase(updateIngreso.fulfilled, (state, action) => {
-        const index = state.list.findIndex(i => i.id === action.payload.id);
+        const index = state.list.findIndex(
+          (i) => i.id === action.payload.id
+        );
         if (index !== -1) {
           state.list[index] = action.payload;
         }
@@ -115,13 +148,14 @@ const ingresosSlice = createSlice({
       })
       // Eliminar ingreso
       .addCase(deleteIngreso.fulfilled, (state, action) => {
-        state.list = state.list.filter(i => i.id !== action.payload);
+        state.list = state.list.filter((i) => i.id !== action.payload);
         state.status = 'succeeded';
         state.error = null;
       })
       .addCase(deleteIngreso.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload || 'Error al eliminar el ingreso';
+        state.error =
+          action.payload || 'Error al eliminar el ingreso';
       });
   },
 });

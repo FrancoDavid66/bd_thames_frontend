@@ -35,13 +35,12 @@ const writeLS = (k, arr) => {
   }
 };
 
-// 🔹 Normalizar categorías "largas" de pagos automáticos
+// Normalizar categorías "largas"
 const normalizarCategoria = (raw) => {
   const v = (raw ?? "").toString().trim();
   if (!v) return "";
   const lower = v.toLowerCase();
 
-  // Todo lo que venga como "Pago de cuota de XXX" lo juntamos en una sola
   if (lower.startsWith("pago de cuota de")) {
     return "Pago de seguro";
   }
@@ -56,7 +55,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
   const [form, setForm] = useState({
     monto: "",
     fecha: dayjs().format("YYYY-MM-DD"),
-    forma_pago: "EFECTIVO", // EFECTIVO | VIRTUAL
+    forma_pago: "EFECTIVO", // EFECTIVO | TRANSFERENCIA (UI)
     billetera: "",
     categoria: "",
     descripcion: "",
@@ -70,7 +69,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
   const catRef = useRef(null);
   const billeRef = useRef(null);
 
-  /* abrir = reset errores y foco */
+  // al abrir: reset
   useEffect(() => {
     if (!isOpen) return;
     setErrors({});
@@ -82,21 +81,25 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
     setTimeout(() => montoRef.current?.focus(), 60);
   }, [isOpen]);
 
-  /* Sugerencias (lectura local) */
+  // Sugerencias desde localStorage
   const [localCats, setLocalCats] = useState(() =>
     readLS(STORAGE_CATS, []).map(normalizarCategoria)
   );
-  const [localWallets] = useState(() =>
-    readLS(STORAGE_WALLETS, [])
-  );
+  const [localWallets] = useState(() => readLS(STORAGE_WALLETS, []));
 
-  /* Derivadas de historial (NORMALIZADAS) */
+  // Historial (normalizado)
   const fromIngresos = useMemo(
-    () => uniqClean((ingresos || []).map((i) => normalizarCategoria(i.categoria))),
+    () =>
+      uniqClean(
+        (ingresos || []).map((i) => normalizarCategoria(i.categoria))
+      ),
     [ingresos]
   );
   const fromEgresos = useMemo(
-    () => uniqClean((egresos || []).map((e) => normalizarCategoria(e.categoria))),
+    () =>
+      uniqClean(
+        (egresos || []).map((e) => normalizarCategoria(e.categoria))
+      ),
     [egresos]
   );
 
@@ -125,8 +128,8 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
   const setFormaPago = (fp) =>
     setForm((p) => ({
       ...p,
-      forma_pago: fp,
-      billetera: fp === "VIRTUAL" ? p.billetera : "",
+      forma_pago: fp, // "EFECTIVO" | "TRANSFERENCIA"
+      billetera: fp === "TRANSFERENCIA" ? p.billetera : "",
     }));
 
   const validate = () => {
@@ -135,8 +138,9 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
       e.monto = "Ingresá un monto válido.";
     if (!form.fecha) e.fecha = "Seleccioná la fecha.";
     if (!form.categoria?.trim()) e.categoria = "Indicá la categoría.";
-    if (form.forma_pago === "VIRTUAL" && !form.billetera?.trim())
-      e.billetera = "Indicá la billetera/cuenta.";
+    if (form.forma_pago === "TRANSFERENCIA" && !form.billetera?.trim())
+      e.billetera = "Indicá la cuenta / banco.";
+
     setErrors(e);
 
     const first = Object.keys(e)[0];
@@ -149,6 +153,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
       };
       setTimeout(() => map[first]?.current?.focus(), 0);
     }
+
     return Object.keys(e).length === 0;
   };
 
@@ -161,28 +166,47 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
 
     const categoriaNormalizada = normalizarCategoria(form.categoria);
 
-    // Payload limpio con valores por defecto
+    // Mapeamos a los valores que entiende el backend
+    // EFECTIVO (UI)      -> "EFECTIVO" (backend)
+    // TRANSFERENCIA (UI) -> "TRANSFERENCIA" (backend)
+    const formaPagoBackend =
+      form.forma_pago === "EFECTIVO" ? "EFECTIVO" : "TRANSFERENCIA";
+
+    const billeteraDetalle =
+      form.forma_pago === "TRANSFERENCIA"
+        ? form.billetera || "Sin especificar"
+        : "";
+
+    let descripcionBase =
+      (form.descripcion || "").trim() ||
+      `Ingreso ${categoriaNormalizada || ""}`.trim() ||
+      "Ingreso";
+
+    if (billeteraDetalle) {
+      descripcionBase = `${descripcionBase} [Cuenta: ${billeteraDetalle}]`;
+    }
+
+    // Payload
     const payload = {
       monto: montoNum,
       fecha: form.fecha || dayjs().format("YYYY-MM-DD"),
-      forma_pago: form.forma_pago,
-      billetera:
-        form.forma_pago === "VIRTUAL"
-          ? form.billetera || "Sin especificar"
-          : "",
+      forma_pago: formaPagoBackend,
+      billetera: billeteraDetalle,
       categoria: categoriaNormalizada || "Sin categoría",
-      descripcion:
-        (form.descripcion || "").trim() ||
-        `Ingreso ${categoriaNormalizada || ""}`.trim() ||
-        "Ingreso",
+      descripcion: descripcionBase,
       pagado_por: (form.pagado_por || "").trim() || "No especificado",
     };
+
+    console.log(
+      "[IngresoCreateModal] Enviando ingreso a /ingresos/:",
+      payload
+    );
 
     try {
       setSubmitting(true);
       await dispatch(createIngreso(payload));
 
-      // Guardamos la categoría normalizada en localStorage para sugerencias
+      // Guardar categoría en LS para sugerencias
       if (categoriaNormalizada) {
         setLocalCats((prev) => {
           const next = uniqClean([...prev, categoriaNormalizada]);
@@ -213,7 +237,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
     Number(form.monto) <= 0 ||
     !form.fecha ||
     !form.categoria ||
-    (form.forma_pago === "VIRTUAL" && !form.billetera);
+    (form.forma_pago === "TRANSFERENCIA" && !form.billetera);
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose} title="Nuevo ingreso">
@@ -255,7 +279,9 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
               className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
             />
             {errors.fecha && (
-              <p className="text-xs text-red-500 mt-1">{errors.fecha}</p>
+              <p className="text-xs text-red-500 mt-1">
+                {errors.fecha}
+              </p>
             )}
           </div>
         </div>
@@ -277,23 +303,23 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
             </button>
             <button
               type="button"
-              onClick={() => setFormaPago("VIRTUAL")}
+              onClick={() => setFormaPago("TRANSFERENCIA")}
               className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                form.forma_pago === "VIRTUAL"
+                form.forma_pago === "TRANSFERENCIA"
                   ? "bg-emerald-500 text-white"
                   : "text-zinc-600 dark:text-zinc-300"
               }`}
             >
-              Virtual
+              Transferencia
             </button>
           </div>
         </div>
 
-        {/* Billetera (si es virtual) */}
-        {form.forma_pago === "VIRTUAL" && (
+        {/* Cuenta (si es transferencia) */}
+        {form.forma_pago === "TRANSFERENCIA" && (
           <div>
             <label className="block text-xs sm:text-sm mb-1">
-              Billetera / Cuenta *
+              Cuenta / Banco *
             </label>
             <input
               ref={billeRef}
@@ -301,7 +327,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
               list="billetera-opciones"
               value={form.billetera}
               onChange={handleChange}
-              placeholder="Ej: Mercado Pago, Cuenta banco…"
+              placeholder="Ej: Mercado Pago, Banco Nación…"
               className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
             />
             <datalist id="billetera-opciones">
@@ -343,7 +369,7 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
           )}
         </div>
 
-        {/* Descripción + Pagado por (opcionales) */}
+        {/* Descripción + Pagado por */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs sm:text-sm mb-1">
