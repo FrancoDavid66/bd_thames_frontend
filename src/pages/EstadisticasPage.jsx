@@ -33,10 +33,10 @@ const getOficinaNombre = (valor) => {
   if (!valor) return "SIN_OFICINA";
   const id = String(valor).trim();
   const match = OFICINAS.find((o) => o.id === id);
-  return match ? match.nombre : valor; // si no mapea, devuelvo tal cual viene
+  return match ? match.nombre : valor;
 };
 
-// Variants simples para animar entrada de las cards
+// Variants para animar entrada de las cards
 const cardVariants = {
   hidden: { opacity: 0, y: 10 },
   visible: (i = 0) => ({
@@ -64,12 +64,7 @@ const ORBS = [
 ];
 
 // Wrapper para darle glow y animación card-por-card
-const AnimatedCard = ({
-  children,
-  index = 0,
-  glow,
-  interactive = true,
-}) => {
+const AnimatedCard = ({ children, index = 0, glow, interactive = true }) => {
   const baseGlow =
     glow || "from-sky-500/40 via-emerald-500/20 to-transparent";
 
@@ -90,7 +85,6 @@ const AnimatedCard = ({
       whileTap={interactive ? { scale: 0.97 } : undefined}
       className="relative group"
     >
-      {/* Borde / aura animada alrededor del Card */}
       <motion.div
         className={`pointer-events-none absolute -inset-[1px] rounded-2xl bg-gradient-to-br ${baseGlow} opacity-40 group-hover:opacity-80 -z-10`}
         animate={{
@@ -112,7 +106,7 @@ export default function EstadisticasPage() {
   const hoy = useMemo(() => new Date(), []);
   const [anio, setAnio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [oficina, setOficina] = useState(""); // todas
+  const [oficina, setOficina] = useState("");
   const [fuenteSnapshot, setFuenteSnapshot] = useState("live"); // "live" | "snapshot"
 
   const [loading, setLoading] = useState(false);
@@ -164,13 +158,12 @@ export default function EstadisticasPage() {
     }
   };
 
-  // Cargar al entrar y cuando cambian filtros principales
   useEffect(() => {
     fetchEstadisticas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anio, mes, oficina, fuenteSnapshot]);
 
-  // Totales agregados (sumando oficinas filtradas)
+  // Totales agregados
   const totales = useMemo(() => {
     return oficinasData.reduce(
       (acc, o) => {
@@ -178,7 +171,6 @@ export default function EstadisticasPage() {
         acc.activas += o.polizas_activas || 0;
         acc.nuevas += o.nuevas_mes || 0;
         acc.bajas += o.bajas_mes || 0;
-        // Para churn promedio simple sacamos promedio de porcentajes
         const churnPct = Number(o.churn_porcentaje || 0);
         acc.churnSumaPct += churnPct;
         acc.churnOficinasCount += 1;
@@ -200,7 +192,7 @@ export default function EstadisticasPage() {
       ? totales.churnSumaPct / totales.churnOficinasCount
       : 0;
 
-  // Lista de oficinas distintas para el combo (ids que vienen del back)
+  // Lista de oficinas para el combo
   const oficinasOptions = useMemo(() => {
     const set = new Set();
     oficinasData.forEach((o) => {
@@ -237,11 +229,9 @@ export default function EstadisticasPage() {
         className="pointer-events-none absolute inset-0 overflow-hidden"
         aria-hidden="true"
       >
-        {/* Halo base */}
         <div className="absolute -top-32 left-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
         <div className="absolute -bottom-32 right-4 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
 
-        {/* Orbes suaves en movimiento */}
         {ORBS.map((orb, idx) => (
           <motion.div
             key={idx}
@@ -274,7 +264,6 @@ export default function EstadisticasPage() {
           glow="from-sky-500/60 via-indigo-500/40 to-transparent"
         >
           <div className="relative flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-            {/* Línea glow superior */}
             <motion.div
               className="pointer-events-none absolute inset-x-4 -top-1 h-px bg-gradient-to-r from-transparent via-sky-400/80 to-transparent"
               initial={{ opacity: 0 }}
@@ -292,7 +281,7 @@ export default function EstadisticasPage() {
               </h1>
               <p className="mt-1 text-sm text-slate-300">
                 Visualizá el stock por sucursal, las altas y bajas del mes, la
-                antigüedad del libro y el churn por oficina.
+                antigüedad del libro y el churn basado en cuotas vencidas.
               </p>
             </div>
 
@@ -325,7 +314,7 @@ export default function EstadisticasPage() {
           </div>
         </AnimatedCard>
 
-        {/* FILTROS DENTRO DE CARD */}
+        {/* FILTROS */}
         <AnimatedCard
           index={1}
           interactive={false}
@@ -392,7 +381,7 @@ export default function EstadisticasPage() {
               </select>
             </div>
 
-            {/* Fuente: live vs snapshot */}
+            {/* Modo de cálculo */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                 <HiChartBar className="text-sky-300" />
@@ -495,7 +484,7 @@ export default function EstadisticasPage() {
             </div>
           </AnimatedCard>
 
-          {/* Churn promedio del mes */}
+          {/* Churn promedio (cuotas vencidas) */}
           <AnimatedCard
             index={6}
             glow="from-rose-500/60 via-amber-400/30 to-transparent"
@@ -511,14 +500,14 @@ export default function EstadisticasPage() {
                 {churnPromedio.toFixed(1)}%
               </p>
               <p className="text-xs font-medium text-slate-400">
-                Promedio de bajas del mes sobre el total de pólizas por
-                oficina.
+                % de pólizas con <strong>cuotas vencidas</strong> sobre el
+                stock de pólizas por oficina.
               </p>
             </div>
           </AnimatedCard>
         </div>
 
-        {/* BLOQUE PRINCIPAL: TABLA POR OFICINA */}
+        {/* TABLA POR OFICINA */}
         <AnimatedCard
           index={7}
           interactive={false}
@@ -572,36 +561,59 @@ export default function EstadisticasPage() {
                       const antig = o.antiguedad || {};
                       const churnPct = Number(o.churn_porcentaje || 0);
 
+                      // Resumen coberturas (solo %)
                       const cobKeys = Object.keys(mixCob);
-                      const compKeys = Object.keys(mixComp);
-
                       const cobResumen = cobKeys
                         .slice(0, 3)
-                        .map(
-                          (k) =>
-                            `${k}: ${formatMixPercent(mixCob[k], totalOf)}`
+                        .map((k) =>
+                          `${k}: ${formatMixPercent(mixCob[k], totalOf)}`
                         )
                         .join(" · ");
 
+                      // Resumen compañías: número + %
+                      const compKeys = Object.keys(mixComp);
                       const compResumen = compKeys
                         .slice(0, 3)
-                        .map(
-                          (k) =>
-                            `${k}: ${formatMixPercent(
-                              mixComp[k],
-                              totalOf
-                            )}`
-                        )
+                        .map((k) => {
+                          const count = Number(mixComp[k] || 0);
+                          const pct = formatMixPercent(count, totalOf);
+                          return `${k}: ${count} (${pct})`;
+                        })
                         .join(" · ");
 
+                      // Antigüedad del libro
                       const antigResumenParts = [];
-                      if (antig["0_1"]) antigResumenParts.push(`0–1: ${antig["0_1"]}`);
-                      if (antig["1_3"]) antigResumenParts.push(`1–3: ${antig["1_3"]}`);
-                      if (antig["3_5"]) antigResumenParts.push(`3–5: ${antig["3_5"]}`);
+                      if (antig["0_1"])
+                        antigResumenParts.push(`0–1: ${antig["0_1"]}`);
+                      if (antig["1_3"])
+                        antigResumenParts.push(`1–3: ${antig["1_3"]}`);
+                      if (antig["3_5"])
+                        antigResumenParts.push(`3–5: ${antig["3_5"]}`);
                       if (antig["5_plus"])
                         antigResumenParts.push(`5+: ${antig["5_plus"]}`);
                       const antigResumen = antigResumenParts.join(" · ");
 
+                      // Años de vehículo (rango + promedio)
+                      const anioVeh = o.anio_vehiculo || {};
+                      let anioLabel = "";
+                      if (anioVeh.min && anioVeh.max) {
+                        const prom =
+                          anioVeh.promedio !== undefined &&
+                          anioVeh.promedio !== null
+                            ? Math.round(Number(anioVeh.promedio))
+                            : null;
+                        anioLabel = prom
+                          ? `${anioVeh.min}–${anioVeh.max} (prom: ${prom})`
+                          : `${anioVeh.min}–${anioVeh.max}`;
+                      } else if (
+                        anioVeh.promedio !== undefined &&
+                        anioVeh.promedio !== null
+                      ) {
+                        const prom = Math.round(Number(anioVeh.promedio));
+                        anioLabel = `prom: ${prom}`;
+                      }
+
+                      // Color del churn
                       let churnColor = "text-slate-100";
                       if (churnPct >= 5 && churnPct < 10) {
                         churnColor = "text-amber-300";
@@ -638,6 +650,9 @@ export default function EstadisticasPage() {
                               {antigResumen && (
                                 <div>Antigüedad (años): {antigResumen}</div>
                               )}
+                              {anioLabel && (
+                                <div>Años vehículo: {anioLabel}</div>
+                              )}
                             </div>
                           </td>
                           <td className="px-3 py-2 text-right text-slate-100 align-top">
@@ -667,7 +682,7 @@ export default function EstadisticasPage() {
           </div>
         </AnimatedCard>
 
-        {/* FUTURO: COBRANZAS / SOLICITUDES / CLIENTES */}
+        {/* FUTURO MÓDULOS */}
         <AnimatedCard
           index={8}
           interactive={false}
