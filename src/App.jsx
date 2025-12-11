@@ -27,6 +27,8 @@ import GruasPage from "./pages/GruasPage";
 import CuponerasPage from "./pages/CuponerasPage";
 // COMPETENCIA
 import CompetenciaPage from "./pages/CompetenciaPage";
+// ESTADÍSTICAS
+import EstadisticasPage from "./pages/EstadisticasPage";
 
 // 🔔 Realtime counters (front-only BroadcastChannel)
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
@@ -330,6 +332,9 @@ function App() {
 
               {/* Competencia */}
               <Route path="/competencia" element={<CompetenciaPage />} />
+
+              {/* Estadísticas */}
+              <Route path="/estadisticas" element={<EstadisticasPage />} />
 
               {/* Propiedades / Alquileres aún bloqueadas */}
               <Route path="/propiedades" element={<Navigate to="/" />} />

@@ -9,6 +9,7 @@ import {
   FaDatabase, // icono para Balanzes
   FaMapMarkedAlt, // icono para Geo
   FaChartBar, // icono para Competencia
+  FaChartPie, // icono para Estadísticas
 } from "react-icons/fa";
 
 const tabs = [
@@ -17,6 +18,7 @@ const tabs = [
   { to: "/clientes", label: "Clientes", icon: FaUsers },
   { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
   { to: "/competencia", label: "Competencia", icon: FaChartBar },
+  { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie },
   { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
   { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
   { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },

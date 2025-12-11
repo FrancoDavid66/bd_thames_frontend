@@ -17,6 +17,7 @@ import {
   FaTimes,
   FaTicketAlt, // ← icono para Cuponeras
   FaChartBar, // ← icono para Competencia
+  FaChartPie, // ← icono para Estadísticas
 } from "react-icons/fa";
 import ThemeToggle from "./ThemeToggle";
 import logo_thames from "../../assets/logos/logo_thames.svg";
@@ -37,6 +38,7 @@ const navItems = [
   { to: "/competencia", label: "Competencia", icon: <FaChartBar /> },
   { to: "/polizas", label: "Pólizas", icon: <FaFileAlt /> },
   { to: "/pagos", label: "Pagos", icon: <FaMoneyCheckAlt /> },
+  { to: "/estadisticas", label: "Estadísticas", icon: <FaChartPie /> },
   { to: "/cuponeras", label: "Cuponeras", icon: <FaTicketAlt /> },
   { to: "/balanzes", label: "Balanzes", icon: <FaBalanceScale /> },
   { to: "/siniestros", label: "Siniestros", icon: <FaCarCrash /> },
@@ -89,11 +91,7 @@ export default function Sidebar({
         <div className="relative">
           {/* Header con logo */}
           <div className="flex items-center justify-center py-4 border-b border-blue-700 dark:border-gray-800">
-            <img
-              src={logo_thames}
-              alt="Thames"
-              className="h-8 w-auto"
-            />
+            <img src={logo_thames} alt="Thames" className="h-8 w-auto" />
           </div>
 
           {/* Botón cerrar (solo mobile) */}
