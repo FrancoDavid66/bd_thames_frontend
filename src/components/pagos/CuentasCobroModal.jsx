@@ -1,145 +1,202 @@
-/* src/components/pagos/CuentasCobroModal.jsx — CRUD real (backend) de Cuentas MP y Billeteras */
+// src/components/pagos/RecordatoriosCuotasModal.jsx
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { HiX, HiPlus, HiPencil, HiTrash, HiCheck } from "react-icons/hi";
-import { useDispatch, useSelector } from "react-redux";
+import {
+  HiX,
+  HiSpeakerphone,
+  HiCreditCard,
+  HiCash,
+  HiPencil,
+  HiTrash,
+  HiPlus,
+} from "react-icons/hi";
+import { useDispatch } from "react-redux";
+import toast from "react-hot-toast";
 import {
   fetchMediosCobro,
   crearMedioCobro,
   actualizarMedioCobro,
   eliminarMedioCobro,
 } from "../../store/slices/pagosSlice";
-import toast from "react-hot-toast";
 
-export default function CuentasCobroModal({
+function proveedorLabel(proveedor) {
+  if (proveedor === "mercado_pago") return "Mercado Pago";
+  if (proveedor === "billetera_virtual") return "Billetera virtual";
+  return "Otro";
+}
+
+export default function RecordatoriosCuotasModal({
   isOpen,
   onClose,
-  onChange, // opcional: se llama tras cada alta/edición/baja para que el padre refresque si quiere
+  mediosCobro = [],
+  sending = false,
+  // onEnviar(medio_cobro_id | null, oficina: "1" | "2") => {hoy, procesadas, enviados, errores}
+  onEnviar,
 }) {
   const dispatch = useDispatch();
-  const { mediosCobro, status, error } = useSelector((s) => ({
-    mediosCobro: s.pagos?.mediosCobro || [],
-    status: s.pagos?.status || "idle",
-    error: s.pagos?.error || null,
-  }));
 
-  const [newMP, setNewMP] = useState("");
-  const [newBil, setNewBil] = useState("");
-  const [editing, setEditing] = useState(null); // { id, proveedor, value }
+  // Solo medios aptos para recordatorios (MP o billetera virtual)
+  const mediosAptos = useMemo(
+    () =>
+      (mediosCobro || []).filter(
+        (m) =>
+          m &&
+          (m.proveedor === "mercado_pago" || m.proveedor === "billetera_virtual") &&
+          m.activo !== false
+      ),
+    [mediosCobro]
+  );
 
-  // Cargar lista al abrir
-  useEffect(() => {
-    if (isOpen) {
-      dispatch(fetchMediosCobro({ activo: true }));
-    }
-  }, [isOpen, dispatch]);
+  const [selectedId, setSelectedId] = useState(null);
 
-  // Agrupar por proveedor
-  const { mpList, bilList } = useMemo(() => {
-    const activos = (mediosCobro || []).filter((m) => m.activo !== false);
-    return {
-      mpList: activos.filter((m) => m.proveedor === "mercado_pago"),
-      bilList: activos.filter((m) => m.proveedor === "billetera_virtual"),
-    };
-  }, [mediosCobro]);
+  // Formulario CRUD
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({
+    proveedor: "mercado_pago", // tipo de billetera
+    aliasCbu: "",
+    titular: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
-  // Helpers
-  const displayName = (m) => (m?.etiqueta || m?.valor || "").toString();
-
-  // Validar duplicado contra TODA la lista y por valor *y* nombre visible
-  const isDuplicate = (name) => {
-    const k = (name || "").trim().toLowerCase();
-    if (!k) return true;
-    const all = Array.isArray(mediosCobro) ? mediosCobro : [];
-    return all.some((x) => {
-      const val = (x?.valor || "").toString().trim().toLowerCase();
-      const label = displayName(x).trim().toLowerCase();
-      return val === k || label === k;
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({
+      proveedor: "mercado_pago",
+      aliasCbu: "",
+      titular: "",
     });
   };
 
-  // Altas
-  const addMP = async () => {
-    const name = (newMP || "").trim();
-    if (!name) return;
-    if (isDuplicate(name)) {
-      toast("Ya existe un medio con ese nombre/valor");
+  // Al abrir, preseleccionamos el primero disponible
+  useEffect(() => {
+    if (isOpen) {
+      const first = mediosAptos[0];
+      setSelectedId(first ? first.id : null);
+      resetForm();
+    }
+  }, [isOpen, mediosAptos]);
+
+  const canEnviar = !sending && (selectedId || mediosAptos.length === 0);
+
+  const handleEnviarPorOficina = async (oficinaId) => {
+    if (!onEnviar) return;
+
+    if (!canEnviar) {
+      toast.error("Elegí una billetera/alias antes de enviar.");
       return;
     }
+
     try {
-      await dispatch(
-        crearMedioCobro({
-          proveedor: "mercado_pago",
-          etiqueta: name,
-          valor: name,
-          activo: true,
-        })
-      ).unwrap();
-      setNewMP("");
-      toast.success("Cuenta de Mercado Pago creada");
-      onChange?.();
+      const result = await onEnviar(selectedId || null, oficinaId);
+
+      const errores = result?.errores || [];
+      const yaEnviado = errores.find((e) => e?.error === "YA_ENVIADO_HOY");
+
+      if (yaEnviado) {
+        toast.success("Hoy ya se enviaron los recordatorios para esta oficina.");
+      } else {
+        const enviados = result?.enviados ?? 0;
+        const procesadas = result?.procesadas ?? 0;
+        toast.success(`Recordatorios enviados: ${enviados} de ${procesadas}.`);
+      }
     } catch (e) {
-      toast.error("No se pudo crear la cuenta");
+      console.error("[PAGOS][RecordatoriosCuotas] Error al enviar:", e);
+      toast.error("No se pudieron enviar los recordatorios.");
     }
   };
 
-  const addBil = async () => {
-    const name = (newBil || "").trim();
-    if (!name) return;
-    if (isDuplicate(name)) {
-      toast("Ya existe un medio con ese nombre/valor");
+  const handleEditClick = (medio) => {
+    setEditingId(medio.id);
+    setForm({
+      proveedor: medio.proveedor || "mercado_pago",
+      aliasCbu: medio.valor || "",
+      titular: medio.titular_nombre || "",
+    });
+  };
+
+  const handleSave = async () => {
+    const aliasCbu = form.aliasCbu.trim();
+    const titular = form.titular.trim();
+    const proveedor = form.proveedor || "mercado_pago";
+
+    if (!aliasCbu || !titular) {
+      toast.error("Completá alias/CBU y nombre de la persona");
       return;
     }
+
     try {
-      await dispatch(
-        crearMedioCobro({
-          proveedor: "billetera_virtual",
-          etiqueta: name,
-          valor: name,
-          activo: true,
-        })
-      ).unwrap();
-      setNewBil("");
-      toast.success("Billetera creada");
-      onChange?.();
-    } catch (e) {
-      toast.error("No se pudo crear la billetera");
+      setSaving(true);
+
+      const payload = {
+        proveedor, // "mercado_pago" | "billetera_virtual"
+        valor: aliasCbu, // alias o CBU
+        titular_nombre: titular,
+        activo: true,
+      };
+
+      let data;
+      if (editingId) {
+        data = await dispatch(
+          actualizarMedioCobro({ id: editingId, ...payload })
+        ).unwrap();
+        toast.success("Billetera actualizada");
+      } else {
+        data = await dispatch(crearMedioCobro(payload)).unwrap();
+        toast.success("Billetera creada");
+      }
+
+      // Refrescamos la lista global
+      dispatch(fetchMediosCobro({ activo: true }));
+
+      // Seleccionamos la nueva/actualizada
+      if (data?.id) {
+        setSelectedId(data.id);
+      }
+
+      resetForm();
+    } catch (err) {
+      console.error("[PAGOS][MediosCobro] Error al guardar:", err);
+      toast.error("No se pudo guardar la billetera");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Edición
-  const startEdit = (item) => {
-    setEditing({ id: item.id, proveedor: item.proveedor, value: displayName(item) });
-  };
-  const cancelEdit = () => setEditing(null);
-  const applyEdit = async () => {
-    if (!editing) return;
-    const value = (editing.value || "").trim();
-    if (!value) return;
-    try {
-      await dispatch(actualizarMedioCobro({ id: editing.id, etiqueta: value })).unwrap();
-      toast.success("Nombre actualizado");
-      setEditing(null);
-      onChange?.();
-    } catch (e) {
-      toast.error("No se pudo actualizar");
-    }
-  };
+  const handleDelete = async (medio) => {
+    if (!medio?.id) return;
+    const ok = window.confirm(
+      `¿Eliminar la billetera "${medio.etiqueta || medio.valor}"?`
+    );
+    if (!ok) return;
 
-  // Baja
-  const removeItem = async (item) => {
     try {
-      await dispatch(eliminarMedioCobro(item.id)).unwrap();
-      toast.success("Eliminado");
-      onChange?.();
-    } catch (e) {
-      toast.error("No se pudo eliminar");
+      setDeletingId(medio.id);
+      await dispatch(eliminarMedioCobro(medio.id)).unwrap();
+      toast.success("Billetera eliminada");
+      dispatch(fetchMediosCobro({ activo: true }));
+
+      if (selectedId === medio.id) {
+        setSelectedId(null);
+      }
+      if (editingId === medio.id) {
+        resetForm();
+      }
+    } catch (err) {
+      console.error("[PAGOS][MediosCobro] Error al eliminar:", err);
+      toast.error("No se pudo eliminar la billetera");
+    } finally {
+      setDeletingId(null);
     }
   };
 
   return (
     <Transition appear show={!!isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="relative z-50"
+        onClose={sending ? () => {} : onClose}
+      >
         {/* overlay */}
         <Transition.Child
           as={Fragment}
@@ -150,7 +207,7 @@ export default function CuentasCobroModal({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px]" />
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
         </Transition.Child>
 
         {/* panel */}
@@ -165,200 +222,314 @@ export default function CuentasCobroModal({
               leaveFrom="opacity-100 translate-y-0 scale-100"
               leaveTo="opacity-0 translate-y-2 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-2xl overflow-hidden rounded-2xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800 text-white shadow-xl">
+              <Dialog.Panel className="w-full max-w-lg rounded-3xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800/80 text-white shadow-2xl">
                 {/* header */}
-                <div className="relative px-6 py-5 border-b border-neutral-800">
-                  <Dialog.Title className="text-xl font-bold">
-                    Cuentas y Billeteras
-                  </Dialog.Title>
+                <div className="relative px-6 pt-6 pb-4 border-b border-neutral-800">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
+                      <HiSpeakerphone className="w-5 h-5 text-emerald-300" />
+                    </div>
+                    <div>
+                      <Dialog.Title className="text-lg font-semibold">
+                        Enviar recordatorios de cuotas
+                      </Dialog.Title>
+                      <p className="mt-1 text-xs text-neutral-300">
+                        Elegí y gestioná las billeteras/alias que se van a mostrar como
+                        medio de pago por transferencia en el WhatsApp.
+                      </p>
+                    </div>
+                  </div>
+
                   <button
                     onClick={onClose}
-                    className="absolute right-3 top-3 rounded-lg p-2 hover:bg-neutral-800 border border-transparent hover:border-neutral-700"
+                    className="absolute right-4 top-4 rounded-full p-2 hover:bg-neutral-900 border border-neutral-800/80"
                     aria-label="Cerrar"
                     title="Cerrar"
+                    disabled={sending}
                   >
-                    <HiX className="w-5 h-5" />
+                    <HiX className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* body */}
-                <div className="px-6 py-6 space-y-8">
-                  {/* MP */}
-                  <section>
-                    <h3 className="text-sm font-semibold text-neutral-200 mb-2">
-                      Cuentas de Mercado Pago
-                    </h3>
-
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {mpList.map((item) => (
-                        <span
-                          key={item.id}
-                          className="inline-flex items-center gap-1 rounded-xl border border-neutral-700 bg-neutral-900/70 px-3 h-9"
+                <div className="px-6 py-5 space-y-4">
+                  {/* Form CRUD */}
+                  <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold">
+                        {editingId ? "Editar billetera" : "Agregar billetera"}
+                      </h3>
+                      {editingId && (
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="inline-flex items-center gap-1 text-[11px] text-neutral-300 hover:text-neutral-100"
                         >
-                          {editing?.id === item.id ? (
-                            <>
-                              <input
-                                value={editing.value}
-                                onChange={(e) =>
-                                  setEditing({ ...editing, value: e.target.value })
-                                }
-                                className="bg-transparent outline-none"
-                              />
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Guardar"
-                                onClick={applyEdit}
-                              >
-                                <HiCheck className="w-4 h-4" />
-                              </button>
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Cancelar"
-                                onClick={cancelEdit}
-                              >
-                                <HiX className="w-4 h-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="truncate max-w-[14rem]">
-                                {displayName(item)}
-                              </span>
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Renombrar"
-                                onClick={() => startEdit(item)}
-                              >
-                                <HiPencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Eliminar"
-                                onClick={() => removeItem(item)}
-                              >
-                                <HiTrash className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </span>
-                      ))}
+                          <HiPlus className="w-3 h-3 rotate-45" />
+                          Limpiar y crear nueva
+                        </button>
+                      )}
                     </div>
 
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newMP}
-                        onChange={(e) => setNewMP(e.target.value)}
-                        placeholder="Nueva cuenta (ej: MP Principal)"
-                        className="h-10 flex-1 rounded-xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 px-3 outline-none transition"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Tipo de billetera */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-neutral-300">
+                          Tipo de billetera
+                        </label>
+                        <select
+                          className="h-9 rounded-xl bg-neutral-950 border border-neutral-700 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
+                          value={form.proveedor}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, proveedor: e.target.value }))
+                          }
+                        >
+                          <option value="mercado_pago">Mercado Pago</option>
+                          <option value="billetera_virtual">Billetera virtual</option>
+                        </select>
+                      </div>
+
+                      {/* Alias / CBU */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-neutral-300">
+                          Alias o CBU
+                        </label>
+                        <input
+                          type="text"
+                          className="h-9 rounded-xl bg-neutral-950 border border-neutral-700 px-2 text-xs text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
+                          placeholder="ALIAS.MP o CBU"
+                          value={form.aliasCbu}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, aliasCbu: e.target.value }))
+                          }
+                        />
+                      </div>
+
+                      {/* Titular */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-neutral-300">
+                          Nombre de la persona
+                        </label>
+                        <input
+                          type="text"
+                          className="h-9 rounded-xl bg-neutral-950 border border-neutral-700 px-2 text-xs text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
+                          placeholder="Titular de la billetera"
+                          value={form.titular}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, titular: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={addMP}
-                        className="h-10 px-3 rounded-xl inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700"
-                        disabled={status === "loading"}
+                        onClick={handleSave}
+                        disabled={
+                          saving || !form.aliasCbu.trim() || !form.titular.trim()
+                        }
+                        className="h-9 px-3 rounded-2xl bg-emerald-500/90 text-xs font-medium text-neutral-950 hover:bg-emerald-400 disabled:opacity-50 inline-flex items-center gap-2"
                       >
-                        <HiPlus className="w-4 h-4" />
-                        Agregar
+                        {saving ? (
+                          <span className="inline-block w-3 h-3 border-2 border-emerald-900/40 border-t-emerald-900 rounded-full animate-spin" />
+                        ) : (
+                          <HiPlus className="w-4 h-4" />
+                        )}
+                        {editingId ? "Guardar cambios" : "Agregar billetera"}
                       </button>
                     </div>
-                  </section>
+                  </div>
 
-                  {/* Billeteras */}
-                  <section>
-                    <h3 className="text-sm font-semibold text-neutral-200 mb-2">
-                      Billeteras virtuales
-                    </h3>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {bilList.map((item) => (
-                        <span
-                          key={item.id}
-                          className="inline-flex items-center gap-1 rounded-xl border border-neutral-700 bg-neutral-900/70 px-3 h-9"
-                        >
-                          {editing?.id === item.id ? (
-                            <>
-                              <input
-                                value={editing.value}
-                                onChange={(e) =>
-                                  setEditing({ ...editing, value: e.target.value })
+                  {/* Lista y selección */}
+                  {mediosAptos.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-neutral-700 bg-neutral-900/40 p-4 text-sm text-neutral-200">
+                      <p className="font-medium mb-1">
+                        No tenés alias ni billeteras configuradas para recordatorios.
+                      </p>
+                      <p className="text-xs text-neutral-300">
+                        Usá el cuadro de arriba para cargar tu primera billetera. Luego
+                        elegila para que aparezca en el WhatsApp.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-neutral-300">
+                        Elegí cuál de estas billeteras/alias se va a incluir en el mensaje
+                        como medio de pago por transferencia.
+                      </p>
+
+                      <div className="space-y-2">
+                        {mediosAptos.map((m) => {
+                          const isSelected = selectedId === m.id;
+                          const label = (m.etiqueta || m.valor || "").toString();
+                          const proveedor = proveedorLabel(m.proveedor);
+                          const isMP = m.proveedor === "mercado_pago";
+
+                          return (
+                            <div
+                              key={m.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedId(m.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setSelectedId(m.id);
                                 }
-                                className="bg-transparent outline-none"
-                              />
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Guardar"
-                                onClick={applyEdit}
-                              >
-                                <HiCheck className="w-4 h-4" />
-                              </button>
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Cancelar"
-                                onClick={cancelEdit}
-                              >
-                                <HiX className="w-4 h-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="truncate max-w-[14rem]">
-                                {displayName(item)}
-                              </span>
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Renombrar"
-                                onClick={() => startEdit(item)}
-                              >
-                                <HiPencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                className="p-1 rounded hover:bg-neutral-800"
-                                title="Eliminar"
-                                onClick={() => removeItem(item)}
-                              >
-                                <HiTrash className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                              }}
+                              className={`w-full flex items-center justify-between rounded-2xl border px-3 py-3 text-left transition cursor-pointer ${
+                                isSelected
+                                  ? "border-emerald-400/70 bg-emerald-500/10 ring-1 ring-emerald-400/40"
+                                  : "border-neutral-800 bg-neutral-900/60 hover:border-neutral-700"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                                    isSelected
+                                      ? "bg-emerald-500/20 text-emerald-200"
+                                      : "bg-neutral-800 text-neutral-300"
+                                  }`}
+                                >
+                                  {isMP ? (
+                                    <HiCreditCard className="w-4 h-4" />
+                                  ) : (
+                                    <HiCash className="w-4 h-4" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium truncate max-w-[12rem]">
+                                    {label}
+                                  </div>
+                                  <div className="text-[11px] text-neutral-400 flex items-center gap-2">
+                                    <span>{proveedor}</span>
+                                    {m.titular_nombre && (
+                                      <>
+                                        <span className="w-1 h-1 rounded-full bg-neutral-500" />
+                                        <span className="truncate max-w-[8rem]">
+                                          Titular: {m.titular_nombre}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
 
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newBil}
-                        onChange={(e) => setNewBil(e.target.value)}
-                        placeholder="Nueva billetera (ej: Ualá Emisor)"
-                        className="h-10 flex-1 rounded-xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 px-3 outline-none transition"
-                      />
-                      <button
-                        type="button"
-                        onClick={addBil}
-                        className="h-10 px-3 rounded-xl inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700"
-                        disabled={status === "loading"}
-                      >
-                        <HiPlus className="w-4 h-4" />
-                        Agregar
-                      </button>
-                    </div>
-                  </section>
+                              <div className="flex items-center gap-2">
+                                {/* Botones editar/eliminar */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditClick(m);
+                                  }}
+                                  className="w-7 h-7 rounded-full border border-neutral-700 bg-neutral-900/70 flex items-center justify-center text-neutral-300 hover:border-emerald-400/70 hover:text-emerald-200 text-[11px]"
+                                >
+                                  <HiPencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(m);
+                                  }}
+                                  disabled={deletingId === m.id}
+                                  className="w-7 h-7 rounded-full border border-neutral-700 bg-neutral-900/70 flex items-center justify-center text-neutral-300 hover:border-red-400/70 hover:text-red-300 text-[11px] disabled:opacity-50"
+                                >
+                                  {deletingId === m.id ? (
+                                    <span className="inline-block w-3 h-3 border-2 border-red-900/40 border-t-red-300 rounded-full animate-spin" />
+                                  ) : (
+                                    <HiTrash className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
 
-                  {error ? (
-                    <p className="text-sm text-rose-300/90">
-                      Error: {typeof error === "string" ? error : "no se pudo cargar"}
+                                {/* Radio de selección */}
+                                <div
+                                  className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                    isSelected
+                                      ? "border-emerald-400 bg-emerald-500/20"
+                                      : "border-neutral-600"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <span className="w-2 h-2 rounded-full bg-emerald-300" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Envío por oficina (cada botón envía) */}
+                  <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 space-y-2">
+                    <p className="text-xs text-neutral-200 font-medium">
+                      ¿Desde qué oficina se envían los mensajes?
                     </p>
-                  ) : null}
+                    <p className="text-[11px] text-neutral-400">
+                      Cada botón envía usando el WhatsApp de su oficina.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEnviarPorOficina("1")}
+                        disabled={!canEnviar || saving}
+                        className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                          !canEnviar || saving
+                            ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
+                            : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                        }`}
+                      >
+                        <span>Oficina 1 – 5 esquinas</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleEnviarPorOficina("2")}
+                        disabled={!canEnviar || saving}
+                        className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                          !canEnviar || saving
+                            ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
+                            : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                        }`}
+                      >
+                        <span>Oficina 2 – Axion</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* footer */}
-                <div className="px-6 pb-6 pt-2 flex justify-end">
-                  <button
-                    onClick={onClose}
-                    className="h-12 px-5 rounded-2xl bg-neutral-800 text-white hover:bg-neutral-700 border border-neutral-700 transition"
-                  >
-                    Cerrar
-                  </button>
+                <div className="px-6 pb-5 pt-2 flex items-center justify-between gap-3 border-t border-neutral-800">
+                  <p className="text-[11px] text-neutral-400 max-w-xs">
+                    Se enviará un solo WhatsApp por cliente agrupando sus cuotas.
+                    El alias elegido y la oficina seleccionada se usan en el mensaje.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={sending}
+                      className="h-10 px-4 rounded-2xl bg-neutral-900 border border-neutral-700 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+
+                    <div className="hidden sm:flex items-center gap-2">
+                      <div className="h-10 px-3 rounded-2xl bg-neutral-900 border border-neutral-800 text-xs text-neutral-300 inline-flex items-center gap-2">
+                        {sending ? (
+                          <span className="inline-block w-3 h-3 border-2 border-neutral-700 border-t-neutral-200 rounded-full animate-spin" />
+                        ) : (
+                          <HiSpeakerphone className="w-4 h-4" />
+                        )}
+                        <span>{sending ? "Enviando..." : "Elegí oficina arriba"}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </Dialog.Panel>
             </Transition.Child>

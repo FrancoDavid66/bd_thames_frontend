@@ -25,28 +25,6 @@ function proveedorLabel(proveedor) {
   return "Otro";
 }
 
-// Calcula la próxima medianoche a partir de una fecha "YYYY-MM-DD"
-function calcularProximaMedianoche(hoyStr) {
-  let base;
-  if (hoyStr) {
-    const [y, m, d] = hoyStr.split("-").map((n) => parseInt(n, 10));
-    base = new Date(y, m - 1, d, 0, 0, 0, 0);
-  } else {
-    base = new Date();
-  }
-  const next = new Date(base.getTime() + 24 * 60 * 60 * 1000);
-  return next.toISOString();
-}
-
-function formatearRestante(ms) {
-  if (ms <= 0) return "00:00:00";
-  const totalSec = Math.floor(ms / 1000);
-  const h = String(Math.floor(totalSec / 3600)).padStart(2, "0");
-  const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
-  const s = String(totalSec % 60).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
 export default function RecordatoriosCuotasModal({
   isOpen,
   onClose,
@@ -63,7 +41,8 @@ export default function RecordatoriosCuotasModal({
       (mediosCobro || []).filter(
         (m) =>
           m &&
-          (m.proveedor === "mercado_pago" || m.proveedor === "billetera_virtual") &&
+          (m.proveedor === "mercado_pago" ||
+            m.proveedor === "billetera_virtual") &&
           m.activo !== false
       ),
     [mediosCobro]
@@ -83,16 +62,6 @@ export default function RecordatoriosCuotasModal({
   });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-
-  // Oficinas bloqueadas por hoy: { "1": hastaISO, "2": hastaISO }
-  const [bloqueadasHasta, setBloqueadasHasta] = useState({});
-  const [now, setNow] = useState(Date.now());
-
-  // Tick del temporizador
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const resetForm = () => {
     setEditingId(null);
@@ -122,21 +91,17 @@ export default function RecordatoriosCuotasModal({
 
     try {
       const result = await onEnviar(selectedId || null, oficinaSeleccionada);
+
+      const enviados = result?.enviados ?? 0;
+      const procesadas = result?.procesadas ?? 0;
       const errores = result?.errores || [];
-      const yaEnviado = errores.find((e) => e?.error === "YA_ENVIADO_HOY");
+      const erroresCount = Array.isArray(errores) ? errores.length : 0;
 
-      const hoy = result?.hoy;
-      const hasta = calcularProximaMedianoche(hoy);
-      setBloqueadasHasta((prev) => ({
-        ...prev,
-        [oficinaSeleccionada]: hasta,
-      }));
-
-      if (yaEnviado) {
-        toast.success("Hoy ya se enviaron los recordatorios para esta oficina.");
+      if (erroresCount > 0) {
+        toast.success(
+          `Enviados: ${enviados} de ${procesadas}. Con ${erroresCount} error(es).`
+        );
       } else {
-        const enviados = result?.enviados ?? 0;
-        const procesadas = result?.procesadas ?? 0;
         toast.success(`Recordatorios enviados: ${enviados} de ${procesadas}.`);
       }
     } catch (e) {
@@ -231,21 +196,6 @@ export default function RecordatoriosCuotasModal({
       setDeletingId(null);
     }
   };
-
-  // Helpers para saber si una oficina está bloqueada y cuánto falta
-  const getEstadoOficina = (id) => {
-    const hastaISO = bloqueadasHasta[id];
-    if (!hastaISO) return { bloqueada: false, restante: null };
-    const hastaMs = new Date(hastaISO).getTime();
-    const restanteMs = hastaMs - now;
-    if (restanteMs <= 0) {
-      return { bloqueada: false, restante: null };
-    }
-    return { bloqueada: true, restante: formatearRestante(restanteMs) };
-  };
-
-  const estadoOfi1 = getEstadoOficina("1");
-  const estadoOfi2 = getEstadoOficina("2");
 
   return (
     <Transition appear show={!!isOpen} as={Fragment}>
@@ -528,41 +478,25 @@ export default function RecordatoriosCuotasModal({
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         type="button"
-                        disabled={estadoOfi1.bloqueada}
-                        onClick={() => !estadoOfi1.bloqueada && setOficinaSeleccionada("1")}
+                        onClick={() => setOficinaSeleccionada("1")}
                         className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
-                          estadoOfi1.bloqueada
-                            ? "border-emerald-500/40 bg-emerald-900/40 text-emerald-200/80 cursor-not-allowed"
-                            : oficinaSeleccionada === "1"
+                          oficinaSeleccionada === "1"
                             ? "border-emerald-400 bg-emerald-500/20 text-emerald-100"
                             : "border-neutral-700 bg-neutral-950 text-neutral-200 hover:bg-neutral-900"
                         }`}
                       >
                         <span>Oficina 1 – 5 esquinas</span>
-                        {estadoOfi1.bloqueada && estadoOfi1.restante && (
-                          <span className="text-[11px] opacity-90">
-                            ({estadoOfi1.restante})
-                          </span>
-                        )}
                       </button>
                       <button
                         type="button"
-                        disabled={estadoOfi2.bloqueada}
-                        onClick={() => !estadoOfi2.bloqueada && setOficinaSeleccionada("2")}
+                        onClick={() => setOficinaSeleccionada("2")}
                         className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
-                          estadoOfi2.bloqueada
-                            ? "border-emerald-500/40 bg-emerald-900/40 text-emerald-200/80 cursor-not-allowed"
-                            : oficinaSeleccionada === "2"
+                          oficinaSeleccionada === "2"
                             ? "border-emerald-400 bg-emerald-500/20 text-emerald-100"
                             : "border-neutral-700 bg-neutral-950 text-neutral-200 hover:bg-neutral-900"
                         }`}
                       >
                         <span>Oficina 2 – Axion</span>
-                        {estadoOfi2.bloqueada && estadoOfi2.restante && (
-                          <span className="text-[11px] opacity-90">
-                            ({estadoOfi2.restante})
-                          </span>
-                        )}
                       </button>
                       {/* Cuando esté lista la 3:
                       <button ...>Oficina 3 – Km 39</button>

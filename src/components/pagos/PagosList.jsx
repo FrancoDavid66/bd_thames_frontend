@@ -17,6 +17,7 @@ import {
 
 import { marcarCuotaComoPagada } from "../../store/slices/pagosSlice";
 import DescargarFactura from "./DescargarFactura";
+import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
 import EnviarFacturaWhatsapp from "./EnviarFacturaWhatsapp";
 import ModalFormaPago from "./ModalFormaPago";
 
@@ -69,6 +70,10 @@ const PALETTE = {
   neutralBtn:
     "bg-neutral-800 hover:bg-neutral-700 text-neutral-100 border-neutral-700",
   actionBtn: "bg-indigo-400 hover:bg-indigo-500 text-indigo-950",
+
+  // botón ticket térmico (pastel violeta)
+  ticketBtn:
+    "bg-violet-300 hover:bg-violet-400 text-violet-950 border-violet-500",
 };
 
 const fmtMoney = (n) =>
@@ -405,14 +410,26 @@ export default function PagosList({
                         )}
 
                         {cuota.pagado && (
-                          <DescargarFactura
-                            cliente={pol?.cliente}
-                            poliza={pol}
-                            cuota={cuota}
-                            tone="neutral"
-                            label="Factura"
-                            className="mt-0 w-full sm:w-auto"
-                          />
+                          <>
+                            {/* A4 (compartir) */}
+                            <DescargarFactura
+                              cliente={pol?.cliente}
+                              poliza={pol}
+                              cuota={cuota}
+                              tone="neutral"
+                              label="Compartir factura"
+                              className="mt-0 w-full sm:w-auto"
+                            />
+
+                            {/* Ticket térmico */}
+                            <ImprimirFacturaTicket
+                              cliente={pol?.cliente}
+                              poliza={pol}
+                              cuota={cuota}
+                              label="Imprimir factura"
+                              className={`h-10 px-3 rounded-xl border transition inline-flex items-center justify-center gap-2 w-full sm:w-auto ${PALETTE.ticketBtn}`}
+                            />
+                          </>
                         )}
 
                         <EnviarFacturaWhatsapp cuota={cuota}>
@@ -625,10 +642,7 @@ export default function PagosList({
                             : "—"
                         }
                       />
-                      <InfoRow
-                        label="Monto"
-                        value={`$ ${fmtMoney(c?.monto)}`}
-                      />
+                      <InfoRow label="Monto" value={`$ ${fmtMoney(c?.monto)}`} />
                       <InfoRow
                         label="Vencimiento"
                         value={fmtDate(c?.fecha_vencimiento)}

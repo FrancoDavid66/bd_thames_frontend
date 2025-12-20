@@ -13,6 +13,7 @@ import {
 
 import { registrarPagoYBalance } from "../../utils/pagos/registrarPagoYBalance";
 import DescargarFactura from "./DescargarFactura";
+import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
 import ModalFormaPago from "./ModalFormaPago";
 
 /* ====== Paleta pastel sólida ====== */
@@ -52,6 +53,10 @@ const P = {
   },
   link: "bg-sky-300 hover:bg-sky-400 text-sky-950 border-sky-500",
   tip: "bg-fuchsia-300 text-fuchsia-950 border-fuchsia-500",
+
+  // NUEVO: botón ticket (pastel violeta)
+  ticketBtn:
+    "bg-violet-300 hover:bg-violet-400 text-violet-950 border-violet-500",
 };
 
 const fmtMoney = (n) =>
@@ -278,7 +283,7 @@ export default function PolizaCuotasCard({ poliza }) {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {!cuota.pagado && (
                     <motion.button
                       whileHover={{ scale: 1.03 }}
@@ -294,13 +299,25 @@ export default function PolizaCuotasCard({ poliza }) {
                   )}
 
                   {cuota.pagado && (
-                    <DescargarFactura
-                      cliente={poliza?.cliente}
-                      poliza={poliza}
-                      cuota={cuota}
-                      label="Factura"
-                      tone="friendly"
-                    />
+                    <>
+                      {/* A4 (como estaba) */}
+                      <DescargarFactura
+                        cliente={poliza?.cliente}
+                        poliza={poliza}
+                        cuota={cuota}
+                        label="Factura"
+                        tone="friendly"
+                      />
+
+                      {/* Ticket térmico */}
+                      <ImprimirFacturaTicket
+                        cliente={poliza?.cliente}
+                        poliza={poliza}
+                        cuota={cuota}
+                        label="Imprimir factura"
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-extrabold ${P.ticketBtn}`}
+                      />
+                    </>
                   )}
 
                   <a
@@ -320,9 +337,7 @@ export default function PolizaCuotasCard({ poliza }) {
 
       {/* Nota inferior */}
       <div className="mt-4 flex items-center gap-2 text-xs text-neutral-700">
-        <span
-          className={`inline-block px-2 py-1 rounded-full border ${P.tip}`}
-        >
+        <span className={`inline-block px-2 py-1 rounded-full border ${P.tip}`}>
           ✨ tip
         </span>
         Podés registrar pagos parciales desde el modal y dejar una nota.
@@ -381,10 +396,7 @@ export default function PolizaCuotasCard({ poliza }) {
                     #{confirmData.cuotaNro ?? "?"}
                   </span>{" "}
                   de la póliza{" "}
-                  <span className="font-semibold">
-                    {confirmData.numeroPoliza}
-                  </span>
-                  .
+                  <span className="font-semibold">{confirmData.numeroPoliza}</span>.
                 </p>
 
                 <div className="mt-2 mb-4 text-center">
