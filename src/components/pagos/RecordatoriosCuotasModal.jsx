@@ -30,7 +30,7 @@ export default function RecordatoriosCuotasModal({
   onClose,
   mediosCobro = [],
   sending = false,
-  // onEnviar(medio_cobro_id | null, oficina: "1" | "2") => {hoy, procesadas, enviados, errores}
+  // onEnviar(medio_cobro_id | null, oficina: "1" | "2" | "3") => {hoy, procesadas, enviados, errores}
   onEnviar,
 }) {
   const dispatch = useDispatch();
@@ -498,9 +498,17 @@ export default function RecordatoriosCuotasModal({
                       >
                         <span>Oficina 2 – Axion</span>
                       </button>
-                      {/* Cuando esté lista la 3:
-                      <button ...>Oficina 3 – Km 39</button>
-                      */}
+                      <button
+                        type="button"
+                        onClick={() => setOficinaSeleccionada("3")}
+                        className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                          oficinaSeleccionada === "3"
+                            ? "border-emerald-400 bg-emerald-500/20 text-emerald-100"
+                            : "border-neutral-700 bg-neutral-950 text-neutral-200 hover:bg-neutral-900"
+                        }`}
+                      >
+                        <span>Oficina 3 – Km 39</span>
+                      </button>
                     </div>
                   </div>
                 </div>
