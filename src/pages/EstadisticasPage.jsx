@@ -2,10 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
-import {
-  OFICINAS,
-  getOficinaNombre,
-} from "../components/estadisticas/oficinas";
+import { OFICINAS, getOficinaNombre } from "../components/estadisticas/oficinas";
 
 import EstadisticasHeader from "../components/estadisticas/EstadisticasHeader";
 import EstadisticasFilters from "../components/estadisticas/EstadisticasFilters";
@@ -14,6 +11,10 @@ import OficinasTable from "../components/estadisticas/OficinasTable";
 import FutureModulesCard from "../components/estadisticas/FutureModulesCard";
 import AnimatedCard from "../components/estadisticas/AnimatedCard";
 import AseguradosExportModal from "../components/estadisticas/AseguradosExportModal";
+
+// ✅ NUEVO: panel vehículos + modal export
+import VehiculosPanel from "../components/estadisticas/VehiculosPanel";
+import VehiculosExportModal from "../components/estadisticas/VehiculosExportModal";
 
 const getApiBase = () => {
   const raw =
@@ -59,6 +60,10 @@ export default function EstadisticasPage() {
 
   const [showExport, setShowExport] = useState(false);
 
+  // ✅ NUEVO: modal export vehículos
+  const [showVehiculosExport, setShowVehiculosExport] = useState(false);
+  const [vehiculosExportDefaults, setVehiculosExportDefaults] = useState(null);
+
   const apiBase = useMemo(() => getApiBase(), []);
 
   const fetchEstadisticas = async () => {
@@ -103,7 +108,6 @@ export default function EstadisticasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anio, mes, oficina, fuenteSnapshot]);
 
-  // Totales agregados
   const totales = useMemo(() => {
     return oficinasData.reduce(
       (acc, o) => {
@@ -132,7 +136,6 @@ export default function EstadisticasPage() {
       ? totales.churnSumaPct / totales.churnOficinasCount
       : 0;
 
-  // Lista de oficinas para el combo (según respuesta)
   const oficinasOptions = useMemo(() => {
     const set = new Set();
     oficinasData.forEach((o) => {
@@ -156,6 +159,12 @@ export default function EstadisticasPage() {
   const periodoLabel =
     periodo ||
     `${mes.toString().padStart(2, "0")}/${anio.toString().padStart(4, "0")}`;
+
+  // ✅ abre export vehículos con defaults (los filtros actuales del panel)
+  const openVehiculosExport = (defaults) => {
+    setVehiculosExportDefaults(defaults || null);
+    setShowVehiculosExport(true);
+  };
 
   return (
     <motion.div
@@ -244,6 +253,15 @@ export default function EstadisticasPage() {
           formatMixPercent={formatMixPercent}
         />
 
+        {/* ✅ NUEVO: PANEL VEHÍCULOS */}
+        <VehiculosPanel
+          apiBase={apiBase}
+          oficinas={OFICINAS}
+          getOficinaNombre={getOficinaNombre}
+          defaultOficina={oficina}
+          onOpenExport={openVehiculosExport}
+        />
+
         {/* FUTURO */}
         <FutureModulesCard />
       </div>
@@ -255,6 +273,16 @@ export default function EstadisticasPage() {
         oficinas={OFICINAS}
         defaultOficina={oficina}
         getOficinaNombre={getOficinaNombre}
+      />
+
+      {/* ✅ NUEVO: EXPORT VEHÍCULOS */}
+      <VehiculosExportModal
+        open={showVehiculosExport}
+        onClose={() => setShowVehiculosExport(false)}
+        apiBase={apiBase}
+        oficinas={OFICINAS}
+        getOficinaNombre={getOficinaNombre}
+        defaults={vehiculosExportDefaults}
       />
     </motion.div>
   );
