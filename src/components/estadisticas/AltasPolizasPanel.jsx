@@ -1,8 +1,8 @@
-// src/components/estadisticas/SolicitudesPanel.jsx
+// src/components/estadisticas/AltasPolizasPanel.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import { motion } from "framer-motion";
 import {
   HiChartBar,
   HiCalendar,
@@ -27,8 +27,7 @@ const clampIsoDate = (v) => {
 const defaultDesdeFor = (agrupacion) => {
   const hoy = dayjs().startOf("day");
   if (agrupacion === "mes") return hoy.subtract(12, "month").format("YYYY-MM-DD");
-  if (agrupacion === "semana")
-    return hoy.subtract(12, "week").format("YYYY-MM-DD");
+  if (agrupacion === "semana") return hoy.subtract(12, "week").format("YYYY-MM-DD");
   return hoy.subtract(30, "day").format("YYYY-MM-DD");
 };
 
@@ -44,7 +43,7 @@ const labelPeriodo = (agrupacion, periodo) => {
   return d.format("DD/MM/YYYY");
 };
 
-export default function SolicitudesPanel({
+export default function AltasPolizasPanel({
   apiBase,
   oficinas = [],
   getOficinaNombre,
@@ -57,21 +56,19 @@ export default function SolicitudesPanel({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const [payload, setPayload] = useState(null);
 
-  // Si cambia defaultOficina (filtros globales), mantenemos sincronizado
+  // sync con filtro global
   useEffect(() => {
     setOficina(defaultOficina || "");
   }, [defaultOficina]);
 
-  // Ajustar desde cuando cambia agrupación (para que sea cómodo)
+  // ajuste cómodo de rango por agrupación
   useEffect(() => {
     setDesde((prev) => prev || defaultDesdeFor(agrupacion));
   }, [agrupacion]);
 
   const oficinasOptions = useMemo(() => {
-    // incluye opciones conocidas + las buckets “OTRAS/SIN”
     const base = Array.isArray(oficinas) ? oficinas : [];
     const ids = base.map((o) => String(o.id));
     const extras = ["OTRAS", "SIN_OFICINA"];
@@ -88,17 +85,21 @@ export default function SolicitudesPanel({
       if (clampIsoDate(hasta)) params.set("hasta", clampIsoDate(hasta));
       if (oficina) params.set("oficina", oficina);
 
-      const url = `${apiBase}estadisticas/solicitudes/serie/?${params.toString()}`;
+      // ✅ IMPORTANTE: este endpoint debe existir en backend
+      const url = `${apiBase}estadisticas/polizas/altas/serie/?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
-      const data = await res.json();
 
+      if (!res.ok) {
+        throw new Error(`Error HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
       setPayload(data || null);
     } catch (e) {
-      console.error("[SolicitudesPanel] Error:", e);
+      console.error("[AltasPolizasPanel] Error:", e);
       setPayload(null);
       setError(
-        "No se pudieron cargar las solicitudes. Revisá el endpoint /api/estadisticas/solicitudes/serie/."
+        "No se pudieron cargar las altas de póliza. Revisá el endpoint /api/estadisticas/polizas/altas/serie/."
       );
     } finally {
       setLoading(false);
@@ -111,7 +112,6 @@ export default function SolicitudesPanel({
 
   const oficinasSerie = useMemo(() => {
     const arr = Array.isArray(payload?.oficinas) ? payload.oficinas : [];
-    // orden: 1,2,3,OTRAS,SIN + resto al final
     const extra = arr
       .map((x) => String(x?.oficina || ""))
       .filter(Boolean)
@@ -119,18 +119,14 @@ export default function SolicitudesPanel({
     const order = [...ORDER_BUCKETS, ...extra];
 
     const map = new Map(arr.map((o) => [String(o.oficina || ""), o]));
-    return order
-      .map((k) => map.get(k))
-      .filter(Boolean);
+    return order.map((k) => map.get(k)).filter(Boolean);
   }, [payload]);
 
   const periodos = useMemo(() => {
-    const p = Array.isArray(payload?.periodos) ? payload.periodos : [];
-    return p;
+    return Array.isArray(payload?.periodos) ? payload.periodos : [];
   }, [payload]);
 
   const table = useMemo(() => {
-    // construye tabla: filas por periodo, cols por oficina
     const cols = oficinasSerie.map((o) => String(o.oficina));
     const colMeta = oficinasSerie.map((o) => ({
       oficina: String(o.oficina),
@@ -144,7 +140,9 @@ export default function SolicitudesPanel({
     const seriesByOfi = new Map();
     oficinasSerie.forEach((o) => {
       const s = Array.isArray(o.serie) ? o.serie : [];
-      const m = new Map(s.map((it) => [String(it.periodo), Number(it.cantidad || 0)]));
+      const m = new Map(
+        s.map((it) => [String(it.periodo), Number(it.cantidad || 0)])
+      );
       seriesByOfi.set(String(o.oficina), m);
     });
 
@@ -169,38 +167,32 @@ export default function SolicitudesPanel({
     return { colMeta, cols, rows, totalsRow };
   }, [oficinasSerie, periodos, getOficinaNombre]);
 
-  const kpis = useMemo(() => {
-    const totalGeneral = Number(table?.totalsRow?.total || 0);
-    const totalesPorOfi = (oficinasSerie || []).map((o) => ({
-      oficina: String(o.oficina),
-      oficina_nombre:
-        o.oficina_nombre ||
-        (typeof getOficinaNombre === "function"
-          ? getOficinaNombre(String(o.oficina))
-          : String(o.oficina)),
-      total: Number(o.total || 0),
-    }));
-    return { totalGeneral, totalesPorOfi };
-  }, [table, oficinasSerie, getOficinaNombre]);
+  const totalGeneral = Number(table?.totalsRow?.total || 0);
 
   return (
     <AnimatedCard
       index={4}
       interactive={false}
-      glow="from-sky-500/40 via-indigo-500/25 to-transparent"
+      glow="from-emerald-500/35 via-cyan-500/20 to-transparent"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/25">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/25">
               <HiChartBar className="text-lg" />
             </span>
             <div>
               <h3 className="text-base sm:text-lg font-semibold tracking-tight">
-                Solicitudes por oficina
+                Altas de póliza por oficina
               </h3>
               <p className="text-xs sm:text-sm text-slate-400">
-                Conteo por {agrupacion === "dia" ? "día" : agrupacion === "semana" ? "semana" : "mes"} según rango de fechas.
+                Cuenta pólizas creadas (solicitud de alta) por{" "}
+                {agrupacion === "dia"
+                  ? "día"
+                  : agrupacion === "semana"
+                  ? "semana"
+                  : "mes"}
+                .
               </p>
             </div>
           </div>
@@ -220,7 +212,6 @@ export default function SolicitudesPanel({
 
       {/* filtros */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* agrupación */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400 inline-flex items-center gap-2">
             <HiCalendar className="opacity-70" />
@@ -229,7 +220,7 @@ export default function SolicitudesPanel({
           <select
             value={agrupacion}
             onChange={(e) => setAgrupacion(e.target.value)}
-            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
           >
             <option value="dia">Día</option>
             <option value="semana">Semana</option>
@@ -237,7 +228,6 @@ export default function SolicitudesPanel({
           </select>
         </div>
 
-        {/* oficina */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400 inline-flex items-center gap-2">
             <HiOfficeBuilding className="opacity-70" />
@@ -246,7 +236,7 @@ export default function SolicitudesPanel({
           <select
             value={oficina}
             onChange={(e) => setOficina(e.target.value)}
-            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
           >
             <option value="">Todas</option>
             {oficinasOptions.map((id) => (
@@ -259,25 +249,23 @@ export default function SolicitudesPanel({
           </select>
         </div>
 
-        {/* desde */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">Desde</label>
           <input
             type="date"
             value={clampIsoDate(desde)}
             onChange={(e) => setDesde(e.target.value)}
-            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
           />
         </div>
 
-        {/* hasta */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">Hasta</label>
           <input
             type="date"
             value={clampIsoDate(hasta)}
             onChange={(e) => setHasta(e.target.value)}
-            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
           />
         </div>
       </div>
@@ -290,33 +278,17 @@ export default function SolicitudesPanel({
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        <div className="rounded-2xl bg-slate-950/40 border border-slate-800 px-3 py-2">
-          <div className="text-[0.65rem] uppercase tracking-wide text-slate-400">
-            Total (rango)
-          </div>
-          <div className="text-lg sm:text-2xl font-semibold tabular-nums">
-            {kpis.totalGeneral}
-          </div>
+      {/* total */}
+      <div className="mt-4 rounded-2xl bg-slate-950/40 border border-slate-800 px-3 py-2">
+        <div className="text-[0.65rem] uppercase tracking-wide text-slate-400">
+          Total altas (rango)
         </div>
-
-        {kpis.totalesPorOfi.slice(0, 3).map((o) => (
-          <div
-            key={o.oficina}
-            className="rounded-2xl bg-slate-950/40 border border-slate-800 px-3 py-2"
-          >
-            <div className="text-[0.65rem] uppercase tracking-wide text-slate-400">
-              {o.oficina_nombre}
-            </div>
-            <div className="text-lg sm:text-2xl font-semibold tabular-nums">
-              {o.total}
-            </div>
-          </div>
-        ))}
+        <div className="text-lg sm:text-2xl font-semibold tabular-nums">
+          {totalGeneral}
+        </div>
       </div>
 
-      {/* Tabla */}
+      {/* tabla */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/30">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs sm:text-sm">
@@ -333,9 +305,7 @@ export default function SolicitudesPanel({
                     {c.oficina_nombre}
                   </th>
                 ))}
-                <th className="px-3 py-2 text-slate-200 font-semibold">
-                  Total
-                </th>
+                <th className="px-3 py-2 text-slate-200 font-semibold">Total</th>
               </tr>
             </thead>
 

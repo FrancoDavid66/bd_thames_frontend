@@ -12,12 +12,12 @@ import FutureModulesCard from "../components/estadisticas/FutureModulesCard";
 import AnimatedCard from "../components/estadisticas/AnimatedCard";
 import AseguradosExportModal from "../components/estadisticas/AseguradosExportModal";
 
-// ✅ NUEVO: panel vehículos + modal export
+// ✅ panel vehículos + modal export
 import VehiculosPanel from "../components/estadisticas/VehiculosPanel";
 import VehiculosExportModal from "../components/estadisticas/VehiculosExportModal";
 
-// ✅ NUEVO: panel solicitudes por oficina
-import SolicitudesPanel from "../components/estadisticas/SolicitudesPanel";
+// ✅ altas de póliza por oficina (día/semana/mes)
+import AltasPolizasPanel from "../components/estadisticas/AltasPolizasPanel";
 
 const getApiBase = () => {
   const raw =
@@ -63,7 +63,7 @@ export default function EstadisticasPage() {
 
   const [showExport, setShowExport] = useState(false);
 
-  // ✅ NUEVO: modal export vehículos
+  // ✅ modal export vehículos
   const [showVehiculosExport, setShowVehiculosExport] = useState(false);
   const [vehiculosExportDefaults, setVehiculosExportDefaults] = useState(null);
 
@@ -261,8 +261,8 @@ export default function EstadisticasPage() {
           formatMixPercent={formatMixPercent}
         />
 
-        {/* ✅ NUEVO: SOLICITUDES POR OFICINA (día/semana/mes) */}
-        <SolicitudesPanel
+        {/* ✅ ALTAS DE PÓLIZA POR OFICINA (día/semana/mes) */}
+        <AltasPolizasPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
           getOficinaNombre={getOficinaNombre}
