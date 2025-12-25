@@ -12,11 +12,9 @@ import FutureModulesCard from "../components/estadisticas/FutureModulesCard";
 import AnimatedCard from "../components/estadisticas/AnimatedCard";
 import AseguradosExportModal from "../components/estadisticas/AseguradosExportModal";
 
-// ✅ panel vehículos + modal export
 import VehiculosPanel from "../components/estadisticas/VehiculosPanel";
 import VehiculosExportModal from "../components/estadisticas/VehiculosExportModal";
 
-// ✅ altas de póliza por oficina (día/semana/mes)
 import AltasPolizasPanel from "../components/estadisticas/AltasPolizasPanel";
 
 const getApiBase = () => {
@@ -29,7 +27,6 @@ const getApiBase = () => {
   return raw.endsWith("/") ? raw : `${raw}/`;
 };
 
-// Helpers de formato para mixes
 const formatMixPercent = (value, total) => {
   const v = Number(value || 0);
   const t = Number(total || 0);
@@ -38,7 +35,6 @@ const formatMixPercent = (value, total) => {
   return `${pct.toFixed(0)}%`;
 };
 
-// Orbes de fondo animados
 const ORBS = [
   { top: "12%", left: "10%", size: 140, duration: 18 },
   { top: "70%", left: "15%", size: 160, duration: 22 },
@@ -63,7 +59,6 @@ export default function EstadisticasPage() {
 
   const [showExport, setShowExport] = useState(false);
 
-  // ✅ modal export vehículos
   const [showVehiculosExport, setShowVehiculosExport] = useState(false);
   const [vehiculosExportDefaults, setVehiculosExportDefaults] = useState(null);
 
@@ -77,9 +72,7 @@ export default function EstadisticasPage() {
       params.set("anio", anio);
       params.set("mes", mes);
       if (oficina) params.set("oficina", oficina);
-      if (fuenteSnapshot === "snapshot") {
-        params.set("usar_snapshot", "1");
-      }
+      if (fuenteSnapshot === "snapshot") params.set("usar_snapshot", "1");
 
       const url = `${apiBase}estadisticas/polizas/por-oficina/?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
@@ -154,16 +147,13 @@ export default function EstadisticasPage() {
 
   const handleAnioChange = (value) => {
     const n = Number(value);
-    if (!Number.isNaN(n) && n >= 2000 && n <= hoy.getFullYear() + 1) {
-      setAnio(n);
-    }
+    if (!Number.isNaN(n) && n >= 2000 && n <= hoy.getFullYear() + 1) setAnio(n);
   };
 
   const periodoLabel =
     periodo ||
     `${mes.toString().padStart(2, "0")}/${anio.toString().padStart(4, "0")}`;
 
-  // ✅ abre export vehículos con defaults (los filtros actuales del panel)
   const openVehiculosExport = (defaults) => {
     setVehiculosExportDefaults(defaults || null);
     setShowVehiculosExport(true);
@@ -176,40 +166,25 @@ export default function EstadisticasPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
     >
-      {/* Fondo animado */}
-      <div
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -top-32 left-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
         <div className="absolute -bottom-32 right-4 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-
         {ORBS.map((orb, idx) => (
           <motion.div
             key={idx}
             className="absolute rounded-full bg-sky-400/10 blur-2xl shadow-[0_0_60px_rgba(56,189,248,0.35)]"
-            style={{
-              top: orb.top,
-              left: orb.left,
-              width: orb.size,
-              height: orb.size,
-            }}
+            style={{ top: orb.top, left: orb.left, width: orb.size, height: orb.size }}
             animate={{
               y: ["-10px", "15px", "-10px"],
               x: ["0px", idx % 2 === 0 ? "10px" : "-10px", "0px"],
               opacity: [0.55, 0.95, 0.55],
             }}
-            transition={{
-              duration: orb.duration,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
+            transition={{ duration: orb.duration, repeat: Infinity, ease: "easeInOut" }}
           />
         ))}
       </div>
 
       <div className="relative mx-auto flex max-w-6xl flex-col gap-6">
-        {/* HEADER */}
         <EstadisticasHeader
           periodoLabel={periodoLabel}
           fuenteRespuesta={fuenteRespuesta}
@@ -218,13 +193,10 @@ export default function EstadisticasPage() {
           onOpenExport={() => setShowExport(true)}
         />
 
-        {/* FILTROS */}
         <EstadisticasFilters
           oficina={oficina}
           setOficina={setOficina}
-          oficinasOptions={
-            oficinasOptions.length ? oficinasOptions : OFICINAS.map((o) => o.id)
-          }
+          oficinasOptions={oficinasOptions.length ? oficinasOptions : OFICINAS.map((o) => o.id)}
           anio={anio}
           onAnioChange={handleAnioChange}
           mes={mes}
@@ -235,41 +207,32 @@ export default function EstadisticasPage() {
           hasta={hasta}
         />
 
-        {/* ERROR */}
         {error && (
-          <AnimatedCard
-            index={2}
-            interactive={false}
-            glow="from-rose-500/50 via-red-500/30 to-transparent"
-          >
+          <AnimatedCard index={2} interactive={false} glow="from-rose-500/50 via-red-500/30 to-transparent">
             <div className="rounded-xl border border-rose-500/60 bg-rose-950/40 px-3 py-2 text-xs sm:text-sm text-rose-100">
               {error}
             </div>
           </AnimatedCard>
         )}
 
-        {/* RESUMEN */}
-        <EstadisticasSummaryCards
-          totales={totales}
-          churnPromedio={churnPromedio}
-        />
+        <EstadisticasSummaryCards totales={totales} churnPromedio={churnPromedio} />
 
-        {/* TABLA POR OFICINA */}
         <OficinasTable
           oficinasData={oficinasData}
           getOficinaNombre={getOficinaNombre}
           formatMixPercent={formatMixPercent}
         />
 
-        {/* ✅ ALTAS DE PÓLIZA POR OFICINA (día/semana/mes) */}
+        {/* ✅ ALTAS DE PÓLIZA (SINCRONIZADO con mes/año) */}
         <AltasPolizasPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
           getOficinaNombre={getOficinaNombre}
           defaultOficina={oficina}
+          anio={anio}
+          mes={mes}
         />
 
-        {/* ✅ PANEL VEHÍCULOS */}
         <VehiculosPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
@@ -278,7 +241,6 @@ export default function EstadisticasPage() {
           onOpenExport={openVehiculosExport}
         />
 
-        {/* FUTURO */}
         <FutureModulesCard />
       </div>
 
@@ -291,7 +253,6 @@ export default function EstadisticasPage() {
         getOficinaNombre={getOficinaNombre}
       />
 
-      {/* ✅ EXPORT VEHÍCULOS */}
       <VehiculosExportModal
         open={showVehiculosExport}
         onClose={() => setShowVehiculosExport(false)}
