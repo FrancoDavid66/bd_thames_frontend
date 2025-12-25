@@ -34,7 +34,6 @@ const defaultDesdeFor = (agrupacion) => {
 const labelPeriodo = (agrupacion, periodo) => {
   const p = String(periodo || "").trim();
   if (!p) return "—";
-
   const d = dayjs(p);
   if (!d.isValid()) return p;
 
@@ -42,6 +41,17 @@ const labelPeriodo = (agrupacion, periodo) => {
   if (agrupacion === "semana") return `Semana de ${d.format("DD/MM/YYYY")}`;
   return d.format("DD/MM/YYYY");
 };
+
+async function fetchJsonTry(url, options) {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`);
+    err.status = res.status;
+    err.url = url;
+    throw err;
+  }
+  return res.json();
+}
 
 export default function AltasPolizasPanel({
   apiBase,
@@ -63,7 +73,7 @@ export default function AltasPolizasPanel({
     setOficina(defaultOficina || "");
   }, [defaultOficina]);
 
-  // ajuste cómodo de rango por agrupación
+  // rango sugerido por agrupación
   useEffect(() => {
     setDesde((prev) => prev || defaultDesdeFor(agrupacion));
   }, [agrupacion]);
@@ -78,28 +88,60 @@ export default function AltasPolizasPanel({
   const fetchSerie = useCallback(async () => {
     setLoading(true);
     setError("");
+
     try {
       const params = new URLSearchParams();
       params.set("agrupacion", agrupacion);
-      if (clampIsoDate(desde)) params.set("desde", clampIsoDate(desde));
-      if (clampIsoDate(hasta)) params.set("hasta", clampIsoDate(hasta));
+
+      const d = clampIsoDate(desde);
+      const h = clampIsoDate(hasta);
+      if (d) params.set("desde", d);
+      if (h) params.set("hasta", h);
+
       if (oficina) params.set("oficina", oficina);
 
-      // ✅ IMPORTANTE: este endpoint debe existir en backend
-      const url = `${apiBase}estadisticas/polizas/altas/serie/?${params.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
+      // ✅ CLAVE: queremos “solicitud de alta”
+      params.set("motivo", "ALTA_POLIZA");
 
-      if (!res.ok) {
-        throw new Error(`Error HTTP ${res.status}`);
+      // ✅ probamos rutas en orden (por compatibilidad)
+      const candidates = [
+        // (vieja/ideal si existiera)
+        `${apiBase}estadisticas/polizas/altas/serie/?${params.toString()}`,
+        // (la que normalmente existe en tu backend)
+        `${apiBase}estadisticas/solicitudes/serie/?${params.toString()}`,
+        // (fallback extra por si lo publicaste así)
+        `${apiBase}estadisticas/altas/serie/?${params.toString()}`,
+      ];
+
+      let data = null;
+      let lastErr = null;
+
+      for (const url of candidates) {
+        try {
+          data = await fetchJsonTry(url, { credentials: "include" });
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          // si no es 404, cortamos (puede ser 401/500 real)
+          if (e?.status && e.status !== 404) break;
+        }
       }
 
-      const data = await res.json();
+      if (!data) {
+        const msg =
+          lastErr?.status === 404
+            ? "No se encontró el endpoint para altas. Verificá que exista /api/estadisticas/solicitudes/serie/."
+            : "No se pudieron cargar las altas. Revisá logs del backend.";
+        throw new Error(msg);
+      }
+
       setPayload(data || null);
     } catch (e) {
       console.error("[AltasPolizasPanel] Error:", e);
       setPayload(null);
       setError(
-        "No se pudieron cargar las altas de póliza. Revisá el endpoint /api/estadisticas/polizas/altas/serie/."
+        "No se pudieron cargar las altas de póliza (solicitud de alta). Revisá el endpoint /api/estadisticas/solicitudes/serie/ y que acepte motivo=ALTA_POLIZA."
       );
     } finally {
       setLoading(false);
@@ -186,7 +228,7 @@ export default function AltasPolizasPanel({
                 Altas de póliza por oficina
               </h3>
               <p className="text-xs sm:text-sm text-slate-400">
-                Cuenta pólizas creadas (solicitud de alta) por{" "}
+                Cuenta solicitudes con motivo <span className="text-slate-200">ALTA_POLIZA</span> por{" "}
                 {agrupacion === "dia"
                   ? "día"
                   : agrupacion === "semana"
@@ -372,7 +414,7 @@ export default function AltasPolizasPanel({
         <div className="px-3 py-2 text-[0.7rem] text-slate-400 border-t border-slate-800">
           Fuente: {payload?.fuente || "live"} · Rango:{" "}
           {payload?.desde || clampIsoDate(desde) || "—"} →{" "}
-          {payload?.hasta || clampIsoDate(hasta) || "—"}
+          {payload?.hasta || clampIsoDate(hasta) || "—"} · motivo=ALTA_POLIZA
         </div>
       </div>
     </AnimatedCard>
