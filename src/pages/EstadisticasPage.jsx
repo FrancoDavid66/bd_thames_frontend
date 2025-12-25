@@ -261,12 +261,14 @@ export default function EstadisticasPage() {
           formatMixPercent={formatMixPercent}
         />
 
-        {/* ✅ ALTAS DE PÓLIZA POR OFICINA (día/semana/mes) */}
+        {/* ✅ EMISIONES DE PÓLIZA POR OFICINA (hora/día/semana/mes) */}
         <AltasPolizasPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
           getOficinaNombre={getOficinaNombre}
           defaultOficina={oficina}
+          anio={anio}
+          mes={mes}
         />
 
         {/* ✅ PANEL VEHÍCULOS */}
