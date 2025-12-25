@@ -9,19 +9,14 @@ import {
   HiDownload,
   HiShieldCheck,
   HiRefresh,
+  HiChevronLeft,
+  HiChevronRight,
 } from "react-icons/hi";
 import AnimatedCard from "./AnimatedCard";
 
 const boolToParam = (v) => (v ? "1" : "0");
 
-const TIPOS = [
-  "",
-  "Auto",
-  "Camioneta",
-  "Camion",
-  "Moto",
-  "Trailer",
-];
+const TIPOS = ["", "Auto", "Camioneta", "Camion", "Moto", "Trailer"];
 
 export default function VehiculosPanel({
   apiBase,
@@ -40,10 +35,17 @@ export default function VehiculosPanel({
   const [patente, setPatente] = useState("");
   const [soloActivas, setSoloActivas] = useState(true);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
+  const [loadingResumen, setLoadingResumen] = useState(false);
+  const [errorResumen, setErrorResumen] = useState("");
   const [data, setData] = useState(null);
+
+  // ✅ NUEVO: listado asegurados (paginado)
+  const [loadingList, setLoadingList] = useState(false);
+  const [errorList, setErrorList] = useState("");
+  const [listData, setListData] = useState({ page: 1, page_size: 25, count: 0, total_pages: 1, results: [] });
+
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(25);
 
   const debounceRef = useRef(null);
 
@@ -65,6 +67,13 @@ export default function VehiculosPanel({
     };
   }, [oficina, tipo, anio, anioDesde, anioHasta, marca, modelo, patente, soloActivas]);
 
+  const filtrosKey = useMemo(() => JSON.stringify(filtros), [filtros]);
+
+  // ✅ cuando cambian filtros, vuelvo a página 1
+  useEffect(() => {
+    setPage(1);
+  }, [filtrosKey]);
+
   const buildParams = (f) => {
     const p = new URLSearchParams();
     if (f.oficina) p.set("oficina", f.oficina);
@@ -80,8 +89,8 @@ export default function VehiculosPanel({
   };
 
   const fetchResumen = async () => {
-    setLoading(true);
-    setError("");
+    setLoadingResumen(true);
+    setErrorResumen("");
     try {
       const params = buildParams(filtros);
       const url = `${apiBase}estadisticas/vehiculos/resumen/?${params.toString()}`;
@@ -98,24 +107,68 @@ export default function VehiculosPanel({
       setData(json);
     } catch (e) {
       console.error(e);
-      setError(String(e?.message || "No se pudo cargar el resumen."));
+      setErrorResumen(String(e?.message || "No se pudo cargar el resumen."));
       setData(null);
     } finally {
-      setLoading(false);
+      setLoadingResumen(false);
     }
   };
 
-  // debounce al cambiar filtros
+  const fetchList = async () => {
+    setLoadingList(true);
+    setErrorList("");
+    try {
+      const params = buildParams(filtros);
+      params.set("page", String(page));
+      params.set("page_size", String(pageSize));
+
+      // orden default: últimos primero
+      params.set("orden", "id");
+      params.set("dir", "desc");
+
+      const url = `${apiBase}estadisticas/vehiculos/list/?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        let msg = `Error HTTP ${res.status}`;
+        try {
+          const d = await res.json();
+          msg = d?.detail || d?.error || msg;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+      const json = await res.json();
+      setListData({
+        page: Number(json?.page || 1),
+        page_size: Number(json?.page_size || pageSize),
+        count: Number(json?.count || 0),
+        total_pages: Number(json?.total_pages || 1),
+        results: Array.isArray(json?.results) ? json.results : [],
+      });
+    } catch (e) {
+      console.error(e);
+      setErrorList(String(e?.message || "No se pudo cargar el listado."));
+      setListData({ page: 1, page_size: pageSize, count: 0, total_pages: 1, results: [] });
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  const refetchAll = async () => {
+    // paralelo para que se sienta rápido
+    await Promise.allSettled([fetchResumen(), fetchList()]);
+  };
+
+  // debounce al cambiar filtros o página
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetchResumen();
+      refetchAll();
     }, 250);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtros]);
+  }, [filtrosKey, page]);
 
   const total = Number(data?.total_polizas || 0);
   const activas = Number(data?.total_activas || 0);
@@ -138,15 +191,21 @@ export default function VehiculosPanel({
   const handleOpenExport = () => {
     onOpenExport?.({
       ...filtros,
-      // defaults del modal
       formato: "xlsx",
     });
   };
 
   const oficinaLabel = useMemo(() => getOficinaNombre(oficina), [oficina, getOficinaNombre]);
 
+  const canPrev = page > 1;
+  const canNext = page < Number(listData?.total_pages || 1);
+
   return (
-    <AnimatedCard index={9} interactive={false} glow="from-sky-500/40 via-emerald-500/20 to-transparent">
+    <AnimatedCard
+      index={9}
+      interactive={false}
+      glow="from-sky-500/40 via-emerald-500/20 to-transparent"
+    >
       <div className="flex flex-col gap-4">
         {/* Header del panel */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -156,20 +215,20 @@ export default function VehiculosPanel({
               Análisis de vehículos
             </div>
             <div className="mt-1 text-sm text-slate-300">
-              Filtrá por oficina, tipo, año y más — y exportá el resultado.
+              Filtrá por oficina, tipo, año y más — y ahora también ves qué asegurados son.
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <motion.button
               type="button"
-              onClick={fetchResumen}
+              onClick={refetchAll}
               className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 ring-1 ring-slate-700/80"
               whileHover={{ scale: 1.05, y: -1 }}
               whileTap={{ scale: 0.96 }}
             >
-              <HiRefresh className={loading ? "animate-spin" : ""} />
-              {loading ? "Cargando..." : "Refrescar"}
+              <HiRefresh className={loadingResumen || loadingList ? "animate-spin" : ""} />
+              {loadingResumen || loadingList ? "Cargando..." : "Refrescar"}
             </motion.button>
 
             <motion.button
@@ -207,9 +266,7 @@ export default function VehiculosPanel({
             </select>
             <div className="text-[11px] text-slate-500">
               Seleccionada:{" "}
-              <span className="text-slate-300 font-medium">
-                {oficina ? oficinaLabel : "Todas"}
-              </span>
+              <span className="text-slate-300 font-medium">{oficina ? oficinaLabel : "Todas"}</span>
             </div>
           </div>
 
@@ -243,7 +300,7 @@ export default function VehiculosPanel({
               className="h-10 rounded-xl bg-slate-950 border border-slate-700 text-sm px-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               value={anio}
               onChange={(e) => setAnio(e.target.value)}
-              placeholder="Ej: 2005"
+              placeholder="Ej: 2015"
             />
           </div>
 
@@ -275,7 +332,7 @@ export default function VehiculosPanel({
               className="h-10 rounded-xl bg-slate-950 border border-slate-700 text-sm px-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               value={anioDesde}
               onChange={(e) => setAnioDesde(e.target.value)}
-              placeholder="Ej: 2000"
+              placeholder="Ej: 2010"
             />
           </div>
 
@@ -289,7 +346,7 @@ export default function VehiculosPanel({
               className="h-10 rounded-xl bg-slate-950 border border-slate-700 text-sm px-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               value={anioHasta}
               onChange={(e) => setAnioHasta(e.target.value)}
-              placeholder="Ej: 2010"
+              placeholder="Ej: 2020"
             />
           </div>
 
@@ -335,10 +392,15 @@ export default function VehiculosPanel({
           </div>
         </div>
 
-        {/* Error */}
-        {error && (
+        {/* Errores */}
+        {errorResumen && (
           <div className="rounded-2xl border border-rose-700/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-100">
-            {error}
+            {errorResumen}
+          </div>
+        )}
+        {errorList && (
+          <div className="rounded-2xl border border-rose-700/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-100">
+            {errorList}
           </div>
         )}
 
@@ -351,15 +413,11 @@ export default function VehiculosPanel({
             <div className="mt-1 text-2xl font-bold text-slate-50">
               {total.toLocaleString("es-AR")}
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">
-              Con los filtros actuales.
-            </div>
+            <div className="mt-1 text-[11px] text-slate-400">Con los filtros actuales.</div>
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/20 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Activas
-            </div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Activas</div>
             <div className="mt-1 text-2xl font-bold text-slate-50">
               {activas.toLocaleString("es-AR")}
             </div>
@@ -369,14 +427,16 @@ export default function VehiculosPanel({
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/20 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Oficina / Tipo
-            </div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Oficina / Tipo</div>
             <div className="mt-1 text-sm font-semibold text-slate-100">
               {oficina ? oficinaLabel : "Todas"} · {tipo || "Todos"}
             </div>
             <div className="mt-1 text-[11px] text-slate-400">
-              {anio ? `Año: ${anio}` : anioDesde || anioHasta ? `Rango: ${anioDesde || "—"}–${anioHasta || "—"}` : "Sin filtro de año"}
+              {anio
+                ? `Año: ${anio}`
+                : anioDesde || anioHasta
+                ? `Rango: ${anioDesde || "—"}–${anioHasta || "—"}`
+                : "Sin filtro de año"}
             </div>
           </div>
         </div>
@@ -402,7 +462,6 @@ export default function VehiculosPanel({
               </div>
             )}
 
-            {/* Hint: si estás filtrando por oficina, igual te mostramos qué vio el backend */}
             {Object.keys(porOficina || {}).length > 0 && (
               <div className="mt-3 text-[11px] text-slate-500">
                 Oficinas en el set:{" "}
@@ -433,6 +492,113 @@ export default function VehiculosPanel({
               </div>
             )}
           </div>
+        </div>
+
+        {/* ✅ NUEVO: listado de asegurados */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/10 px-4 py-3">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-2 mb-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              Asegurados encontrados
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <span>
+                {loadingList ? "Cargando..." : `${Number(listData?.count || 0).toLocaleString("es-AR")} resultados`}
+              </span>
+              <span className="text-slate-600">·</span>
+              <span>
+                pág {page}/{Number(listData?.total_pages || 1)}
+              </span>
+            </div>
+          </div>
+
+          {Number(listData?.count || 0) === 0 ? (
+            <div className="text-xs text-slate-400">No hay asegurados para esos filtros.</div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs sm:text-sm">
+                  <thead className="bg-slate-900/60 border-b border-slate-800">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-300">Asegurado</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-300">DNI/CUIT</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-300">Vehículo</th>
+                      <th className="px-3 py-2 text-right font-semibold text-slate-300">Año</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-300">Oficina</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-300">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(listData?.results || []).map((r, idx) => (
+                      <tr
+                        key={`${r.poliza_id}-${idx}`}
+                        className={idx % 2 === 0 ? "bg-slate-900/30" : "bg-slate-900/10"}
+                      >
+                        <td className="px-3 py-2 text-slate-100 whitespace-nowrap">
+                          <div className="font-semibold">{r.asegurado || "—"}</div>
+                          <div className="text-[10px] text-slate-400">
+                            Póliza: {r.numero_poliza || "—"} · Patente: {r.patente || "—"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-slate-200 whitespace-nowrap">
+                          {r.dni_cuit_cuil || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-slate-200">
+                          {(r.marca || "—") + " " + (r.modelo || "")}
+                          <div className="text-[10px] text-slate-500">{r.tipo || "—"}</div>
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-200 whitespace-nowrap">
+                          {r.anio ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-slate-200 whitespace-nowrap">
+                          {r.oficina_nombre || getOficinaNombre(r.oficina) || r.oficina || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-slate-200 whitespace-nowrap">
+                          {r.estado || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación */}
+              <div className="mt-3 flex items-center justify-between">
+                <div className="text-[11px] text-slate-500">
+                  Mostrando {(listData?.results || []).length} de{" "}
+                  {Number(listData?.count || 0).toLocaleString("es-AR")}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!canPrev || loadingList}
+                    onClick={() => canPrev && setPage((p) => Math.max(1, p - 1))}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${
+                      canPrev && !loadingList
+                        ? "bg-slate-900/80 hover:bg-slate-800 text-slate-100 ring-slate-700/80"
+                        : "bg-slate-900/30 text-slate-500 ring-slate-800 cursor-not-allowed"
+                    }`}
+                  >
+                    <HiChevronLeft />
+                    Anterior
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!canNext || loadingList}
+                    onClick={() => canNext && setPage((p) => p + 1)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${
+                      canNext && !loadingList
+                        ? "bg-slate-900/80 hover:bg-slate-800 text-slate-100 ring-slate-700/80"
+                        : "bg-slate-900/30 text-slate-500 ring-slate-800 cursor-not-allowed"
+                    }`}
+                  >
+                    Siguiente
+                    <HiChevronRight />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </AnimatedCard>
