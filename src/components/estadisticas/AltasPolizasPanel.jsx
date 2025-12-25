@@ -2,13 +2,15 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   HiChartBar,
   HiCalendar,
   HiOfficeBuilding,
   HiRefresh,
   HiExclamation,
+  HiDownload,
+  HiCheckCircle,
 } from "react-icons/hi";
 
 import AnimatedCard from "./AnimatedCard";
@@ -48,7 +50,6 @@ const labelPeriodo = (agrupacion, periodo) => {
   const p = String(periodo || "").trim();
   if (!p) return "—";
 
-  // soportar date o datetime iso
   const d = dayjs(p);
   if (!d.isValid()) return p;
 
@@ -69,14 +70,44 @@ async function fetchJsonTry(url, options) {
   return res.json();
 }
 
+const safeNamePart = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_\-]/g, "");
+
+const csvEscape = (v) => {
+  const s = v === null || v === undefined ? "" : String(v);
+  // si tiene coma, comillas o salto de línea, quote
+  if (/[,"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const oficinaTone = (oficinaId) => {
+  const k = String(oficinaId || "").toUpperCase();
+  if (k === "1") return "ring-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (k === "2") return "ring-sky-500/25 bg-sky-500/10 text-sky-200";
+  if (k === "3") return "ring-violet-500/25 bg-violet-500/10 text-violet-200";
+  if (k === "OTRAS") return "ring-amber-500/25 bg-amber-500/10 text-amber-200";
+  if (k === "SIN_OFICINA")
+    return "ring-rose-500/25 bg-rose-500/10 text-rose-200";
+  return "ring-slate-500/25 bg-slate-500/10 text-slate-200";
+};
+
 /**
  * Panel: Emisiones de póliza (fecha_emision) por oficina y por período.
- *
- * Props:
- * - apiBase: "/api/" (o base completa con trailing slash)
- * - oficinas: [{id:"1",...}]
- * - defaultOficina: string (filtro global)
- * - anio / mes: para modo "Mes seleccionado"
  */
 export default function AltasPolizasPanel({
   apiBase,
@@ -114,6 +145,9 @@ export default function AltasPolizasPanel({
   });
 
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportOk, setExportOk] = useState(false);
+
   const [error, setError] = useState("");
   const [payload, setPayload] = useState(null);
 
@@ -150,7 +184,6 @@ export default function AltasPolizasPanel({
 
   const buildCandidates = useCallback(() => {
     const base = String(apiBase || "/api/").trim();
-    // canonical + aliases defensivos
     const cands = [
       `${base}estadisticas/polizas/emisiones/serie/`,
       `${base}estadisticas/polizas/emisiones/serie`,
@@ -195,15 +228,12 @@ export default function AltasPolizasPanel({
           break;
         } catch (e) {
           lastErr = e;
-          // Si es 404, probamos siguiente candidato
           if (Number(e?.status) === 404) continue;
-          // Otros errores (500, red, etc.) cortamos
           throw e;
         }
       }
 
       if (lastErr) {
-        // todos 404
         const tried = candidates.join(" | ");
         setPayload(null);
         setError(
@@ -261,6 +291,7 @@ export default function AltasPolizasPanel({
         (typeof getOficinaNombre === "function"
           ? getOficinaNombre(String(o.oficina))
           : String(o.oficina)),
+      total: Number(o.total || 0),
     }));
 
     const seriesByOfi = new Map();
@@ -302,6 +333,104 @@ export default function AltasPolizasPanel({
   const degradadoHoraADia =
     agrupacion === "hora" && payload?.agrupacion && payload.agrupacion !== "hora";
 
+  const canExport = table.rows.length > 0 && !loading && !exporting;
+
+  const onExportCSV = useCallback(async () => {
+    if (!canExport) return;
+
+    try {
+      setExporting(true);
+      setExportOk(false);
+
+      const agr = payload?.agrupacion || agrupacion;
+      const ofiLabel =
+        oficina
+          ? typeof getOficinaNombre === "function"
+            ? getOficinaNombre(oficina)
+            : oficina
+          : "todas";
+
+      const headerCols = [
+        "Período",
+        ...table.colMeta.map((c) => c.oficina_nombre),
+        "Total",
+      ];
+
+      // metadata arriba (Excel lo muestra como primera fila)
+      const metaLine = [
+        `Filtros: agrupacion=${agr}`,
+        `desde=${footerDesde}`,
+        `hasta=${footerHasta}`,
+        `oficina=${ofiLabel}`,
+      ].join(" | ");
+
+      const lines = [];
+      // BOM para Excel
+      lines.push(csvEscape(metaLine));
+      lines.push(headerCols.map(csvEscape).join(","));
+
+      table.rows.forEach((r) => {
+        const periodoLabel = labelPeriodo(agr, r.periodo);
+        const row = [
+          periodoLabel,
+          ...table.cols.map((ofi) => String(r[ofi] || 0)),
+          String(r.total || 0),
+        ];
+        lines.push(row.map(csvEscape).join(","));
+      });
+
+      // Totales
+      const totalRow = [
+        "TOTAL",
+        ...table.cols.map((ofi) => String(table.totalsRow[ofi] || 0)),
+        String(table.totalsRow.total || 0),
+      ];
+      lines.push(totalRow.map(csvEscape).join(","));
+
+      const csv = "\uFEFF" + lines.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+      const filename = [
+        "emisiones_por_oficina",
+        safeNamePart(agr),
+        safeNamePart(footerDesde),
+        safeNamePart(footerHasta),
+        oficina ? safeNamePart(oficina) : "todas",
+      ].join("_");
+
+      downloadBlob(blob, `${filename}.csv`);
+
+      setExportOk(true);
+      window.setTimeout(() => setExportOk(false), 1600);
+    } catch (e) {
+      console.error("[AltasPolizasPanel] Export error:", e);
+      setError("No se pudo exportar el CSV. Mirá la consola para más detalle.");
+    } finally {
+      setExporting(false);
+    }
+  }, [
+    canExport,
+    payload,
+    agrupacion,
+    oficina,
+    getOficinaNombre,
+    footerDesde,
+    footerHasta,
+    table,
+    loading,
+    exporting,
+  ]);
+
+  const chips = useMemo(() => {
+    const list = Array.isArray(table?.colMeta) ? table.colMeta : [];
+    return list
+      .filter((c) => Number(c.total || 0) > 0)
+      .map((c) => ({
+        ...c,
+        pct: totalGeneral > 0 ? Math.round((Number(c.total || 0) / totalGeneral) * 100) : 0,
+      }));
+  }, [table, totalGeneral]);
+
   return (
     <AnimatedCard
       index={4}
@@ -334,17 +463,78 @@ export default function AltasPolizasPanel({
           </div>
         </div>
 
-        <motion.button
-          type="button"
-          onClick={fetchSerie}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900/70 border border-slate-800 px-3 py-2 text-xs sm:text-sm text-slate-200 hover:bg-slate-800/70 cursor-pointer"
-        >
-          <HiRefresh className={`${loading ? "animate-spin" : ""}`} />
-          <span>{loading ? "Cargando..." : "Refrescar"}</span>
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            type="button"
+            onClick={fetchSerie}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            className="inline-flex items-center gap-2 rounded-2xl bg-slate-900/70 border border-slate-800 px-3 py-2 text-xs sm:text-sm text-slate-200 hover:bg-slate-800/70 cursor-pointer"
+          >
+            <HiRefresh className={`${loading ? "animate-spin" : ""}`} />
+            <span>{loading ? "Cargando..." : "Refrescar"}</span>
+          </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={onExportCSV}
+            whileHover={{ scale: canExport ? 1.03 : 1.0 }}
+            whileTap={{ scale: canExport ? 0.97 : 1.0 }}
+            disabled={!canExport}
+            className={[
+              "inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs sm:text-sm border cursor-pointer",
+              canExport
+                ? "bg-gradient-to-r from-emerald-500/25 via-cyan-500/15 to-slate-900/40 border-emerald-500/25 text-emerald-100 hover:from-emerald-500/30 hover:via-cyan-500/20"
+                : "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed",
+            ].join(" ")}
+          >
+            {exporting ? (
+              <span className="inline-flex items-center gap-2">
+                <HiRefresh className="animate-spin" />
+                Exportando…
+              </span>
+            ) : exportOk ? (
+              <span className="inline-flex items-center gap-2">
+                <HiCheckCircle />
+                Listo
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <HiDownload />
+                Descargar CSV
+              </span>
+            )}
+          </motion.button>
+        </div>
       </div>
+
+      {/* chips de resumen por oficina (color + % del total) */}
+      <AnimatePresence>
+        {chips.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="mt-3 flex flex-wrap gap-2"
+          >
+            {chips.map((c) => (
+              <motion.div
+                key={c.oficina}
+                whileHover={{ y: -1 }}
+                className={[
+                  "inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 ring-1",
+                  oficinaTone(c.oficina),
+                ].join(" ")}
+                title={`${c.oficina_nombre}: ${c.total} (${c.pct}%)`}
+              >
+                <span className="text-xs font-semibold">{c.oficina_nombre}</span>
+                <span className="text-xs tabular-nums opacity-90">{c.total}</span>
+                <span className="text-[0.7rem] opacity-75">({c.pct}%)</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* filtros */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -378,9 +568,7 @@ export default function AltasPolizasPanel({
             <option value="">Todas</option>
             {oficinasOptions.map((id) => (
               <option key={id} value={id}>
-                {typeof getOficinaNombre === "function"
-                  ? getOficinaNombre(id)
-                  : id}
+                {typeof getOficinaNombre === "function" ? getOficinaNombre(id) : id}
               </option>
             ))}
           </select>
@@ -426,6 +614,27 @@ export default function AltasPolizasPanel({
         </div>
       </div>
 
+      {/* barra de carga */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="mt-3"
+          >
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-900/60 border border-slate-800">
+              <motion.div
+                className="h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-500/35 via-cyan-500/25 to-transparent"
+                initial={{ x: "-40%" }}
+                animate={{ x: "140%" }}
+                transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* aviso degradación hora->día */}
       {degradadoHoraADia && (
         <div className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-950/20 px-3 py-2 text-xs sm:text-sm text-amber-100 flex items-center gap-2">
@@ -450,9 +659,14 @@ export default function AltasPolizasPanel({
         <div className="text-[0.65rem] uppercase tracking-wide text-slate-400">
           Total emisiones (rango)
         </div>
-        <div className="text-lg sm:text-2xl font-semibold tabular-nums">
+        <motion.div
+          key={totalGeneral}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-lg sm:text-2xl font-semibold tabular-nums text-slate-50"
+        >
           {totalGeneral}
-        </div>
+        </motion.div>
       </div>
 
       {/* tabla */}
@@ -467,7 +681,14 @@ export default function AltasPolizasPanel({
                     key={c.oficina}
                     className="px-3 py-2 text-slate-300 font-semibold whitespace-nowrap"
                   >
-                    {c.oficina_nombre}
+                    <span
+                      className={[
+                        "inline-flex items-center gap-2 rounded-xl px-2 py-1 ring-1",
+                        oficinaTone(c.oficina),
+                      ].join(" ")}
+                    >
+                      {c.oficina_nombre}
+                    </span>
                   </th>
                 ))}
                 <th className="px-3 py-2 text-slate-200 font-semibold">Total</th>
@@ -487,11 +708,14 @@ export default function AltasPolizasPanel({
               ) : (
                 <>
                   {table.rows.map((r, idx) => (
-                    <tr
+                    <motion.tr
                       key={`${r.periodo}-${idx}`}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: Math.min(idx * 0.01, 0.15) }}
                       className={`border-b border-slate-800/70 ${
                         idx % 2 === 0 ? "bg-slate-950/10" : "bg-slate-950/0"
-                      }`}
+                      } hover:bg-emerald-500/5`}
                     >
                       <td className="px-3 py-2 text-slate-200 whitespace-nowrap">
                         {labelPeriodo(payload?.agrupacion || agrupacion, r.periodo)}
@@ -507,10 +731,10 @@ export default function AltasPolizasPanel({
                       <td className="px-3 py-2 text-slate-50 tabular-nums font-semibold">
                         {r.total || 0}
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
 
-                  <tr className="bg-slate-900/60">
+                  <tr className="bg-slate-900/70">
                     <td className="px-3 py-2 text-slate-50 font-semibold">TOTAL</td>
                     {table.cols.map((ofi) => (
                       <td
