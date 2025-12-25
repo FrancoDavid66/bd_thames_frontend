@@ -3,7 +3,11 @@ import { motion } from "framer-motion";
 import { HiOfficeBuilding } from "react-icons/hi";
 import AnimatedCard from "./AnimatedCard";
 
-export default function OficinasTable({ oficinasData, getOficinaNombre, formatMixPercent }) {
+export default function OficinasTable({
+  oficinasData,
+  getOficinaNombre,
+  formatMixPercent,
+}) {
   return (
     <AnimatedCard
       index={7}
@@ -58,6 +62,12 @@ export default function OficinasTable({ oficinasData, getOficinaNombre, formatMi
                   const antig = o.antiguedad || {};
                   const churnPct = Number(o.churn_porcentaje || 0);
 
+                  // ✅ Preferimos el nombre que manda backend (oficina_nombre)
+                  const oficinaNombre =
+                    (o.oficina_nombre && String(o.oficina_nombre).trim()) ||
+                    getOficinaNombre?.(o.oficina) ||
+                    String(o.oficina || "—");
+
                   const cobKeys = Object.keys(mixCob);
                   const cobResumen = cobKeys
                     .slice(0, 3)
@@ -109,7 +119,15 @@ export default function OficinasTable({ oficinasData, getOficinaNombre, formatMi
                       transition={{ duration: 0.15 }}
                     >
                       <td className="px-3 py-2 whitespace-nowrap text-slate-100 align-top">
-                        <div className="font-semibold">{getOficinaNombre(o.oficina)}</div>
+                        <div className="font-semibold">{oficinaNombre}</div>
+
+                        {/* ✅ mostramos código si existe (útil para buckets/diagnóstico) */}
+                        {o.oficina ? (
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Código: {String(o.oficina)}
+                          </div>
+                        ) : null}
+
                         <div className="mt-0.5 text-[10px] text-slate-400 space-y-0.5">
                           {cobResumen && <div>Coberturas: {cobResumen}</div>}
                           {compResumen && <div>Compañías: {compResumen}</div>}
@@ -117,6 +135,7 @@ export default function OficinasTable({ oficinasData, getOficinaNombre, formatMi
                           {anioLabel && <div>Años vehículo: {anioLabel}</div>}
                         </div>
                       </td>
+
                       <td className="px-3 py-2 text-right text-slate-100 align-top">
                         {totalOf.toLocaleString("es-AR")}
                       </td>

@@ -2,6 +2,40 @@
 import AnimatedCard from "./AnimatedCard";
 import { HiOfficeBuilding, HiCalendar, HiChartBar } from "react-icons/hi";
 
+const OFICINA_LABELS = {
+  "1": "5 esquinas (1)",
+  "2": "axion (2)",
+  "3": "kilometro 39 (3)",
+  OTRAS: "Otras / sin mapear",
+  SIN_OFICINA: "Sin oficina",
+};
+
+const getOficinaLabel = (value) => {
+  const v = value === null || value === undefined ? "" : String(value).trim();
+  if (!v) return "";
+  return OFICINA_LABELS[v] || v;
+};
+
+const sortOficinas = (arr) => {
+  const order = ["1", "2", "3", "OTRAS", "SIN_OFICINA"];
+  const orderIdx = new Map(order.map((v, i) => [v, i]));
+
+  return [...arr].sort((a, b) => {
+    const A = String(a ?? "").trim();
+    const B = String(b ?? "").trim();
+
+    const ia = orderIdx.has(A) ? orderIdx.get(A) : 999;
+    const ib = orderIdx.has(B) ? orderIdx.get(B) : 999;
+
+    if (ia !== ib) return ia - ib;
+
+    // resto: alfabético por label (para que sea “lindo” si hay valores legacy)
+    const la = getOficinaLabel(A).toLowerCase();
+    const lb = getOficinaLabel(B).toLowerCase();
+    return la.localeCompare(lb, "es");
+  });
+};
+
 export default function EstadisticasFilters({
   oficina,
   setOficina,
@@ -15,6 +49,13 @@ export default function EstadisticasFilters({
   desde,
   hasta,
 }) {
+  // dedupe + orden
+  const raw = Array.isArray(oficinasOptions) ? oficinasOptions : [];
+  const unique = Array.from(
+    new Set(raw.map((x) => String(x ?? "").trim()).filter(Boolean))
+  );
+  const ordered = sortOficinas(unique);
+
   return (
     <AnimatedCard
       index={1}
@@ -30,15 +71,26 @@ export default function EstadisticasFilters({
           </label>
           <select
             className="h-9 rounded-lg bg-slate-950 border border-slate-700 text-xs sm:text-sm px-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-            value={oficina}
-            onChange={(e) => setOficina(e.target.value)}
+            value={String(oficina ?? "")}
+            onChange={(e) => setOficina(String(e.target.value))}
           >
             <option value="">Todas las oficinas</option>
-            {oficinasOptions.map((of) => (
-              <option key={of} value={of}>
-                {String(of)}
-              </option>
-            ))}
+
+            {ordered.map((of) => {
+              const label = getOficinaLabel(of);
+              const showCode =
+                of === "1" ||
+                of === "2" ||
+                of === "3" ||
+                of === "OTRAS" ||
+                of === "SIN_OFICINA";
+
+              return (
+                <option key={of} value={of}>
+                  {showCode ? `${label}` : label}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -96,6 +148,7 @@ export default function EstadisticasFilters({
             <option value="live">Cálculo en vivo</option>
             <option value="snapshot">Snapshot guardado (si existe)</option>
           </select>
+
           {desde && hasta && (
             <span className="mt-0.5 text-[10px] text-slate-400">
               Período: {desde} → {hasta}
