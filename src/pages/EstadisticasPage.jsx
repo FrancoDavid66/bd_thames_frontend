@@ -16,6 +16,9 @@ import AseguradosExportModal from "../components/estadisticas/AseguradosExportMo
 import VehiculosPanel from "../components/estadisticas/VehiculosPanel";
 import VehiculosExportModal from "../components/estadisticas/VehiculosExportModal";
 
+// ✅ NUEVO: panel solicitudes por oficina
+import SolicitudesPanel from "../components/estadisticas/SolicitudesPanel";
+
 const getApiBase = () => {
   const raw =
     (import.meta?.env?.VITE_API_BASE &&
@@ -219,7 +222,9 @@ export default function EstadisticasPage() {
         <EstadisticasFilters
           oficina={oficina}
           setOficina={setOficina}
-          oficinasOptions={oficinasOptions.length ? oficinasOptions : OFICINAS.map((o) => o.id)}
+          oficinasOptions={
+            oficinasOptions.length ? oficinasOptions : OFICINAS.map((o) => o.id)
+          }
           anio={anio}
           onAnioChange={handleAnioChange}
           mes={mes}
@@ -244,7 +249,10 @@ export default function EstadisticasPage() {
         )}
 
         {/* RESUMEN */}
-        <EstadisticasSummaryCards totales={totales} churnPromedio={churnPromedio} />
+        <EstadisticasSummaryCards
+          totales={totales}
+          churnPromedio={churnPromedio}
+        />
 
         {/* TABLA POR OFICINA */}
         <OficinasTable
@@ -253,7 +261,15 @@ export default function EstadisticasPage() {
           formatMixPercent={formatMixPercent}
         />
 
-        {/* ✅ NUEVO: PANEL VEHÍCULOS */}
+        {/* ✅ NUEVO: SOLICITUDES POR OFICINA (día/semana/mes) */}
+        <SolicitudesPanel
+          apiBase={apiBase}
+          oficinas={OFICINAS}
+          getOficinaNombre={getOficinaNombre}
+          defaultOficina={oficina}
+        />
+
+        {/* ✅ PANEL VEHÍCULOS */}
         <VehiculosPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
@@ -275,7 +291,7 @@ export default function EstadisticasPage() {
         getOficinaNombre={getOficinaNombre}
       />
 
-      {/* ✅ NUEVO: EXPORT VEHÍCULOS */}
+      {/* ✅ EXPORT VEHÍCULOS */}
       <VehiculosExportModal
         open={showVehiculosExport}
         onClose={() => setShowVehiculosExport(false)}

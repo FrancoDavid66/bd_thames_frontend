@@ -364,9 +364,6 @@ const PagosPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-3 sm:space-y-4"
           >
-            {/* Alertas de cuotas por vencer / vencidas */}
-            <CuotasAlertas />
-
             {/* Buscador + toggle ocultar pagadas */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4 space-y-3">
               <PagosSearch onBuscar={handleBuscarPolizas} />
@@ -391,6 +388,9 @@ const PagosPage = () => {
                 <span>Ocultar cuotas pagadas</span>
               </button>
             </div>
+
+            {/* ✅ Alertas de cuotas por vencer / vencidas (ahora debajo del buscador) */}
+            <CuotasAlertas />
 
             {/* Lista de cuotas / pólizas */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">

@@ -1,0 +1,410 @@
+// src/components/estadisticas/SolicitudesPanel.jsx
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { motion } from "framer-motion";
+import dayjs from "dayjs";
+import "dayjs/locale/es";
+import {
+  HiChartBar,
+  HiCalendar,
+  HiOfficeBuilding,
+  HiRefresh,
+  HiExclamation,
+} from "react-icons/hi";
+
+import AnimatedCard from "./AnimatedCard";
+
+dayjs.locale("es");
+
+const ORDER_BUCKETS = ["1", "2", "3", "OTRAS", "SIN_OFICINA"];
+
+const clampIsoDate = (v) => {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  const d = dayjs(s);
+  return d.isValid() ? d.format("YYYY-MM-DD") : "";
+};
+
+const defaultDesdeFor = (agrupacion) => {
+  const hoy = dayjs().startOf("day");
+  if (agrupacion === "mes") return hoy.subtract(12, "month").format("YYYY-MM-DD");
+  if (agrupacion === "semana")
+    return hoy.subtract(12, "week").format("YYYY-MM-DD");
+  return hoy.subtract(30, "day").format("YYYY-MM-DD");
+};
+
+const labelPeriodo = (agrupacion, periodo) => {
+  const p = String(periodo || "").trim();
+  if (!p) return "—";
+
+  const d = dayjs(p);
+  if (!d.isValid()) return p;
+
+  if (agrupacion === "mes") return d.format("YYYY-MM");
+  if (agrupacion === "semana") return `Semana de ${d.format("DD/MM/YYYY")}`;
+  return d.format("DD/MM/YYYY");
+};
+
+export default function SolicitudesPanel({
+  apiBase,
+  oficinas = [],
+  getOficinaNombre,
+  defaultOficina = "",
+}) {
+  const [agrupacion, setAgrupacion] = useState("dia"); // dia | semana | mes
+  const [oficina, setOficina] = useState(defaultOficina || "");
+  const [desde, setDesde] = useState(() => defaultDesdeFor("dia"));
+  const [hasta, setHasta] = useState(() => dayjs().format("YYYY-MM-DD"));
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [payload, setPayload] = useState(null);
+
+  // Si cambia defaultOficina (filtros globales), mantenemos sincronizado
+  useEffect(() => {
+    setOficina(defaultOficina || "");
+  }, [defaultOficina]);
+
+  // Ajustar desde cuando cambia agrupación (para que sea cómodo)
+  useEffect(() => {
+    setDesde((prev) => prev || defaultDesdeFor(agrupacion));
+  }, [agrupacion]);
+
+  const oficinasOptions = useMemo(() => {
+    // incluye opciones conocidas + las buckets “OTRAS/SIN”
+    const base = Array.isArray(oficinas) ? oficinas : [];
+    const ids = base.map((o) => String(o.id));
+    const extras = ["OTRAS", "SIN_OFICINA"];
+    return Array.from(new Set([...ids, ...extras]));
+  }, [oficinas]);
+
+  const fetchSerie = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams();
+      params.set("agrupacion", agrupacion);
+      if (clampIsoDate(desde)) params.set("desde", clampIsoDate(desde));
+      if (clampIsoDate(hasta)) params.set("hasta", clampIsoDate(hasta));
+      if (oficina) params.set("oficina", oficina);
+
+      const url = `${apiBase}estadisticas/solicitudes/serie/?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+      const data = await res.json();
+
+      setPayload(data || null);
+    } catch (e) {
+      console.error("[SolicitudesPanel] Error:", e);
+      setPayload(null);
+      setError(
+        "No se pudieron cargar las solicitudes. Revisá el endpoint /api/estadisticas/solicitudes/serie/."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase, agrupacion, desde, hasta, oficina]);
+
+  useEffect(() => {
+    fetchSerie();
+  }, [fetchSerie]);
+
+  const oficinasSerie = useMemo(() => {
+    const arr = Array.isArray(payload?.oficinas) ? payload.oficinas : [];
+    // orden: 1,2,3,OTRAS,SIN + resto al final
+    const extra = arr
+      .map((x) => String(x?.oficina || ""))
+      .filter(Boolean)
+      .filter((k) => !ORDER_BUCKETS.includes(k));
+    const order = [...ORDER_BUCKETS, ...extra];
+
+    const map = new Map(arr.map((o) => [String(o.oficina || ""), o]));
+    return order
+      .map((k) => map.get(k))
+      .filter(Boolean);
+  }, [payload]);
+
+  const periodos = useMemo(() => {
+    const p = Array.isArray(payload?.periodos) ? payload.periodos : [];
+    return p;
+  }, [payload]);
+
+  const table = useMemo(() => {
+    // construye tabla: filas por periodo, cols por oficina
+    const cols = oficinasSerie.map((o) => String(o.oficina));
+    const colMeta = oficinasSerie.map((o) => ({
+      oficina: String(o.oficina),
+      oficina_nombre:
+        o.oficina_nombre ||
+        (typeof getOficinaNombre === "function"
+          ? getOficinaNombre(String(o.oficina))
+          : String(o.oficina)),
+    }));
+
+    const seriesByOfi = new Map();
+    oficinasSerie.forEach((o) => {
+      const s = Array.isArray(o.serie) ? o.serie : [];
+      const m = new Map(s.map((it) => [String(it.periodo), Number(it.cantidad || 0)]));
+      seriesByOfi.set(String(o.oficina), m);
+    });
+
+    const rows = periodos.map((p) => {
+      const row = { periodo: String(p) };
+      cols.forEach((ofi) => {
+        const m = seriesByOfi.get(ofi);
+        row[ofi] = m ? Number(m.get(String(p)) || 0) : 0;
+      });
+      row.total = cols.reduce((acc, ofi) => acc + Number(row[ofi] || 0), 0);
+      return row;
+    });
+
+    const totalsRow = {
+      periodo: "TOTAL",
+      total: rows.reduce((acc, r) => acc + Number(r.total || 0), 0),
+    };
+    cols.forEach((ofi) => {
+      totalsRow[ofi] = rows.reduce((acc, r) => acc + Number(r[ofi] || 0), 0);
+    });
+
+    return { colMeta, cols, rows, totalsRow };
+  }, [oficinasSerie, periodos, getOficinaNombre]);
+
+  const kpis = useMemo(() => {
+    const totalGeneral = Number(table?.totalsRow?.total || 0);
+    const totalesPorOfi = (oficinasSerie || []).map((o) => ({
+      oficina: String(o.oficina),
+      oficina_nombre:
+        o.oficina_nombre ||
+        (typeof getOficinaNombre === "function"
+          ? getOficinaNombre(String(o.oficina))
+          : String(o.oficina)),
+      total: Number(o.total || 0),
+    }));
+    return { totalGeneral, totalesPorOfi };
+  }, [table, oficinasSerie, getOficinaNombre]);
+
+  return (
+    <AnimatedCard
+      index={4}
+      interactive={false}
+      glow="from-sky-500/40 via-indigo-500/25 to-transparent"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/25">
+              <HiChartBar className="text-lg" />
+            </span>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold tracking-tight">
+                Solicitudes por oficina
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400">
+                Conteo por {agrupacion === "dia" ? "día" : agrupacion === "semana" ? "semana" : "mes"} según rango de fechas.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <motion.button
+          type="button"
+          onClick={fetchSerie}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900/70 border border-slate-800 px-3 py-2 text-xs sm:text-sm text-slate-200 hover:bg-slate-800/70 cursor-pointer"
+        >
+          <HiRefresh className={`${loading ? "animate-spin" : ""}`} />
+          <span>{loading ? "Cargando..." : "Refrescar"}</span>
+        </motion.button>
+      </div>
+
+      {/* filtros */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* agrupación */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400 inline-flex items-center gap-2">
+            <HiCalendar className="opacity-70" />
+            Agrupación
+          </label>
+          <select
+            value={agrupacion}
+            onChange={(e) => setAgrupacion(e.target.value)}
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+          >
+            <option value="dia">Día</option>
+            <option value="semana">Semana</option>
+            <option value="mes">Mes</option>
+          </select>
+        </div>
+
+        {/* oficina */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400 inline-flex items-center gap-2">
+            <HiOfficeBuilding className="opacity-70" />
+            Oficina
+          </label>
+          <select
+            value={oficina}
+            onChange={(e) => setOficina(e.target.value)}
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+          >
+            <option value="">Todas</option>
+            {oficinasOptions.map((id) => (
+              <option key={id} value={id}>
+                {typeof getOficinaNombre === "function"
+                  ? getOficinaNombre(id)
+                  : id}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* desde */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">Desde</label>
+          <input
+            type="date"
+            value={clampIsoDate(desde)}
+            onChange={(e) => setDesde(e.target.value)}
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+          />
+        </div>
+
+        {/* hasta */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">Hasta</label>
+          <input
+            type="date"
+            value={clampIsoDate(hasta)}
+            onChange={(e) => setHasta(e.target.value)}
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-sky-500/30"
+          />
+        </div>
+      </div>
+
+      {/* error */}
+      {error && (
+        <div className="mt-4 rounded-2xl border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-xs sm:text-sm text-rose-100 flex items-center gap-2">
+          <HiExclamation />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <div className="rounded-2xl bg-slate-950/40 border border-slate-800 px-3 py-2">
+          <div className="text-[0.65rem] uppercase tracking-wide text-slate-400">
+            Total (rango)
+          </div>
+          <div className="text-lg sm:text-2xl font-semibold tabular-nums">
+            {kpis.totalGeneral}
+          </div>
+        </div>
+
+        {kpis.totalesPorOfi.slice(0, 3).map((o) => (
+          <div
+            key={o.oficina}
+            className="rounded-2xl bg-slate-950/40 border border-slate-800 px-3 py-2"
+          >
+            <div className="text-[0.65rem] uppercase tracking-wide text-slate-400">
+              {o.oficina_nombre}
+            </div>
+            <div className="text-lg sm:text-2xl font-semibold tabular-nums">
+              {o.total}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabla */}
+      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/30">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-800">
+              <tr>
+                <th className="px-3 py-2 text-slate-300 font-semibold">
+                  Período
+                </th>
+                {table.colMeta.map((c) => (
+                  <th
+                    key={c.oficina}
+                    className="px-3 py-2 text-slate-300 font-semibold whitespace-nowrap"
+                  >
+                    {c.oficina_nombre}
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-slate-200 font-semibold">
+                  Total
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {table.rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={table.colMeta.length + 2}
+                    className="px-3 py-4 text-slate-400"
+                  >
+                    {loading
+                      ? "Cargando..."
+                      : "Sin datos para el rango seleccionado."}
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {table.rows.map((r, idx) => (
+                    <tr
+                      key={`${r.periodo}-${idx}`}
+                      className={`border-b border-slate-800/70 ${
+                        idx % 2 === 0 ? "bg-slate-950/10" : "bg-slate-950/0"
+                      }`}
+                    >
+                      <td className="px-3 py-2 text-slate-200 whitespace-nowrap">
+                        {labelPeriodo(payload?.agrupacion || agrupacion, r.periodo)}
+                      </td>
+                      {table.cols.map((ofi) => (
+                        <td
+                          key={`${r.periodo}-${ofi}`}
+                          className="px-3 py-2 text-slate-100 tabular-nums"
+                        >
+                          {r[ofi] || 0}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-slate-50 tabular-nums font-semibold">
+                        {r.total || 0}
+                      </td>
+                    </tr>
+                  ))}
+
+                  <tr className="bg-slate-900/60">
+                    <td className="px-3 py-2 text-slate-50 font-semibold">
+                      TOTAL
+                    </td>
+                    {table.cols.map((ofi) => (
+                      <td
+                        key={`total-${ofi}`}
+                        className="px-3 py-2 text-slate-50 tabular-nums font-semibold"
+                      >
+                        {table.totalsRow[ofi] || 0}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-slate-50 tabular-nums font-semibold">
+                      {table.totalsRow.total || 0}
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-3 py-2 text-[0.7rem] text-slate-400 border-t border-slate-800">
+          Fuente: {payload?.fuente || "live"} · Rango:{" "}
+          {payload?.desde || clampIsoDate(desde) || "—"} →{" "}
+          {payload?.hasta || clampIsoDate(hasta) || "—"}
+        </div>
+      </div>
+    </AnimatedCard>
+  );
+}
