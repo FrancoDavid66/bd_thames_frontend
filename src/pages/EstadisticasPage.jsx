@@ -16,7 +16,7 @@ import AseguradosExportModal from "../components/estadisticas/AseguradosExportMo
 import VehiculosPanel from "../components/estadisticas/VehiculosPanel";
 import VehiculosExportModal from "../components/estadisticas/VehiculosExportModal";
 
-// ✅ altas de póliza por oficina (día/semana/mes)
+// ✅ NUEVO: altas de póliza por oficina (día/semana/mes)
 import AltasPolizasPanel from "../components/estadisticas/AltasPolizasPanel";
 
 const getApiBase = () => {
@@ -261,14 +261,12 @@ export default function EstadisticasPage() {
           formatMixPercent={formatMixPercent}
         />
 
-        {/* ✅ EMISIONES DE PÓLIZA POR OFICINA (hora/día/semana/mes) */}
+        {/* ✅ NUEVO: ALTAS DE PÓLIZA POR OFICINA (día/semana/mes) */}
         <AltasPolizasPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
           getOficinaNombre={getOficinaNombre}
           defaultOficina={oficina}
-          anio={anio}
-          mes={mes}
         />
 
         {/* ✅ PANEL VEHÍCULOS */}

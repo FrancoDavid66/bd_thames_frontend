@@ -24,9 +24,21 @@ const clampIsoDate = (v) => {
   return d.isValid() ? d.format("YYYY-MM-DD") : "";
 };
 
+const monthRangeFrom = (anio, mes) => {
+  const a = String(anio || "").trim();
+  const mRaw = String(mes || "").trim();
+  if (!a || !mRaw) return { desde: "", hasta: "" };
+  const m = mRaw.length === 1 ? `0${mRaw}` : mRaw;
+  const start = dayjs(`${a}-${m}-01`).startOf("day");
+  const end = start.endOf("month").startOf("day");
+  return {
+    desde: start.isValid() ? start.format("YYYY-MM-DD") : "",
+    hasta: end.isValid() ? end.format("YYYY-MM-DD") : "",
+  };
+};
+
 const defaultDesdeFor = (agrupacion) => {
   const hoy = dayjs().startOf("day");
-  // hora/día: último mes aprox
   if (agrupacion === "mes") return hoy.subtract(12, "month").format("YYYY-MM-DD");
   if (agrupacion === "semana") return hoy.subtract(12, "week").format("YYYY-MM-DD");
   return hoy.subtract(30, "day").format("YYYY-MM-DD");
@@ -36,7 +48,7 @@ const labelPeriodo = (agrupacion, periodo) => {
   const p = String(periodo || "").trim();
   if (!p) return "—";
 
-  // Soportar "YYYY-MM-DD", "YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DD HH:mm:ss"
+  // soportar date o datetime iso
   const d = dayjs(p);
   if (!d.isValid()) return p;
 
@@ -58,26 +70,25 @@ async function fetchJsonTry(url, options) {
 }
 
 /**
- * Panel de EMISIONES (fecha_emision) por oficina y por período.
+ * Panel: Emisiones de póliza (fecha_emision) por oficina y por período.
  *
- * Props opcionales para sincronizar con filtros globales:
- * - anio: number|string (ej "2025")
- * - mes: number|string (1..12 o "01".."12")
+ * Props:
+ * - apiBase: "/api/" (o base completa con trailing slash)
+ * - oficinas: [{id:"1",...}]
+ * - defaultOficina: string (filtro global)
+ * - anio / mes: para modo "Mes seleccionado"
  */
 export default function AltasPolizasPanel({
   apiBase,
   oficinas = [],
   getOficinaNombre,
   defaultOficina = "",
-
-  // 🔁 filtros globales opcionales (para "Mes seleccionado")
   anio,
   mes,
 }) {
   const [agrupacion, setAgrupacion] = useState("dia"); // hora | dia | semana | mes
   const [oficina, setOficina] = useState(defaultOficina || "");
 
-  // Si vienen mes/año globales, por defecto usamos "Mes seleccionado"
   const hasMesGlobal = useMemo(() => {
     const a = String(anio || "").trim();
     const m = String(mes || "").trim();
@@ -88,53 +99,47 @@ export default function AltasPolizasPanel({
     return Boolean(String(anio || "").trim()) && Boolean(String(mes || "").trim());
   });
 
-  const [desdeManual, setDesdeManual] = useState(() => defaultDesdeFor("dia"));
-  const [hastaManual, setHastaManual] = useState(() => dayjs().format("YYYY-MM-DD"));
+  const [desde, setDesde] = useState(() => {
+    if (String(anio || "").trim() && String(mes || "").trim()) {
+      return monthRangeFrom(anio, mes).desde || defaultDesdeFor("dia");
+    }
+    return defaultDesdeFor("dia");
+  });
+
+  const [hasta, setHasta] = useState(() => {
+    if (String(anio || "").trim() && String(mes || "").trim()) {
+      return monthRangeFrom(anio, mes).hasta || dayjs().format("YYYY-MM-DD");
+    }
+    return dayjs().format("YYYY-MM-DD");
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState(null);
 
-  // sync con filtro global de oficina
+  // ✅ guarda qué endpoint real responde (para no reprobar cada vez)
+  const [resolvedEndpoint, setResolvedEndpoint] = useState("");
+
+  // sync con filtro global (oficina)
   useEffect(() => {
     setOficina(defaultOficina || "");
   }, [defaultOficina]);
 
-  // si aparece/desaparece mes global, ajustamos el default
+  // si cambian mes/año globales y estamos en "mes seleccionado", actualizamos rango
   useEffect(() => {
-    if (hasMesGlobal) setUsarMesSeleccionado(true);
-  }, [hasMesGlobal]);
+    if (!hasMesGlobal) return;
+    if (!usarMesSeleccionado) return;
+    const r = monthRangeFrom(anio, mes);
+    if (r.desde) setDesde(r.desde);
+    if (r.hasta) setHasta(r.hasta);
+  }, [anio, mes, hasMesGlobal, usarMesSeleccionado]);
 
-  // rango sugerido por agrupación solo si estamos en modo manual
+  // cuando cambia agrupación, si el usuario no está en mes seleccionado y no tiene rango, sugerimos uno
   useEffect(() => {
-    if (!usarMesSeleccionado) {
-      setDesdeManual((prev) => prev || defaultDesdeFor(agrupacion));
-      setHastaManual((prev) => prev || dayjs().format("YYYY-MM-DD"));
-    }
+    if (usarMesSeleccionado) return;
+    setDesde((prev) => prev || defaultDesdeFor(agrupacion));
+    setHasta((prev) => prev || dayjs().format("YYYY-MM-DD"));
   }, [agrupacion, usarMesSeleccionado]);
-
-  const computedRange = useMemo(() => {
-    // Mes seleccionado (calendario): desde = 1er día, hasta = último día
-    if (usarMesSeleccionado && hasMesGlobal) {
-      const a = String(anio).trim();
-      const mRaw = String(mes).trim();
-      const m = mRaw.length === 1 ? `0${mRaw}` : mRaw; // "1" -> "01"
-
-      const start = dayjs(`${a}-${m}-01`).startOf("day");
-      const end = start.endOf("month").startOf("day"); // mantenemos formato date (YYYY-MM-DD)
-      return {
-        desde: start.isValid() ? start.format("YYYY-MM-DD") : "",
-        hasta: end.isValid() ? end.format("YYYY-MM-DD") : "",
-        mode: "mes",
-      };
-    }
-
-    return {
-      desde: clampIsoDate(desdeManual),
-      hasta: clampIsoDate(hastaManual),
-      mode: "manual",
-    };
-  }, [usarMesSeleccionado, hasMesGlobal, anio, mes, desdeManual, hastaManual]);
 
   const oficinasOptions = useMemo(() => {
     const base = Array.isArray(oficinas) ? oficinas : [];
@@ -142,6 +147,18 @@ export default function AltasPolizasPanel({
     const extras = ["OTRAS", "SIN_OFICINA"];
     return Array.from(new Set([...ids, ...extras]));
   }, [oficinas]);
+
+  const buildCandidates = useCallback(() => {
+    const base = String(apiBase || "/api/").trim();
+    // canonical + aliases defensivos
+    const cands = [
+      `${base}estadisticas/polizas/emisiones/serie/`,
+      `${base}estadisticas/polizas/emisiones/serie`,
+      `${base}estadisticas/polizas/emisiones-serie/`,
+      `${base}estadisticas/polizas/emisiones-serie`,
+    ];
+    return Array.from(new Set(cands));
+  }, [apiBase]);
 
   const fetchSerie = useCallback(async () => {
     setLoading(true);
@@ -151,58 +168,69 @@ export default function AltasPolizasPanel({
       const params = new URLSearchParams();
       params.set("agrupacion", agrupacion);
 
-      if (computedRange.desde) params.set("desde", computedRange.desde);
-      if (computedRange.hasta) params.set("hasta", computedRange.hasta);
+      const d = clampIsoDate(desde);
+      const h = clampIsoDate(hasta);
+      if (d) params.set("desde", d);
+      if (h) params.set("hasta", h);
 
       if (oficina) params.set("oficina", oficina);
 
-      // ✅ CLAVE: queremos EMISIONES por fecha_emision
-      // (si tu backend soporta elegir campo, genial; si no, igual queda documentado)
-      params.set("date_field", "fecha_emision");
+      const query = params.toString();
 
-      // ✅ probamos rutas en orden (compatibilidad)
-      const candidates = [
-        // recomendado (nuevo): serie de emisiones por oficina usando fecha_emision
-        `${apiBase}estadisticas/polizas/emisiones/serie/?${params.toString()}`,
-        // alternativo genérico si ya existe en tu proyecto
-        `${apiBase}estadisticas/polizas/serie/?${params.toString()}`,
-        // fallback (si por-oficina termina devolviendo series en tu implementación)
-        `${apiBase}estadisticas/polizas/por-oficina/?${params.toString()}`,
-      ];
+      const candidates = resolvedEndpoint ? [resolvedEndpoint] : buildCandidates();
 
-      let data = null;
       let lastErr = null;
-
-      for (const url of candidates) {
+      for (const baseUrl of candidates) {
+        const url = query ? `${baseUrl}?${query}` : baseUrl;
         try {
-          data = await fetchJsonTry(url, { credentials: "include" });
+          const data = await fetchJsonTry(url, { credentials: "include" });
+          setPayload(data || null);
+
+          if (!resolvedEndpoint || resolvedEndpoint !== baseUrl) {
+            setResolvedEndpoint(baseUrl);
+            console.info("[AltasPolizasPanel] Endpoint OK:", baseUrl);
+          }
+
           lastErr = null;
           break;
         } catch (e) {
           lastErr = e;
-          if (e?.status && e.status !== 404) break;
+          // Si es 404, probamos siguiente candidato
+          if (Number(e?.status) === 404) continue;
+          // Otros errores (500, red, etc.) cortamos
+          throw e;
         }
       }
 
-      if (!data) {
-        const msg =
-          lastErr?.status === 404
-            ? "No se encontró el endpoint de emisiones. Ideal: /api/estadisticas/polizas/emisiones/serie/."
-            : "No se pudieron cargar las emisiones. Revisá logs del backend.";
-        throw new Error(msg);
+      if (lastErr) {
+        // todos 404
+        const tried = candidates.join(" | ");
+        setPayload(null);
+        setError(
+          `Endpoint de emisiones no encontrado (404). Probé: ${tried}. ` +
+            `Esto suele pasar cuando el backend desplegado no está con la última versión o no se reinició.`
+        );
       }
-
-      setPayload(data || null);
     } catch (e) {
       console.error("[AltasPolizasPanel] Error:", e);
       setPayload(null);
-      setError(
-        "No se pudieron cargar las emisiones por fecha_emision. Verificá que exista un endpoint de serie (ideal: /api/estadisticas/polizas/emisiones/serie/) y que aplique filtros oficina+desde+hasta."
-      );
+
+      const is404 = Number(e?.status) === 404;
+      if (is404) {
+        const tried = buildCandidates().join(" | ");
+        setError(
+          `Endpoint de emisiones no encontrado (404). Probé: ${tried}. ` +
+            `Revisá que el backend esté desplegado con el endpoint y que gunicorn/railway haya reiniciado.`
+        );
+      } else {
+        setError(
+          "No se pudieron cargar las emisiones por fecha_emision. Revisá logs del backend."
+        );
+      }
     } finally {
       setLoading(false);
     }
-  }, [apiBase, agrupacion, computedRange.desde, computedRange.hasta, oficina]);
+  }, [apiBase, agrupacion, desde, hasta, oficina, resolvedEndpoint, buildCandidates]);
 
   useEffect(() => {
     fetchSerie();
@@ -267,8 +295,12 @@ export default function AltasPolizasPanel({
 
   const totalGeneral = Number(table?.totalsRow?.total || 0);
 
-  const footerDesde = payload?.desde || computedRange.desde || "—";
-  const footerHasta = payload?.hasta || computedRange.hasta || "—";
+  const footerDesde = payload?.desde || clampIsoDate(desde) || "—";
+  const footerHasta = payload?.hasta || clampIsoDate(hasta) || "—";
+  const footerAgr = payload?.agrupacion || agrupacion;
+
+  const degradadoHoraADia =
+    agrupacion === "hora" && payload?.agrupacion && payload.agrupacion !== "hora";
 
   return (
     <AnimatedCard
@@ -287,12 +319,13 @@ export default function AltasPolizasPanel({
                 Emisiones de póliza por oficina
               </h3>
               <p className="text-xs sm:text-sm text-slate-400">
-                Cuenta pólizas emitidas por <span className="text-slate-200">fecha_emision</span> por{" "}
-                {agrupacion === "hora"
+                Cuenta pólizas por{" "}
+                <span className="text-slate-200">fecha_emision</span> por{" "}
+                {footerAgr === "hora"
                   ? "hora"
-                  : agrupacion === "dia"
+                  : footerAgr === "dia"
                   ? "día"
-                  : agrupacion === "semana"
+                  : footerAgr === "semana"
                   ? "semana"
                   : "mes"}
                 .
@@ -353,68 +386,56 @@ export default function AltasPolizasPanel({
           </select>
         </div>
 
-        {/* Mes seleccionado (si hay mes/año global) */}
-        <div className="flex flex-col gap-1 lg:col-span-2">
-          <label className="text-xs text-slate-400">Rango</label>
-          <div className="flex flex-col gap-2 rounded-2xl bg-slate-950/40 border border-slate-800 p-3">
-            {hasMesGlobal ? (
-              <>
-                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={usarMesSeleccionado}
-                    onChange={(e) => setUsarMesSeleccionado(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-700 bg-slate-950"
-                  />
-                  Usar mes seleccionado (filtros superiores)
-                </label>
-
-                {usarMesSeleccionado ? (
-                  <div className="text-xs text-slate-400">
-                    Mes:{" "}
-                    <span className="text-slate-200 font-medium">
-                      {String(anio)}-{String(mes).padStart(2, "0")}
-                    </span>{" "}
-                    · Rango:{" "}
-                    <span className="text-slate-200 font-medium">
-                      {computedRange.desde} → {computedRange.hasta}
-                    </span>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="text-xs text-slate-400">
-                No hay mes/año global en props. Usando rango manual.
-              </div>
-            )}
-
-            {/* rango manual */}
-            {!usarMesSeleccionado && (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[0.7rem] text-slate-400">Desde</span>
-                  <input
-                    type="date"
-                    value={clampIsoDate(desdeManual)}
-                    onChange={(e) => setDesdeManual(e.target.value)}
-                    className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <span className="text-[0.7rem] text-slate-400">Hasta</span>
-                  <input
-                    type="date"
-                    value={clampIsoDate(hastaManual)}
-                    onChange={(e) => setHastaManual(e.target.value)}
-                    className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </div>
-              </div>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-slate-400">Desde</label>
+            {hasMesGlobal && (
+              <label className="flex items-center gap-2 text-[0.7rem] text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={usarMesSeleccionado}
+                  onChange={(e) => setUsarMesSeleccionado(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-700 bg-slate-950"
+                />
+                Usar mes seleccionado
+              </label>
             )}
           </div>
+          <input
+            type="date"
+            value={clampIsoDate(desde)}
+            onChange={(e) => {
+              setUsarMesSeleccionado(false);
+              setDesde(e.target.value);
+            }}
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">Hasta</label>
+          <input
+            type="date"
+            value={clampIsoDate(hasta)}
+            onChange={(e) => {
+              setUsarMesSeleccionado(false);
+              setHasta(e.target.value);
+            }}
+            className="h-11 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/25"
+          />
         </div>
       </div>
+
+      {/* aviso degradación hora->día */}
+      {degradadoHoraADia && (
+        <div className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-950/20 px-3 py-2 text-xs sm:text-sm text-amber-100 flex items-center gap-2">
+          <HiExclamation />
+          <span>
+            La agrupación <b>hora</b> no aplica (fecha_emision sin hora). Se mostró por{" "}
+            <b>{payload?.agrupacion}</b>.
+          </span>
+        </div>
+      )}
 
       {/* error */}
       {error && (
@@ -440,9 +461,7 @@ export default function AltasPolizasPanel({
           <table className="min-w-full text-left text-xs sm:text-sm">
             <thead className="bg-slate-900/60 border-b border-slate-800">
               <tr>
-                <th className="px-3 py-2 text-slate-300 font-semibold">
-                  Período
-                </th>
+                <th className="px-3 py-2 text-slate-300 font-semibold">Período</th>
                 {table.colMeta.map((c) => (
                   <th
                     key={c.oficina}
@@ -462,9 +481,7 @@ export default function AltasPolizasPanel({
                     colSpan={table.colMeta.length + 2}
                     className="px-3 py-4 text-slate-400"
                   >
-                    {loading
-                      ? "Cargando..."
-                      : "Sin datos para el rango seleccionado."}
+                    {loading ? "Cargando..." : "Sin datos para el rango seleccionado."}
                   </td>
                 </tr>
               ) : (
@@ -494,9 +511,7 @@ export default function AltasPolizasPanel({
                   ))}
 
                   <tr className="bg-slate-900/60">
-                    <td className="px-3 py-2 text-slate-50 font-semibold">
-                      TOTAL
-                    </td>
+                    <td className="px-3 py-2 text-slate-50 font-semibold">TOTAL</td>
                     {table.cols.map((ofi) => (
                       <td
                         key={`total-${ofi}`}
@@ -517,13 +532,13 @@ export default function AltasPolizasPanel({
 
         <div className="px-3 py-2 text-[0.7rem] text-slate-400 border-t border-slate-800">
           Fuente: {payload?.fuente || "live"} · Campo:{" "}
-          <span className="text-slate-200">fecha_emision</span> · Rango:{" "}
-          {footerDesde} → {footerHasta}
-          {payload?.date_field ? (
+          <span className="text-slate-200">fecha_emision</span> · Agrupación:{" "}
+          <span className="text-slate-200">{payload?.agrupacion || agrupacion}</span>{" "}
+          · Rango: {footerDesde} → {footerHasta}
+          {resolvedEndpoint ? (
             <>
               {" "}
-              · date_field backend:{" "}
-              <span className="text-slate-200">{payload.date_field}</span>
+              · Endpoint: <span className="text-slate-200">{resolvedEndpoint}</span>
             </>
           ) : null}
         </div>
