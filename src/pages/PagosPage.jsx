@@ -45,6 +45,10 @@ const PagosPage = () => {
   const [cuotas, setCuotas] = useState([]);
   const [ocultarPagadas, setOcultarPagadas] = useState(false);
 
+  // ✅ Filtro de oficina para las alertas (controla CuotasAlertas)
+  // Buckets: "ALL" | "1" | "2" | "3" | "OTRAS" | "SIN_OFICINA"
+  const [alertasOficina, setAlertasOficina] = useState("ALL");
+
   // Estado para el envío masivo de recordatorios
   const [sendingRecordatorios, setSendingRecordatorios] = useState(false);
 
@@ -171,13 +175,7 @@ const PagosPage = () => {
 
   /* ================== KPIs ================== */
 
-  const {
-    totalCuotas,
-    alDia,
-    porVencer,
-    venceHoy,
-    vencidas,
-  } = useMemo(() => {
+  const { totalCuotas, alDia, porVencer, venceHoy, vencidas } = useMemo(() => {
     const hoy = dayjs().startOf("day");
     const stats = {
       totalCuotas: 0,
@@ -389,8 +387,11 @@ const PagosPage = () => {
               </button>
             </div>
 
-            {/* ✅ Alertas de cuotas por vencer / vencidas (ahora debajo del buscador) */}
-            <CuotasAlertas />
+            {/* ✅ Alertas de cuotas por vencer / vencidas (sincronizadas por oficina) */}
+            <CuotasAlertas
+              oficina={alertasOficina}
+              onOficinaChange={setAlertasOficina}
+            />
 
             {/* Lista de cuotas / pólizas */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">
