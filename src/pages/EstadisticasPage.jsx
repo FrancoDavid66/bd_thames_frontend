@@ -1,6 +1,7 @@
 // src/pages/EstadisticasPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { HiShieldCheck, HiTruck, HiExclamation } from "react-icons/hi";
 
 import { OFICINAS, getOficinaNombre } from "../components/estadisticas/oficinas";
 
@@ -67,6 +68,11 @@ export default function EstadisticasPage() {
   const [showVehiculosExport, setShowVehiculosExport] = useState(false);
   const [vehiculosExportDefaults, setVehiculosExportDefaults] = useState(null);
 
+  // ✅ KPIs Agrosalta
+  const [agroKpis, setAgroKpis] = useState(null);
+  const [agroLoading, setAgroLoading] = useState(false);
+  const [agroError, setAgroError] = useState("");
+
   const apiBase = useMemo(() => getApiBase(), []);
 
   const fetchEstadisticas = async () => {
@@ -106,10 +112,39 @@ export default function EstadisticasPage() {
     }
   };
 
+  const fetchAgroKpis = async () => {
+    setAgroLoading(true);
+    setAgroError("");
+    try {
+      const params = new URLSearchParams();
+      params.set("solo_activas", "1");
+      if (oficina) params.set("oficina", oficina);
+
+      const url = `${apiBase}estadisticas/agrosalta/kpis/?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+      const data = await res.json();
+      setAgroKpis(data || null);
+    } catch (err) {
+      console.error("Error al cargar KPIs Agrosalta:", err);
+      setAgroKpis(null);
+      setAgroError(
+        "No se pudieron cargar los KPIs de Agrosalta. Revisá el endpoint /api/estadisticas/agrosalta/kpis/."
+      );
+    } finally {
+      setAgroLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchEstadisticas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anio, mes, oficina, fuenteSnapshot]);
+
+  useEffect(() => {
+    fetchAgroKpis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oficina]);
 
   const totales = useMemo(() => {
     return oficinasData.reduce(
@@ -253,6 +288,91 @@ export default function EstadisticasPage() {
           totales={totales}
           churnPromedio={churnPromedio}
         />
+
+        {/* ✅ KPIs AGROSALTA (compañía + regla cobertura) */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <AnimatedCard index={3} glow="from-fuchsia-500/50 via-sky-500/25 to-transparent">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <HiShieldCheck className="h-5 w-5 text-sky-200" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                    Autos con robo (Agrosalta)
+                  </span>
+                </div>
+
+                <div className="text-3xl font-semibold text-slate-50">
+                  {agroLoading ? "…" : Number(agroKpis?.autos_con_robo || 0).toLocaleString("es-AR")}
+                </div>
+
+                <div className="text-xs text-slate-400">
+                  Regla: cobertura != “A” {oficina ? `(ofi ${oficina})` : ""}
+                </div>
+
+                {!agroLoading && agroKpis && (
+                  <div className="mt-1 text-[11px] text-slate-400">
+                    Total autos:{" "}
+                    <span className="font-semibold text-slate-200">
+                      {Number(agroKpis.autos_total || 0).toLocaleString("es-AR")}
+                    </span>
+                    {" · "}
+                    Cobertura A:{" "}
+                    <span className="font-semibold text-slate-200">
+                      {Number(agroKpis.autos_cobertura_A || 0).toLocaleString("es-AR")}
+                    </span>
+                    {Number(agroKpis.autos_sin_cobertura || 0) > 0 && (
+                      <>
+                        {" · "}
+                        Sin cobertura:{" "}
+                        <span className="font-semibold text-amber-200">
+                          {Number(agroKpis.autos_sin_cobertura || 0).toLocaleString("es-AR")}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-200">
+                solo activas
+              </div>
+            </div>
+          </AnimatedCard>
+
+          <AnimatedCard index={4} glow="from-emerald-500/45 via-cyan-500/20 to-transparent">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <HiTruck className="h-5 w-5 text-emerald-200" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                    Camiones (Agrosalta)
+                  </span>
+                </div>
+
+                <div className="text-3xl font-semibold text-slate-50">
+                  {agroLoading ? "…" : Number(agroKpis?.camiones_total || 0).toLocaleString("es-AR")}
+                </div>
+
+                <div className="text-xs text-slate-400">
+                  Compañía = Agrosalta {oficina ? `(ofi ${oficina})` : ""}
+                </div>
+              </div>
+            </div>
+          </AnimatedCard>
+        </div>
+
+        {agroError && (
+          <AnimatedCard
+            index={5}
+            interactive={false}
+            glow="from-amber-500/50 via-orange-500/25 to-transparent"
+          >
+            <div className="flex items-start gap-2 rounded-xl border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-100">
+              <HiExclamation className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <span>{agroError}</span>
+            </div>
+          </AnimatedCard>
+        )}
 
         {/* TABLA POR OFICINA */}
         <OficinasTable
