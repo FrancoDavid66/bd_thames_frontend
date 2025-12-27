@@ -6,16 +6,21 @@ import {
   FaUsers,
   FaFileAlt,
   FaMoneyCheckAlt,
-  FaDatabase, // icono para Balanzes
-  FaMapMarkedAlt, // icono para Geo
-  FaChartBar, // icono para Competencia
-  FaChartPie, // icono para Estadísticas
+  FaDatabase,
+  FaMapMarkedAlt,
+  FaChartBar,
+  FaChartPie,
+  FaBullhorn, // 🆕 Campañas
 } from "react-icons/fa";
 
 const tabs = [
   { to: "/", label: "Inicio", icon: FaHome },
   { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
   { to: "/clientes", label: "Clientes", icon: FaUsers },
+
+  // 🆕 Marketing / Campañas
+  { to: "/marketing", label: "Campañas", icon: FaBullhorn },
+
   { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
   { to: "/competencia", label: "Competencia", icon: FaChartBar },
   { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie },
@@ -28,9 +33,7 @@ export default function MobileTopBar({
   solPendienteAlta = 0,
   solPendienteEnvio = 0,
 }) {
-  // Altura visual estimada (icono + label + paddings)
   const MOBILE_NAV_H = 68; // px
-
   const solTotal = (solPendienteAlta || 0) + (solPendienteEnvio || 0);
 
   return (
@@ -52,9 +55,7 @@ export default function MobileTopBar({
                 to={to}
                 className={({ isActive }) =>
                   `group relative flex flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium transition-colors ${
-                    isActive
-                      ? "text-yellow-300"
-                      : "text-gray-300 hover:text-white"
+                    isActive ? "text-yellow-300" : "text-gray-300 hover:text-white"
                   }`
                 }
               >
@@ -66,7 +67,6 @@ export default function MobileTopBar({
                 >
                   <Icon />
 
-                  {/* Badge de notificaciones SOLO en Solicitudes */}
                   {isSolicitudes && solTotal > 0 && (
                     <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white shadow-lg">
                       {solTotal > 9 ? "9+" : solTotal}

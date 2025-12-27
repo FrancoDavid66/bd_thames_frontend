@@ -356,6 +356,59 @@ export default function EstadisticasPage() {
                 <div className="text-xs text-slate-400">
                   Compañía = Agrosalta {oficina ? `(ofi ${oficina})` : ""}
                 </div>
+
+                {!agroLoading &&
+                  Array.isArray(agroKpis?.camiones_por_compania) &&
+                  agroKpis.camiones_por_compania.length > 0 && (
+                    <div className="mt-3 grid gap-2">
+                      <div className="text-[11px] text-slate-400">
+                        Total camiones (todas):{" "}
+                        <span className="font-semibold text-slate-200">
+                          {Number(agroKpis?.camiones_total_todas_companias || 0).toLocaleString(
+                            "es-AR"
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="grid gap-1 rounded-xl border border-white/10 bg-white/5 p-2">
+                        {agroKpis.camiones_por_compania.slice(0, 6).map((row, i) => {
+                          const name = String(row?.compania || "—");
+                          const isAgro = name.toLowerCase().includes("agrosalta");
+                          return (
+                            <div
+                              key={`${name}-${i}`}
+                              className="flex items-center justify-between text-[11px]"
+                            >
+                              <span
+                                className={
+                                  isAgro
+                                    ? "font-semibold text-emerald-200"
+                                    : "text-slate-200"
+                                }
+                              >
+                                {name}
+                              </span>
+                              <span
+                                className={
+                                  isAgro
+                                    ? "font-semibold text-emerald-100"
+                                    : "text-slate-300"
+                                }
+                              >
+                                {Number(row?.cantidad || 0).toLocaleString("es-AR")}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {agroKpis.camiones_por_compania.length > 6 && (
+                        <div className="text-[11px] text-slate-500">
+                          +{agroKpis.camiones_por_compania.length - 6} compañías más…
+                        </div>
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
           </AnimatedCard>

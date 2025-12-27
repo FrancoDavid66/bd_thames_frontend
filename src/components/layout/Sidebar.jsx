@@ -15,16 +15,16 @@ import {
   FaTruck,
   FaClipboardList,
   FaTimes,
-  FaTicketAlt, // ← icono para Cuponeras
-  FaChartBar, // ← icono para Competencia
-  FaChartPie, // ← icono para Estadísticas
+  FaTicketAlt,
+  FaChartBar,
+  FaChartPie,
+  FaBullhorn, // 🆕 Campañas
 } from "react-icons/fa";
 import ThemeToggle from "./ThemeToggle";
 import logo_thames from "../../assets/logos/logo_thames.svg";
 
 // Bloqueadas por ahora
 const DISABLED_PATHS = [
-  // "/geo", ← Geo ahora habilitado
   "/propiedades",
   "/alquileres",
   "/siniestros",
@@ -35,6 +35,10 @@ const navItems = [
   { to: "/", label: "Inicio", icon: <FaHome /> },
   { to: "/solicitudes", label: "Solicitudes", icon: <FaClipboardList /> },
   { to: "/clientes", label: "Clientes", icon: <FaUsers /> },
+
+  // 🆕 Marketing / Campañas
+  { to: "/marketing", label: "Campañas", icon: <FaBullhorn /> },
+
   { to: "/competencia", label: "Competencia", icon: <FaChartBar /> },
   { to: "/polizas", label: "Pólizas", icon: <FaFileAlt /> },
   { to: "/pagos", label: "Pagos", icon: <FaMoneyCheckAlt /> },
@@ -51,10 +55,8 @@ const navItems = [
 export default function Sidebar({
   isOpen,
   onClose,
-  // Contadores Solicitudes
   solPendienteAlta = 0,
   solPendienteEnvio = 0,
-  // Contadores Cuponeras
   cuponPendientes = 0,
   cuponPorVencer7 = 0,
   cuponVencidas = 0,
@@ -65,12 +67,10 @@ export default function Sidebar({
   };
 
   const solTotal = (solPendienteAlta || 0) + (solPendienteEnvio || 0);
-  const cuponAlertTotal =
-    (cuponPorVencer7 || 0) + (cuponVencidas || 0); // sólo mostramos alerta por vencidas/por vencer
+  const cuponAlertTotal = (cuponPorVencer7 || 0) + (cuponVencidas || 0);
 
   return (
     <>
-      {/* Overlay para mobile (ya NO cierra al hacer click afuera) */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-[1px] lg:hidden z-40"
@@ -89,12 +89,10 @@ export default function Sidebar({
         aria-label="Menú principal"
       >
         <div className="relative">
-          {/* Header con logo */}
           <div className="flex items-center justify-center py-4 border-b border-blue-700 dark:border-gray-800">
             <img src={logo_thames} alt="Thames" className="h-8 w-auto" />
           </div>
 
-          {/* Botón cerrar (solo mobile) */}
           <button
             onClick={onClose}
             className="lg:hidden absolute right-3 top-3 p-2 rounded-full bg-blue-700/70 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-yellow-400"
@@ -109,15 +107,12 @@ export default function Sidebar({
           {navItems.map((item) => {
             const isDisabled = DISABLED_PATHS.includes(item.to);
 
-            // Badge para Solicitudes
             const showSolBadge = item.to === "/solicitudes" && solTotal > 0;
             const solTitle = showSolBadge
               ? `Pendientes: ${solTotal} (Alta: ${solPendienteAlta} · Envío: ${solPendienteEnvio})`
               : undefined;
 
-            // Badge para Cuponeras (vencidas / por vencer)
-            const showCuponBadge =
-              item.to === "/cuponeras" && cuponAlertTotal > 0;
+            const showCuponBadge = item.to === "/cuponeras" && cuponAlertTotal > 0;
             const cuponTitle = showCuponBadge
               ? `Cuponeras en alerta: ${cuponAlertTotal} (Por vencer ≤7 días: ${cuponPorVencer7} · Vencidas: ${cuponVencidas})`
               : undefined;
@@ -159,16 +154,11 @@ export default function Sidebar({
                 {item.icon}
                 <span>{item.label}</span>
 
-                {/* Badge derecha para Solicitudes */}
                 {showSolBadge && (
                   <motion.span
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 18,
-                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 18 }}
                     aria-label={`${solTotal} notificaciones en Solicitudes`}
                     className="ml-auto inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-yellow-400 text-gray-900 text-xs font-extrabold ring-1 ring-yellow-200"
                   >
@@ -176,16 +166,11 @@ export default function Sidebar({
                   </motion.span>
                 )}
 
-                {/* Badge derecha para Cuponeras */}
                 {showCuponBadge && (
                   <motion.span
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 18,
-                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 18 }}
                     aria-label={`${cuponAlertTotal} cuponeras en alerta`}
                     className="ml-auto inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-rose-400 text-gray-900 text-xs font-extrabold ring-1 ring-rose-200"
                   >

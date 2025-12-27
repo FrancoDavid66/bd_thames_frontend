@@ -29,6 +29,8 @@ import CuponerasPage from "./pages/CuponerasPage";
 import CompetenciaPage from "./pages/CompetenciaPage";
 // ESTADÍSTICAS
 import EstadisticasPage from "./pages/EstadisticasPage";
+// MARKETING / CAMPAÑAS
+import MarketingPage from "./pages/MarketingPage";
 
 // 🔔 Realtime counters (front-only BroadcastChannel)
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
@@ -292,7 +294,6 @@ function App() {
       />
 
       <motion.div
-        // ⬇️ IMPORTANTE: lo volvemos columna y dejamos que el main sea el área scrolleable
         className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${
           sidebarOpen ? "lg:ml-64" : ""
         }`}
@@ -303,7 +304,6 @@ function App() {
         <Navbar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
         <motion.main
-          // ⬇️ ESTA ES EL ÁREA SCROLLEABLE
           className="flex-1 px-4 sm:px-6 md:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -335,6 +335,9 @@ function App() {
 
               {/* Estadísticas */}
               <Route path="/estadisticas" element={<EstadisticasPage />} />
+
+              {/* Marketing / Campañas */}
+              <Route path="/marketing" element={<MarketingPage />} />
 
               {/* Propiedades / Alquileres aún bloqueadas */}
               <Route path="/propiedades" element={<Navigate to="/" />} />
