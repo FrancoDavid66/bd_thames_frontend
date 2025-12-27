@@ -1,6 +1,7 @@
 // src/pages/EstadisticasPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { HiShieldCheck, HiTruck, HiExclamation } from "react-icons/hi";
 
 import { OFICINAS, getOficinaNombre } from "../components/estadisticas/oficinas";
@@ -49,7 +50,17 @@ const ORBS = [
 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
+const safeStr = (v) => String(v ?? "").trim();
+
+const normalizePatente = (raw) =>
+  safeStr(raw)
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+
 export default function EstadisticasPage() {
+  const navigate = useNavigate();
+
   const hoy = useMemo(() => new Date(), []);
   const [anio, setAnio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
@@ -75,12 +86,10 @@ export default function EstadisticasPage() {
   const [agroLoading, setAgroLoading] = useState(false);
   const [agroError, setAgroError] = useState("");
 
-  // ✅ NUEVO: Duplicados (clientes / pólizas)
+  // ✅ Duplicados (clientes / pólizas)
   const [dupExpanded, setDupExpanded] = useState(false);
-
   const [dupLoading, setDupLoading] = useState(false);
   const [dupError, setDupError] = useState("");
-
   const [dupClientes, setDupClientes] = useState(null);
   const [dupPolizas, setDupPolizas] = useState(null);
 
@@ -162,11 +171,15 @@ export default function EstadisticasPage() {
       paramsClientes.set("modos", "dni,telefono,email");
       paramsClientes.set("max_groups", String(maxG));
       paramsClientes.set("max_items", String(maxI));
+      // ✅ filtro por oficina (si está seleccionado)
+      if (oficina) paramsClientes.set("oficina", oficina);
 
       const paramsPolizas = new URLSearchParams();
       paramsPolizas.set("solo_activas", dupPolizasSoloActivas ? "1" : "0");
       paramsPolizas.set("max_groups", String(maxG));
       paramsPolizas.set("max_items", String(maxI));
+      // ✅ filtro por oficina (si está seleccionado)
+      if (oficina) paramsPolizas.set("oficina", oficina);
 
       const urlClientes = `${apiBase}estadisticas/duplicados/clientes/?${paramsClientes.toString()}`;
       const urlPolizas = `${apiBase}estadisticas/duplicados/polizas/?${paramsPolizas.toString()}`;
@@ -196,6 +209,42 @@ export default function EstadisticasPage() {
     }
   };
 
+  const goCliente = (id) => {
+    const n = Number(id);
+    if (!Number.isFinite(n) || n <= 0) return;
+    navigate(`/clientes/${n}`);
+  };
+
+  const goPolizasPorPatente = (patenteRaw) => {
+    const p = normalizePatente(patenteRaw);
+    if (!p) return;
+    navigate(`/polizas?patente=${encodeURIComponent(p)}`);
+  };
+
+  const copyText = async (text) => {
+    const t = safeStr(text);
+    if (!t) return;
+    try {
+      await navigator.clipboard.writeText(t);
+    } catch {
+      // fallback simple
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = t;
+        ta.style.position = "fixed";
+        ta.style.left = "-1000px";
+        ta.style.top = "-1000px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        /* noop */
+      }
+    }
+  };
+
   useEffect(() => {
     fetchEstadisticas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,11 +255,11 @@ export default function EstadisticasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oficina]);
 
-  // ✅ cargamos duplicados al montar (y si cambias los parámetros locales)
+  // ✅ refresca duplicados también al cambiar oficina / límites
   useEffect(() => {
     fetchDuplicados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dupPolizasSoloActivas]);
+  }, [dupPolizasSoloActivas, oficina, dupMaxGroups, dupMaxItems]);
 
   const totales = useMemo(() => {
     return oficinasData.reduce(
@@ -264,7 +313,6 @@ export default function EstadisticasPage() {
     periodo ||
     `${mes.toString().padStart(2, "0")}/${anio.toString().padStart(4, "0")}`;
 
-  // ✅ abre export vehículos con defaults (los filtros actuales del panel)
   const openVehiculosExport = (defaults) => {
     setVehiculosExportDefaults(defaults || null);
     setShowVehiculosExport(true);
@@ -374,7 +422,7 @@ export default function EstadisticasPage() {
           churnPromedio={churnPromedio}
         />
 
-        {/* ✅ KPIs AGROSALTA (compañía + regla cobertura) */}
+        {/* ✅ KPIs AGROSALTA */}
         <div className="grid gap-4 md:grid-cols-2">
           <AnimatedCard
             index={3}
@@ -419,9 +467,9 @@ export default function EstadisticasPage() {
                         {" · "}
                         Sin cobertura:{" "}
                         <span className="font-semibold text-amber-200">
-                          {Number(agroKpis.autos_sin_cobertura || 0).toLocaleString(
-                            "es-AR"
-                          )}
+                          {Number(
+                            agroKpis.autos_sin_cobertura || 0
+                          ).toLocaleString("es-AR")}
                         </span>
                       </>
                     )}
@@ -531,7 +579,7 @@ export default function EstadisticasPage() {
           </AnimatedCard>
         )}
 
-        {/* ✅ NUEVO: DUPLICADOS */}
+        {/* ✅ DUPLICADOS */}
         <AnimatedCard
           index={6}
           glow="from-rose-500/25 via-fuchsia-500/20 to-transparent"
@@ -547,8 +595,23 @@ export default function EstadisticasPage() {
                 </div>
 
                 <div className="text-[11px] text-slate-400">
-                  Clientes (por DNI/teléfono/email) y pólizas (por patente). Usá esto
-                  para limpiar y evitar inconsistencias.
+                  Clientes (por DNI/teléfono/email) y pólizas (por patente).
+                  {oficina ? (
+                    <>
+                      {" "}
+                      <span className="text-slate-300">
+                        Filtrado por oficina:{" "}
+                        <span className="font-semibold text-slate-100">
+                          {oficina}
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {" "}
+                      <span className="text-slate-500">(sin filtro de oficina)</span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -690,7 +753,7 @@ export default function EstadisticasPage() {
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ duration: 0.22, ease: "easeOut" }}
                 >
-                  {/* Clientes (tabla simple) */}
+                  {/* Clientes */}
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
@@ -723,6 +786,15 @@ export default function EstadisticasPage() {
                                 <span className="text-sm font-semibold text-slate-100">
                                   {String(g?.key || "—")}
                                 </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => copyText(String(g?.key || ""))}
+                                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 transition hover:bg-white/10"
+                                  title="Copiar valor"
+                                >
+                                  Copiar
+                                </button>
                               </div>
 
                               <div className="text-[11px] text-slate-300">
@@ -738,7 +810,7 @@ export default function EstadisticasPage() {
                                 (c, i) => (
                                   <div
                                     key={`${c?.id || "c"}-${i}`}
-                                    className="flex flex-col gap-0.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]"
+                                    className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-[11px]"
                                   >
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                       <span className="font-semibold text-slate-100">
@@ -746,10 +818,27 @@ export default function EstadisticasPage() {
                                         {`${c?.apellido || ""} ${c?.nombre || ""}`.trim() ||
                                           "—"}
                                       </span>
-                                      <span className="text-slate-300">
-                                        {c?.estado ? `Estado: ${c.estado}` : ""}
-                                      </span>
+
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => goCliente(c?.id)}
+                                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200 transition hover:bg-white/10"
+                                        >
+                                          Abrir cliente
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => copyText(String(c?.id || ""))}
+                                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 transition hover:bg-white/10"
+                                          title="Copiar ID"
+                                        >
+                                          Copiar ID
+                                        </button>
+                                      </div>
                                     </div>
+
                                     <div className="text-slate-300">
                                       DNI/CUIT:{" "}
                                       <span className="font-semibold text-slate-200">
@@ -776,7 +865,7 @@ export default function EstadisticasPage() {
                     )}
                   </div>
 
-                  {/* Pólizas (tabla simple) */}
+                  {/* Pólizas */}
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
@@ -797,81 +886,117 @@ export default function EstadisticasPage() {
                       </div>
                     ) : (
                       <div className="mt-3 grid gap-2">
-                        {dupPolizasGroups.slice(0, dupMaxGroups).map((g, idx) => (
-                          <div
-                            key={`${g?.key || "p"}-${idx}`}
-                            className="rounded-xl border border-white/10 bg-slate-950/30 p-3"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200">
-                                  PATENTE
-                                </span>
-                                <span className="text-sm font-semibold text-slate-100">
-                                  {String(g?.key || "—")}
-                                </span>
-                              </div>
+                        {dupPolizasGroups.slice(0, dupMaxGroups).map((g, idx) => {
+                          const patenteKey = String(g?.key || "—");
+                          return (
+                            <div
+                              key={`${g?.key || "p"}-${idx}`}
+                              className="rounded-xl border border-white/10 bg-slate-950/30 p-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200">
+                                    PATENTE
+                                  </span>
+                                  <span className="text-sm font-semibold text-slate-100">
+                                    {patenteKey}
+                                  </span>
 
-                              <div className="text-[11px] text-slate-300">
-                                <span className="font-semibold text-slate-100">
-                                  {Number(g?.count || 0).toLocaleString("es-AR")}
-                                </span>{" "}
-                                pólizas {g?.truncated ? "(truncado)" : ""}
-                              </div>
-                            </div>
-
-                            <div className="mt-2 grid gap-1">
-                              {(Array.isArray(g?.polizas) ? g.polizas : []).map(
-                                (p, i) => (
-                                  <div
-                                    key={`${p?.poliza_id || "p"}-${i}`}
-                                    className="flex flex-col gap-0.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]"
+                                  <button
+                                    type="button"
+                                    onClick={() => goPolizasPorPatente(patenteKey)}
+                                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200 transition hover:bg-white/10"
                                   >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="font-semibold text-slate-100">
-                                        #{p?.poliza_id} — {p?.numero_poliza || "—"}
-                                      </span>
-                                      <span className="text-slate-300">
-                                        {p?.estado ? `Estado: ${p.estado}` : ""}
-                                      </span>
-                                    </div>
+                                    Ver en pólizas
+                                  </button>
 
-                                    <div className="text-slate-300">
-                                      Asegurado:{" "}
-                                      <span className="font-semibold text-slate-200">
-                                        {p?.asegurado || "—"}
-                                      </span>
-                                      {" · "}
-                                      DNI/CUIT:{" "}
-                                      <span className="font-semibold text-slate-200">
-                                        {p?.dni_cuit_cuil || "—"}
-                                      </span>
-                                    </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyText(normalizePatente(patenteKey))}
+                                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 transition hover:bg-white/10"
+                                    title="Copiar patente normalizada"
+                                  >
+                                    Copiar
+                                  </button>
+                                </div>
 
-                                    <div className="text-slate-300">
-                                      Compañía:{" "}
-                                      <span className="font-semibold text-slate-200">
-                                        {p?.compania || "—"}
-                                      </span>
-                                      {" · "}
-                                      Oficina:{" "}
-                                      <span className="font-semibold text-slate-200">
-                                        {p?.oficina || "—"}
-                                      </span>
-                                      {" · "}
-                                      Vehículo:{" "}
-                                      <span className="font-semibold text-slate-200">
-                                        {`${p?.marca || ""} ${p?.modelo || ""}`.trim() ||
-                                          "—"}
-                                        {p?.anio ? ` (${p.anio})` : ""}
-                                      </span>
+                                <div className="text-[11px] text-slate-300">
+                                  <span className="font-semibold text-slate-100">
+                                    {Number(g?.count || 0).toLocaleString("es-AR")}
+                                  </span>{" "}
+                                  pólizas {g?.truncated ? "(truncado)" : ""}
+                                </div>
+                              </div>
+
+                              <div className="mt-2 grid gap-1">
+                                {(Array.isArray(g?.polizas) ? g.polizas : []).map(
+                                  (p, i) => (
+                                    <div
+                                      key={`${p?.poliza_id || "p"}-${i}`}
+                                      className="flex flex-col gap-0.5 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-[11px]"
+                                    >
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="font-semibold text-slate-100">
+                                          #{p?.poliza_id} — {p?.numero_poliza || "—"}
+                                        </span>
+
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => goPolizasPorPatente(patenteKey)}
+                                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200 transition hover:bg-white/10"
+                                          >
+                                            Abrir (patente)
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => copyText(String(p?.poliza_id || ""))}
+                                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 transition hover:bg-white/10"
+                                            title="Copiar ID de póliza"
+                                          >
+                                            Copiar ID
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-slate-300">
+                                        Asegurado:{" "}
+                                        <span className="font-semibold text-slate-200">
+                                          {p?.asegurado || "—"}
+                                        </span>
+                                        {" · "}
+                                        DNI/CUIT:{" "}
+                                        <span className="font-semibold text-slate-200">
+                                          {p?.dni_cuit_cuil || "—"}
+                                        </span>
+                                      </div>
+
+                                      <div className="text-slate-300">
+                                        Compañía:{" "}
+                                        <span className="font-semibold text-slate-200">
+                                          {p?.compania || "—"}
+                                        </span>
+                                        {" · "}
+                                        Oficina:{" "}
+                                        <span className="font-semibold text-slate-200">
+                                          {p?.oficina || "—"}
+                                        </span>
+                                        {" · "}
+                                        Vehículo:{" "}
+                                        <span className="font-semibold text-slate-200">
+                                          {`${p?.marca || ""} ${p?.modelo || ""}`.trim() ||
+                                            "—"}
+                                          {p?.anio ? ` (${p.anio})` : ""}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                )
-                              )}
+                                  )
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -888,7 +1013,7 @@ export default function EstadisticasPage() {
           formatMixPercent={formatMixPercent}
         />
 
-        {/* ✅ NUEVO: ALTAS DE PÓLIZA POR OFICINA (día/semana/mes) */}
+        {/* ALTAS */}
         <AltasPolizasPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
@@ -896,7 +1021,7 @@ export default function EstadisticasPage() {
           defaultOficina={oficina}
         />
 
-        {/* ✅ PANEL VEHÍCULOS */}
+        {/* VEHÍCULOS */}
         <VehiculosPanel
           apiBase={apiBase}
           oficinas={OFICINAS}
@@ -918,7 +1043,6 @@ export default function EstadisticasPage() {
         getOficinaNombre={getOficinaNombre}
       />
 
-      {/* ✅ EXPORT VEHÍCULOS */}
       <VehiculosExportModal
         open={showVehiculosExport}
         onClose={() => setShowVehiculosExport(false)}
