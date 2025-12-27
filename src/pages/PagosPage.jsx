@@ -387,13 +387,7 @@ const PagosPage = () => {
               </button>
             </div>
 
-            {/* ✅ Alertas de cuotas por vencer / vencidas (sincronizadas por oficina) */}
-            <CuotasAlertas
-              oficina={alertasOficina}
-              onOficinaChange={setAlertasOficina}
-            />
-
-            {/* Lista de cuotas / pólizas */}
+            {/* ✅ Lista de cuotas / pólizas (PAGO) — ahora arriba */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">
               <PagosList
                 cuotas={cuotas}
@@ -404,6 +398,12 @@ const PagosPage = () => {
                 mediosCobro={mediosCobro}
               />
             </div>
+
+            {/* ✅ Alertas / tarjetas de vencimientos — ahora abajo */}
+            <CuotasAlertas
+              oficina={alertasOficina}
+              onOficinaChange={setAlertasOficina}
+            />
           </motion.div>
         ) : (
           <motion.div
