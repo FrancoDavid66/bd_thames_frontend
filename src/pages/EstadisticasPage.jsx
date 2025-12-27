@@ -1,6 +1,6 @@
 // src/pages/EstadisticasPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { HiShieldCheck, HiTruck, HiExclamation } from "react-icons/hi";
 
 import { OFICINAS, getOficinaNombre } from "../components/estadisticas/oficinas";
@@ -47,6 +47,8 @@ const ORBS = [
   { top: "65%", left: "80%", size: 180, duration: 26 },
 ];
 
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
 export default function EstadisticasPage() {
   const hoy = useMemo(() => new Date(), []);
   const [anio, setAnio] = useState(hoy.getFullYear());
@@ -72,6 +74,19 @@ export default function EstadisticasPage() {
   const [agroKpis, setAgroKpis] = useState(null);
   const [agroLoading, setAgroLoading] = useState(false);
   const [agroError, setAgroError] = useState("");
+
+  // ✅ NUEVO: Duplicados (clientes / pólizas)
+  const [dupExpanded, setDupExpanded] = useState(false);
+
+  const [dupLoading, setDupLoading] = useState(false);
+  const [dupError, setDupError] = useState("");
+
+  const [dupClientes, setDupClientes] = useState(null);
+  const [dupPolizas, setDupPolizas] = useState(null);
+
+  const [dupPolizasSoloActivas, setDupPolizasSoloActivas] = useState(true);
+  const [dupMaxGroups, setDupMaxGroups] = useState(120);
+  const [dupMaxItems, setDupMaxItems] = useState(12);
 
   const apiBase = useMemo(() => getApiBase(), []);
 
@@ -136,6 +151,51 @@ export default function EstadisticasPage() {
     }
   };
 
+  const fetchDuplicados = async () => {
+    setDupLoading(true);
+    setDupError("");
+    try {
+      const maxG = clamp(Number(dupMaxGroups || 120), 10, 2000);
+      const maxI = clamp(Number(dupMaxItems || 12), 5, 200);
+
+      const paramsClientes = new URLSearchParams();
+      paramsClientes.set("modos", "dni,telefono,email");
+      paramsClientes.set("max_groups", String(maxG));
+      paramsClientes.set("max_items", String(maxI));
+
+      const paramsPolizas = new URLSearchParams();
+      paramsPolizas.set("solo_activas", dupPolizasSoloActivas ? "1" : "0");
+      paramsPolizas.set("max_groups", String(maxG));
+      paramsPolizas.set("max_items", String(maxI));
+
+      const urlClientes = `${apiBase}estadisticas/duplicados/clientes/?${paramsClientes.toString()}`;
+      const urlPolizas = `${apiBase}estadisticas/duplicados/polizas/?${paramsPolizas.toString()}`;
+
+      const [resC, resP] = await Promise.all([
+        fetch(urlClientes, { credentials: "include" }),
+        fetch(urlPolizas, { credentials: "include" }),
+      ]);
+
+      if (!resC.ok) throw new Error(`Clientes duplicados: HTTP ${resC.status}`);
+      if (!resP.ok) throw new Error(`Pólizas duplicadas: HTTP ${resP.status}`);
+
+      const dataC = await resC.json();
+      const dataP = await resP.json();
+
+      setDupClientes(dataC || null);
+      setDupPolizas(dataP || null);
+    } catch (err) {
+      console.error("Error al cargar duplicados:", err);
+      setDupClientes(null);
+      setDupPolizas(null);
+      setDupError(
+        "No se pudieron cargar los duplicados. Revisá los endpoints /api/estadisticas/duplicados/clientes/ y /api/estadisticas/duplicados/polizas/."
+      );
+    } finally {
+      setDupLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchEstadisticas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,6 +205,12 @@ export default function EstadisticasPage() {
     fetchAgroKpis();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oficina]);
+
+  // ✅ cargamos duplicados al montar (y si cambias los parámetros locales)
+  useEffect(() => {
+    fetchDuplicados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dupPolizasSoloActivas]);
 
   const totales = useMemo(() => {
     return oficinasData.reduce(
@@ -203,6 +269,25 @@ export default function EstadisticasPage() {
     setVehiculosExportDefaults(defaults || null);
     setShowVehiculosExport(true);
   };
+
+  const dupClientesGroups = useMemo(() => {
+    const grupos = dupClientes?.grupos;
+    return Array.isArray(grupos) ? grupos : [];
+  }, [dupClientes]);
+
+  const dupPolizasGroups = useMemo(() => {
+    const grupos = dupPolizas?.grupos;
+    return Array.isArray(grupos) ? grupos : [];
+  }, [dupPolizas]);
+
+  const dupClientesCountsByModo = useMemo(() => {
+    const acc = { dni: 0, telefono: 0, email: 0 };
+    dupClientesGroups.forEach((g) => {
+      const m = String(g?.modo || "").toLowerCase();
+      if (m in acc) acc[m] += 1;
+    });
+    return acc;
+  }, [dupClientesGroups]);
 
   return (
     <motion.div
@@ -291,7 +376,10 @@ export default function EstadisticasPage() {
 
         {/* ✅ KPIs AGROSALTA (compañía + regla cobertura) */}
         <div className="grid gap-4 md:grid-cols-2">
-          <AnimatedCard index={3} glow="from-fuchsia-500/50 via-sky-500/25 to-transparent">
+          <AnimatedCard
+            index={3}
+            glow="from-fuchsia-500/50 via-sky-500/25 to-transparent"
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -302,7 +390,11 @@ export default function EstadisticasPage() {
                 </div>
 
                 <div className="text-3xl font-semibold text-slate-50">
-                  {agroLoading ? "…" : Number(agroKpis?.autos_con_robo || 0).toLocaleString("es-AR")}
+                  {agroLoading
+                    ? "…"
+                    : Number(agroKpis?.autos_con_robo || 0).toLocaleString(
+                        "es-AR"
+                      )}
                 </div>
 
                 <div className="text-xs text-slate-400">
@@ -318,14 +410,18 @@ export default function EstadisticasPage() {
                     {" · "}
                     Cobertura A:{" "}
                     <span className="font-semibold text-slate-200">
-                      {Number(agroKpis.autos_cobertura_A || 0).toLocaleString("es-AR")}
+                      {Number(agroKpis.autos_cobertura_A || 0).toLocaleString(
+                        "es-AR"
+                      )}
                     </span>
                     {Number(agroKpis.autos_sin_cobertura || 0) > 0 && (
                       <>
                         {" · "}
                         Sin cobertura:{" "}
                         <span className="font-semibold text-amber-200">
-                          {Number(agroKpis.autos_sin_cobertura || 0).toLocaleString("es-AR")}
+                          {Number(agroKpis.autos_sin_cobertura || 0).toLocaleString(
+                            "es-AR"
+                          )}
                         </span>
                       </>
                     )}
@@ -339,7 +435,10 @@ export default function EstadisticasPage() {
             </div>
           </AnimatedCard>
 
-          <AnimatedCard index={4} glow="from-emerald-500/45 via-cyan-500/20 to-transparent">
+          <AnimatedCard
+            index={4}
+            glow="from-emerald-500/45 via-cyan-500/20 to-transparent"
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -350,7 +449,11 @@ export default function EstadisticasPage() {
                 </div>
 
                 <div className="text-3xl font-semibold text-slate-50">
-                  {agroLoading ? "…" : Number(agroKpis?.camiones_total || 0).toLocaleString("es-AR")}
+                  {agroLoading
+                    ? "…"
+                    : Number(agroKpis?.camiones_total || 0).toLocaleString(
+                        "es-AR"
+                      )}
                 </div>
 
                 <div className="text-xs text-slate-400">
@@ -364,9 +467,9 @@ export default function EstadisticasPage() {
                       <div className="text-[11px] text-slate-400">
                         Total camiones (todas):{" "}
                         <span className="font-semibold text-slate-200">
-                          {Number(agroKpis?.camiones_total_todas_companias || 0).toLocaleString(
-                            "es-AR"
-                          )}
+                          {Number(
+                            agroKpis?.camiones_total_todas_companias || 0
+                          ).toLocaleString("es-AR")}
                         </span>
                       </div>
 
@@ -404,7 +507,8 @@ export default function EstadisticasPage() {
 
                       {agroKpis.camiones_por_compania.length > 6 && (
                         <div className="text-[11px] text-slate-500">
-                          +{agroKpis.camiones_por_compania.length - 6} compañías más…
+                          +{agroKpis.camiones_por_compania.length - 6} compañías
+                          más…
                         </div>
                       )}
                     </div>
@@ -426,6 +530,356 @@ export default function EstadisticasPage() {
             </div>
           </AnimatedCard>
         )}
+
+        {/* ✅ NUEVO: DUPLICADOS */}
+        <AnimatedCard
+          index={6}
+          glow="from-rose-500/25 via-fuchsia-500/20 to-transparent"
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <HiExclamation className="h-5 w-5 text-rose-200" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                    Duplicados (calidad de datos)
+                  </span>
+                </div>
+
+                <div className="text-[11px] text-slate-400">
+                  Clientes (por DNI/teléfono/email) y pólizas (por patente). Usá esto
+                  para limpiar y evitar inconsistencias.
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-sky-400"
+                    checked={dupPolizasSoloActivas}
+                    onChange={(e) => setDupPolizasSoloActivas(e.target.checked)}
+                  />
+                  Pólizas: solo activas
+                </label>
+
+                <button
+                  type="button"
+                  onClick={fetchDuplicados}
+                  disabled={dupLoading}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {dupLoading ? "Actualizando…" : "Refrescar"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDupExpanded((v) => !v)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+                >
+                  {dupExpanded ? "Ocultar detalle" : "Ver detalle"}
+                </button>
+              </div>
+            </div>
+
+            {dupError && (
+              <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-950/20 px-3 py-2 text-xs text-rose-100">
+                <HiExclamation className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>{dupError}</span>
+              </div>
+            )}
+
+            {/* Resumen cards */}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                      Clientes duplicados
+                    </div>
+                    <div className="text-3xl font-semibold text-slate-50">
+                      {dupLoading
+                        ? "…"
+                        : Number(dupClientes?.total_grupos || 0).toLocaleString(
+                            "es-AR"
+                          )}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Grupos detectados (clave repetida).
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1 text-[11px] text-slate-300">
+                    <div>
+                      DNI:{" "}
+                      <span className="font-semibold text-slate-100">
+                        {Number(dupClientesCountsByModo.dni || 0).toLocaleString(
+                          "es-AR"
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      Tel:{" "}
+                      <span className="font-semibold text-slate-100">
+                        {Number(
+                          dupClientesCountsByModo.telefono || 0
+                        ).toLocaleString("es-AR")}
+                      </span>
+                    </div>
+                    <div>
+                      Email:{" "}
+                      <span className="font-semibold text-slate-100">
+                        {Number(dupClientesCountsByModo.email || 0).toLocaleString(
+                          "es-AR"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-[11px] text-slate-400">
+                  Clientes en los grupos devueltos:{" "}
+                  <span className="font-semibold text-slate-200">
+                    {Number(
+                      dupClientes?.total_clientes_en_grupos_devueltos || 0
+                    ).toLocaleString("es-AR")}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                      Pólizas duplicadas
+                    </div>
+                    <div className="text-3xl font-semibold text-slate-50">
+                      {dupLoading
+                        ? "…"
+                        : Number(dupPolizas?.total_grupos || 0).toLocaleString(
+                            "es-AR"
+                          )}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Por patente (normalizada).
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-200">
+                    {dupPolizasSoloActivas ? "solo activas" : "incluye inactivas"}
+                  </div>
+                </div>
+
+                <div className="mt-2 text-[11px] text-slate-400">
+                  Pólizas en los grupos devueltos:{" "}
+                  <span className="font-semibold text-slate-200">
+                    {Number(
+                      dupPolizas?.total_polizas_en_grupos_devueltos || 0
+                    ).toLocaleString("es-AR")}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {dupExpanded && (
+                <motion.div
+                  className="mt-1 grid gap-4"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.22, ease: "easeOut" }}
+                >
+                  {/* Clientes (tabla simple) */}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                        Clientes — detalle
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Mostrando hasta {dupMaxGroups} grupos · {dupMaxItems} items
+                        por grupo
+                      </div>
+                    </div>
+
+                    {dupClientesGroups.length === 0 ? (
+                      <div className="mt-2 text-sm text-slate-300">
+                        {dupLoading
+                          ? "Cargando…"
+                          : "No se detectaron duplicados (con los modos actuales)."}
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid gap-2">
+                        {dupClientesGroups.slice(0, dupMaxGroups).map((g, idx) => (
+                          <div
+                            key={`${g?.modo || "x"}-${g?.key || "y"}-${idx}`}
+                            className="rounded-xl border border-white/10 bg-slate-950/30 p-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200">
+                                  {String(g?.modo || "").toUpperCase()}
+                                </span>
+                                <span className="text-sm font-semibold text-slate-100">
+                                  {String(g?.key || "—")}
+                                </span>
+                              </div>
+
+                              <div className="text-[11px] text-slate-300">
+                                <span className="font-semibold text-slate-100">
+                                  {Number(g?.count || 0).toLocaleString("es-AR")}
+                                </span>{" "}
+                                clientes {g?.truncated ? "(truncado)" : ""}
+                              </div>
+                            </div>
+
+                            <div className="mt-2 grid gap-1">
+                              {(Array.isArray(g?.clientes) ? g.clientes : []).map(
+                                (c, i) => (
+                                  <div
+                                    key={`${c?.id || "c"}-${i}`}
+                                    className="flex flex-col gap-0.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="font-semibold text-slate-100">
+                                        #{c?.id} —{" "}
+                                        {`${c?.apellido || ""} ${c?.nombre || ""}`.trim() ||
+                                          "—"}
+                                      </span>
+                                      <span className="text-slate-300">
+                                        {c?.estado ? `Estado: ${c.estado}` : ""}
+                                      </span>
+                                    </div>
+                                    <div className="text-slate-300">
+                                      DNI/CUIT:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {c?.dni_cuit_cuil || "—"}
+                                      </span>
+                                      {" · "}
+                                      Tel:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {c?.telefono || "—"}
+                                      </span>
+                                      {" · "}
+                                      Email:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {c?.email || "—"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pólizas (tabla simple) */}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                        Pólizas — detalle (patente)
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {dupPolizasSoloActivas
+                          ? "Solo activas"
+                          : "Incluye activas e inactivas"}
+                      </div>
+                    </div>
+
+                    {dupPolizasGroups.length === 0 ? (
+                      <div className="mt-2 text-sm text-slate-300">
+                        {dupLoading
+                          ? "Cargando…"
+                          : "No se detectaron duplicados de pólizas por patente."}
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid gap-2">
+                        {dupPolizasGroups.slice(0, dupMaxGroups).map((g, idx) => (
+                          <div
+                            key={`${g?.key || "p"}-${idx}`}
+                            className="rounded-xl border border-white/10 bg-slate-950/30 p-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-200">
+                                  PATENTE
+                                </span>
+                                <span className="text-sm font-semibold text-slate-100">
+                                  {String(g?.key || "—")}
+                                </span>
+                              </div>
+
+                              <div className="text-[11px] text-slate-300">
+                                <span className="font-semibold text-slate-100">
+                                  {Number(g?.count || 0).toLocaleString("es-AR")}
+                                </span>{" "}
+                                pólizas {g?.truncated ? "(truncado)" : ""}
+                              </div>
+                            </div>
+
+                            <div className="mt-2 grid gap-1">
+                              {(Array.isArray(g?.polizas) ? g.polizas : []).map(
+                                (p, i) => (
+                                  <div
+                                    key={`${p?.poliza_id || "p"}-${i}`}
+                                    className="flex flex-col gap-0.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="font-semibold text-slate-100">
+                                        #{p?.poliza_id} — {p?.numero_poliza || "—"}
+                                      </span>
+                                      <span className="text-slate-300">
+                                        {p?.estado ? `Estado: ${p.estado}` : ""}
+                                      </span>
+                                    </div>
+
+                                    <div className="text-slate-300">
+                                      Asegurado:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {p?.asegurado || "—"}
+                                      </span>
+                                      {" · "}
+                                      DNI/CUIT:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {p?.dni_cuit_cuil || "—"}
+                                      </span>
+                                    </div>
+
+                                    <div className="text-slate-300">
+                                      Compañía:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {p?.compania || "—"}
+                                      </span>
+                                      {" · "}
+                                      Oficina:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {p?.oficina || "—"}
+                                      </span>
+                                      {" · "}
+                                      Vehículo:{" "}
+                                      <span className="font-semibold text-slate-200">
+                                        {`${p?.marca || ""} ${p?.modelo || ""}`.trim() ||
+                                          "—"}
+                                        {p?.anio ? ` (${p.anio})` : ""}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </AnimatedCard>
 
         {/* TABLA POR OFICINA */}
         <OficinasTable
