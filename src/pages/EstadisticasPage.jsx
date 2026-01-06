@@ -31,7 +31,7 @@ const getApiBase = () => {
   return raw.endsWith("/") ? raw : `${raw}/`;
 };
 
-// Helpers de formato para mixes
+// Helpers de formato para mi xes
 const formatMixPercent = (value, total) => {
   const v = Number(value || 0);
   const t = Number(total || 0);
