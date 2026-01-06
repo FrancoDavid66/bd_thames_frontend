@@ -1,4 +1,4 @@
-/* src/components/pagos/PagosSearch.jsx — Optimizado: chips recientes + atajo "/" */
+/* src/components/pagos/PagosSearch.jsx — Optimizado: chips recientes + atajo "/" + status separado */
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
@@ -11,10 +11,12 @@ export default function PagosSearch({ onBuscar }) {
   const inputRef = useRef(null);
   const dispatch = useDispatch();
 
-  const { status, polizasCache, polizasCacheOrder } = useSelector(
-    (state) => state.pagos
-  );
-  const cargando = status === "loading";
+  const {
+    searchStatus = "idle",
+    polizasCache = {},
+    polizasCacheOrder = [],
+  } = useSelector((state) => state.pagos || {});
+  const cargando = searchStatus === "loading";
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
@@ -50,7 +52,7 @@ export default function PagosSearch({ onBuscar }) {
       .slice(0, 6);
   }, [polizasCache, polizasCacheOrder]);
 
-  const handleSubmit = async (e, force = false, qOverride = null) => {
+  const handleSubmit = async (e, qOverride = null) => {
     e?.preventDefault?.();
 
     const q = String(qOverride ?? query).trim();
@@ -60,11 +62,9 @@ export default function PagosSearch({ onBuscar }) {
     }
 
     try {
-      // Si querés forzar, podés “bustear” el cache cambiando el query levemente:
-      // pero preferí no inventar param extra; el thunk ya usa TTL.
       const action = await dispatch(fetchPolizas(q));
-
       const payload = action?.payload;
+
       const polizas =
         payload?.polizas ??
         payload ??
@@ -91,8 +91,7 @@ export default function PagosSearch({ onBuscar }) {
 
   const usarReciente = (q) => {
     setQuery(q);
-    // Disparo inmediato (sin esperar Enter)
-    handleSubmit({ preventDefault() {} }, false, q);
+    handleSubmit({ preventDefault() {} }, q);
   };
 
   return (

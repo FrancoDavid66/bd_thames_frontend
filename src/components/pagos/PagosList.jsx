@@ -1,6 +1,6 @@
-/* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos, full-width móvil */
+/* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos, full-width móvil (OPTIMIZADO) */
 import { useDispatch } from "react-redux";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -84,6 +84,12 @@ const fmtMoney = (n) =>
 
 const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "—");
 
+/* ====== Performance knobs ====== */
+const AUTO_FAST_THRESHOLD = 120; // si hay >= 120 items, activa modo rápido
+const FAST_INITIAL = 40;
+const FAST_STEP = 60;
+const SHOW_FAST_TOGGLE_FROM = 60;
+
 export default function PagosList({
   cuotas = [],
   actualizarCuotas,
@@ -91,6 +97,8 @@ export default function PagosList({
   cuentasMercadoPago = [],
   billeterasVirtuales = [],
   mediosCobro = [],
+  // opcional: forzar modo rápido desde el padre si querés
+  preferFast = false,
 }) {
   const dispatch = useDispatch();
   const [cuotaSeleccionada, setCuotaSeleccionada] = useState(null);
@@ -105,35 +113,69 @@ export default function PagosList({
     return ocultarPagadas ? base.filter((c) => !c.pagado) : base;
   }, [cuotas, ocultarPagadas]);
 
-  const abrirPagar = (cuota) => setCuotaSeleccionada(cuota);
-  const cerrarPagar = () => setCuotaSeleccionada(null);
-  const abrirDetalle = (cuota) => setDetalleAbierto(cuota);
-  const cerrarDetalle = () => setDetalleAbierto(null);
+  // fecha “hoy” estable por render (y por día)
+  const hoy = useMemo(() => dayjs().startOf("day"), []);
+
+  /* ================== Modo rápido + render progresivo ================== */
+  const [modoRapidoManual, setModoRapidoManual] = useState(null);
+
+  const modoRapidoAuto =
+    !!preferFast || (Array.isArray(items) && items.length >= AUTO_FAST_THRESHOLD);
+
+  const modoRapido = modoRapidoManual ?? modoRapidoAuto;
+
+  const [renderLimit, setRenderLimit] = useState(
+    modoRapido ? Math.min(FAST_INITIAL, items.length) : items.length
+  );
+
+  useEffect(() => {
+    if (!modoRapido) {
+      setRenderLimit(items.length);
+      return;
+    }
+    setRenderLimit(Math.min(FAST_INITIAL, items.length));
+  }, [items.length, modoRapido]);
+
+  const visibleItems = useMemo(() => {
+    if (!modoRapido) return items;
+    return items.slice(0, renderLimit);
+  }, [items, modoRapido, renderLimit]);
+
+  const showFastControls = items.length >= SHOW_FAST_TOGGLE_FROM;
+
+  /* ================== Handlers memo ================== */
+  const abrirPagar = useCallback((cuota) => setCuotaSeleccionada(cuota), []);
+  const cerrarPagar = useCallback(() => setCuotaSeleccionada(null), []);
+  const abrirDetalle = useCallback((cuota) => setDetalleAbierto(cuota), []);
+  const cerrarDetalle = useCallback(() => setDetalleAbierto(null), []);
 
   // Paso 1: desde ModalFormaPago armamos datos y abrimos el modal de confirmación
-  const confirmarPago = (datos) => {
-    if (!cuotaSeleccionada) return;
+  const confirmarPago = useCallback(
+    (datos) => {
+      if (!cuotaSeleccionada) return;
 
-    const cuota = cuotaSeleccionada;
-    const monto = Number(datos.monto ?? cuota.monto);
-    const pol = cuota.poliza || {};
-    const numeroPoliza =
-      pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "-";
+      const cuota = cuotaSeleccionada;
+      const monto = Number(datos.monto ?? cuota.monto);
+      const pol = cuota.poliza || {};
+      const numeroPoliza =
+        pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "-";
 
-    setConfirmData({
-      datos,
-      cuota,
-      monto,
-      numeroPoliza,
-      cuotaNro: cuota.cuota_nro,
-    });
+      setConfirmData({
+        datos,
+        cuota,
+        monto,
+        numeroPoliza,
+        cuotaNro: cuota.cuota_nro,
+      });
 
-    // cerramos el modal de forma de pago para que se vea solo el de confirmación
-    cerrarPagar();
-  };
+      // cerramos el modal de forma de pago para que se vea solo el de confirmación
+      cerrarPagar();
+    },
+    [cuotaSeleccionada, cerrarPagar]
+  );
 
   // Paso 2: ejecutar el pago realmente después de confirmar
-  const ejecutarPagoConfirmado = async () => {
+  const ejecutarPagoConfirmado = useCallback(async () => {
     if (!confirmData) return;
 
     const { datos, cuota, monto } = confirmData;
@@ -166,9 +208,9 @@ export default function PagosList({
       console.error(e);
       toast.error("No se pudo registrar el pago");
     }
-  };
+  }, [confirmData, dispatch, actualizarCuotas]);
 
-  const handleCancelarConfirm = () => {
+  const handleCancelarConfirm = useCallback(() => {
     if (!confirmData) {
       setConfirmData(null);
       return;
@@ -176,10 +218,8 @@ export default function PagosList({
     const { cuota } = confirmData;
     setConfirmData(null);
     // reabrimos el modal de forma de pago para corregir el monto
-    if (cuota) {
-      setCuotaSeleccionada(cuota);
-    }
-  };
+    if (cuota) setCuotaSeleccionada(cuota);
+  }, [confirmData]);
 
   const datosNoti = useMemo(() => {
     if (!cuotaSeleccionada) return null;
@@ -228,227 +268,83 @@ export default function PagosList({
       <div
         className={`px-4 sm:px-6 py-3 sm:py-4 text-sm uppercase tracking-wide border-b border-neutral-900 ${PALETTE.header}`}
       >
-        Resultados
+        <div className="flex items-center justify-between gap-3">
+          <span>Resultados</span>
+
+          {showFastControls && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] normal-case text-neutral-500">
+                {items.length} cuotas
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setModoRapidoManual((v) => {
+                    const current = v ?? modoRapido;
+                    return !current;
+                  })
+                }
+                className={`h-8 px-3 rounded-xl border text-[11px] transition cursor-pointer ${
+                  modoRapido
+                    ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-200"
+                    : "border-neutral-800 bg-neutral-950 text-neutral-300 hover:bg-neutral-900"
+                }`}
+                title="Modo rápido reduce animaciones y renderiza por partes"
+              >
+                {modoRapido ? "Modo rápido: ON" : "Modo rápido: OFF"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Lista tipo cards oscuras — scroll solo en desktop */}
       <div className="max-h-none md:max-h-[60vh] overflow-y-visible md:overflow-y-auto">
         <ul role="list" className={`divide-y ${PALETTE.divider}`}>
-          {items.map((cuota, idx) => {
-            const venc = cuota.fecha_vencimiento
-              ? dayjs(cuota.fecha_vencimiento)
-              : null;
-            const dias = venc ? venc.diff(dayjs(), "day") : null;
-
-            const state = cuota.pagado
-              ? "paid"
-              : dias !== null && dias < 0
-              ? "overdue"
-              : "pending";
-            const S = PALETTE[state];
-            const label =
-              state === "paid"
-                ? "Pagada"
-                : state === "overdue"
-                ? "Vencida"
-                : "Pendiente";
-            const Icon = state === "paid" ? HiBadgeCheck : HiClock;
-
-            const pol = cuota?.poliza || {};
-            const cliente = pol?.cliente || {};
-            const nombreCompleto =
-              [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") ||
-              "Cliente";
-            const patente = (pol?.patente || "").toUpperCase();
-            const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
-            const observacion = (
-              (cuota.observaciones_pago ||
-                cuota.ultima_observacion_pago ||
-                "") || ""
-            )
-              .toString()
-              .trim();
-            const obsActiva = obsAbiertaId === cuota.id;
+          {visibleItems.map((cuota, idx) => {
+            // si modo rápido: evitamos motion para no pagar el costo de animación por N filas
+            const Comp = modoRapido ? "li" : motion.li;
+            const motionProps = modoRapido
+              ? {}
+              : {
+                  initial: { opacity: 0, y: 8 },
+                  animate: { opacity: 1, y: 0 },
+                  transition: {
+                    duration: 0.2,
+                    ease: "easeOut",
+                    delay: idx * 0.015,
+                  },
+                };
 
             return (
-              <motion.li
-                key={cuota.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.2,
-                  ease: "easeOut",
-                  delay: idx * 0.015,
-                }}
-                className="relative"
-              >
-                {/* Línea de estado */}
-                <span
-                  className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe}`}
-                  aria-hidden
+              <Comp key={cuota.id} className="relative" {...motionProps}>
+                <CuotaRow
+                  cuota={cuota}
+                  hoy={hoy}
+                  obsAbiertaId={obsAbiertaId}
+                  setObsAbiertaId={setObsAbiertaId}
+                  abrirDetalle={abrirDetalle}
+                  abrirPagar={abrirPagar}
                 />
-
-                {/* Tarjeta oscura con borde acentuado */}
-                <div
-                  className={`mx-0 sm:mx-3 my-2 sm:my-3 rounded-none sm:rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
-                    {/* Izquierda */}
-                    <div className="min-w-0">
-                      {/* Encabezado fila */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-800 text-neutral-200 ring-1 ring-white/5">
-                          <HiUser className="w-5 h-5" />
-                        </span>
-                        <span className="truncate max-w-[60ch] font-semibold">
-                          {nombreCompleto}
-                        </span>
-
-                        {patente && (
-                          <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-100">
-                            {patente}
-                          </span>
-                        )}
-
-                        {modelo && (
-                          <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-300">
-                            {modelo}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Estado + fechas */}
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <span
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder}`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${S.dot}`} />
-                          <Icon className="w-4 h-4" />
-                          {label}
-                        </span>
-
-                        <span className="text-neutral-500">•</span>
-
-                        <div className="text-sm text-neutral-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span>Vence: {fmtDate(cuota.fecha_vencimiento)}</span>
-                          {cuota.fecha_pago && (
-                            <span>Pagada: {fmtDate(cuota.fecha_pago)}</span>
-                          )}
-                          {dias !== null && !cuota.pagado && (
-                            <span>
-                              {dias < 0
-                                ? `Atraso: ${Math.abs(dias)} días`
-                                : `Faltan: ${dias} días`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Observaciones (pastel sólido sobre dark) */}
-                      {observacion && obsActiva && (
-                        <div
-                          className={`mt-3 rounded-2xl border px-3 py-3 ${PALETTE.overdue.noteBg} ${PALETTE.overdue.noteText} border-rose-400`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                            <div className="text-sm whitespace-pre-wrap break-words">
-                              <span className="font-semibold">
-                                Observaciones:{" "}
-                              </span>
-                              {observacion}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Derecha: monto + acciones */}
-                    <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
-                      <p className="text-3xl font-extrabold tracking-tight text-neutral-50 text-right w-full">
-                        $ {fmtMoney(cuota.monto)}
-                      </p>
-
-                      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full">
-                        <button
-                          onClick={() => abrirDetalle(cuota)}
-                          className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto`}
-                          title="Ver más información"
-                          aria-label="Ver más información"
-                        >
-                          <HiQuestionMarkCircle className="w-5 h-5" />
-                          <span className="hidden sm:inline">Más info</span>
-                        </button>
-
-                        {observacion && (
-                          <button
-                            onClick={() =>
-                              setObsAbiertaId(obsActiva ? null : cuota.id)
-                            }
-                            className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-2 transition w-full sm:w-auto`}
-                            title={
-                              obsActiva
-                                ? "Ocultar observación"
-                                : "Ver observación"
-                            }
-                          >
-                            <HiExclamationCircle className="w-5 h-5" />
-                            <span className="hidden sm:inline">
-                              {obsActiva ? "Ocultar nota" : "Ver nota"}
-                            </span>
-                          </button>
-                        )}
-
-                        {!cuota.pagado && (
-                          <button
-                            onClick={() => abrirPagar(cuota)}
-                            className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto`}
-                            title="Registrar pago"
-                          >
-                            <HiCash className="w-5 h-5" />
-                            <span className="hidden sm:inline">Pagar</span>
-                          </button>
-                        )}
-
-                        {cuota.pagado && (
-                          <>
-                            {/* A4 (compartir) */}
-                            <DescargarFactura
-                              cliente={pol?.cliente}
-                              poliza={pol}
-                              cuota={cuota}
-                              tone="neutral"
-                              label="Compartir factura"
-                              className="mt-0 w-full sm:w-auto"
-                            />
-
-                            {/* Ticket térmico */}
-                            <ImprimirFacturaTicket
-                              cliente={pol?.cliente}
-                              poliza={pol}
-                              cuota={cuota}
-                              label="Imprimir factura"
-                              className={`h-10 px-3 rounded-xl border transition inline-flex items-center justify-center gap-2 w-full sm:w-auto ${PALETTE.ticketBtn}`}
-                            />
-                          </>
-                        )}
-
-                        <EnviarFacturaWhatsapp cuota={cuota}>
-                          <button
-                            className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto`}
-                            title="Enviar por WhatsApp"
-                          >
-                            <HiDeviceMobile className="w-5 h-5" />
-                            <span className="hidden sm:inline">Enviar</span>
-                          </button>
-                        </EnviarFacturaWhatsapp>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.li>
+              </Comp>
             );
           })}
         </ul>
+
+        {/* Render progresivo */}
+        {modoRapido && renderLimit < items.length && (
+          <div className="p-3 sm:p-4 border-t border-neutral-900 bg-neutral-950">
+            <button
+              type="button"
+              onClick={() =>
+                setRenderLimit((n) => Math.min(items.length, n + FAST_STEP))
+              }
+              className="w-full h-11 rounded-2xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 text-sm font-semibold cursor-pointer"
+            >
+              Mostrar más ({Math.min(FAST_STEP, items.length - renderLimit)})
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Modal de pago (oscuro) */}
@@ -496,7 +392,7 @@ export default function PagosList({
                 </h3>
                 <button
                   onClick={handleCancelarConfirm}
-                  className="h-9 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 inline-flex items-center gap-2 text-sm"
+                  className="h-9 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 inline-flex items-center gap-2 text-sm cursor-pointer"
                 >
                   <HiX className="w-5 h-5" />
                   <span className="hidden sm:inline">Cancelar</span>
@@ -534,13 +430,13 @@ export default function PagosList({
               <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
                 <button
                   onClick={handleCancelarConfirm}
-                  className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 text-sm"
+                  className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 text-sm cursor-pointer"
                 >
                   Volver y corregir
                 </button>
                 <button
                   onClick={ejecutarPagoConfirmado}
-                  className="h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm inline-flex items-center justify-center gap-2"
+                  className="h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <HiCash className="w-5 h-5" />
                   Confirmar pago
@@ -583,7 +479,7 @@ export default function PagosList({
                 </h3>
                 <button
                   onClick={cerrarDetalle}
-                  className="h-9 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 inline-flex items-center gap-2"
+                  className="h-9 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 inline-flex items-center gap-2 cursor-pointer"
                   aria-label="Cerrar"
                 >
                   <HiX className="w-5 h-5" />
@@ -690,7 +586,7 @@ export default function PagosList({
                     <div className="flex justify-end">
                       <button
                         onClick={cerrarDetalle}
-                        className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200"
+                        className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 cursor-pointer"
                       >
                         Entendido
                       </button>
@@ -705,6 +601,201 @@ export default function PagosList({
     </div>
   );
 }
+
+/* ====== Row memoizada para bajar re-renders ====== */
+const CuotaRow = memo(function CuotaRow({
+  cuota,
+  hoy,
+  obsAbiertaId,
+  setObsAbiertaId,
+  abrirDetalle,
+  abrirPagar,
+}) {
+  const venc = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
+  const fv = venc ? venc.startOf("day") : null;
+  const dias = fv ? fv.diff(hoy, "day") : null;
+
+  const state = cuota.pagado
+    ? "paid"
+    : dias !== null && dias < 0
+    ? "overdue"
+    : "pending";
+
+  const S = PALETTE[state];
+  const label =
+    state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
+  const Icon = state === "paid" ? HiBadgeCheck : HiClock;
+
+  const pol = cuota?.poliza || {};
+  const cliente = pol?.cliente || {};
+  const nombreCompleto =
+    [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || "Cliente";
+  const patente = (pol?.patente || "").toUpperCase();
+  const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
+  const observacion = (
+    (cuota.observaciones_pago || cuota.ultima_observacion_pago || "") || ""
+  )
+    .toString()
+    .trim();
+  const obsActiva = obsAbiertaId === cuota.id;
+
+  return (
+    <>
+      {/* Línea de estado */}
+      <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe}`} aria-hidden />
+
+      {/* Tarjeta oscura con borde acentuado */}
+      <div
+        className={`mx-0 sm:mx-3 my-2 sm:my-3 rounded-none sm:rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+          {/* Izquierda */}
+          <div className="min-w-0">
+            {/* Encabezado fila */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-800 text-neutral-200 ring-1 ring-white/5">
+                <HiUser className="w-5 h-5" />
+              </span>
+              <span className="truncate max-w-[60ch] font-semibold">
+                {nombreCompleto}
+              </span>
+
+              {patente && (
+                <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-100">
+                  {patente}
+                </span>
+              )}
+
+              {modelo && (
+                <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-300">
+                  {modelo}
+                </span>
+              )}
+            </div>
+
+            {/* Estado + fechas */}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span
+                className={`inline-flex items-center gap-2 rounded-full border px-3 h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${S.dot}`} />
+                <Icon className="w-4 h-4" />
+                {label}
+              </span>
+
+              <span className="text-neutral-500">•</span>
+
+              <div className="text-sm text-neutral-300 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>Vence: {fmtDate(cuota.fecha_vencimiento)}</span>
+                {cuota.fecha_pago && (
+                  <span>Pagada: {fmtDate(cuota.fecha_pago)}</span>
+                )}
+                {dias !== null && !cuota.pagado && (
+                  <span>
+                    {dias < 0
+                      ? `Atraso: ${Math.abs(dias)} días`
+                      : `Faltan: ${dias} días`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Observaciones (pastel sólido sobre dark) */}
+            {observacion && obsActiva && (
+              <div
+                className={`mt-3 rounded-2xl border px-3 py-3 ${PALETTE.overdue.noteBg} ${PALETTE.overdue.noteText} border-rose-400`}
+              >
+                <div className="flex items-start gap-2">
+                  <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                  <div className="text-sm whitespace-pre-wrap break-words">
+                    <span className="font-semibold">Observaciones: </span>
+                    {observacion}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Derecha: monto + acciones */}
+          <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
+            <p className="text-3xl font-extrabold tracking-tight text-neutral-50 text-right w-full">
+              $ {fmtMoney(cuota.monto)}
+            </p>
+
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full">
+              <button
+                onClick={() => abrirDetalle(cuota)}
+                className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
+                title="Ver más información"
+                aria-label="Ver más información"
+              >
+                <HiQuestionMarkCircle className="w-5 h-5" />
+                <span className="hidden sm:inline">Más info</span>
+              </button>
+
+              {observacion && (
+                <button
+                  onClick={() => setObsAbiertaId(obsActiva ? null : cuota.id)}
+                  className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-2 transition w-full sm:w-auto cursor-pointer`}
+                  title={obsActiva ? "Ocultar observación" : "Ver observación"}
+                >
+                  <HiExclamationCircle className="w-5 h-5" />
+                  <span className="hidden sm:inline">
+                    {obsActiva ? "Ocultar nota" : "Ver nota"}
+                  </span>
+                </button>
+              )}
+
+              {!cuota.pagado && (
+                <button
+                  onClick={() => abrirPagar(cuota)}
+                  className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
+                  title="Registrar pago"
+                >
+                  <HiCash className="w-5 h-5" />
+                  <span className="hidden sm:inline">Pagar</span>
+                </button>
+              )}
+
+              {cuota.pagado && (
+                <>
+                  {/* A4 (compartir) */}
+                  <DescargarFactura
+                    cliente={pol?.cliente}
+                    poliza={pol}
+                    cuota={cuota}
+                    tone="neutral"
+                    label="Compartir factura"
+                    className="mt-0 w-full sm:w-auto"
+                  />
+
+                  {/* Ticket térmico */}
+                  <ImprimirFacturaTicket
+                    cliente={pol?.cliente}
+                    poliza={pol}
+                    cuota={cuota}
+                    label="Imprimir factura"
+                    className={`h-10 px-3 rounded-xl border transition inline-flex items-center justify-center gap-2 w-full sm:w-auto ${PALETTE.ticketBtn}`}
+                  />
+                </>
+              )}
+
+              <EnviarFacturaWhatsapp cuota={cuota}>
+                <button
+                  className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
+                  title="Enviar por WhatsApp"
+                >
+                  <HiDeviceMobile className="w-5 h-5" />
+                  <span className="hidden sm:inline">Enviar</span>
+                </button>
+              </EnviarFacturaWhatsapp>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+});
 
 /* Subcomponente: fila label/valor para el modal (dark) */
 function InfoRow({ label, value }) {

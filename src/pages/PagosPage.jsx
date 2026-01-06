@@ -1,6 +1,4 @@
-/* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos)
-   ✅ OPTIMIZADO: modo rápido + limpiar resultados + memo de cuotas + menos re-renders
-*/
+/* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos) */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -16,7 +14,6 @@ import {
   HiCog,
   HiSpeakerphone,
   HiEyeOff,
-  HiLightningBolt,
 } from "react-icons/hi";
 
 import PagosSearch from "../components/pagos/PagosSearch";
@@ -34,23 +31,11 @@ import {
 
 dayjs.locale("es");
 
-const LS_FAST_MODE = "pagos:fastMode";
-
 const PagosPage = () => {
   const dispatch = useDispatch();
 
   // Tabs: "pagos" | "historial"
   const [tab, setTab] = useState("pagos");
-
-  // ✅ Modo rápido (reduce animaciones y PagosList renderiza por tandas si lo soporta)
-  const [modoRapido, setModoRapido] = useState(() => {
-    try {
-      const v = localStorage.getItem(LS_FAST_MODE);
-      return v === null ? true : v === "1";
-    } catch {
-      return true;
-    }
-  });
 
   // Modales
   const [showCuentasModal, setShowCuentasModal] = useState(false);
@@ -80,15 +65,6 @@ const PagosPage = () => {
 
   /* ================== EFFECTS ================== */
 
-  // Persistir fast mode
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_FAST_MODE, modoRapido ? "1" : "0");
-    } catch {
-      // ignore
-    }
-  }, [modoRapido]);
-
   // Carga de medios de cobro al entrar a la página
   useEffect(() => {
     dispatch(fetchMediosCobro({ activo: true }));
@@ -108,38 +84,29 @@ const PagosPage = () => {
   /* ================== HANDLERS ================== */
 
   // PagosSearch -> nos devuelve una lista de pólizas; las aplanamos en cuotas
-  // ✅ Optim: no recrear objetos innecesarios; aplanado más directo
   const handleBuscarPolizas = useCallback((polizas) => {
     const lista = Array.isArray(polizas) ? polizas : [];
     const nuevasCuotas = [];
 
-    for (const pol of lista) {
-      const cuotasPol = Array.isArray(pol?.cuotas) ? pol.cuotas : [];
-      for (const c of cuotasPol) {
+    lista.forEach((pol) => {
+      const cuotasPol = Array.isArray(pol.cuotas) ? pol.cuotas : [];
+      cuotasPol.forEach((c) => {
         nuevasCuotas.push({ ...c, poliza: pol });
-      }
-    }
+      });
+    });
 
     setCuotas(nuevasCuotas);
   }, []);
 
-  // Limpia resultados (atajo operativo)
-  const handleLimpiarResultados = useCallback(() => {
-    setCuotas([]);
-  }, []);
-
   // PagosList -> al marcar pagada una cuota, actualizamos el array local
-  // ✅ Optim: update por map id -> O(n)
   const handleActualizarCuotas = useCallback((actualizadas = []) => {
     if (!Array.isArray(actualizadas) || actualizadas.length === 0) return;
 
     setCuotas((prev) => {
       const prevList = Array.isArray(prev) ? prev : [];
-      if (prevList.length === 0) return prevList;
-
       const map = new Map();
 
-      for (const item of actualizadas) {
+      actualizadas.forEach((item) => {
         if (item?.cuotaActualizada?.id) {
           map.set(item.cuotaActualizada.id, {
             ...item.cuotaActualizada,
@@ -149,7 +116,7 @@ const PagosPage = () => {
         } else if (item?.id) {
           map.set(item.id, item);
         }
-      }
+      });
 
       if (map.size === 0) return prevList;
 
@@ -183,10 +150,7 @@ const PagosPage = () => {
     async (medioCobroId, oficina) => {
       setSendingRecordatorios(true);
       try {
-        const medio =
-          (medioCobroId
-            ? mediosCobro.find((m) => m.id === medioCobroId)
-            : null) || null;
+        const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
         const alias = medio ? medio.etiqueta || medio.valor : undefined;
 
         const result = await dispatch(
@@ -197,7 +161,6 @@ const PagosPage = () => {
           })
         ).unwrap();
 
-        // el modal espera que devolvamos { hoy, procesadas, enviados, errores }
         return result;
       } catch (err) {
         console.error("[PagosPage] Error enviando recordatorios:", err);
@@ -211,12 +174,6 @@ const PagosPage = () => {
 
   /* ================== KPIs ================== */
 
-  // ✅ KPIs sobre la lista visible (si ocultarPagadas=true, KPIs reflejan lo que estás viendo)
-  const cuotasParaKpis = useMemo(() => {
-    const list = Array.isArray(cuotas) ? cuotas : [];
-    return ocultarPagadas ? list.filter((c) => !c?.pagado) : list;
-  }, [cuotas, ocultarPagadas]);
-
   const { totalCuotas, alDia, porVencer, venceHoy, vencidas } = useMemo(() => {
     const hoy = dayjs().startOf("day");
     const stats = {
@@ -227,7 +184,7 @@ const PagosPage = () => {
       vencidas: 0,
     };
 
-    (cuotasParaKpis || []).forEach((c) => {
+    (cuotas || []).forEach((c) => {
       stats.totalCuotas += 1;
 
       if (c.pagado) {
@@ -249,7 +206,7 @@ const PagosPage = () => {
     });
 
     return stats;
-  }, [cuotasParaKpis]);
+  }, [cuotas]);
 
   const kpis = useMemo(
     () => [
@@ -257,7 +214,7 @@ const PagosPage = () => {
         label: "Cuotas",
         value: totalCuotas,
         icon: HiBadgeCheck,
-        hint: ocultarPagadas ? "Resultados (sin pagadas)" : "Total en resultados",
+        hint: "Total cuotas en los resultados",
       },
       {
         label: "Al día",
@@ -284,7 +241,7 @@ const PagosPage = () => {
         hint: "Atrasadas",
       },
     ],
-    [totalCuotas, alDia, porVencer, venceHoy, vencidas, ocultarPagadas]
+    [totalCuotas, alDia, porVencer, venceHoy, vencidas]
   );
 
   /* ================== RENDER ================== */
@@ -301,20 +258,6 @@ const PagosPage = () => {
                 <HiSparkles className="mr-1" />
                 <span>Panel operativo</span>
               </span>
-              {/* ✅ Toggle rápido */}
-              <button
-                type="button"
-                onClick={() => setModoRapido((v) => !v)}
-                className={`ml-1 inline-flex items-center gap-1 rounded-full text-xs px-2 py-0.5 border transition cursor-pointer ${
-                  modoRapido
-                    ? "bg-primary-500/15 text-primary-200 border-primary-500/30"
-                    : "bg-slate-900/60 text-slate-300 border-slate-700"
-                }`}
-                title="Modo rápido: menos animación y lista por tandas"
-              >
-                <HiLightningBolt className="text-sm" />
-                <span>{modoRapido ? "Rápido" : "Normal"}</span>
-              </button>
             </h1>
             <p className="text-slate-400 text-sm sm:text-base mt-1">
               Administrá cuotas, medios de cobro y envíos de recordatorios desde
@@ -326,20 +269,19 @@ const PagosPage = () => {
             <motion.button
               type="button"
               onClick={handleOpenCuentas}
-              whileHover={modoRapido ? undefined : { scale: 1.03 }}
-              whileTap={modoRapido ? undefined : { scale: 0.97 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-800/70 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-slate-200 shadow-sm hover:bg-slate-700/80 cursor-pointer"
             >
               <HiCog className="text-base sm:text-lg" />
               <span>Medios de cobro</span>
             </motion.button>
 
-            {/* Botón Enviar recordatorios - verde tipo WhatsApp */}
             <motion.button
               type="button"
               onClick={handleOpenRecordatorios}
-              whileHover={modoRapido ? undefined : { scale: 1.06 }}
-              whileTap={modoRapido ? undefined : { scale: 0.96 }}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.96 }}
               className="inline-flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80"
               style={{ backgroundColor: "#25D366" }}
             >
@@ -358,8 +300,8 @@ const PagosPage = () => {
           {kpis.map(({ label, value, icon: Icon, hint }) => (
             <motion.div
               key={label}
-              initial={modoRapido ? undefined : { opacity: 0, y: 8 }}
-              animate={modoRapido ? undefined : { opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
               className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-2.5 sm:px-4 sm:py-3 flex flex-col justify-between shadow-[0_0_18px_rgba(15,23,42,0.75)]"
             >
               <div className="flex items-center justify-between mb-1.5 sm:mb-2">
@@ -414,52 +356,36 @@ const PagosPage = () => {
         {tab === "pagos" ? (
           <motion.div
             key="tab-pagos"
-            initial={modoRapido ? undefined : { opacity: 0, y: 8 }}
-            animate={modoRapido ? undefined : { opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             className="space-y-3 sm:space-y-4"
           >
-            {/* Buscador + toggles */}
+            {/* Buscador + toggle ocultar pagadas */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4 space-y-3">
               <PagosSearch onBuscar={handleBuscarPolizas} />
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setOcultarPagadas((v) => !v)}
-                  className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer"
+              <button
+                type="button"
+                onClick={() => setOcultarPagadas((v) => !v)}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer"
+              >
+                <span
+                  className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    ocultarPagadas
+                      ? "bg-slate-200 border-slate-100"
+                      : "border-slate-500"
+                  }`}
                 >
-                  <span
-                    className={`w-4 h-4 rounded border flex items-center justify-center ${
-                      ocultarPagadas
-                        ? "bg-slate-200 border-slate-100"
-                        : "border-slate-500"
-                    }`}
-                  >
-                    {ocultarPagadas && (
-                      <span className="w-2 h-2 rounded bg-slate-900" />
-                    )}
-                  </span>
-                  <HiEyeOff className="w-4 h-4 opacity-70" />
-                  <span>Ocultar cuotas pagadas</span>
-                </button>
-
-                {cuotas.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleLimpiarResultados}
-                    className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer"
-                    title="Limpiar resultados"
-                  >
-                    <span className="w-4 h-4 rounded border border-slate-600 flex items-center justify-center">
-                      <HiX className="w-3 h-3 opacity-80" />
-                    </span>
-                    <span>Limpiar resultados</span>
-                  </button>
-                )}
-              </div>
+                  {ocultarPagadas && (
+                    <span className="w-2 h-2 rounded bg-slate-900" />
+                  )}
+                </span>
+                <HiEyeOff className="w-4 h-4 opacity-70" />
+                <span>Ocultar cuotas pagadas</span>
+              </button>
             </div>
 
-            {/* ✅ Lista de cuotas / pólizas (PAGO) — ahora arriba */}
+            {/* ✅ Lista de cuotas / pólizas (PAGO) */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">
               <PagosList
                 cuotas={cuotas}
@@ -468,11 +394,11 @@ const PagosPage = () => {
                 cuentasMercadoPago={mpCuentas}
                 billeterasVirtuales={billeteras}
                 mediosCobro={mediosCobro}
-                modoRapido={modoRapido}
+                preferFast={true} // ✅ forzado: siempre prioriza velocidad
               />
             </div>
 
-            {/* ✅ Alertas / tarjetas de vencimientos — ahora abajo */}
+            {/* ✅ Alertas / tarjetas de vencimientos */}
             <CuotasAlertas
               oficina={alertasOficina}
               onOficinaChange={setAlertasOficina}
@@ -481,8 +407,8 @@ const PagosPage = () => {
         ) : (
           <motion.div
             key="tab-historial"
-            initial={modoRapido ? undefined : { opacity: 0, y: 8 }}
-            animate={modoRapido ? undefined : { opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4"
           >
             <HistorialRecordatorios

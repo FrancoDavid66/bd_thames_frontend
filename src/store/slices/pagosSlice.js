@@ -1,4 +1,4 @@
-/* src/store/slices/pagosSlice.js — Optimizado: cache de búsquedas + recientes */
+/* src/store/slices/pagosSlice.js — Optimizado: cache búsqueda + estados separados */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -17,11 +17,10 @@ const compact = (obj) =>
     Object.entries(obj).filter(([_, v]) => v !== undefined && v !== "")
   );
 
-/* Cache settings */
-const SEARCH_CACHE_MAX = 20; // últimas 20 búsquedas
-const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
-
-const normKey = (q) => String(q || "").trim().toLowerCase();
+/* ===================== CACHE DE BÚSQUEDA ===================== */
+const POLIZAS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos
+const POLIZAS_CACHE_MAX = 20;
+const keyFromQuery = (q) => String(q || "").trim().toLowerCase();
 
 /* ============== THUNKS ============== */
 
@@ -148,41 +147,37 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache */
+/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache TTL */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
   async (query, { rejectWithValue, getState }) => {
     try {
       const q = String(query || "").trim();
-      if (!q) return { polizas: [], queryKey: "", cached: true, at: Date.now(), originalQuery: "" };
+      const k = keyFromQuery(q);
+      if (!k) return { polizas: [], originalQuery: q, fromCache: true };
 
-      const queryKey = normKey(q);
+      const st = getState()?.pagos;
+      const cache = st?.polizasCache || {};
+      const hit = cache?.[k];
+      const now = Date.now();
 
-      // Cache hit?
-      const st = getState?.();
-      const cache = st?.pagos?.polizasCache?.[queryKey];
-      if (cache && cache.at && Date.now() - cache.at <= SEARCH_CACHE_TTL_MS) {
-        return {
-          polizas: cache.polizas || [],
-          queryKey,
-          cached: true,
-          at: cache.at,
-          originalQuery: cache.originalQuery || q,
-        };
+      if (
+        hit &&
+        typeof hit.ts === "number" &&
+        now - hit.ts < POLIZAS_CACHE_TTL_MS &&
+        Array.isArray(hit.polizas)
+      ) {
+        return { polizas: hit.polizas, originalQuery: q, fromCache: true };
       }
 
       const { data } = await axios.get(API("polizas/"), {
         params: { search: q },
       });
 
-      const polizas = unwrap(data) || [];
-
       return {
-        polizas,
-        queryKey,
-        cached: false,
-        at: Date.now(),
+        polizas: unwrap(data),
         originalQuery: q,
+        fromCache: false,
       };
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al buscar pólizas");
@@ -286,21 +281,26 @@ export const eliminarMedioCobro = createAsyncThunk(
 /* ============== SLICE ============== */
 
 const initialState = {
+  // Estado general (para acciones que no sean “buscar pólizas”)
   status: "idle",
   error: null,
+
+  // Estado específico del buscador (PagosSearch)
+  searchStatus: "idle",
+  searchError: null,
 
   polizas: [],
   cuotas: [],
   cuotasAVencer: [],
 
+  // Cache de búsquedas de pólizas
+  polizasCache: {}, // { [key]: { ts, polizas, originalQuery } }
+  polizasCacheOrder: [], // keys en orden reciente
+
   // Medios de cobro
   mediosCobro: [],
   mpCuentas: [],
   billeteras: [],
-
-  // Cache de búsquedas de pólizas
-  polizasCache: {}, // { [queryKey]: { polizas, at, originalQuery } }
-  polizasCacheOrder: [], // queryKey[] (más reciente primero)
 
   // Historial de recordatorios de cuotas
   historialRecordatorios: [],
@@ -320,11 +320,28 @@ function recomputeMedioNombres(state) {
     .filter(Boolean);
 }
 
-function rememberSearch(state, queryKey) {
-  if (!queryKey) return;
-  const prev = Array.isArray(state.polizasCacheOrder) ? state.polizasCacheOrder : [];
-  const next = [queryKey, ...prev.filter((k) => k !== queryKey)].slice(0, SEARCH_CACHE_MAX);
+function savePolizasCache(state, originalQuery, polizas) {
+  const k = keyFromQuery(originalQuery);
+  if (!k) return;
+
+  state.polizasCache[k] = {
+    ts: Date.now(),
+    polizas: Array.isArray(polizas) ? polizas : [],
+    originalQuery: String(originalQuery || "").trim(),
+  };
+
+  // actualizar orden (MRU)
+  const prev = Array.isArray(state.polizasCacheOrder)
+    ? state.polizasCacheOrder
+    : [];
+  const next = [k, ...prev.filter((x) => x !== k)].slice(0, POLIZAS_CACHE_MAX);
   state.polizasCacheOrder = next;
+
+  // limpieza extra (si sobran keys)
+  const keep = new Set(next);
+  Object.keys(state.polizasCache || {}).forEach((key) => {
+    if (!keep.has(key)) delete state.polizasCache[key];
+  });
 }
 
 const pagosSlice = createSlice({
@@ -379,7 +396,7 @@ const pagosSlice = createSlice({
         state.error = action.payload;
       })
 
-      // --- Enviar recordatorios de cuotas ---
+      // --- Enviar recordatorios de cuotas (notificaciones) ---
       .addCase(enviarRecordatoriosCuotas.pending, (state) => {
         state.status = "loading";
         state.error = null;
@@ -406,31 +423,21 @@ const pagosSlice = createSlice({
         state.historialRecordatoriosError = action.payload;
       })
 
-      // --- Buscar pólizas (con cache) ---
+      // --- Buscar pólizas (estado separado + cache) ---
       .addCase(fetchPolizas.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
+        state.searchStatus = "loading";
+        state.searchError = null;
       })
       .addCase(fetchPolizas.fulfilled, (state, action) => {
-        state.status = "succeeded";
-
+        state.searchStatus = "succeeded";
         const payload = action.payload || {};
-        const polizas = payload?.polizas ?? payload ?? [];
+        const polizas = payload.polizas ?? payload ?? [];
         state.polizas = Array.isArray(polizas) ? polizas : [];
-
-        const queryKey = payload?.queryKey || "";
-        if (queryKey) {
-          state.polizasCache[queryKey] = {
-            polizas: state.polizas,
-            at: payload?.at || Date.now(),
-            originalQuery: payload?.originalQuery || "",
-          };
-          rememberSearch(state, queryKey);
-        }
+        savePolizasCache(state, payload.originalQuery, state.polizas);
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
+        state.searchStatus = "failed";
+        state.searchError = action.payload;
       })
 
       // --- Cuotas a vencer ---
