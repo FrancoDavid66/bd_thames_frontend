@@ -1,4 +1,4 @@
-/* src/store/slices/pagosSlice.js — Reemplaza TODO el archivo con esta versión */
+/* src/store/slices/pagosSlice.js — Optimizado: cache de búsquedas + recientes */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -16,6 +16,12 @@ const compact = (obj) =>
   Object.fromEntries(
     Object.entries(obj).filter(([_, v]) => v !== undefined && v !== "")
   );
+
+/* Cache settings */
+const SEARCH_CACHE_MAX = 20; // últimas 20 búsquedas
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
+
+const normKey = (q) => String(q || "").trim().toLowerCase();
 
 /* ============== THUNKS ============== */
 
@@ -62,13 +68,13 @@ export const marcarCuotaComoPagada = createAsyncThunk(
         monto,
         fecha_pago,
         observaciones,
-        medio_cobro_id, // preferido para tracking de MedioCobro
-        destino_tipo, // tipo del destino (MP o billetera)
-        destino_cuenta, // alias si no mandás el id
+        medio_cobro_id,
+        destino_tipo,
+        destino_cuenta,
       });
 
       const { data } = await axios.patch(API(`cuotas/${id}/pagar/`), payload);
-      return data; // devuelve la cuota actualizada
+      return data;
     } catch (error) {
       return rejectWithValue(
         error?.response?.data || "Error al marcar cuota como pagada"
@@ -93,22 +99,19 @@ export const enviarAlertas = createAsyncThunk(
 /** 🔔 Enviar recordatorios de cuotas vía app `notificaciones` */
 export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
-  // payload puede traer: { alias, medio_cobro_id, oficina }
   async (payload = {}, { rejectWithValue }) => {
     try {
       const body = compact({
         alias: payload.alias,
         medio_cobro_id: payload.medio_cobro_id,
-        oficina: payload.oficina, // se envía la oficina al backend
+        oficina: payload.oficina,
       });
 
-      // Backend: POST /api/notificaciones/cuotas/enviar-recordatorios/
       const { data } = await axios.post(
         API("notificaciones/cuotas/enviar-recordatorios/"),
         body
       );
 
-      // El view devuelve: { hoy, cuotas_procesadas, mensajes_enviados, errores }
       const {
         hoy,
         cuotas_procesadas,
@@ -116,7 +119,6 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
         errores = [],
       } = data || {};
 
-      // Lo mapeo a lo que usa el front (PagosPage / modal)
       return {
         hoy,
         procesadas: cuotas_procesadas,
@@ -136,9 +138,7 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   "pagos/fetchHistorialRecordatorios",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(
-        API("notificaciones/cuotas/historial/")
-      );
+      const { data } = await axios.get(API("notificaciones/cuotas/historial/"));
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(
@@ -148,15 +148,42 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** Buscar pólizas por texto (nombre, patente, modelo…) */
+/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
-  async (query, { rejectWithValue }) => {
+  async (query, { rejectWithValue, getState }) => {
     try {
+      const q = String(query || "").trim();
+      if (!q) return { polizas: [], queryKey: "", cached: true, at: Date.now(), originalQuery: "" };
+
+      const queryKey = normKey(q);
+
+      // Cache hit?
+      const st = getState?.();
+      const cache = st?.pagos?.polizasCache?.[queryKey];
+      if (cache && cache.at && Date.now() - cache.at <= SEARCH_CACHE_TTL_MS) {
+        return {
+          polizas: cache.polizas || [],
+          queryKey,
+          cached: true,
+          at: cache.at,
+          originalQuery: cache.originalQuery || q,
+        };
+      }
+
       const { data } = await axios.get(API("polizas/"), {
-        params: { search: query },
+        params: { search: q },
       });
-      return unwrap(data);
+
+      const polizas = unwrap(data) || [];
+
+      return {
+        polizas,
+        queryKey,
+        cached: false,
+        at: Date.now(),
+        originalQuery: q,
+      };
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al buscar pólizas");
     }
@@ -174,7 +201,9 @@ export const registrarIngreso = createAsyncThunk(
       const { data } = await axios.post(API("ingresos/"), ingresoData);
       return data;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || "Error al registrar ingreso");
+      return rejectWithValue(
+        error?.response?.data || "Error al registrar ingreso"
+      );
     }
   }
 );
@@ -196,7 +225,6 @@ export const fetchCuotasAVencer = createAsyncThunk(
 
 /* ---------- CRUD de Medios de Cobro (billeteras / MP) ---------- */
 
-/** Listar medios de cobro activos (GET /medios-cobro/?activo=true) */
 export const fetchMediosCobro = createAsyncThunk(
   "pagos/fetchMediosCobro",
   async ({ activo = true } = {}, { rejectWithValue }) => {
@@ -213,7 +241,6 @@ export const fetchMediosCobro = createAsyncThunk(
   }
 );
 
-/** Crear medio de cobro (POST /medios-cobro/) */
 export const crearMedioCobro = createAsyncThunk(
   "pagos/crearMedioCobro",
   async (payload, { rejectWithValue }) => {
@@ -228,7 +255,6 @@ export const crearMedioCobro = createAsyncThunk(
   }
 );
 
-/** Actualizar medio de cobro (PATCH /medios-cobro/{id}/) */
 export const actualizarMedioCobro = createAsyncThunk(
   "pagos/actualizarMedioCobro",
   async ({ id, ...payload }, { rejectWithValue }) => {
@@ -243,7 +269,6 @@ export const actualizarMedioCobro = createAsyncThunk(
   }
 );
 
-/** Eliminar medio de cobro (DELETE /medios-cobro/{id}/) */
 export const eliminarMedioCobro = createAsyncThunk(
   "pagos/eliminarMedioCobro",
   async (id, { rejectWithValue }) => {
@@ -270,8 +295,12 @@ const initialState = {
 
   // Medios de cobro
   mediosCobro: [],
-  mpCuentas: [], // strings listos para <select> en ModalFormaPago
-  billeteras: [], // strings listos para <select>
+  mpCuentas: [],
+  billeteras: [],
+
+  // Cache de búsquedas de pólizas
+  polizasCache: {}, // { [queryKey]: { polizas, at, originalQuery } }
+  polizasCacheOrder: [], // queryKey[] (más reciente primero)
 
   // Historial de recordatorios de cuotas
   historialRecordatorios: [],
@@ -289,6 +318,13 @@ function recomputeMedioNombres(state) {
     .filter((m) => m.proveedor === "billetera_virtual")
     .map((m) => m.etiqueta || m.valor)
     .filter(Boolean);
+}
+
+function rememberSearch(state, queryKey) {
+  if (!queryKey) return;
+  const prev = Array.isArray(state.polizasCacheOrder) ? state.polizasCacheOrder : [];
+  const next = [queryKey, ...prev.filter((k) => k !== queryKey)].slice(0, SEARCH_CACHE_MAX);
+  state.polizasCacheOrder = next;
 }
 
 const pagosSlice = createSlice({
@@ -343,7 +379,7 @@ const pagosSlice = createSlice({
         state.error = action.payload;
       })
 
-      // --- Enviar recordatorios de cuotas (notificaciones) ---
+      // --- Enviar recordatorios de cuotas ---
       .addCase(enviarRecordatoriosCuotas.pending, (state) => {
         state.status = "loading";
         state.error = null;
@@ -370,14 +406,27 @@ const pagosSlice = createSlice({
         state.historialRecordatoriosError = action.payload;
       })
 
-      // --- Buscar pólizas ---
+      // --- Buscar pólizas (con cache) ---
       .addCase(fetchPolizas.pending, (state) => {
         state.status = "loading";
         state.error = null;
       })
       .addCase(fetchPolizas.fulfilled, (state, action) => {
         state.status = "succeeded";
-        state.polizas = action.payload || [];
+
+        const payload = action.payload || {};
+        const polizas = payload?.polizas ?? payload ?? [];
+        state.polizas = Array.isArray(polizas) ? polizas : [];
+
+        const queryKey = payload?.queryKey || "";
+        if (queryKey) {
+          state.polizasCache[queryKey] = {
+            polizas: state.polizas,
+            at: payload?.at || Date.now(),
+            originalQuery: payload?.originalQuery || "",
+          };
+          rememberSearch(state, queryKey);
+        }
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
         state.status = "failed";
