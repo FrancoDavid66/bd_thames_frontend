@@ -1,11 +1,16 @@
 // src/pages/ClienteProfilePage.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-import { fetchClientes, updateCliente, deleteCliente } from '../store/slices/clientesSlice';
+import {
+  fetchClienteById,
+  fetchClientes,
+  updateCliente,
+  deleteCliente,
+} from '../store/slices/clientesSlice';
 
 import ClienteEditModal from '../components/clientes/ClienteEditModal';
 import ClienteDatosPersonalesCard from '../components/clientes/ClienteDatosPersonalesCard';
@@ -21,29 +26,52 @@ import ConfirmModal from '../components/comunes/ConfirmModal';
 
 const ClienteProfilePage = () => {
   const { id } = useParams();
+  const idKey = String(id ?? '');
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { clientes, status, error } = useSelector((state) => state.clientes);
+  const {
+    clientes,
+    status,
+    error,
+    byId,
+    byIdStatus,
+    byIdError,
+  } = useSelector((state) => state.clientes);
 
-  const cliente = Array.isArray(clientes)
-    ? clientes.find((c) => c.id === Number(id))
-    : undefined;
+  // ✅ Fuente principal: cache por ID (detalle)
+  // 🟡 Fallback: si venís desde la lista y todavía no cargó detalle, puede estar en clientes[]
+  const cliente = useMemo(() => {
+    const cached = byId?.[idKey];
+    if (cached) return cached;
+
+    if (Array.isArray(clientes)) {
+      return clientes.find((c) => String(c?.id) === idKey);
+    }
+    return undefined;
+  }, [byId, idKey, clientes]);
+
+  const detailStatus = byIdStatus?.[idKey] || 'idle';
+  const detailError = byIdError?.[idKey] || null;
 
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
   const [modalCrearPolizaAbierto, setModalCrearPolizaAbierto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
+  // ✅ Cargar SIEMPRE el detalle por ID (no depende de la página del listado)
   useEffect(() => {
-    if (!cliente) dispatch(fetchClientes({ page: 1 }));
-  }, [dispatch, cliente]);
+    if (!id) return;
+    dispatch(fetchClienteById(id));
+  }, [dispatch, id]);
 
   const handleSaveCliente = async (updated) => {
     try {
       await dispatch(updateCliente(updated)).unwrap();
       toast.success('Cliente actualizado');
       setModalEditarAbierto(false);
+      // refrescar detalle por si backend devuelve algo recalculado
+      if (id) dispatch(fetchClienteById(id));
     } catch {
       toast.error('No se pudo actualizar');
     }
@@ -67,12 +95,26 @@ const ClienteProfilePage = () => {
   const abrirCrearPoliza = () => setModalCrearPolizaAbierto(true);
 
   const handlePolizaCreada = () => {
+    // refresca detalle (pólizas)
+    if (id) dispatch(fetchClienteById(id));
+    // opcional: refrescar primera página (por si tu lista muestra datos agregados)
     dispatch(fetchClientes({ page: 1 }));
     setModalCrearPolizaAbierto(false);
   };
 
-  if (status === 'loading') return <p className="p-6">Cargando…</p>;
-  if (status === 'failed') return <p className="p-6">Error: {error}</p>;
+  // Loading/error del detalle
+  if (detailStatus === 'loading' || (status === 'loading' && !cliente)) {
+    return <p className="p-6">Cargando…</p>;
+  }
+
+  if (detailStatus === 'failed') {
+    return <p className="p-6">Error: {typeof detailError === 'string' ? detailError : 'No se pudo cargar el cliente'}</p>;
+  }
+
+  if (status === 'failed' && !cliente) {
+    return <p className="p-6">Error: {error}</p>;
+  }
+
   if (!cliente) return <p className="p-6">Cargando cliente…</p>;
 
   return (
