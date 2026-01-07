@@ -1,6 +1,6 @@
-/* src/pages/PolizasPage.jsx — Versión COMPLETA con panel/cuasi-tab de cuponeras de robo */
-import { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+/* src/pages/PolizasPage.jsx — Versión COMPLETA (optimizada: init URL batched + debounce search + anti doble-fetch + envío masivo corregido) */
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { batch, useDispatch, useSelector } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { HiChatAlt2 } from "react-icons/hi";
@@ -43,31 +43,89 @@ import {
   selectEnvioMensajesProcesadas,
 } from "../store/slices/polizasSlice";
 
-/* ---- Helper para clasificar pólizas por cuotas (para filtros y resumen en modo "cuotas") ---- */
+/* ---------------- helpers ---------------- */
+
+function useDebouncedValue(value, delayMs = 350) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function diffDays(a, b) {
+  return Math.floor((a.getTime() - b.getTime()) / 86400000);
+}
+
+/* ---- Helper para clasificar pólizas por cuotas (modo "cuotas") ----
+   Optimizado: usa estado_cuotas / proxima_vencimiento_impaga / impagas_count si vienen del backend
+*/
 const estadoPorCuotas = (poliza) => {
+  const key = (poliza?.estado_cuotas || "").toString().trim().toLowerCase();
+  if (
+    key === "al_dia" ||
+    key === "por_vencer" ||
+    key === "vence_hoy" ||
+    key === "vencida_7" ||
+    key === "vencida_30" ||
+    key === "vencidas"
+  ) {
+    return key;
+  }
+
+  const impagasCount = Number(poliza?.impagas_count ?? poliza?.impagasCount);
+  if (Number.isFinite(impagasCount) && impagasCount <= 0) return "al_dia";
+
+  const proxRaw =
+    poliza?.proxima_vencimiento_impaga ||
+    poliza?.proximaVencimientoImpaga ||
+    null;
+
+  if (proxRaw) {
+    const hoy = startOfDay(new Date());
+    const prox = startOfDay(new Date(proxRaw));
+    if (Number.isNaN(prox.getTime())) return "vencidas";
+
+    const d = diffDays(hoy, prox); // >0 vencida | 0 hoy | <0 futura
+    if (d === 0) return "vence_hoy";
+    if (d > 0) {
+      if (d <= 7) return "vencida_7";
+      if (d <= 30) return "vencida_30";
+      return "vencidas";
+    }
+    return Math.abs(d) <= 7 ? "por_vencer" : "al_dia";
+  }
+
+  // fallback caro (si vienen cuotas embebidas)
   const cuotas = poliza?.cuotas || [];
   const impagas = cuotas.filter((c) => !c.pagado);
   if (impagas.length === 0) return "al_dia";
 
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
+  const hoy = startOfDay(new Date());
   const fechas = impagas
     .filter((c) => c?.fecha_vencimiento)
-    .map((c) => new Date(c.fecha_vencimiento))
+    .map((c) => startOfDay(new Date(c.fecha_vencimiento)))
+    .filter((d) => !Number.isNaN(d.getTime()))
     .sort((a, b) => a - b);
 
   if (!fechas.length) return "vencidas";
 
   const proxima = fechas[0];
-  const diffDays = Math.floor((hoy - proxima) / 86400000);
-  if (diffDays === 0) return "vence_hoy";
-  if (diffDays > 0) {
-    if (diffDays <= 7) return "vencida_7";
-    if (diffDays <= 30) return "vencida_30";
+  const d = diffDays(hoy, proxima);
+  if (d === 0) return "vence_hoy";
+  if (d > 0) {
+    if (d <= 7) return "vencida_7";
+    if (d <= 30) return "vencida_30";
     return "vencidas";
   }
-  return Math.abs(diffDays) <= 7 ? "por_vencer" : "al_dia";
+  return Math.abs(d) <= 7 ? "por_vencer" : "al_dia";
 };
 
 export default function PolizasPage() {
@@ -91,18 +149,37 @@ export default function PolizasPage() {
     solo_activas = false,
     ordering = "-id",
     modo = "polizas",
-    // NUEVOS filtros de vencimiento
+    // filtros vencimiento
     fecha_vencimiento_desde,
     fecha_vencimiento_hasta,
     vencidas_ultimos_dias,
     vencidas_mas_de_dias,
-    // KPIs (para chips de mora y totales globales)
+    // KPIs
     kpis = {},
   } = useSelector((s) => s.polizas || {});
 
   const resumenCuotasDesdeSlice = useSelector(selectResumenCuotas);
 
-  // --------- 1) Cargar filtros iniciales desde la URL (una sola vez) ----------
+  // --------- 0) Gate para evitar doble-fetch durante init desde URL ----------
+  const [ready, setReady] = useState(false);
+  const didInitRef = useRef(false);
+
+  // --------- Search con debounce (evita spam de requests al tipear) ----------
+  const [searchDraft, setSearchDraft] = useState(search || "");
+  useEffect(() => {
+    // si el store cambia (ej: navegación), sincronizamos el input
+    setSearchDraft(search || "");
+  }, [search]);
+
+  const debouncedSearchDraft = useDebouncedValue(searchDraft, 350);
+
+  useEffect(() => {
+    if (!ready) return;
+    const next = (debouncedSearchDraft || "").trim();
+    if ((search || "") !== next) dispatch(setSearch(next));
+  }, [dispatch, debouncedSearchDraft, ready, search]);
+
+  // --------- 1) Cargar filtros iniciales desde la URL (BATCH) ----------
   useEffect(() => {
     const qpCliente = searchParams.get("cliente") || searchParams.get("cliente_id");
     const qpPatente = searchParams.get("patente");
@@ -113,24 +190,44 @@ export default function PolizasPage() {
     const qpUltimos = searchParams.get("vencidas_ultimos_dias");
     const qpMasDe = searchParams.get("vencidas_mas_de_dias");
 
-    if (qpCliente) dispatch(setCliente(String(qpCliente)));
-    if (qpPatente) dispatch(setPatente(String(qpPatente)));
-    if (qpCompania) dispatch(setCompania(String(qpCompania)));
-    if (qpModo && (qpModo === "polizas" || qpModo === "cuotas")) dispatch(setModo(qpModo));
+    batch(() => {
+      if (qpCliente) dispatch(setCliente(String(qpCliente)));
+      if (qpPatente) dispatch(setPatente(String(qpPatente)));
+      if (qpCompania) dispatch(setCompania(String(qpCompania)));
+      if (qpModo && (qpModo === "polizas" || qpModo === "cuotas")) dispatch(setModo(qpModo));
 
-    if (qpDesde) dispatch(setFechaVencimientoDesde(qpDesde));
-    if (qpHasta) dispatch(setFechaVencimientoHasta(qpHasta));
-    if (qpUltimos) dispatch(setVencidasUltimosDias(qpUltimos));
-    if (qpMasDe) dispatch(setVencidasMasDeDias(qpMasDe));
+      if (qpDesde) dispatch(setFechaVencimientoDesde(qpDesde));
+      if (qpHasta) dispatch(setFechaVencimientoHasta(qpHasta));
+      if (qpUltimos) dispatch(setVencidasUltimosDias(qpUltimos));
+      if (qpMasDe) dispatch(setVencidasMasDeDias(qpMasDe));
 
-    dispatch(setPage(1));
+      dispatch(setPage(1));
+    });
+
+    didInitRef.current = true;
+    setReady(true);
   }, [dispatch, searchParams]);
 
-  // --------- 2) Efectos para cargar pólizas y KPIs ----------
-  useEffect(() => {
-    dispatch(fetchPolizas());
+  // --------- 2) Anti doble-fetch por queryKey ----------
+  const listQueryKey = useMemo(() => {
+    return JSON.stringify({
+      page,
+      pageSize,
+      search,
+      estado,
+      estado_financiero,
+      compania,
+      cliente,
+      patente,
+      solo_activas,
+      ordering,
+      modo,
+      fecha_vencimiento_desde,
+      fecha_vencimiento_hasta,
+      vencidas_ultimos_dias,
+      vencidas_mas_de_dias,
+    });
   }, [
-    dispatch,
     page,
     pageSize,
     search,
@@ -148,10 +245,22 @@ export default function PolizasPage() {
     vencidas_mas_de_dias,
   ]);
 
-  useEffect(() => {
-    dispatch(fetchPolizasKpis());
+  const kpisQueryKey = useMemo(() => {
+    return JSON.stringify({
+      search,
+      compania,
+      cliente,
+      patente,
+      solo_activas,
+      estado,
+      estado_financiero,
+      modo,
+      fecha_vencimiento_desde,
+      fecha_vencimiento_hasta,
+      vencidas_ultimos_dias,
+      vencidas_mas_de_dias,
+    });
   }, [
-    dispatch,
     search,
     compania,
     cliente,
@@ -166,14 +275,28 @@ export default function PolizasPage() {
     vencidas_mas_de_dias,
   ]);
 
-  // --------- 3) Resúmenes locales (fallback) para modo "cuotas" ---------
+  const lastListKeyRef = useRef("");
+  const lastKpisKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!ready || !didInitRef.current) return;
+    if (lastListKeyRef.current === listQueryKey) return;
+    lastListKeyRef.current = listQueryKey;
+    dispatch(fetchPolizas());
+  }, [dispatch, listQueryKey, ready]);
+
+  useEffect(() => {
+    if (!ready || !didInitRef.current) return;
+    if (lastKpisKeyRef.current === kpisQueryKey) return;
+    lastKpisKeyRef.current = kpisQueryKey;
+    dispatch(fetchPolizasKpis());
+  }, [dispatch, kpisQueryKey, ready]);
+
+  // --------- 3) Resúmenes (modo cuotas y modo polizas) ----------
   const resumenCuotas = useMemo(() => {
-    // Si el slice ya trae un resumen calculado, lo usamos
     if (resumenCuotasDesdeSlice && typeof resumenCuotasDesdeSlice === "object") {
       return resumenCuotasDesdeSlice;
     }
-
-    // Fallback local sobre la lista (modo cuotas)
     const base = {
       todos: 0,
       al_dia: 0,
@@ -206,11 +329,7 @@ export default function PolizasPage() {
     [kpis]
   );
 
-  /* 🔍 NUEVO: lista filtrada por estado de cuotas cuando el modo es "cuotas"
-     - Si modo = "cuotas" y el chip seleccionado no es "todos",
-       filtramos usando estadoPorCuotas(poliza).
-     - En cualquier otro caso, usamos la lista tal cual viene del backend.
-  */
+  /* 🔍 lista filtrada por estado de cuotas cuando modo = "cuotas" (filtro local) */
   const listFiltrada = useMemo(() => {
     if (modo === "cuotas" && estado && estado !== "todos") {
       return list.filter((p) => estadoPorCuotas(p) === estado);
@@ -219,7 +338,11 @@ export default function PolizasPage() {
   }, [list, modo, estado]);
 
   // --------- 5) Handlers de filtros ----------
-  const onSearchChange = (val) => dispatch(setSearch(val));
+  const onSearchChange = useCallback((val) => {
+    // debounce local → store
+    setSearchDraft(val || "");
+  }, []);
+
   const onEstadoChange = (val) => dispatch(setEstado(val));
   const onEstadoFinancieroChange = (val) => dispatch(setEstadoFinanciero(val));
   const onCompaniaChange = (val) => dispatch(setCompania(val));
@@ -261,14 +384,68 @@ export default function PolizasPage() {
 
   const [previewOnly, setPreviewOnly] = useState(true);
 
+  const filtrosEnvio = useMemo(() => {
+    const f = {
+      // “global”
+      search: search || "",
+      compania: compania || "",
+      cliente: cliente || "",
+      patente: patente || "",
+      solo_activas: solo_activas ? 1 : undefined,
+
+      // “modo polizas”
+      estado: modo === "polizas" && estado !== "todos" ? estado : undefined,
+      estado_financiero:
+        modo === "polizas" && estado_financiero !== "todos"
+          ? estado_financiero
+          : undefined,
+
+      // vencimientos
+      fecha_vencimiento_desde: fecha_vencimiento_desde || "",
+      fecha_vencimiento_hasta: fecha_vencimiento_hasta || "",
+      vencidas_ultimos_dias: vencidas_ultimos_dias || "",
+      vencidas_mas_de_dias: vencidas_mas_de_dias || "",
+    };
+
+    // si el modo es cuotas y se eligió chip, intentamos mandar el “estado” como estado_cuotas
+    if (modo === "cuotas" && estado && estado !== "todos") {
+      f.estado_cuotas = estado;
+    }
+
+    // limpiar vacíos para que el backend no reciba basura
+    Object.keys(f).forEach((k) => {
+      const v = f[k];
+      if (v === undefined) delete f[k];
+      if (typeof v === "string" && v.trim() === "") delete f[k];
+    });
+
+    return f;
+  }, [
+    search,
+    compania,
+    cliente,
+    patente,
+    solo_activas,
+    estado,
+    estado_financiero,
+    modo,
+    fecha_vencimiento_desde,
+    fecha_vencimiento_hasta,
+    vencidas_ultimos_dias,
+    vencidas_mas_de_dias,
+  ]);
+
+  const hayUniverso = (modo === "cuotas" ? listFiltrada.length > 0 : total > 0);
+
   const handleEnviarMensajes = async () => {
     try {
       await dispatch(
         enviarMensajesEstadoCuotas({
-          preview_only: previewOnly ? 1 : 0,
-          modo,
+          filtros: filtrosEnvio,
+          preview: !!previewOnly,
         })
       ).unwrap();
+
       toast.success(
         previewOnly
           ? "Reporte de mensajes generado (preview)."
@@ -279,8 +456,6 @@ export default function PolizasPage() {
       toast.error("Error al enviar/generar el reporte de mensajes.");
     }
   };
-
-  const hayPolizas = list.length > 0;
 
   return (
     <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4 text-gray-100">
@@ -309,7 +484,7 @@ export default function PolizasPage() {
 
       {/* Filtros / barra superior */}
       <PolizaFilter
-        searchValue={search}
+        searchValue={searchDraft}
         onSearchChange={onSearchChange}
         estadoActual={estado}
         onEstadoChange={onEstadoChange}
@@ -334,8 +509,14 @@ export default function PolizasPage() {
         onClearVencimientoFilters={onClearVencimiento}
       />
 
+      {/* Mensaje de error si existe */}
+      {error && status === "failed" && (
+        <div className="mt-2 rounded-xl border border-rose-700/50 bg-rose-950/30 p-3 text-xs text-rose-100">
+          {typeof error === "string" ? error : JSON.stringify(error)}
+        </div>
+      )}
+
       <div className="mt-1 text-xs sm:text-sm text-gray-300">
-        {/* usamos listFiltrada para que el texto coincida con lo que se ve en la tabla */}
         Mostrando {listFiltrada.length} de {total} pólizas (página {page})
       </div>
 
@@ -378,9 +559,7 @@ export default function PolizasPage() {
       {showGrua && polizaSeleccionada && (
         <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
-              Servicio de grúa
-            </h2>
+            <h2 className="text-lg font-semibold text-white">Servicio de grúa</h2>
             <button
               type="button"
               onClick={() => setShowGrua(false)}
@@ -397,9 +576,7 @@ export default function PolizasPage() {
       {showCupones && polizaSeleccionada && (
         <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/95 p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
-              Cuponeras de robo
-            </h2>
+            <h2 className="text-lg font-semibold text-white">Cuponeras de robo</h2>
             <button
               type="button"
               onClick={() => setShowCupones(false)}
@@ -429,6 +606,7 @@ export default function PolizasPage() {
               </div>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1 text-xs">
               <input
@@ -439,10 +617,11 @@ export default function PolizasPage() {
               />
               <span>Solo preview (no enviar)</span>
             </label>
+
             <button
               type="button"
               onClick={handleEnviarMensajes}
-              disabled={envioStatus === "loading" || !hayPolizas}
+              disabled={envioStatus === "loading" || !hayUniverso}
               className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800/70"
             >
               {envioStatus === "loading" ? (
@@ -472,6 +651,7 @@ export default function PolizasPage() {
                 {JSON.stringify(envioResumen, null, 2)}
               </pre>
             </div>
+
             <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
               <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
                 Buckets
@@ -480,6 +660,7 @@ export default function PolizasPage() {
                 {JSON.stringify(envioBuckets, null, 2)}
               </pre>
             </div>
+
             {envioDiag && (
               <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
@@ -490,6 +671,7 @@ export default function PolizasPage() {
                 </pre>
               </div>
             )}
+
             {envioPayload && (
               <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
@@ -500,13 +682,15 @@ export default function PolizasPage() {
                 </pre>
               </div>
             )}
+
             {(envioSeleccionadas || envioProcesadas) && (
               <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">
                   Conteo
                 </div>
                 <div className="mt-1 text-[11px]">
-                  Seleccionadas: {envioSeleccionadas} · Procesadas: {envioProcesadas}
+                  Seleccionadas: {envioSeleccionadas} · Procesadas:{" "}
+                  {envioProcesadas}
                 </div>
               </div>
             )}

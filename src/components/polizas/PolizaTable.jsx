@@ -1,31 +1,173 @@
 // src/components/polizas/PolizaTable.jsx
-import React, { useState } from "react";
+import React, { useMemo, useState, useCallback, memo } from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import dayjs from "dayjs";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 import PolizaEditModal from "./PolizaEditModal";
 import ConfirmModal from "./ConfirmModal";
 import { deletePoliza } from "../../store/slices/polizasSlice";
 
-const SortHeader = ({
+/* ---------------- Helpers (sin dayjs) ---------------- */
+
+function toIntOrNaN(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function diffDays(a, b) {
+  // a - b en días, ambos startOfDay
+  return Math.floor((a.getTime() - b.getTime()) / 86400000);
+}
+
+function normalizeEstadoCuotasKey(raw) {
+  const v = (raw || "").toString().trim().toLowerCase();
+  // soporta backend: al_dia, por_vencer, vence_hoy, vencida_7, vencida_30, vencidas
+  // soporta variantes: mora_*, etc (si aparecieran)
+  if (!v) return "";
+  return v;
+}
+
+function computeCuotasBadge(poliza) {
+  const keyFromBackend = normalizeEstadoCuotasKey(poliza?.estado_cuotas);
+
+  const impagasCount = toIntOrNaN(poliza?.impagas_count ?? poliza?.impagasCount);
+  const cuotasArr = Array.isArray(poliza?.cuotas) ? poliza.cuotas : null;
+
+  const countImpagas = () => {
+    if (!Number.isNaN(impagasCount)) return Math.max(0, impagasCount);
+    if (!cuotasArr) return 0;
+    let n = 0;
+    for (const c of cuotasArr) if (!c?.pagado) n += 1;
+    return n;
+  };
+
+  const impagas = countImpagas();
+
+  // Si backend ya nos dice el estado → usarlo
+  let key = keyFromBackend;
+
+  // Si no vino key, intentamos con proxima_vencimiento_impaga (barato)
+  if (!key) {
+    const proxRaw =
+      poliza?.proxima_vencimiento_impaga ||
+      poliza?.proximaVencimientoImpaga ||
+      poliza?.proxima_vencimiento ||
+      null;
+
+    if (impagas <= 0) key = "al_dia";
+    else if (proxRaw) {
+      const hoy = startOfDay(new Date());
+      const prox = startOfDay(new Date(proxRaw));
+      if (Number.isNaN(prox.getTime())) {
+        key = "vencidas";
+      } else {
+        const d = diffDays(hoy, prox); // >0 vencida | 0 hoy | <0 futura
+        if (d === 0) key = "vence_hoy";
+        else if (d > 0) {
+          if (d <= 7) key = "vencida_7";
+          else if (d <= 30) key = "vencida_30";
+          else key = "vencidas";
+        } else {
+          const faltan = Math.abs(d);
+          key = faltan <= 7 ? "por_vencer" : "al_dia";
+        }
+      }
+    } else if (cuotasArr) {
+      // Fallback caro (solo si no vino nada útil)
+      if (impagas <= 0) key = "al_dia";
+      else {
+        const hoy = startOfDay(new Date());
+        let proxima = null;
+
+        for (const c of cuotasArr) {
+          if (c?.pagado) continue;
+          if (!c?.fecha_vencimiento) continue;
+          const fv = startOfDay(new Date(c.fecha_vencimiento));
+          if (Number.isNaN(fv.getTime())) continue;
+          if (!proxima || fv.getTime() < proxima.getTime()) proxima = fv;
+        }
+
+        if (!proxima) key = "vencidas";
+        else {
+          const d = diffDays(hoy, proxima);
+          if (d === 0) key = "vence_hoy";
+          else if (d > 0) {
+            if (d <= 7) key = "vencida_7";
+            else if (d <= 30) key = "vencida_30";
+            else key = "vencidas";
+          } else {
+            const faltan = Math.abs(d);
+            key = faltan <= 7 ? "por_vencer" : "al_dia";
+          }
+        }
+      }
+    } else {
+      key = impagas <= 0 ? "al_dia" : "vencidas";
+    }
+  }
+
+  const styles = {
+    al_dia: {
+      label: "AL DÍA",
+      clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/5",
+    },
+    por_vencer: {
+      label: "POR VENCER",
+      clase: "border-amber-500/60 text-amber-300 bg-amber-500/5",
+    },
+    vence_hoy: {
+      label: "VENCE HOY",
+      clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
+    },
+    vencida_7: {
+      label: "VENCIDA (7 días)",
+      clase: "border-amber-500/70 text-amber-300 bg-amber-500/10",
+    },
+    vencida_30: {
+      label: "VENCIDA (30 días)",
+      clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
+    },
+    vencidas: {
+      label: "VENCIDAS",
+      clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
+    },
+  };
+
+  const st = styles[key] || styles.vencidas;
+
+  return {
+    key,
+    label: st.label,
+    clase: st.clase,
+    extra: `${impagas} impagas`,
+  };
+}
+
+/* ---------------- UI Pieces ---------------- */
+
+const SortHeader = memo(function SortHeader({
   label,
   field,
   ordering,
   onOrderingChange,
   className = "",
-}) => {
-  const isActive =
-    ordering && (ordering === field || ordering === `-${field}`);
+}) {
+  const isActive = ordering && (ordering === field || ordering === `-${field}`);
   const dir = ordering && ordering.startsWith("-") ? "desc" : "asc";
 
-  const nextOrdering = () => {
+  const nextOrdering = useCallback(() => {
     if (!onOrderingChange) return;
-    if (!isActive) return onOrderingChange(field); // activa asc
-    if (dir === "asc") return onOrderingChange(`-${field}`); // alterna a desc
-    return onOrderingChange(field); // vuelve a asc
-  };
+    if (!isActive) return onOrderingChange(field);
+    if (dir === "asc") return onOrderingChange(`-${field}`);
+    return onOrderingChange(field);
+  }, [onOrderingChange, isActive, dir, field]);
 
   return (
     <th
@@ -45,7 +187,223 @@ const SortHeader = ({
       </span>
     </th>
   );
-};
+});
+
+const CuotasBadge = memo(function CuotasBadge({ poliza }) {
+  const est = computeCuotasBadge(poliza);
+  return (
+    <div className="flex flex-col gap-1 text-xs">
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold border ${est.clase}`}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        {est.label}
+      </span>
+      <span className="text-[11px] text-gray-400">{est.extra}</span>
+    </div>
+  );
+});
+
+/* ---------------- Rows (memo) ---------------- */
+
+const DesktopRow = memo(function DesktopRow({
+  poliza,
+  zebra,
+  isDeleting,
+  onEditClick,
+  onDeleteClick,
+}) {
+  const activa = (poliza?.estado || "").toString().toLowerCase() === "activa";
+
+  const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
+
+  return (
+    <tr
+      className={`transition-colors ${zebra} hover:bg-gray-850`}
+    >
+      {/* N° Póliza */}
+      <td className="p-3 border-b border-gray-850 align-top">
+        <Link
+          to={`/polizas/${poliza.id}`}
+          className="text-primary-300 hover:text-primary-200 font-medium text-sm"
+          title="Ver detalle de póliza"
+        >
+          {poliza.numero_poliza || "-"}
+        </Link>
+        {poliza.compania && (
+          <div className="mt-0.5 text-[11px] text-gray-400">
+            {poliza.compania}
+          </div>
+        )}
+      </td>
+
+      {/* Cliente */}
+      <td className="p-3 border-b border-gray-850 align-top">
+        <Link
+          to={`/clientes/${poliza.cliente?.id}`}
+          className="text-sm text-primary-200 hover:text-primary-100"
+          title="Ver perfil de cliente"
+        >
+          {clienteNombre || "-"}
+        </Link>
+        {poliza.cliente?.dni_cuit_cuil && (
+          <div className="mt-0.5 text-[11px] text-gray-400">
+            {poliza.cliente.dni_cuit_cuil}
+          </div>
+        )}
+      </td>
+
+      {/* Patente / Marca / Modelo */}
+      <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
+        {poliza.patente || "-"}
+      </td>
+      <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
+        {poliza.marca || "-"}
+      </td>
+      <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
+        {poliza.modelo || "-"}
+      </td>
+
+      {/* Cuotas */}
+      <td className="p-3 border-b border-gray-850 align-top">
+        <CuotasBadge poliza={poliza} />
+      </td>
+
+      {/* Estado */}
+      <td className="p-3 border-b border-gray-850 align-top text-center">
+        <span
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+            activa
+              ? "border-emerald-500/60 text-emerald-300 bg-emerald-500/5"
+              : "border-rose-500/60 text-rose-300 bg-rose-500/5"
+          }`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {activa ? "Activa" : "Inactiva"}
+        </span>
+      </td>
+
+      {/* Acciones */}
+      <td className="p-3 border-b border-gray-850 align-top text-center">
+        <div className="inline-flex items-center gap-2">
+          <button
+            className="p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs transition disabled:opacity-50"
+            onClick={() => onEditClick(poliza)}
+            title="Editar póliza"
+            aria-label="Editar póliza"
+            disabled={isDeleting}
+          >
+            <FaEdit className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className={`p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs transition disabled:opacity-50 ${
+              isDeleting
+                ? "opacity-60 cursor-wait text-rose-300"
+                : "text-rose-400 hover:text-rose-300"
+            }`}
+            onClick={() => onDeleteClick(poliza)}
+            title="Eliminar póliza"
+            aria-label="Eliminar póliza"
+            disabled={isDeleting}
+          >
+            <FaTrash className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
+const MobileCard = memo(function MobileCard({
+  poliza,
+  isDeleting,
+  onEditClick,
+  onDeleteClick,
+}) {
+  const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
+
+  return (
+    <div className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] text-gray-400">N° Póliza</div>
+          <Link
+            to={`/polizas/${poliza.id}`}
+            className="font-semibold text-sm text-primary-300 hover:text-primary-200"
+          >
+            {poliza.numero_poliza || "-"}
+          </Link>
+          {poliza.compania && (
+            <div className="mt-0.5 text-[11px] text-gray-500">
+              {poliza.compania}
+            </div>
+          )}
+        </div>
+        <div className={isDeleting ? "opacity-60 shrink-0" : "shrink-0"}>
+          <CuotasBadge poliza={poliza} />
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <div className="text-[11px] text-gray-400">Cliente</div>
+          <Link
+            to={`/clientes/${poliza.cliente?.id}`}
+            className="text-sm text-primary-200 hover:text-primary-100"
+          >
+            {clienteNombre || "-"}
+          </Link>
+          {poliza.cliente?.dni_cuit_cuil && (
+            <div className="mt-0.5 text-[11px] text-gray-500">
+              {poliza.cliente.dni_cuit_cuil}
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="text-[11px] text-gray-400">Patente</div>
+          <div className="text-sm text-gray-100">{poliza.patente || "-"}</div>
+        </div>
+        <div>
+          <div className="text-[11px] text-gray-400">Marca</div>
+          <div className="text-sm text-gray-100">{poliza.marca || "-"}</div>
+        </div>
+        <div>
+          <div className="text-[11px] text-gray-400">Modelo</div>
+          <div className="text-sm text-gray-100">{poliza.modelo || "-"}</div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          className="flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs font-medium transition disabled:opacity-50"
+          onClick={() => onEditClick(poliza)}
+          title="Editar póliza"
+          disabled={isDeleting}
+        >
+          <span className="inline-flex items-center gap-2 justify-center">
+            <FaEdit className="w-3.5 h-3.5" /> Editar
+          </span>
+        </button>
+        <button
+          className={`flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs font-medium transition ${
+            isDeleting
+              ? "opacity-60 cursor-wait text-rose-300"
+              : "text-rose-400 hover:text-rose-300"
+          }`}
+          onClick={() => onDeleteClick(poliza)}
+          title="Eliminar póliza"
+          disabled={isDeleting}
+        >
+          <span className="inline-flex items-center gap-2 justify-center">
+            <FaTrash className="w-3.5 h-3.5" /> Eliminar
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+});
+
+/* ---------------- Main ---------------- */
 
 const PolizaTable = ({
   polizas = [],
@@ -69,33 +427,52 @@ const PolizaTable = ({
   const [openConfirm, setOpenConfirm] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil((Number(total) || 0) / (Number(pageSize) || 1))
+  const totalPages = useMemo(() => {
+    const t = Number(total) || 0;
+    const ps = Number(pageSize) || 1;
+    return Math.max(1, Math.ceil(t / ps));
+  }, [total, pageSize]);
+
+  const { startIdx, endIdx } = useMemo(() => {
+    const ps = Number(pageSize) || 1;
+    const p = Number(page) || 1;
+    const t = Number(total) || 0;
+
+    if (!polizas.length) return { startIdx: 0, endIdx: 0 };
+    const start = (p - 1) * ps + 1;
+    const end = Math.min(start + polizas.length - 1, t);
+    return { startIdx: start, endIdx: end };
+  }, [polizas.length, page, pageSize, total]);
+
+  const handleEditClick = useCallback(
+    (poliza) => {
+      if (onEdit) return onEdit(poliza);
+      setEditing(poliza);
+      setOpenEdit(true);
+    },
+    [onEdit]
   );
 
-  const handleEditClick = (poliza) => {
-    if (onEdit) return onEdit(poliza);
-    setEditing(poliza);
-    setOpenEdit(true);
-  };
+  const handleDeleteClick = useCallback(
+    (poliza) => {
+      if (onDelete) return onDelete(poliza);
+      setDeleting(poliza);
+      setOpenConfirm(true);
+    },
+    [onDelete]
+  );
 
-  const handleDeleteClick = (poliza) => {
-    if (onDelete) return onDelete(poliza);
-    setDeleting(poliza);
-    setOpenConfirm(true);
-  };
-
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = useCallback(async () => {
     try {
-      setDeletingId(deleting?.id || null);
+      const id = deleting?.id;
+      if (!id) return;
+
+      setDeletingId(id);
 
       const shouldGoPrev =
-        polizas.length === 1 &&
-        page > 1 &&
-        typeof onPageChange === "function";
+        polizas.length === 1 && page > 1 && typeof onPageChange === "function";
 
-      await dispatch(deletePoliza(deleting.id)).unwrap();
+      await dispatch(deletePoliza(id)).unwrap();
       toast.success("Póliza eliminada");
 
       if (shouldGoPrev) onPageChange(page - 1);
@@ -107,118 +484,7 @@ const PolizaTable = ({
       setDeleting(null);
       setDeletingId(null);
     }
-  };
-
-  // ===== Estado de cuotas → badge más minimal =====
-  const getEstadoCuotas = (poliza) => {
-    const cuotas = poliza?.cuotas || [];
-    const impagas = cuotas.filter((c) => !c.pagado);
-
-    if (impagas.length === 0) {
-      return {
-        key: "AL_DIA",
-        label: "AL DÍA",
-        clase:
-          "border-emerald-500/60 text-emerald-300 bg-emerald-500/5",
-        extra: "0 impagas",
-      };
-    }
-
-    const hoy = dayjs().startOf("day");
-    const proxima = impagas
-      .filter((c) => c.fecha_vencimiento)
-      .map((c) => ({ ...c, fv: dayjs(c.fecha_vencimiento) }))
-      .sort((a, b) => a.fv.valueOf() - b.fv.valueOf())[0];
-
-    if (!proxima) {
-      return {
-        key: "VENCIDAS",
-        label: "VENCIDAS",
-        clase:
-          "border-rose-500/60 text-rose-300 bg-rose-500/5",
-        extra: `${impagas.length} impagas`,
-      };
-    }
-
-    const diff = hoy.diff(proxima.fv, "day"); // >0 vencida | 0 hoy | <0 futura
-
-    if (diff === 0) {
-      return {
-        key: "VENCE_HOY",
-        label: "VENCE HOY",
-        clase:
-          "border-rose-500/70 text-rose-300 bg-rose-500/10",
-        extra: `${impagas.length} impagas`,
-      };
-    }
-
-    if (diff > 0) {
-      if (diff <= 7)
-        return {
-          key: "VENCIDA_7",
-          label: "VENCIDA (7 días)",
-          clase:
-            "border-amber-500/70 text-amber-300 bg-amber-500/10",
-          extra: `${impagas.length} impagas`,
-        };
-      if (diff <= 30)
-        return {
-          key: "VENCIDA_30",
-          label: "VENCIDA (30 días)",
-          clase:
-            "border-rose-500/70 text-rose-300 bg-rose-500/10",
-          extra: `${impagas.length} impagas`,
-        };
-      return {
-        key: "VENCIDAS",
-        label: "VENCIDAS",
-        clase:
-          "border-rose-500/70 text-rose-300 bg-rose-500/10",
-        extra: `${impagas.length} impagas`,
-      };
-    }
-
-    const faltan = Math.abs(diff);
-    if (faltan <= 7) {
-      return {
-        key: "POR_VENCER",
-        label: "POR VENCER",
-        clase:
-          "border-amber-500/60 text-amber-300 bg-amber-500/5",
-        extra: `${impagas.length} impagas`,
-      };
-    }
-
-    return {
-      key: "AL_DIA",
-      label: "AL DÍA",
-      clase:
-        "border-emerald-500/60 text-emerald-300 bg-emerald-500/5",
-      extra: `${impagas.length} impagas`,
-    };
-  };
-
-  const CuotasBadge = ({ poliza }) => {
-    const est = getEstadoCuotas(poliza);
-    return (
-      <div className="flex flex-col gap-1 text-xs">
-        <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold border ${est.clase}`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {est.label}
-        </span>
-        <span className="text-[11px] text-gray-400">{est.extra}</span>
-      </div>
-    );
-  };
-
-  const isActiva = (p) =>
-    (p?.estado || "").toString().toLowerCase() === "activa";
-
-  const startIdx =
-    polizas.length > 0 ? (page - 1) * pageSize + 1 : 0;
-  const endIdx = Math.min(startIdx + polizas.length - 1, total || 0);
+  }, [deleting, dispatch, onPageChange, page, polizas.length]);
 
   return (
     <div className="rounded-2xl border border-gray-800 bg-gray-900/95 text-white shadow-sm overflow-hidden">
@@ -279,106 +545,17 @@ const PolizaTable = ({
               </th>
             </tr>
           </thead>
+
           <tbody>
             {polizas.map((poliza, idx) => (
-              <tr
+              <DesktopRow
                 key={poliza.id}
-                className={`transition-colors ${
-                  idx % 2 === 0 ? "bg-gray-900" : "bg-gray-900/90"
-                } hover:bg-gray-850`}
-              >
-                {/* N° Póliza */}
-                <td className="p-3 border-b border-gray-850 align-top">
-                  <Link
-                    to={`/polizas/${poliza.id}`}
-                    className="text-primary-300 hover:text-primary-200 font-medium text-sm"
-                    title="Ver detalle de póliza"
-                  >
-                    {poliza.numero_poliza || "-"}
-                  </Link>
-                  {poliza.compania && (
-                    <div className="mt-0.5 text-[11px] text-gray-400">
-                      {poliza.compania}
-                    </div>
-                  )}
-                </td>
-
-                {/* Cliente */}
-                <td className="p-3 border-b border-gray-850 align-top">
-                  <Link
-                    to={`/clientes/${poliza.cliente?.id}`}
-                    className="text-sm text-primary-200 hover:text-primary-100"
-                    title="Ver perfil de cliente"
-                  >
-                    {(poliza.cliente?.nombre || "") +
-                      " " +
-                      (poliza.cliente?.apellido || "")}
-                  </Link>
-                  {poliza.cliente?.dni_cuit_cuil && (
-                    <div className="mt-0.5 text-[11px] text-gray-400">
-                      {poliza.cliente.dni_cuit_cuil}
-                    </div>
-                  )}
-                </td>
-
-                {/* Patente / Marca / Modelo */}
-                <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-                  {poliza.patente || "-"}
-                </td>
-                <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-                  {poliza.marca || "-"}
-                </td>
-                <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-                  {poliza.modelo || "-"}
-                </td>
-
-                {/* Cuotas */}
-                <td className="p-3 border-b border-gray-850 align-top">
-                  <CuotasBadge poliza={poliza} />
-                </td>
-
-                {/* Estado */}
-                <td className="p-3 border-b border-gray-850 align-top text-center">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                      isActiva(poliza)
-                        ? "border-emerald-500/60 text-emerald-300 bg-emerald-500/5"
-                        : "border-rose-500/60 text-rose-300 bg-rose-500/5"
-                    }`}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {isActiva(poliza) ? "Activa" : "Inactiva"}
-                  </span>
-                </td>
-
-                {/* Acciones */}
-                <td className="p-3 border-b border-gray-850 align-top text-center">
-                  <div className="inline-flex items-center gap-2">
-                    <button
-                      className="p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs transition disabled:opacity-50"
-                      onClick={() => handleEditClick(poliza)}
-                      title="Editar póliza"
-                      aria-label="Editar póliza"
-                      disabled={!!deletingId}
-                    >
-                      <FaEdit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      className={`p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs transition disabled:opacity-50 ${
-                        deletingId === poliza.id
-                          ? "opacity-60 cursor-wait text-rose-300"
-                          : "text-rose-400 hover:text-rose-300"
-                      }`}
-                      onClick={() => handleDeleteClick(poliza)}
-                      title="Eliminar póliza"
-                      aria-label="Eliminar póliza"
-                      disabled={!!deletingId}
-                    >
-                      <FaTrash className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                poliza={poliza}
+                zebra={idx % 2 === 0 ? "bg-gray-900" : "bg-gray-900/90"}
+                isDeleting={!!deletingId}
+                onEditClick={handleEditClick}
+                onDeleteClick={handleDeleteClick}
+              />
             ))}
           </tbody>
         </table>
@@ -387,103 +564,20 @@ const PolizaTable = ({
       {/* Lista responsiva (mobile) */}
       <div className="md:hidden divide-y divide-gray-850">
         {polizas.map((poliza) => (
-          <div key={poliza.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[11px] text-gray-400">N° Póliza</div>
-                <Link
-                  to={`/polizas/${poliza.id}`}
-                  className="font-semibold text-sm text-primary-300 hover:text-primary-200"
-                >
-                  {poliza.numero_poliza || "-"}
-                </Link>
-                {poliza.compania && (
-                  <div className="mt-0.5 text-[11px] text-gray-500">
-                    {poliza.compania}
-                  </div>
-                )}
-              </div>
-              <div
-                className={
-                  deletingId === poliza.id ? "opacity-60 shrink-0" : "shrink-0"
-                }
-              >
-                <CuotasBadge poliza={poliza} />
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div className="text-[11px] text-gray-400">Cliente</div>
-                <Link
-                  to={`/clientes/${poliza.cliente?.id}`}
-                  className="text-sm text-primary-200 hover:text-primary-100"
-                >
-                  {(poliza.cliente?.nombre || "") +
-                    " " +
-                    (poliza.cliente?.apellido || "")}
-                </Link>
-                {poliza.cliente?.dni_cuit_cuil && (
-                  <div className="mt-0.5 text-[11px] text-gray-500">
-                    {poliza.cliente.dni_cuit_cuil}
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-[11px] text-gray-400">Patente</div>
-                <div className="text-sm text-gray-100">
-                  {poliza.patente || "-"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] text-gray-400">Marca</div>
-                <div className="text-sm text-gray-100">
-                  {poliza.marca || "-"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] text-gray-400">Modelo</div>
-                <div className="text-sm text-gray-100">
-                  {poliza.modelo || "-"}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                className="flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs font-medium transition disabled:opacity-50"
-                onClick={() => handleEditClick(poliza)}
-                title="Editar póliza"
-                disabled={!!deletingId}
-              >
-                <span className="inline-flex items-center gap-2 justify-center">
-                  <FaEdit className="w-3.5 h-3.5" /> Editar
-                </span>
-              </button>
-              <button
-                className={`flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs font-medium transition ${
-                  deletingId === poliza.id
-                    ? "opacity-60 cursor-wait text-rose-300"
-                    : "text-rose-400 hover:text-rose-300"
-                }`}
-                onClick={() => handleDeleteClick(poliza)}
-                title="Eliminar póliza"
-                disabled={!!deletingId}
-              >
-                <span className="inline-flex items-center gap-2 justify-center">
-                  <FaTrash className="w-3.5 h-3.5" /> Eliminar
-                </span>
-              </button>
-            </div>
-          </div>
+          <MobileCard
+            key={poliza.id}
+            poliza={poliza}
+            isDeleting={!!deletingId}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+          />
         ))}
       </div>
 
       {/* Footer de paginación (server-side) */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-3 bg-gray-900 border-t border-gray-800">
         <div className="text-xs sm:text-sm text-gray-300">
-          Mostrando{" "}
-          <strong>{startIdx || 0}</strong>–<strong>{endIdx || 0}</strong> de{" "}
+          Mostrando <strong>{startIdx || 0}</strong>–<strong>{endIdx || 0}</strong> de{" "}
           <strong>{total || 0}</strong>
         </div>
 
@@ -505,8 +599,7 @@ const PolizaTable = ({
             ‹
           </button>
           <span className="text-xs sm:text-sm text-gray-300 px-2">
-            Página <strong>{page}</strong> de{" "}
-            <strong>{totalPages}</strong>
+            Página <strong>{page}</strong> de <strong>{totalPages}</strong>
           </span>
           <button
             onClick={() => onPageChange?.(page + 1)}
@@ -562,9 +655,7 @@ const PolizaTable = ({
           setDeleting(null);
         }}
         onConfirm={handleConfirmDelete}
-        message={`¿Eliminar la póliza ${
-          deleting?.numero_poliza || ""
-        }? Esta acción no se puede deshacer.`}
+        message={`¿Eliminar la póliza ${deleting?.numero_poliza || ""}? Esta acción no se puede deshacer.`}
       />
     </div>
   );
