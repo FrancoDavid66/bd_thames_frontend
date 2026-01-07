@@ -26,7 +26,10 @@ export default function PolizaDetails() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const poliza = useSelector((s) => s.polizas?.poliza || null);
+  // ✅ IMPORTANTE: tomar primero byId[polizaId] (cache normalizado)
+  const poliza = useSelector(
+    (s) => s.polizas?.byId?.[polizaId] || s.polizas?.poliza || null
+  );
   const loadStatus = useSelector((s) => s.polizas?.status || "idle");
   const loadError = useSelector((s) => s.polizas?.error || null);
 
@@ -47,9 +50,10 @@ export default function PolizaDetails() {
   const [openRenovar, setOpenRenovar] = useState(false);
 
   useEffect(() => {
-    if (polizaId) {
+    if (polizaId && Number.isFinite(polizaId)) {
       console.log("[DBG] PolizaDetails: fetchPolizaPorId", { polizaId });
-      dispatch(fetchPolizaPorId(polizaId));
+      // ✅ FIX: el thunk espera {id, force}
+      dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
     }
   }, [polizaId, dispatch]);
 
@@ -74,9 +78,10 @@ export default function PolizaDetails() {
       } catch (e) {
         console.warn("[DBG] refreshPack ERROR", e);
       } finally {
-        dispatch(fetchPolizaPorId(targetId));
+        // ✅ FIX: forzar para evitar TTL/cache
+        dispatch(fetchPolizaPorId({ id: targetId, force: true }));
         setRefreshTick((x) => x + 1);
-        console.log("[DBG] fetchPolizaPorId + refreshTick++", { targetId });
+        console.log("[DBG] fetchPolizaPorId(force) + refreshTick++", { targetId });
         if (focusTab) changeTab(focusTab);
         console.groupEnd();
       }
@@ -106,8 +111,8 @@ export default function PolizaDetails() {
     };
 
     const onRefrescar = () => {
-      console.log("[DBG] event: poliza:refrescar -> fetchPolizaPorId");
-      dispatch(fetchPolizaPorId(polizaId));
+      console.log("[DBG] event: poliza:refrescar -> fetchPolizaPorId(force)");
+      dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
       setRefreshTick((x) => x + 1);
     };
 
@@ -137,17 +142,16 @@ export default function PolizaDetails() {
   };
 
   const onBack = () => navigate(-1);
-  const onPerfilActualizado = () => dispatch(fetchPolizaPorId(polizaId));
+
+  // ✅ FIX: usar firma correcta + force para refrescar realmente
+  const onPerfilActualizado = () =>
+    dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
 
   // 🧪 LOG: cada vez que abrís el tab Vehículo/Papeles o cambia la data en store
   useEffect(() => {
     if (tab === "vehiculo") {
-      const count = Array.isArray(poliza?.documentos)
-        ? poliza.documentos.length
-        : 0;
-      console.groupCollapsed(
-        "[DBG] PolizaDetails → TAB Vehículo/Papeles (unificado)"
-      );
+      const count = Array.isArray(poliza?.documentos) ? poliza.documentos.length : 0;
+      console.groupCollapsed("[DBG] PolizaDetails → TAB Vehículo/Papeles (unificado)");
       console.log("polizaId", polizaId, "documentos en store", count);
       if (count) {
         console.table(
@@ -191,7 +195,7 @@ export default function PolizaDetails() {
           {String(loadError || "Error desconocido")}
         </div>
         <button
-          onClick={() => dispatch(fetchPolizaPorId(polizaId))}
+          onClick={() => dispatch(fetchPolizaPorId({ id: polizaId, force: true }))}
           className="mt-4 px-3 py-2 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-100 text-sm"
         >
           Reintentar
@@ -218,7 +222,6 @@ export default function PolizaDetails() {
               ["vehiculo", "Vehículo / papeles"],
               ["gruas", "Grúas"],
               ["cuotas", "Cuotas"],
-              // 🆕 nuevo tab
               ["cuponeras", "Cuponeras robo"],
               ["historial", "Historial"],
               ["notas", "Notas"],
@@ -262,10 +265,10 @@ export default function PolizaDetails() {
               key={`veh-${refreshTick}`}
               poliza={poliza}
               polizaId={polizaId}
-              focus="fotos" // el panel internamente maneja fotos+docs
+              focus="fotos"
               onPerfilChange={onPerfilActualizado}
               onRefrescar={() => {
-                dispatch(fetchPolizaPorId(polizaId));
+                dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
                 setRefreshTick((x) => x + 1);
               }}
             />
