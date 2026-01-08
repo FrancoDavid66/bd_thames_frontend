@@ -1,197 +1,218 @@
 // src/components/layout/Sidebar.jsx
-import { NavLink } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   FaHome,
   FaUsers,
   FaFileAlt,
   FaMoneyCheckAlt,
-  FaCarCrash,
-  FaCog,
-  FaMapMarkedAlt,
-  FaBuilding,
-  FaBalanceScale,
-  FaExclamationTriangle,
-  FaTruck,
-  FaClipboardList,
-  FaTimes,
-  FaTicketAlt,
+  FaDatabase,
   FaChartBar,
-  FaChartPie,
-  FaBullhorn, // 🆕 Campañas
+  FaMapMarkedAlt,
+  FaClipboardList,
+  FaBullhorn,
+  FaChevronDown,
+  FaChevronRight,
+  FaSyncAlt,
 } from "react-icons/fa";
-import ThemeToggle from "./ThemeToggle";
-import logo_thames from "../../assets/logos/logo_thames.svg";
 
-// Bloqueadas por ahora
-const DISABLED_PATHS = [
-  "/propiedades",
-  "/alquileres",
-  "/siniestros",
-  "/gruas",
-];
+import ThemeToggle from "./ThemeToggle";
 
 const navItems = [
-  { to: "/", label: "Inicio", icon: <FaHome /> },
-  { to: "/solicitudes", label: "Solicitudes", icon: <FaClipboardList /> },
-  { to: "/clientes", label: "Clientes", icon: <FaUsers /> },
+  { to: "/", label: "Inicio", icon: FaHome },
+  { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
+  { to: "/clientes", label: "Clientes", icon: FaUsers },
+  { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt },
+  { to: "/marketing", label: "Campañas", icon: FaBullhorn },
+  { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
+  { to: "/competencia", label: "Competencia", icon: FaChartBar },
+  { to: "/estadisticas", label: "Estadísticas", icon: FaChartBar },
+  { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
 
-  // 🆕 Marketing / Campañas
-  { to: "/marketing", label: "Campañas", icon: <FaBullhorn /> },
+  // 👇 dejamos “Pólizas” acá, pero lo renderizamos como grupo desplegable
+  { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
 
-  { to: "/competencia", label: "Competencia", icon: <FaChartBar /> },
-  { to: "/polizas", label: "Pólizas", icon: <FaFileAlt /> },
-  { to: "/pagos", label: "Pagos", icon: <FaMoneyCheckAlt /> },
-  { to: "/estadisticas", label: "Estadísticas", icon: <FaChartPie /> },
-  { to: "/cuponeras", label: "Cuponeras", icon: <FaTicketAlt /> },
-  { to: "/balanzes", label: "Balanzes", icon: <FaBalanceScale /> },
-  { to: "/siniestros", label: "Siniestros", icon: <FaCarCrash /> },
-  { to: "/gruas", label: "Grúas", icon: <FaTruck /> },
-  { to: "/geo", label: "Geo", icon: <FaMapMarkedAlt /> },
-  { to: "/propiedades", label: "Propiedades", icon: <FaBuilding /> },
-  { to: "/alquileres", label: "Alquileres", icon: <FaBuilding /> },
+  { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
 ];
+
+const Badge = ({ value = 0, tone = "red" }) => {
+  const v = Number(value) || 0;
+  if (v <= 0) return null;
+
+  const toneCls =
+    tone === "amber"
+      ? "bg-amber-500 text-black"
+      : tone === "sky"
+      ? "bg-sky-500 text-black"
+      : "bg-red-500 text-white";
+
+  return (
+    <span
+      className={`ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-extrabold shadow ${toneCls}`}
+      title={`${v}`}
+    >
+      {v > 99 ? "99+" : v}
+    </span>
+  );
+};
 
 export default function Sidebar({
   isOpen,
   onClose,
   solPendienteAlta = 0,
   solPendienteEnvio = 0,
+
   cuponPendientes = 0,
   cuponPorVencer7 = 0,
   cuponVencidas = 0,
-}) {
-  const sidebarVariants = {
-    open: { x: 0 },
-    closed: { x: "-100%" },
-  };
 
-  const solTotal = (solPendienteAlta || 0) + (solPendienteEnvio || 0);
-  const cuponAlertTotal = (cuponPorVencer7 || 0) + (cuponVencidas || 0);
+  renovacionesPendientes = 0, // ✅ nuevo
+}) {
+  const location = useLocation();
+  const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
+
+  const polizasActive = useMemo(
+    () => location.pathname === "/polizas" || location.pathname.startsWith("/polizas/"),
+    [location.pathname]
+  );
+
+  const [polizasOpen, setPolizasOpen] = useState(polizasActive);
+
+  useEffect(() => {
+    // si navegás dentro de /polizas, lo abrimos solo
+    if (polizasActive) setPolizasOpen(true);
+  }, [polizasActive]);
+
+  const sidebarClass = isOpen
+    ? "translate-x-0"
+    : "-translate-x-full lg:translate-x-0";
 
   return (
     <>
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-[1px] lg:hidden z-40"
-          aria-hidden="true"
-        />
-      )}
+      {/* Overlay móvil */}
+      <div
+        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity ${
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={onClose}
+      />
 
-      <motion.aside
-        className="w-72 lg:w-64 h-screen bg-blue-800 dark:bg-gray-900 text-white fixed left-0 top-0 z-50 shadow-lg flex flex-col justify-between"
-        animate={isOpen ? "open" : "closed"}
-        variants={sidebarVariants}
-        initial={false}
-        transition={{ duration: 0.28 }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Menú principal"
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-blue-900 dark:bg-gray-900 text-white z-50 transform transition-transform duration-300 ${sidebarClass}`}
       >
-        <div className="relative">
-          <div className="flex items-center justify-center py-4 border-b border-blue-700 dark:border-gray-800">
-            <img src={logo_thames} alt="Thames" className="h-8 w-auto" />
-          </div>
-
+        <div className="p-4 border-b border-blue-800 dark:border-gray-800 flex items-center justify-between">
+          <h1 className="text-lg font-bold">Thames Seguros</h1>
           <button
             onClick={onClose}
-            className="lg:hidden absolute right-3 top-3 p-2 rounded-full bg-blue-700/70 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            aria-label="Cerrar menú"
-            title="Cerrar"
+            className="lg:hidden text-white bg-blue-800 dark:bg-gray-800 px-3 py-1 rounded"
           >
-            <FaTimes />
+            ✕
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100%-80px)]">
           {navItems.map((item) => {
-            const isDisabled = DISABLED_PATHS.includes(item.to);
+            // ✅ Grupo desplegable de Pólizas
+            if (item.to === "/polizas") {
+              return (
+                <div key="polizas-group" className="space-y-1">
+                  <div
+                    className={`flex items-center gap-2 rounded-lg transition ${
+                      polizasActive
+                        ? "bg-blue-800 dark:bg-gray-800"
+                        : "hover:bg-blue-800/60 dark:hover:bg-gray-800/60"
+                    }`}
+                  >
+                    <NavLink
+                      to="/polizas"
+                      className="flex-1 flex items-center gap-3 px-4 py-2"
+                    >
+                      <item.icon className="text-lg" />
+                      <span className="font-medium">Pólizas</span>
+                    </NavLink>
 
-            const showSolBadge = item.to === "/solicitudes" && solTotal > 0;
-            const solTitle = showSolBadge
-              ? `Pendientes: ${solTotal} (Alta: ${solPendienteAlta} · Envío: ${solPendienteEnvio})`
-              : undefined;
+                    <button
+                      type="button"
+                      onClick={() => setPolizasOpen((v) => !v)}
+                      className="px-3 py-2 text-white/80 hover:text-white"
+                      title={polizasOpen ? "Cerrar" : "Abrir"}
+                    >
+                      {polizasOpen ? <FaChevronDown /> : <FaChevronRight />}
+                    </button>
+                  </div>
 
-            const showCuponBadge = item.to === "/cuponeras" && cuponAlertTotal > 0;
-            const cuponTitle = showCuponBadge
-              ? `Cuponeras en alerta: ${cuponAlertTotal} (Por vencer ≤7 días: ${cuponPorVencer7} · Vencidas: ${cuponVencidas})`
-              : undefined;
+                  {polizasOpen && (
+                    <div className="ml-3 border-l border-white/10 pl-3 space-y-1">
+                      <NavLink
+                        to="/polizas"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+                            isActive
+                              ? "bg-blue-800/70 dark:bg-gray-800/70"
+                              : "text-white/90 hover:bg-blue-800/50 dark:hover:bg-gray-800/50"
+                          }`
+                        }
+                      >
+                        <FaFileAlt className="text-base" />
+                        <span>Listado</span>
+                      </NavLink>
 
-            const itemTitle =
-              item.to === "/solicitudes"
-                ? solTitle
-                : item.to === "/cuponeras"
-                ? cuponTitle
-                : undefined;
+                      <NavLink
+                        to="/polizas/renovaciones"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+                            isActive
+                              ? "bg-blue-800/70 dark:bg-gray-800/70"
+                              : "text-white/90 hover:bg-blue-800/50 dark:hover:bg-gray-800/50"
+                          }`
+                        }
+                      >
+                        <FaSyncAlt className="text-base" />
+                        <span>Renovaciones</span>
+                        <Badge value={renovacionesPendientes} tone="amber" />
+                      </NavLink>
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
-            return isDisabled ? (
-              <div
-                key={item.to}
-                className="flex items-center gap-3 px-4 py-2 rounded text-gray-500 opacity-60 cursor-not-allowed select-none bg-blue-900/30"
-                aria-disabled="true"
-                title="En desarrollo"
-              >
-                {item.icon}
-                <span>{item.label}</span>
-                <FaExclamationTriangle className="ml-auto text-yellow-400" />
-                <span className="ml-1 text-xs italic text-gray-400">
-                  (En desarrollo)
-                </span>
-              </div>
-            ) : (
+            // Items normales
+            const isCuponeras = item.to === "/cuponeras";
+            const isSolicitudes = item.to === "/solicitudes";
+
+            return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                title={itemTitle}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 rounded transition-colors duration-200 ${
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition ${
                     isActive
-                      ? "bg-blue-600 text-white font-semibold border-l-4 border-yellow-400"
-                      : "text-gray-300 hover:bg-blue-500 hover:text-white"
+                      ? "bg-blue-800 dark:bg-gray-800"
+                      : "hover:bg-blue-800/60 dark:hover:bg-gray-800/60"
                   }`
                 }
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <item.icon className="text-lg" />
+                <span className="font-medium">{item.label}</span>
 
-                {showSolBadge && (
-                  <motion.span
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 18 }}
-                    aria-label={`${solTotal} notificaciones en Solicitudes`}
-                    className="ml-auto inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-yellow-400 text-gray-900 text-xs font-extrabold ring-1 ring-yellow-200"
-                  >
-                    {solTotal}
-                  </motion.span>
-                )}
+                {isSolicitudes && <Badge value={solTotal} tone="red" />}
 
-                {showCuponBadge && (
-                  <motion.span
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 18 }}
-                    aria-label={`${cuponAlertTotal} cuponeras en alerta`}
-                    className="ml-auto inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-rose-400 text-gray-900 text-xs font-extrabold ring-1 ring-rose-200"
-                  >
-                    {cuponAlertTotal}
-                  </motion.span>
+                {isCuponeras && (
+                  <Badge
+                    value={(Number(cuponPendientes) || 0) + (Number(cuponPorVencer7) || 0) + (Number(cuponVencidas) || 0)}
+                    tone="sky"
+                  />
                 )}
               </NavLink>
             );
           })}
-        </nav>
 
-        <div className="p-4 border-t border-blue-700 dark:border-gray-800 space-y-3">
-          <div className="flex items-center gap-3 text-sm text-gray-300 font-semibold">
-            <FaCog />
-            <span>Configuración</span>
+          <div className="pt-4 border-t border-blue-800 dark:border-gray-800">
+            <ThemeToggle />
           </div>
-          <div className="pl-2">
-            <ThemeToggle small />
-          </div>
-        </div>
-      </motion.aside>
+        </nav>
+      </aside>
     </>
   );
 }

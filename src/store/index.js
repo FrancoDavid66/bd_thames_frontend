@@ -21,6 +21,7 @@ import cuponesRoboReducer from "./slices/cuponesRoboSlice";
 // 👇 NUEVO: slice de Competencia
 // Archivo: src/store/slices/competenciaSlice.js
 import competenciaReducer from "./slices/competenciaSlice";
+import renovacionesReducer from "./slices/renovacionesSlice";
 
 export const store = configureStore({
   reducer: {
@@ -41,6 +42,7 @@ export const store = configureStore({
     cuponesRobo: cuponesRoboReducer,
     // 👇 ahora podés usar useSelector((s) => s.competencia)
     competencia: competenciaReducer,
+    renovaciones: renovacionesReducer,
   },
 });
 

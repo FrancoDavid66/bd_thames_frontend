@@ -32,6 +32,9 @@ import EstadisticasPage from "./pages/EstadisticasPage";
 // MARKETING / CAMPAÑAS
 import MarketingPage from "./pages/MarketingPage";
 
+// ✅ Renovaciones
+import RenovacionesPage from "./pages/RenovacionesPage";
+
 // 🔔 Realtime counters (front-only BroadcastChannel)
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
@@ -70,17 +73,18 @@ function App() {
   const [cuponPorVencer7, setCuponPorVencer7] = useState(0);
   const [cuponVencidas, setCuponVencidas] = useState(0);
 
+  // ✅ Contador Renovaciones (para badge en sidebar)
+  const [renovacionesPendientes, setRenovacionesPendientes] = useState(0);
+
   // ====== Flags / configuración de polling (Solicitudes) ======
   const DISABLE_POLL =
     String(import.meta?.env?.VITE_DISABLE_COUNTERS_POLL || "").toLowerCase() ===
     "true";
 
-  // 🔄 Ahora PROBE_COUNTERS es true por defecto (si no ponés nada en el .env)
   const PROBE_COUNTERS =
     String(import.meta?.env?.VITE_PROBE_COUNTERS || "true").toLowerCase() ===
     "true";
 
-  // 🔗 Base de la API para probar /solicitudes/counters en backend
   const API_BASE = useMemo(() => {
     const raw =
       (import.meta?.env?.VITE_API_BASE &&
@@ -99,11 +103,10 @@ function App() {
     return url || null;
   }, []);
 
-  // === Utils HTTP (sin logs ni throws; evitamos 404 si no hay URL configurada) ===
   const fetchJSON = async (url) => {
     try {
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) return null; // evita loggear 404 en consola
+      if (!res.ok) return null;
       return await res.json();
     } catch {
       return null;
@@ -114,7 +117,6 @@ function App() {
   const tryFetchCounters = async () => {
     if (DISABLE_POLL) return;
 
-    // 1) Si hay URL explícita, usar SOLO esa.
     if (EXPLICIT_COUNTERS_URL) {
       const data = await fetchJSON(EXPLICIT_COUNTERS_URL);
       if (data) {
@@ -137,7 +139,6 @@ function App() {
       return;
     }
 
-    // 2) Si PROBE_COUNTERS está activo (por defecto true), probamos rutas conocidas.
     if (!PROBE_COUNTERS) return;
 
     const candidates = [
@@ -191,7 +192,31 @@ function App() {
       setCuponPorVencer7(Number(por7) || 0);
       setCuponVencidas(Number(vencidas) || 0);
     } catch {
-      // silencio: no queremos romper nada si el endpoint no está
+      // silencio
+    }
+  };
+
+  // ✅ Renovaciones: contador (usamos page_size=1 para que sea liviano)
+  const fetchRenovacionesCounters = async () => {
+    try {
+      const rawBase = (import.meta?.env?.VITE_API_BASE ||
+        import.meta?.env?.VITE_API_URL ||
+        "/api/")
+        .toString()
+        .trim();
+      const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
+
+      // Importante: el count viene aunque pidas 1 resultado
+      const url = `${base}polizas/renovaciones/?dias=30&solo_pendientes=1&page=1&page_size=1`;
+
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const count = Number(data?.count ?? (Array.isArray(data) ? data.length : 0)) || 0;
+      setRenovacionesPendientes(count);
+    } catch {
+      // silencio
     }
   };
 
@@ -199,14 +224,14 @@ function App() {
   useEffect(() => {
     const unsub = solicitudesRealtime.subscribe((evt) => {
       if (!evt) return;
-      // Evento directo desde SolicitudesPage: { type:"solicitudes.counters", data:{ alta, envio } }
+
       if (evt.type === "solicitudes.counters" && evt.data) {
         const { alta = 0, envio = 0 } = evt.data || {};
         setSolPendienteAlta(Number(alta) || 0);
         setSolPendienteEnvio(Number(envio) || 0);
         return;
       }
-      // Evento desde backend (si lo usás): mapeo defensivo
+
       if (evt.type === "solicitudes.counters.backend" && evt.data) {
         const root = evt.data?.solicitudes ?? evt.data ?? {};
         const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? 0;
@@ -218,9 +243,12 @@ function App() {
         }
       }
     });
+
     // Primer intento en frío
     tryFetchCounters();
     fetchCuponerasCounters();
+    fetchRenovacionesCounters();
+
     return () => {
       try {
         unsub && unsub();
@@ -261,21 +289,24 @@ function App() {
     if (isMobile) closeSidebar();
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refrescar contadores al navegar (si el polling está habilitado)
+  // Refrescar contadores al navegar
   useEffect(() => {
     tryFetchCounters();
     fetchCuponerasCounters();
+    fetchRenovacionesCounters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  // Refresco periódico (Solicitudes y Cuponeras)
+  // Refresco periódico
   useEffect(() => {
     tryFetchCounters();
     fetchCuponerasCounters();
+    fetchRenovacionesCounters();
     if (DISABLE_POLL) return;
     const id = setInterval(() => {
       tryFetchCounters();
       fetchCuponerasCounters();
+      fetchRenovacionesCounters();
     }, 60_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,6 +322,7 @@ function App() {
         cuponPendientes={cuponPendientes}
         cuponPorVencer7={cuponPorVencer7}
         cuponVencidas={cuponVencidas}
+        renovacionesPendientes={renovacionesPendientes}
       />
 
       <motion.div
@@ -318,8 +350,11 @@ function App() {
               <Route path="/clientes" element={<ClientesPage />} />
               <Route path="/clientes/:id" element={<ClienteProfilePage />} />
 
+              {/* Pólizas */}
               <Route path="/polizas" element={<PolizasPage />} />
+              <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
               <Route path="/polizas/:id" element={<PolizaDetails />} />
+
               <Route path="/pagos" element={<PagosPage />} />
               <Route path="/balanzes" element={<BalanzesPage />} />
               <Route path="/siniestros" element={<SiniestrosPage />} />
@@ -347,7 +382,7 @@ function App() {
               {/* Solicitudes */}
               <Route path="/solicitudes" element={<SolicitudesPage />} />
 
-              {/* Pública existente */}
+              {/* Gruas */}
               <Route path="/gruas" element={<GruasPage />} />
             </Routes>
           </AnimatePresence>
@@ -356,6 +391,7 @@ function App() {
         <MobileTopBar
           solPendienteAlta={solPendienteAlta}
           solPendienteEnvio={solPendienteEnvio}
+          renovacionesPendientes={renovacionesPendientes}
         />
       </motion.div>
     </div>
