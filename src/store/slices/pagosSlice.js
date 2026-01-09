@@ -42,24 +42,48 @@ export const fetchTodasLasCuotas = createAsyncThunk(
   }
 );
 
-/** Marcar cuota como pagada */
+/** Marcar cuota como pagada (PATCH /cuotas/{id}/pagar/) */
 export const marcarCuotaComoPagada = createAsyncThunk(
   "pagos/marcarCuotaComoPagada",
-  async (
-    { cuotaId, fecha_pago, medio_pago, referencia, notas, monto_pagado },
-    { rejectWithValue }
-  ) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API(`cuotas/${cuotaId}/pagar/`), {
-        fecha_pago,
-        medio_pago,
-        referencia,
-        notas,
-        monto_pagado,
+      // ✅ Compat: antes se usaba cuotaId, ahora desde UI mandás id
+      const cuotaId = payload?.cuotaId ?? payload?.id;
+
+      if (!cuotaId) {
+        return rejectWithValue({
+          detail:
+            "No se pudo pagar: falta el id de la cuota (payload.id / payload.cuotaId).",
+        });
+      }
+
+      // ✅ Normalizamos nombres para matchear el backend
+      const body = compact({
+        fecha_pago: payload?.fecha_pago,
+        forma_pago: payload?.forma_pago,
+        metodo: payload?.metodo ?? payload?.medio_pago, // legacy
+        monto: payload?.monto ?? payload?.monto_pagado, // legacy
+        observaciones: payload?.observaciones ?? payload?.notas, // legacy
+
+        // medios (tu backend mira medio_cobro_id y/o medio_cobro_valor / destino_cuenta)
+        medio_cobro_id: payload?.medio_cobro_id,
+        medio_cobro_valor:
+          payload?.medio_cobro_valor ??
+          payload?.destino_cuenta ??
+          payload?.referencia,
+        destino_cuenta: payload?.destino_cuenta,
+
+        // opcional
+        registrar_en_balance: payload?.registrar_en_balance,
       });
+
+      // ✅ El backend define methods=['patch'] → POST da 405
+      const { data } = await axios.patch(API(`cuotas/${cuotaId}/pagar/`), body);
       return data;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || "Error al marcar como pagada");
+      return rejectWithValue(
+        error?.response?.data || "Error al marcar como pagada"
+      );
     }
   }
 );
@@ -82,7 +106,9 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API("notificaciones/cuotas/recordatorios/"));
+      const { data } = await axios.post(
+        API("notificaciones/cuotas/recordatorios/")
+      );
       return data;
     } catch (error) {
       return rejectWithValue(
@@ -116,9 +142,6 @@ export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
   async (arg, { rejectWithValue, getState }) => {
     try {
-      // arg puede ser:
-      //  - "texto"
-      //  - { query: "texto", withCuotas: true|false, limit: number }
       const query =
         typeof arg === "string" || typeof arg === "number"
           ? String(arg)
@@ -165,8 +188,6 @@ export const fetchPolizas = createAsyncThunk(
         };
       }
 
-      // 1) Buscar pólizas (listado)
-      //    Nota: include_cuotas=1 NO rompe si el backend lo ignora.
       const { data } = await axios.get(API("polizas/"), {
         params: compact({
           search: q,
@@ -177,7 +198,6 @@ export const fetchPolizas = createAsyncThunk(
 
       const polizasList = Array.isArray(unwrap(data)) ? unwrap(data) : [];
 
-      // 2) Si necesitamos cuotas y el listado no trae "cuotas", hidratamos con detalle por ID.
       if (withCuotas) {
         const needsHydrate = polizasList.some((p) => !Array.isArray(p?.cuotas));
 
@@ -195,9 +215,7 @@ export const fetchPolizas = createAsyncThunk(
           .map((p) => p?.id)
           .filter((id) => id !== undefined && id !== null);
 
-        // Limitar hidración para mantenerlo rápido
         const idsToFetch = ids.slice(0, limit);
-
         const CONCURRENCY = 6;
 
         const detailed = [];
@@ -209,7 +227,7 @@ export const fetchPolizas = createAsyncThunk(
               axios
                 .get(API(`polizas/${id}/`), {
                   params: compact({
-                    include_cuotas: 1, // por si el backend usa flag
+                    include_cuotas: 1,
                   }),
                 })
                 .then((r) => r.data)
@@ -221,7 +239,6 @@ export const fetchPolizas = createAsyncThunk(
           }
         }
 
-        // Normalizar: algunos backends devuelven {data:{...}}
         const detailedPolizas = detailed.map((x) =>
           x && typeof x === "object" && "data" in x ? x.data : x
         );
