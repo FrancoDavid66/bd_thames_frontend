@@ -1,5 +1,5 @@
-/* src/components/pagos/PagosSearch.jsx — Optimizado: chips recientes + atajo "/" + status separado */
-import { useEffect, useRef, useState, useMemo } from "react";
+/* src/components/pagos/PagosSearch.jsx — Optimizado: cache + recientes + "/" + busca pólizas CON cuotas */
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
@@ -19,7 +19,7 @@ export default function PagosSearch({ onBuscar }) {
   const cargando = searchStatus === "loading";
 
   useEffect(() => {
-    if (inputRef.current) inputRef.current.focus();
+    inputRef.current?.focus?.();
   }, []);
 
   // Atajo: "/" enfoca el buscador (tipo Instagram/Twitter)
@@ -35,58 +35,83 @@ export default function PagosSearch({ onBuscar }) {
         if (isTyping) return;
 
         e.preventDefault();
-        inputRef.current?.focus();
+        inputRef.current?.focus?.();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // ✅ Recientes (dedupe por texto, aunque cache key tenga sufijos |lite / |cuotas)
   const recientes = useMemo(() => {
     const order = Array.isArray(polizasCacheOrder) ? polizasCacheOrder : [];
-    return order
-      .map((k) => polizasCache?.[k])
-      .filter(Boolean)
-      .map((e) => e.originalQuery || "")
-      .filter(Boolean)
-      .slice(0, 6);
+    const seen = new Set();
+    const out = [];
+
+    for (const k of order) {
+      const entry = polizasCache?.[k];
+      const q = String(entry?.originalQuery || "").trim();
+      if (!q) continue;
+      const norm = q.toLowerCase();
+      if (seen.has(norm)) continue;
+      seen.add(norm);
+      out.push(q);
+      if (out.length >= 6) break;
+    }
+    return out;
   }, [polizasCache, polizasCacheOrder]);
 
-  const handleSubmit = async (e, qOverride = null) => {
-    e?.preventDefault?.();
+  const handleSubmit = useCallback(
+    async (e, qOverride = null) => {
+      e?.preventDefault?.();
 
-    const q = String(qOverride ?? query).trim();
-    if (!q) {
-      toast.error("Escribí algo para buscar (cliente, patente, póliza…)");
-      return;
-    }
-
-    try {
-      const action = await dispatch(fetchPolizas(q));
-      const payload = action?.payload;
-
-      const polizas =
-        payload?.polizas ??
-        payload ??
-        action?.polizas ??
-        (Array.isArray(action) ? action : []);
-
-      if (!Array.isArray(polizas)) {
-        toast.error("No pude interpretar el resultado de la búsqueda.");
+      const q = String(qOverride ?? query).trim();
+      if (!q) {
+        toast.error("Escribí algo para buscar (cliente, patente, póliza…)"); // UX
         return;
       }
 
-      onBuscar?.(polizas);
-      if (polizas.length === 0) toast("Sin resultados para esa búsqueda.");
-    } catch (err) {
-      console.error(err);
-      toast.error("Ocurrió un error buscando pólizas.");
-    }
-  };
+      try {
+        // ✅ Pedimos pólizas HIDRATADAS con cuotas (rápido, cacheado)
+        const action = await dispatch(
+          fetchPolizas({ query: q, withCuotas: true, limit: 25 })
+        );
+
+        const payload = action?.payload;
+        const polizas =
+          payload?.polizas ??
+          payload ??
+          action?.polizas ??
+          (Array.isArray(action) ? action : []);
+
+        if (!Array.isArray(polizas)) {
+          toast.error("No pude interpretar el resultado de la búsqueda.");
+          return;
+        }
+
+        // Si encontró pólizas pero no vienen cuotas, lo avisamos (backend/serializer)
+        if (polizas.length > 0) {
+          const anyHasCuotas = polizas.some((p) => Array.isArray(p?.cuotas));
+          if (!anyHasCuotas) {
+            toast.error(
+              "Encontré pólizas, pero el backend no está devolviendo cuotas en el detalle. Revisá el serializer de /polizas/{id}/."
+            );
+          }
+        }
+
+        onBuscar?.(polizas);
+        if (polizas.length === 0) toast("Sin resultados para esa búsqueda.");
+      } catch (err) {
+        console.error(err);
+        toast.error("Ocurrió un error buscando pólizas.");
+      }
+    },
+    [dispatch, onBuscar, query]
+  );
 
   const limpiar = () => {
     setQuery("");
-    inputRef.current?.focus();
+    inputRef.current?.focus?.();
   };
 
   const usarReciente = (q) => {
@@ -113,13 +138,18 @@ export default function PagosSearch({ onBuscar }) {
             <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-60">
               <HiSearch className="w-6 h-6" />
             </span>
+
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") limpiar();
+              }}
               placeholder="Buscar por cliente, patente o nº de póliza…"
               className="w-full h-14 bg-neutral-900/70 border border-neutral-700/70 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 rounded-2xl pl-12 pr-12 text-base md:text-lg outline-none transition"
             />
+
             {query && (
               <button
                 type="button"
@@ -155,7 +185,8 @@ export default function PagosSearch({ onBuscar }) {
 
         <p className="mt-2 text-xs md:text-sm text-neutral-400">
           Tip: <span className="font-semibold">Enter</span> para buscar •{" "}
-          <span className="font-semibold">/</span> para enfocar rápido.
+          <span className="font-semibold">/</span> para enfocar rápido •{" "}
+          <span className="font-semibold">Esc</span> para limpiar.
         </p>
       </motion.form>
 

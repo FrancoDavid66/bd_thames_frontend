@@ -13,6 +13,7 @@ import {
   FaBullhorn,
   FaChevronDown,
   FaChevronRight,
+  FaChevronLeft,
   FaSyncAlt,
 } from "react-icons/fa";
 
@@ -69,10 +70,13 @@ export default function Sidebar({
   renovacionesPendientes = 0, // ✅ nuevo
 }) {
   const location = useLocation();
-  const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
+  const solTotal =
+    (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
   const polizasActive = useMemo(
-    () => location.pathname === "/polizas" || location.pathname.startsWith("/polizas/"),
+    () =>
+      location.pathname === "/polizas" ||
+      location.pathname.startsWith("/polizas/"),
     [location.pathname]
   );
 
@@ -83,9 +87,8 @@ export default function Sidebar({
     if (polizasActive) setPolizasOpen(true);
   }, [polizasActive]);
 
-  const sidebarClass = isOpen
-    ? "translate-x-0"
-    : "-translate-x-full lg:translate-x-0";
+  // ✅ Ahora el sidebar se puede cerrar también en desktop
+  const sidebarClass = isOpen ? "translate-x-0" : "-translate-x-full";
 
   return (
     <>
@@ -102,11 +105,15 @@ export default function Sidebar({
       >
         <div className="p-4 border-b border-blue-800 dark:border-gray-800 flex items-center justify-between">
           <h1 className="text-lg font-bold">Thames Seguros</h1>
+
+          {/* ✅ Botón cerrar (visible también en desktop) */}
           <button
             onClick={onClose}
-            className="lg:hidden text-white bg-blue-800 dark:bg-gray-800 px-3 py-1 rounded"
+            className="text-white bg-blue-800 dark:bg-gray-800 hover:bg-blue-700 dark:hover:bg-gray-700 px-2 py-2 rounded-md inline-flex items-center justify-center"
+            title="Cerrar sidebar"
+            aria-label="Cerrar sidebar"
           >
-            ✕
+            <FaChevronLeft />
           </button>
         </div>
 
@@ -200,7 +207,11 @@ export default function Sidebar({
 
                 {isCuponeras && (
                   <Badge
-                    value={(Number(cuponPendientes) || 0) + (Number(cuponPorVencer7) || 0) + (Number(cuponVencidas) || 0)}
+                    value={
+                      (Number(cuponPendientes) || 0) +
+                      (Number(cuponPorVencer7) || 0) +
+                      (Number(cuponVencidas) || 0)
+                    }
                     tone="sky"
                   />
                 )}

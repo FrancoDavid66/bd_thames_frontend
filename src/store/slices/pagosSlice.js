@@ -21,6 +21,11 @@ const compact = (obj) =>
 const POLIZAS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos
 const POLIZAS_CACHE_MAX = 20;
 const keyFromQuery = (q) => String(q || "").trim().toLowerCase();
+const keyForSearch = (q, withCuotas) => {
+  const base = keyFromQuery(q);
+  if (!base) return "";
+  return withCuotas ? `${base}|cuotas` : `${base}|lite`;
+};
 
 /* ============== THUNKS ============== */
 
@@ -37,57 +42,34 @@ export const fetchTodasLasCuotas = createAsyncThunk(
   }
 );
 
-/**
- * Marcar una cuota como pagada (PATCH /cuotas/{id}/pagar/)
- * Acepta:
- *  - forma_pago ("efectivo" | "transferencia")  [opcional]
- *  - metodo ("efectivo" | "transferencia" | "mercado_pago" | "tarjeta")  [opcional]
- *  - monto, fecha_pago, observaciones, medio_cobro_id, destino_tipo, destino_cuenta  [opcionales]
- */
+/** Marcar cuota como pagada */
 export const marcarCuotaComoPagada = createAsyncThunk(
   "pagos/marcarCuotaComoPagada",
   async (
-    {
-      id,
-      forma_pago,
-      metodo,
-      monto,
-      fecha_pago,
-      observaciones,
-      medio_cobro_id,
-      destino_tipo,
-      destino_cuenta,
-    },
+    { cuotaId, fecha_pago, medio_pago, referencia, notas, monto_pagado },
     { rejectWithValue }
   ) => {
     try {
-      const payload = compact({
-        metodo,
-        forma_pago,
-        monto,
+      const { data } = await axios.post(API(`cuotas/${cuotaId}/pagar/`), {
         fecha_pago,
-        observaciones,
-        medio_cobro_id,
-        destino_tipo,
-        destino_cuenta,
+        medio_pago,
+        referencia,
+        notas,
+        monto_pagado,
       });
-
-      const { data } = await axios.patch(API(`cuotas/${id}/pagar/`), payload);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al marcar cuota como pagada"
-      );
+      return rejectWithValue(error?.response?.data || "Error al marcar como pagada");
     }
   }
 );
 
-/** Enviar alertas manualmente (POST /pagos/enviar-alertas/) */
+/** Enviar alertas */
 export const enviarAlertas = createAsyncThunk(
   "pagos/enviarAlertas",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API("pagos/enviar-alertas/"));
+      const { data } = await axios.post(API("notificaciones/cuotas/alertas/"));
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al enviar alertas");
@@ -95,44 +77,22 @@ export const enviarAlertas = createAsyncThunk(
   }
 );
 
-/** 🔔 Enviar recordatorios de cuotas vía app `notificaciones` */
+/** Enviar recordatorios */
 export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
-  async (payload = {}, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const body = compact({
-        alias: payload.alias,
-        medio_cobro_id: payload.medio_cobro_id,
-        oficina: payload.oficina,
-      });
-
-      const { data } = await axios.post(
-        API("notificaciones/cuotas/enviar-recordatorios/"),
-        body
-      );
-
-      const {
-        hoy,
-        cuotas_procesadas,
-        mensajes_enviados,
-        errores = [],
-      } = data || {};
-
-      return {
-        hoy,
-        procesadas: cuotas_procesadas,
-        enviados: mensajes_enviados,
-        errores,
-      };
+      const { data } = await axios.post(API("notificaciones/cuotas/recordatorios/"));
+      return data;
     } catch (error) {
       return rejectWithValue(
-        error?.response?.data || "Error al enviar recordatorios de cuotas"
+        error?.response?.data || "Error al enviar recordatorios"
       );
     }
   }
 );
 
-/** 📜 Historial de recordatorios enviados (GET /notificaciones/cuotas/historial/) */
+/** Historial recordatorios */
 export const fetchHistorialRecordatorios = createAsyncThunk(
   "pagos/fetchHistorialRecordatorios",
   async (_, { rejectWithValue }) => {
@@ -147,18 +107,47 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache TTL */
+/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache TTL
+ *  arg:
+ *    - "texto"
+ *    - { query: "texto", withCuotas: true|false, limit: number }
+ */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
-  async (query, { rejectWithValue, getState }) => {
+  async (arg, { rejectWithValue, getState }) => {
     try {
+      // arg puede ser:
+      //  - "texto"
+      //  - { query: "texto", withCuotas: true|false, limit: number }
+      const query =
+        typeof arg === "string" || typeof arg === "number"
+          ? String(arg)
+          : String(arg?.query || "");
+
+      const withCuotas = Boolean(
+        typeof arg === "object" && arg ? arg.withCuotas : false
+      );
+
+      const limit = Math.max(
+        1,
+        Math.min(100, Number(typeof arg === "object" && arg ? arg.limit : 25) || 25)
+      );
+
       const q = String(query || "").trim();
-      const k = keyFromQuery(q);
-      if (!k) return { polizas: [], originalQuery: q, fromCache: true };
+      const cacheKey = keyForSearch(q, withCuotas);
+      if (!cacheKey) {
+        return {
+          polizas: [],
+          originalQuery: q,
+          cacheKey,
+          fromCache: true,
+          withCuotas,
+        };
+      }
 
       const st = getState()?.pagos;
       const cache = st?.polizasCache || {};
-      const hit = cache?.[k];
+      const hit = cache?.[cacheKey];
       const now = Date.now();
 
       if (
@@ -167,17 +156,91 @@ export const fetchPolizas = createAsyncThunk(
         now - hit.ts < POLIZAS_CACHE_TTL_MS &&
         Array.isArray(hit.polizas)
       ) {
-        return { polizas: hit.polizas, originalQuery: q, fromCache: true };
+        return {
+          polizas: hit.polizas,
+          originalQuery: hit.originalQuery || q,
+          cacheKey,
+          fromCache: true,
+          withCuotas,
+        };
       }
 
+      // 1) Buscar pólizas (listado)
+      //    Nota: include_cuotas=1 NO rompe si el backend lo ignora.
       const { data } = await axios.get(API("polizas/"), {
-        params: { search: q },
+        params: compact({
+          search: q,
+          page_size: limit,
+          include_cuotas: withCuotas ? 1 : undefined,
+        }),
       });
 
+      const polizasList = Array.isArray(unwrap(data)) ? unwrap(data) : [];
+
+      // 2) Si necesitamos cuotas y el listado no trae "cuotas", hidratamos con detalle por ID.
+      if (withCuotas) {
+        const needsHydrate = polizasList.some((p) => !Array.isArray(p?.cuotas));
+
+        if (!needsHydrate) {
+          return {
+            polizas: polizasList,
+            originalQuery: q,
+            cacheKey,
+            fromCache: false,
+            withCuotas,
+          };
+        }
+
+        const ids = polizasList
+          .map((p) => p?.id)
+          .filter((id) => id !== undefined && id !== null);
+
+        // Limitar hidración para mantenerlo rápido
+        const idsToFetch = ids.slice(0, limit);
+
+        const CONCURRENCY = 6;
+
+        const detailed = [];
+        for (let i = 0; i < idsToFetch.length; i += CONCURRENCY) {
+          const chunk = idsToFetch.slice(i, i + CONCURRENCY);
+
+          const results = await Promise.allSettled(
+            chunk.map((id) =>
+              axios
+                .get(API(`polizas/${id}/`), {
+                  params: compact({
+                    include_cuotas: 1, // por si el backend usa flag
+                  }),
+                })
+                .then((r) => r.data)
+            )
+          );
+
+          for (const r of results) {
+            if (r.status === "fulfilled") detailed.push(r.value);
+          }
+        }
+
+        // Normalizar: algunos backends devuelven {data:{...}}
+        const detailedPolizas = detailed.map((x) =>
+          x && typeof x === "object" && "data" in x ? x.data : x
+        );
+
+        return {
+          polizas: detailedPolizas,
+          originalQuery: q,
+          cacheKey,
+          fromCache: false,
+          withCuotas,
+        };
+      }
+
       return {
-        polizas: unwrap(data),
+        polizas: polizasList,
         originalQuery: q,
+        cacheKey,
         fromCache: false,
+        withCuotas,
       };
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al buscar pólizas");
@@ -187,23 +250,21 @@ export const fetchPolizas = createAsyncThunk(
 
 /**
  * Registrar un ingreso en balances (POST /ingresos/)
- * Nota: al pagar una cuota ya NO hace falta (se genera por signal de backend).
+ * Nota: al pagar una cuota ya NO hace falta (a menos que lo uses por separado)
  */
 export const registrarIngreso = createAsyncThunk(
   "pagos/registrarIngreso",
-  async (ingresoData, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API("ingresos/"), ingresoData);
+      const { data } = await axios.post(API("ingresos/"), payload);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al registrar ingreso"
-      );
+      return rejectWithValue(error?.response?.data || "Error al registrar ingreso");
     }
   }
 );
 
-/** Obtener cuotas a vencer (GET /cuotas/a-vencer/) */
+/** Obtener cuotas a vencer */
 export const fetchCuotasAVencer = createAsyncThunk(
   "pagos/fetchCuotasAVencer",
   async (_, { rejectWithValue }) => {
@@ -222,11 +283,9 @@ export const fetchCuotasAVencer = createAsyncThunk(
 
 export const fetchMediosCobro = createAsyncThunk(
   "pagos/fetchMediosCobro",
-  async ({ activo = true } = {}, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(API("medios-cobro/"), {
-        params: compact({ activo }),
-      });
+      const { data } = await axios.get(API("medios-cobro/"));
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(
@@ -278,31 +337,39 @@ export const eliminarMedioCobro = createAsyncThunk(
   }
 );
 
-/* ============== SLICE ============== */
+/* ===================== SLICE ===================== */
 
 const initialState = {
-  // Estado general (para acciones que no sean “buscar pólizas”)
   status: "idle",
   error: null,
 
-  // Estado específico del buscador (PagosSearch)
-  searchStatus: "idle",
-  searchError: null,
-
-  polizas: [],
   cuotas: [],
   cuotasAVencer: [],
 
-  // Cache de búsquedas de pólizas
-  polizasCache: {}, // { [key]: { ts, polizas, originalQuery } }
-  polizasCacheOrder: [], // keys en orden reciente
+  // búsqueda
+  searchStatus: "idle",
+  searchError: null,
+  polizas: [],
 
-  // Medios de cobro
+  // cache búsqueda
+  polizasCache: {},
+  polizasCacheOrder: [],
+
+  // medios de cobro
   mediosCobro: [],
+  mediosCobroStatus: "idle",
+  mediosCobroError: null,
+
+  // derivados
   mpCuentas: [],
   billeteras: [],
 
-  // Historial de recordatorios de cuotas
+  // notificaciones
+  alertasStatus: "idle",
+  alertasError: null,
+  recordatoriosStatus: "idle",
+  recordatoriosError: null,
+
   historialRecordatorios: [],
   historialRecordatoriosStatus: "idle",
   historialRecordatoriosError: null,
@@ -320,11 +387,27 @@ function recomputeMedioNombres(state) {
     .filter(Boolean);
 }
 
-function savePolizasCache(state, originalQuery, polizas) {
-  const k = keyFromQuery(originalQuery);
-  if (!k) return;
+function savePolizasCache(state, a, b, c) {
+  // Soporta 2 firmas:
+  //  - (state, originalQuery, polizas)  [legacy]
+  //  - (state, cacheKey, originalQuery, polizas)
+  let cacheKey = "";
+  let originalQuery = "";
+  let polizas = [];
 
-  state.polizasCache[k] = {
+  if (c === undefined) {
+    originalQuery = a;
+    polizas = b;
+    cacheKey = keyFromQuery(originalQuery);
+  } else {
+    cacheKey = String(a || "").trim().toLowerCase();
+    originalQuery = b;
+    polizas = c;
+  }
+
+  if (!cacheKey) return;
+
+  state.polizasCache[cacheKey] = {
     ts: Date.now(),
     polizas: Array.isArray(polizas) ? polizas : [],
     originalQuery: String(originalQuery || "").trim(),
@@ -334,7 +417,10 @@ function savePolizasCache(state, originalQuery, polizas) {
   const prev = Array.isArray(state.polizasCacheOrder)
     ? state.polizasCacheOrder
     : [];
-  const next = [k, ...prev.filter((x) => x !== k)].slice(0, POLIZAS_CACHE_MAX);
+  const next = [cacheKey, ...prev.filter((x) => x !== cacheKey)].slice(
+    0,
+    POLIZAS_CACHE_MAX
+  );
   state.polizasCacheOrder = next;
 
   // limpieza extra (si sobran keys)
@@ -347,83 +433,19 @@ function savePolizasCache(state, originalQuery, polizas) {
 const pagosSlice = createSlice({
   name: "pagos",
   initialState,
-  reducers: {},
+  reducers: {
+    setCuotas(state, action) {
+      state.cuotas = Array.isArray(action.payload) ? action.payload : [];
+    },
+    clearSearch(state) {
+      state.polizas = [];
+      state.searchStatus = "idle";
+      state.searchError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
-      // --- Todas las cuotas ---
-      .addCase(fetchTodasLasCuotas.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
-      .addCase(fetchTodasLasCuotas.fulfilled, (state, action) => {
-        state.status = "succeeded";
-        state.cuotas = action.payload || [];
-      })
-      .addCase(fetchTodasLasCuotas.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
-      })
-
-      // --- Marcar cuota como pagada ---
-      .addCase(marcarCuotaComoPagada.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
-      .addCase(marcarCuotaComoPagada.fulfilled, (state, action) => {
-        state.status = "succeeded";
-        const updated = action.payload;
-        if (updated?.id && Array.isArray(state.cuotas) && state.cuotas.length) {
-          state.cuotas = state.cuotas.map((c) =>
-            c.id === updated.id ? { ...c, ...updated } : c
-          );
-        }
-      })
-      .addCase(marcarCuotaComoPagada.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
-      })
-
-      // --- Enviar alertas ---
-      .addCase(enviarAlertas.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
-      .addCase(enviarAlertas.fulfilled, (state) => {
-        state.status = "succeeded";
-      })
-      .addCase(enviarAlertas.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
-      })
-
-      // --- Enviar recordatorios de cuotas (notificaciones) ---
-      .addCase(enviarRecordatoriosCuotas.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
-      .addCase(enviarRecordatoriosCuotas.fulfilled, (state) => {
-        state.status = "succeeded";
-      })
-      .addCase(enviarRecordatoriosCuotas.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
-      })
-
-      // --- Historial de recordatorios ---
-      .addCase(fetchHistorialRecordatorios.pending, (state) => {
-        state.historialRecordatoriosStatus = "loading";
-        state.historialRecordatoriosError = null;
-      })
-      .addCase(fetchHistorialRecordatorios.fulfilled, (state, action) => {
-        state.historialRecordatoriosStatus = "succeeded";
-        state.historialRecordatorios = action.payload || [];
-      })
-      .addCase(fetchHistorialRecordatorios.rejected, (state, action) => {
-        state.historialRecordatoriosStatus = "failed";
-        state.historialRecordatoriosError = action.payload;
-      })
-
-      // --- Buscar pólizas (estado separado + cache) ---
+      // --- Buscar pólizas ---
       .addCase(fetchPolizas.pending, (state) => {
         state.searchStatus = "loading";
         state.searchError = null;
@@ -433,7 +455,12 @@ const pagosSlice = createSlice({
         const payload = action.payload || {};
         const polizas = payload.polizas ?? payload ?? [];
         state.polizas = Array.isArray(polizas) ? polizas : [];
-        savePolizasCache(state, payload.originalQuery, state.polizas);
+        savePolizasCache(
+          state,
+          payload.cacheKey || payload.originalQuery,
+          payload.originalQuery,
+          state.polizas
+        );
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
         state.searchStatus = "failed";
@@ -456,69 +483,84 @@ const pagosSlice = createSlice({
 
       // --- Medios de cobro: listar ---
       .addCase(fetchMediosCobro.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
+        state.mediosCobroStatus = "loading";
+        state.mediosCobroError = null;
       })
       .addCase(fetchMediosCobro.fulfilled, (state, action) => {
-        state.status = "succeeded";
-        state.mediosCobro = action.payload || [];
+        state.mediosCobroStatus = "succeeded";
+        state.mediosCobro = Array.isArray(action.payload) ? action.payload : [];
         recomputeMedioNombres(state);
       })
       .addCase(fetchMediosCobro.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
+        state.mediosCobroStatus = "failed";
+        state.mediosCobroError = action.payload;
       })
 
       // --- Medios de cobro: crear ---
-      .addCase(crearMedioCobro.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
       .addCase(crearMedioCobro.fulfilled, (state, action) => {
-        state.status = "succeeded";
-        const nuevo = action.payload;
-        state.mediosCobro = [nuevo, ...(state.mediosCobro || [])];
+        state.mediosCobro = [action.payload, ...(state.mediosCobro || [])];
         recomputeMedioNombres(state);
-      })
-      .addCase(crearMedioCobro.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
       })
 
       // --- Medios de cobro: actualizar ---
-      .addCase(actualizarMedioCobro.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
       .addCase(actualizarMedioCobro.fulfilled, (state, action) => {
-        state.status = "succeeded";
-        const upd = action.payload;
+        const updated = action.payload;
         state.mediosCobro = (state.mediosCobro || []).map((m) =>
-          m.id === upd.id ? { ...m, ...upd } : m
+          m.id === updated?.id ? updated : m
         );
         recomputeMedioNombres(state);
       })
-      .addCase(actualizarMedioCobro.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
-      })
 
       // --- Medios de cobro: eliminar ---
-      .addCase(eliminarMedioCobro.pending, (state) => {
-        state.status = "loading";
-        state.error = null;
-      })
       .addCase(eliminarMedioCobro.fulfilled, (state, action) => {
-        state.status = "succeeded";
         const id = action.payload;
         state.mediosCobro = (state.mediosCobro || []).filter((m) => m.id !== id);
         recomputeMedioNombres(state);
       })
-      .addCase(eliminarMedioCobro.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload;
+
+      // --- Alertas ---
+      .addCase(enviarAlertas.pending, (state) => {
+        state.alertasStatus = "loading";
+        state.alertasError = null;
+      })
+      .addCase(enviarAlertas.fulfilled, (state) => {
+        state.alertasStatus = "succeeded";
+      })
+      .addCase(enviarAlertas.rejected, (state, action) => {
+        state.alertasStatus = "failed";
+        state.alertasError = action.payload;
+      })
+
+      // --- Recordatorios ---
+      .addCase(enviarRecordatoriosCuotas.pending, (state) => {
+        state.recordatoriosStatus = "loading";
+        state.recordatoriosError = null;
+      })
+      .addCase(enviarRecordatoriosCuotas.fulfilled, (state) => {
+        state.recordatoriosStatus = "succeeded";
+      })
+      .addCase(enviarRecordatoriosCuotas.rejected, (state, action) => {
+        state.recordatoriosStatus = "failed";
+        state.recordatoriosError = action.payload;
+      })
+
+      // --- Historial recordatorios ---
+      .addCase(fetchHistorialRecordatorios.pending, (state) => {
+        state.historialRecordatoriosStatus = "loading";
+        state.historialRecordatoriosError = null;
+      })
+      .addCase(fetchHistorialRecordatorios.fulfilled, (state, action) => {
+        state.historialRecordatoriosStatus = "succeeded";
+        state.historialRecordatorios = Array.isArray(action.payload)
+          ? action.payload
+          : [];
+      })
+      .addCase(fetchHistorialRecordatorios.rejected, (state, action) => {
+        state.historialRecordatoriosStatus = "failed";
+        state.historialRecordatoriosError = action.payload;
       });
   },
 });
 
+export const { setCuotas, clearSearch } = pagosSlice.actions;
 export default pagosSlice.reducer;
