@@ -506,7 +506,10 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
     dispatch(fetchCuotasAVencer());
   }, [dispatch]);
 
-  const listAll = useMemo(() => (Array.isArray(cuotasAVencer) ? cuotasAVencer : []), [cuotasAVencer]);
+  const listAll = useMemo(
+    () => (Array.isArray(cuotasAVencer) ? cuotasAVencer : []),
+    [cuotasAVencer]
+  );
 
   /** Opciones y conteos de compañías (siempre desde el total cargado) */
   const companiasMeta = useMemo(() => {
@@ -625,7 +628,9 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
         .trim();
 
       const nombre = (cli?.nombre || cli?.name || "").toString().trim();
-      const apellido = (cli?.apellido || cli?.last_name || "").toString().trim();
+      const apellido = (cli?.apellido || cli?.last_name || "")
+        .toString()
+        .trim();
       const telefono = (cli?.telefono || cli?.celular || cli?.whatsapp || "")
         .toString()
         .trim();
@@ -639,7 +644,9 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
 
       const rawOfi = extractRawOficina(cuota);
       const ofiNorm = normalizeOficina3(rawOfi);
-      const ofiLabelFromBackend = String(cuota?.poliza?.oficina_nombre || "").trim();
+      const ofiLabelFromBackend = String(
+        cuota?.poliza?.oficina_nombre || ""
+      ).trim();
       const oficinaLabel =
         ofiLabelFromBackend ||
         (ofiNorm ? oficinaLabelFromKey(ofiNorm) : "Sin oficina");
@@ -730,7 +737,9 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
       x.compania,
       x.cuotas_count,
       Array.from(x.buckets).join("|"),
-      x.vencimiento_mas_proximo ? x.vencimiento_mas_proximo.format("YYYY-MM-DD") : "",
+      x.vencimiento_mas_proximo
+        ? x.vencimiento_mas_proximo.format("YYYY-MM-DD")
+        : "",
       x.dias_mas_proximo,
       x.numero_poliza,
       x.patente,
@@ -764,7 +773,8 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
       title: `Asegurados en alertas (${getFilterMeta(oficinaSel).label} / ${
         companiaSel === "ALL"
           ? "Todas las compañías"
-          : companiasMeta.options.find((o) => o.key === companiaSel)?.label || "Compañía"
+          : companiasMeta.options.find((o) => o.key === companiaSel)?.label ||
+            "Compañía"
       })`,
       header,
       rows,
@@ -817,10 +827,14 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
             <HiClock className="w-5 h-5" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
+            <h2 className="text-lg font-semibold">
+              Alertas de cuotas (por bucket)
+            </h2>
             <p className="text-xs text-slate-300 mt-0.5">
               Mostrando{" "}
-              <span className="font-semibold text-slate-50">{totalMostrado}</span>{" "}
+              <span className="font-semibold text-slate-50">
+                {totalMostrado}
+              </span>{" "}
               (filtradas) de{" "}
               <span className="font-semibold text-slate-50">
                 {cuotasAVencer.length}
@@ -897,9 +911,10 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
             title="Filtrar por compañía"
           >
             <option value="ALL" style={optStyle}>
-              Todas las compañías ({companiaSel === "ALL" ? listAll.length : companiasMeta.total})
+              Todas las compañías (
+              {companiaSel === "ALL" ? listAll.length : companiasMeta.total})
             </option>
-            {compañiasMeta.options.map((o) => (
+            {companiasMeta.options.map((o) => (
               <option key={o.key} value={o.key} style={optStyle}>
                 {o.label} ({o.count})
               </option>
@@ -980,7 +995,9 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
               <div>
                 <h3 className="text-base font-semibold text-slate-50">
                   Otros{" "}
-                  <span className="text-slate-300 font-normal">({otros.length})</span>
+                  <span className="text-slate-300 font-normal">
+                    ({otros.length})
+                  </span>
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5">
                   Fuera de 3_antes / hoy / 3_despues / 7_despues / 30_despues
@@ -1005,7 +1022,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
                 {" "}
                 en{" "}
                 <span className="font-semibold">
-                  {compañiasMeta.options.find((o) => o.key === companiaSel)?.label ||
+                  {companiasMeta.options.find((o) => o.key === companiaSel)?.label ||
                     "la compañía seleccionada"}
                 </span>
               </>
