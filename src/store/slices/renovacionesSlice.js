@@ -138,10 +138,12 @@ const normalizeOficinas = (data) => {
  * Soporta filtros típicos:
  *  - dias
  *  - solo_pendientes
+ *  - bucket (🆕 filtros rápidos: hoy/en_1/en_2/en_3/proximos_3/vencida_1/..)
  *  - search
  *  - ordering
  *  - page / page_size
  *  - estado / fase / compania / oficina / cliente / patente / asegurado / sin_numero / solo_activas (opcionales)
+ *  - fecha (opcional) YYYY-MM-DD
  *
  * Importante: ignora "force" (solo se usa para bypass de cache)
  */
@@ -167,6 +169,7 @@ export const buildRenovacionesQuery = (params = {}) => {
   };
 
   const entries = [
+    ["bucket", trimOrUndef(p.bucket)], // 🆕
     ["dias", trimOrUndef(p.dias)],
     ["solo_pendientes", trimOrUndef(p.solo_pendientes)],
     ["search", trimOrUndef(p.search)],
@@ -184,6 +187,9 @@ export const buildRenovacionesQuery = (params = {}) => {
     ["asegurado", trimOrUndef(p.asegurado)],
     ["sin_numero", p.sin_numero != null ? to01(p.sin_numero) : undefined],
     ["solo_activas", p.solo_activas != null ? to01(p.solo_activas) : undefined],
+
+    // auditoría opcional (por si querés base date fija)
+    ["fecha", trimOrUndef(p.fecha)],
   ].filter(([, v]) => v !== undefined);
 
   // orden estable para cache key
@@ -201,6 +207,8 @@ export const buildRenovacionesQuery = (params = {}) => {
  *  - search
  *  - oficina / compania / estado / fase / cliente / patente / asegurado / sin_numero / solo_activas
  *  - fecha (opcional) YYYY-MM-DD
+ *
+ * Nota: a propósito NO incluye "bucket" para que el resumen siga mostrando TODO.
  */
 export const buildRenovacionesResumenQuery = (params = {}) => {
   const p0 = stripForce(params);
@@ -254,7 +262,8 @@ const normalizeRenovacionesResponse = (data) => {
 
 const normalizeResumen = (data) => {
   const safe = data && typeof data === "object" ? data : {};
-  const buckets = safe?.buckets && typeof safe.buckets === "object" ? safe.buckets : {};
+  const buckets =
+    safe?.buckets && typeof safe.buckets === "object" ? safe.buckets : {};
   return {
     hoy: safe?.hoy || null,
     dias_ventana: safe?.dias_ventana ?? null,
@@ -271,6 +280,7 @@ const normalizeResumen = (data) => {
       vencida_2: Number(buckets?.vencida_2 || 0),
       vencida_3: Number(buckets?.vencida_3 || 0),
       vencidas_3: Number(buckets?.vencidas_3 || 0),
+      vencidas_4_mas: Number(buckets?.vencidas_4_mas || 0), // 🆕
     },
   };
 };
@@ -457,7 +467,7 @@ const initialState = {
   },
   lastQuery: "",
 
-  // ✅ resumen (buckets HOY, +1/+2/+3, -1/-2/-3)
+  // ✅ resumen (buckets HOY, +1/+2/+3, -1/-2/-3, + vencidas_4_mas)
   resumen: null,
   resumenStatus: "idle", // idle | loading | succeeded | failed
   resumenError: null,
