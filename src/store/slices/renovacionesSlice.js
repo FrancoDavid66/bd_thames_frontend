@@ -14,13 +14,69 @@ const api = axios.create({
 /** TTL del cache de la bandeja (ms) */
 const LIST_CACHE_TTL = 20_000;
 
+/** TTL del cache de oficinas (ms) */
+const OFICINAS_CACHE_TTL = 5 * 60_000; // 5 min
+
 /** Normaliza bools query a "1"/"0" */
 const to01 = (v) => {
   if (v === true) return "1";
   if (v === false) return "0";
   if (v == null) return undefined;
   const s = String(v).trim().toLowerCase();
-  return ["1", "true", "t", "yes", "y", "on", "si", "sí"].includes(s) ? "1" : "0";
+  return ["1", "true", "t", "yes", "y", "on", "si", "sí"].includes(s)
+    ? "1"
+    : "0";
+};
+
+const isFresh = (cached, ttl = LIST_CACHE_TTL) => {
+  if (!cached) return false;
+  const age = Date.now() - (cached.fetchedAt || 0);
+  return age <= ttl;
+};
+
+const stripForce = (params = {}) => {
+  if (!params) return {};
+  // eslint-disable-next-line no-unused-vars
+  const { force, ...rest } = params;
+  return rest;
+};
+
+const normalizeOficinas = (data) => {
+  // soporta:
+  // - ["Casa Central", "Sucursal 1"]
+  // - [{nombre:"..."}, {oficina:"..."}]
+  // - {results:[...]} o {oficinas:[...]}
+  const arr = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data?.oficinas)
+    ? data.oficinas
+    : [];
+
+  const out = [];
+  for (const x of arr) {
+    if (x == null) continue;
+    if (typeof x === "string" || typeof x === "number") {
+      const s = String(x).trim();
+      if (s) out.push(s);
+      continue;
+    }
+    if (typeof x === "object") {
+      const s =
+        String(
+          x?.nombre ??
+            x?.name ??
+            x?.oficina ??
+            x?.oficina_nombre ??
+            x?.label ??
+            ""
+        ).trim() || "";
+      if (s) out.push(s);
+    }
+  }
+
+  return Array.from(new Set(out)).sort((a, b) => a.localeCompare(b));
 };
 
 /**
@@ -31,13 +87,20 @@ const to01 = (v) => {
  *  - search
  *  - ordering
  *  - page / page_size
- *  - estado / fase / compania / oficina / cliente / patente / asegurado / sin_numero / solo_activas (si los querés pasar)
+ *  - estado / fase / compania / oficina / cliente / patente / asegurado / sin_numero / solo_activas (opcionales)
+ *
+ * Importante: ignora "force" (solo se usa para bypass de cache)
  */
 export const buildRenovacionesQuery = (params = {}) => {
-  const p = { ...params };
+  const p0 = stripForce(params);
+  const p = { ...p0 };
 
   // defaults razonables
   if (p.dias == null || p.dias === "") p.dias = 30;
+
+  // ✅ defaults paginación (para cache key estable)
+  if (p.page == null || p.page === "") p.page = 1;
+  if (p.page_size == null || p.page_size === "") p.page_size = 25;
 
   // bools -> 1/0
   if (p.solo_pendientes != null) p.solo_pendientes = to01(p.solo_pendientes);
@@ -76,41 +139,92 @@ export const buildRenovacionesQuery = (params = {}) => {
   return qs ? `?${qs}` : "";
 };
 
+const normalizeRenovacionesResponse = (data) => {
+  const items = Array.isArray(data) ? data : data?.results || [];
+  const count = Array.isArray(data) ? items.length : Number(data?.count || 0);
+  const next = Array.isArray(data) ? null : data?.next || null;
+  const previous = Array.isArray(data) ? null : data?.previous || null;
+  return { items, count, next, previous };
+};
+
 /**
  * Thunk: traer bandeja de renovaciones
- * Devuelve { results, count, next, previous } si hay paginación,
- * o array si no hay paginación (pero tu backend usa pagination_class, así que debería ser paginado).
+ * ✅ Importante: devolvemos desde cache dentro del thunk.
+ * ✅ Si params.force === true => bypass cache y pega a red sí o sí.
  */
 export const fetchRenovaciones = createAsyncThunk(
   "renovaciones/fetchRenovaciones",
-  async (params = {}, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue, getState }) => {
+    const force = !!params?.force;
+    const cleanParams = stripForce(params);
+    const query = buildRenovacionesQuery(cleanParams);
+
     try {
-      const query = buildRenovacionesQuery(params);
+      const state = getState().renovaciones;
+      const cached = state?.cache?.[query];
+
+      // ✅ si hay cache fresco y NO es force, devolvemos desde cache
+      if (!force && isFresh(cached, LIST_CACHE_TTL)) {
+        return {
+          params: cleanParams,
+          query,
+          fromCache: true,
+          normalized: {
+            items: cached.items || [],
+            count: Number(cached.count || 0),
+            next: cached.next || null,
+            previous: cached.previous || null,
+          },
+        };
+      }
+
       const { data } = await api.get(`/polizas/renovaciones/${query}`);
-      return { data, params };
+      const normalized = normalizeRenovacionesResponse(data);
+
+      return { params: cleanParams, query, fromCache: false, normalized };
     } catch (err) {
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.error ||
         err?.message ||
         "Error al cargar renovaciones";
+      return rejectWithValue({ message: msg, raw: err?.response?.data, query });
+    }
+  }
+);
+
+/**
+ * Thunk: traer listado de oficinas (para dropdown estable)
+ * Endpoint esperado: GET /api/polizas/oficinas/
+ */
+export const fetchRenovacionesOficinas = createAsyncThunk(
+  "renovaciones/fetchRenovacionesOficinas",
+  async (opts = {}, { rejectWithValue, getState }) => {
+    const force = !!opts?.force;
+
+    try {
+      const state = getState().renovaciones;
+      const cached = state?.oficinasCache;
+
+      if (!force && isFresh(cached, OFICINAS_CACHE_TTL)) {
+        return {
+          fromCache: true,
+          oficinas: cached.items || [],
+        };
+      }
+
+      const { data } = await api.get(`/polizas/oficinas/`);
+      const oficinas = normalizeOficinas(data);
+
+      return { fromCache: false, oficinas };
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al cargar oficinas";
       return rejectWithValue({ message: msg, raw: err?.response?.data });
     }
-  },
-  {
-    condition: (params = {}, { getState }) => {
-      const state = getState().renovaciones;
-      const query = buildRenovacionesQuery(params);
-
-      const cached = state.cache[query];
-      if (!cached) return true;
-
-      const age = Date.now() - (cached.fetchedAt || 0);
-      if (age > LIST_CACHE_TTL) return true;
-
-      // ya está fresco
-      return false;
-    },
   }
 );
 
@@ -171,9 +285,15 @@ const initialState = {
 
   // cache por querystring
   cache: {
-    // "?dias=30&solo_pendientes=1&page=1": { items, count, next, previous, fetchedAt }
+    // "?dias=30&solo_pendientes=1&page=1&page_size=25": { items, count, next, previous, fetchedAt }
   },
   lastQuery: "",
+
+  // oficinas (dropdown)
+  oficinas: [],
+  oficinasStatus: "idle", // idle | loading | succeeded | failed
+  oficinasError: null,
+  oficinasCache: null, // { items: [], fetchedAt }
 
   // acciones (renovar/refacturar) por póliza
   actionStatusById: {
@@ -190,6 +310,13 @@ const setActionError = (state, id, type, error) => {
 };
 const setActionSuccess = (state, id, type) => {
   state.actionStatusById[id] = { status: "succeeded", error: null, type };
+};
+
+const invalidateAllCache = (state) => {
+  const keys = Object.keys(state.cache || {});
+  for (const k of keys) {
+    if (state.cache[k]) state.cache[k].fetchedAt = 0;
+  }
 };
 
 const renovacionesSlice = createSlice({
@@ -218,47 +345,104 @@ const renovacionesSlice = createSlice({
         delete state.actionStatusById[id];
       }
     },
+
+    // opcional: por si querés resetear oficinas desde UI
+    clearOficinas(state) {
+      state.oficinas = [];
+      state.oficinasStatus = "idle";
+      state.oficinasError = null;
+      state.oficinasCache = null;
+    },
   },
   extraReducers: (builder) => {
     builder
       // ---------- LISTADO ----------
       .addCase(fetchRenovaciones.pending, (state, action) => {
-        state.status = "loading";
         state.error = null;
+
+        const force = !!action.meta.arg?.force;
         const query = buildRenovacionesQuery(action.meta.arg || {});
         state.lastQuery = query;
+
+        const cached = state.cache?.[query];
+
+        // ✅ si hay cache fresco y NO es force, hidratamos de inmediato
+        if (!force && isFresh(cached, LIST_CACHE_TTL)) {
+          state.status = "succeeded";
+          state.items = cached.items || [];
+          state.count = Number(cached.count || 0);
+          state.next = cached.next || null;
+          state.previous = cached.previous || null;
+          return;
+        }
+
+        state.status = "loading";
       })
       .addCase(fetchRenovaciones.fulfilled, (state, action) => {
         state.status = "succeeded";
         state.error = null;
 
-        const query = buildRenovacionesQuery(action.payload.params || {});
-        state.lastQuery = query;
+        const { query, normalized, fromCache } = action.payload || {};
+        const q = query || buildRenovacionesQuery(action.payload?.params || {});
+        state.lastQuery = q;
 
-        const data = action.payload.data;
-
-        // paginado DRF: { count, next, previous, results }
-        const items = Array.isArray(data) ? data : data?.results || [];
-        const count = Array.isArray(data) ? items.length : Number(data?.count || 0);
-        const next = Array.isArray(data) ? null : data?.next || null;
-        const previous = Array.isArray(data) ? null : data?.previous || null;
+        const items = normalized?.items || [];
+        const count = Number(normalized?.count || 0);
+        const next = normalized?.next || null;
+        const previous = normalized?.previous || null;
 
         state.items = items;
         state.count = count;
         state.next = next;
         state.previous = previous;
 
-        state.cache[query] = {
-          items,
-          count,
-          next,
-          previous,
-          fetchedAt: Date.now(),
-        };
+        // ✅ si vino de cache, no tocamos fetchedAt; si vino de red, guardamos/actualizamos
+        if (!fromCache) {
+          state.cache[q] = {
+            items,
+            count,
+            next,
+            previous,
+            fetchedAt: Date.now(),
+          };
+        }
       })
       .addCase(fetchRenovaciones.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload?.message || "Error al cargar renovaciones";
+      })
+
+      // ---------- OFICINAS ----------
+      .addCase(fetchRenovacionesOficinas.pending, (state) => {
+        state.oficinasError = null;
+
+        // si ya tenés cache fresco, no hace falta loading fuerte (evita flicker)
+        if (isFresh(state.oficinasCache, OFICINAS_CACHE_TTL)) {
+          state.oficinasStatus = "succeeded";
+          state.oficinas = state.oficinasCache?.items || [];
+          return;
+        }
+
+        state.oficinasStatus = "loading";
+      })
+      .addCase(fetchRenovacionesOficinas.fulfilled, (state, action) => {
+        state.oficinasStatus = "succeeded";
+        state.oficinasError = null;
+
+        const oficinas = action.payload?.oficinas || [];
+        state.oficinas = oficinas;
+
+        if (!action.payload?.fromCache) {
+          state.oficinasCache = {
+            items: oficinas,
+            fetchedAt: Date.now(),
+          };
+        }
+      })
+      .addCase(fetchRenovacionesOficinas.rejected, (state, action) => {
+        state.oficinasStatus = "failed";
+        state.oficinasError =
+          action.payload?.message || "Error al cargar oficinas";
       })
 
       // ---------- REFACTURAR ----------
@@ -277,10 +461,8 @@ const renovacionesSlice = createSlice({
           nuevaPoliza: action.payload?.data || null,
         };
 
-        // invalidar cache para que al volver a pedir bandeja salga actualizado
-        if (state.lastQuery && state.cache[state.lastQuery]) {
-          state.cache[state.lastQuery].fetchedAt = 0;
-        }
+        // ✅ invalidar todo cache (páginas/filtros distintos)
+        invalidateAllCache(state);
       })
       .addCase(refacturarPoliza.rejected, (state, action) => {
         const id = action.payload?.id ?? action.meta.arg?.id;
@@ -304,10 +486,8 @@ const renovacionesSlice = createSlice({
           nuevaPoliza: action.payload?.data || null,
         };
 
-        // invalidar cache
-        if (state.lastQuery && state.cache[state.lastQuery]) {
-          state.cache[state.lastQuery].fetchedAt = 0;
-        }
+        // ✅ invalidar todo cache
+        invalidateAllCache(state);
       })
       .addCase(renovarPoliza.rejected, (state, action) => {
         const id = action.payload?.id ?? action.meta.arg?.id;
@@ -323,6 +503,7 @@ export const {
   invalidateRenovaciones,
   clearLastActionResult,
   clearActionStatus,
+  clearOficinas,
 } = renovacionesSlice.actions;
 
 export default renovacionesSlice.reducer;
@@ -332,11 +513,24 @@ export const selectRenovacionesState = (state) => state.renovaciones;
 
 export const selectRenovacionesItems = (state) => state.renovaciones.items;
 export const selectRenovacionesCount = (state) => state.renovaciones.count;
+export const selectRenovacionesNext = (state) => state.renovaciones.next;
+export const selectRenovacionesPrevious = (state) => state.renovaciones.previous;
+
 export const selectRenovacionesStatus = (state) => state.renovaciones.status;
 export const selectRenovacionesError = (state) => state.renovaciones.error;
+
+export const selectRenovacionesOficinas = (state) => state.renovaciones.oficinas;
+export const selectRenovacionesOficinasStatus = (state) =>
+  state.renovaciones.oficinasStatus;
+export const selectRenovacionesOficinasError = (state) =>
+  state.renovaciones.oficinasError;
 
 export const selectRenovacionesLastActionResult = (state) =>
   state.renovaciones.lastActionResult;
 
 export const selectRenovacionActionStatusById = (state, polizaId) =>
-  state.renovaciones.actionStatusById?.[polizaId] || { status: "idle", error: null, type: null };
+  state.renovaciones.actionStatusById?.[polizaId] || {
+    status: "idle",
+    error: null,
+    type: null,
+  };

@@ -1,5 +1,5 @@
 // src/pages/RenovacionesPage.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,10 +18,14 @@ import {
 import {
   fetchRenovaciones,
   renovarPoliza,
+  fetchRenovacionesOficinas,
   selectRenovacionesItems,
   selectRenovacionesStatus,
   selectRenovacionesError,
   selectRenovacionesCount,
+  selectRenovacionesOficinas,
+  selectRenovacionesOficinasStatus,
+  selectRenovacionesOficinasError,
 } from "../store/slices/renovacionesSlice";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
@@ -253,13 +257,22 @@ export default function RenovacionesPage() {
   const error = useSelector(selectRenovacionesError);
   const count = useSelector(selectRenovacionesCount);
 
+  const oficinas = useSelector(selectRenovacionesOficinas);
+  const oficinasStatus = useSelector(selectRenovacionesOficinasStatus);
+  const oficinasError = useSelector(selectRenovacionesOficinasError);
+
   const [dias, setDias] = useState(30);
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [search, setSearch] = useState("");
   const [ordering, setOrdering] = useState("vto_referencia");
-
-  // ✅ filtro oficina
   const [oficina, setOficina] = useState("");
+
+  // paginación
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // token para forzar reload al aplicar filtros aunque page=1
+  const [filtersToken, setFiltersToken] = useState(0);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -267,36 +280,41 @@ export default function RenovacionesPage() {
 
   const loading = status === "loading";
 
-  // ✅ lista oficinas desde datos
-  const oficinas = useMemo(() => {
-    const set = new Set();
-    (Array.isArray(items) ? items : []).forEach((p) => {
-      const o = (p?.oficina || "").toString().trim();
-      if (o) set.add(o);
-    });
-    return ["", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [items]);
+  // ✅ cargar oficinas UNA vez (cacheado en slice)
+  useEffect(() => {
+    dispatch(fetchRenovacionesOficinas());
+  }, [dispatch]);
 
-  const load = async () => {
-    try {
-      await dispatch(
-        fetchRenovaciones({
-          dias,
-          solo_pendientes: soloPendientes,
-          search: search || "",
-          ordering: ordering || "",
-          oficina: oficina || undefined,
-        })
-      ).unwrap();
-    } catch {
-      // el error queda en el state
-    }
-  };
+  const oficinasOptions = useMemo(() => {
+    const arr = Array.isArray(oficinas) ? oficinas : [];
+    return ["", ...arr];
+  }, [oficinas]);
+
+  const load = useCallback(
+    async (opts = {}) => {
+      const payload = {
+        dias,
+        solo_pendientes: soloPendientes,
+        search: (search || "").trim(),
+        ordering: ordering || "",
+        oficina: oficina || undefined,
+        page,
+        page_size: pageSize,
+        ...opts,
+      };
+
+      try {
+        await dispatch(fetchRenovaciones(payload)).unwrap();
+      } catch {
+        // error queda en state
+      }
+    },
+    [dias, soloPendientes, search, ordering, oficina, page, pageSize, dispatch]
+  );
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load, page, pageSize, filtersToken]);
 
   const filtered = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
@@ -356,12 +374,28 @@ export default function RenovacionesPage() {
         return;
       }
 
-      await load();
+      await load({ force: true });
     } catch (e) {
       toast.error(e?.message || "No se pudo renovar");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const totalCount = Number(count || 0);
+  const totalPages =
+    pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
+  const safePage = Math.min(Math.max(1, page), totalPages);
+
+  const from = totalCount ? (safePage - 1) * pageSize + 1 : 0;
+  const to = totalCount ? Math.min(safePage * pageSize, totalCount) : 0;
+
+  const canPrev = safePage > 1;
+  const canNext = totalCount ? safePage < totalPages : filtered.length === pageSize;
+
+  const applyFilters = () => {
+    setPage(1);
+    setFiltersToken((t) => t + 1);
   };
 
   return (
@@ -372,17 +406,31 @@ export default function RenovacionesPage() {
             <div className="text-xl font-extrabold text-white">Renovaciones</div>
             <div className="mt-1 text-sm text-white/75">
               Bandeja operativa ·{" "}
-              <span className="text-white/60">Total backend: {count}</span>
+              <span className="text-white/60">Total backend: {totalCount || 0}</span>
+              {!!totalCount && (
+                <span className="text-white/60"> · Mostrando: {from}-{to}</span>
+              )}
             </div>
+
+            {(oficinasStatus === "failed" || oficinasError) && (
+              <div className="mt-2 text-xs text-rose-200/90">
+                No se pudieron cargar oficinas:{" "}
+                {typeof oficinasError === "string"
+                  ? oficinasError
+                  : oficinasError
+                  ? JSON.stringify(oficinasError)
+                  : ""}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="neutral">Visible: {counters.total}</Badge>
+            <Badge tone="neutral">Visible (página): {counters.total}</Badge>
             <Badge tone="red">Urgentes ≤ 3d: {counters.urgentes}</Badge>
 
             <button
               className="ml-auto inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
-              onClick={load}
+              onClick={() => load({ force: true })}
               disabled={loading}
             >
               <HiRefresh className={loading ? "animate-spin" : ""} />
@@ -420,7 +468,7 @@ export default function RenovacionesPage() {
             </button>
           </div>
 
-          {/* ✅ Oficina (FIX DARK OPTIONS) */}
+          {/* Oficina */}
           <div className="grid gap-2">
             <label className="text-xs font-semibold text-white/90">Oficina</label>
             <select
@@ -431,7 +479,7 @@ export default function RenovacionesPage() {
               <option value="" className="bg-slate-900 text-white">
                 Todas
               </option>
-              {oficinas
+              {oficinasOptions
                 .filter((o) => o)
                 .map((o) => (
                   <option key={o} value={o} className="bg-slate-900 text-white">
@@ -439,6 +487,11 @@ export default function RenovacionesPage() {
                   </option>
                 ))}
             </select>
+            <div className="text-[11px] text-white/55">
+              {oficinasStatus === "loading"
+                ? "Cargando oficinas..."
+                : "Oficinas cargadas desde backend (no depende del paginado)."}
+            </div>
           </div>
 
           <div className="grid gap-2 md:col-span-2">
@@ -463,7 +516,7 @@ export default function RenovacionesPage() {
             </div>
           </div>
 
-          {/* ✅ Orden (FIX DARK OPTIONS) */}
+          {/* Orden */}
           <div className="grid gap-2 md:col-span-3">
             <label className="text-xs font-semibold text-white/90">Orden</label>
             <select
@@ -492,10 +545,33 @@ export default function RenovacionesPage() {
             </select>
           </div>
 
+          {/* Page size */}
+          <div className="grid gap-2 md:col-span-2">
+            <label className="text-xs font-semibold text-white/90">
+              Tamaño página
+            </label>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const v = Number(e.target.value || 25);
+                setPageSize(v);
+                setPage(1);
+                setFiltersToken((t) => t + 1);
+              }}
+              className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
+            >
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n} className="bg-slate-900 text-white">
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="md:col-span-2 flex items-end gap-2">
             <button
               className="w-full rounded-xl bg-sky-300 px-4 py-2 text-sm font-extrabold text-black hover:bg-sky-200 disabled:opacity-70"
-              onClick={load}
+              onClick={applyFilters}
               disabled={loading}
             >
               Aplicar filtros
@@ -518,6 +594,31 @@ export default function RenovacionesPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Controles paginación */}
+      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="text-xs text-white/65">
+          Página <span className="text-white/90 font-semibold">{safePage}</span>{" "}
+          de <span className="text-white/90 font-semibold">{totalPages}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+            disabled={!canPrev || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Anterior
+          </button>
+          <button
+            className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+            disabled={!canNext || loading}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-3">
