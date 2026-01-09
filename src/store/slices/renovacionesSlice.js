@@ -65,6 +65,9 @@ const api = axios.create({
 /** TTL del cache de la bandeja (ms) */
 const LIST_CACHE_TTL = 20_000;
 
+/** TTL del cache del resumen (ms) */
+const RESUMEN_CACHE_TTL = 20_000;
+
 /** TTL del cache de oficinas (ms) */
 const OFICINAS_CACHE_TTL = 5 * 60_000; // 5 min
 
@@ -190,12 +193,86 @@ export const buildRenovacionesQuery = (params = {}) => {
   return qs ? `?${qs}` : "";
 };
 
+/**
+ * ✅ Querystring para RESUMEN (sin paginación ni ordering).
+ * Soporta:
+ *  - dias
+ *  - solo_pendientes
+ *  - search
+ *  - oficina / compania / estado / fase / cliente / patente / asegurado / sin_numero / solo_activas
+ *  - fecha (opcional) YYYY-MM-DD
+ */
+export const buildRenovacionesResumenQuery = (params = {}) => {
+  const p0 = stripForce(params);
+  const p = { ...p0 };
+
+  // defaults razonables (ventana para "pendientes_ventana")
+  if (p.dias == null || p.dias === "") p.dias = 30;
+
+  // bools -> 1/0
+  if (p.solo_pendientes != null) p.solo_pendientes = to01(p.solo_pendientes);
+
+  const trimOrUndef = (x) => {
+    if (x == null) return undefined;
+    const s = String(x).trim();
+    return s === "" ? undefined : s;
+  };
+
+  const entries = [
+    ["dias", trimOrUndef(p.dias)],
+    ["solo_pendientes", trimOrUndef(p.solo_pendientes)],
+    ["search", trimOrUndef(p.search)],
+
+    // (opcionales) filtros de backend
+    ["estado", trimOrUndef(p.estado)],
+    ["fase", trimOrUndef(p.fase)],
+    ["compania", trimOrUndef(p.compania)],
+    ["oficina", trimOrUndef(p.oficina)],
+    ["cliente", trimOrUndef(p.cliente)],
+    ["patente", trimOrUndef(p.patente)],
+    ["asegurado", trimOrUndef(p.asegurado)],
+    ["sin_numero", p.sin_numero != null ? to01(p.sin_numero) : undefined],
+    ["solo_activas", p.solo_activas != null ? to01(p.solo_activas) : undefined],
+
+    // auditoría opcional
+    ["fecha", trimOrUndef(p.fecha)],
+  ].filter(([, v]) => v !== undefined);
+
+  entries.sort((a, b) => a[0].localeCompare(b[0]));
+
+  const qs = new URLSearchParams(entries).toString();
+  return qs ? `?${qs}` : "";
+};
+
 const normalizeRenovacionesResponse = (data) => {
   const items = Array.isArray(data) ? data : data?.results || [];
   const count = Array.isArray(data) ? items.length : Number(data?.count || 0);
   const next = Array.isArray(data) ? null : data?.next || null;
   const previous = Array.isArray(data) ? null : data?.previous || null;
   return { items, count, next, previous };
+};
+
+const normalizeResumen = (data) => {
+  const safe = data && typeof data === "object" ? data : {};
+  const buckets = safe?.buckets && typeof safe.buckets === "object" ? safe.buckets : {};
+  return {
+    hoy: safe?.hoy || null,
+    dias_ventana: safe?.dias_ventana ?? null,
+    limite: safe?.limite || null,
+    solo_pendientes: !!safe?.solo_pendientes,
+    pendientes_ventana: Number(safe?.pendientes_ventana || 0),
+    buckets: {
+      vence_hoy: Number(buckets?.vence_hoy || 0),
+      vence_en_1: Number(buckets?.vence_en_1 || 0),
+      vence_en_2: Number(buckets?.vence_en_2 || 0),
+      vence_en_3: Number(buckets?.vence_en_3 || 0),
+      proximos_3: Number(buckets?.proximos_3 || 0),
+      vencida_1: Number(buckets?.vencida_1 || 0),
+      vencida_2: Number(buckets?.vencida_2 || 0),
+      vencida_3: Number(buckets?.vencida_3 || 0),
+      vencidas_3: Number(buckets?.vencidas_3 || 0),
+    },
+  };
 };
 
 /**
@@ -240,6 +317,45 @@ export const fetchRenovaciones = createAsyncThunk(
         err?.response?.data?.error ||
         err?.message ||
         "Error al cargar renovaciones";
+      return rejectWithValue({ message: msg, raw: err?.response?.data, query });
+    }
+  }
+);
+
+/**
+ * ✅ Thunk: traer resumen de renovaciones (HOY + buckets)
+ * Endpoint esperado: GET /api/polizas/renovaciones/resumen/
+ */
+export const fetchRenovacionesResumen = createAsyncThunk(
+  "renovaciones/fetchRenovacionesResumen",
+  async (params = {}, { rejectWithValue, getState }) => {
+    const force = !!params?.force;
+    const cleanParams = stripForce(params);
+    const query = buildRenovacionesResumenQuery(cleanParams);
+
+    try {
+      const state = getState().renovaciones;
+      const cached = state?.resumenCache?.[query];
+
+      if (!force && isFresh(cached, RESUMEN_CACHE_TTL)) {
+        return {
+          params: cleanParams,
+          query,
+          fromCache: true,
+          resumen: cached.resumen || null,
+        };
+      }
+
+      const { data } = await api.get(`polizas/renovaciones/resumen/${query}`);
+      const resumen = normalizeResumen(data);
+
+      return { params: cleanParams, query, fromCache: false, resumen };
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al cargar resumen de renovaciones";
       return rejectWithValue({ message: msg, raw: err?.response?.data, query });
     }
   }
@@ -341,6 +457,15 @@ const initialState = {
   },
   lastQuery: "",
 
+  // ✅ resumen (buckets HOY, +1/+2/+3, -1/-2/-3)
+  resumen: null,
+  resumenStatus: "idle", // idle | loading | succeeded | failed
+  resumenError: null,
+  resumenCache: {
+    // "?dias=30&solo_pendientes=1&oficina=...": { resumen, fetchedAt }
+  },
+  lastResumenQuery: "",
+
   // oficinas (dropdown)
   oficinas: [],
   oficinasStatus: "idle", // idle | loading | succeeded | failed
@@ -369,6 +494,11 @@ const invalidateAllCache = (state) => {
   for (const k of keys) {
     if (state.cache[k]) state.cache[k].fetchedAt = 0;
   }
+
+  const rkeys = Object.keys(state.resumenCache || {});
+  for (const k of rkeys) {
+    if (state.resumenCache[k]) state.resumenCache[k].fetchedAt = 0;
+  }
 };
 
 const renovacionesSlice = createSlice({
@@ -388,6 +518,24 @@ const renovacionesSlice = createSlice({
         state.cache[state.lastQuery].fetchedAt = 0;
       }
     },
+
+    // ✅ resumen
+    clearRenovacionesResumenError(state) {
+      state.resumenError = null;
+    },
+    clearRenovacionesResumenCache(state) {
+      state.resumenCache = {};
+      state.lastResumenQuery = "";
+      state.resumen = null;
+      state.resumenStatus = "idle";
+      state.resumenError = null;
+    },
+    invalidateRenovacionesResumen(state) {
+      if (state.lastResumenQuery && state.resumenCache[state.lastResumenQuery]) {
+        state.resumenCache[state.lastResumenQuery].fetchedAt = 0;
+      }
+    },
+
     clearLastActionResult(state) {
       state.lastActionResult = null;
     },
@@ -462,6 +610,48 @@ const renovacionesSlice = createSlice({
       .addCase(fetchRenovaciones.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload?.message || "Error al cargar renovaciones";
+      })
+
+      // ---------- RESUMEN ----------
+      .addCase(fetchRenovacionesResumen.pending, (state, action) => {
+        state.resumenError = null;
+
+        const force = !!action.meta.arg?.force;
+        const query = buildRenovacionesResumenQuery(action.meta.arg || {});
+        state.lastResumenQuery = query;
+
+        const cached = state.resumenCache?.[query];
+
+        if (!force && isFresh(cached, RESUMEN_CACHE_TTL)) {
+          state.resumenStatus = "succeeded";
+          state.resumen = cached.resumen || null;
+          return;
+        }
+
+        state.resumenStatus = "loading";
+      })
+      .addCase(fetchRenovacionesResumen.fulfilled, (state, action) => {
+        state.resumenStatus = "succeeded";
+        state.resumenError = null;
+
+        const { query, resumen, fromCache } = action.payload || {};
+        const q =
+          query || buildRenovacionesResumenQuery(action.payload?.params || {});
+        state.lastResumenQuery = q;
+
+        state.resumen = resumen || null;
+
+        if (!fromCache) {
+          state.resumenCache[q] = {
+            resumen: resumen || null,
+            fetchedAt: Date.now(),
+          };
+        }
+      })
+      .addCase(fetchRenovacionesResumen.rejected, (state, action) => {
+        state.resumenStatus = "failed";
+        state.resumenError =
+          action.payload?.message || "Error al cargar resumen de renovaciones";
       })
 
       // ---------- OFICINAS ----------
@@ -553,6 +743,11 @@ export const {
   clearRenovacionesError,
   clearRenovacionesCache,
   invalidateRenovaciones,
+
+  clearRenovacionesResumenError,
+  clearRenovacionesResumenCache,
+  invalidateRenovacionesResumen,
+
   clearLastActionResult,
   clearActionStatus,
   clearOficinas,
@@ -570,6 +765,12 @@ export const selectRenovacionesPrevious = (state) => state.renovaciones.previous
 
 export const selectRenovacionesStatus = (state) => state.renovaciones.status;
 export const selectRenovacionesError = (state) => state.renovaciones.error;
+
+export const selectRenovacionesResumen = (state) => state.renovaciones.resumen;
+export const selectRenovacionesResumenStatus = (state) =>
+  state.renovaciones.resumenStatus;
+export const selectRenovacionesResumenError = (state) =>
+  state.renovaciones.resumenError;
 
 export const selectRenovacionesOficinas = (state) => state.renovaciones.oficinas;
 export const selectRenovacionesOficinasStatus = (state) =>

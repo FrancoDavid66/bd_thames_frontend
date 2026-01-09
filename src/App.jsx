@@ -79,7 +79,8 @@ function App() {
   // ====== Helper: API ROOT (siempre /api/) ======
   const getApiRoot = () => {
     const raw = (
-      (typeof window !== "undefined" && (window.__API_URL__ || window.API_URL || window.API_BASE)) ||
+      (typeof window !== "undefined" &&
+        (window.__API_URL__ || window.API_URL || window.API_BASE)) ||
       import.meta?.env?.VITE_API_BASE ||
       import.meta?.env?.VITE_API_URL ||
       ""
@@ -92,6 +93,28 @@ function App() {
     let base = raw.endsWith("/") ? raw : `${raw}/`;
     if (/\/api\/?$/i.test(base)) return base.replace(/\/api\/?$/i, "/api/");
     return `${base}api/`;
+  };
+
+  // ====== 🆕 Helper: oficina scope por URL (?oficina=) + fallback localStorage ======
+  const getScopedOficina = (key) => {
+    // 1) si viene por querystring, la persistimos
+    try {
+      const sp = new URLSearchParams(location.search || "");
+      const fromUrl = (sp.get("oficina") || "").toString().trim();
+      if (fromUrl) {
+        try {
+          localStorage.setItem(key, fromUrl);
+        } catch {}
+        return fromUrl;
+      }
+    } catch {}
+
+    // 2) fallback a localStorage (última elegida)
+    try {
+      return (localStorage.getItem(key) || "").toString().trim();
+    } catch {
+      return "";
+    }
   };
 
   // ====== Flags / configuración de polling (Solicitudes) ======
@@ -187,11 +210,24 @@ function App() {
     }
   };
 
-  // ====== Cuponeras: fetch de counters propio ======
+  // ====== Cuponeras: fetch de counters (🆕 soporta oficina por query/localStorage) ======
   const fetchCuponerasCounters = async () => {
     try {
       const apiRoot = getApiRoot();
-      const url = `${apiRoot}polizas/cupones-robo/counters/`;
+      const key = "scope.cuponeras.oficina";
+
+      const shouldScope =
+        location.pathname === "/cuponeras" ||
+        location.pathname.startsWith("/cuponeras/");
+
+      const oficina = shouldScope ? getScopedOficina(key) : "";
+
+      const qs = new URLSearchParams();
+      if (oficina) qs.set("oficina", oficina);
+
+      const url = `${apiRoot}polizas/cupones-robo/counters/${
+        qs.toString() ? `?${qs.toString()}` : ""
+      }`;
 
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
@@ -209,13 +245,26 @@ function App() {
     }
   };
 
-  // ✅ Renovaciones: contador (usamos page_size=1 para que sea liviano)
+  // ✅ Renovaciones: contador (🆕 soporta oficina por query/localStorage)
   const fetchRenovacionesCounters = async () => {
     try {
       const apiRoot = getApiRoot();
+      const key = "scope.renovaciones.oficina";
 
-      // Importante: el count viene aunque pidas 1 resultado
-      const url = `${apiRoot}polizas/renovaciones/?dias=30&solo_pendientes=1&page=1&page_size=1`;
+      const shouldScope =
+        location.pathname === "/polizas/renovaciones" ||
+        location.pathname.startsWith("/polizas/renovaciones/");
+
+      const oficina = shouldScope ? getScopedOficina(key) : "";
+
+      const qs = new URLSearchParams();
+      qs.set("dias", "30");
+      qs.set("solo_pendientes", "1");
+      qs.set("page", "1");
+      qs.set("page_size", "1");
+      if (oficina) qs.set("oficina", oficina);
+
+      const url = `${apiRoot}polizas/renovaciones/?${qs.toString()}`;
 
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
@@ -298,13 +347,13 @@ function App() {
     if (isMobile) closeSidebar();
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refrescar contadores al navegar
+  // Refrescar contadores al navegar (incluye querystring)
   useEffect(() => {
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Refresco periódico
   useEffect(() => {
@@ -319,7 +368,7 @@ function App() {
     }, 60_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // mount once
 
   return (
     <div className="flex min-h-screen bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
@@ -361,10 +410,7 @@ function App() {
 
               {/* Pólizas */}
               <Route path="/polizas" element={<PolizasPage />} />
-              <Route
-                path="/polizas/renovaciones"
-                element={<RenovacionesPage />}
-              />
+              <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
               <Route path="/polizas/:id" element={<PolizaDetails />} />
 
               <Route path="/pagos" element={<PagosPage />} />
