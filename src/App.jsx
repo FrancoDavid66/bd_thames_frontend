@@ -76,6 +76,24 @@ function App() {
   // ✅ Contador Renovaciones (para badge en sidebar)
   const [renovacionesPendientes, setRenovacionesPendientes] = useState(0);
 
+  // ====== Helper: API ROOT (siempre /api/) ======
+  const getApiRoot = () => {
+    const raw = (
+      (typeof window !== "undefined" && (window.__API_URL__ || window.API_URL || window.API_BASE)) ||
+      import.meta?.env?.VITE_API_BASE ||
+      import.meta?.env?.VITE_API_URL ||
+      ""
+    )
+      .toString()
+      .trim();
+
+    if (!raw) return "/api/";
+
+    let base = raw.endsWith("/") ? raw : `${raw}/`;
+    if (/\/api\/?$/i.test(base)) return base.replace(/\/api\/?$/i, "/api/");
+    return `${base}api/`;
+  };
+
   // ====== Flags / configuración de polling (Solicitudes) ======
   const DISABLE_POLL =
     String(import.meta?.env?.VITE_DISABLE_COUNTERS_POLL || "").toLowerCase() ===
@@ -172,13 +190,8 @@ function App() {
   // ====== Cuponeras: fetch de counters propio ======
   const fetchCuponerasCounters = async () => {
     try {
-      const rawBase = (import.meta?.env?.VITE_API_BASE ||
-        import.meta?.env?.VITE_API_URL ||
-        "/api/")
-        .toString()
-        .trim();
-      const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
-      const url = `${base}polizas/cupones-robo/counters/`;
+      const apiRoot = getApiRoot();
+      const url = `${apiRoot}polizas/cupones-robo/counters/`;
 
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
@@ -199,21 +212,17 @@ function App() {
   // ✅ Renovaciones: contador (usamos page_size=1 para que sea liviano)
   const fetchRenovacionesCounters = async () => {
     try {
-      const rawBase = (import.meta?.env?.VITE_API_BASE ||
-        import.meta?.env?.VITE_API_URL ||
-        "/api/")
-        .toString()
-        .trim();
-      const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
+      const apiRoot = getApiRoot();
 
       // Importante: el count viene aunque pidas 1 resultado
-      const url = `${base}polizas/renovaciones/?dias=30&solo_pendientes=1&page=1&page_size=1`;
+      const url = `${apiRoot}polizas/renovaciones/?dias=30&solo_pendientes=1&page=1&page_size=1`;
 
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
 
       const data = await res.json();
-      const count = Number(data?.count ?? (Array.isArray(data) ? data.length : 0)) || 0;
+      const count =
+        Number(data?.count ?? (Array.isArray(data) ? data.length : 0)) || 0;
       setRenovacionesPendientes(count);
     } catch {
       // silencio
@@ -352,7 +361,10 @@ function App() {
 
               {/* Pólizas */}
               <Route path="/polizas" element={<PolizasPage />} />
-              <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
+              <Route
+                path="/polizas/renovaciones"
+                element={<RenovacionesPage />}
+              />
               <Route path="/polizas/:id" element={<PolizaDetails />} />
 
               <Route path="/pagos" element={<PagosPage />} />

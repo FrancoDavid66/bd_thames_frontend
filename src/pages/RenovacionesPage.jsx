@@ -312,15 +312,19 @@ export default function RenovacionesPage() {
     [dias, soloPendientes, search, ordering, oficina, page, pageSize, dispatch]
   );
 
+  // ✅ solo depende de "load" y "filtersToken"
+  // (load ya cambia cuando cambia page/pageSize/filtros)
   useEffect(() => {
     load();
-  }, [load, page, pageSize, filtersToken]);
+  }, [load, filtersToken]);
 
   const filtered = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
     const q = (search || "").trim().toLowerCase();
     if (!q) return arr;
 
+    // ⚠️ filtro local SOLO para detectar mismatch sin DevTools.
+    // Si querés 100% server-side, esto se puede eliminar.
     return arr.filter((p) => {
       const cliente =
         `${p?.cliente?.apellido || ""} ${p?.cliente?.nombre || ""}`.toLowerCase();
@@ -383,20 +387,41 @@ export default function RenovacionesPage() {
   };
 
   const totalCount = Number(count || 0);
+  const receivedCount = Array.isArray(items) ? items.length : 0;
+  const visibleCount = Array.isArray(filtered) ? filtered.length : 0;
+
   const totalPages =
     pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   const safePage = Math.min(Math.max(1, page), totalPages);
+
+  // ✅ clamp page si cambia count/pageSize y quedaste fuera de rango
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safePage]);
 
   const from = totalCount ? (safePage - 1) * pageSize + 1 : 0;
   const to = totalCount ? Math.min(safePage * pageSize, totalCount) : 0;
 
   const canPrev = safePage > 1;
-  const canNext = totalCount ? safePage < totalPages : filtered.length === pageSize;
+  const canNext = totalCount ? safePage < totalPages : receivedCount === pageSize;
 
   const applyFilters = () => {
     setPage(1);
     setFiltersToken((t) => t + 1);
   };
+
+  const mismatch =
+    totalCount > 0 && receivedCount > 0 && visibleCount !== receivedCount;
+
+  const mismatchHint = useMemo(() => {
+    const q = (search || "").trim();
+    if (!mismatch) return null;
+    if (q) {
+      return `⚠️ Mismatch: el backend devolvió ${receivedCount} en esta página pero el filtro local por búsqueda dejó ${visibleCount}. (Probá vaciar “Buscar” para comparar.)`;
+    }
+    return `⚠️ Mismatch: el backend devolvió ${receivedCount} en esta página pero se renderizan ${visibleCount}. (Suele ser filtro local/condición de render.)`;
+  }, [mismatch, search, receivedCount, visibleCount]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
@@ -404,13 +429,33 @@ export default function RenovacionesPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-xl font-extrabold text-white">Renovaciones</div>
+
             <div className="mt-1 text-sm text-white/75">
               Bandeja operativa ·{" "}
-              <span className="text-white/60">Total backend: {totalCount || 0}</span>
+              <span className="text-white/60">
+                Total backend: {totalCount || 0}
+              </span>
+              <span className="text-white/60">
+                {" "}
+                · Recibidos (página): {receivedCount}
+              </span>
+              <span className="text-white/60">
+                {" "}
+                · Cards: {visibleCount}
+              </span>
               {!!totalCount && (
-                <span className="text-white/60"> · Mostrando: {from}-{to}</span>
+                <span className="text-white/60">
+                  {" "}
+                  · Mostrando: {from}-{to}
+                </span>
               )}
             </div>
+
+            {mismatchHint && (
+              <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+                {mismatchHint}
+              </div>
+            )}
 
             {(oficinasStatus === "failed" || oficinasError) && (
               <div className="mt-2 text-xs text-rose-200/90">
