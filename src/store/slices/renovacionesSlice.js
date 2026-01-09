@@ -3,12 +3,63 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
 /**
- * Ajustá esto a tu config real si ya tenés api client (recomendado).
- * Si ya usás un axiosInstance en otro slice (ej: api.js), reemplazá por ese.
+ * ✅ Base URL unificada (MISMA idea que App.jsx)
+ * Prioridad:
+ *  - VITE_API_BASE
+ *  - VITE_API_URL
+ *  - window.__API_URL__
+ *  - "/api/" (proxy / mismo dominio)
+ *
+ * ✅ En producción: si está seteado a localhost/127.0.0.1, lo ignoramos y usamos "/api/"
  */
-const API_BASE = import.meta?.env?.VITE_API_URL || "http://127.0.0.1:8000";
+const resolveApiBase = () => {
+  const raw =
+    (import.meta?.env?.VITE_API_BASE &&
+      String(import.meta.env.VITE_API_BASE).trim()) ||
+    (import.meta?.env?.VITE_API_URL &&
+      String(import.meta.env.VITE_API_URL).trim()) ||
+    (typeof window !== "undefined" && (window.__API_URL__ || "")) ||
+    "/api/";
+
+  let base = String(raw || "").trim();
+
+  // si viene vacío, usamos proxy
+  if (!base) base = "/api/";
+
+  // normalizar slash final
+  if (!base.endsWith("/")) base += "/";
+
+  // ✅ Si el env trae solo el ORIGIN (https://dominio.com/), aseguramos /api/
+  // (si ya incluye /api/ no hacemos nada)
+  if (!base.includes("/api/")) {
+    // Evita caso base="/api/" que ya incluye /api/
+    if (base !== "/api/") base = `${base}api/`;
+  }
+
+  // ✅ Anti-bug prod: si apunta a localhost pero estás en un dominio real => usar "/api/"
+  try {
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname || "";
+      const baseHasLocalhost = /localhost|127\.0\.0\.1/.test(base);
+      const appIsLocalhost = /localhost|127\.0\.0\.1/.test(host);
+
+      if (baseHasLocalhost && !appIsLocalhost) {
+        base = "/api/";
+      }
+    }
+  } catch {
+    // silencio
+  }
+
+  return base;
+};
+
+const API_BASE = resolveApiBase();
+
+// ✅ IMPORTANTE: baseURL termina en "/api/" o es "/api/"
 const api = axios.create({
-  baseURL: `${API_BASE}/api`,
+  baseURL: API_BASE,
+  withCredentials: true,
 });
 
 /** TTL del cache de la bandeja (ms) */
@@ -178,7 +229,8 @@ export const fetchRenovaciones = createAsyncThunk(
         };
       }
 
-      const { data } = await api.get(`/polizas/renovaciones/${query}`);
+      // ⚠️ NO usar "/polizas..." porque rompe /api/ en axios baseURL
+      const { data } = await api.get(`polizas/renovaciones/${query}`);
       const normalized = normalizeRenovacionesResponse(data);
 
       return { params: cleanParams, query, fromCache: false, normalized };
@@ -213,7 +265,7 @@ export const fetchRenovacionesOficinas = createAsyncThunk(
         };
       }
 
-      const { data } = await api.get(`/polizas/oficinas/`);
+      const { data } = await api.get(`polizas/oficinas/`);
       const oficinas = normalizeOficinas(data);
 
       return { fromCache: false, oficinas };
@@ -237,7 +289,7 @@ export const refacturarPoliza = createAsyncThunk(
   "renovaciones/refacturarPoliza",
   async ({ id, payload = {} }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`/polizas/${id}/refacturar/`, payload);
+      const { data } = await api.post(`polizas/${id}/refacturar/`, payload);
       return { id, data };
     } catch (err) {
       const msg =
@@ -259,7 +311,7 @@ export const renovarPoliza = createAsyncThunk(
   "renovaciones/renovarPoliza",
   async ({ id, payload = {} }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`/polizas/${id}/renovar/`, payload);
+      const { data } = await api.post(`polizas/${id}/renovar/`, payload);
       return { id, data };
     } catch (err) {
       const msg =
@@ -524,13 +576,3 @@ export const selectRenovacionesOficinasStatus = (state) =>
   state.renovaciones.oficinasStatus;
 export const selectRenovacionesOficinasError = (state) =>
   state.renovaciones.oficinasError;
-
-export const selectRenovacionesLastActionResult = (state) =>
-  state.renovaciones.lastActionResult;
-
-export const selectRenovacionActionStatusById = (state, polizaId) =>
-  state.renovaciones.actionStatusById?.[polizaId] || {
-    status: "idle",
-    error: null,
-    type: null,
-  };
