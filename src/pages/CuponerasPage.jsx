@@ -13,6 +13,8 @@ import {
   HiClipboardCheck,
   HiArrowRight,
   HiExclamation,
+  HiChevronDown,
+  HiChevronUp,
 } from "react-icons/hi";
 
 import {
@@ -34,7 +36,7 @@ import {
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
-const Badge = ({ children, tone = "neutral" }) => {
+const Chip = ({ children, tone = "neutral", className = "" }) => {
   const map = {
     neutral: "bg-white/10 text-white border-white/15",
     green: "bg-emerald-500/15 text-emerald-100 border-emerald-400/30",
@@ -46,7 +48,8 @@ const Badge = ({ children, tone = "neutral" }) => {
     <span
       className={cx(
         "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold",
-        map[tone] || map.neutral
+        map[tone] || map.neutral,
+        className
       )}
     >
       {children}
@@ -265,7 +268,6 @@ export default function RenovacionesPage() {
   const oficinasStatus = useSelector(selectRenovacionesOficinasStatus);
   const oficinasError = useSelector(selectRenovacionesOficinasError);
 
-  // ✅ resumen (hoy/+1/+2/+3 y vencidas -1/-2/-3)
   const resumen = useSelector(selectRenovacionesResumen);
   const resumenStatus = useSelector(selectRenovacionesResumenStatus);
   const resumenError = useSelector(selectRenovacionesResumenError);
@@ -280,8 +282,9 @@ export default function RenovacionesPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // token para forzar reload al aplicar filtros aunque page=1
-  const [filtersToken, setFiltersToken] = useState(0);
+  // UI: colapsables
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [diagnosticoOpen, setDiagnosticoOpen] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -290,28 +293,26 @@ export default function RenovacionesPage() {
   const loading = status === "loading";
   const resumenLoading = resumenStatus === "loading";
 
-  // ✅ cargar oficinas UNA vez (cacheado en slice)
+  // cargar oficinas 1 vez
   useEffect(() => {
     dispatch(fetchRenovacionesOficinas());
   }, [dispatch]);
 
   const oficinasOptions = useMemo(() => {
     const arr = Array.isArray(oficinas) ? oficinas : [];
-    return ["", ...arr];
+    return arr;
   }, [oficinas]);
 
-  // ✅ Load: trae listado + resumen con los mismos filtros
   const load = useCallback(
     async (opts = {}) => {
       const cleanSearch = (search || "").trim();
 
-      // payload común (para que el resumen use EXACTAMENTE lo mismo)
       const common = {
         dias,
         solo_pendientes: soloPendientes,
         search: cleanSearch,
         oficina: oficina || undefined,
-        ...opts, // puede incluir force
+        ...opts,
       };
 
       const listPayload = {
@@ -321,10 +322,7 @@ export default function RenovacionesPage() {
         page_size: pageSize,
       };
 
-      const resumenPayload = {
-        ...common,
-        // sin paginación ni ordering (el endpoint resumen no los necesita)
-      };
+      const resumenPayload = { ...common };
 
       try {
         await Promise.all([
@@ -335,31 +333,52 @@ export default function RenovacionesPage() {
         // errores quedan en state
       }
     },
-    [
+    [dias, soloPendientes, search, ordering, oficina, page, pageSize, dispatch]
+  );
+
+  // ✅ Auto-aplica filtros con debounce
+  const filtersKey = useMemo(() => {
+    return JSON.stringify({
       dias,
       soloPendientes,
-      search,
+      search: (search || "").trim(),
       ordering,
       oficina,
       page,
       pageSize,
-      dispatch,
-    ]
-  );
+    });
+  }, [dias, soloPendientes, search, ordering, oficina, page, pageSize]);
 
-  // ✅ solo depende de "load" y "filtersToken"
-  // (load ya cambia cuando cambia page/pageSize/filtros)
+  // Si cambian filtros (menos page), resetea a página 1
+  const nonPageFiltersKey = useMemo(() => {
+    return JSON.stringify({
+      dias,
+      soloPendientes,
+      search: (search || "").trim(),
+      ordering,
+      oficina,
+      pageSize,
+    });
+  }, [dias, soloPendientes, search, ordering, oficina, pageSize]);
+
   useEffect(() => {
-    load();
-  }, [load, filtersToken]);
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonPageFiltersKey]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      load();
+    }, 350);
+    return () => clearTimeout(t);
+  }, [filtersKey, load]);
 
   const filtered = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
     const q = (search || "").trim().toLowerCase();
     if (!q) return arr;
 
-    // ⚠️ filtro local SOLO para detectar mismatch sin DevTools.
-    // Si querés 100% server-side, esto se puede eliminar.
+    // filtro local (solo para búsqueda)
     return arr.filter((p) => {
       const cliente =
         `${p?.cliente?.apellido || ""} ${p?.cliente?.nombre || ""}`.toLowerCase();
@@ -389,27 +408,19 @@ export default function RenovacionesPage() {
 
   const resumenBuckets = useMemo(() => {
     const b = resumen?.buckets || {};
-    const vence_hoy = Number(b?.vence_hoy || 0);
-    const vence_en_1 = Number(b?.vence_en_1 || 0);
-    const vence_en_2 = Number(b?.vence_en_2 || 0);
-    const vence_en_3 = Number(b?.vence_en_3 || 0);
-    const proximos_3 = Number(b?.proximos_3 || 0);
-
-    const vencida_1 = Number(b?.vencida_1 || 0);
-    const vencida_2 = Number(b?.vencida_2 || 0);
-    const vencida_3 = Number(b?.vencida_3 || 0);
-    const vencidas_3 = Number(b?.vencidas_3 || 0);
+    const toN = (x) => Number(x || 0);
 
     return {
-      vence_hoy,
-      vence_en_1,
-      vence_en_2,
-      vence_en_3,
-      proximos_3,
-      vencida_1,
-      vencida_2,
-      vencida_3,
-      vencidas_3,
+      vence_hoy: toN(b?.vence_hoy),
+      vence_en_1: toN(b?.vence_en_1),
+      vence_en_2: toN(b?.vence_en_2),
+      vence_en_3: toN(b?.vence_en_3),
+      proximos_3: toN(b?.proximos_3),
+
+      vencida_1: toN(b?.vencida_1),
+      vencida_2: toN(b?.vencida_2),
+      vencida_3: toN(b?.vencida_3),
+      vencidas_3: toN(b?.vencidas_3),
     };
   }, [resumen]);
 
@@ -455,7 +466,6 @@ export default function RenovacionesPage() {
     pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   const safePage = Math.min(Math.max(1, page), totalPages);
 
-  // ✅ clamp page si cambia count/pageSize y quedaste fuera de rango
   useEffect(() => {
     if (page !== safePage) setPage(safePage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -467,56 +477,36 @@ export default function RenovacionesPage() {
   const canPrev = safePage > 1;
   const canNext = totalCount ? safePage < totalPages : receivedCount === pageSize;
 
-  const applyFilters = () => {
-    setPage(1);
-    setFiltersToken((t) => t + 1);
-  };
-
   const mismatch =
     totalCount > 0 && receivedCount > 0 && visibleCount !== receivedCount;
 
-  const mismatchHint = useMemo(() => {
-    const q = (search || "").trim();
-    if (!mismatch) return null;
-    if (q) {
-      return `⚠️ Mismatch: el backend devolvió ${receivedCount} en esta página pero el filtro local por búsqueda dejó ${visibleCount}. (Probá vaciar “Buscar” para comparar.)`;
-    }
-    return `⚠️ Mismatch: el backend devolvió ${receivedCount} en esta página pero se renderizan ${visibleCount}. (Suele ser filtro local/condición de render.)`;
-  }, [mismatch, search, receivedCount, visibleCount]);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
+      {/* Header */}
       <div className="mb-4 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-4 shadow-lg">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-xl font-extrabold text-white">Renovaciones</div>
-
-            <div className="mt-1 text-sm text-white/75">
-              Bandeja operativa ·{" "}
-              <span className="text-white/60">
-                Total backend: {totalCount || 0}
-              </span>
-              <span className="text-white/60">
-                {" "}
-                · Recibidos (página): {receivedCount}
-              </span>
-              <span className="text-white/60">
-                {" "}
-                · Cards: {visibleCount}
-              </span>
-              {!!totalCount && (
-                <span className="text-white/60">
-                  {" "}
-                  · Mostrando: {from}-{to}
-                </span>
+            <div className="mt-1 text-sm text-white/70">
+              {resumen?.hoy ? (
+                <>
+                  Fecha ref:{" "}
+                  <span className="text-white/90 font-semibold">
+                    {fmtDate(resumen.hoy)}
+                  </span>
+                </>
+              ) : (
+                <>Bandeja operativa</>
               )}
             </div>
 
-            {mismatchHint && (
-              <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-100">
-                {mismatchHint}
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Chip tone="neutral">Total: {totalCount || 0}</Chip>
+              <Chip tone="neutral">
+                Mostrando: {from}-{to}
+              </Chip>
+              <Chip tone="red">Urgentes ≤ 3d: {counters.urgentes}</Chip>
+            </div>
 
             {(oficinasStatus === "failed" || oficinasError) && (
               <div className="mt-2 text-xs text-rose-200/90">
@@ -542,11 +532,8 @@ export default function RenovacionesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="neutral">Visible (página): {counters.total}</Badge>
-            <Badge tone="red">Urgentes ≤ 3d: {counters.urgentes}</Badge>
-
             <button
-              className="ml-auto inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
               onClick={() => load({ force: true })}
               disabled={loading || resumenLoading}
               title="Actualiza listado + resumen"
@@ -556,188 +543,182 @@ export default function RenovacionesPage() {
               />
               {loading || resumenLoading ? "Cargando..." : "Actualizar"}
             </button>
-          </div>
-        </div>
 
-        {/* ✅ Resumen HOY / +1 +2 +3 / -1 -2 -3 */}
-        <div className="mt-3 flex flex-col gap-2">
-          <div className="text-xs text-white/70">
-            Resumen por fecha de referencia{" "}
-            <span className="text-white/90 font-semibold">
-              {resumen?.hoy ? fmtDate(resumen.hoy) : "—"}
-            </span>
-            {typeof resumen?.dias_ventana === "number" && (
-              <>
-                {" "}
-                · ventana{" "}
-                <span className="text-white/90 font-semibold">
-                  {resumen.dias_ventana} días
-                </span>
-              </>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="yellow">
-              Hoy: {resumenBuckets.vence_hoy}
-            </Badge>
-            <Badge tone="blue">+1d: {resumenBuckets.vence_en_1}</Badge>
-            <Badge tone="blue">+2d: {resumenBuckets.vence_en_2}</Badge>
-            <Badge tone="blue">+3d: {resumenBuckets.vence_en_3}</Badge>
-            <Badge tone="neutral">Próx 3: {resumenBuckets.proximos_3}</Badge>
-
-            <span className="mx-1 h-5 w-px bg-white/10" />
-
-            <Badge tone="red">-1d: {resumenBuckets.vencida_1}</Badge>
-            <Badge tone="red">-2d: {resumenBuckets.vencida_2}</Badge>
-            <Badge tone="red">-3d: {resumenBuckets.vencida_3}</Badge>
-            <Badge tone="red">Vencidas 3: {resumenBuckets.vencidas_3}</Badge>
-
-            {resumenLoading && (
-              <span className="text-xs text-white/60">Actualizando resumen…</span>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
-          <div className="grid gap-2">
-            <label className="text-xs font-semibold text-white/90">Días</label>
-            <input
-              value={dias}
-              onChange={(e) => setDias(Number(e.target.value || 0))}
-              type="number"
-              min={0}
-              className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <label className="text-xs font-semibold text-white/90">
-              Solo pendientes
-            </label>
             <button
-              className={cx(
-                "w-full rounded-xl border px-3 py-2 text-left text-sm font-semibold",
-                soloPendientes
-                  ? "border-emerald-400/30 bg-emerald-300/15 text-emerald-50"
-                  : "border-white/10 bg-white/10 text-white hover:bg-white/15"
-              )}
-              onClick={() => setSoloPendientes((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-300 px-4 py-2 text-sm font-extrabold text-black hover:bg-sky-200"
+              onClick={() => setFiltersOpen((v) => !v)}
+              title="Mostrar/ocultar filtros"
             >
-              {soloPendientes ? "✅ Sí" : "No"}
+              Filtros {filtersOpen ? <HiChevronUp /> : <HiChevronDown />}
+            </button>
+
+            <button
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+              onClick={() => setDiagnosticoOpen((v) => !v)}
+              title="Mostrar diagnóstico"
+            >
+              Diagnóstico {diagnosticoOpen ? <HiChevronUp /> : <HiChevronDown />}
             </button>
           </div>
+        </div>
 
-          {/* Oficina */}
-          <div className="grid gap-2">
-            <label className="text-xs font-semibold text-white/90">Oficina</label>
-            <select
-              value={oficina}
-              onChange={(e) => setOficina(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
-            >
-              <option value="" className="bg-slate-900 text-white">
-                Todas
-              </option>
-              {oficinasOptions
-                .filter((o) => o)
-                .map((o) => (
+        {/* Diagnóstico (oculto por defecto) */}
+        {diagnosticoOpen && (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-xs text-white/75">
+            <div>Total backend: {totalCount || 0}</div>
+            <div>Recibidos (página): {receivedCount}</div>
+            <div>Cards visibles: {visibleCount}</div>
+            {mismatch && (
+              <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-2 text-amber-100">
+                ⚠️ Mismatch: backend devolvió {receivedCount} pero se renderizan{" "}
+                {visibleCount}. (Suele ser filtro local por búsqueda o condición
+                de render.)
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Resumen compacto */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Chip tone="yellow">Hoy: {resumenBuckets.vence_hoy}</Chip>
+          <Chip tone="blue">+1: {resumenBuckets.vence_en_1}</Chip>
+          <Chip tone="blue">+2: {resumenBuckets.vence_en_2}</Chip>
+          <Chip tone="blue">+3: {resumenBuckets.vence_en_3}</Chip>
+          <Chip tone="neutral">Próx 3: {resumenBuckets.proximos_3}</Chip>
+          <span className="mx-1 h-5 w-px bg-white/10" />
+          <Chip tone="red">-1: {resumenBuckets.vencida_1}</Chip>
+          <Chip tone="red">-2: {resumenBuckets.vencida_2}</Chip>
+          <Chip tone="red">-3: {resumenBuckets.vencida_3}</Chip>
+          <Chip tone="red">Vencidas 3: {resumenBuckets.vencidas_3}</Chip>
+        </div>
+
+        {/* Filtros (colapsables) */}
+        {filtersOpen && (
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
+            <div className="grid gap-2">
+              <label className="text-xs font-semibold text-white/90">Días</label>
+              <input
+                value={dias}
+                onChange={(e) => setDias(Number(e.target.value || 0))}
+                type="number"
+                min={0}
+                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-xs font-semibold text-white/90">
+                Solo pendientes
+              </label>
+              <button
+                className={cx(
+                  "w-full rounded-xl border px-3 py-2 text-left text-sm font-semibold",
+                  soloPendientes
+                    ? "border-emerald-400/30 bg-emerald-300/15 text-emerald-50"
+                    : "border-white/10 bg-white/10 text-white hover:bg-white/15"
+                )}
+                onClick={() => setSoloPendientes((v) => !v)}
+              >
+                {soloPendientes ? "✅ Sí" : "No"}
+              </button>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-xs font-semibold text-white/90">
+                Oficina
+              </label>
+              <select
+                value={oficina}
+                onChange={(e) => setOficina(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
+              >
+                <option value="" className="bg-slate-900 text-white">
+                  Todas
+                </option>
+                {oficinasOptions.map((o) => (
                   <option key={o} value={o} className="bg-slate-900 text-white">
                     {o}
                   </option>
                 ))}
-            </select>
-            <div className="text-[11px] text-white/55">
-              {oficinasStatus === "loading"
-                ? "Cargando oficinas..."
-                : "Oficinas cargadas desde backend (no depende del paginado)."}
+              </select>
+              <div className="text-[11px] text-white/55">
+                {oficinasStatus === "loading"
+                  ? "Cargando oficinas..."
+                  : "Lista desde backend."}
+              </div>
             </div>
-          </div>
 
-          <div className="grid gap-2 md:col-span-2">
-            <label className="text-xs font-semibold text-white/90">Buscar</label>
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2">
-              <HiSearch className="text-white/70" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-transparent text-white outline-none"
-                placeholder="Asegurado, patente, número, compañía..."
-              />
-              {!!search && (
-                <button
-                  className="rounded-lg p-1 text-white/80 hover:bg-white/10"
-                  onClick={() => setSearch("")}
-                  title="Limpiar"
-                >
-                  <HiX />
-                </button>
-              )}
+            <div className="grid gap-2 md:col-span-2">
+              <label className="text-xs font-semibold text-white/90">Buscar</label>
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                <HiSearch className="text-white/70" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-transparent text-white outline-none"
+                  placeholder="Asegurado, patente, número, compañía..."
+                />
+                {!!search && (
+                  <button
+                    className="rounded-lg p-1 text-white/80 hover:bg-white/10"
+                    onClick={() => setSearch("")}
+                    title="Limpiar"
+                  >
+                    <HiX />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Orden */}
-          <div className="grid gap-2 md:col-span-3">
-            <label className="text-xs font-semibold text-white/90">Orden</label>
-            <select
-              value={ordering}
-              onChange={(e) => setOrdering(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
-            >
-              <option value="vto_referencia" className="bg-slate-900 text-white">
-                Vto referencia (asc)
-              </option>
-              <option value="-vto_referencia" className="bg-slate-900 text-white">
-                Vto referencia (desc)
-              </option>
-              <option value="fecha_vencimiento" className="bg-slate-900 text-white">
-                Vto póliza (asc)
-              </option>
-              <option value="-fecha_vencimiento" className="bg-slate-900 text-white">
-                Vto póliza (desc)
-              </option>
-              <option value="id" className="bg-slate-900 text-white">
-                ID (asc)
-              </option>
-              <option value="-id" className="bg-slate-900 text-white">
-                ID (desc)
-              </option>
-            </select>
-          </div>
-
-          {/* Page size */}
-          <div className="grid gap-2 md:col-span-2">
-            <label className="text-xs font-semibold text-white/90">
-              Tamaño página
-            </label>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                const v = Number(e.target.value || 25);
-                setPageSize(v);
-                setPage(1);
-                setFiltersToken((t) => t + 1);
-              }}
-              className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
-            >
-              {[10, 25, 50, 100].map((n) => (
-                <option key={n} value={n} className="bg-slate-900 text-white">
-                  {n}
+            <div className="grid gap-2 md:col-span-3">
+              <label className="text-xs font-semibold text-white/90">Orden</label>
+              <select
+                value={ordering}
+                onChange={(e) => setOrdering(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
+              >
+                <option value="vto_referencia" className="bg-slate-900 text-white">
+                  Vto referencia (asc)
                 </option>
-              ))}
-            </select>
-          </div>
+                <option value="-vto_referencia" className="bg-slate-900 text-white">
+                  Vto referencia (desc)
+                </option>
+                <option value="fecha_vencimiento" className="bg-slate-900 text-white">
+                  Vto póliza (asc)
+                </option>
+                <option value="-fecha_vencimiento" className="bg-slate-900 text-white">
+                  Vto póliza (desc)
+                </option>
+                <option value="id" className="bg-slate-900 text-white">
+                  ID (asc)
+                </option>
+                <option value="-id" className="bg-slate-900 text-white">
+                  ID (desc)
+                </option>
+              </select>
+            </div>
 
-          <div className="md:col-span-2 flex items-end gap-2">
-            <button
-              className="w-full rounded-xl bg-sky-300 px-4 py-2 text-sm font-extrabold text-black hover:bg-sky-200 disabled:opacity-70"
-              onClick={applyFilters}
-              disabled={loading || resumenLoading}
-            >
-              Aplicar filtros
-            </button>
+            <div className="grid gap-2 md:col-span-2">
+              <label className="text-xs font-semibold text-white/90">
+                Tamaño página
+              </label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  const v = Number(e.target.value || 25);
+                  setPageSize(v);
+                }}
+                className="w-full rounded-xl border border-white/10 bg-slate-900 text-white px-3 py-2 outline-none focus:border-white/30"
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n} className="bg-slate-900 text-white">
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
 
         {!!error && (
           <div className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/15 p-3 text-sm text-rose-50">
@@ -756,11 +737,12 @@ export default function RenovacionesPage() {
         )}
       </div>
 
-      {/* Controles paginación */}
+      {/* Paginación */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/65">
-          Página <span className="text-white/90 font-semibold">{safePage}</span>{" "}
-          de <span className="text-white/90 font-semibold">{totalPages}</span>
+          Página{" "}
+          <span className="text-white/90 font-semibold">{safePage}</span> de{" "}
+          <span className="text-white/90 font-semibold">{totalPages}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -781,6 +763,7 @@ export default function RenovacionesPage() {
         </div>
       </div>
 
+      {/* Lista */}
       <div className="grid gap-3">
         {loading && !filtered.length ? (
           <div className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 text-white/80">
@@ -809,17 +792,18 @@ export default function RenovacionesPage() {
                       <Link
                         to={`/polizas/${p.id}`}
                         className="inline-flex items-center gap-2 text-base font-extrabold text-white hover:underline"
+                        title="Abrir detalle"
                       >
                         {p?.patente || "SIN PATENTE"}{" "}
                         <HiArrowRight className="text-white/60" />
                       </Link>
 
-                      <Badge tone={tone}>
-                        Vto ref: {fmtDate(vtoRef)}{" "}
+                      <Chip tone={tone}>
+                        Vto: {fmtDate(vtoRef)}{" "}
                         {diasVto != null ? `· ${diasVto}d` : ""}
-                      </Badge>
+                      </Chip>
 
-                      <Badge tone="neutral">Oficina: {p?.oficina || "—"}</Badge>
+                      <Chip tone="neutral">Ofi: {p?.oficina || "—"}</Chip>
                     </div>
 
                     <div className="mt-2 grid gap-1 text-sm text-white/85">
@@ -840,7 +824,7 @@ export default function RenovacionesPage() {
                           {p?.compania_nombre || p?.compania || "—"}
                         </span>
                         <span>
-                          <span className="text-white/60">Precio cuota:</span>{" "}
+                          <span className="text-white/60">Cuota:</span>{" "}
                           {p?.precio_cuota ?? "—"}
                         </span>
                       </div>
@@ -855,26 +839,28 @@ export default function RenovacionesPage() {
                           {fmtDate(p?.fecha_vencimiento)}
                         </span>
                       </div>
+
+                      <div className="mt-1">
+                        <Link
+                          to={`/polizas/${p.id}`}
+                          className="text-xs font-semibold text-white/70 hover:text-white hover:underline"
+                        >
+                          Ver detalle →
+                        </Link>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2 md:min-w-[220px]">
+                  {/* Acciones: 1 principal (menos ruido) */}
+                  <div className="flex md:flex-col gap-2 md:min-w-[220px]">
                     <button
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-300 px-4 py-2 text-sm font-extrabold text-black hover:bg-emerald-200 disabled:opacity-60"
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-300 px-4 py-2 text-sm font-extrabold text-black hover:bg-emerald-200 disabled:opacity-60"
                       disabled={submitting}
                       onClick={() => openModal(p)}
                     >
                       <HiClipboardCheck />
                       Renovar
                     </button>
-
-                    <Link
-                      to={`/polizas/${p.id}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
-                    >
-                      Ver detalle
-                      <HiArrowRight />
-                    </Link>
                   </div>
                 </div>
               </motion.div>

@@ -15,25 +15,36 @@ import {
   FaChevronRight,
   FaChevronLeft,
   FaSyncAlt,
+  FaClock, // ✅🆕 Vencimientos
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
 
 const navItems = [
+  // Core
   { to: "/", label: "Inicio", icon: FaHome },
+
+  // Operación
   { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
   { to: "/clientes", label: "Clientes", icon: FaUsers },
+
+  // Grupo
+  { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
+
+  // Cobranza / gestión
   { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt },
+  { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
+
+  // Comunicación
   { to: "/marketing", label: "Campañas", icon: FaBullhorn },
-  { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
-  { to: "/competencia", label: "Competencia", icon: FaChartBar },
+
+  // Análisis / admin
   { to: "/estadisticas", label: "Estadísticas", icon: FaChartBar },
   { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
 
-  // 👇 dejamos “Pólizas” acá, pero lo renderizamos como grupo desplegable
-  { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
-
-  { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
+  // Extras
+  { to: "/competencia", label: "Competencia", icon: FaChartBar },
+  { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
 ];
 
 const Badge = ({ value = 0, tone = "red" }) => {
@@ -67,27 +78,26 @@ export default function Sidebar({
   cuponPorVencer7 = 0,
   cuponVencidas = 0,
 
-  renovacionesPendientes = 0, // ✅ nuevo
+  renovacionesPendientes = 0,
 }) {
   const location = useLocation();
+
   const solTotal =
     (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
-  const polizasActive = useMemo(
-    () =>
+  const polizasActive = useMemo(() => {
+    return (
       location.pathname === "/polizas" ||
-      location.pathname.startsWith("/polizas/"),
-    [location.pathname]
-  );
+      location.pathname.startsWith("/polizas/")
+    );
+  }, [location.pathname]);
 
   const [polizasOpen, setPolizasOpen] = useState(polizasActive);
 
   useEffect(() => {
-    // si navegás dentro de /polizas, lo abrimos solo
     if (polizasActive) setPolizasOpen(true);
   }, [polizasActive]);
 
-  // ✅ Ahora el sidebar se puede cerrar también en desktop
   const sidebarClass = isOpen ? "translate-x-0" : "-translate-x-full";
 
   return (
@@ -106,7 +116,7 @@ export default function Sidebar({
         <div className="p-4 border-b border-blue-800 dark:border-gray-800 flex items-center justify-between">
           <h1 className="text-lg font-bold">Thames Seguros</h1>
 
-          {/* ✅ Botón cerrar (visible también en desktop) */}
+          {/* Botón cerrar (visible también en desktop) */}
           <button
             onClick={onClose}
             className="text-white bg-blue-800 dark:bg-gray-800 hover:bg-blue-700 dark:hover:bg-gray-700 px-2 py-2 rounded-md inline-flex items-center justify-center"
@@ -119,7 +129,7 @@ export default function Sidebar({
 
         <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100%-80px)]">
           {navItems.map((item) => {
-            // ✅ Grupo desplegable de Pólizas
+            // Grupo desplegable de Pólizas
             if (item.to === "/polizas") {
               return (
                 <div key="polizas-group" className="space-y-1">
@@ -143,6 +153,7 @@ export default function Sidebar({
                       onClick={() => setPolizasOpen((v) => !v)}
                       className="px-3 py-2 text-white/80 hover:text-white"
                       title={polizasOpen ? "Cerrar" : "Abrir"}
+                      aria-label={polizasOpen ? "Cerrar Pólizas" : "Abrir Pólizas"}
                     >
                       {polizasOpen ? <FaChevronDown /> : <FaChevronRight />}
                     </button>
@@ -162,6 +173,21 @@ export default function Sidebar({
                       >
                         <FaFileAlt className="text-base" />
                         <span>Listado</span>
+                      </NavLink>
+
+                      {/* ✅🆕 Vencimientos */}
+                      <NavLink
+                        to="/polizas/vencimientos"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+                            isActive
+                              ? "bg-blue-800/70 dark:bg-gray-800/70"
+                              : "text-white/90 hover:bg-blue-800/50 dark:hover:bg-gray-800/50"
+                          }`
+                        }
+                      >
+                        <FaClock className="text-base" />
+                        <span>Vencimientos</span>
                       </NavLink>
 
                       <NavLink

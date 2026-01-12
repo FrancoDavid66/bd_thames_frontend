@@ -104,10 +104,18 @@ export const enviarAlertas = createAsyncThunk(
 /** Enviar recordatorios */
 export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
-  async (_, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
+      const body = compact({
+        alias: payload?.alias,
+        alias_transferencia: payload?.alias_transferencia, // compat
+        medio_cobro_id: payload?.medio_cobro_id,
+        oficina: payload?.oficina,
+      });
+
       const { data } = await axios.post(
-        API("notificaciones/cuotas/recordatorios/")
+        API("notificaciones/cuotas/recordatorios/"),
+        body
       );
       return data;
     } catch (error) {

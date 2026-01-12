@@ -1,0 +1,346 @@
+// src/store/slices/vencimientosSlice.js
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+
+const TTL_MS = 30 * 1000;
+
+// Si usás proxy en Vite (/api) dejalo vacío.
+// Si lo definís, puede venir como: "http://localhost:8000", "http://localhost:8000/", "http://localhost:8000/api", etc.
+const RAW_BASE = (import.meta.env.VITE_API_URL || "").toString().trim();
+
+const DEFAULT_RESUMEN = {
+  vencidas_3: 0,
+  vencidas_7: 0,
+  vencidas_14: 0,
+  vencidas_30: 0,
+  vence_hoy: 0,
+  por_vencer_3: 0,
+};
+
+function normalizeApiRoot(rawBase) {
+  // Queremos un root que termine en "/api" o vacío (para proxy).
+  if (!rawBase) return "";
+
+  let base = rawBase;
+  if (!/^https?:\/\//i.test(base) && !base.startsWith("/")) {
+    // por si alguien pasa "localhost:8000"
+    base = `http://${base}`;
+  }
+
+  // Asegurar slash final
+  base = base.endsWith("/") ? base : `${base}/`;
+
+  // Si ya termina en /api/ => ok
+  if (/\/api\/$/i.test(base)) return base.replace(/\/api\/$/i, "/api");
+  if (/\/api\/$/i.test(base)) return base.slice(0, -1);
+
+  // Si termina en /api => ok
+  if (/\/api$/i.test(base)) return base.replace(/\/api$/i, "/api");
+
+  // Si no, le agregamos /api
+  return `${base.replace(/\/$/, "")}/api`;
+}
+
+const API_ROOT = normalizeApiRoot(RAW_BASE);
+
+// --- Query helpers ---
+function buildQuery(params = {}) {
+  const sp = new URLSearchParams();
+
+  // orden estable para cache-key más predecible
+  Object.keys(params)
+    .sort()
+    .forEach((k) => {
+      const v = params[k];
+      if (v === undefined || v === null || v === "") return;
+      sp.append(k, String(v));
+    });
+
+  const qs = sp.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function joinUrl(root, path) {
+  // root: "" (proxy) o "http://x/api"
+  // path: "/polizas/vencimientos/" o "/api/polizas/..."
+  const p = (path || "").toString().trim();
+
+  // Si root vacío => usar path tal cual (idealmente "/api/...")
+  if (!root) return p;
+
+  // Evitar doble /api si path ya empieza con /api
+  if (p.startsWith("/api/")) {
+    return `${root}${p.replace(/^\/api/, "")}`;
+  }
+
+  // Si viene "/polizas/..." => append a /api
+  if (p.startsWith("/")) return `${root}${p}`;
+
+  // fallback
+  return `${root}/${p}`;
+}
+
+async function apiGet(path, params = {}) {
+  const url = `${joinUrl(API_ROOT, path)}${buildQuery(params)}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`GET ${url} failed (${res.status}): ${txt}`);
+  }
+
+  return res.json();
+}
+
+function stableKey(obj = {}) {
+  // key estable: ordena claves
+  const out = {};
+  Object.keys(obj)
+    .sort()
+    .forEach((k) => (out[k] = obj[k]));
+  return JSON.stringify(out);
+}
+
+function isFresh(entry) {
+  return !!(entry && entry.ts && entry.data && Date.now() - entry.ts < TTL_MS);
+}
+
+// ✅ Normalizar oficinas robusto: [{id,nombre}] | ["1","2"] | ["Oficina A"] | {results:...}
+function normalizeOficinasPayload(data) {
+  const arr = Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data)
+    ? data
+    : [];
+
+  const out = [];
+  for (const x of arr) {
+    if (!x && x !== 0) continue;
+
+    if (typeof x === "string" || typeof x === "number") {
+      const s = String(x).trim();
+      if (!s) continue;
+      out.push({ id: s, nombre: s });
+      continue;
+    }
+
+    if (typeof x === "object") {
+      const id = x?.id ?? x?.value ?? x?.pk ?? "";
+      const nombre = x?.nombre ?? x?.name ?? x?.label ?? x?.toString?.() ?? "";
+      const idStr = String(id ?? "").trim();
+      const nomStr = String(nombre ?? "").trim();
+
+      if (idStr || nomStr) {
+        out.push({ id: idStr || nomStr, nombre: nomStr || idStr });
+      }
+    }
+  }
+
+  // dedup + sort
+  const map = new Map();
+  for (const o of out) {
+    const key = String(o.id ?? o.nombre ?? "").trim();
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, o);
+  }
+
+  return Array.from(map.values()).sort((a, b) =>
+    String(a.nombre || a.id).localeCompare(String(b.nombre || b.id), "es", {
+      sensitivity: "base",
+    })
+  );
+}
+
+// --- Thunks ---
+export const fetchVencimientos = createAsyncThunk(
+  "vencimientos/fetchVencimientos",
+  async ({ params = {}, force = false } = {}, { getState }) => {
+    const key = stableKey(params);
+    const cache = getState().vencimientos?.cache?.[key];
+
+    if (!force && isFresh(cache)) {
+      return { key, data: cache.data, cached: true };
+    }
+
+    // 👇 IMPORTANTE: acá usamos path sin /api (para que joinUrl lo maneje)
+    const data = await apiGet("/polizas/vencimientos/", params);
+    return { key, data, cached: false };
+  }
+);
+
+export const fetchVencimientosResumen = createAsyncThunk(
+  "vencimientos/fetchVencimientosResumen",
+  async ({ params = {}, force = false } = {}, { getState }) => {
+    const key = stableKey({ ...params, _resumen: 1 });
+    const cache = getState().vencimientos?.cache?.[key];
+
+    if (!force && isFresh(cache)) {
+      return { key, data: cache.data, cached: true };
+    }
+
+    const data = await apiGet("/polizas/vencimientos/resumen/", params);
+    return { key, data, cached: false };
+  }
+);
+
+// ✅🆕 Oficinas para el select
+export const fetchVencimientosOficinas = createAsyncThunk(
+  "vencimientos/fetchVencimientosOficinas",
+  async ({ force = false } = {}, { getState }) => {
+    const key = stableKey({ _oficinas: 1 });
+    const cache = getState().vencimientos?.cache?.[key];
+
+    if (!force && isFresh(cache)) {
+      return { key, data: cache.data, cached: true };
+    }
+
+    const data = await apiGet("/polizas/oficinas/", {}); // sin flat para traer {id,nombre}
+    return { key, data, cached: false };
+  }
+);
+
+const vencimientosSlice = createSlice({
+  name: "vencimientos",
+  initialState: {
+    items: [],
+    count: 0,
+    next: null,
+    previous: null,
+
+    resumen: { ...DEFAULT_RESUMEN },
+
+    // ✅🆕 oficinas para select
+    oficinas: [],
+    oficinasStatus: "idle",
+    oficinasError: null,
+
+    status: "idle",
+    resumenStatus: "idle",
+
+    error: null,
+    resumenError: null,
+
+    cache: {},
+  },
+  reducers: {
+    invalidateVencimientosCache(state) {
+      state.cache = {};
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // ===== LISTADO =====
+      .addCase(fetchVencimientos.pending, (state, action) => {
+        state.status = "loading";
+        state.error = null;
+
+        // ✅ UX: si hay cache fresco, hidratar mientras “carga”
+        const params = action?.meta?.arg?.params || {};
+        const key = stableKey(params);
+        const cache = state.cache?.[key];
+        if (isFresh(cache)) {
+          const data = cache.data || {};
+          const results = Array.isArray(data?.results)
+            ? data.results
+            : Array.isArray(data)
+            ? data
+            : [];
+          state.items = results;
+          state.count = data?.count ?? (Array.isArray(results) ? results.length : 0);
+          state.next = data?.next ?? null;
+          state.previous = data?.previous ?? null;
+        }
+      })
+      .addCase(fetchVencimientos.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        const { key, data } = action.payload || {};
+        if (key) state.cache[key] = { ts: Date.now(), data };
+
+        const results = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : [];
+        state.items = results;
+
+        state.count = data?.count ?? (Array.isArray(results) ? results.length : 0);
+        state.next = data?.next ?? null;
+        state.previous = data?.previous ?? null;
+      })
+      .addCase(fetchVencimientos.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.error?.message || "Error";
+      })
+
+      // ===== RESUMEN =====
+      .addCase(fetchVencimientosResumen.pending, (state, action) => {
+        state.resumenStatus = "loading";
+        state.resumenError = null;
+
+        // ✅ UX: hidratar resumen desde cache fresco
+        const params = action?.meta?.arg?.params || {};
+        const key = stableKey({ ...params, _resumen: 1 });
+        const cache = state.cache?.[key];
+        if (isFresh(cache)) {
+          state.resumen = { ...DEFAULT_RESUMEN, ...(cache.data || {}) };
+        }
+      })
+      .addCase(fetchVencimientosResumen.fulfilled, (state, action) => {
+        state.resumenStatus = "succeeded";
+        const { key, data } = action.payload || {};
+        if (key) state.cache[key] = { ts: Date.now(), data };
+        state.resumen = { ...DEFAULT_RESUMEN, ...(data || {}) };
+      })
+      .addCase(fetchVencimientosResumen.rejected, (state, action) => {
+        state.resumenStatus = "failed";
+        state.resumenError = action.error?.message || "Error";
+      })
+
+      // ===== OFICINAS =====
+      .addCase(fetchVencimientosOficinas.pending, (state, action) => {
+        state.oficinasStatus = "loading";
+        state.oficinasError = null;
+
+        // ✅ UX: hidratar desde cache si hay
+        const key = stableKey({ _oficinas: 1 });
+        const cache = state.cache?.[key];
+        if (isFresh(cache)) {
+          state.oficinas = normalizeOficinasPayload(cache.data);
+        }
+      })
+      .addCase(fetchVencimientosOficinas.fulfilled, (state, action) => {
+        state.oficinasStatus = "succeeded";
+        const { key, data } = action.payload || {};
+        if (key) state.cache[key] = { ts: Date.now(), data };
+        state.oficinas = normalizeOficinasPayload(data);
+      })
+      .addCase(fetchVencimientosOficinas.rejected, (state, action) => {
+        state.oficinasStatus = "failed";
+        state.oficinasError = action.error?.message || "Error";
+      });
+  },
+});
+
+export const { invalidateVencimientosCache } = vencimientosSlice.actions;
+export default vencimientosSlice.reducer;
+
+// ✅ Selectors seguros
+export const selectVencimientos = (s) => s?.vencimientos?.items || [];
+export const selectVencimientosResumen = (s) =>
+  s?.vencimientos?.resumen || { ...DEFAULT_RESUMEN };
+export const selectVencimientosStatus = (s) => s?.vencimientos?.status || "idle";
+export const selectVencimientosResumenStatus = (s) =>
+  s?.vencimientos?.resumenStatus || "idle";
+export const selectVencimientosError = (s) => s?.vencimientos?.error || null;
+export const selectVencimientosResumenError = (s) =>
+  s?.vencimientos?.resumenError || null;
+
+// ✅🆕 oficinas selectors
+export const selectVencimientosOficinas = (s) => s?.vencimientos?.oficinas || [];
+export const selectVencimientosOficinasStatus = (s) =>
+  s?.vencimientos?.oficinasStatus || "idle";
+export const selectVencimientosOficinasError = (s) =>
+  s?.vencimientos?.oficinasError || null;

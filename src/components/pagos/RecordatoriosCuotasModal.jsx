@@ -30,7 +30,7 @@ export default function RecordatoriosCuotasModal({
   onClose,
   mediosCobro = [],
   sending = false,
-  // onEnviar(medio_cobro_id | null, oficina: "1" | "2" | "3") => {hoy, procesadas, enviados, errores}
+  // onEnviar(medio_cobro_id | null, oficina: "1" | "2" | "3") => {hoy, cuotas_procesadas, mensajes_enviados, errores}
   onEnviar,
 }) {
   const dispatch = useDispatch();
@@ -92,8 +92,12 @@ export default function RecordatoriosCuotasModal({
     try {
       const result = await onEnviar(selectedId || null, oficinaSeleccionada);
 
-      const enviados = result?.enviados ?? 0;
-      const procesadas = result?.procesadas ?? 0;
+      // ✅ Backend devuelve mensajes_enviados / cuotas_procesadas
+      const enviados =
+        result?.mensajes_enviados ?? result?.enviados ?? result?.mensajesEnviados ?? 0;
+      const procesadas =
+        result?.cuotas_procesadas ?? result?.procesadas ?? result?.cuotasProcesadas ?? 0;
+
       const errores = result?.errores || [];
       const erroresCount = Array.isArray(errores) ? errores.length : 0;
 
