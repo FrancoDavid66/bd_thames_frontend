@@ -1,3 +1,4 @@
+// src/pages/VencimientosPage.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -60,6 +61,7 @@ function toNonNegInt(x, fallback = 0) {
 function KpiButton({ label, value, active, onClick, tone = "slate" }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`rounded border p-3 text-left transition ${
         active ? "ring-2 ring-white/30" : "hover:bg-white/5"
@@ -70,6 +72,57 @@ function KpiButton({ label, value, active, onClick, tone = "slate" }) {
       <div className="text-lg font-semibold">{value ?? "—"}</div>
     </button>
   );
+}
+
+// ✅ parsea "YYYY-MM-DD" o ISO y devuelve Date local a las 00:00
+function parseToLocalDateOnly(v) {
+  if (!v) return null;
+
+  // Date instance
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    const d = new Date(v);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const da = Number(m[3]);
+    if (!y || !mo || !da) return null;
+    const d = new Date(y, mo - 1, da);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  // fallback: intentamos Date()
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  return null;
+}
+
+function computeDiasFallback(p) {
+  // 1) si viene del backend, usarlo
+  const dRaw = p?.dias_para_vencer;
+  const d = typeof dRaw === "number" ? dRaw : Number(dRaw);
+  if (Number.isFinite(d)) return d;
+
+  // 2) fallback: vto_referencia / fecha_vencimiento
+  const vto = p?.vto_referencia || p?.fecha_vencimiento;
+  const vtoDate = parseToLocalDateOnly(vto);
+  if (!vtoDate) return null;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const ms = vtoDate.getTime() - hoy.getTime();
+  return Math.round(ms / 86400000);
 }
 
 export default function VencimientosPage() {
@@ -88,6 +141,9 @@ export default function VencimientosPage() {
   // tabs
   const [tab, setTab] = useState("por_vencer"); // por_vencer | hoy | vencidas
   const [viewMode, setViewMode] = useState("polizas"); // polizas | asegurados
+
+  // 🔥 forzar recarga aunque el filtro “no cambie”
+  const [reloadToken, setReloadToken] = useState(0);
 
   // filtros
   const [oficina, setOficina] = useState("");
@@ -108,6 +164,8 @@ export default function VencimientosPage() {
   const [customPastDays, setCustomPastDays] = useState(2);
   const [customFutureDays, setCustomFutureDays] = useState(2);
 
+  const bumpReload = useCallback(() => setReloadToken((t) => t + 1), []);
+
   const applyCustomRange = useCallback(() => {
     const p = toNonNegInt(draftPastDays, 0);
     const f = toNonNegInt(draftFutureDays, 0);
@@ -115,7 +173,9 @@ export default function VencimientosPage() {
     setCustomFutureDays(f);
     setUseCustomRange(true);
     setPage(1);
-  }, [draftPastDays, draftFutureDays]);
+    setViewMode("polizas");
+    bumpReload();
+  }, [draftPastDays, draftFutureDays, bumpReload]);
 
   // Ventana dinámica según tab (o rango personalizado)
   const { pastDays, futureDays } = useMemo(() => {
@@ -126,6 +186,14 @@ export default function VencimientosPage() {
     // por_vencer (1-3)
     return { pastDays: 0, futureDays: 3 };
   }, [tab, useCustomRange, customPastDays, customFutureDays]);
+
+  // ✅ modo explícito (backend lo soporta)
+  const modo = useMemo(() => {
+    if (useCustomRange) return "all";
+    if (tab === "hoy") return "hoy";
+    if (tab === "vencidas") return "vencidas";
+    return "por_vencer";
+  }, [tab, useCustomRange]);
 
   // Cargar oficinas (una vez)
   useEffect(() => {
@@ -158,11 +226,12 @@ export default function VencimientosPage() {
       search: debouncedSearch || undefined,
       past_days: pastDays,
       future_days: futureDays,
+      modo,
       page,
       page_size: pageSize,
       ordering: "vto_referencia",
     }),
-    [oficina, debouncedSearch, pastDays, futureDays, page, pageSize]
+    [oficina, debouncedSearch, pastDays, futureDays, modo, page, pageSize]
   );
 
   const load = useCallback(
@@ -173,36 +242,21 @@ export default function VencimientosPage() {
     [dispatch, params]
   );
 
+  // ✅ ahora también recarga con reloadToken
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, reloadToken]);
 
-  // ✅ Filtrado: si hay rango personalizado, mostramos TODO lo que venga (ya viene acotado por backend)
-  // Si NO hay rango personalizado, seguimos mostrando por tab (por vencer / hoy / vencidas)
+  // ✅ CAMBIO: calcular _dias con fallback y NO filtrar afuera por null
   const filtered = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
-
-    // Normalizamos dias_para_vencer a number (si no es number, igual lo intentamos)
-    const normalized = arr
-      .map((p) => {
-        const dRaw = p?.dias_para_vencer;
-        const d = typeof dRaw === "number" ? dRaw : Number(dRaw);
-        return { ...p, _dias: Number.isFinite(d) ? d : null };
-      })
-      .filter((p) => p._dias !== null);
-
-    if (useCustomRange) return normalized;
-
-    return normalized.filter((p) => {
-      const d = p._dias;
-      if (tab === "vencidas") return d < 0;
-      if (tab === "hoy") return d === 0;
-      return d > 0 && d <= 3;
+    return arr.map((p) => {
+      const d = computeDiasFallback(p);
+      return { ...p, _dias: Number.isFinite(d) ? d : null };
     });
-  }, [items, tab, useCustomRange]);
+  }, [items]);
 
-  // ✅ FIX CLAVE: no tirar a la basura pólizas sin cliente.
-  // Si no hay cliente_id/dni, armamos una “fila” igual (Asegurado desconocido) y link a póliza.
+  // ✅ Asegurados deduplicados (NO descarta pólizas sin cliente: crea fila “desconocido”)
   const asegurados = useMemo(() => {
     const arr = Array.isArray(filtered) ? filtered : [];
     const map = new Map();
@@ -224,7 +278,7 @@ export default function VencimientosPage() {
 
       const nombreReal = `${c?.apellido || ""}, ${c?.nombre || ""}`.trim().replace(/^, /, "");
       const nombre = hasClienteKey
-        ? (nombreReal || "—")
+        ? nombreReal || "—"
         : `Asegurado desconocido (póliza #${p?.id ?? "?"})`;
 
       const ofi = p?.oficina ?? "";
@@ -242,7 +296,6 @@ export default function VencimientosPage() {
           vencidas: 0,
           hoy: 0,
           por_vencer: 0,
-          // 👇 si no hay cliente, guardo poliza_id para link
           poliza_id_ref: hasClienteKey ? null : p?.id ?? null,
         });
       }
@@ -283,13 +336,20 @@ export default function VencimientosPage() {
     ? "Vence hoy"
     : "Por vencer (1-3 días)";
 
-  // pequeño “diagnóstico” útil: cuántas pólizas vs cuántos asegurados
   const info = useMemo(() => {
-    return {
-      polizas: filtered.length,
-      asegurados: asegurados.length,
-    };
+    return { polizas: filtered.length, asegurados: asegurados.length };
   }, [filtered, asegurados]);
+
+  const gotoTab = useCallback(
+    (nextTab) => {
+      setUseCustomRange(false);
+      setTab(nextTab);
+      setPage(1);
+      setViewMode("polizas"); // 🔥 evita “parece que no funciona”
+      bumpReload(); // 🔥 recarga aunque sea el mismo tab
+    },
+    [bumpReload]
+  );
 
   return (
     <div className="p-4 text-slate-100">
@@ -306,6 +366,7 @@ export default function VencimientosPage() {
 
         <div className="flex gap-2">
           <button
+            type="button"
             className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700"
             onClick={() => load({ force: true })}
           >
@@ -323,11 +384,8 @@ export default function VencimientosPage() {
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => {
-              setUseCustomRange(false);
-              setTab(t.id);
-              setPage(1);
-            }}
+            type="button"
+            onClick={() => gotoTab(t.id)}
             className={`px-3 py-2 rounded border text-sm transition ${
               !useCustomRange && tab === t.id ? "bg-white/10" : "hover:bg-white/5"
             } ${pillCls(t.tone)}`}
@@ -348,6 +406,8 @@ export default function VencimientosPage() {
                 const next = e.target.checked;
                 setUseCustomRange(next);
                 setPage(1);
+                setViewMode("polizas");
+                bumpReload();
                 if (next) {
                   setCustomPastDays(toNonNegInt(customPastDays, 0));
                   setCustomFutureDays(toNonNegInt(customFutureDays, 0));
@@ -382,6 +442,7 @@ export default function VencimientosPage() {
             />
 
             <button
+              type="button"
               className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-sm"
               onClick={applyCustomRange}
             >
@@ -394,6 +455,7 @@ export default function VencimientosPage() {
       {/* Switch vista */}
       <div className="flex flex-wrap gap-2 mb-4">
         <button
+          type="button"
           onClick={() => setViewMode("polizas")}
           className={`px-3 py-2 rounded border text-sm transition ${
             viewMode === "polizas" ? "bg-white/10" : "hover:bg-white/5"
@@ -403,6 +465,7 @@ export default function VencimientosPage() {
         </button>
 
         <button
+          type="button"
           onClick={() => setViewMode("asegurados")}
           className={`px-3 py-2 rounded border text-sm transition ${
             viewMode === "asegurados" ? "bg-white/10" : "hover:bg-white/5"
@@ -419,66 +482,42 @@ export default function VencimientosPage() {
           value={resumen?.vencidas_30}
           tone="red"
           active={!useCustomRange && tab === "vencidas"}
-          onClick={() => {
-            setUseCustomRange(false);
-            setTab("vencidas");
-            setPage(1);
-          }}
+          onClick={() => gotoTab("vencidas")}
         />
         <KpiButton
           label="Vencidas 14"
           value={resumen?.vencidas_14}
           tone="red"
           active={!useCustomRange && tab === "vencidas"}
-          onClick={() => {
-            setUseCustomRange(false);
-            setTab("vencidas");
-            setPage(1);
-          }}
+          onClick={() => gotoTab("vencidas")}
         />
         <KpiButton
           label="Vencidas 7"
           value={resumen?.vencidas_7}
           tone="red"
           active={!useCustomRange && tab === "vencidas"}
-          onClick={() => {
-            setUseCustomRange(false);
-            setTab("vencidas");
-            setPage(1);
-          }}
+          onClick={() => gotoTab("vencidas")}
         />
         <KpiButton
           label="Vencidas 3"
           value={resumen?.vencidas_3}
           tone="red"
           active={!useCustomRange && tab === "vencidas"}
-          onClick={() => {
-            setUseCustomRange(false);
-            setTab("vencidas");
-            setPage(1);
-          }}
+          onClick={() => gotoTab("vencidas")}
         />
         <KpiButton
           label="Vence hoy"
           value={resumen?.vence_hoy}
           tone="amber"
           active={!useCustomRange && tab === "hoy"}
-          onClick={() => {
-            setUseCustomRange(false);
-            setTab("hoy");
-            setPage(1);
-          }}
+          onClick={() => gotoTab("hoy")}
         />
         <KpiButton
           label="Por vencer (3)"
           value={resumen?.por_vencer_3}
           tone="emerald"
           active={!useCustomRange && tab === "por_vencer"}
-          onClick={() => {
-            setUseCustomRange(false);
-            setTab("por_vencer");
-            setPage(1);
-          }}
+          onClick={() => gotoTab("por_vencer")}
         />
       </div>
 
@@ -491,6 +530,7 @@ export default function VencimientosPage() {
           onChange={(e) => {
             setSearch(e.target.value);
             setPage(1);
+            bumpReload();
           }}
         />
 
@@ -501,7 +541,9 @@ export default function VencimientosPage() {
           onChange={(e) => {
             setOficina(e.target.value);
             setPage(1);
+            bumpReload();
           }}
+          title="Filtrar por oficina"
         >
           <option value="">
             {oficinasStatus === "loading"
@@ -525,6 +567,7 @@ export default function VencimientosPage() {
           onChange={(e) => {
             setPageSize(Number(e.target.value));
             setPage(1);
+            bumpReload();
           }}
         >
           {[25, 50, 100].map((n) => (
@@ -571,14 +614,10 @@ export default function VencimientosPage() {
 
                       <div className="col-span-3">
                         <div className="truncate">{cliente}</div>
-                        <div className="text-xs opacity-70 truncate">
-                          Póliza: {p?.numero_poliza || "s/n"}
-                        </div>
+                        <div className="text-xs opacity-70 truncate">Póliza: {p?.numero_poliza || "s/n"}</div>
                       </div>
 
-                      <div className="col-span-2">
-                        {fmtVto(p?.vto_referencia || p?.fecha_vencimiento)}
-                      </div>
+                      <div className="col-span-2">{fmtVto(p?.vto_referencia || p?.fecha_vencimiento)}</div>
 
                       <div className="col-span-1 flex justify-center">
                         <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>
@@ -586,9 +625,7 @@ export default function VencimientosPage() {
                         </span>
                       </div>
 
-                      <div className="col-span-2 truncate">
-                        {p?.compania_nombre || p?.compania || "—"}
-                      </div>
+                      <div className="col-span-2 truncate">{p?.compania_nombre || p?.compania || "—"}</div>
 
                       <div className="col-span-1 truncate">{p?.oficina ?? "—"}</div>
 
@@ -617,12 +654,7 @@ export default function VencimientosPage() {
               </div>
 
               {asegurados.length === 0 ? (
-                <div className="p-4 text-sm opacity-80">
-                  Sin asegurados en este filtro. <br />
-                  <span className="opacity-70">
-                    Si el KPI marca resultados, probá “Vista: Pólizas” (puede faltar cliente/dni en la respuesta).
-                  </span>
-                </div>
+                <div className="p-4 text-sm opacity-80">Sin asegurados en este filtro.</div>
               ) : (
                 asegurados.map((a) => {
                   const d = a?.dias_mas_proximo;
