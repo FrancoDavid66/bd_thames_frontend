@@ -149,10 +149,10 @@ export default function RenovacionesPage() {
         dias,
         solo_pendientes: soloPendientes,
         search: (search || "").trim(),
-        ordering: "vto_referencia", // ✅ fijo (se entiende y es el que querés)
+        ordering: "vto_referencia", // ✅ fijo
         oficina: oficina || undefined,
         bucket: bucket || undefined,
-        fecha: (fechaBase || "").trim() || undefined,
+        fecha: (fechaBase || "").trim() || undefined, // vacío => HOY en backend
         page,
         page_size: pageSize,
         ...opts,
@@ -174,7 +174,7 @@ export default function RenovacionesPage() {
         solo_pendientes: soloPendientes,
         search: (search || "").trim(),
         oficina: oficina || undefined,
-        fecha: (fechaBase || "").trim() || undefined,
+        fecha: (fechaBase || "").trim() || undefined, // vacío => HOY en backend
         ...opts,
       };
 
@@ -219,9 +219,6 @@ export default function RenovacionesPage() {
   const from = totalCount ? (safePage - 1) * pageSize + 1 : 0;
   const to = totalCount ? Math.min(safePage * pageSize, totalCount) : 0;
 
-  const canPrev = safePage > 1;
-  const canNext = totalCount ? safePage < totalPages : receivedCount === pageSize;
-
   const applyFilters = () => {
     setPage(1);
     setDias(Number(uiDias || 0));
@@ -240,6 +237,16 @@ export default function RenovacionesPage() {
   const onClearBucket = () => {
     setBucket("");
     setPage(1);
+  };
+
+  // ✅ BOTÓN HOY (simple)
+  const hoyActive = bucket === "hoy";
+  const toggleHoy = () => {
+    if (hoyActive) {
+      onClearBucket();
+    } else {
+      onSelectBucket("hoy");
+    }
   };
 
   const resumenBuckets = resumen?.buckets || {};
@@ -271,6 +278,9 @@ export default function RenovacionesPage() {
       { id: "__all_vencidas__", label: "Vencidas (todas)", tone: "red", count: allVencidasCount, title: "Solo informativo", disabled: true },
     ];
   }, [resumenBuckets, pendientesVentana, allVencidasCount]);
+
+  const canPrev = safePage > 1;
+  const canNext = totalCount ? safePage < totalPages : receivedCount === pageSize;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
@@ -319,6 +329,23 @@ export default function RenovacionesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="neutral">Visible (página): {counters.total}</Badge>
             <Badge tone="red">Urgentes ≤ 3d: {counters.urgentes}</Badge>
+
+            {/* ✅ Botón HOY */}
+            <button
+              type="button"
+              onClick={toggleHoy}
+              disabled={loading}
+              title="Mostrar solo las que vencen hoy"
+              className={cx(
+                "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
+                hoyActive
+                  ? "border-amber-400/50 bg-amber-500/25 text-amber-50"
+                  : "border-amber-400/20 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15",
+                loading ? "opacity-70" : ""
+              )}
+            >
+              Hoy
+            </button>
 
             <button
               className="ml-auto inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
@@ -404,7 +431,7 @@ export default function RenovacionesPage() {
 
           <button
             className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
-            disabled={safePage <= 1 || loading}
+            disabled={!canPrev || loading}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             type="button"
           >
@@ -412,7 +439,7 @@ export default function RenovacionesPage() {
           </button>
           <button
             className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
-            disabled={totalCount ? safePage >= totalPages : receivedCount !== pageSize || loading}
+            disabled={!canNext || loading}
             onClick={() => setPage((p) => p + 1)}
             type="button"
           >
