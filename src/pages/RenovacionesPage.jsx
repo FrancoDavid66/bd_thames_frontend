@@ -90,7 +90,7 @@ export default function RenovacionesPage() {
   const error = useSelector(selectRenovacionesError);
   const count = useSelector(selectRenovacionesCount);
 
-  const oficinas = useSelector(selectRenovacionesOficinas); // [{value,label}]
+  const oficinas = useSelector(selectRenovacionesOficinas);
   const oficinasStatus = useSelector(selectRenovacionesOficinasStatus);
   const oficinasError = useSelector(selectRenovacionesOficinasError);
 
@@ -103,7 +103,6 @@ export default function RenovacionesPage() {
   const [uiFechaBase, setUiFechaBase] = useState("");
   const [uiSoloPendientes, setUiSoloPendientes] = useState(true);
   const [uiSearch, setUiSearch] = useState("");
-  const [uiOrdering, setUiOrdering] = useState("vto_referencia");
   const [uiOficina, setUiOficina] = useState("");
 
   // Aplicados
@@ -111,7 +110,6 @@ export default function RenovacionesPage() {
   const [fechaBase, setFechaBase] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [search, setSearch] = useState("");
-  const [ordering, setOrdering] = useState("vto_referencia");
   const [oficina, setOficina] = useState("");
   const [bucket, setBucket] = useState("");
 
@@ -151,7 +149,7 @@ export default function RenovacionesPage() {
         dias,
         solo_pendientes: soloPendientes,
         search: (search || "").trim(),
-        ordering: ordering || "",
+        ordering: "vto_referencia", // ✅ fijo (se entiende y es el que querés)
         oficina: oficina || undefined,
         bucket: bucket || undefined,
         fecha: (fechaBase || "").trim() || undefined,
@@ -166,7 +164,7 @@ export default function RenovacionesPage() {
         // error queda en state
       }
     },
-    [dias, fechaBase, soloPendientes, search, ordering, oficina, bucket, page, pageSize, dispatch]
+    [dias, fechaBase, soloPendientes, search, oficina, bucket, page, pageSize, dispatch]
   );
 
   const loadResumen = useCallback(
@@ -207,38 +205,6 @@ export default function RenovacionesPage() {
     return { total, urgentes };
   }, [items]);
 
-  const openModal = (item) => {
-    setSelected(item);
-    setModalOpen(true);
-  };
-
-  const handleSubmitModal = async (payload) => {
-    if (!selected?.id) return;
-    setSubmitting(true);
-
-    try {
-      const res = await dispatch(renovarPoliza({ id: selected.id, payload })).unwrap();
-      const nuevaId = res?.data?.id;
-
-      toast.success("Póliza renovada ✅");
-
-      setModalOpen(false);
-      setSelected(null);
-
-      if (nuevaId) {
-        navigate(`/polizas/${nuevaId}`);
-        return;
-      }
-
-      await load({ force: true });
-      await loadResumen({ force: true });
-    } catch (e) {
-      toast.error(e?.message || "No se pudo renovar");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const totalCount = Number(count || 0);
   const receivedCount = Array.isArray(items) ? items.length : 0;
 
@@ -262,7 +228,6 @@ export default function RenovacionesPage() {
     setFechaBase((uiFechaBase || "").trim());
     setSoloPendientes(!!uiSoloPendientes);
     setSearch((uiSearch || "").trim());
-    setOrdering(uiOrdering || "");
     setOficina(uiOficina || "");
     // bucket queda como estaba
   };
@@ -274,11 +239,6 @@ export default function RenovacionesPage() {
 
   const onClearBucket = () => {
     setBucket("");
-    setPage(1);
-  };
-
-  const onChangePageSize = (v) => {
-    setPageSize(v);
     setPage(1);
   };
 
@@ -295,25 +255,22 @@ export default function RenovacionesPage() {
     return [
       { id: "", label: "Todos", tone: "neutral", count: pendientesVentana, title: "Sin filtro rápido" },
 
-      { id: "hoy", label: "Hoy", tone: "yellow", count: Number(resumenBuckets?.vence_hoy || 0), title: "Vence hoy (según fecha base)" },
-      { id: "en_1", label: "+1", tone: "blue", count: Number(resumenBuckets?.vence_en_1 || 0), title: "Vence mañana (según fecha base)" },
-      { id: "en_2", label: "+2", tone: "blue", count: Number(resumenBuckets?.vence_en_2 || 0), title: "Vence en 2 días (según fecha base)" },
-      { id: "en_3", label: "+3", tone: "blue", count: Number(resumenBuckets?.vence_en_3 || 0), title: "Vence en 3 días (según fecha base)" },
-      { id: "proximos_3", label: "Próx 3", tone: "blue", count: Number(resumenBuckets?.proximos_3 || 0), title: "Vence entre hoy y +3 (según fecha base)" },
+      { id: "hoy", label: "Hoy", tone: "yellow", count: Number(resumenBuckets?.vence_hoy || 0), title: "Vence hoy" },
+      { id: "en_1", label: "+1", tone: "blue", count: Number(resumenBuckets?.vence_en_1 || 0), title: "Vence mañana" },
+      { id: "en_2", label: "+2", tone: "blue", count: Number(resumenBuckets?.vence_en_2 || 0), title: "Vence en 2 días" },
+      { id: "en_3", label: "+3", tone: "blue", count: Number(resumenBuckets?.vence_en_3 || 0), title: "Vence en 3 días" },
+      { id: "proximos_3", label: "Próx 3", tone: "blue", count: Number(resumenBuckets?.proximos_3 || 0), title: "Vence entre hoy y +3" },
 
-      { id: "vencida_1", label: "-1", tone: "red", count: Number(resumenBuckets?.vencida_1 || 0), title: "Venció ayer (según fecha base)" },
-      { id: "vencida_2", label: "-2", tone: "red", count: Number(resumenBuckets?.vencida_2 || 0), title: "Venció hace 2 días (según fecha base)" },
-      { id: "vencida_3", label: "-3", tone: "red", count: Number(resumenBuckets?.vencida_3 || 0), title: "Venció hace 3 días (según fecha base)" },
+      { id: "vencida_1", label: "-1", tone: "red", count: Number(resumenBuckets?.vencida_1 || 0), title: "Venció ayer" },
+      { id: "vencida_2", label: "-2", tone: "red", count: Number(resumenBuckets?.vencida_2 || 0), title: "Venció hace 2 días" },
+      { id: "vencida_3", label: "-3", tone: "red", count: Number(resumenBuckets?.vencida_3 || 0), title: "Venció hace 3 días" },
 
-      { id: "vencidas_3", label: "Vencidas ≤3", tone: "red", count: Number(resumenBuckets?.vencidas_3 || 0), title: "Vencidas entre 1 y 3 días (según fecha base)" },
-      { id: "vencidas", label: "Vencidas 4+", tone: "red", count: Number(resumenBuckets?.vencidas_4_mas || 0), title: "Vencidas hace 4+ días (según fecha base)" },
+      { id: "vencidas_3", label: "Vencidas ≤3", tone: "red", count: Number(resumenBuckets?.vencidas_3 || 0), title: "Vencidas 1..3 días" },
+      { id: "vencidas", label: "Vencidas 4+", tone: "red", count: Number(resumenBuckets?.vencidas_4_mas || 0), title: "Vencidas 4+ días" },
 
       { id: "__all_vencidas__", label: "Vencidas (todas)", tone: "red", count: allVencidasCount, title: "Solo informativo", disabled: true },
     ];
   }, [resumenBuckets, pendientesVentana, allVencidasCount]);
-
-  const oficinasLoading = oficinasStatus === "loading";
-  const oficinasEmpty = oficinasOptions.length === 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
@@ -378,7 +335,6 @@ export default function RenovacionesPage() {
           </div>
         </div>
 
-        {/* Chips */}
         <RenovacionesBucketsBar
           quickButtons={quickButtons}
           activeBucket={bucket}
@@ -386,9 +342,9 @@ export default function RenovacionesPage() {
           onClearBucket={onClearBucket}
         />
 
-        {/* Filtros (refactor) */}
         <RenovacionesFiltersBar
           loading={loading}
+          baseCalculoLabel={baseCalculoLabel}
           uiDias={uiDias}
           setUiDias={setUiDias}
           uiFechaBase={uiFechaBase}
@@ -397,16 +353,10 @@ export default function RenovacionesPage() {
           setUiSoloPendientes={setUiSoloPendientes}
           uiSearch={uiSearch}
           setUiSearch={setUiSearch}
-          uiOrdering={uiOrdering}
-          setUiOrdering={setUiOrdering}
           uiOficina={uiOficina}
           setUiOficina={setUiOficina}
           oficinasOptions={oficinasOptions}
           oficinasStatus={oficinasStatus}
-          oficinasLoading={oficinasLoading}
-          oficinasEmpty={oficinasEmpty}
-          pageSize={pageSize}
-          onChangePageSize={onChangePageSize}
           onApply={applyFilters}
         />
 
@@ -425,14 +375,33 @@ export default function RenovacionesPage() {
         )}
       </div>
 
-      {/* Controles paginación */}
+      {/* Barra paginación + tamaño página */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/65">
           Página <span className="text-white/90 font-semibold">{safePage}</span> de{" "}
           <span className="text-white/90 font-semibold">{totalPages}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+            <span className="text-xs font-semibold text-white/70">Tamaño:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const v = Number(e.target.value || 25);
+                setPageSize(v);
+                setPage(1);
+              }}
+              className="bg-transparent text-sm font-bold text-white outline-none"
+            >
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n} className="bg-slate-900 text-white">
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
             disabled={safePage <= 1 || loading}
@@ -528,7 +497,10 @@ export default function RenovacionesPage() {
                     <button
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-300 px-4 py-2 text-sm font-extrabold text-black hover:bg-emerald-200 disabled:opacity-60"
                       disabled={submitting}
-                      onClick={() => openModal(p)}
+                      onClick={() => {
+                        setSelected(p);
+                        setModalOpen(true);
+                      }}
                       type="button"
                     >
                       <HiClipboardCheck />
@@ -558,7 +530,32 @@ export default function RenovacionesPage() {
           setModalOpen(false);
           setSelected(null);
         }}
-        onSubmit={handleSubmitModal}
+        onSubmit={async (payload) => {
+          if (!selected?.id) return;
+          setSubmitting(true);
+
+          try {
+            const res = await dispatch(renovarPoliza({ id: selected.id, payload })).unwrap();
+            const nuevaId = res?.data?.id;
+
+            toast.success("Póliza renovada ✅");
+
+            setModalOpen(false);
+            setSelected(null);
+
+            if (nuevaId) {
+              navigate(`/polizas/${nuevaId}`);
+              return;
+            }
+
+            await load({ force: true });
+            await loadResumen({ force: true });
+          } catch (e) {
+            toast.error(e?.message || "No se pudo renovar");
+          } finally {
+            setSubmitting(false);
+          }
+        }}
         submitting={submitting}
       />
     </div>
