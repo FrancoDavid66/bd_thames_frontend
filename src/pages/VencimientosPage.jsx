@@ -38,6 +38,13 @@ function pillCls(tone) {
   return "bg-slate-500/15 text-slate-200 border-slate-500/30";
 }
 
+function badgeCls(kind) {
+  if (kind === "finalizada") return "bg-slate-600/20 text-slate-200 border-slate-500/30";
+  if (kind === "vencida") return "bg-red-600/20 text-red-200 border-red-500/30";
+  if (kind === "activa") return "bg-emerald-600/20 text-emerald-200 border-emerald-500/30";
+  return "bg-slate-600/15 text-slate-200 border-slate-500/30";
+}
+
 // ✅ dd/mm/aaaa (soporta "YYYY-MM-DD" o ISO "YYYY-MM-DDTHH:mm...")
 function fmtVto(v) {
   if (!v) return "—";
@@ -107,7 +114,16 @@ function parseToLocalDateOnly(v) {
   return null;
 }
 
+function isFinalizada(p) {
+  const e = (p?.estado || "").toString().trim().toLowerCase();
+  return e === "finalizada";
+}
+
 function computeDiasFallback(p) {
+  // 🔒 Regla: si está FINALIZADA no la tratamos como “requiere baja”
+  // (no la contamos urgente; si se incluye, que quede neutra)
+  if (isFinalizada(p)) return null;
+
   // 1) si viene del backend, usarlo
   const dRaw = p?.dias_para_vencer;
   const d = typeof dRaw === "number" ? dRaw : Number(dRaw);
@@ -149,6 +165,9 @@ export default function VencimientosPage() {
   const [oficina, setOficina] = useState("");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search, 350);
+
+  // ✅ incluir finalizadas (override backend)
+  const [includeFinalizadas, setIncludeFinalizadas] = useState(false);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -230,8 +249,10 @@ export default function VencimientosPage() {
       page,
       page_size: pageSize,
       ordering: "vto_referencia",
+      // ✅ override backend: incluir finalizadas
+      include_finalizadas: includeFinalizadas ? 1 : undefined,
     }),
-    [oficina, debouncedSearch, pastDays, futureDays, modo, page, pageSize]
+    [oficina, debouncedSearch, pastDays, futureDays, modo, page, pageSize, includeFinalizadas]
   );
 
   const load = useCallback(
@@ -247,7 +268,7 @@ export default function VencimientosPage() {
     load();
   }, [load, reloadToken]);
 
-  // ✅ CAMBIO: calcular _dias con fallback y NO filtrar afuera por null
+  // ✅ CAMBIO: calcular _dias con fallback y mantener FINALIZADAS en neutro
   const filtered = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
     return arr.map((p) => {
@@ -257,6 +278,7 @@ export default function VencimientosPage() {
   }, [items]);
 
   // ✅ Asegurados deduplicados (NO descarta pólizas sin cliente: crea fila “desconocido”)
+  // ✅ y NO cuenta FINALIZADAS como urgencia
   const asegurados = useMemo(() => {
     const arr = Array.isArray(filtered) ? filtered : [];
     const map = new Map();
@@ -282,6 +304,7 @@ export default function VencimientosPage() {
         : `Asegurado desconocido (póliza #${p?.id ?? "?"})`;
 
       const ofi = p?.oficina ?? "";
+      const finalizada = isFinalizada(p);
 
       if (!map.has(key)) {
         map.set(key, {
@@ -303,13 +326,15 @@ export default function VencimientosPage() {
       const row = map.get(key);
       row.polizas_count += 1;
 
-      if (diasOk) {
+      // ✅ no sumar urgencia si es FINALIZADA
+      if (!finalizada && diasOk) {
         if (dias < 0) row.vencidas += 1;
         else if (dias === 0) row.hoy += 1;
         else if (dias > 0) row.por_vencer += 1;
       }
 
-      if (diasOk) {
+      // Preferimos “más próximo” entre NO FINALIZADAS
+      if (!finalizada && diasOk) {
         if (row.dias_mas_proximo === null || dias < row.dias_mas_proximo) {
           row.dias_mas_proximo = dias;
           row.vto_mas_proximo = vtoStr;
@@ -522,7 +547,7 @@ export default function VencimientosPage() {
       </div>
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
         <input
           className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
           placeholder="Buscar (cliente, patente, póliza...)"
@@ -578,6 +603,23 @@ export default function VencimientosPage() {
         </select>
       </div>
 
+      {/* Toggle finalizadas */}
+      <div className="flex items-center gap-2 mb-4">
+        <input
+          id="includeFinalizadas"
+          type="checkbox"
+          checked={includeFinalizadas}
+          onChange={(e) => {
+            setIncludeFinalizadas(e.target.checked);
+            setPage(1);
+            bumpReload();
+          }}
+        />
+        <label htmlFor="includeFinalizadas" className="text-sm opacity-80 select-none">
+          Incluir finalizadas <span className="opacity-60">(solo para revisar, no cuenta como “requiere baja”)</span>
+        </label>
+      </div>
+
       {status === "loading" ? (
         <div className="opacity-80">Cargando…</div>
       ) : (
@@ -605,6 +647,8 @@ export default function VencimientosPage() {
                     ? `${p.cliente.apellido || ""}, ${p.cliente.nombre || ""}`.trim()
                     : "—";
 
+                  const finalizada = isFinalizada(p);
+
                   return (
                     <div
                       key={p.id}
@@ -613,7 +657,14 @@ export default function VencimientosPage() {
                       <div className="col-span-2 font-semibold">{p?.patente || "—"}</div>
 
                       <div className="col-span-3">
-                        <div className="truncate">{cliente}</div>
+                        <div className="truncate flex items-center gap-2">
+                          <span className="truncate">{cliente}</span>
+                          {finalizada ? (
+                            <span className={`px-2 py-0.5 rounded border text-[10px] ${badgeCls("finalizada")}`}>
+                              FINALIZADA
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="text-xs opacity-70 truncate">Póliza: {p?.numero_poliza || "s/n"}</div>
                       </div>
 
