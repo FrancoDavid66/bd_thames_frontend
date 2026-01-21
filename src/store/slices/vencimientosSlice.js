@@ -1,7 +1,9 @@
 // src/store/slices/vencimientosSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
-const TTL_MS = 30 * 1000;
+const TTL_LIST_MS = 30 * 1000;
+const TTL_RESUMEN_MS = 30 * 1000;
+const TTL_OFICINAS_MS = 5 * 60 * 1000;
 
 // Si usás proxy en Vite (/api) dejalo vacío.
 // Si lo definís, puede venir como: "http://localhost:8000", "http://localhost:8000/", "http://localhost:8000/api", etc.
@@ -29,9 +31,8 @@ function normalizeApiRoot(rawBase) {
   // Asegurar slash final
   base = base.endsWith("/") ? base : `${base}/`;
 
-  // Si ya termina en /api/ => ok
+  // Si ya termina en /api/ => lo dejamos como /api
   if (/\/api\/$/i.test(base)) return base.replace(/\/api\/$/i, "/api");
-  if (/\/api\/$/i.test(base)) return base.slice(0, -1);
 
   // Si termina en /api => ok
   if (/\/api$/i.test(base)) return base.replace(/\/api$/i, "/api");
@@ -64,7 +65,7 @@ function joinUrl(root, path) {
   // path: "/polizas/vencimientos/" o "/api/polizas/..."
   const p = (path || "").toString().trim();
 
-  // Si root vacío => usar path tal cual (idealmente "/api/...")
+  // Si root vacío => usar path tal cual (idealmente "/api/..." por proxy)
   if (!root) return p;
 
   // Evitar doble /api si path ya empieza con /api
@@ -104,8 +105,8 @@ function stableKey(obj = {}) {
   return JSON.stringify(out);
 }
 
-function isFresh(entry) {
-  return !!(entry && entry.ts && entry.data && Date.now() - entry.ts < TTL_MS);
+function isFresh(entry, ttlMs) {
+  return !!(entry && entry.ts && entry.data !== undefined && Date.now() - entry.ts < ttlMs);
 }
 
 // ✅ Normalizar oficinas robusto: [{id,nombre}] | ["1","2"] | ["Oficina A"] | {results:...}
@@ -158,10 +159,11 @@ function normalizeOficinasPayload(data) {
 export const fetchVencimientos = createAsyncThunk(
   "vencimientos/fetchVencimientos",
   async ({ params = {}, force = false } = {}, { getState }) => {
+    // params ya incluye include_finalizadas si el front lo manda (y entra en la cache key)
     const key = stableKey(params);
     const cache = getState().vencimientos?.cache?.[key];
 
-    if (!force && isFresh(cache)) {
+    if (!force && isFresh(cache, TTL_LIST_MS)) {
       return { key, data: cache.data, cached: true };
     }
 
@@ -177,7 +179,7 @@ export const fetchVencimientosResumen = createAsyncThunk(
     const key = stableKey({ ...params, _resumen: 1 });
     const cache = getState().vencimientos?.cache?.[key];
 
-    if (!force && isFresh(cache)) {
+    if (!force && isFresh(cache, TTL_RESUMEN_MS)) {
       return { key, data: cache.data, cached: true };
     }
 
@@ -193,7 +195,7 @@ export const fetchVencimientosOficinas = createAsyncThunk(
     const key = stableKey({ _oficinas: 1 });
     const cache = getState().vencimientos?.cache?.[key];
 
-    if (!force && isFresh(cache)) {
+    if (!force && isFresh(cache, TTL_OFICINAS_MS)) {
       return { key, data: cache.data, cached: true };
     }
 
@@ -241,7 +243,7 @@ const vencimientosSlice = createSlice({
         const params = action?.meta?.arg?.params || {};
         const key = stableKey(params);
         const cache = state.cache?.[key];
-        if (isFresh(cache)) {
+        if (isFresh(cache, TTL_LIST_MS)) {
           const data = cache.data || {};
           const results = Array.isArray(data?.results)
             ? data.results
@@ -284,7 +286,7 @@ const vencimientosSlice = createSlice({
         const params = action?.meta?.arg?.params || {};
         const key = stableKey({ ...params, _resumen: 1 });
         const cache = state.cache?.[key];
-        if (isFresh(cache)) {
+        if (isFresh(cache, TTL_RESUMEN_MS)) {
           state.resumen = { ...DEFAULT_RESUMEN, ...(cache.data || {}) };
         }
       })
@@ -300,14 +302,14 @@ const vencimientosSlice = createSlice({
       })
 
       // ===== OFICINAS =====
-      .addCase(fetchVencimientosOficinas.pending, (state, action) => {
+      .addCase(fetchVencimientosOficinas.pending, (state) => {
         state.oficinasStatus = "loading";
         state.oficinasError = null;
 
         // ✅ UX: hidratar desde cache si hay
         const key = stableKey({ _oficinas: 1 });
         const cache = state.cache?.[key];
-        if (isFresh(cache)) {
+        if (isFresh(cache, TTL_OFICINAS_MS)) {
           state.oficinas = normalizeOficinasPayload(cache.data);
         }
       })
