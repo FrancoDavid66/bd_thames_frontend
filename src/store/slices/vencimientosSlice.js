@@ -5,7 +5,7 @@ const TTL_LIST_MS = 30 * 1000;
 const TTL_RESUMEN_MS = 30 * 1000;
 const TTL_OFICINAS_MS = 5 * 60 * 1000;
 
-// Si usás proxy en Vite (/api) dejalo vacío.
+// Si usás proxy en Vite, normalmente el backend está en "/api".
 // Si lo definís, puede venir como: "http://localhost:8000", "http://localhost:8000/", "http://localhost:8000/api", etc.
 const RAW_BASE = (import.meta.env.VITE_API_URL || "").toString().trim();
 
@@ -19,8 +19,9 @@ const DEFAULT_RESUMEN = {
 };
 
 function normalizeApiRoot(rawBase) {
-  // Queremos un root que termine en "/api" o vacío (para proxy).
-  if (!rawBase) return "";
+  // ✅ Si no hay base (proxy / same-origin), usamos "/api" por defecto.
+  // Esto evita que los fetch terminen pegando a "/polizas/..." sin el prefijo "/api".
+  if (!rawBase) return "/api";
 
   let base = rawBase;
   if (!/^https?:\/\//i.test(base) && !base.startsWith("/")) {
@@ -61,23 +62,24 @@ function buildQuery(params = {}) {
 }
 
 function joinUrl(root, path) {
-  // root: "" (proxy) o "http://x/api"
+  // root: "/api" | "http://x/api"
   // path: "/polizas/vencimientos/" o "/api/polizas/..."
+  const r = (root || "").toString().trim();
   const p = (path || "").toString().trim();
 
-  // Si root vacío => usar path tal cual (idealmente "/api/..." por proxy)
-  if (!root) return p;
+  // Si no hay root (no debería pasar ahora), usar path tal cual.
+  if (!r) return p;
 
   // Evitar doble /api si path ya empieza con /api
   if (p.startsWith("/api/")) {
-    return `${root}${p.replace(/^\/api/, "")}`;
+    return `${r}${p.replace(/^\/api/, "")}`;
   }
 
   // Si viene "/polizas/..." => append a /api
-  if (p.startsWith("/")) return `${root}${p}`;
+  if (p.startsWith("/")) return `${r}${p}`;
 
   // fallback
-  return `${root}/${p}`;
+  return `${r}/${p}`;
 }
 
 async function apiGet(path, params = {}) {
@@ -167,7 +169,6 @@ export const fetchVencimientos = createAsyncThunk(
       return { key, data: cache.data, cached: true };
     }
 
-    // 👇 IMPORTANTE: acá usamos path sin /api (para que joinUrl lo maneje)
     const data = await apiGet("/polizas/vencimientos/", params);
     return { key, data, cached: false };
   }
@@ -188,7 +189,7 @@ export const fetchVencimientosResumen = createAsyncThunk(
   }
 );
 
-// ✅🆕 Oficinas para el select
+// ✅ Oficinas para el select
 export const fetchVencimientosOficinas = createAsyncThunk(
   "vencimientos/fetchVencimientosOficinas",
   async ({ force = false } = {}, { getState }) => {
@@ -214,7 +215,7 @@ const vencimientosSlice = createSlice({
 
     resumen: { ...DEFAULT_RESUMEN },
 
-    // ✅🆕 oficinas para select
+    // ✅ oficinas para select
     oficinas: [],
     oficinasStatus: "idle",
     oficinasError: null,
@@ -340,7 +341,7 @@ export const selectVencimientosError = (s) => s?.vencimientos?.error || null;
 export const selectVencimientosResumenError = (s) =>
   s?.vencimientos?.resumenError || null;
 
-// ✅🆕 oficinas selectors
+// ✅ oficinas selectors
 export const selectVencimientosOficinas = (s) => s?.vencimientos?.oficinas || [];
 export const selectVencimientosOficinasStatus = (s) =>
   s?.vencimientos?.oficinasStatus || "idle";
