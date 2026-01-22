@@ -277,6 +277,27 @@ export default function VencimientosPage() {
     });
   }, [items]);
 
+  // ✅ Map id->nombre para mostrar oficina en la tabla
+  const oficinaNameById = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(oficinas)) {
+      for (const o of oficinas) {
+        const id = String(o?.id ?? "").trim();
+        const nombre = String(o?.nombre ?? "").trim();
+        if (id) map.set(id, nombre || id);
+      }
+    }
+    return map;
+  }, [oficinas]);
+
+  function getOficinaLabel(p) {
+    const raw = p?.oficina;
+    if (raw === null || raw === undefined) return "—";
+    const key = String(raw).trim();
+    if (!key) return "—";
+    return oficinaNameById.get(key) || key;
+  }
+
   // ✅ Asegurados deduplicados (NO descarta pólizas sin cliente: crea fila “desconocido”)
   // ✅ y NO cuenta FINALIZADAS como urgencia
   const asegurados = useMemo(() => {
@@ -286,7 +307,7 @@ export default function VencimientosPage() {
     for (const p of arr) {
       const c = p?.cliente || {};
       const clienteId = p?.cliente_id ?? c?.id ?? null;
-      const dni = c?.dni ?? "";
+      const dni = c?.dni ?? c?.dni_cuit_cuil ?? "";
 
       const hasClienteKey = !!(clienteId || dni);
       const key = String(clienteId ?? dni ?? `POLIZA_${p?.id ?? "?"}`).trim();
@@ -303,7 +324,7 @@ export default function VencimientosPage() {
         ? nombreReal || "—"
         : `Asegurado desconocido (póliza #${p?.id ?? "?"})`;
 
-      const ofi = p?.oficina ?? "";
+      const ofi = getOficinaLabel(p);
       const finalizada = isFinalizada(p);
 
       if (!map.has(key)) {
@@ -351,7 +372,7 @@ export default function VencimientosPage() {
       const db = b.dias_mas_proximo ?? 999999;
       return da - db;
     });
-  }, [filtered]);
+  }, [filtered, oficinaNameById]);
 
   const title = useCustomRange
     ? `Rango personalizado (-${pastDays} / +${futureDays})`
@@ -626,12 +647,13 @@ export default function VencimientosPage() {
         <>
           {viewMode === "polizas" ? (
             <div className="rounded border border-slate-700 overflow-hidden">
+              {/* ✅ Header: agregamos columna "Póliza" y hacemos "Asegurado" con links */}
               <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-xs font-semibold border-b border-slate-700">
                 <div className="col-span-2">Patente</div>
+                <div className="col-span-2">Póliza</div>
                 <div className="col-span-3">Asegurado</div>
                 <div className="col-span-2">Vto</div>
                 <div className="col-span-1 text-center">Días</div>
-                <div className="col-span-2">Compañía</div>
                 <div className="col-span-1">Oficina</div>
                 <div className="col-span-1 text-right">Abrir</div>
               </div>
@@ -643,11 +665,17 @@ export default function VencimientosPage() {
                   const d = p?._dias;
                   const tone = toneByDias(d);
 
-                  const cliente = p?.cliente
-                    ? `${p.cliente.apellido || ""}, ${p.cliente.nombre || ""}`.trim()
+                  const clienteObj = p?.cliente || {};
+                  const clienteId = p?.cliente_id ?? clienteObj?.id ?? null;
+                  const clienteNombre = clienteObj
+                    ? `${clienteObj.apellido || ""}, ${clienteObj.nombre || ""}`.trim().replace(/^, /, "")
                     : "—";
 
+                  const clienteDoc =
+                    (clienteObj?.dni_cuit_cuil || clienteObj?.dni || "").toString().trim();
+
                   const finalizada = isFinalizada(p);
+                  const oficinaLabel = getOficinaLabel(p);
 
                   return (
                     <div
@@ -656,29 +684,79 @@ export default function VencimientosPage() {
                     >
                       <div className="col-span-2 font-semibold">{p?.patente || "—"}</div>
 
+                      {/* ✅ Link al número de póliza */}
+                      <div className="col-span-2">
+                        <NavLink
+                          to={`/polizas/${p.id}`}
+                          className="font-semibold underline opacity-90 hover:opacity-100"
+                          title="Abrir póliza"
+                        >
+                          {p?.numero_poliza || "s/n"}
+                        </NavLink>
+                        <div className="text-xs opacity-70 truncate">
+                          ID póliza: <span className="opacity-90">{p?.id}</span>
+                        </div>
+                      </div>
+
+                      {/* ✅ Nombre + número de cliente con links */}
                       <div className="col-span-3">
                         <div className="truncate flex items-center gap-2">
-                          <span className="truncate">{cliente}</span>
+                          {clienteId ? (
+                            <NavLink
+                              to={`/clientes/${clienteId}`}
+                              className="truncate underline opacity-90 hover:opacity-100"
+                              title="Abrir cliente"
+                            >
+                              {clienteNombre || "—"}
+                            </NavLink>
+                          ) : (
+                            <span className="truncate">{clienteNombre || "—"}</span>
+                          )}
+
                           {finalizada ? (
                             <span className={`px-2 py-0.5 rounded border text-[10px] ${badgeCls("finalizada")}`}>
                               FINALIZADA
                             </span>
                           ) : null}
                         </div>
-                        <div className="text-xs opacity-70 truncate">Póliza: {p?.numero_poliza || "s/n"}</div>
+
+                        <div className="text-xs opacity-70 truncate flex gap-2">
+                          {clienteId ? (
+                            <NavLink
+                              to={`/clientes/${clienteId}`}
+                              className="underline opacity-80 hover:opacity-100"
+                              title="Abrir cliente"
+                            >
+                              Cliente #{clienteId}
+                            </NavLink>
+                          ) : (
+                            <span>Cliente: —</span>
+                          )}
+
+                          {clienteId && clienteDoc ? (
+                            <NavLink
+                              to={`/clientes/${clienteId}`}
+                              className="underline opacity-80 hover:opacity-100"
+                              title="Abrir cliente"
+                            >
+                              DNI/CUIT: {clienteDoc}
+                            </NavLink>
+                          ) : clienteDoc ? (
+                            <span>DNI/CUIT: {clienteDoc}</span>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="col-span-2">{fmtVto(p?.vto_referencia || p?.fecha_vencimiento)}</div>
 
                       <div className="col-span-1 flex justify-center">
-                        <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>
-                          {d ?? "—"}
-                        </span>
+                        <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>{d ?? "—"}</span>
                       </div>
 
-                      <div className="col-span-2 truncate">{p?.compania_nombre || p?.compania || "—"}</div>
-
-                      <div className="col-span-1 truncate">{p?.oficina ?? "—"}</div>
+                      {/* ✅ Oficina con nombre */}
+                      <div className="col-span-1 truncate" title={oficinaLabel}>
+                        {oficinaLabel}
+                      </div>
 
                       <div className="col-span-1 text-right">
                         <NavLink
@@ -749,9 +827,7 @@ export default function VencimientosPage() {
                       <div className="col-span-2">{a.vto_mas_proximo || "—"}</div>
 
                       <div className="col-span-1 flex justify-center">
-                        <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>
-                          {d ?? "—"}
-                        </span>
+                        <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>{d ?? "—"}</span>
                       </div>
                     </div>
                   );
