@@ -16,6 +16,7 @@ import {
   FaChevronLeft,
   FaSyncAlt,
   FaClock, // ✅🆕 Vencimientos
+  FaBan, // ✅🆕 Bajas
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
@@ -188,6 +189,21 @@ export default function Sidebar({
                       >
                         <FaClock className="text-base" />
                         <span>Vencimientos</span>
+                      </NavLink>
+
+                      {/* ✅🆕 Bajas */}
+                      <NavLink
+                        to="/polizas/bajas"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+                            isActive
+                              ? "bg-blue-800/70 dark:bg-gray-800/70"
+                              : "text-white/90 hover:bg-blue-800/50 dark:hover:bg-gray-800/50"
+                          }`
+                        }
+                      >
+                        <FaBan className="text-base" />
+                        <span>Bajas</span>
                       </NavLink>
 
                       <NavLink

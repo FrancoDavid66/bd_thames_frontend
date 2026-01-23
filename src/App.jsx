@@ -38,6 +38,9 @@ import RenovacionesPage from "./pages/RenovacionesPage";
 // ✅🆕 Vencimientos
 import VencimientosPage from "./pages/VencimientosPage";
 
+// ✅🆕 Bajas
+import BajasPage from "./pages/BajasPage";
+
 // 🔔 Realtime counters (front-only BroadcastChannel)
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
@@ -417,6 +420,9 @@ function App() {
 
               {/* ✅🆕 Vencimientos */}
               <Route path="/polizas/vencimientos" element={<VencimientosPage />} />
+
+              {/* ✅🆕 Bajas */}
+              <Route path="/polizas/bajas" element={<BajasPage />} />
 
               <Route path="/polizas/:id" element={<PolizaDetails />} />
 
