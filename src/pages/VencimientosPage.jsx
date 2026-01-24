@@ -13,6 +13,14 @@ import {
   selectVencimientosOficinasStatus,
 } from "../store/slices/vencimientosSlice";
 
+import VencimientosTabs from "../components/vencimientos/VencimientosTabs";
+import VencimientosSummary from "../components/vencimientos/VencimientosSummary";
+import VencimientosFiltersBar from "../components/vencimientos/VencimientosFiltersBar";
+import VencimientosPagination from "../components/vencimientos/VencimientosPagination";
+import VencimientosPolizasTable from "../components/vencimientos/VencimientosPolizasTable";
+import VencimientosAseguradosTable from "../components/vencimientos/VencimientosAseguradosTable";
+import VencimientosExportModal from "../components/vencimientos/VencimientosExportModal";
+
 // 🔹 helper debounce simple
 function useDebounced(value, ms = 350) {
   const [v, setV] = useState(value);
@@ -49,13 +57,10 @@ function badgeCls(kind) {
 function fmtVto(v) {
   if (!v) return "—";
   const s = String(v).trim();
-
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-
   const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if (m2) return m2[0];
-
   return s.slice(0, 10);
 }
 
@@ -119,9 +124,7 @@ function computeDiasFallback(p) {
   return Math.round(ms / 86400000);
 }
 
-// 📞 TEL robusto:
-// 1) si backend manda cliente_telefono (recomendado) => usa eso
-// 2) si no, busca en campos típicos dentro de cliente
+// 📞 TEL robusto
 function getTelefonoFromPoliza(p) {
   const direct = p?.cliente_telefono ?? p?.clienteTelefono ?? "";
   if (direct !== null && direct !== undefined) {
@@ -130,18 +133,7 @@ function getTelefonoFromPoliza(p) {
   }
 
   const c = p?.cliente || {};
-  const candidates = [
-    "telefono",
-    "celular",
-    "whatsapp",
-    "telefono1",
-    "telefono2",
-    "tel",
-    "movil",
-    "mobile",
-    "phone",
-    "numero",
-  ];
+  const candidates = ["telefono", "celular", "whatsapp", "telefono1", "telefono2", "tel", "movil", "mobile", "phone", "numero"];
   for (const k of candidates) {
     const v = c?.[k];
     if (v === null || v === undefined) continue;
@@ -156,103 +148,15 @@ function normalizePhoneDigits(phone) {
   return String(phone).replace(/[^\d]/g, "");
 }
 
-// ✅ WhatsApp: normaliza y, si no viene con país, asume AR (+54)
 function waUrl(phone) {
   const digits0 = normalizePhoneDigits(phone);
   if (!digits0) return "";
 
   let d = digits0;
-
-  // prefijos comunes
   if (d.startsWith("00")) d = d.slice(2);
   if (d.startsWith("0")) d = d.slice(1);
-
-  // si no trae país, asumimos AR (54)
   if (!d.startsWith("54")) d = `54${d}`;
-
   return `https://wa.me/${d}`;
-}
-
-function KpiButton({ label, value, active, onClick, tone = "slate" }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded border p-3 text-left transition ${
-        active ? "ring-2 ring-white/30" : "hover:bg-white/5"
-      } ${pillCls(tone)}`}
-      title={label}
-    >
-      <div className="text-xs opacity-80">{label}</div>
-      <div className="text-lg font-semibold">{value ?? "—"}</div>
-    </button>
-  );
-}
-
-function downloadTextFile(filename, text, mime = "text/plain;charset=utf-8") {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-// ====== helpers API (para export de TODAS las páginas) ======
-const RAW_BASE = (import.meta.env.VITE_API_URL || "").toString().trim();
-
-function normalizeApiRoot(rawBase) {
-  if (!rawBase) return "";
-  let base = rawBase;
-  if (!/^https?:\/\//i.test(base) && !base.startsWith("/")) base = `http://${base}`;
-  base = base.endsWith("/") ? base : `${base}/`;
-  if (/\/api\/$/i.test(base)) return base.replace(/\/api\/$/i, "/api");
-  if (/\/api$/i.test(base)) return base.replace(/\/api$/i, "/api");
-  return `${base.replace(/\/$/, "")}/api`;
-}
-const API_ROOT = normalizeApiRoot(RAW_BASE);
-
-function buildQuery(params = {}) {
-  const sp = new URLSearchParams();
-  Object.keys(params)
-    .sort()
-    .forEach((k) => {
-      const v = params[k];
-      if (v === undefined || v === null || v === "") return;
-      sp.append(k, String(v));
-    });
-  const qs = sp.toString();
-  return qs ? `?${qs}` : "";
-}
-
-function joinUrl(root, path) {
-  const p = (path || "").toString().trim();
-  if (!root) return p;
-  if (p.startsWith("/api/")) return `${root}${p.replace(/^\/api/, "")}`;
-  if (p.startsWith("/")) return `${root}${p}`;
-  return `${root}/${p}`;
-}
-
-async function apiGetJson(urlOrPath, params = null) {
-  const url =
-    params && typeof urlOrPath === "string"
-      ? `${joinUrl(API_ROOT, urlOrPath)}${buildQuery(params)}`
-      : urlOrPath;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`GET ${url} failed (${res.status}): ${txt}`);
-  }
-  return res.json();
 }
 
 export default function VencimientosPage() {
@@ -267,13 +171,13 @@ export default function VencimientosPage() {
   const oficinas = useSelector(selectVencimientosOficinas);
   const oficinasStatus = useSelector(selectVencimientosOficinasStatus);
 
-  // ✅🆕 paginación desde Redux (DRF)
+  // paginación DRF
   const totalCount = useSelector((s) => Number(s?.vencimientos?.count ?? 0));
   const nextUrl = useSelector((s) => s?.vencimientos?.next ?? null);
   const prevUrl = useSelector((s) => s?.vencimientos?.previous ?? null);
 
-  const [tab, setTab] = useState("por_vencer"); // por_vencer | hoy | vencidas
-  const [viewMode, setViewMode] = useState("polizas"); // polizas | asegurados
+  const [tab, setTab] = useState("por_vencer");
+  const [viewMode, setViewMode] = useState("polizas");
 
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -292,7 +196,12 @@ export default function VencimientosPage() {
   const [customPastDays, setCustomPastDays] = useState(2);
   const [customFutureDays, setCustomFutureDays] = useState(2);
 
-  const [baseDate, setBaseDate] = useState(""); // "YYYY-MM-DD" o ""
+  const [baseDate, setBaseDate] = useState("");
+
+  // ✅ Orden mejorado
+  // backend seguro: vto_referencia / -vto_referencia
+  // si el usuario elige "días", lo hacemos local SOLO en la página (sin depender del backend)
+  const [sortMode, setSortMode] = useState("urgente"); // urgente | lejos | dias_asc | dias_desc
 
   const bumpReload = useCallback(() => setReloadToken((t) => t + 1), []);
 
@@ -321,10 +230,17 @@ export default function VencimientosPage() {
     return "por_vencer";
   }, [tab, useCustomRange]);
 
+  const ordering = useMemo(() => {
+    if (sortMode === "lejos") return "-vto_referencia";
+    // default: urgente primero
+    return "vto_referencia";
+  }, [sortMode]);
+
   useEffect(() => {
     dispatch(fetchVencimientosOficinas());
   }, [dispatch]);
 
+  // mantener oficina en querystring (como ya tenías)
   useEffect(() => {
     try {
       const sp = new URLSearchParams(location.search || "");
@@ -352,11 +268,11 @@ export default function VencimientosPage() {
       modo,
       page,
       page_size: pageSize,
-      ordering: "vto_referencia",
+      ordering,
       include_finalizadas: includeFinalizadas ? 1 : undefined,
       fecha: baseDate || undefined,
     }),
-    [oficina, debouncedSearch, pastDays, futureDays, modo, page, pageSize, includeFinalizadas, baseDate]
+    [oficina, debouncedSearch, pastDays, futureDays, modo, page, pageSize, ordering, includeFinalizadas, baseDate]
   );
 
   const load = useCallback(
@@ -371,14 +287,6 @@ export default function VencimientosPage() {
     load();
   }, [load, reloadToken]);
 
-  const filtered = useMemo(() => {
-    const arr = Array.isArray(items) ? items : [];
-    return arr.map((p) => {
-      const d = computeDiasFallback(p);
-      return { ...p, _dias: Number.isFinite(d) ? d : null };
-    });
-  }, [items]);
-
   const oficinaNameById = useMemo(() => {
     const map = new Map();
     if (Array.isArray(oficinas)) {
@@ -391,16 +299,44 @@ export default function VencimientosPage() {
     return map;
   }, [oficinas]);
 
-  function getOficinaLabel(p) {
-    const raw = p?.oficina;
-    if (raw === null || raw === undefined) return "—";
-    const key = String(raw).trim();
-    if (!key) return "—";
-    return oficinaNameById.get(key) || key;
-  }
+  const getOficinaLabel = useCallback(
+    (p) => {
+      const raw = p?.oficina;
+      if (raw === null || raw === undefined) return "—";
+      const key = String(raw).trim();
+      if (!key) return "—";
+      return oficinaNameById.get(key) || key;
+    },
+    [oficinaNameById]
+  );
 
+  // ✅ polizas: agregar _dias y aplicar orden local si se eligió dias_asc/dias_desc
+  const polizas = useMemo(() => {
+    const arr = Array.isArray(items) ? items : [];
+    const withDias = arr.map((p) => ({ ...p, _dias: Number.isFinite(computeDiasFallback(p)) ? computeDiasFallback(p) : null }));
+
+    if (sortMode === "dias_asc") {
+      return [...withDias].sort((a, b) => {
+        const da = a._dias ?? 999999;
+        const db = b._dias ?? 999999;
+        return da - db;
+      });
+    }
+
+    if (sortMode === "dias_desc") {
+      return [...withDias].sort((a, b) => {
+        const da = a._dias ?? -999999;
+        const db = b._dias ?? -999999;
+        return db - da;
+      });
+    }
+
+    return withDias;
+  }, [items, sortMode]);
+
+  // ✅ asegurados dedup (igual a tu lógica, pero basado en polizas ya normalizadas)
   const asegurados = useMemo(() => {
-    const arr = Array.isArray(filtered) ? filtered : [];
+    const arr = Array.isArray(polizas) ? polizas : [];
     const map = new Map();
 
     for (const p of arr) {
@@ -445,7 +381,6 @@ export default function VencimientosPage() {
 
       const row = map.get(key);
       row.polizas_count += 1;
-
       if (!row.telefono && tel) row.telefono = tel;
 
       if (!finalizada && diasOk) {
@@ -471,46 +406,20 @@ export default function VencimientosPage() {
       const db = b.dias_mas_proximo ?? 999999;
       return da - db;
     });
-  }, [filtered, oficinaNameById]);
+  }, [polizas, getOficinaLabel]);
 
-  const title = useCustomRange
-    ? `Rango personalizado (-${pastDays} / +${futureDays})`
-    : tab === "vencidas"
-    ? "Vencidas"
-    : tab === "hoy"
-    ? "Vence hoy"
-    : "Por vencer (1-3 días)";
-
-  // ✅🆕 paginación: total pages / rango mostrado
   const totalPages = useMemo(() => {
     const ps = Math.max(1, Number(pageSize) || 1);
     const c = Math.max(0, Number(totalCount) || 0);
     return Math.max(1, Math.ceil(c / ps));
   }, [totalCount, pageSize]);
 
-  const showingFrom = useMemo(() => {
-    if (!totalCount) return 0;
-    return (page - 1) * pageSize + 1;
-  }, [totalCount, page, pageSize]);
-
-  const showingTo = useMemo(() => {
-    if (!totalCount) return 0;
-    return Math.min(page * pageSize, totalCount);
-  }, [totalCount, page, pageSize]);
-
-  // ✅🆕 clamp automático: si cambiás filtros y la página actual queda fuera de rango
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const info = useMemo(() => {
-    // ⚠️ filtered.length es SOLO “recibidos en esta página”
-    return {
-      polizas_pagina: filtered.length,
-      polizas_total: totalCount,
-      asegurados_pagina: asegurados.length,
-    };
-  }, [filtered, asegurados, totalCount]);
+  const showingFrom = useMemo(() => (!totalCount ? 0 : (page - 1) * pageSize + 1), [totalCount, page, pageSize]);
+  const showingTo = useMemo(() => (!totalCount ? 0 : Math.min(page * pageSize, totalCount)), [totalCount, page, pageSize]);
 
   const gotoTab = useCallback(
     (nextTab) => {
@@ -523,215 +432,16 @@ export default function VencimientosPage() {
     [bumpReload]
   );
 
-  // ✅ Export: trae TODAS las pólizas del filtro y exporta asegurados dedup (CSV)
-  const [exporting, setExporting] = useState(false);
+  const title = useCustomRange
+    ? `Rango personalizado (-${pastDays} / +${futureDays})`
+    : tab === "vencidas"
+    ? "Vencidas"
+    : tab === "hoy"
+    ? "Vence hoy"
+    : "Por vencer (1-3 días)";
 
-  const exportAseguradosCsvAll = useCallback(async () => {
-    try {
-      setExporting(true);
-
-      const baseParams = {
-        oficina: oficina || undefined,
-        search: debouncedSearch || undefined,
-        past_days: pastDays,
-        future_days: futureDays,
-        modo,
-        ordering: "vto_referencia",
-        include_finalizadas: includeFinalizadas ? 1 : undefined,
-        fecha: baseDate || undefined,
-        page: 1,
-        page_size: 200,
-      };
-
-      const first = await apiGetJson("/polizas/vencimientos/", baseParams);
-      const all = [];
-      const r1 = Array.isArray(first?.results) ? first.results : Array.isArray(first) ? first : [];
-      all.push(...r1);
-
-      let next = first?.next || null;
-      while (next) {
-        const pageData = await apiGetJson(next, null);
-        const rr = Array.isArray(pageData?.results) ? pageData.results : Array.isArray(pageData) ? pageData : [];
-        all.push(...rr);
-        next = pageData?.next || null;
-      }
-
-      const map = new Map();
-      for (const p0 of all) {
-        const p = {
-          ...p0,
-          _dias: Number.isFinite(Number(p0?.dias_para_vencer))
-            ? Number(p0?.dias_para_vencer)
-            : computeDiasFallback(p0),
-        };
-
-        const c = p?.cliente || {};
-        const clienteId = p?.cliente_id ?? c?.id ?? null;
-        const dni = c?.dni ?? c?.dni_cuit_cuil ?? "";
-        const hasKey = !!(clienteId || dni);
-        const key = String(clienteId ?? dni ?? `POLIZA_${p?.id ?? "?"}`).trim();
-        if (!key) continue;
-
-        const nombreReal = `${c?.apellido || ""}, ${c?.nombre || ""}`.trim().replace(/^, /, "");
-        const nombre = hasKey ? nombreReal || "—" : `Asegurado desconocido (póliza #${p?.id ?? "?"})`;
-
-        const tel = getTelefonoFromPoliza(p);
-        const ofi = (() => {
-          const raw = p?.oficina;
-          if (raw === null || raw === undefined) return "—";
-          const k = String(raw).trim();
-          if (!k) return "—";
-          return oficinaNameById.get(k) || k;
-        })();
-
-        const vto = p?.vto_referencia || p?.fecha_vencimiento || null;
-        const vtoStr = vto ? fmtVto(vto) : "";
-        const dias = typeof p?._dias === "number" ? p._dias : null;
-        const finalizada = isFinalizada(p);
-
-        if (!map.has(key)) {
-          map.set(key, {
-            cliente_id: clienteId || "",
-            nombre,
-            dni: hasKey ? (dni || "") : "",
-            telefono: tel || "",
-            oficina: ofi || "",
-            polizas_count: 0,
-            vencidas: 0,
-            hoy: 0,
-            por_vencer: 0,
-            vto_mas_proximo: vtoStr || "",
-            dias_mas_proximo: dias,
-          });
-        }
-
-        const row = map.get(key);
-        row.polizas_count += 1;
-        if (!row.telefono && tel) row.telefono = tel;
-        if (!row.oficina && ofi) row.oficina = ofi;
-
-        if (!finalizada && typeof dias === "number") {
-          if (dias < 0) row.vencidas += 1;
-          else if (dias === 0) row.hoy += 1;
-          else row.por_vencer += 1;
-
-          if (row.dias_mas_proximo === null || row.dias_mas_proximo === undefined || dias < row.dias_mas_proximo) {
-            row.dias_mas_proximo = dias;
-            row.vto_mas_proximo = vtoStr || row.vto_mas_proximo;
-          }
-        } else {
-          if (!row.vto_mas_proximo && vtoStr) row.vto_mas_proximo = vtoStr;
-        }
-      }
-
-      const rows = Array.from(map.values()).sort((a, b) => {
-        const da = a.dias_mas_proximo ?? 999999;
-        const db = b.dias_mas_proximo ?? 999999;
-        return da - db;
-      });
-
-      const headers = [
-        "cliente_id",
-        "nombre",
-        "dni_cuit_cuil",
-        "telefono",
-        "oficina",
-        "polizas_count",
-        "vencidas",
-        "vence_hoy",
-        "por_vencer",
-        "vto_mas_proximo",
-        "dias_mas_proximo",
-      ];
-
-      const esc = (v) => {
-        const s = String(v ?? "");
-        if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-        return s;
-      };
-
-      const csv = [
-        headers.join(","),
-        ...rows.map((r) =>
-          [
-            r.cliente_id,
-            r.nombre,
-            r.dni,
-            r.telefono,
-            r.oficina,
-            r.polizas_count,
-            r.vencidas,
-            r.hoy,
-            r.por_vencer,
-            r.vto_mas_proximo,
-            r.dias_mas_proximo ?? "",
-          ].map(esc).join(",")
-        ),
-      ].join("\n");
-
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const dd = String(today.getDate()).padStart(2, "0");
-      const fname = `asegurados_vencimientos_${yyyy}-${mm}-${dd}.csv`;
-      downloadTextFile(fname, csv, "text/csv;charset=utf-8");
-    } catch (e) {
-      alert(e?.message || "Error exportando");
-    } finally {
-      setExporting(false);
-    }
-  }, [
-    oficina,
-    debouncedSearch,
-    pastDays,
-    futureDays,
-    modo,
-    includeFinalizadas,
-    baseDate,
-    oficinaNameById,
-  ]);
-
-  // ✅🆕 Componente paginación reutilizable
-  const PaginationBar = useCallback(() => {
-    const canPrev = page > 1 && !!prevUrl;
-    const canNext = page < totalPages && !!nextUrl;
-
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-        <div className="text-xs opacity-70">
-          Mostrando <span className="font-semibold">{showingFrom}</span>–<span className="font-semibold">{showingTo}</span>{" "}
-          de <span className="font-semibold">{totalCount}</span> • Página{" "}
-          <span className="font-semibold">{page}</span> / <span className="font-semibold">{totalPages}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={`px-3 py-2 rounded border border-white/10 bg-slate-900 hover:bg-slate-800 text-sm ${
-              canPrev ? "" : "opacity-50 cursor-not-allowed"
-            }`}
-            disabled={!canPrev}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            title="Página anterior"
-          >
-            ⬅ Anterior
-          </button>
-
-          <button
-            type="button"
-            className={`px-3 py-2 rounded border border-white/10 bg-slate-900 hover:bg-slate-800 text-sm ${
-              canNext ? "" : "opacity-50 cursor-not-allowed"
-            }`}
-            disabled={!canNext}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            title="Página siguiente"
-          >
-            Siguiente ➡
-          </button>
-        </div>
-      </div>
-    );
-  }, [page, prevUrl, nextUrl, totalPages, totalCount, showingFrom, showingTo]);
+  // export modal
+  const [exportOpen, setExportOpen] = useState(false);
 
   return (
     <div className="p-4 text-slate-100">
@@ -740,16 +450,7 @@ export default function VencimientosPage() {
           <h1 className="text-xl font-semibold">Vencimientos</h1>
           <div className="text-sm opacity-75">Mostrando: {title}</div>
           <div className="text-xs opacity-60 mt-1">
-            {viewMode === "asegurados" ? (
-              <>
-                Pólizas en esta página: {info.polizas_pagina} • Total backend: {info.polizas_total} • Asegurados en esta página:{" "}
-                {info.asegurados_pagina}
-              </>
-            ) : (
-              <>
-                Pólizas en esta página: {info.polizas_pagina} • Total backend: {info.polizas_total}
-              </>
-            )}
+            Pólizas en esta página: {polizas.length} • Total backend: {totalCount}
           </div>
         </div>
 
@@ -764,135 +465,80 @@ export default function VencimientosPage() {
 
           <button
             type="button"
-            className={`px-3 py-2 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 ${
-              exporting ? "opacity-60 cursor-not-allowed" : ""
-            }`}
-            onClick={exportAseguradosCsvAll}
-            disabled={exporting}
-            title="Descarga TODOS los asegurados según filtros actuales"
+            className="px-3 py-2 rounded bg-emerald-700 hover:bg-emerald-600"
+            onClick={() => setExportOpen(true)}
           >
-            {exporting ? "Exportando…" : "Exportar asegurados (CSV)"}
+            Exportar (Excel/PDF)
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {[
-          { id: "por_vencer", label: "Por vencer (1-3)", tone: "emerald" },
-          { id: "hoy", label: "Vence hoy", tone: "amber" },
-          { id: "vencidas", label: "Vencidas", tone: "red" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => gotoTab(t.id)}
-            className={`px-3 py-2 rounded border text-sm transition ${
-              !useCustomRange && tab === t.id ? "bg-white/10" : "hover:bg-white/5"
-            } ${pillCls(t.tone)}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <VencimientosTabs tab={tab} onChangeTab={gotoTab} />
 
-      {/* ✅ Fecha base */}
-      <div className="rounded border border-slate-700 bg-slate-950 p-3 mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm">
-            <span className="font-semibold">Fecha base</span>{" "}
-            <span className="opacity-70">(simular vencimientos desde una fecha)</span>
-          </div>
+      <VencimientosSummary
+        resumen={resumen}
+        useCustomRange={useCustomRange}
+        tab={tab}
+        onSelectTab={gotoTab}
+      />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              value={baseDate}
-              onChange={(e) => {
-                setBaseDate(e.target.value || "");
-                setPage(1);
-                bumpReload();
-              }}
-              className="px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm"
-              title="Fecha base (YYYY-MM-DD)"
-            />
-
-            <button
-              type="button"
-              className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-sm"
-              onClick={() => {
-                setBaseDate("");
-                setPage(1);
-                bumpReload();
-              }}
-              title="Volver a hoy real (sin fecha)"
-            >
-              Hoy
-            </button>
-          </div>
-        </div>
-
-        <div className="text-xs opacity-60 mt-2">
-          {baseDate ? <>Usando fecha={baseDate} (backend calcula todo relativo a esa fecha)</> : <>Sin fecha: se usa “hoy” real</>}
-        </div>
-      </div>
-
-      {/* Rango personalizado */}
-      <div className="rounded border border-slate-700 bg-slate-950 p-3 mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={useCustomRange}
-              onChange={(e) => {
-                const next = e.target.checked;
-                setUseCustomRange(next);
-                setPage(1);
-                setViewMode("polizas");
-                bumpReload();
-                if (next) {
-                  setCustomPastDays(toNonNegInt(customPastDays, 0));
-                  setCustomFutureDays(toNonNegInt(customFutureDays, 0));
-                }
-              }}
-            />
-            <div className="text-sm">
-              <span className="font-semibold">Rango personalizado</span>{" "}
-              <span className="opacity-70">(vencidas + por vencer juntas)</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-xs opacity-70">Vencidas (días):</div>
-            <input
-              className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700"
-              type="number"
-              min="0"
-              value={draftPastDays}
-              onChange={(e) => setDraftPastDays(e.target.value)}
-              disabled={status === "loading"}
-            />
-
-            <div className="text-xs opacity-70">Por vencer (días):</div>
-            <input
-              className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700"
-              type="number"
-              min="0"
-              value={draftFutureDays}
-              onChange={(e) => setDraftFutureDays(e.target.value)}
-              disabled={status === "loading"}
-            />
-
-            <button
-              type="button"
-              className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-sm"
-              onClick={applyCustomRange}
-            >
-              Aplicar
-            </button>
-          </div>
-        </div>
-      </div>
+      <VencimientosFiltersBar
+        // search/oficina/pageSize
+        search={search}
+        onChangeSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+          bumpReload();
+        }}
+        oficina={oficina}
+        oficinas={oficinas}
+        oficinasStatus={oficinasStatus}
+        onChangeOficina={(v) => {
+          setOficina(v);
+          setPage(1);
+          bumpReload();
+        }}
+        pageSize={pageSize}
+        onChangePageSize={(n) => {
+          setPageSize(n);
+          setPage(1);
+          bumpReload();
+        }}
+        includeFinalizadas={includeFinalizadas}
+        onToggleFinalizadas={(v) => {
+          setIncludeFinalizadas(v);
+          setPage(1);
+          bumpReload();
+        }}
+        // sorting
+        sortMode={sortMode}
+        onChangeSortMode={(v) => {
+          setSortMode(v);
+          setPage(1);
+          bumpReload();
+        }}
+        // base date
+        baseDate={baseDate}
+        onChangeBaseDate={(v) => {
+          setBaseDate(v);
+          setPage(1);
+          bumpReload();
+        }}
+        // custom range
+        useCustomRange={useCustomRange}
+        onToggleCustomRange={(v) => {
+          setUseCustomRange(v);
+          setPage(1);
+          setViewMode("polizas");
+          bumpReload();
+        }}
+        draftPastDays={draftPastDays}
+        setDraftPastDays={setDraftPastDays}
+        draftFutureDays={draftFutureDays}
+        setDraftFutureDays={setDraftFutureDays}
+        onApplyCustomRange={applyCustomRange}
+        status={status}
+      />
 
       {/* Switch vista */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -903,7 +549,7 @@ export default function VencimientosPage() {
             viewMode === "polizas" ? "bg-white/10" : "hover:bg-white/5"
           }`}
         >
-          Vista: Pólizas (página: {filtered.length})
+          Vista: Pólizas (página: {polizas.length})
         </button>
 
         <button
@@ -917,336 +563,81 @@ export default function VencimientosPage() {
         </button>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
-        <KpiButton label="Vencidas 30" value={resumen?.vencidas_30} tone="red" active={!useCustomRange && tab === "vencidas"} onClick={() => gotoTab("vencidas")} />
-        <KpiButton label="Vencidas 14" value={resumen?.vencidas_14} tone="red" active={!useCustomRange && tab === "vencidas"} onClick={() => gotoTab("vencidas")} />
-        <KpiButton label="Vencidas 7" value={resumen?.vencidas_7} tone="red" active={!useCustomRange && tab === "vencidas"} onClick={() => gotoTab("vencidas")} />
-        <KpiButton label="Vencidas 3" value={resumen?.vencidas_3} tone="red" active={!useCustomRange && tab === "vencidas"} onClick={() => gotoTab("vencidas")} />
-        <KpiButton label="Vence hoy" value={resumen?.vence_hoy} tone="amber" active={!useCustomRange && tab === "hoy"} onClick={() => gotoTab("hoy")} />
-        <KpiButton label="Por vencer (3)" value={resumen?.por_vencer_3} tone="emerald" active={!useCustomRange && tab === "por_vencer"} onClick={() => gotoTab("por_vencer")} />
-      </div>
-
-      {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-        <input
-          className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
-          placeholder="Buscar (cliente, patente, póliza...)"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-            bumpReload();
-          }}
-        />
-
-        <select
-          className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
-          value={oficina}
-          disabled={oficinasStatus === "loading" || (Array.isArray(oficinas) && oficinas.length === 0)}
-          onChange={(e) => {
-            setOficina(e.target.value);
-            setPage(1);
-            bumpReload();
-          }}
-          title="Filtrar por oficina"
-        >
-          <option value="">
-            {oficinasStatus === "loading" ? "Cargando oficinas…" : oficinas?.length ? "Todas las oficinas" : "Sin oficinas"}
-          </option>
-
-          {Array.isArray(oficinas) &&
-            oficinas.map((o) => (
-              <option key={String(o.id)} value={String(o.id)}>
-                {o.nombre}
-              </option>
-            ))}
-        </select>
-
-        <select
-          className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
-          value={pageSize}
-          onChange={(e) => {
-            setPageSize(Number(e.target.value));
-            setPage(1);
-            bumpReload();
-          }}
-        >
-          {[25, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n}/pág
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Toggle finalizadas */}
-      <div className="flex items-center gap-2 mb-4">
-        <input
-          id="includeFinalizadas"
-          type="checkbox"
-          checked={includeFinalizadas}
-          onChange={(e) => {
-            setIncludeFinalizadas(e.target.checked);
-            setPage(1);
-            bumpReload();
-          }}
-        />
-        <label htmlFor="includeFinalizadas" className="text-sm opacity-80 select-none">
-          Incluir finalizadas <span className="opacity-60">(solo para revisar, no cuenta como “requiere baja”)</span>
-        </label>
-      </div>
-
-      {/* ✅🆕 barra paginación (arriba) */}
-      <PaginationBar />
+      <VencimientosPagination
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        showingFrom={showingFrom}
+        showingTo={showingTo}
+        nextUrl={nextUrl}
+        prevUrl={prevUrl}
+      />
 
       {status === "loading" ? (
         <div className="opacity-80 mt-3">Cargando…</div>
+      ) : viewMode === "polizas" ? (
+        <VencimientosPolizasTable
+          polizas={polizas}
+          getOficinaLabel={getOficinaLabel}
+          fmtVto={fmtVto}
+          pillCls={pillCls}
+          toneByDias={toneByDias}
+          badgeCls={badgeCls}
+          isFinalizada={isFinalizada}
+          getTelefonoFromPoliza={getTelefonoFromPoliza}
+          waUrl={waUrl}
+          NavLink={NavLink}
+        />
       ) : (
-        <>
-          {viewMode === "polizas" ? (
-            <div className="rounded border border-slate-700 overflow-hidden mt-3">
-              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-xs font-semibold border-b border-slate-700">
-                <div className="col-span-2">Patente</div>
-                <div className="col-span-2">Póliza</div>
-                <div className="col-span-3">Asegurado</div>
-                <div className="col-span-1">Contacto</div>
-                <div className="col-span-2">Vto</div>
-                <div className="col-span-1 text-center">Días</div>
-                <div className="col-span-1">Oficina</div>
-              </div>
-
-              {filtered.length === 0 ? (
-                <div className="p-4 text-sm opacity-80">Sin resultados.</div>
-              ) : (
-                filtered.map((p) => {
-                  const d = p?._dias;
-                  const tone = toneByDias(d);
-
-                  const clienteObj = p?.cliente || {};
-                  const clienteId = p?.cliente_id ?? clienteObj?.id ?? null;
-                  const clienteNombre = clienteObj
-                    ? `${clienteObj.apellido || ""}, ${clienteObj.nombre || ""}`.trim().replace(/^, /, "")
-                    : "—";
-
-                  const clienteDoc = (clienteObj?.dni_cuit_cuil || clienteObj?.dni || "").toString().trim();
-
-                  const finalizada = isFinalizada(p);
-                  const oficinaLabel = getOficinaLabel(p);
-
-                  const tel = getTelefonoFromPoliza(p);
-                  const wa = waUrl(tel);
-
-                  return (
-                    <div
-                      key={p.id}
-                      className="grid grid-cols-12 gap-2 px-3 py-2 border-b border-slate-800 bg-slate-950 hover:bg-white/5 text-sm"
-                    >
-                      <div className="col-span-2 font-semibold">{p?.patente || "—"}</div>
-
-                      <div className="col-span-2">
-                        <NavLink
-                          to={`/polizas/${p.id}`}
-                          className="font-semibold underline opacity-90 hover:opacity-100"
-                          title="Abrir póliza"
-                        >
-                          {p?.numero_poliza || "s/n"}
-                        </NavLink>
-                      </div>
-
-                      <div className="col-span-3">
-                        <div className="truncate flex items-center gap-2">
-                          {clienteId ? (
-                            <NavLink
-                              to={`/clientes/${clienteId}`}
-                              className="truncate underline opacity-90 hover:opacity-100"
-                              title="Abrir cliente"
-                            >
-                              {clienteNombre || "—"}
-                            </NavLink>
-                          ) : (
-                            <span className="truncate">{clienteNombre || "—"}</span>
-                          )}
-
-                          {finalizada ? (
-                            <span className={`px-2 py-0.5 rounded border text-[10px] ${badgeCls("finalizada")}`}>
-                              FINALIZADA
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <div className="text-xs opacity-70 truncate flex gap-2">
-                          {clienteId ? (
-                            <NavLink
-                              to={`/clientes/${clienteId}`}
-                              className="underline opacity-80 hover:opacity-100"
-                              title="Abrir cliente"
-                            >
-                              Cliente #{clienteId}
-                            </NavLink>
-                          ) : (
-                            <span>Cliente: —</span>
-                          )}
-
-                          {clienteId && clienteDoc ? (
-                            <NavLink
-                              to={`/clientes/${clienteId}`}
-                              className="underline opacity-80 hover:opacity-100"
-                              title="Abrir cliente"
-                            >
-                              DNI/CUIT: {clienteDoc}
-                            </NavLink>
-                          ) : clienteDoc ? (
-                            <span>DNI/CUIT: {clienteDoc}</span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* ✅ Contacto: el número abre WhatsApp (hablar). Abajo queda "Llamar" */}
-                      <div className="col-span-1">
-                        {tel ? (
-                          <div className="flex flex-col gap-1">
-                            {wa ? (
-                              <a
-                                href={wa}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs underline font-semibold text-emerald-200 hover:text-emerald-100 truncate"
-                                title="Abrir chat de WhatsApp"
-                              >
-                                🟢 {tel}
-                              </a>
-                            ) : (
-                              <span className="text-xs truncate">{tel}</span>
-                            )}
-
-                            <a
-                              href={`tel:${tel}`}
-                              className="text-[11px] underline opacity-70 hover:opacity-100"
-                              title="Llamar"
-                            >
-                              Llamar
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-xs opacity-60">—</span>
-                        )}
-                      </div>
-
-                      <div className="col-span-2">{fmtVto(p?.vto_referencia || p?.fecha_vencimiento)}</div>
-
-                      <div className="col-span-1 flex justify-center">
-                        <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>{d ?? "—"}</span>
-                      </div>
-
-                      <div className="col-span-1 truncate" title={oficinaLabel}>
-                        {oficinaLabel}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          ) : (
-            <div className="rounded border border-slate-700 overflow-hidden mt-3">
-              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-xs font-semibold border-b border-slate-700">
-                <div className="col-span-4">Asegurado</div>
-                <div className="col-span-2">DNI</div>
-                <div className="col-span-2">Contacto</div>
-                <div className="col-span-2">Oficina</div>
-                <div className="col-span-1 text-center">Pólizas</div>
-                <div className="col-span-1 text-center">Urgencia</div>
-              </div>
-
-              {asegurados.length === 0 ? (
-                <div className="p-4 text-sm opacity-80">Sin asegurados en este filtro.</div>
-              ) : (
-                asegurados.map((a) => {
-                  const d = a?.dias_mas_proximo;
-                  const tone = toneByDias(typeof d === "number" ? d : null);
-                  const wa = waUrl(a?.telefono);
-
-                  return (
-                    <div
-                      key={a.key}
-                      className="grid grid-cols-12 gap-2 px-3 py-2 border-b border-slate-800 bg-slate-950 hover:bg-white/5 text-sm"
-                    >
-                      <div className="col-span-4">
-                        <div className="font-semibold truncate">{a.nombre}</div>
-                        <div className="text-xs opacity-70">
-                          {a.vencidas ? `Vencidas:${a.vencidas} ` : ""}
-                          {a.hoy ? `Hoy:${a.hoy} ` : ""}
-                          {a.por_vencer ? `PorVencer:${a.por_vencer}` : ""}
-                        </div>
-
-                        {a.cliente_id ? (
-                          <NavLink
-                            to={`/clientes/${a.cliente_id}`}
-                            className="text-xs underline opacity-80 hover:opacity-100"
-                          >
-                            Ver cliente
-                          </NavLink>
-                        ) : a.poliza_id_ref ? (
-                          <NavLink
-                            to={`/polizas/${a.poliza_id_ref}`}
-                            className="text-xs underline opacity-80 hover:opacity-100"
-                          >
-                            Ver póliza
-                          </NavLink>
-                        ) : null}
-                      </div>
-
-                      <div className="col-span-2 truncate">{a.dni || "—"}</div>
-
-                      {/* ✅ Contacto: el número abre WhatsApp (hablar). Abajo queda "Llamar" */}
-                      <div className="col-span-2 truncate">
-                        {a.telefono ? (
-                          <div className="flex flex-col gap-1">
-                            {wa ? (
-                              <a
-                                href={wa}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs underline font-semibold text-emerald-200 hover:text-emerald-100 truncate"
-                                title="Abrir chat de WhatsApp"
-                              >
-                                🟢 {a.telefono}
-                              </a>
-                            ) : (
-                              <span className="text-xs truncate">{a.telefono}</span>
-                            )}
-
-                            <a
-                              className="text-[11px] underline opacity-70 hover:opacity-100"
-                              href={`tel:${a.telefono}`}
-                              title="Llamar"
-                            >
-                              Llamar
-                            </a>
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </div>
-
-                      <div className="col-span-2 truncate">{a.oficina || "—"}</div>
-
-                      <div className="col-span-1 text-center font-semibold">{a.polizas_count}</div>
-
-                      <div className="col-span-1 flex justify-center">
-                        <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>{d ?? "—"}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          {/* ✅🆕 barra paginación (abajo) */}
-          <PaginationBar />
-        </>
+        <VencimientosAseguradosTable
+          asegurados={asegurados}
+          waUrl={waUrl}
+          pillCls={pillCls}
+          toneByDias={toneByDias}
+          NavLink={NavLink}
+        />
       )}
+
+      <VencimientosPagination
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        showingFrom={showingFrom}
+        showingTo={showingTo}
+        nextUrl={nextUrl}
+        prevUrl={prevUrl}
+      />
+
+      {exportOpen ? (
+        <VencimientosExportModal
+          onClose={() => setExportOpen(false)}
+          // params base actuales
+          currentParams={params}
+          // para construir params por filtro elegido (hoy/vencidas/etc)
+          context={{
+            oficina,
+            search: debouncedSearch,
+            includeFinalizadas,
+            baseDate,
+            sortMode,
+            // rango actual
+            useCustomRange,
+            customPastDays,
+            customFutureDays,
+          }}
+          // data de la página (por si elige "solo página")
+          pageData={{
+            polizas,
+            asegurados,
+            getOficinaLabel,
+            fmtVto,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
