@@ -267,6 +267,11 @@ export default function VencimientosPage() {
   const oficinas = useSelector(selectVencimientosOficinas);
   const oficinasStatus = useSelector(selectVencimientosOficinasStatus);
 
+  // ✅🆕 paginación desde Redux (DRF)
+  const totalCount = useSelector((s) => Number(s?.vencimientos?.count ?? 0));
+  const nextUrl = useSelector((s) => s?.vencimientos?.next ?? null);
+  const prevUrl = useSelector((s) => s?.vencimientos?.previous ?? null);
+
   const [tab, setTab] = useState("por_vencer"); // por_vencer | hoy | vencidas
   const [viewMode, setViewMode] = useState("polizas"); // polizas | asegurados
 
@@ -476,9 +481,36 @@ export default function VencimientosPage() {
     ? "Vence hoy"
     : "Por vencer (1-3 días)";
 
+  // ✅🆕 paginación: total pages / rango mostrado
+  const totalPages = useMemo(() => {
+    const ps = Math.max(1, Number(pageSize) || 1);
+    const c = Math.max(0, Number(totalCount) || 0);
+    return Math.max(1, Math.ceil(c / ps));
+  }, [totalCount, pageSize]);
+
+  const showingFrom = useMemo(() => {
+    if (!totalCount) return 0;
+    return (page - 1) * pageSize + 1;
+  }, [totalCount, page, pageSize]);
+
+  const showingTo = useMemo(() => {
+    if (!totalCount) return 0;
+    return Math.min(page * pageSize, totalCount);
+  }, [totalCount, page, pageSize]);
+
+  // ✅🆕 clamp automático: si cambiás filtros y la página actual queda fuera de rango
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   const info = useMemo(() => {
-    return { polizas: filtered.length, asegurados: asegurados.length };
-  }, [filtered, asegurados]);
+    // ⚠️ filtered.length es SOLO “recibidos en esta página”
+    return {
+      polizas_pagina: filtered.length,
+      polizas_total: totalCount,
+      asegurados_pagina: asegurados.length,
+    };
+  }, [filtered, asegurados, totalCount]);
 
   const gotoTab = useCallback(
     (nextTab) => {
@@ -659,6 +691,48 @@ export default function VencimientosPage() {
     oficinaNameById,
   ]);
 
+  // ✅🆕 Componente paginación reutilizable
+  const PaginationBar = useCallback(() => {
+    const canPrev = page > 1 && !!prevUrl;
+    const canNext = page < totalPages && !!nextUrl;
+
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+        <div className="text-xs opacity-70">
+          Mostrando <span className="font-semibold">{showingFrom}</span>–<span className="font-semibold">{showingTo}</span>{" "}
+          de <span className="font-semibold">{totalCount}</span> • Página{" "}
+          <span className="font-semibold">{page}</span> / <span className="font-semibold">{totalPages}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={`px-3 py-2 rounded border border-white/10 bg-slate-900 hover:bg-slate-800 text-sm ${
+              canPrev ? "" : "opacity-50 cursor-not-allowed"
+            }`}
+            disabled={!canPrev}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            title="Página anterior"
+          >
+            ⬅ Anterior
+          </button>
+
+          <button
+            type="button"
+            className={`px-3 py-2 rounded border border-white/10 bg-slate-900 hover:bg-slate-800 text-sm ${
+              canNext ? "" : "opacity-50 cursor-not-allowed"
+            }`}
+            disabled={!canNext}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            title="Página siguiente"
+          >
+            Siguiente ➡
+          </button>
+        </div>
+      </div>
+    );
+  }, [page, prevUrl, nextUrl, totalPages, totalCount, showingFrom, showingTo]);
+
   return (
     <div className="p-4 text-slate-100">
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -666,9 +740,16 @@ export default function VencimientosPage() {
           <h1 className="text-xl font-semibold">Vencimientos</h1>
           <div className="text-sm opacity-75">Mostrando: {title}</div>
           <div className="text-xs opacity-60 mt-1">
-            {viewMode === "asegurados"
-              ? `Pólizas en filtro: ${info.polizas} • Asegurados listados: ${info.asegurados}`
-              : `Pólizas listadas: ${info.polizas}`}
+            {viewMode === "asegurados" ? (
+              <>
+                Pólizas en esta página: {info.polizas_pagina} • Total backend: {info.polizas_total} • Asegurados en esta página:{" "}
+                {info.asegurados_pagina}
+              </>
+            ) : (
+              <>
+                Pólizas en esta página: {info.polizas_pagina} • Total backend: {info.polizas_total}
+              </>
+            )}
           </div>
         </div>
 
@@ -822,7 +903,7 @@ export default function VencimientosPage() {
             viewMode === "polizas" ? "bg-white/10" : "hover:bg-white/5"
           }`}
         >
-          Vista: Pólizas ({filtered.length})
+          Vista: Pólizas (página: {filtered.length})
         </button>
 
         <button
@@ -832,7 +913,7 @@ export default function VencimientosPage() {
             viewMode === "asegurados" ? "bg-white/10" : "hover:bg-white/5"
           }`}
         >
-          Vista: Asegurados ({asegurados.length})
+          Vista: Asegurados (página: {asegurados.length})
         </button>
       </div>
 
@@ -916,12 +997,15 @@ export default function VencimientosPage() {
         </label>
       </div>
 
+      {/* ✅🆕 barra paginación (arriba) */}
+      <PaginationBar />
+
       {status === "loading" ? (
-        <div className="opacity-80">Cargando…</div>
+        <div className="opacity-80 mt-3">Cargando…</div>
       ) : (
         <>
           {viewMode === "polizas" ? (
-            <div className="rounded border border-slate-700 overflow-hidden">
+            <div className="rounded border border-slate-700 overflow-hidden mt-3">
               <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-xs font-semibold border-b border-slate-700">
                 <div className="col-span-2">Patente</div>
                 <div className="col-span-2">Póliza</div>
@@ -1039,9 +1123,9 @@ export default function VencimientosPage() {
                             <a
                               href={`tel:${tel}`}
                               className="text-[11px] underline opacity-70 hover:opacity-100"
-                              title="Mensaje"
+                              title="Llamar"
                             >
-                              Mensaje
+                              Llamar
                             </a>
                           </div>
                         ) : (
@@ -1064,7 +1148,7 @@ export default function VencimientosPage() {
               )}
             </div>
           ) : (
-            <div className="rounded border border-slate-700 overflow-hidden">
+            <div className="rounded border border-slate-700 overflow-hidden mt-3">
               <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-xs font-semibold border-b border-slate-700">
                 <div className="col-span-4">Asegurado</div>
                 <div className="col-span-2">DNI</div>
@@ -1158,6 +1242,9 @@ export default function VencimientosPage() {
               )}
             </div>
           )}
+
+          {/* ✅🆕 barra paginación (abajo) */}
+          <PaginationBar />
         </>
       )}
     </div>

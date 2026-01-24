@@ -16,20 +16,6 @@ import {
 
 import BajasTable from "../components/bajas/BajasTable";
 
-function parseDate(v) {
-  if (!v) return null;
-  const s = String(v).trim();
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function daysBetween(a, b) {
-  if (!a || !b) return null;
-  const ms = a.getTime() - b.getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-}
-
 const STATUS = {
   ENVIAR: "ENVIAR_BAJA",
   ENVIADA: "BAJA_ENVIADA",
@@ -57,6 +43,75 @@ function saveStatusMap(map) {
   try {
     localStorage.setItem(LS.statusById, JSON.stringify(map || {}));
   } catch {}
+}
+
+function parseDateRobusta(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+
+  // "YYYY-MM-DD" -> construir local (evita parse UTC y desfases)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [yy, mm, dd] = s.split("-").map((x) => Number(x));
+    const d = new Date(yy, (mm || 1) - 1, dd || 1);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // "DD/MM/YYYY"
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [dd, mm, yy] = s.split("/").map((x) => Number(x));
+    const d = new Date(yy, (mm || 1) - 1, dd || 1);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // ISO con hora u otros (mejor esfuerzo)
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function daysBetween(a, b) {
+  if (!a || !b) return null;
+  const ms = a.getTime() - b.getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
+function pickFirstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v === undefined || v === null) continue;
+    const s = String(v).trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+function getImpagasCount(p) {
+  const cand = [
+    p?.impagas_count,
+    p?.impagasCount,
+    p?.cuotas_impagas_count,
+    p?.cuotasImpagasCount,
+    p?.impagas,
+    p?.cuotas_impagas,
+    p?.cuotasImpagas,
+  ];
+  for (const v of cand) {
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return 0;
+}
+
+function getProximaVencImpagaRaw(p) {
+  return pickFirstNonEmpty(
+    p?.proxima_vencimiento_impaga,
+    p?.proximaVencimientoImpaga,
+    p?.proximo_vencimiento_impago,
+    p?.proximoVencimientoImpago,
+    p?.vencimiento_impaga_mas_proximo,
+    p?.vencimientoImpagaMasProximo,
+    p?.proxima_impaga,
+    p?.proximaImpaga
+  );
 }
 
 export default function BajasPage() {
@@ -98,7 +153,7 @@ export default function BajasPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Estado por póliza (persistido)
+  // Estados por póliza (persistido local)
   const [statusById, setStatusById] = useState(() => loadStatusMap());
 
   // Selección masiva
@@ -183,10 +238,11 @@ export default function BajasPage() {
     const hoy = new Date();
 
     const out = (items || []).map((p) => {
-      const proximaImpaga = parseDate(p?.proxima_vencimiento_impaga);
+      const rawVtoImpaga = getProximaVencImpagaRaw(p);
+      const proximaImpaga = parseDateRobusta(rawVtoImpaga);
       const diasMora = proximaImpaga ? daysBetween(hoy, proximaImpaga) : null;
 
-      const impagas = Number(p?.impagas_count) || 0;
+      const impagas = getImpagasCount(p);
 
       const requiereBaja =
         (p?.estado || "").toString().toLowerCase() !== "finalizada" &&
@@ -221,6 +277,16 @@ export default function BajasPage() {
 
   const totalRequiere = useMemo(() => {
     return (enriched || []).filter((x) => x._requiereBaja).length;
+  }, [enriched]);
+
+  // Diagnóstico rápido cuando “se ve 0” pero hay data
+  const diag = useMemo(() => {
+    const arr = enriched || [];
+    const total = arr.length;
+    const conImpagas = arr.filter((x) => (Number(x?.impagas_count) || getImpagasCount(x)) > 0).length;
+    const conFecha = arr.filter((x) => x?._diasMora != null).length;
+    const maxMora = arr.reduce((m, x) => (x?._diasMora != null ? Math.max(m, x._diasMora) : m), -1);
+    return { total, conImpagas, conFecha, maxMora };
   }, [enriched]);
 
   const canPrev = page > 1 && !!previous;
@@ -271,7 +337,7 @@ export default function BajasPage() {
     }
 
     const setIds = new Set((ids || []).map((x) => String(x)));
-    const rows = filtered.filter((p) => setIds.has(String(p.id)));
+    const rows = (enriched || []).filter((p) => setIds.has(String(p.id)));
 
     if (rows.length === 0) {
       alert("No hay pólizas seleccionadas para el correo.");
@@ -289,7 +355,7 @@ export default function BajasPage() {
     const lines = rows.map((p) => {
       const nro = p?.numero_poliza || "—";
       const comp = p?.compania || "—";
-      const vto = p?.proxima_vencimiento_impaga || "—";
+      const vto = getProximaVencImpagaRaw(p) || p?.proxima_vencimiento_impaga || "—";
       const mora = p?._diasMora == null ? "—" : `${p._diasMora}d`;
       return `- Poliza ${nro} | ${comp} | Vto impaga: ${vto} | Mora: ${mora} | ID: ${p.id}`;
     });
@@ -469,6 +535,19 @@ export default function BajasPage() {
         </div>
       </div>
 
+      {/* Diagnóstico si hay data pero se ve 0 */}
+      {soloRequiereBaja && (items || []).length > 0 && filtered.length === 0 ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100 text-sm">
+          <div className="font-extrabold mb-1">Diagnóstico</div>
+          <div className="opacity-90">
+            En esta página: items={diag.total} · con impagas={diag.conImpagas} · con fecha impaga={diag.conFecha} · max mora={diag.maxMora}d
+          </div>
+          <div className="opacity-80 mt-1">
+            Probable causa: el backend no está enviando la fecha de impaga o viene en otro formato/nombre de campo.
+          </div>
+        </div>
+      ) : null}
+
       {/* Paginación */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
@@ -534,7 +613,17 @@ export default function BajasPage() {
         destinatario={destinatario}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
-        onSelectAllVisible={selectAllVisible}
+        onSelectAllVisible={(checked) => {
+          setSelectedIds((prev) => {
+            const s = new Set(prev || []);
+            if (!checked) {
+              for (const p of filtered) s.delete(String(p.id));
+              return s;
+            }
+            for (const p of filtered) s.add(String(p.id));
+            return s;
+          });
+        }}
         onComposeEmail={composeEmail}
         onSetStatus={setPolizaStatus}
       />
