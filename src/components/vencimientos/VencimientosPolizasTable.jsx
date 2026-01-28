@@ -18,11 +18,11 @@ export default function VencimientosPolizasTable({
       <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-xs font-semibold border-b border-slate-700">
         <div className="col-span-2">Patente</div>
         <div className="col-span-2">Póliza</div>
+        <div className="col-span-2">Compañía</div>
         <div className="col-span-3">Asegurado</div>
         <div className="col-span-1">Contacto</div>
-        <div className="col-span-2">Vto</div>
+        <div className="col-span-1">Vto</div>
         <div className="col-span-1 text-center">Días</div>
-        <div className="col-span-1">Oficina</div>
       </div>
 
       {polizas.length === 0 ? (
@@ -35,7 +35,9 @@ export default function VencimientosPolizasTable({
           const clienteObj = p?.cliente || {};
           const clienteId = p?.cliente_id ?? clienteObj?.id ?? null;
           const clienteNombre = clienteObj
-            ? `${clienteObj.apellido || ""}, ${clienteObj.nombre || ""}`.trim().replace(/^, /, "")
+            ? `${clienteObj.apellido || ""}, ${clienteObj.nombre || ""}`
+                .trim()
+                .replace(/^, /, "")
             : "—";
           const clienteDoc = (clienteObj?.dni_cuit_cuil || clienteObj?.dni || "").toString().trim();
 
@@ -44,6 +46,9 @@ export default function VencimientosPolizasTable({
 
           const tel = getTelefonoFromPoliza(p);
           const wa = waUrl(tel);
+
+          const compania = (p?.compania || p?.compañia || "").toString().trim();
+          const companiaLabel = compania || "—";
 
           return (
             <div
@@ -60,6 +65,16 @@ export default function VencimientosPolizasTable({
                 >
                   {p?.numero_poliza || "s/n"}
                 </NavLink>
+
+                <div className="text-[11px] opacity-70 truncate" title={oficinaLabel}>
+                  {oficinaLabel}
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <div className="truncate font-semibold" title={companiaLabel}>
+                  {companiaLabel}
+                </div>
               </div>
 
               <div className="col-span-3">
@@ -140,14 +155,10 @@ export default function VencimientosPolizasTable({
                 )}
               </div>
 
-              <div className="col-span-2">{fmtVto(p?.vto_referencia || p?.fecha_vencimiento)}</div>
+              <div className="col-span-1">{fmtVto(p?.vto_referencia || p?.fecha_vencimiento)}</div>
 
               <div className="col-span-1 flex justify-center">
                 <span className={`px-2 py-1 rounded border text-xs ${pillCls(tone)}`}>{d ?? "—"}</span>
-              </div>
-
-              <div className="col-span-1 truncate" title={oficinaLabel}>
-                {oficinaLabel}
               </div>
             </div>
           );
