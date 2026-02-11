@@ -35,7 +35,7 @@ import {
   fetchHistorialRecordatorios,
   fetchHistorialPagos,
   downloadHistorialPagosCSV,
-  downloadHistorialPagosPDF, // ✅ nuevo
+  downloadHistorialPagosPDF,
 } from "../store/slices/pagosSlice";
 
 dayjs.locale("es");
@@ -98,9 +98,16 @@ const PagosPage = () => {
   const [hpHasta, setHpHasta] = useState(ymd(new Date())); // YYYY-MM-DD
 
   const [hpOficina, setHpOficina] = useState("ALL"); // ALL | 1 | 2 | 3
-  const [hpQ, setHpQ] = useState("");
+
+  // ✅ Debounce: input vs applied
+  const [hpQInput, setHpQInput] = useState("");
+  const [hpQApplied, setHpQApplied] = useState("");
+
   const [hpPage, setHpPage] = useState(1);
   const hpPageSize = 25;
+
+  // (opcional) ordering explícito (dejamos default)
+  const [hpOrdering, setHpOrdering] = useState("-fecha_pago");
 
   // Estado global desde Redux (slice pagos)
   const {
@@ -119,7 +126,6 @@ const PagosPage = () => {
     historialPagosDownloadStatus = "idle",
     historialPagosDownloadError = null,
 
-    // ✅ PDF
     historialPagosDownloadPdfStatus = "idle",
     historialPagosDownloadPdfError = null,
   } = useSelector((state) => state.pagos || {});
@@ -142,6 +148,16 @@ const PagosPage = () => {
     return out;
   }, []);
 
+  // ✅ Debounce de búsqueda (no dispara requests en cada tecla)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = String(hpQInput || "").trim();
+      setHpQApplied(next);
+      setHpPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [hpQInput]);
+
   const handleChangeTab = useCallback(
     (nuevoTab) => {
       if (nuevoTab === tab) return;
@@ -154,34 +170,43 @@ const PagosPage = () => {
       }
 
       if (nuevoTab === "historial_pagos") {
+        // solo reseteo de página (y el effect se encarga de cargar)
         setHpPage(1);
       }
     },
     [dispatch, tab]
   );
 
-  const buildHistorialParams = useCallback(() => {
-    const base = {
-      oficina: hpOficina === "ALL" ? undefined : hpOficina,
-      q: hpQ || undefined,
-      page: hpPage,
-      page_size: hpPageSize,
-    };
-
-    if (hpModo === "DIA") {
-      return { ...base, dia: hpDia, mes: undefined, desde: undefined, hasta: undefined };
-    }
-    if (hpModo === "RANGO") {
-      return {
-        ...base,
-        desde: hpDesde || undefined,
-        hasta: hpHasta || undefined,
-        mes: undefined,
-        dia: undefined,
+  const buildHistorialParams = useCallback(
+    (extra = null) => {
+      const base = {
+        oficina: hpOficina === "ALL" ? undefined : hpOficina,
+        q: hpQApplied || undefined, // ✅ usa applied
+        page: hpPage,
+        page_size: hpPageSize,
+        ordering: hpOrdering || "-fecha_pago",
       };
-    }
-    return { ...base, mes: hpMes, dia: undefined, desde: undefined, hasta: undefined };
-  }, [hpModo, hpOficina, hpQ, hpPage, hpPageSize, hpMes, hpDia, hpDesde, hpHasta]);
+
+      let out;
+      if (hpModo === "DIA") {
+        out = { ...base, dia: hpDia, mes: undefined, desde: undefined, hasta: undefined };
+      } else if (hpModo === "RANGO") {
+        out = {
+          ...base,
+          desde: hpDesde || undefined,
+          hasta: hpHasta || undefined,
+          mes: undefined,
+          dia: undefined,
+        };
+      } else {
+        out = { ...base, mes: hpMes, dia: undefined, desde: undefined, hasta: undefined };
+      }
+
+      if (extra && typeof extra === "object") out = { ...out, ...extra };
+      return out;
+    },
+    [hpModo, hpOficina, hpQApplied, hpPage, hpPageSize, hpMes, hpDia, hpDesde, hpHasta, hpOrdering]
+  );
 
   useEffect(() => {
     if (tab !== "historial_pagos") return;
@@ -243,20 +268,22 @@ const PagosPage = () => {
   }, [dispatch]);
 
   const handleRefreshHistorialPagos = useCallback(() => {
-    dispatch(fetchHistorialPagos(buildHistorialParams()));
+    // ✅ force: bypass cache
+    dispatch(fetchHistorialPagos(buildHistorialParams({ force: true })));
   }, [dispatch, buildHistorialParams]);
 
   const buildExportParams = useCallback(() => {
     const base = {
       oficina: hpOficina === "ALL" ? undefined : hpOficina,
-      q: hpQ || undefined,
+      q: hpQApplied || undefined, // ✅ usa applied
+      ordering: hpOrdering || "-fecha_pago",
     };
 
     if (hpModo === "DIA") return { ...base, dia: hpDia };
     if (hpModo === "RANGO")
       return { ...base, desde: hpDesde || undefined, hasta: hpHasta || undefined };
     return { ...base, mes: hpMes };
-  }, [hpModo, hpOficina, hpQ, hpMes, hpDia, hpDesde, hpHasta]);
+  }, [hpModo, hpOficina, hpQApplied, hpMes, hpDia, hpDesde, hpHasta, hpOrdering]);
 
   const handleDownloadCSV = useCallback(async () => {
     try {
@@ -632,19 +659,17 @@ const PagosPage = () => {
                   <div className="relative">
                     <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
-                      value={hpQ}
-                      onChange={(e) => {
-                        setHpQ(e.target.value);
-                        setHpPage(1);
-                      }}
+                      value={hpQInput}
+                      onChange={(e) => setHpQInput(e.target.value)}
                       placeholder="Ej: 30123456 • Gómez • ABC123 • 000123"
                       className="w-full rounded-2xl bg-slate-950/60 border border-slate-700 pl-10 pr-10 py-2 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
-                    {!!hpQ && (
+                    {!!hpQInput && (
                       <button
                         type="button"
                         onClick={() => {
-                          setHpQ("");
+                          setHpQInput("");
+                          setHpQApplied("");
                           setHpPage(1);
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl hover:bg-slate-800/60 text-slate-300 cursor-pointer"
@@ -654,6 +679,11 @@ const PagosPage = () => {
                       </button>
                     )}
                   </div>
+                  {!!hpQInput && hpQApplied !== String(hpQInput || "").trim() && (
+                    <div className="mt-1 text-[0.72rem] text-slate-500">
+                      Aplicando búsqueda…
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
@@ -686,7 +716,7 @@ const PagosPage = () => {
                     <span>{downloadingCSV ? "Descargando..." : "CSV"}</span>
                   </motion.button>
 
-                  {/* ✅ PDF */}
+                  {/* PDF */}
                   <motion.button
                     type="button"
                     onClick={handleDownloadPDF}
@@ -791,12 +821,7 @@ const PagosPage = () => {
                         const patente = it?.patente || "";
                         const numeroPoliza = it?.numero_poliza || "";
                         const compania = it?.compania || "";
-                        const oficina =
-                          it?.oficina_nombre ||
-                          it?.oficina ||
-                          it?.poliza?.oficina_nombre ||
-                          it?.poliza?.oficina ||
-                          "";
+                        const oficina = it?.oficina_nombre || it?.oficina || "";
 
                         const monto = it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
                         const medio = it?.medio || it?.forma_pago || "";

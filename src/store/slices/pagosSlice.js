@@ -1,4 +1,4 @@
-/* src/store/slices/pagosSlice.js — Optimizado: cache búsqueda + estados separados */
+/* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + estados separados */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -17,7 +17,7 @@ const compact = (obj) =>
     Object.entries(obj).filter(([_, v]) => v !== undefined && v !== "")
   );
 
-/* ===================== CACHE DE BÚSQUEDA ===================== */
+/* ===================== CACHE DE BÚSQUEDA (PÓLIZAS) ===================== */
 const POLIZAS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos
 const POLIZAS_CACHE_MAX = 20;
 const keyFromQuery = (q) => String(q || "").trim().toLowerCase();
@@ -26,6 +26,46 @@ const keyForSearch = (q, withCuotas) => {
   if (!base) return "";
   return withCuotas ? `${base}|cuotas` : `${base}|lite`;
 };
+
+/* ===================== CACHE HISTORIAL PAGOS ===================== */
+const HISTORIAL_CACHE_TTL_MS = 25 * 1000; // 20–30s recomendado
+const HISTORIAL_CACHE_MAX = 40;
+
+// stable stringify (ordenado) para key de params
+function stableKey(obj) {
+  const o = obj && typeof obj === "object" ? obj : {};
+  const keys = Object.keys(o).sort();
+  const entries = [];
+  for (const k of keys) {
+    const v = o[k];
+    if (v === undefined || v === "") continue;
+    entries.push([k, v]);
+  }
+  return JSON.stringify(entries);
+}
+
+function isFresh(ts, ttlMs) {
+  return typeof ts === "number" && Date.now() - ts < ttlMs;
+}
+
+function buildHistorialParams(p) {
+  const pp = p && typeof p === "object" ? p : {};
+  return compact({
+    mes: pp?.mes, // YYYY-MM
+    dia: pp?.dia, // YYYY-MM-DD
+    desde: pp?.desde, // YYYY-MM-DD
+    hasta: pp?.hasta, // YYYY-MM-DD
+    oficina: pp?.oficina,
+    search: pp?.q ?? pp?.search,
+    page: pp?.page ?? 1,
+    page_size: pp?.page_size ?? 25,
+    ordering: pp?.ordering ?? "-fecha_pago",
+  });
+}
+
+function buildHistorialCacheKey(params) {
+  return stableKey(params);
+}
 
 /* ===================== HELPERS DESCARGA ===================== */
 
@@ -163,43 +203,54 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** ✅ Historial de pagos (GET /cuotas/pagos/) con filtros día/mes/rango */
+/** ✅ Historial de pagos (GET /cuotas/pagos/) con filtros día/mes/rango + cache TTL */
 export const fetchHistorialPagos = createAsyncThunk(
   "pagos/fetchHistorialPagos",
-  async (params, { rejectWithValue }) => {
+  async (params, { rejectWithValue, getState }) => {
     try {
-      const p = params && typeof params === "object" ? params : {};
+      const built = buildHistorialParams(params);
+      const cacheKey = buildHistorialCacheKey(built);
 
-      const { data } = await axios.get(API("cuotas/pagos/"), {
-        params: compact({
-          mes: p?.mes, // YYYY-MM
-          dia: p?.dia, // YYYY-MM-DD
-          desde: p?.desde, // YYYY-MM-DD
-          hasta: p?.hasta, // YYYY-MM-DD
+      // cache hit (rápido)
+      const st = getState()?.pagos;
+      const hit = st?.historialPagosCache?.[cacheKey];
+      if (
+        hit &&
+        isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
+        Array.isArray(hit.items) &&
+        hit.meta &&
+        typeof hit.meta === "object"
+      ) {
+        return {
+          items: hit.items,
+          meta: hit.meta,
+          _cacheKey: cacheKey,
+          _fromCache: true,
+        };
+      }
 
-          oficina: p?.oficina,
-          search: p?.q ?? p?.search,
-          page: p?.page ?? 1,
-          page_size: p?.page_size ?? 25,
-          ordering: p?.ordering ?? "-fecha_pago",
-        }),
-      });
+      const { data } = await axios.get(API("cuotas/pagos/"), { params: built });
 
       if (data && typeof data === "object" && "results" in data) {
-        return {
+        const out = {
           items: Array.isArray(data.results) ? data.results : [],
           meta: {
             count: Number(data.count || 0) || 0,
             next: data.next ?? null,
             previous: data.previous ?? null,
           },
+          _cacheKey: cacheKey,
+          _fromCache: false,
         };
+        return out;
       }
 
       const items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
       return {
         items,
         meta: { count: items.length, next: null, previous: null },
+        _cacheKey: cacheKey,
+        _fromCache: false,
       };
     } catch (error) {
       return rejectWithValue(
@@ -252,7 +303,7 @@ export const downloadHistorialPagosCSV = createAsyncThunk(
   }
 );
 
-/** ✅ NUEVO: Descargar PDF de historial de pagos (GET /cuotas/pagos/?export=pdf) */
+/** ✅ Descargar PDF de historial de pagos (GET /cuotas/pagos/?export=pdf) */
 export const downloadHistorialPagosPDF = createAsyncThunk(
   "pagos/downloadHistorialPagosPDF",
   async (params, { rejectWithValue }) => {
@@ -558,17 +609,21 @@ const initialState = {
   historialRecordatoriosStatus: "idle",
   historialRecordatoriosError: null,
 
-  // historial pagos
+  // historial pagos (tabla)
   historialPagosItems: [],
   historialPagosMeta: { count: 0, next: null, previous: null },
   historialPagosStatus: "idle",
   historialPagosError: null,
 
+  // cache historial pagos
+  historialPagosCache: {},
+  historialPagosCacheOrder: [],
+
   // descarga historial pagos
   historialPagosDownloadStatus: "idle",
   historialPagosDownloadError: null,
 
-  // ✅ nuevo: descarga PDF historial pagos
+  // descarga PDF historial pagos
   historialPagosDownloadPdfStatus: "idle",
   historialPagosDownloadPdfError: null,
 };
@@ -623,6 +678,37 @@ function savePolizasCache(state, a, b, c) {
   });
 }
 
+function saveHistorialCache(state, cacheKey, items, meta) {
+  if (!cacheKey) return;
+
+  state.historialPagosCache[cacheKey] = {
+    ts: Date.now(),
+    items: Array.isArray(items) ? items : [],
+    meta:
+      meta && typeof meta === "object"
+        ? {
+            count: Number(meta.count || 0) || 0,
+            next: meta.next ?? null,
+            previous: meta.previous ?? null,
+          }
+        : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
+  };
+
+  const prev = Array.isArray(state.historialPagosCacheOrder)
+    ? state.historialPagosCacheOrder
+    : [];
+  const next = [cacheKey, ...prev.filter((x) => x !== cacheKey)].slice(
+    0,
+    HISTORIAL_CACHE_MAX
+  );
+  state.historialPagosCacheOrder = next;
+
+  const keep = new Set(next);
+  Object.keys(state.historialPagosCache || {}).forEach((key) => {
+    if (!keep.has(key)) delete state.historialPagosCache[key];
+  });
+}
+
 const pagosSlice = createSlice({
   name: "pagos",
   initialState,
@@ -634,6 +720,11 @@ const pagosSlice = createSlice({
       state.polizas = [];
       state.searchStatus = "idle";
       state.searchError = null;
+    },
+    // opcional: para invalidar historial cuando pagás una cuota y querés refrescar
+    invalidateHistorialPagosCache(state) {
+      state.historialPagosCache = {};
+      state.historialPagosCacheOrder = [];
     },
   },
   extraReducers: (builder) => {
@@ -753,10 +844,28 @@ const pagosSlice = createSlice({
         state.historialRecordatoriosError = action.payload;
       })
 
-      // --- Historial pagos ---
-      .addCase(fetchHistorialPagos.pending, (state) => {
+      // --- Historial pagos (con hidratación desde cache en pending) ---
+      .addCase(fetchHistorialPagos.pending, (state, action) => {
         state.historialPagosStatus = "loading";
         state.historialPagosError = null;
+
+        // hidratación optimista desde cache fresco (evita “parpadeo” y sensación lenta)
+        const built = buildHistorialParams(action?.meta?.arg);
+        const cacheKey = buildHistorialCacheKey(built);
+        const hit = state.historialPagosCache?.[cacheKey];
+        if (
+          hit &&
+          isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
+          Array.isArray(hit.items)
+        ) {
+          state.historialPagosItems = hit.items;
+          state.historialPagosMeta = hit.meta || {
+            count: hit.items.length,
+            next: null,
+            previous: null,
+          };
+          // mantenemos status loading para permitir refresh “silencioso”
+        }
       })
       .addCase(fetchHistorialPagos.fulfilled, (state, action) => {
         state.historialPagosStatus = "succeeded";
@@ -768,6 +877,16 @@ const pagosSlice = createSlice({
           next: null,
           previous: null,
         };
+
+        const cacheKey = action.payload?._cacheKey;
+        if (cacheKey) {
+          saveHistorialCache(
+            state,
+            cacheKey,
+            state.historialPagosItems,
+            state.historialPagosMeta
+          );
+        }
       })
       .addCase(fetchHistorialPagos.rejected, (state, action) => {
         state.historialPagosStatus = "failed";
@@ -789,7 +908,7 @@ const pagosSlice = createSlice({
         state.historialPagosDownloadError = action.payload;
       })
 
-      // ✅ --- Descargar PDF historial pagos ---
+      // --- Descargar PDF historial pagos ---
       .addCase(downloadHistorialPagosPDF.pending, (state) => {
         state.historialPagosDownloadPdfStatus = "loading";
         state.historialPagosDownloadPdfError = null;
@@ -804,5 +923,6 @@ const pagosSlice = createSlice({
   },
 });
 
-export const { setCuotas, clearSearch } = pagosSlice.actions;
+export const { setCuotas, clearSearch, invalidateHistorialPagosCache } =
+  pagosSlice.actions;
 export default pagosSlice.reducer;
