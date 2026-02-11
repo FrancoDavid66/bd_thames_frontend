@@ -70,6 +70,59 @@ const safe = (v, fallback = "—") => {
 
 const ymd = (d) => dayjs(d).format("YYYY-MM-DD");
 
+// ✅ helpers historial pagos: timestamp real
+function pickRegistroTs(it) {
+  // prioridad: pago_registrado_en (ISO datetime desde backend)
+  const v = it?.pago_registrado_en ?? it?.registrado_en ?? it?.pago_ts ?? null;
+  if (v) return v;
+
+  // fallback: fecha+hora viejas (si quedaran)
+  const f = it?.fecha_guardado_pago || "";
+  const h = it?.hora_guardado_pago || it?.pago_hora || "";
+  if (f && h) {
+    // f viene "DD/MM/YYYY"
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(f).trim());
+    if (m) {
+      const iso = `${m[3]}-${m[2]}-${m[1]}T${String(h).trim()}:00`;
+      return iso;
+    }
+  }
+  return null;
+}
+
+function fmtRegistro(it) {
+  const ts = pickRegistroTs(it);
+  if (!ts) {
+    // fallback final: fecha_guardado + pago_hora
+    const f = String(it?.fecha_guardado_pago || "").trim();
+    const h = String(it?.pago_hora || it?.hora_guardado_pago || "").trim();
+    if (f && h) return `${f} ${h}`;
+    if (f) return f;
+    if (h) return h;
+    return "—";
+  }
+
+  // dayjs parse
+  const d = dayjs(ts);
+  if (d.isValid()) return d.format("DD/MM/YYYY HH:mm");
+
+  // fallback string slice "YYYY-MM-DDTHH:mm..."
+  try {
+    const s = String(ts);
+    if (s.includes("T")) {
+      const [datePart, timePart] = s.split("T");
+      const dd = dayjs(datePart).isValid()
+        ? dayjs(datePart).format("DD/MM/YYYY")
+        : datePart;
+      const hhmm = (timePart || "").slice(0, 5);
+      return `${dd} ${hhmm}`.trim();
+    }
+    return s;
+  } catch {
+    return "—";
+  }
+}
+
 const PagosPage = () => {
   const dispatch = useDispatch();
 
@@ -393,7 +446,8 @@ const PagosPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+      {/* ✅ CAMBIO: más ancho (2xl) */}
+      <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-10 2xl:px-12 py-4 sm:py-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
           <div>
@@ -680,9 +734,7 @@ const PagosPage = () => {
                     )}
                   </div>
                   {!!hpQInput && hpQApplied !== String(hpQInput || "").trim() && (
-                    <div className="mt-1 text-[0.72rem] text-slate-500">
-                      Aplicando búsqueda…
-                    </div>
+                    <div className="mt-1 text-[0.72rem] text-slate-500">Aplicando búsqueda…</div>
                   )}
                 </div>
 
@@ -773,9 +825,7 @@ const PagosPage = () => {
                   </div>
                 </div>
                 <div className="rounded-2xl bg-slate-950/50 border border-slate-800 px-3 py-2">
-                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">
-                    Estado
-                  </div>
+                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">Estado</div>
                   <div className="text-sm font-semibold">
                     {loadingHistorialPagos
                       ? "Cargando..."
@@ -792,10 +842,12 @@ const PagosPage = () => {
             {/* Tabla */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] overflow-hidden">
               <div className="overflow-auto">
-                <table className="min-w-[980px] w-full text-sm">
+                <table className="min-w-[1120px] w-full text-sm">
                   <thead className="bg-slate-950/60 border-b border-slate-800">
                     <tr className="text-slate-300">
                       <th className="text-left px-3 py-2">Fecha pago</th>
+                      <th className="text-left px-3 py-2">Registrado</th>
+                      <th className="text-left px-3 py-2">Cuota</th>
                       <th className="text-left px-3 py-2">Asegurado</th>
                       <th className="text-left px-3 py-2">DNI</th>
                       <th className="text-left px-3 py-2">Patente</th>
@@ -816,6 +868,8 @@ const PagosPage = () => {
                             : String(fechaPago)
                           : "—";
 
+                        const registradoFmt = fmtRegistro(it);
+
                         const clienteNombre = it?.cliente_nombre || "";
                         const dni = it?.cliente_dni || "";
                         const patente = it?.patente || "";
@@ -826,12 +880,32 @@ const PagosPage = () => {
                         const monto = it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
                         const medio = it?.medio || it?.forma_pago || "";
 
+                        // ✅ NUEVO: cuota "3/12"
+                        const cuotaLabel =
+                          it?.cuota_label ||
+                          it?.cuota_va ||
+                          (it?.cuota_nro !== undefined && it?.cuota_nro !== null
+                            ? String(it.cuota_nro)
+                            : "");
+
                         return (
                           <tr
                             key={it?.id ?? `${fechaPago}-${numeroPoliza}-${patente}`}
                             className="border-b border-slate-800/70 hover:bg-slate-950/40"
                           >
                             <td className="px-3 py-2 text-slate-200">{fechaFmt}</td>
+
+                            <td className="px-3 py-2 text-slate-300">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400/70 shadow-[0_0_10px_rgba(52,211,153,0.55)]" />
+                                <span className="tabular-nums">{registradoFmt}</span>
+                              </span>
+                            </td>
+
+                            <td className="px-3 py-2 text-slate-200 font-semibold tabular-nums">
+                              {safe(cuotaLabel, "—")}
+                            </td>
+
                             <td className="px-3 py-2 text-slate-100 font-medium">
                               {safe(clienteNombre)}
                             </td>
@@ -849,7 +923,7 @@ const PagosPage = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={9} className="px-3 py-10 text-center text-slate-400">
+                        <td colSpan={11} className="px-3 py-10 text-center text-slate-400">
                           {loadingHistorialPagos
                             ? "Cargando historial de pagos..."
                             : "No hay pagos registrados con esos filtros."}
