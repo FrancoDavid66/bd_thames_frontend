@@ -1,5 +1,5 @@
-/* src/components/pagos/CuotasAlertas.jsx — Buckets 3/0/3/7/30 + Export CSV/Excel/PDF + filtros Oficina + Compañía */
-import { useEffect, useMemo, useState } from "react";
+/* src/components/pagos/CuotasAlertas.jsx — Buckets 3/0/3/7/30 + Export CSV/Excel/PDF + filtros Oficina + Compañía + búsqueda intencional */
+import { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
@@ -105,11 +105,7 @@ const normalizeOficina3 = (raw) => {
 
   if ((/\(1\)/.test(up) || /\b1\b/.test(up)) && /ESQUINAS/.test(up)) return "1";
   if (/\(2\)/.test(up) || /AXION/.test(up)) return "2";
-  if (
-    /\(3\)/.test(up) ||
-    /KILOMETRO\s*39/.test(up) ||
-    /\bKM\s*39\b/.test(up)
-  )
+  if (/\(3\)/.test(up) || /KILOMETRO\s*39/.test(up) || /\bKM\s*39\b/.test(up))
     return "3";
 
   if (/5\s*ESQUINAS/.test(up)) return "1";
@@ -213,8 +209,7 @@ const BUCKETS = [
     key: "30_despues",
     title: "🚨 Último aviso",
     subtitle: "Vencida hace 30+ días",
-    message:
-      "🚨 Último aviso para recuperar cobertura: cuotas vencidas hace 30 días",
+    message: "🚨 Último aviso para recuperar cobertura: cuotas vencidas hace 30 días",
     match: (d) => d !== null && d <= -30,
   },
   {
@@ -268,10 +263,7 @@ function downloadBlob(filename, mime, content) {
 }
 
 function downloadCSV(filename, header, rows) {
-  const lines = [
-    header.map(csvSafe).join(","),
-    ...rows.map((r) => r.map(csvSafe).join(",")),
-  ].join("\n");
+  const lines = [header.map(csvSafe).join(","), ...rows.map((r) => r.map(csvSafe).join(","))].join("\n");
   downloadBlob(filename, "text/csv;charset=utf-8;", lines);
 }
 
@@ -284,15 +276,10 @@ function downloadExcelXls(filename, header, rows) {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
 
-  const thead = `<tr>${header
-    .map((h) => `<th>${escapeHtml(h)}</th>`)
-    .join("")}</tr>`;
+  const thead = `<tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`;
 
   const tbody = rows
-    .map(
-      (r) =>
-        `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`
-    )
+    .map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
     .join("");
 
   const html = `<!doctype html>
@@ -318,15 +305,10 @@ function openPrintToPDF({ title, header, rows }) {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
 
-  const thead = `<tr>${header
-    .map((h) => `<th>${escapeHtml(h)}</th>`)
-    .join("")}</tr>`;
+  const thead = `<tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`;
 
   const tbody = rows
-    .map(
-      (r) =>
-        `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`
-    )
+    .map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
     .join("");
 
   const html = `<!doctype html>
@@ -374,18 +356,13 @@ function CuotaAlertaCard({ cuota, dias }) {
   const ofiNorm = normalizeOficina3(rawOfi);
 
   const ofiLabelFromBackend = String(cuota?.poliza?.oficina_nombre || "").trim();
-  const ofiLabel =
-    ofiLabelFromBackend ||
-    (ofiNorm ? oficinaLabelFromKey(ofiNorm) : "Sin oficina");
+  const ofiLabel = ofiLabelFromBackend || (ofiNorm ? oficinaLabelFromKey(ofiNorm) : "Sin oficina");
 
   const compLabel = labelCompania(extractRawCompania(cuota));
 
   const asegurado = formatAseguradoName(cuota);
   const patente = String(cuota?.poliza?.patente || "").toUpperCase().trim();
-  const vehiculo = [cuota?.poliza?.marca, cuota?.poliza?.modelo]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const vehiculo = [cuota?.poliza?.marca, cuota?.poliza?.modelo].filter(Boolean).join(" ").trim();
 
   return (
     <motion.div
@@ -398,9 +375,7 @@ function CuotaAlertaCard({ cuota, dias }) {
       <div className="space-y-2">
         {/* ✅ ASEGURADO MÁS GRANDE */}
         <div className="flex items-start justify-between gap-2">
-          <p className="text-base sm:text-lg font-extrabold tracking-tight">
-            {asegurado}
-          </p>
+          <p className="text-base sm:text-lg font-extrabold tracking-tight">{asegurado}</p>
           {patente && (
             <span className="shrink-0 inline-flex items-center rounded-xl border border-white/15 bg-white/5 px-3 py-1 text-sm sm:text-base font-extrabold tracking-wider">
               {patente}
@@ -441,9 +416,7 @@ function CuotaAlertaCard({ cuota, dias }) {
         <p className="text-sm">
           Vencimiento:{" "}
           <span className="font-semibold">
-            {cuota.fecha_vencimiento
-              ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY")
-              : "—"}
+            {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY") : "—"}
           </span>
         </p>
 
@@ -466,8 +439,7 @@ function BucketSection({ bucket, items }) {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-50">
-            {bucket.title}{" "}
-            <span className="text-slate-300 font-normal">({items.length})</span>
+            {bucket.title} <span className="text-slate-300 font-normal">({items.length})</span>
           </h3>
           <p className="text-xs text-slate-300 mt-0.5">{bucket.subtitle}</p>
         </div>
@@ -502,14 +474,15 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
   const [companiaSel, setCompaniaSel] = useState("ALL"); // key normalizada (lower)
   const [exportFormat, setExportFormat] = useState("csv"); // csv | excel | pdf
 
-  useEffect(() => {
-    dispatch(fetchCuotasAVencer());
-  }, [dispatch]);
+  // ✅ NUEVO: búsqueda intencional
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const listAll = useMemo(
-    () => (Array.isArray(cuotasAVencer) ? cuotasAVencer : []),
-    [cuotasAVencer]
-  );
+  const runSearch = () => {
+    setHasSearched(true);
+    dispatch(fetchCuotasAVencer());
+  };
+
+  const listAll = useMemo(() => (Array.isArray(cuotasAVencer) ? cuotasAVencer : []), [cuotasAVencer]);
 
   /** Opciones y conteos de compañías (siempre desde el total cargado) */
   const companiasMeta = useMemo(() => {
@@ -602,10 +575,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
   }, [cuotasFiltradas]);
 
   const totalMostrado = useMemo(() => {
-    return Object.values(buckets || {}).reduce(
-      (acc, arr) => acc + (arr?.length || 0),
-      0
-    );
+    return Object.values(buckets || {}).reduce((acc, arr) => acc + (arr?.length || 0), 0);
   }, [buckets]);
 
   /** Export: dedupe por cliente (solo visibles: compañía + oficina) */
@@ -623,17 +593,11 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
 
       const cli = extractCliente(cuota) || {};
       const cliId = cli?.id;
-      const dni = (cli?.dni_cuit_cuil || cli?.dni || cli?.cuit || "")
-        .toString()
-        .trim();
+      const dni = (cli?.dni_cuit_cuil || cli?.dni || cli?.cuit || "").toString().trim();
 
       const nombre = (cli?.nombre || cli?.name || "").toString().trim();
-      const apellido = (cli?.apellido || cli?.last_name || "")
-        .toString()
-        .trim();
-      const telefono = (cli?.telefono || cli?.celular || cli?.whatsapp || "")
-        .toString()
-        .trim();
+      const apellido = (cli?.apellido || cli?.last_name || "").toString().trim();
+      const telefono = (cli?.telefono || cli?.celular || cli?.whatsapp || "").toString().trim();
       const email = (cli?.email || "").toString().trim();
 
       const key =
@@ -644,24 +608,17 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
 
       const rawOfi = extractRawOficina(cuota);
       const ofiNorm = normalizeOficina3(rawOfi);
-      const ofiLabelFromBackend = String(
-        cuota?.poliza?.oficina_nombre || ""
-      ).trim();
-      const oficinaLabel =
-        ofiLabelFromBackend ||
-        (ofiNorm ? oficinaLabelFromKey(ofiNorm) : "Sin oficina");
+      const ofiLabelFromBackend = String(cuota?.poliza?.oficina_nombre || "").trim();
+      const oficinaLabel = ofiLabelFromBackend || (ofiNorm ? oficinaLabelFromKey(ofiNorm) : "Sin oficina");
 
       const compLabel = labelCompania(extractRawCompania(cuota));
 
       const pol = cuota?.poliza || {};
-      const numeroPoliza =
-        pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "";
+      const numeroPoliza = pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "";
       const patente = (pol.patente || "").toString().toUpperCase();
       const vehiculo = [pol.marca, pol.modelo].filter(Boolean).join(" ").trim();
 
-      const fv = cuota?.fecha_vencimiento
-        ? dayjs(cuota.fecha_vencimiento).startOf("day")
-        : null;
+      const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
       const diasCalc = fv && fv.isValid() ? fv.diff(hoy, "day") : dias;
 
       const prev = map.get(key);
@@ -692,10 +649,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
             prev.vencimiento_mas_proximo = fv;
             prev.dias_mas_proximo = diasCalc;
           } else {
-            const prevDias =
-              typeof prev.dias_mas_proximo === "number"
-                ? prev.dias_mas_proximo
-                : null;
+            const prevDias = typeof prev.dias_mas_proximo === "number" ? prev.dias_mas_proximo : null;
 
             if (typeof diasCalc === "number") {
               if (prevDias === null || diasCalc < prevDias) {
@@ -737,9 +691,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
       x.compania,
       x.cuotas_count,
       Array.from(x.buckets).join("|"),
-      x.vencimiento_mas_proximo
-        ? x.vencimiento_mas_proximo.format("YYYY-MM-DD")
-        : "",
+      x.vencimiento_mas_proximo ? x.vencimiento_mas_proximo.format("YYYY-MM-DD") : "",
       x.dias_mas_proximo,
       x.numero_poliza,
       x.patente,
@@ -752,13 +704,9 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
   const doExport = () => {
     const { header, rows } = buildAseguradosTable();
 
-    const fileOfi =
-      oficinaSel && oficinaSel !== "ALL" ? `ofi_${oficinaSel}` : "todas";
-    const fileComp =
-      companiaSel && companiaSel !== "ALL" ? `comp_${companiaSel}` : "todas";
-    const baseName = `asegurados_alertas_${fileOfi}_${fileComp}_${dayjs().format(
-      "YYYY-MM-DD_HH-mm"
-    )}`;
+    const fileOfi = oficinaSel && oficinaSel !== "ALL" ? `ofi_${oficinaSel}` : "todas";
+    const fileComp = companiaSel && companiaSel !== "ALL" ? `comp_${companiaSel}` : "todas";
+    const baseName = `asegurados_alertas_${fileOfi}_${fileComp}_${dayjs().format("YYYY-MM-DD_HH-mm")}`;
 
     if (exportFormat === "csv") {
       downloadCSV(`${baseName}.csv`, header, rows);
@@ -773,14 +721,53 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
       title: `Asegurados en alertas (${getFilterMeta(oficinaSel).label} / ${
         companiaSel === "ALL"
           ? "Todas las compañías"
-          : companiasMeta.options.find((o) => o.key === companiaSel)?.label ||
-            "Compañía"
+          : companiasMeta.options.find((o) => o.key === companiaSel)?.label || "Compañía"
       })`,
       header,
       rows,
     });
   };
 
+  // ✅ NUEVO: si aún no buscaste, mostramos un panel liviano (no hace fetch)
+  if (!hasSearched) {
+    return (
+      <motion.div
+        className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-[0_0_30px_rgba(15,23,42,0.55)]"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-primary-400 text-slate-950">
+              <HiClock className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
+              <p className="text-xs text-slate-300 mt-0.5">
+                La búsqueda es intencional para que la página cargue más rápido.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={runSearch}
+            className="h-10 px-4 rounded-2xl border text-sm font-semibold transition cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100"
+            title="Buscar cuotas a vencer/vencidas"
+          >
+            Buscar
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
+          Elegí filtros (opcional) y tocá <span className="font-semibold">Buscar</span> para cargar las alertas.
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ✅ loading / error solo aplican DESPUÉS de buscar
   if (status === "loading") {
     return (
       <div className="mt-6 rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
@@ -801,7 +788,42 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
     );
   }
 
-  if (!cuotasAVencer || cuotasAVencer.length === 0) return null;
+  // si buscaste y no hay resultados, mostramos estado vacío (en vez de null)
+  if (!cuotasAVencer || cuotasAVencer.length === 0) {
+    return (
+      <motion.div
+        className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-[0_0_30px_rgba(15,23,42,0.55)]"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-primary-400 text-slate-950">
+              <HiClock className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
+              <p className="text-xs text-slate-300 mt-0.5">Sin resultados para esta búsqueda.</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={runSearch}
+            className="h-10 px-4 rounded-2xl border text-sm font-semibold transition cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100"
+            title="Volver a buscar"
+          >
+            Buscar
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
+          Probá cambiar filtros y tocar <span className="font-semibold">Buscar</span> otra vez.
+        </div>
+      </motion.div>
+    );
+  }
 
   const otros = buckets?.otros || [];
   const anyBucket =
@@ -827,26 +849,25 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
             <HiClock className="w-5 h-5" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">
-              Alertas de cuotas (por bucket)
-            </h2>
+            <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              Mostrando{" "}
-              <span className="font-semibold text-slate-50">
-                {totalMostrado}
-              </span>{" "}
-              (filtradas) de{" "}
-              <span className="font-semibold text-slate-50">
-                {cuotasAVencer.length}
-              </span>{" "}
-              (totales)
+              Mostrando <span className="font-semibold text-slate-50">{totalMostrado}</span> (filtradas) de{" "}
+              <span className="font-semibold text-slate-50">{cuotasAVencer.length}</span> (totales)
             </p>
           </div>
         </div>
 
-        {/* Export controls */}
+        {/* Acciones: Buscar + Export */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* formato export */}
+          <button
+            type="button"
+            onClick={runSearch}
+            className="h-10 px-4 rounded-2xl border text-sm font-semibold transition cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100"
+            title="Actualizar búsqueda"
+          >
+            Buscar
+          </button>
+
           <div className="relative">
             <select
               value={exportFormat}
@@ -911,8 +932,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
             title="Filtrar por compañía"
           >
             <option value="ALL" style={optStyle}>
-              Todas las compañías (
-              {companiaSel === "ALL" ? listAll.length : companiasMeta.total})
+              Todas las compañías ({companiaSel === "ALL" ? listAll.length : companiasMeta.total})
             </option>
             {companiasMeta.options.map((o) => (
               <option key={o.key} value={o.key} style={optStyle}>
@@ -962,9 +982,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
                 f.ring,
                 active ? f.active : f.inactive,
-                disabled
-                  ? "opacity-35 cursor-not-allowed hover:scale-100"
-                  : "cursor-pointer",
+                disabled ? "opacity-35 cursor-not-allowed hover:scale-100" : "cursor-pointer",
               ].join(" ")}
             >
               <span className="font-semibold">{f.label}</span>
@@ -994,10 +1012,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
                 <h3 className="text-base font-semibold text-slate-50">
-                  Otros{" "}
-                  <span className="text-slate-300 font-normal">
-                    ({otros.length})
-                  </span>
+                  Otros <span className="text-slate-300 font-normal">({otros.length})</span>
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5">
                   Fuera de 3_antes / hoy / 3_despues / 7_despues / 30_despues
@@ -1015,15 +1030,13 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
 
         {!anyBucket && totalMostrado === 0 && (
           <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
-            No hay alertas para{" "}
-            <span className="font-semibold">{getFilterMeta(oficinaSel).label}</span>
+            No hay alertas para <span className="font-semibold">{getFilterMeta(oficinaSel).label}</span>
             {companiaSel !== "ALL" ? (
               <>
                 {" "}
                 en{" "}
                 <span className="font-semibold">
-                  {companiasMeta.options.find((o) => o.key === companiaSel)?.label ||
-                    "la compañía seleccionada"}
+                  {companiasMeta.options.find((o) => o.key === companiaSel)?.label || "la compañía seleccionada"}
                 </span>
               </>
             ) : null}

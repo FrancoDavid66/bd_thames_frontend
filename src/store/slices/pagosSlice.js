@@ -499,12 +499,24 @@ export const registrarIngreso = createAsyncThunk(
   }
 );
 
-/** Obtener cuotas a vencer */
+/** Obtener cuotas a vencer (✅ ahora acepta params opcionales, sin romper llamadas viejas) */
 export const fetchCuotasAVencer = createAsyncThunk(
   "pagos/fetchCuotasAVencer",
-  async (_, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(API("cuotas/a-vencer/"));
+      const p = params && typeof params === "object" ? params : {};
+      const built = compact({
+        oficina: p?.oficina,
+        search: p?.search ?? p?.q,
+        desde: p?.desde,
+        hasta: p?.hasta,
+        modo: p?.modo, // por si el backend lo soporta a futuro
+      });
+
+      const { data } = await axios.get(API("cuotas/a-vencer/"), {
+        params: built,
+      });
+
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(
@@ -691,7 +703,11 @@ function saveHistorialCache(state, cacheKey, items, meta) {
             next: meta.next ?? null,
             previous: meta.previous ?? null,
           }
-        : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
+        : {
+            count: Array.isArray(items) ? items.length : 0,
+            next: null,
+            previous: null,
+          },
   };
 
   const prev = Array.isArray(state.historialPagosCacheOrder)
