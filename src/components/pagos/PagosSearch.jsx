@@ -1,10 +1,14 @@
-/* src/components/pagos/PagosSearch.jsx — Optimizado: cache + recientes + "/" + busca pólizas CON cuotas */
+/* src/components/pagos/PagosSearch.jsx — PRO: cache + recientes + "/" + prefetch + anti-stale (cuotas aplanadas) */
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { HiSearch, HiX } from "react-icons/hi";
-import { fetchPolizas } from "../../store/slices/pagosSlice";
+import { fetchPagosBuscar } from "../../store/slices/pagosSlice";
+
+const PREFETCH_DEBOUNCE_MS = 260;
+const PREFETCH_MIN_CHARS = 3;
+const PREFETCH_LIMIT = 20; // liviano: calienta cache de cuotas aplanadas
 
 export default function PagosSearch({ onBuscar }) {
   const [query, setQuery] = useState("");
@@ -12,17 +16,31 @@ export default function PagosSearch({ onBuscar }) {
   const dispatch = useDispatch();
 
   const {
+    // ✅ mantenemos compat: searchStatus lo setea el slice también en fetchPagosBuscar
     searchStatus = "idle",
+
+    // ✅ PRO cache (cuotas aplanadas)
+    buscarCache = {},
+    buscarCacheOrder = [],
+
+    // fallback legacy (por si venías con cache viejo)
     polizasCache = {},
     polizasCacheOrder = [],
   } = useSelector((state) => state.pagos || {});
+
   const cargando = searchStatus === "loading";
+
+  // ✅ anti-stale real: guardamos el requestId del dispatch *antes* del await
+  const lastRequestIdRef = useRef(null);
+
+  // para evitar toasts repetidos
+  const lastToastKeyRef = useRef("");
 
   useEffect(() => {
     inputRef.current?.focus?.();
   }, []);
 
-  // Atajo: "/" enfoca el buscador (tipo Instagram/Twitter)
+  // Atajo: "/" enfoca el buscador
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -42,24 +60,55 @@ export default function PagosSearch({ onBuscar }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ✅ Recientes (dedupe por texto, aunque cache key tenga sufijos |lite / |cuotas)
+  // ✅ Recientes (PRO): dedupe por texto desde buscarCacheOrder
+  // fallback: si no hay cache PRO todavía, usa el legacy de polizas
   const recientes = useMemo(() => {
-    const order = Array.isArray(polizasCacheOrder) ? polizasCacheOrder : [];
-    const seen = new Set();
     const out = [];
+    const seen = new Set();
 
-    for (const k of order) {
-      const entry = polizasCache?.[k];
-      const q = String(entry?.originalQuery || "").trim();
-      if (!q) continue;
-      const norm = q.toLowerCase();
-      if (seen.has(norm)) continue;
-      seen.add(norm);
-      out.push(q);
-      if (out.length >= 6) break;
-    }
-    return out;
-  }, [polizasCache, polizasCacheOrder]);
+    const pushFrom = (order, cache) => {
+      const arr = Array.isArray(order) ? order : [];
+      for (const k of arr) {
+        const entry = cache?.[k];
+        const q = String(entry?.originalQuery || "").trim();
+        if (!q) continue;
+        const norm = q.toLowerCase();
+        if (seen.has(norm)) continue;
+        seen.add(norm);
+        out.push(q);
+        if (out.length >= 6) break;
+      }
+    };
+
+    pushFrom(buscarCacheOrder, buscarCache);
+
+    // fallback legacy
+    if (out.length < 6) pushFrom(polizasCacheOrder, polizasCache);
+
+    return out.slice(0, 6);
+  }, [buscarCache, buscarCacheOrder, polizasCache, polizasCacheOrder]);
+
+  /* ===================== Prefetch liviano (debounce) ===================== */
+  useEffect(() => {
+    const q = String(query || "").trim();
+    if (q.length < PREFETCH_MIN_CHARS) return;
+
+    const t = setTimeout(() => {
+      // Prefetch rápido: cuotas aplanadas (sin pagadas, liviano)
+      dispatch(
+        fetchPagosBuscar({
+          query: q,
+          page_size: PREFETCH_LIMIT, // ✅ backend entiende page_size
+          limit: PREFETCH_LIMIT, // compat
+          include_pagadas: false,
+          // ordering: "vencimiento",
+          // oficina: ...
+        })
+      );
+    }, PREFETCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(t);
+  }, [dispatch, query]);
 
   const handleSubmit = useCallback(
     async (e, qOverride = null) => {
@@ -67,57 +116,91 @@ export default function PagosSearch({ onBuscar }) {
 
       const q = String(qOverride ?? query).trim();
       if (!q) {
-        toast.error("Escribí algo para buscar (cliente, patente, póliza…)"); // UX
+        const key = "empty";
+        if (lastToastKeyRef.current !== key) {
+          lastToastKeyRef.current = key;
+          toast.error("Escribí algo para buscar (cliente, patente, póliza…)");
+        }
         return;
       }
 
       try {
-        // ✅ Pedimos pólizas HIDRATADAS con cuotas (rápido, cacheado)
-        const action = await dispatch(
-          fetchPolizas({ query: q, withCuotas: true, limit: 25 })
+        // ✅ PRO: pedimos CUOTAS APLANADAS (backend: /pagos/buscar/)
+        const promise = dispatch(
+          fetchPagosBuscar({
+            query: q,
+            page: 1,
+            page_size: 300,
+            limit: 300, // compat
+            include_pagadas: false, // => ocultar_pagadas=1 en el slice
+            // ordering: "vencimiento",
+            // oficina: ...
+            // force: true, // si querés que el botón Buscar SIEMPRE pegue al backend
+          })
         );
 
-        const payload = action?.payload;
-        const polizas =
-          payload?.polizas ??
-          payload ??
-          action?.polizas ??
-          (Array.isArray(action) ? action : []);
+        // ✅ anti-stale real: guardamos requestId antes del await
+        lastRequestIdRef.current = promise?.requestId || null;
 
-        if (!Array.isArray(polizas)) {
-          toast.error("No pude interpretar el resultado de la búsqueda.");
+        const action = await promise;
+
+        // Si por algún motivo llegó tarde otra respuesta, la ignoramos
+        if (
+          lastRequestIdRef.current &&
+          action?.meta?.requestId &&
+          lastRequestIdRef.current !== action.meta.requestId
+        ) {
           return;
         }
 
-        // Si encontró pólizas pero no vienen cuotas, lo avisamos (backend/serializer)
-        if (polizas.length > 0) {
-          const anyHasCuotas = polizas.some((p) => Array.isArray(p?.cuotas));
-          if (!anyHasCuotas) {
-            toast.error(
-              "Encontré pólizas, pero el backend no está devolviendo cuotas en el detalle. Revisá el serializer de /polizas/{id}/."
-            );
-          }
-        }
+        const payload = action?.payload || {};
+        const items = Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload)
+          ? payload
+          : [];
 
-        onBuscar?.(polizas);
-        if (polizas.length === 0) toast("Sin resultados para esa búsqueda.");
+        const meta =
+          payload?.meta && typeof payload.meta === "object"
+            ? payload.meta
+            : { count: items.length, next: null, previous: null };
+
+        // 👇 onBuscar recibe CUOTAS (flat) + meta + query (sin romper compat si solo usa el 1er arg)
+        onBuscar?.(items, meta, q);
+
+        if (items.length === 0) {
+          const key = `nores:${q.toLowerCase()}`;
+          if (lastToastKeyRef.current !== key) {
+            lastToastKeyRef.current = key;
+            toast("Sin resultados para esa búsqueda.");
+          }
+        } else {
+          lastToastKeyRef.current = "";
+        }
       } catch (err) {
+        // si fue abort / stale, no spameamos
+        if (err?.payload?._aborted) return;
+
         console.error(err);
-        toast.error("Ocurrió un error buscando pólizas.");
+        toast.error("Ocurrió un error buscando pagos.");
       }
     },
     [dispatch, onBuscar, query]
   );
 
-  const limpiar = () => {
+  const limpiar = useCallback(() => {
     setQuery("");
+    lastToastKeyRef.current = "";
     inputRef.current?.focus?.();
-  };
+  }, []);
 
-  const usarReciente = (q) => {
-    setQuery(q);
-    handleSubmit({ preventDefault() {} }, q);
-  };
+  const usarReciente = useCallback(
+    (q) => {
+      setQuery(q);
+      handleSubmit({ preventDefault() {} }, q);
+    },
+    [handleSubmit]
+  );
 
   return (
     <motion.div
@@ -130,7 +213,7 @@ export default function PagosSearch({ onBuscar }) {
         onSubmit={handleSubmit}
         className="w-full"
         role="search"
-        aria-label="Buscar pólizas para gestionar pagos"
+        aria-label="Buscar cuotas para gestionar pagos"
       >
         <div className="flex w-full gap-2">
           <label className="relative flex-1">

@@ -76,12 +76,12 @@ const PALETTE = {
     "bg-violet-300 hover:bg-violet-400 text-violet-950 border-violet-500",
 };
 
-const fmtMoney = (n) =>
-  new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(n || 0));
-
+/* ====== Formatters cacheados (evita recrear Intl por fila/render) ====== */
+const MONEY_FMT = new Intl.NumberFormat("es-AR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const fmtMoney = (n) => MONEY_FMT.format(Number(n || 0));
 const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "—");
 
 /* ====== Performance knobs ====== */
@@ -89,6 +89,30 @@ const AUTO_FAST_THRESHOLD = 120; // si hay >= 120 items, activa modo rápido
 const FAST_INITIAL = 40;
 const FAST_STEP = 60;
 const SHOW_FAST_TOGGLE_FROM = 60;
+
+/* ====== helpers “hoy” estable que se actualiza al cambiar el día ====== */
+function todayKey() {
+  return dayjs().format("YYYY-MM-DD");
+}
+function msUntilNextDay() {
+  const now = dayjs();
+  const next = now.add(1, "day").startOf("day").add(2, "second"); // colchón
+  const ms = next.diff(now, "millisecond");
+  return Math.max(5_000, Math.min(ms, 24 * 60 * 60 * 1000));
+}
+
+// ✅ helper: normaliza la respuesta del backend al pagar
+function pickCuotaActualizada(resp) {
+  // tolera:
+  // - cuota directa
+  // - { cuotaActualizada: {...} }
+  // - { data: {...} } (por algún wrapper)
+  const r = resp && typeof resp === "object" ? resp : null;
+  if (!r) return null;
+  if (r.cuotaActualizada && typeof r.cuotaActualizada === "object") return r.cuotaActualizada;
+  if (r.data && typeof r.data === "object") return r.data;
+  return r; // asume cuota
+}
 
 export default function PagosList({
   cuotas = [],
@@ -108,13 +132,29 @@ export default function PagosList({
   // datos para el modal de confirmación visual
   const [confirmData, setConfirmData] = useState(null);
 
+  // ✅ evita doble click / doble pago mientras confirma
+  const [confirmandoPago, setConfirmandoPago] = useState(false);
+
   const items = useMemo(() => {
     const base = Array.isArray(cuotas) ? cuotas : [];
     return ocultarPagadas ? base.filter((c) => !c.pagado) : base;
   }, [cuotas, ocultarPagadas]);
 
-  // fecha “hoy” estable por render (y por día)
-  const hoy = useMemo(() => dayjs().startOf("day"), []);
+  // hoy “real” que se actualiza automáticamente al cambiar el día
+  const [hoyKey, setHoyKey] = useState(todayKey());
+  useEffect(() => {
+    let t = null;
+    const tick = () => {
+      setHoyKey(todayKey());
+      t = setTimeout(tick, msUntilNextDay());
+    };
+    t = setTimeout(tick, msUntilNextDay());
+    return () => {
+      if (t) clearTimeout(t);
+    };
+  }, []);
+
+  const hoy = useMemo(() => dayjs(hoyKey).startOf("day"), [hoyKey]);
 
   /* ================== Modo rápido + render progresivo ================== */
   const [modoRapidoManual, setModoRapidoManual] = useState(null);
@@ -149,6 +189,10 @@ export default function PagosList({
   const abrirDetalle = useCallback((cuota) => setDetalleAbierto(cuota), []);
   const cerrarDetalle = useCallback(() => setDetalleAbierto(null), []);
 
+  const toggleObs = useCallback((id) => {
+    setObsAbiertaId((prev) => (prev === id ? null : id));
+  }, []);
+
   // Paso 1: desde ModalFormaPago armamos datos y abrimos el modal de confirmación
   const confirmarPago = useCallback(
     (datos) => {
@@ -177,6 +221,7 @@ export default function PagosList({
   // Paso 2: ejecutar el pago realmente después de confirmar
   const ejecutarPagoConfirmado = useCallback(async () => {
     if (!confirmData) return;
+    if (confirmandoPago) return;
 
     const { datos, cuota, monto } = confirmData;
 
@@ -193,22 +238,40 @@ export default function PagosList({
     if (datos.destino_cuenta) payload.destino_cuenta = datos.destino_cuenta;
 
     try {
-      const cuotaActualizada = await dispatch(
-        marcarCuotaComoPagada(payload)
-      ).unwrap();
+      setConfirmandoPago(true);
+
+      const resp = await dispatch(marcarCuotaComoPagada(payload)).unwrap();
+      const cuotaActualizada = pickCuotaActualizada(resp);
+
+      if (!cuotaActualizada || typeof cuotaActualizada !== "object") {
+        toast.error("Pago registrado, pero no pude actualizar la cuota en pantalla.");
+        setConfirmData(null);
+        return;
+      }
+
       toast.success("Cuota marcada como pagada");
+
       const conObs = {
         ...cuotaActualizada,
+        // preserva cosas que quizás no vienen en la respuesta
+        poliza: cuotaActualizada.poliza || cuota.poliza,
+        cantidad_cuotas:
+          cuotaActualizada.cantidad_cuotas ?? cuota.cantidad_cuotas ?? null,
         observaciones_pago: (datos.observaciones || "").trim(),
       };
+
       setConfirmData(null);
       actualizarCuotas?.([conObs]);
+
+      // si hay observación, abrimos la nota (si la cuota sigue visible)
       if (conObs.observaciones_pago) setObsAbiertaId(conObs.id);
     } catch (e) {
       console.error(e);
       toast.error("No se pudo registrar el pago");
+    } finally {
+      setConfirmandoPago(false);
     }
-  }, [confirmData, dispatch, actualizarCuotas]);
+  }, [confirmData, confirmandoPago, dispatch, actualizarCuotas]);
 
   const handleCancelarConfirm = useCallback(() => {
     if (!confirmData) {
@@ -236,15 +299,77 @@ export default function PagosList({
       .toString()
       .trim();
     const cobertura = (pol.cobertura || "").toString().trim();
-    const total = Array.isArray(pol.cuotas) ? pol.cuotas.length : null;
+
+    // ✅ total de cuotas: prioriza flat (cantidad_cuotas)
+    const total =
+      cuotaSeleccionada?.cantidad_cuotas ??
+      (Array.isArray(pol.cuotas) ? pol.cuotas.length : null);
+
     const cuotaTxt =
       typeof cuotaSeleccionada.cuota_nro === "number"
         ? total
           ? `Cuota ${cuotaSeleccionada.cuota_nro}/${total}`
           : `Cuota ${cuotaSeleccionada.cuota_nro}`
         : "";
+
     return { nombreAp, dni, compania, cobertura, cuotaTxt };
   }, [cuotaSeleccionada]);
+
+  /* ================== Pre-cálculo por cuota (evita dayjs + format por fila) ================== */
+  const rowModels = useMemo(() => {
+    const base = Array.isArray(visibleItems) ? visibleItems : [];
+    const out = new Array(base.length);
+
+    for (let i = 0; i < base.length; i++) {
+      const cuota = base[i];
+      const pol = cuota?.poliza || {};
+      const cliente = pol?.cliente || {};
+
+      const nombreCompleto =
+        [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || "Cliente";
+
+      const patente = (pol?.patente || "").toUpperCase();
+      const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
+
+      const observacion = (
+        (cuota?.observaciones_pago || cuota?.ultima_observacion_pago || "") || ""
+      )
+        .toString()
+        .trim();
+
+      const fv = cuota?.fecha_vencimiento
+        ? dayjs(cuota.fecha_vencimiento).startOf("day")
+        : null;
+      const dias = fv ? fv.diff(hoy, "day") : null;
+
+      const state = cuota?.pagado
+        ? "paid"
+        : dias !== null && dias < 0
+        ? "overdue"
+        : "pending";
+
+      const label =
+        state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
+
+      out[i] = {
+        cuota,
+        pol,
+        nombreCompleto,
+        patente,
+        modelo,
+        observacion,
+        hasObs: !!observacion,
+        isObsOpen: obsAbiertaId === cuota?.id,
+        state,
+        label,
+        dias,
+        venceTxt: fmtDate(cuota?.fecha_vencimiento),
+        pagaTxt: cuota?.fecha_pago ? fmtDate(cuota?.fecha_pago) : null,
+        montoTxt: fmtMoney(cuota?.monto),
+      };
+    }
+    return out;
+  }, [visibleItems, hoy, obsAbiertaId]);
 
   if (items.length === 0) {
     return (
@@ -301,8 +426,7 @@ export default function PagosList({
       {/* Lista tipo cards oscuras — scroll solo en desktop */}
       <div className="max-h-none md:max-h-[60vh] overflow-y-visible md:overflow-y-auto">
         <ul role="list" className={`divide-y ${PALETTE.divider}`}>
-          {visibleItems.map((cuota, idx) => {
-            // si modo rápido: evitamos motion para no pagar el costo de animación por N filas
+          {rowModels.map((m, idx) => {
             const Comp = modoRapido ? "li" : motion.li;
             const motionProps = modoRapido
               ? {}
@@ -312,19 +436,17 @@ export default function PagosList({
                   transition: {
                     duration: 0.2,
                     ease: "easeOut",
-                    delay: idx * 0.015,
+                    delay: Math.min(0.25, idx * 0.012),
                   },
                 };
 
             return (
-              <Comp key={cuota.id} className="relative" {...motionProps}>
+              <Comp key={m?.cuota?.id} className="relative" {...motionProps}>
                 <CuotaRow
-                  cuota={cuota}
-                  hoy={hoy}
-                  obsAbiertaId={obsAbiertaId}
-                  setObsAbiertaId={setObsAbiertaId}
+                  model={m}
                   abrirDetalle={abrirDetalle}
                   abrirPagar={abrirPagar}
+                  onToggleObs={toggleObs}
                 />
               </Comp>
             );
@@ -375,7 +497,7 @@ export default function PagosList({
           >
             <div
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={handleCancelarConfirm}
+              onClick={confirmandoPago ? undefined : handleCancelarConfirm}
             />
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 12 }}
@@ -392,7 +514,12 @@ export default function PagosList({
                 </h3>
                 <button
                   onClick={handleCancelarConfirm}
-                  className="h-9 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 inline-flex items-center gap-2 text-sm cursor-pointer"
+                  disabled={confirmandoPago}
+                  className={`h-9 px-3 rounded-xl border text-neutral-200 inline-flex items-center gap-2 text-sm cursor-pointer ${
+                    confirmandoPago
+                      ? "bg-neutral-900/40 border-neutral-800 text-neutral-600 cursor-not-allowed"
+                      : "bg-neutral-800 hover:bg-neutral-700 border-neutral-700"
+                  }`}
                 >
                   <HiX className="w-5 h-5" />
                   <span className="hidden sm:inline">Cancelar</span>
@@ -430,16 +557,35 @@ export default function PagosList({
               <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
                 <button
                   onClick={handleCancelarConfirm}
-                  className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 text-sm cursor-pointer"
+                  disabled={confirmandoPago}
+                  className={`h-10 px-4 rounded-xl border text-sm cursor-pointer ${
+                    confirmandoPago
+                      ? "bg-neutral-900/40 border-neutral-800 text-neutral-600 cursor-not-allowed"
+                      : "bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-200"
+                  }`}
                 >
                   Volver y corregir
                 </button>
                 <button
                   onClick={ejecutarPagoConfirmado}
-                  className="h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm inline-flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={confirmandoPago}
+                  className={`h-10 px-4 rounded-xl font-semibold text-sm inline-flex items-center justify-center gap-2 cursor-pointer ${
+                    confirmandoPago
+                      ? "bg-emerald-900/30 text-emerald-200/40 cursor-not-allowed"
+                      : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  }`}
                 >
-                  <HiCash className="w-5 h-5" />
-                  Confirmar pago
+                  {confirmandoPago ? (
+                    <>
+                      <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+                      Confirmando…
+                    </>
+                  ) : (
+                    <>
+                      <HiCash className="w-5 h-5" />
+                      Confirmar pago
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -509,9 +655,11 @@ export default function PagosList({
                 )
                   .toString()
                   .trim();
-                const total = Array.isArray(pol?.cuotas)
-                  ? pol.cuotas.length
-                  : null;
+
+                // ✅ total cuotas: prioriza flat
+                const total =
+                  c?.cantidad_cuotas ??
+                  (Array.isArray(pol?.cuotas) ? pol.cuotas.length : null);
 
                 return (
                   <div className="mt-4 space-y-4 text-sm">
@@ -602,200 +750,208 @@ export default function PagosList({
   );
 }
 
-/* ====== Row memoizada para bajar re-renders ====== */
-const CuotaRow = memo(function CuotaRow({
-  cuota,
-  hoy,
-  obsAbiertaId,
-  setObsAbiertaId,
-  abrirDetalle,
-  abrirPagar,
-}) {
-  const venc = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
-  const fv = venc ? venc.startOf("day") : null;
-  const dias = fv ? fv.diff(hoy, "day") : null;
+/* ====== Row memoizada (custom compare) ====== */
+const CuotaRow = memo(
+  function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs }) {
+    const {
+      cuota,
+      pol,
+      nombreCompleto,
+      patente,
+      modelo,
+      observacion,
+      hasObs,
+      isObsOpen,
+      state,
+      label,
+      dias,
+      venceTxt,
+      pagaTxt,
+      montoTxt,
+    } = model || {};
 
-  const state = cuota.pagado
-    ? "paid"
-    : dias !== null && dias < 0
-    ? "overdue"
-    : "pending";
+    const S = PALETTE[state || "pending"];
+    const Icon = state === "paid" ? HiBadgeCheck : HiClock;
 
-  const S = PALETTE[state];
-  const label =
-    state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
-  const Icon = state === "paid" ? HiBadgeCheck : HiClock;
+    return (
+      <>
+        {/* Línea de estado */}
+        <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe}`} aria-hidden />
 
-  const pol = cuota?.poliza || {};
-  const cliente = pol?.cliente || {};
-  const nombreCompleto =
-    [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || "Cliente";
-  const patente = (pol?.patente || "").toUpperCase();
-  const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
-  const observacion = (
-    (cuota.observaciones_pago || cuota.ultima_observacion_pago || "") || ""
-  )
-    .toString()
-    .trim();
-  const obsActiva = obsAbiertaId === cuota.id;
-
-  return (
-    <>
-      {/* Línea de estado */}
-      <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe}`} aria-hidden />
-
-      {/* Tarjeta oscura con borde acentuado */}
-      <div
-        className={`mx-0 sm:mx-3 my-2 sm:my-3 rounded-none sm:rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
-          {/* Izquierda */}
-          <div className="min-w-0">
-            {/* Encabezado fila */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-800 text-neutral-200 ring-1 ring-white/5">
-                <HiUser className="w-5 h-5" />
-              </span>
-              <span className="truncate max-w-[60ch] font-semibold">
-                {nombreCompleto}
-              </span>
-
-              {patente && (
-                <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-100">
-                  {patente}
+        {/* Tarjeta oscura con borde acentuado */}
+        <div
+          className={`mx-0 sm:mx-3 my-2 sm:my-3 rounded-none sm:rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+            {/* Izquierda */}
+            <div className="min-w-0">
+              {/* Encabezado fila */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-800 text-neutral-200 ring-1 ring-white/5">
+                  <HiUser className="w-5 h-5" />
                 </span>
-              )}
-
-              {modelo && (
-                <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-300">
-                  {modelo}
+                <span className="truncate max-w-[60ch] font-semibold">
+                  {nombreCompleto}
                 </span>
-              )}
-            </div>
 
-            {/* Estado + fechas */}
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder}`}
-              >
-                <span className={`w-2 h-2 rounded-full ${S.dot}`} />
-                <Icon className="w-4 h-4" />
-                {label}
-              </span>
-
-              <span className="text-neutral-500">•</span>
-
-              <div className="text-sm text-neutral-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>Vence: {fmtDate(cuota.fecha_vencimiento)}</span>
-                {cuota.fecha_pago && (
-                  <span>Pagada: {fmtDate(cuota.fecha_pago)}</span>
+                {patente && (
+                  <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-100">
+                    {patente}
+                  </span>
                 )}
-                {dias !== null && !cuota.pagado && (
-                  <span>
-                    {dias < 0
-                      ? `Atraso: ${Math.abs(dias)} días`
-                      : `Faltan: ${dias} días`}
+
+                {modelo && (
+                  <span className="inline-flex items-center gap-1 rounded-full border px-3 h-8 bg-neutral-800 border-neutral-700 text-neutral-300">
+                    {modelo}
                   </span>
                 )}
               </div>
-            </div>
 
-            {/* Observaciones (pastel sólido sobre dark) */}
-            {observacion && obsActiva && (
-              <div
-                className={`mt-3 rounded-2xl border px-3 py-3 ${PALETTE.overdue.noteBg} ${PALETTE.overdue.noteText} border-rose-400`}
-              >
-                <div className="flex items-start gap-2">
-                  <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                  <div className="text-sm whitespace-pre-wrap break-words">
-                    <span className="font-semibold">Observaciones: </span>
-                    {observacion}
-                  </div>
+              {/* Estado + fechas */}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${S.dot}`} />
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </span>
+
+                <span className="text-neutral-500">•</span>
+
+                <div className="text-sm text-neutral-300 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>Vence: {venceTxt}</span>
+                  {!!pagaTxt && <span>Pagada: {pagaTxt}</span>}
+                  {dias !== null && !cuota?.pagado && (
+                    <span>
+                      {dias < 0
+                        ? `Atraso: ${Math.abs(dias)} días`
+                        : `Faltan: ${dias} días`}
+                    </span>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Derecha: monto + acciones */}
-          <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
-            <p className="text-3xl font-extrabold tracking-tight text-neutral-50 text-right w-full">
-              $ {fmtMoney(cuota.monto)}
-            </p>
-
-            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full">
-              <button
-                onClick={() => abrirDetalle(cuota)}
-                className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
-                title="Ver más información"
-                aria-label="Ver más información"
-              >
-                <HiQuestionMarkCircle className="w-5 h-5" />
-                <span className="hidden sm:inline">Más info</span>
-              </button>
-
-              {observacion && (
-                <button
-                  onClick={() => setObsAbiertaId(obsActiva ? null : cuota.id)}
-                  className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-2 transition w-full sm:w-auto cursor-pointer`}
-                  title={obsActiva ? "Ocultar observación" : "Ver observación"}
+              {/* Observaciones (pastel sólido sobre dark) */}
+              {hasObs && isObsOpen && (
+                <div
+                  className={`mt-3 rounded-2xl border px-3 py-3 ${PALETTE.overdue.noteBg} ${PALETTE.overdue.noteText} border-rose-400`}
                 >
-                  <HiExclamationCircle className="w-5 h-5" />
-                  <span className="hidden sm:inline">
-                    {obsActiva ? "Ocultar nota" : "Ver nota"}
-                  </span>
-                </button>
+                  <div className="flex items-start gap-2">
+                    <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                    <div className="text-sm whitespace-pre-wrap break-words">
+                      <span className="font-semibold">Observaciones: </span>
+                      {observacion}
+                    </div>
+                  </div>
+                </div>
               )}
+            </div>
 
-              {!cuota.pagado && (
+            {/* Derecha: monto + acciones */}
+            <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
+              <p className="text-3xl font-extrabold tracking-tight text-neutral-50 text-right w-full">
+                $ {montoTxt}
+              </p>
+
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full">
                 <button
-                  onClick={() => abrirPagar(cuota)}
-                  className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
-                  title="Registrar pago"
-                >
-                  <HiCash className="w-5 h-5" />
-                  <span className="hidden sm:inline">Pagar</span>
-                </button>
-              )}
-
-              {cuota.pagado && (
-                <>
-                  {/* A4 (compartir) */}
-                  <DescargarFactura
-                    cliente={pol?.cliente}
-                    poliza={pol}
-                    cuota={cuota}
-                    tone="neutral"
-                    label="Compartir factura"
-                    className="mt-0 w-full sm:w-auto"
-                  />
-
-                  {/* Ticket térmico */}
-                  <ImprimirFacturaTicket
-                    cliente={pol?.cliente}
-                    poliza={pol}
-                    cuota={cuota}
-                    label="Imprimir factura"
-                    className={`h-10 px-3 rounded-xl border transition inline-flex items-center justify-center gap-2 w-full sm:w-auto ${PALETTE.ticketBtn}`}
-                  />
-                </>
-              )}
-
-              <EnviarFacturaWhatsapp cuota={cuota}>
-                <button
+                  onClick={() => abrirDetalle(cuota)}
                   className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
-                  title="Enviar por WhatsApp"
+                  title="Ver más información"
+                  aria-label="Ver más información"
                 >
-                  <HiDeviceMobile className="w-5 h-5" />
-                  <span className="hidden sm:inline">Enviar</span>
+                  <HiQuestionMarkCircle className="w-5 h-5" />
+                  <span className="hidden sm:inline">Más info</span>
                 </button>
-              </EnviarFacturaWhatsapp>
+
+                {hasObs && (
+                  <button
+                    onClick={() => onToggleObs(cuota?.id)}
+                    className={`h-10 px-3 rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-2 transition w-full sm:w-auto cursor-pointer`}
+                    title={isObsOpen ? "Ocultar observación" : "Ver observación"}
+                  >
+                    <HiExclamationCircle className="w-5 h-5" />
+                    <span className="hidden sm:inline">
+                      {isObsOpen ? "Ocultar nota" : "Ver nota"}
+                    </span>
+                  </button>
+                )}
+
+                {!cuota?.pagado && (
+                  <button
+                    onClick={() => abrirPagar(cuota)}
+                    className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
+                    title="Registrar pago"
+                  >
+                    <HiCash className="w-5 h-5" />
+                    <span className="hidden sm:inline">Pagar</span>
+                  </button>
+                )}
+
+                {cuota?.pagado && (
+                  <>
+                    {/* A4 (compartir) */}
+                    <DescargarFactura
+                      cliente={pol?.cliente}
+                      poliza={pol}
+                      cuota={cuota}
+                      tone="neutral"
+                      label="Compartir factura"
+                      className="mt-0 w-full sm:w-auto"
+                    />
+
+                    {/* Ticket térmico */}
+                    <ImprimirFacturaTicket
+                      cliente={pol?.cliente}
+                      poliza={pol}
+                      cuota={cuota}
+                      label="Imprimir factura"
+                      className={`h-10 px-3 rounded-xl border transition inline-flex items-center justify-center gap-2 w-full sm:w-auto ${PALETTE.ticketBtn}`}
+                    />
+                  </>
+                )}
+
+                <EnviarFacturaWhatsapp cuota={cuota}>
+                  <button
+                    className={`h-10 px-3 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
+                    title="Enviar por WhatsApp"
+                  >
+                    <HiDeviceMobile className="w-5 h-5" />
+                    <span className="hidden sm:inline">Enviar</span>
+                  </button>
+                </EnviarFacturaWhatsapp>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </>
-  );
-});
+      </>
+    );
+  },
+  (prev, next) => {
+    const a = prev?.model;
+    const b = next?.model;
+    if (a === b) return true;
+
+    if (a?.isObsOpen !== b?.isObsOpen) return false;
+
+    const ca = a?.cuota;
+    const cb = b?.cuota;
+    if (ca?.id !== cb?.id) return false;
+    if (ca?.pagado !== cb?.pagado) return false;
+    if (ca?.monto !== cb?.monto) return false;
+    if (ca?.fecha_vencimiento !== cb?.fecha_vencimiento) return false;
+    if (ca?.fecha_pago !== cb?.fecha_pago) return false;
+    if (ca?.observaciones_pago !== cb?.observaciones_pago) return false;
+    if (ca?.ultima_observacion_pago !== cb?.ultima_observacion_pago) return false;
+
+    if (a?.nombreCompleto !== b?.nombreCompleto) return false;
+    if (a?.patente !== b?.patente) return false;
+    if (a?.modelo !== b?.modelo) return false;
+
+    return true;
+  }
+);
 
 /* Subcomponente: fila label/valor para el modal (dark) */
 function InfoRow({ label, value }) {

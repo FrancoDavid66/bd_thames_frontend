@@ -1,6 +1,13 @@
 /* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos) */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useDeferredValue,
+  useTransition,
+} from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -72,15 +79,12 @@ const ymd = (d) => dayjs(d).format("YYYY-MM-DD");
 
 // ✅ helpers historial pagos: timestamp real
 function pickRegistroTs(it) {
-  // prioridad: pago_registrado_en (ISO datetime desde backend)
   const v = it?.pago_registrado_en ?? it?.registrado_en ?? it?.pago_ts ?? null;
   if (v) return v;
 
-  // fallback: fecha+hora viejas (si quedaran)
   const f = it?.fecha_guardado_pago || "";
   const h = it?.hora_guardado_pago || it?.pago_hora || "";
   if (f && h) {
-    // f viene "DD/MM/YYYY"
     const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(f).trim());
     if (m) {
       const iso = `${m[3]}-${m[2]}-${m[1]}T${String(h).trim()}:00`;
@@ -93,7 +97,6 @@ function pickRegistroTs(it) {
 function fmtRegistro(it) {
   const ts = pickRegistroTs(it);
   if (!ts) {
-    // fallback final: fecha_guardado + pago_hora
     const f = String(it?.fecha_guardado_pago || "").trim();
     const h = String(it?.pago_hora || it?.hora_guardado_pago || "").trim();
     if (f && h) return `${f} ${h}`;
@@ -102,11 +105,9 @@ function fmtRegistro(it) {
     return "—";
   }
 
-  // dayjs parse
   const d = dayjs(ts);
   if (d.isValid()) return d.format("DD/MM/YYYY HH:mm");
 
-  // fallback string slice "YYYY-MM-DDTHH:mm..."
   try {
     const s = String(ts);
     if (s.includes("T")) {
@@ -123,6 +124,76 @@ function fmtRegistro(it) {
   }
 }
 
+/**
+ * ✅ PRO (cuotas aplanadas):
+ * Normaliza una "cuota flat" para que PagosList siga recibiendo:
+ *  - cuota con campos típicos (id, cuota_nro, fecha_vencimiento, pagado, monto...)
+ *  - y adentro `poliza` con datos mínimos (numero_poliza, patente, oficina, compania, cliente...)
+ *
+ * Importante: si ya viene `item.poliza` (por compat), lo respeta.
+ */
+function normalizeCuotaFlat(item) {
+  const it = item && typeof item === "object" ? item : {};
+
+  // si ya viene con poliza embebida, devolvemos tal cual (compat)
+  if (it.poliza && typeof it.poliza === "object") return it;
+
+  const cliente = {
+    id: it?.cliente_id ?? it?.cliente?.id ?? null,
+    apellido: it?.cliente_apellido ?? it?.cliente?.apellido ?? "",
+    nombre: it?.cliente_nombre ?? it?.cliente?.nombre ?? "",
+    dni_cuit_cuil:
+      it?.cliente_dni ?? it?.cliente?.dni_cuit_cuil ?? it?.dni ?? "",
+    telefono: it?.cliente_telefono ?? it?.cliente?.telefono ?? "",
+  };
+
+  const poliza = {
+    id: it?.poliza_id ?? it?.poliza?.id ?? null,
+    numero_poliza:
+      it?.numero_poliza ?? it?.poliza_numero ?? it?.poliza?.numero_poliza ?? "",
+    patente: it?.patente ?? it?.poliza_patente ?? it?.poliza?.patente ?? "",
+    oficina:
+      it?.oficina ??
+      it?.oficina_nombre ??
+      it?.poliza_oficina ??
+      it?.poliza?.oficina ??
+      "",
+    compania:
+      it?.compania ??
+      it?.compania_nombre ??
+      it?.poliza_compania ??
+      it?.poliza?.compania ??
+      "",
+    cliente,
+  };
+
+  // monto: priorizamos lo que ya venga en la cuota flat
+  const monto =
+    it?.monto ??
+    it?.monto_cuota ??
+    it?.importe ??
+    it?.precio_cuota ??
+    it?.monto_pagado ??
+    null;
+
+  return {
+    ...it,
+    id: it?.cuota_id ?? it?.id,
+    cuota_nro: it?.cuota_nro ?? it?.nro ?? it?.numero ?? it?.cuota_numero,
+    cantidad_cuotas:
+      it?.cantidad_cuotas ??
+      it?.total_cuotas ??
+      it?.cuotas_total ??
+      it?.poliza_cantidad_cuotas,
+    fecha_vencimiento: it?.fecha_vencimiento ?? it?.vencimiento ?? it?.fecha_vto,
+    fecha_pago: it?.fecha_pago ?? it?.pago_fecha ?? null,
+    pagado: Boolean(it?.pagado ?? it?.is_pagado ?? it?.estado_pagado),
+    monto,
+    forma_pago: it?.forma_pago ?? it?.medio ?? it?.metodo ?? it?.pago_metodo ?? "",
+    poliza,
+  };
+}
+
 const PagosPage = () => {
   const dispatch = useDispatch();
 
@@ -136,6 +207,14 @@ const PagosPage = () => {
   // Estado local de cuotas (resultado de la búsqueda)
   const [cuotas, setCuotas] = useState([]);
   const [ocultarPagadas, setOcultarPagadas] = useState(false);
+
+  // ✅ meta + query de la última búsqueda PRO (por si querés mostrar “total” o paginar)
+  const [lastBuscarQuery, setLastBuscarQuery] = useState("");
+  const [lastBuscarMeta, setLastBuscarMeta] = useState({
+    count: 0,
+    next: null,
+    previous: null,
+  });
 
   // Filtro de oficina para alertas
   const [alertasOficina, setAlertasOficina] = useState("ALL");
@@ -162,6 +241,10 @@ const PagosPage = () => {
   // (opcional) ordering explícito (dejamos default)
   const [hpOrdering, setHpOrdering] = useState("-fecha_pago");
 
+  // ✅ React 18: mantener el input fluido aunque haya renders pesados
+  const deferredHpQInput = useDeferredValue(hpQInput);
+  const [isPending, startTransition] = useTransition();
+
   // Estado global desde Redux (slice pagos)
   const {
     mediosCobro = [],
@@ -183,7 +266,8 @@ const PagosPage = () => {
     historialPagosDownloadPdfError = null,
   } = useSelector((state) => state.pagos || {});
 
-  const loadingHistorialRecordatorios = historialRecordatoriosStatus === "loading";
+  const loadingHistorialRecordatorios =
+    historialRecordatoriosStatus === "loading";
   const loadingHistorialPagos = historialPagosStatus === "loading";
   const downloadingCSV = historialPagosDownloadStatus === "loading";
   const downloadingPDF = historialPagosDownloadPdfStatus === "loading";
@@ -197,19 +281,25 @@ const PagosPage = () => {
   const mesesOptions = useMemo(() => {
     const out = [];
     const base = dayjs().startOf("month");
-    for (let i = 0; i < 18; i++) out.push(base.subtract(i, "month").format("YYYY-MM"));
+    for (let i = 0; i < 18; i++)
+      out.push(base.subtract(i, "month").format("YYYY-MM"));
     return out;
   }, []);
 
-  // ✅ Debounce de búsqueda (no dispara requests en cada tecla)
+  // ✅ Debounce de búsqueda (solo cuando estás en historial_pagos)
   useEffect(() => {
+    if (tab !== "historial_pagos") return;
+
     const t = setTimeout(() => {
-      const next = String(hpQInput || "").trim();
-      setHpQApplied(next);
-      setHpPage(1);
+      const next = String(deferredHpQInput || "").trim();
+      startTransition(() => {
+        setHpQApplied(next);
+        setHpPage(1);
+      });
     }, 350);
+
     return () => clearTimeout(t);
-  }, [hpQInput]);
+  }, [deferredHpQInput, tab, startTransition]);
 
   const handleChangeTab = useCallback(
     (nuevoTab) => {
@@ -223,7 +313,6 @@ const PagosPage = () => {
       }
 
       if (nuevoTab === "historial_pagos") {
-        // solo reseteo de página (y el effect se encarga de cargar)
         setHpPage(1);
       }
     },
@@ -234,7 +323,7 @@ const PagosPage = () => {
     (extra = null) => {
       const base = {
         oficina: hpOficina === "ALL" ? undefined : hpOficina,
-        q: hpQApplied || undefined, // ✅ usa applied
+        q: hpQApplied || undefined,
         page: hpPage,
         page_size: hpPageSize,
         ordering: hpOrdering || "-fecha_pago",
@@ -242,7 +331,13 @@ const PagosPage = () => {
 
       let out;
       if (hpModo === "DIA") {
-        out = { ...base, dia: hpDia, mes: undefined, desde: undefined, hasta: undefined };
+        out = {
+          ...base,
+          dia: hpDia,
+          mes: undefined,
+          desde: undefined,
+          hasta: undefined,
+        };
       } else if (hpModo === "RANGO") {
         out = {
           ...base,
@@ -252,13 +347,30 @@ const PagosPage = () => {
           dia: undefined,
         };
       } else {
-        out = { ...base, mes: hpMes, dia: undefined, desde: undefined, hasta: undefined };
+        out = {
+          ...base,
+          mes: hpMes,
+          dia: undefined,
+          desde: undefined,
+          hasta: undefined,
+        };
       }
 
       if (extra && typeof extra === "object") out = { ...out, ...extra };
       return out;
     },
-    [hpModo, hpOficina, hpQApplied, hpPage, hpPageSize, hpMes, hpDia, hpDesde, hpHasta, hpOrdering]
+    [
+      hpModo,
+      hpOficina,
+      hpQApplied,
+      hpPage,
+      hpPageSize,
+      hpMes,
+      hpDia,
+      hpDesde,
+      hpHasta,
+      hpOrdering,
+    ]
   );
 
   useEffect(() => {
@@ -268,18 +380,27 @@ const PagosPage = () => {
 
   /* ================== HANDLERS ================== */
 
-  const handleBuscarPolizas = useCallback((polizas) => {
-    const lista = Array.isArray(polizas) ? polizas : [];
-    const nuevasCuotas = [];
+  // ✅ PRO: PagosSearch devuelve CUOTAS APLANADAS + (opcional) meta + query
+  const handleBuscarPolizas = useCallback((cuotasFlat, meta, q) => {
+    const lista = Array.isArray(cuotasFlat) ? cuotasFlat : [];
+    const normalized = lista.map(normalizeCuotaFlat);
+    setCuotas(normalized);
 
-    lista.forEach((pol) => {
-      const cuotasPol = Array.isArray(pol.cuotas) ? pol.cuotas : [];
-      cuotasPol.forEach((c) => {
-        nuevasCuotas.push({ ...c, poliza: pol });
+    if (meta && typeof meta === "object") {
+      setLastBuscarMeta({
+        count: Number(meta?.count || 0) || 0,
+        next: meta?.next ?? null,
+        previous: meta?.previous ?? null,
       });
-    });
+    } else {
+      setLastBuscarMeta({
+        count: normalized.length,
+        next: null,
+        previous: null,
+      });
+    }
 
-    setCuotas(nuevasCuotas);
+    setLastBuscarQuery(String(q || "").trim());
   }, []);
 
   const handleActualizarCuotas = useCallback((actualizadas = []) => {
@@ -294,7 +415,8 @@ const PagosPage = () => {
           map.set(item.cuotaActualizada.id, {
             ...item.cuotaActualizada,
             observaciones_pago:
-              item.observaciones_pago ?? item.cuotaActualizada.observaciones_pago,
+              item.observaciones_pago ??
+              item.cuotaActualizada.observaciones_pago,
           });
         } else if (item?.id) {
           map.set(item.id, item);
@@ -313,22 +435,27 @@ const PagosPage = () => {
   const handleOpenCuentas = useCallback(() => setShowCuentasModal(true), []);
   const handleCloseCuentas = useCallback(() => setShowCuentasModal(false), []);
 
-  const handleOpenRecordatorios = useCallback(() => setShowRecordatoriosModal(true), []);
-  const handleCloseRecordatorios = useCallback(() => setShowRecordatoriosModal(false), []);
+  const handleOpenRecordatorios = useCallback(
+    () => setShowRecordatoriosModal(true),
+    []
+  );
+  const handleCloseRecordatorios = useCallback(
+    () => setShowRecordatoriosModal(false),
+    []
+  );
 
   const handleRefreshHistorialRecordatorios = useCallback(() => {
     dispatch(fetchHistorialRecordatorios());
   }, [dispatch]);
 
   const handleRefreshHistorialPagos = useCallback(() => {
-    // ✅ force: bypass cache
     dispatch(fetchHistorialPagos(buildHistorialParams({ force: true })));
   }, [dispatch, buildHistorialParams]);
 
   const buildExportParams = useCallback(() => {
     const base = {
       oficina: hpOficina === "ALL" ? undefined : hpOficina,
-      q: hpQApplied || undefined, // ✅ usa applied
+      q: hpQApplied || undefined,
       ordering: hpOrdering || "-fecha_pago",
     };
 
@@ -435,7 +562,8 @@ const PagosPage = () => {
     let count = 0;
     items.forEach((it) => {
       count += 1;
-      const monto = it?.monto_pagado ?? it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
+      const monto =
+        it?.monto_pagado ?? it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
       const n = Number(monto);
       if (Number.isFinite(n)) total += n;
     });
@@ -446,7 +574,6 @@ const PagosPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
-      {/* ✅ CAMBIO: más ancho (2xl) */}
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-10 2xl:px-12 py-4 sm:py-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
@@ -484,7 +611,9 @@ const PagosPage = () => {
               style={{ backgroundColor: "#25D366" }}
             >
               <HiSpeakerphone className="text-base sm:text-lg" />
-              <span>{sendingRecordatorios ? "Enviando recordatorios..." : "Enviar recordatorios"}</span>
+              <span>
+                {sendingRecordatorios ? "Enviando recordatorios..." : "Enviar recordatorios"}
+              </span>
             </motion.button>
           </div>
         </div>
@@ -521,7 +650,9 @@ const PagosPage = () => {
               type="button"
               onClick={() => handleChangeTab("pagos")}
               className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
-                tab === "pagos" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"
+                tab === "pagos"
+                  ? "bg-slate-800 text-slate-50"
+                  : "text-slate-400 hover:text-slate-100"
               }`}
             >
               <HiBadgeCheck className="text-sm sm:text-base" />
@@ -582,6 +713,23 @@ const PagosPage = () => {
                 <HiEyeOff className="w-4 h-4 opacity-70" />
                 <span>Ocultar cuotas pagadas</span>
               </button>
+
+              {/* (opcional) Info útil si querés mostrarlo: */}
+              {!!lastBuscarQuery && (
+                <div className="text-xs text-slate-500">
+                  Última búsqueda:{" "}
+                  <span className="text-slate-300 font-semibold">{lastBuscarQuery}</span>
+                  {Number(lastBuscarMeta?.count || 0) > 0 ? (
+                    <>
+                      {" "}
+                      • Total backend:{" "}
+                      <span className="text-slate-200 font-semibold tabular-nums">
+                        {Number(lastBuscarMeta.count || 0) || 0}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">
@@ -599,12 +747,14 @@ const PagosPage = () => {
             <CuotasAlertas oficina={alertasOficina} onOficinaChange={setAlertasOficina} />
           </motion.div>
         ) : tab === "historial_pagos" ? (
+          /* ---- (historial pagos) ---- */
           <motion.div
             key="tab-historial-pagos"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-3 sm:space-y-4"
           >
+            {/* === tu historial (SIN CAMBIOS) === */}
             {/* Filtros */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
               <div className="flex flex-col lg:flex-row gap-2 lg:items-end">
@@ -723,8 +873,10 @@ const PagosPage = () => {
                         type="button"
                         onClick={() => {
                           setHpQInput("");
-                          setHpQApplied("");
-                          setHpPage(1);
+                          startTransition(() => {
+                            setHpQApplied("");
+                            setHpPage(1);
+                          });
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl hover:bg-slate-800/60 text-slate-300 cursor-pointer"
                         title="Limpiar"
@@ -733,9 +885,12 @@ const PagosPage = () => {
                       </button>
                     )}
                   </div>
-                  {!!hpQInput && hpQApplied !== String(hpQInput || "").trim() && (
-                    <div className="mt-1 text-[0.72rem] text-slate-500">Aplicando búsqueda…</div>
-                  )}
+                  {!!hpQInput &&
+                    (hpQApplied !== String(hpQInput || "").trim() || isPending) && (
+                      <div className="mt-1 text-[0.72rem] text-slate-500">
+                        Aplicando búsqueda…
+                      </div>
+                    )}
                 </div>
 
                 <div className="flex gap-2">
@@ -750,7 +905,6 @@ const PagosPage = () => {
                     <span>Actualizar</span>
                   </motion.button>
 
-                  {/* CSV */}
                   <motion.button
                     type="button"
                     onClick={handleDownloadCSV}
@@ -768,7 +922,6 @@ const PagosPage = () => {
                     <span>{downloadingCSV ? "Descargando..." : "CSV"}</span>
                   </motion.button>
 
-                  {/* PDF */}
                   <motion.button
                     type="button"
                     onClick={handleDownloadPDF}
@@ -788,7 +941,6 @@ const PagosPage = () => {
                 </div>
               </div>
 
-              {/* Errores */}
               {(historialPagosError ||
                 historialPagosDownloadError ||
                 historialPagosDownloadPdfError) && (
@@ -802,7 +954,6 @@ const PagosPage = () => {
                 </div>
               )}
 
-              {/* KPIs mini */}
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="rounded-2xl bg-slate-950/50 border border-slate-800 px-3 py-2">
                   <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">
@@ -839,7 +990,7 @@ const PagosPage = () => {
               </div>
             </div>
 
-            {/* Tabla */}
+            {/* Tabla (SIN CAMBIOS) */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] overflow-hidden">
               <div className="overflow-auto">
                 <table className="min-w-[1120px] w-full text-sm">
@@ -880,7 +1031,6 @@ const PagosPage = () => {
                         const monto = it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
                         const medio = it?.medio || it?.forma_pago || "";
 
-                        // ✅ NUEVO: cuota "3/12"
                         const cuotaLabel =
                           it?.cuota_label ||
                           it?.cuota_va ||
@@ -996,7 +1146,7 @@ const PagosPage = () => {
       {/* Modales */}
       <CuentasCobroModal
         open={showCuentasModal}
-        onClose={handleCloseCuentas}
+        onClose={() => setShowCuentasModal(false)}
         mpCuentas={mpCuentas}
         billeteras={billeteras}
         mediosCobro={mediosCobro}
@@ -1004,7 +1154,7 @@ const PagosPage = () => {
 
       <RecordatoriosCuotasModal
         isOpen={showRecordatoriosModal}
-        onClose={handleCloseRecordatorios}
+        onClose={() => setShowRecordatoriosModal(false)}
         mediosCobro={mediosCobro}
         sending={sendingRecordatorios}
         onEnviar={handleEnviarRecordatorios}

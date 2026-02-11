@@ -1,4 +1,4 @@
-/* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + estados separados */
+/* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + cancelación + force real + búsqueda PRO (/pagos/buscar/) */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -27,11 +27,11 @@ const keyForSearch = (q, withCuotas) => {
   return withCuotas ? `${base}|cuotas` : `${base}|lite`;
 };
 
-/* ===================== CACHE HISTORIAL PAGOS ===================== */
-const HISTORIAL_CACHE_TTL_MS = 25 * 1000; // 20–30s recomendado
-const HISTORIAL_CACHE_MAX = 40;
+/* ===================== CACHE DE BÚSQUEDA PRO (CUOTAS APLANADAS) ===================== */
+const BUSCAR_CACHE_TTL_MS = 20 * 1000; // 15–30s recomendado
+const BUSCAR_CACHE_MAX = 30;
 
-// stable stringify (ordenado) para key de params
+/* stable stringify (ordenado) para key de params */
 function stableKey(obj) {
   const o = obj && typeof obj === "object" ? obj : {};
   const keys = Object.keys(o).sort();
@@ -47,6 +47,51 @@ function stableKey(obj) {
 function isFresh(ts, ttlMs) {
   return typeof ts === "number" && Date.now() - ts < ttlMs;
 }
+
+/* ✅ Params para /pagos/buscar/ (backend PRO) */
+function buildBuscarParams(p) {
+  const pp = p && typeof p === "object" ? p : {};
+
+  const query =
+    typeof p === "string" || typeof p === "number"
+      ? String(p)
+      : String(pp?.query ?? pp?.q ?? pp?.search ?? "");
+
+  const q = String(query || "").trim();
+
+  const page = Number(pp?.page ?? 1) || 1;
+  const page_size = Math.max(
+    1,
+    Math.min(500, Number(pp?.page_size ?? pp?.limit ?? 250) || 250)
+  );
+
+  const oficina = pp?.oficina;
+  const ordering = pp?.ordering;
+
+  // ✅ backend entiende ocultar_pagadas / solo_pendientes
+  // default: ocultar_pagadas=1 (mostramos pendientes)
+  const includePagadas = Boolean(pp?.include_pagadas);
+  const ocultar_pagadas = includePagadas ? 0 : 1;
+
+  return compact({
+    q,
+    search: q, // compat
+    oficina,
+    ordering,
+    page,
+    page_size,
+    limit: pp?.limit, // compat (backend también lo tolera)
+    ocultar_pagadas,
+  });
+}
+
+function buildBuscarCacheKey(params) {
+  return stableKey(params);
+}
+
+/* ===================== CACHE HISTORIAL PAGOS ===================== */
+const HISTORIAL_CACHE_TTL_MS = 25 * 1000; // 20–30s recomendado
+const HISTORIAL_CACHE_MAX = 40;
 
 function buildHistorialParams(p) {
   const pp = p && typeof p === "object" ? p : {};
@@ -93,6 +138,17 @@ function triggerDownloadBlob(blob, filename) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
+
+/* ===================== CANCELACIÓN GLOBAL (EVITA RESPUESTAS VIEJAS) ===================== */
+/**
+ * Si el usuario teclea rápido, abortamos la request anterior para:
+ * - historial pagos
+ * - búsqueda polizas (legacy)
+ * - búsqueda pro (cuotas aplanadas)
+ */
+let historialAbort = null;
+let polizasAbort = null;
+let buscarAbort = null;
 
 /* ============== THUNKS ============== */
 
@@ -203,36 +259,53 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** ✅ Historial de pagos (GET /cuotas/pagos/) con filtros día/mes/rango + cache TTL */
+/** ✅ Historial de pagos (GET /cuotas/pagos/) con filtros día/mes/rango + cache TTL + cancel + force */
 export const fetchHistorialPagos = createAsyncThunk(
   "pagos/fetchHistorialPagos",
   async (params, { rejectWithValue, getState }) => {
     try {
-      const built = buildHistorialParams(params);
+      const pp = params && typeof params === "object" ? params : {};
+      const force = Boolean(pp?.force);
+
+      const built = buildHistorialParams(pp);
       const cacheKey = buildHistorialCacheKey(built);
 
-      // cache hit (rápido)
-      const st = getState()?.pagos;
-      const hit = st?.historialPagosCache?.[cacheKey];
-      if (
-        hit &&
-        isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
-        Array.isArray(hit.items) &&
-        hit.meta &&
-        typeof hit.meta === "object"
-      ) {
-        return {
-          items: hit.items,
-          meta: hit.meta,
-          _cacheKey: cacheKey,
-          _fromCache: true,
-        };
+      // ✅ cache hit (rápido) — pero NO si force
+      if (!force) {
+        const st = getState()?.pagos;
+        const hit = st?.historialPagosCache?.[cacheKey];
+        if (
+          hit &&
+          isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
+          Array.isArray(hit.items) &&
+          hit.meta &&
+          typeof hit.meta === "object"
+        ) {
+          return {
+            items: hit.items,
+            meta: hit.meta,
+            _cacheKey: cacheKey,
+            _fromCache: true,
+            _force: false,
+          };
+        }
       }
 
-      const { data } = await axios.get(API("cuotas/pagos/"), { params: built });
+      // ✅ cancelar request anterior (si el usuario sigue tipeando)
+      if (historialAbort) {
+        try {
+          historialAbort.abort();
+        } catch {}
+      }
+      historialAbort = new AbortController();
+
+      const { data } = await axios.get(API("cuotas/pagos/"), {
+        params: built,
+        signal: historialAbort.signal,
+      });
 
       if (data && typeof data === "object" && "results" in data) {
-        const out = {
+        return {
           items: Array.isArray(data.results) ? data.results : [],
           meta: {
             count: Number(data.count || 0) || 0,
@@ -241,8 +314,8 @@ export const fetchHistorialPagos = createAsyncThunk(
           },
           _cacheKey: cacheKey,
           _fromCache: false,
+          _force: force,
         };
-        return out;
       }
 
       const items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
@@ -251,8 +324,16 @@ export const fetchHistorialPagos = createAsyncThunk(
         meta: { count: items.length, next: null, previous: null },
         _cacheKey: cacheKey,
         _fromCache: false,
+        _force: force,
       };
     } catch (error) {
+      // ✅ si fue abort, no lo tratamos como error “real”
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+        return rejectWithValue({ _aborted: true });
+      }
+      if (error?.name === "AbortError") {
+        return rejectWithValue({ _aborted: true });
+      }
       return rejectWithValue(
         error?.response?.data || "Error al obtener historial de pagos"
       );
@@ -350,7 +431,102 @@ export const downloadHistorialPagosPDF = createAsyncThunk(
   }
 );
 
-/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache TTL */
+/** ✅ Búsqueda PRO (rápida): GET /pagos/buscar/ => devuelve CUOTAS APLANADAS (flat) */
+export const fetchPagosBuscar = createAsyncThunk(
+  "pagos/fetchPagosBuscar",
+  async (arg, { rejectWithValue, getState }) => {
+    try {
+      const pp = arg && typeof arg === "object" ? arg : {};
+      const force = Boolean(pp?.force);
+
+      const built = buildBuscarParams(arg);
+      const cacheKey = buildBuscarCacheKey(built);
+
+      const queryStr = String(built?.q || "").trim();
+
+      if (!queryStr) {
+        return {
+          items: [],
+          meta: { count: 0, next: null, previous: null },
+          originalQuery: "",
+          cacheKey,
+          fromCache: true,
+          _force: false,
+        };
+      }
+
+      // ✅ cache hit (rápido) — pero NO si force
+      if (!force) {
+        const st = getState()?.pagos;
+        const hit = st?.buscarCache?.[cacheKey];
+        if (
+          hit &&
+          isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) &&
+          Array.isArray(hit.items) &&
+          hit.meta &&
+          typeof hit.meta === "object"
+        ) {
+          return {
+            items: hit.items,
+            meta: hit.meta,
+            originalQuery: hit.originalQuery || queryStr,
+            cacheKey,
+            fromCache: true,
+            _force: false,
+          };
+        }
+      }
+
+      // ✅ cancelar request anterior
+      if (buscarAbort) {
+        try {
+          buscarAbort.abort();
+        } catch {}
+      }
+      buscarAbort = new AbortController();
+
+      const { data } = await axios.get(API("pagos/buscar/"), {
+        params: built,
+        signal: buscarAbort.signal,
+      });
+
+      if (data && typeof data === "object" && "results" in data) {
+        return {
+          items: Array.isArray(data.results) ? data.results : [],
+          meta: {
+            count: Number(data.count || 0) || 0,
+            next: data.next ?? null,
+            previous: data.previous ?? null,
+          },
+          originalQuery: queryStr,
+          cacheKey,
+          fromCache: false,
+          _force: force,
+        };
+      }
+
+      const items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
+      return {
+        items,
+        meta: { count: items.length, next: null, previous: null },
+        originalQuery: queryStr,
+        cacheKey,
+        fromCache: false,
+        _force: force,
+      };
+    } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+        return rejectWithValue({ _aborted: true });
+      }
+      if (error?.name === "AbortError") {
+        return rejectWithValue({ _aborted: true });
+      }
+      return rejectWithValue(error?.response?.data || "Error al buscar pagos");
+    }
+  }
+);
+
+/** Buscar pólizas por texto (legacy) — con cache TTL + cancel */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
   async (arg, { rejectWithValue, getState }) => {
@@ -374,6 +550,7 @@ export const fetchPolizas = createAsyncThunk(
 
       const q = String(query || "").trim();
       const cacheKey = keyForSearch(q, withCuotas);
+
       if (!cacheKey) {
         return {
           polizas: [],
@@ -404,12 +581,21 @@ export const fetchPolizas = createAsyncThunk(
         };
       }
 
+      // ✅ cancelar request anterior (si se sigue tipeando)
+      if (polizasAbort) {
+        try {
+          polizasAbort.abort();
+        } catch {}
+      }
+      polizasAbort = new AbortController();
+
       const { data } = await axios.get(API("polizas/"), {
         params: compact({
           search: q,
           page_size: limit,
           include_cuotas: withCuotas ? 1 : undefined,
         }),
+        signal: polizasAbort.signal,
       });
 
       const polizasList = Array.isArray(unwrap(data)) ? unwrap(data) : [];
@@ -442,9 +628,8 @@ export const fetchPolizas = createAsyncThunk(
             chunk.map((id) =>
               axios
                 .get(API(`polizas/${id}/`), {
-                  params: compact({
-                    include_cuotas: 1,
-                  }),
+                  params: compact({ include_cuotas: 1 }),
+                  signal: polizasAbort?.signal,
                 })
                 .then((r) => r.data)
             )
@@ -453,6 +638,9 @@ export const fetchPolizas = createAsyncThunk(
           for (const r of results) {
             if (r.status === "fulfilled") detailed.push(r.value);
           }
+
+          // ✅ si se abortó, cortamos loop
+          if (polizasAbort?.signal?.aborted) break;
         }
 
         const detailedPolizas = detailed.map((x) =>
@@ -476,6 +664,12 @@ export const fetchPolizas = createAsyncThunk(
         withCuotas,
       };
     } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+        return rejectWithValue({ _aborted: true });
+      }
+      if (error?.name === "AbortError") {
+        return rejectWithValue({ _aborted: true });
+      }
       return rejectWithValue(error?.response?.data || "Error al buscar pólizas");
     }
   }
@@ -510,7 +704,7 @@ export const fetchCuotasAVencer = createAsyncThunk(
         search: p?.search ?? p?.q,
         desde: p?.desde,
         hasta: p?.hasta,
-        modo: p?.modo, // por si el backend lo soporta a futuro
+        modo: p?.modo,
       });
 
       const { data } = await axios.get(API("cuotas/a-vencer/"), {
@@ -593,14 +787,22 @@ const initialState = {
   cuotas: [],
   cuotasAVencer: [],
 
-  // búsqueda
+  // búsqueda (legacy de polizas)
   searchStatus: "idle",
   searchError: null,
   polizas: [],
 
-  // cache búsqueda
+  // cache búsqueda legacy
   polizasCache: {},
   polizasCacheOrder: [],
+
+  // ✅ búsqueda PRO (cuotas aplanadas)
+  buscarItems: [],
+  buscarMeta: { count: 0, next: null, previous: null },
+  buscarStatus: "idle",
+  buscarError: null,
+  buscarCache: {},
+  buscarCacheOrder: [],
 
   // medios de cobro
   mediosCobro: [],
@@ -652,24 +854,12 @@ function recomputeMedioNombres(state) {
     .filter(Boolean);
 }
 
-function savePolizasCache(state, a, b, c) {
-  let cacheKey = "";
-  let originalQuery = "";
-  let polizas = [];
+/** ✅ guarda cache con la key REAL (incluye |cuotas / |lite) */
+function savePolizasCache(state, cacheKey, originalQuery, polizas) {
+  const ck = String(cacheKey || "").trim().toLowerCase();
+  if (!ck) return;
 
-  if (c === undefined) {
-    originalQuery = a;
-    polizas = b;
-    cacheKey = keyFromQuery(originalQuery);
-  } else {
-    cacheKey = String(a || "").trim().toLowerCase();
-    originalQuery = b;
-    polizas = c;
-  }
-
-  if (!cacheKey) return;
-
-  state.polizasCache[cacheKey] = {
+  state.polizasCache[ck] = {
     ts: Date.now(),
     polizas: Array.isArray(polizas) ? polizas : [],
     originalQuery: String(originalQuery || "").trim(),
@@ -678,15 +868,41 @@ function savePolizasCache(state, a, b, c) {
   const prev = Array.isArray(state.polizasCacheOrder)
     ? state.polizasCacheOrder
     : [];
-  const next = [cacheKey, ...prev.filter((x) => x !== cacheKey)].slice(
-    0,
-    POLIZAS_CACHE_MAX
-  );
+  const next = [ck, ...prev.filter((x) => x !== ck)].slice(0, POLIZAS_CACHE_MAX);
   state.polizasCacheOrder = next;
 
   const keep = new Set(next);
   Object.keys(state.polizasCache || {}).forEach((key) => {
     if (!keep.has(key)) delete state.polizasCache[key];
+  });
+}
+
+/** ✅ cache para búsqueda PRO (cuotas flat) */
+function saveBuscarCache(state, cacheKey, originalQuery, items, meta) {
+  const ck = String(cacheKey || "").trim().toLowerCase();
+  if (!ck) return;
+
+  state.buscarCache[ck] = {
+    ts: Date.now(),
+    items: Array.isArray(items) ? items : [],
+    meta:
+      meta && typeof meta === "object"
+        ? {
+            count: Number(meta.count || 0) || 0,
+            next: meta.next ?? null,
+            previous: meta.previous ?? null,
+          }
+        : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
+    originalQuery: String(originalQuery || "").trim(),
+  };
+
+  const prev = Array.isArray(state.buscarCacheOrder) ? state.buscarCacheOrder : [];
+  const next = [ck, ...prev.filter((x) => x !== ck)].slice(0, BUSCAR_CACHE_MAX);
+  state.buscarCacheOrder = next;
+
+  const keep = new Set(next);
+  Object.keys(state.buscarCache || {}).forEach((key) => {
+    if (!keep.has(key)) delete state.buscarCache[key];
   });
 }
 
@@ -736,16 +952,85 @@ const pagosSlice = createSlice({
       state.polizas = [];
       state.searchStatus = "idle";
       state.searchError = null;
+
+      state.buscarItems = [];
+      state.buscarMeta = { count: 0, next: null, previous: null };
+      state.buscarStatus = "idle";
+      state.buscarError = null;
     },
     // opcional: para invalidar historial cuando pagás una cuota y querés refrescar
     invalidateHistorialPagosCache(state) {
       state.historialPagosCache = {};
       state.historialPagosCacheOrder = [];
     },
+    invalidateBuscarCache(state) {
+      state.buscarCache = {};
+      state.buscarCacheOrder = [];
+    },
   },
   extraReducers: (builder) => {
     builder
-      // --- Buscar pólizas ---
+      // --- Buscar PRO (cuotas aplanadas) ---
+      .addCase(fetchPagosBuscar.pending, (state, action) => {
+        state.buscarStatus = "loading";
+        state.buscarError = null;
+
+        // también sincronizamos searchStatus para que el botón “Buscando…” del buscador siga funcionando
+        state.searchStatus = "loading";
+        state.searchError = null;
+
+        const arg = action?.meta?.arg;
+        const force = Boolean(arg && typeof arg === "object" && arg.force);
+
+        const built = buildBuscarParams(arg);
+        const ck = buildBuscarCacheKey(built);
+
+        // hidratación optimista desde cache (si no es force)
+        if (!force && ck) {
+          const hit = state.buscarCache?.[ck];
+          if (hit && isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) && Array.isArray(hit.items)) {
+            state.buscarItems = hit.items;
+            state.buscarMeta =
+              hit.meta ||
+              { count: hit.items.length, next: null, previous: null };
+          }
+        }
+      })
+      .addCase(fetchPagosBuscar.fulfilled, (state, action) => {
+        state.buscarStatus = "succeeded";
+        state.searchStatus = "succeeded";
+
+        const payload = action.payload || {};
+        const items = payload.items ?? payload ?? [];
+        state.buscarItems = Array.isArray(items) ? items : [];
+        state.buscarMeta =
+          payload.meta ||
+          { count: state.buscarItems.length, next: null, previous: null };
+
+        saveBuscarCache(
+          state,
+          payload.cacheKey,
+          payload.originalQuery,
+          state.buscarItems,
+          state.buscarMeta
+        );
+      })
+      .addCase(fetchPagosBuscar.rejected, (state, action) => {
+        if (action?.payload && action.payload._aborted) {
+          state.buscarStatus = "idle";
+          state.buscarError = null;
+          state.searchStatus = "idle";
+          state.searchError = null;
+          return;
+        }
+        state.buscarStatus = "failed";
+        state.buscarError = action.payload;
+
+        state.searchStatus = "failed";
+        state.searchError = action.payload;
+      })
+
+      // --- Buscar pólizas (legacy) ---
       .addCase(fetchPolizas.pending, (state) => {
         state.searchStatus = "loading";
         state.searchError = null;
@@ -755,14 +1040,17 @@ const pagosSlice = createSlice({
         const payload = action.payload || {};
         const polizas = payload.polizas ?? payload ?? [];
         state.polizas = Array.isArray(polizas) ? polizas : [];
-        savePolizasCache(
-          state,
-          payload.cacheKey || payload.originalQuery,
-          payload.originalQuery,
-          state.polizas
-        );
+
+        // ✅ cache real
+        savePolizasCache(state, payload.cacheKey, payload.originalQuery, state.polizas);
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
+        // ✅ si fue abort, no “ensuciamos” con error
+        if (action?.payload && action.payload._aborted) {
+          state.searchStatus = "idle";
+          state.searchError = null;
+          return;
+        }
         state.searchStatus = "failed";
         state.searchError = action.payload;
       })
@@ -865,22 +1153,27 @@ const pagosSlice = createSlice({
         state.historialPagosStatus = "loading";
         state.historialPagosError = null;
 
-        // hidratación optimista desde cache fresco (evita “parpadeo” y sensación lenta)
-        const built = buildHistorialParams(action?.meta?.arg);
-        const cacheKey = buildHistorialCacheKey(built);
-        const hit = state.historialPagosCache?.[cacheKey];
-        if (
-          hit &&
-          isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
-          Array.isArray(hit.items)
-        ) {
-          state.historialPagosItems = hit.items;
-          state.historialPagosMeta = hit.meta || {
-            count: hit.items.length,
-            next: null,
-            previous: null,
-          };
-          // mantenemos status loading para permitir refresh “silencioso”
+        const arg = action?.meta?.arg;
+        const force = Boolean(arg && typeof arg === "object" && arg.force);
+
+        // ✅ hidratación optimista desde cache fresco (evita “parpadeo”)
+        // PERO no si force=true (porque el usuario pidió refresh real)
+        if (!force) {
+          const built = buildHistorialParams(arg);
+          const cacheKey = buildHistorialCacheKey(built);
+          const hit = state.historialPagosCache?.[cacheKey];
+          if (
+            hit &&
+            isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
+            Array.isArray(hit.items)
+          ) {
+            state.historialPagosItems = hit.items;
+            state.historialPagosMeta = hit.meta || {
+              count: hit.items.length,
+              next: null,
+              previous: null,
+            };
+          }
         }
       })
       .addCase(fetchHistorialPagos.fulfilled, (state, action) => {
@@ -905,6 +1198,12 @@ const pagosSlice = createSlice({
         }
       })
       .addCase(fetchHistorialPagos.rejected, (state, action) => {
+        // ✅ si fue abort, no “limpiamos” la tabla (evita parpadeo)
+        if (action?.payload && action.payload._aborted) {
+          state.historialPagosStatus = "idle";
+          state.historialPagosError = null;
+          return;
+        }
         state.historialPagosStatus = "failed";
         state.historialPagosError = action.payload;
         state.historialPagosItems = [];
@@ -939,6 +1238,11 @@ const pagosSlice = createSlice({
   },
 });
 
-export const { setCuotas, clearSearch, invalidateHistorialPagosCache } =
-  pagosSlice.actions;
+export const {
+  setCuotas,
+  clearSearch,
+  invalidateHistorialPagosCache,
+  invalidateBuscarCache,
+} = pagosSlice.actions;
+
 export default pagosSlice.reducer;
