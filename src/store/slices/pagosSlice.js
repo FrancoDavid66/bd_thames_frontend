@@ -27,6 +27,33 @@ const keyForSearch = (q, withCuotas) => {
   return withCuotas ? `${base}|cuotas` : `${base}|lite`;
 };
 
+/* ===================== HELPERS DESCARGA ===================== */
+
+function filenameFromDisposition(disposition) {
+  const s = String(disposition || "");
+  // filename="algo.csv" o filename=algo.csv o filename*=UTF-8''algo.csv
+  const m =
+    /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(s);
+  const raw = (m && (m[1] || m[2] || m[3])) || "";
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw.trim());
+  } catch {
+    return raw.trim();
+  }
+}
+
+function triggerDownloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || "historial_pagos.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
 /* ============== THUNKS ============== */
 
 /** Obtener todas las cuotas (admin) */
@@ -47,7 +74,6 @@ export const marcarCuotaComoPagada = createAsyncThunk(
   "pagos/marcarCuotaComoPagada",
   async (payload, { rejectWithValue }) => {
     try {
-      // ✅ Compat: antes se usaba cuotaId, ahora desde UI mandás id
       const cuotaId = payload?.cuotaId ?? payload?.id;
 
       if (!cuotaId) {
@@ -57,7 +83,6 @@ export const marcarCuotaComoPagada = createAsyncThunk(
         });
       }
 
-      // ✅ Normalizamos nombres para matchear el backend
       const body = compact({
         fecha_pago: payload?.fecha_pago,
         forma_pago: payload?.forma_pago,
@@ -65,7 +90,6 @@ export const marcarCuotaComoPagada = createAsyncThunk(
         monto: payload?.monto ?? payload?.monto_pagado, // legacy
         observaciones: payload?.observaciones ?? payload?.notas, // legacy
 
-        // medios (tu backend mira medio_cobro_id y/o medio_cobro_valor / destino_cuenta)
         medio_cobro_id: payload?.medio_cobro_id,
         medio_cobro_valor:
           payload?.medio_cobro_valor ??
@@ -73,11 +97,9 @@ export const marcarCuotaComoPagada = createAsyncThunk(
           payload?.referencia,
         destino_cuenta: payload?.destino_cuenta,
 
-        // opcional
         registrar_en_balance: payload?.registrar_en_balance,
       });
 
-      // ✅ El backend define methods=['patch'] → POST da 405
       const { data } = await axios.patch(API(`cuotas/${cuotaId}/pagar/`), body);
       return data;
     } catch (error) {
@@ -141,11 +163,143 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache TTL
- *  arg:
- *    - "texto"
- *    - { query: "texto", withCuotas: true|false, limit: number }
- */
+/** ✅ Historial de pagos (GET /cuotas/pagos/) con filtros día/mes/rango */
+export const fetchHistorialPagos = createAsyncThunk(
+  "pagos/fetchHistorialPagos",
+  async (params, { rejectWithValue }) => {
+    try {
+      const p = params && typeof params === "object" ? params : {};
+
+      const { data } = await axios.get(API("cuotas/pagos/"), {
+        params: compact({
+          mes: p?.mes, // YYYY-MM
+          dia: p?.dia, // YYYY-MM-DD
+          desde: p?.desde, // YYYY-MM-DD
+          hasta: p?.hasta, // YYYY-MM-DD
+
+          oficina: p?.oficina,
+          search: p?.q ?? p?.search,
+          page: p?.page ?? 1,
+          page_size: p?.page_size ?? 25,
+          ordering: p?.ordering ?? "-fecha_pago",
+        }),
+      });
+
+      if (data && typeof data === "object" && "results" in data) {
+        return {
+          items: Array.isArray(data.results) ? data.results : [],
+          meta: {
+            count: Number(data.count || 0) || 0,
+            next: data.next ?? null,
+            previous: data.previous ?? null,
+          },
+        };
+      }
+
+      const items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
+      return {
+        items,
+        meta: { count: items.length, next: null, previous: null },
+      };
+    } catch (error) {
+      return rejectWithValue(
+        error?.response?.data || "Error al obtener historial de pagos"
+      );
+    }
+  }
+);
+
+/** ✅ Descargar CSV de historial de pagos (GET /cuotas/pagos/?export=csv) */
+export const downloadHistorialPagosCSV = createAsyncThunk(
+  "pagos/downloadHistorialPagosCSV",
+  async (params, { rejectWithValue }) => {
+    try {
+      const p = params && typeof params === "object" ? params : {};
+
+      const res = await axios.get(API("cuotas/pagos/"), {
+        params: compact({
+          mes: p?.mes,
+          dia: p?.dia,
+          desde: p?.desde,
+          hasta: p?.hasta,
+          oficina: p?.oficina,
+          search: p?.q ?? p?.search,
+          ordering: p?.ordering ?? "-fecha_pago",
+          export: "csv",
+        }),
+        responseType: "blob",
+      });
+
+      const disposition = res?.headers?.["content-disposition"];
+      const filename =
+        filenameFromDisposition(disposition) ||
+        (p?.dia
+          ? `pagos_${p.dia}.csv`
+          : p?.desde || p?.hasta
+          ? `pagos_${p.desde || "inicio"}_a_${p.hasta || "hoy"}.csv`
+          : p?.mes
+          ? `pagos_${p.mes}.csv`
+          : "historial_pagos.csv");
+
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
+      triggerDownloadBlob(blob, filename);
+
+      return { ok: true, filename };
+    } catch (error) {
+      const msg = error?.response?.data || "Error al descargar CSV";
+      return rejectWithValue(msg);
+    }
+  }
+);
+
+/** ✅ NUEVO: Descargar PDF de historial de pagos (GET /cuotas/pagos/?export=pdf) */
+export const downloadHistorialPagosPDF = createAsyncThunk(
+  "pagos/downloadHistorialPagosPDF",
+  async (params, { rejectWithValue }) => {
+    try {
+      const p = params && typeof params === "object" ? params : {};
+
+      const res = await axios.get(API("cuotas/pagos/"), {
+        params: compact({
+          mes: p?.mes,
+          dia: p?.dia,
+          desde: p?.desde,
+          hasta: p?.hasta,
+          oficina: p?.oficina,
+          search: p?.q ?? p?.search,
+          ordering: p?.ordering ?? "-fecha_pago",
+          export: "pdf",
+        }),
+        responseType: "blob",
+      });
+
+      const disposition = res?.headers?.["content-disposition"];
+      const filename =
+        filenameFromDisposition(disposition) ||
+        (p?.dia
+          ? `pagos_${p.dia}.pdf`
+          : p?.desde || p?.hasta
+          ? `pagos_${p.desde || "inicio"}_a_${p.hasta || "hoy"}.pdf`
+          : p?.mes
+          ? `pagos_${p.mes}.pdf`
+          : "historial_pagos.pdf");
+
+      const blob =
+        res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data], { type: "application/pdf" });
+
+      triggerDownloadBlob(blob, filename);
+
+      return { ok: true, filename };
+    } catch (error) {
+      const msg = error?.response?.data || "Error al descargar PDF";
+      return rejectWithValue(msg);
+    }
+  }
+);
+
+/** Buscar pólizas por texto (nombre, patente, modelo…) — con cache TTL */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
   async (arg, { rejectWithValue, getState }) => {
@@ -161,7 +315,10 @@ export const fetchPolizas = createAsyncThunk(
 
       const limit = Math.max(
         1,
-        Math.min(100, Number(typeof arg === "object" && arg ? arg.limit : 25) || 25)
+        Math.min(
+          100,
+          Number(typeof arg === "object" && arg ? arg.limit : 25) || 25
+        )
       );
 
       const q = String(query || "").trim();
@@ -284,7 +441,9 @@ export const registrarIngreso = createAsyncThunk(
       const { data } = await axios.post(API("ingresos/"), payload);
       return data;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || "Error al registrar ingreso");
+      return rejectWithValue(
+        error?.response?.data || "Error al registrar ingreso"
+      );
     }
   }
 );
@@ -398,6 +557,20 @@ const initialState = {
   historialRecordatorios: [],
   historialRecordatoriosStatus: "idle",
   historialRecordatoriosError: null,
+
+  // historial pagos
+  historialPagosItems: [],
+  historialPagosMeta: { count: 0, next: null, previous: null },
+  historialPagosStatus: "idle",
+  historialPagosError: null,
+
+  // descarga historial pagos
+  historialPagosDownloadStatus: "idle",
+  historialPagosDownloadError: null,
+
+  // ✅ nuevo: descarga PDF historial pagos
+  historialPagosDownloadPdfStatus: "idle",
+  historialPagosDownloadPdfError: null,
 };
 
 function recomputeMedioNombres(state) {
@@ -413,9 +586,6 @@ function recomputeMedioNombres(state) {
 }
 
 function savePolizasCache(state, a, b, c) {
-  // Soporta 2 firmas:
-  //  - (state, originalQuery, polizas)  [legacy]
-  //  - (state, cacheKey, originalQuery, polizas)
   let cacheKey = "";
   let originalQuery = "";
   let polizas = [];
@@ -438,7 +608,6 @@ function savePolizasCache(state, a, b, c) {
     originalQuery: String(originalQuery || "").trim(),
   };
 
-  // actualizar orden (MRU)
   const prev = Array.isArray(state.polizasCacheOrder)
     ? state.polizasCacheOrder
     : [];
@@ -448,7 +617,6 @@ function savePolizasCache(state, a, b, c) {
   );
   state.polizasCacheOrder = next;
 
-  // limpieza extra (si sobran keys)
   const keep = new Set(next);
   Object.keys(state.polizasCache || {}).forEach((key) => {
     if (!keep.has(key)) delete state.polizasCache[key];
@@ -583,6 +751,55 @@ const pagosSlice = createSlice({
       .addCase(fetchHistorialRecordatorios.rejected, (state, action) => {
         state.historialRecordatoriosStatus = "failed";
         state.historialRecordatoriosError = action.payload;
+      })
+
+      // --- Historial pagos ---
+      .addCase(fetchHistorialPagos.pending, (state) => {
+        state.historialPagosStatus = "loading";
+        state.historialPagosError = null;
+      })
+      .addCase(fetchHistorialPagos.fulfilled, (state, action) => {
+        state.historialPagosStatus = "succeeded";
+        state.historialPagosItems = Array.isArray(action.payload?.items)
+          ? action.payload.items
+          : [];
+        state.historialPagosMeta = action.payload?.meta || {
+          count: state.historialPagosItems.length,
+          next: null,
+          previous: null,
+        };
+      })
+      .addCase(fetchHistorialPagos.rejected, (state, action) => {
+        state.historialPagosStatus = "failed";
+        state.historialPagosError = action.payload;
+        state.historialPagosItems = [];
+        state.historialPagosMeta = { count: 0, next: null, previous: null };
+      })
+
+      // --- Descargar CSV historial pagos ---
+      .addCase(downloadHistorialPagosCSV.pending, (state) => {
+        state.historialPagosDownloadStatus = "loading";
+        state.historialPagosDownloadError = null;
+      })
+      .addCase(downloadHistorialPagosCSV.fulfilled, (state) => {
+        state.historialPagosDownloadStatus = "succeeded";
+      })
+      .addCase(downloadHistorialPagosCSV.rejected, (state, action) => {
+        state.historialPagosDownloadStatus = "failed";
+        state.historialPagosDownloadError = action.payload;
+      })
+
+      // ✅ --- Descargar PDF historial pagos ---
+      .addCase(downloadHistorialPagosPDF.pending, (state) => {
+        state.historialPagosDownloadPdfStatus = "loading";
+        state.historialPagosDownloadPdfError = null;
+      })
+      .addCase(downloadHistorialPagosPDF.fulfilled, (state) => {
+        state.historialPagosDownloadPdfStatus = "succeeded";
+      })
+      .addCase(downloadHistorialPagosPDF.rejected, (state, action) => {
+        state.historialPagosDownloadPdfStatus = "failed";
+        state.historialPagosDownloadPdfError = action.payload;
       });
   },
 });

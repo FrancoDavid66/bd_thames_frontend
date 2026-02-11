@@ -17,6 +17,7 @@ import {
   FaSyncAlt,
   FaClock, // ✅🆕 Vencimientos
   FaBan, // ✅🆕 Bajas
+  FaTruckMoving, // ✅🆕 Gruas
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
@@ -31,6 +32,9 @@ const navItems = [
 
   // Grupo
   { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
+
+  // ✅ Grúas (simple)
+  { to: "/gruas", label: "Grúas", icon: FaTruckMoving },
 
   // Cobranza / gestión
   { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt },
@@ -154,7 +158,9 @@ export default function Sidebar({
                       onClick={() => setPolizasOpen((v) => !v)}
                       className="px-3 py-2 text-white/80 hover:text-white"
                       title={polizasOpen ? "Cerrar" : "Abrir"}
-                      aria-label={polizasOpen ? "Cerrar Pólizas" : "Abrir Pólizas"}
+                      aria-label={
+                        polizasOpen ? "Cerrar Pólizas" : "Abrir Pólizas"
+                      }
                     >
                       {polizasOpen ? <FaChevronDown /> : <FaChevronRight />}
                     </button>

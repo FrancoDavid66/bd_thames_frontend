@@ -1,7 +1,37 @@
 // src/api/gruas.js
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
-const BASE = `${API_BASE}/gruas`;
-const POLIZAS_BASE = `${API_BASE}/polizas`;
+
+// Normaliza base URL:
+// - acepta "/api", "/api/", "http://127.0.0.1:8000/api", "http://127.0.0.1:8000/api/"
+// - evita dobles slashes al concatenar
+function normalizeBase(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "/api";
+  // quitar slashes finales (pero no tocar "http://")
+  return s.replace(/\/+$/, "");
+}
+
+// Une URLs evitando dobles slashes.
+// joinUrl("/api", "gruas", "adhesiones/") => "/api/gruas/adhesiones/"
+function joinUrl(...parts) {
+  const cleaned = parts
+    .filter((p) => p !== undefined && p !== null)
+    .map((p) => String(p))
+    .filter((p) => p.length > 0);
+
+  if (!cleaned.length) return "";
+
+  const first = cleaned[0]; // puede ser "http://..." o "/api"
+  const rest = cleaned.slice(1);
+
+  const firstNorm = first.replace(/\/+$/, "");
+  const restNorm = rest.map((p) => p.replace(/^\/+/, ""));
+
+  return [firstNorm, ...restNorm].join("/");
+}
+
+const API_BASE = normalizeBase(import.meta.env.VITE_API_BASE || "/api");
+const BASE = joinUrl(API_BASE, "gruas"); // => "/api/gruas" o "http://.../api/gruas"
+const POLIZAS_BASE = joinUrl(API_BASE, "polizas");
 
 function isFormLike(body) {
   const g = typeof globalThis !== "undefined" ? globalThis : window;
@@ -13,7 +43,9 @@ function isFormLike(body) {
 
 async function http(method, url, body, opts = {}) {
   const doFetch = async (u) => {
-    try { console.debug(`[GruasAPI] ${method} ${u}`, body ?? null); } catch {}
+    try {
+      console.debug(`[GruasAPI] ${method} ${u}`, body ?? null);
+    } catch {}
 
     const sendRaw = opts.multipart === true || isFormLike(body);
     const headers = {
@@ -30,7 +62,9 @@ async function http(method, url, body, opts = {}) {
 
     if (!res.ok) {
       let info = null;
-      try { info = await res.json(); } catch {}
+      try {
+        info = await res.json();
+      } catch {}
       const msg = info?.detail || info?.message || res.statusText || "Error";
       const err = new Error(msg);
       err.status = res.status;
@@ -48,7 +82,11 @@ async function http(method, url, body, opts = {}) {
   } catch (err) {
     if (err?.status === 404 && Array.isArray(opts.fallbacks) && opts.fallbacks.length) {
       for (const alt of opts.fallbacks) {
-        try { return await doFetch(alt); } catch { /* sigue probando */ }
+        try {
+          return await doFetch(alt);
+        } catch {
+          /* sigue probando */
+        }
       }
     }
     throw err;
@@ -75,7 +113,11 @@ function normalizeImportResponse(resp) {
   }
 
   if (typeof resp === "object") {
-    const objetos = Array.isArray(resp.objetos) ? resp.objetos : (Array.isArray(resp) ? resp : []);
+    const objetos = Array.isArray(resp.objetos)
+      ? resp.objetos
+      : Array.isArray(resp)
+      ? resp
+      : [];
     const creadas = Number(resp.creadas ?? (Array.isArray(objetos) ? objetos.length : 0)) || 0;
     const omitidas = Number(resp.omitidas ?? 0) || 0;
     return { creadas, omitidas, objetos };
@@ -98,7 +140,7 @@ function buildProveedorPayload(data = {}) {
     "zona",
     "observaciones",
     "activo",
-    // Documentación requerida
+    // Documentación requerida (legacy)
     "dni_frente_url",
     "dni_dorso_url",
     "vtv_url",
@@ -115,102 +157,218 @@ function buildProveedorPayload(data = {}) {
   return out;
 }
 
+function buildProveedorVehiculoPayload(data = {}) {
+  // ✅ flota real: backend soporta patente/alias/modelo/anio/activo
+  const allow = ["patente", "alias", "modelo", "anio", "activo"];
+  const out = {};
+  for (const k of allow) {
+    if (Object.prototype.hasOwnProperty.call(data, k) && data[k] !== undefined) {
+      out[k] = data[k];
+    }
+  }
+  return out;
+}
+
 export const GruasAPI = {
   // -------- PLANES --------
-  async getPlanes() { return http("GET", `${BASE}/planes/`); },
-  async createPlan(data) { return http("POST", `${BASE}/planes/`, data); },
-  async updatePlan(id, data) { return http("PATCH", `${BASE}/planes/${id}/`, data); },
-  async deletePlan(id) { return http("DELETE", `${BASE}/planes/${id}/`); },
-  async togglePlan(id, activo) { return http("PATCH", `${BASE}/planes/${id}/`, { activo: !!activo }); },
-  async togglePlanActivo(id, activo) { return this.togglePlan(id, activo); },
+  async getPlanes() {
+    return http("GET", joinUrl(BASE, "planes/"));
+  },
+  async createPlan(data) {
+    return http("POST", joinUrl(BASE, "planes/"), data);
+  },
+  async updatePlan(id, data) {
+    return http("PATCH", joinUrl(BASE, `planes/${id}/`), data);
+  },
+  async deletePlan(id) {
+    return http("DELETE", joinUrl(BASE, `planes/${id}/`));
+  },
+  async togglePlan(id, activo) {
+    return http("PATCH", joinUrl(BASE, `planes/${id}/`), { activo: !!activo });
+  },
+  async togglePlanActivo(id, activo) {
+    return this.togglePlan(id, activo);
+  },
 
   // -------- PROVEEDORES --------
-  async getProveedores() { return http("GET", `${BASE}/proveedores/`); },
-  async getProveedor(id) { return http("GET", `${BASE}/proveedores/${id}/`); },
+  async getProveedores() {
+    return http("GET", joinUrl(BASE, "proveedores/"));
+  },
+  async getProveedor(id) {
+    return http("GET", joinUrl(BASE, `proveedores/${id}/`));
+  },
   async createProveedor(data) {
-    return http("POST", `${BASE}/proveedores/`, buildProveedorPayload(data));
+    return http("POST", joinUrl(BASE, "proveedores/"), buildProveedorPayload(data));
   },
   async updateProveedor(id, data) {
-    // PATCH parcial con sólo los campos relevantes
-    return http("PATCH", `${BASE}/proveedores/${id}/`, buildProveedorPayload(data));
+    return http("PATCH", joinUrl(BASE, `proveedores/${id}/`), buildProveedorPayload(data));
   },
-  async deleteProveedor(id) { return http("DELETE", `${BASE}/proveedores/${id}/`); },
-  async toggleProveedor(id, activo) { return http("PATCH", `${BASE}/proveedores/${id}/`, { activo: !!activo }); },
-  async toggleProveedorActivo(id, activo) { return this.toggleProveedor(id, activo); },
+  async deleteProveedor(id) {
+    return http("DELETE", joinUrl(BASE, `proveedores/${id}/`));
+  },
+  async toggleProveedor(id, activo) {
+    return http("PATCH", joinUrl(BASE, `proveedores/${id}/`), { activo: !!activo });
+  },
+  async toggleProveedorActivo(id, activo) {
+    return this.toggleProveedor(id, activo);
+  },
 
-  // ✅ PERFIL DE PROVEEDOR
-  async getProveedorPerfil(id) {
-    return http("GET", `${BASE}/proveedores/${id}/perfil/`);
+  // ✅ PERFIL DE PROVEEDOR (soporta ?mes=YYYY-MM)
+  async getProveedorPerfil(id, params = {}) {
+    return http("GET", joinUrl(BASE, `proveedores/${id}/perfil/${buildQuery(params)}`));
   },
 
   // Documentos (DNI/Registro/Cédula)
   async listarProveedorDocumentos(id) {
-    return http("GET", `${BASE}/proveedores/${id}/documentos/`);
+    return http("GET", joinUrl(BASE, `proveedores/${id}/documentos/`));
   },
   async subirProveedorDocumento(id, { tipo, file, archivo, url, public_id } = {}) {
-    // Si viene archivo, usar multipart
     const f = file || archivo;
     if (f) {
       const fd = new FormData();
       fd.append("tipo", String(tipo || "").toUpperCase());
       fd.append("archivo", f);
       if (public_id) fd.append("public_id", public_id);
-      return http("POST", `${BASE}/proveedores/${id}/documentos/`, fd, { multipart: true });
+      return http("POST", joinUrl(BASE, `proveedores/${id}/documentos/`), fd, { multipart: true });
     }
-    // Si no, mandamos URL
-    return http("POST", `${BASE}/proveedores/${id}/documentos/`, {
+    return http("POST", joinUrl(BASE, `proveedores/${id}/documentos/`), {
       tipo: String(tipo || "").toUpperCase(),
       url,
       public_id,
     });
   },
   async eliminarProveedorDocumento(id, docId) {
-    return http("DELETE", `${BASE}/proveedores/${id}/documentos/${buildQuery({ id: docId })}`);
+    // DELETE /proveedores/{id}/documentos/?id=DOC_ID
+    return http("DELETE", joinUrl(BASE, `proveedores/${id}/documentos/${buildQuery({ id: docId })}`));
   },
 
-  // Fotos del vehículo (Frente/Lateral_IZQ/Lateral_DER/Trasera)
-  async listarProveedorVehiculoFotos(id) {
-    return http("GET", `${BASE}/proveedores/${id}/vehiculo-fotos/`);
+  // Fotos del vehículo (perfil legacy + compat con vehiculo_id)
+  async listarProveedorVehiculoFotos(id, params = {}) {
+    return http("GET", joinUrl(BASE, `proveedores/${id}/vehiculo-fotos/${buildQuery(params)}`));
   },
-  async subirProveedorVehiculoFoto(id, { tipo, file, archivo, url, public_id } = {}) {
+  async subirProveedorVehiculoFoto(id, { tipo, vehiculo_id, vehiculo, file, archivo, url, public_id } = {}) {
+    const f = file || archivo;
+    const vehId = vehiculo_id ?? vehiculo;
+
+    if (f) {
+      const fd = new FormData();
+      fd.append("tipo", String(tipo || "").toUpperCase());
+      fd.append("archivo", f);
+      if (public_id) fd.append("public_id", public_id);
+      if (vehId != null) fd.append("vehiculo_id", String(vehId));
+      return http("POST", joinUrl(BASE, `proveedores/${id}/vehiculo-fotos/`), fd, { multipart: true });
+    }
+
+    const payload = {
+      tipo: String(tipo || "").toUpperCase(),
+      url,
+      public_id,
+    };
+    if (vehId != null) payload.vehiculo_id = vehId;
+
+    return http("POST", joinUrl(BASE, `proveedores/${id}/vehiculo-fotos/`), payload);
+  },
+  async eliminarProveedorVehiculoFoto(id, fotoId) {
+    // DELETE /proveedores/{id}/vehiculo-fotos/?id=FOTO_ID
+    return http("DELETE", joinUrl(BASE, `proveedores/${id}/vehiculo-fotos/${buildQuery({ id: fotoId })}`));
+  },
+
+  // ✅ FLOTA REAL (vehículos del proveedor)
+  async listProveedorVehiculos(proveedorId, params = {}) {
+    // GET /proveedores/{id}/vehiculos/?mes=YYYY-MM
+    return http("GET", joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${buildQuery(params)}`));
+  },
+
+  // ✅ Alias para el front (lo que usa ProveedorProfile.jsx)
+  async getProveedorVehiculos(proveedorId, params = {}) {
+    return this.listProveedorVehiculos(proveedorId, params);
+  },
+
+  async createProveedorVehiculo(proveedorId, data = {}) {
+    return http(
+      "POST",
+      joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/`),
+      buildProveedorVehiculoPayload(data)
+    );
+  },
+  async updateProveedorVehiculo(proveedorId, vehiculoId, data = {}) {
+    return http(
+      "PATCH",
+      joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${vehiculoId}/`),
+      buildProveedorVehiculoPayload(data)
+    );
+  },
+  async deleteProveedorVehiculo(proveedorId, vehiculoId) {
+    // ✅ backend: DELETE /proveedores/{id}/vehiculos/{vehiculo_id}/
+    return http("DELETE", joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${vehiculoId}/`));
+  },
+
+  // ✅ NUEVO: Fotos por vehículo (endpoint anidado)
+  async listVehiculoFotos(proveedorId, vehiculoId) {
+    return http("GET", joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${vehiculoId}/fotos/`));
+  },
+  async addVehiculoFoto(proveedorId, vehiculoId, { tipo, file, archivo, url, public_id } = {}) {
     const f = file || archivo;
     if (f) {
       const fd = new FormData();
       fd.append("tipo", String(tipo || "").toUpperCase());
       fd.append("archivo", f);
       if (public_id) fd.append("public_id", public_id);
-      return http("POST", `${BASE}/proveedores/${id}/vehiculo-fotos/`, fd, { multipart: true });
+      return http(
+        "POST",
+        joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${vehiculoId}/fotos/`),
+        fd,
+        { multipart: true }
+      );
     }
-    return http("POST", `${BASE}/proveedores/${id}/vehiculo-fotos/`, {
+    return http("POST", joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${vehiculoId}/fotos/`), {
       tipo: String(tipo || "").toUpperCase(),
       url,
       public_id,
     });
   },
-  async eliminarProveedorVehiculoFoto(id, fotoId) {
-    return http("DELETE", `${BASE}/proveedores/${id}/vehiculo-fotos/${buildQuery({ id: fotoId })}`);
+  async deleteVehiculoFoto(proveedorId, vehiculoId, fotoId) {
+    // DELETE /.../fotos/?id=FOTO_ID
+    return http(
+      "DELETE",
+      joinUrl(BASE, `proveedores/${proveedorId}/vehiculos/${vehiculoId}/fotos/${buildQuery({ id: fotoId })}`)
+    );
   },
 
-  // **Flota por proveedor** (si tu backend lo expone)
-  async getGruasProveedor(proveedorId, params = {}) {
-    return http("GET", `${BASE}/proveedores/${proveedorId}/flota/${buildQuery(params)}`);
+  // ✅ Flota con viajes por mes (compat)
+  async getProveedorFlota(proveedorId, params = {}) {
+    return http("GET", joinUrl(BASE, `proveedores/${proveedorId}/flota/${buildQuery(params)}`));
   },
-  // Fallback genérico para listar grúas
+
+  // 🧩 Backward-compatible (alias viejo)
+  async getGruasProveedor(proveedorId, params = {}) {
+    return this.getProveedorFlota(proveedorId, params);
+  },
+
+  // (Si lo usabas, mejor usar getSolicitudes; lo dejo como alias seguro)
   async getGruas(params = {}) {
-    return http("GET", `${BASE}/gruas/${buildQuery(params)}`);
+    return this.getSolicitudes(params);
   },
 
   // -------- ADHESIONES --------
   async getAdhesiones(params = {}) {
-    return http("GET", `${BASE}/adhesiones/${buildQuery(params)}`);
+    return http("GET", joinUrl(BASE, `adhesiones/${buildQuery(params)}`));
   },
   async getAdhesionesByPoliza(polizaId) {
     return this.getAdhesiones({ poliza: polizaId });
   },
   async activarAdhesion({
-    poliza, poliza_id, plan, planId, plan_id,
-    fecha_activacion, notas, fotos, fotos_galeria_ids,
-    auto_importar_galeria = false, carencia_dias
+    poliza,
+    poliza_id,
+    plan,
+    planId,
+    plan_id,
+    fecha_activacion,
+    notas,
+    fotos,
+    fotos_galeria_ids,
+    auto_importar_galeria = false,
+    carencia_dias,
   }) {
     const payload = {
       poliza: poliza ?? poliza_id,
@@ -224,147 +382,151 @@ export const GruasAPI = {
       auto_importar_galeria,
       carencia_dias,
     };
-    return http("POST", `${BASE}/adhesiones/activar/`, payload);
+    return http("POST", joinUrl(BASE, "adhesiones/activar/"), payload);
   },
 
-  // ⬇️ Agrego fallbacks para backends sin prefijo /gruas
+  // ✅ En tu backend NO hay pausar/reanudar action: lo hacemos por PATCH estado
   async pausarAdhesion(id, motivo = "") {
-    return http("POST", `${BASE}/adhesiones/${id}/pausar/`, { motivo }, {
-      fallbacks: [
-        `${API_BASE}/adhesiones/${id}/pausar/`,
-        `/api/adhesiones/${id}/pausar/`,
-      ],
+    // guardamos motivo en "notas" si querés, o solo cambiamos estado
+    return http("PATCH", joinUrl(BASE, `adhesiones/${id}/`), {
+      estado: "PAUSADA",
+      notas: motivo || undefined,
     });
   },
 
-  // ⬇️ Nuevo: reanudarAdhesion con fallbacks (si tu back lo soporta)
   async reanudarAdhesion(id) {
-    return http("POST", `${BASE}/adhesiones/${id}/reanudar/`, {}, {
-      fallbacks: [
-        `${API_BASE}/adhesiones/${id}/reanudar/`,
-        `/api/adhesiones/${id}/reanudar/`,
-      ],
-    });
+    return http("PATCH", joinUrl(BASE, `adhesiones/${id}/`), { estado: "ACTIVA" });
   },
 
-  // ⬇️ Cancelar con fallbacks y alias comunes (dar_de_baja)
   async cancelarAdhesion(id, motivo = "") {
-    return http("POST", `${BASE}/adhesiones/${id}/cancelar/`, { motivo }, {
-      fallbacks: [
-        `${API_BASE}/adhesiones/${id}/cancelar/`,
-        `/api/adhesiones/${id}/cancelar/`,
-        `${BASE}/adhesiones/${id}/dar_de_baja/`,
-        `${API_BASE}/adhesiones/${id}/dar_de_baja/`,
-        `/api/adhesiones/${id}/dar_de_baja/`,
-      ],
-    });
+    return http(
+      "POST",
+      joinUrl(BASE, `adhesiones/${id}/cancelar/`),
+      { motivo },
+      {
+        fallbacks: [
+          joinUrl(BASE, `adhesiones/${id}/dar_de_baja/`),
+          joinUrl(API_BASE, `gruas/adhesiones/${id}/cancelar/`),
+        ],
+      }
+    );
   },
 
-  // ✅ NUEVO: eliminar adhesión (DELETE duro) con fallbacks
   async eliminarAdhesion(id) {
-    return http("DELETE", `${BASE}/adhesiones/${id}/`, null, {
-      fallbacks: [
-        `${API_BASE}/adhesiones/${id}/`,
-        `/api/adhesiones/${id}/`,
-      ],
-    });
+    return http("DELETE", joinUrl(BASE, `adhesiones/${id}/`));
   },
 
-  // URL directa del archivo (compatible con versión actual del backend)
   async firmarContrato(adhesionId, { archivo_url } = {}) {
-    return http("POST", `${BASE}/adhesiones/${adhesionId}/firmar_contrato/`, { archivo_url });
+    return http("POST", joinUrl(BASE, `adhesiones/${adhesionId}/firmar_contrato/`), { archivo_url });
   },
 
-  // NUEVO: subida de archivo (multipart)
   async firmarContratoUpload(adhesionId, file) {
     const fd = new FormData();
     fd.append("archivo", file);
-    return http("POST", `${BASE}/adhesiones/${adhesionId}/firmar_contrato/`, fd, { multipart: true });
+    return http("POST", joinUrl(BASE, `adhesiones/${adhesionId}/firmar_contrato/`), fd, { multipart: true });
   },
 
-  // ⬇️ Action con guion_bajo
   async importarFotosDesdeGaleria({ poliza, adhesion, fotoIds = [], minimoPatente = 4 }) {
-    const resp = await http("POST", `${BASE}/adhesion-fotos/importar_galeria/`, {
-      poliza, adhesion, foto_ids: fotoIds, minimo_patente: minimoPatente,
+    const resp = await http("POST", joinUrl(BASE, "adhesion-fotos/importar_galeria/"), {
+      poliza,
+      adhesion,
+      foto_ids: fotoIds,
+      minimo_patente: minimoPatente,
     });
     return normalizeImportResponse(resp);
   },
 
-  // -------- SOLICITUDES -------- (con fallbacks)
+  // -------- SOLICITUDES --------
   async getSolicitudes(params = {}) {
-    const path = `${BASE}/solicitudes/${buildQuery(params)}`;
-    return http("GET", path, null, {
-      fallbacks: [
-        `${API_BASE}/solicitudes/${buildQuery(params)}`,
-        `/api/solicitudes/${buildQuery(params)}`,
-      ],
-    });
+    const path = joinUrl(BASE, `solicitudes/${buildQuery(params)}`);
+    return http("GET", path);
   },
-  async crearSolicitud({ adhesion, adhesion_id, poliza, poliza_id, motivo, origen, destino = "", km_estimados = 0, notas = "" }) {
-    const payload = { adhesion_id: adhesion_id ?? adhesion, poliza_id: poliza_id ?? poliza, motivo, origen, destino, km_estimados, notas };
-    const path = `${BASE}/solicitudes/`;
-    return http("POST", path, payload, {
-      fallbacks: [`${API_BASE}/solicitudes/`, `/api/solicitudes/`],
-    });
+
+  async crearSolicitud({
+    adhesion,
+    adhesion_id,
+    poliza,
+    poliza_id,
+    motivo,
+    origen,
+    destino = "",
+    km_estimados = 0,
+    notas = "",
+    // opcionales nuevos
+    vehiculo_id,
+    cobro_express_id,
+  }) {
+    const payload = {
+      adhesion_id: adhesion_id ?? adhesion,
+      poliza_id: poliza_id ?? poliza,
+      motivo,
+      origen,
+      destino,
+      km_estimados,
+      notas,
+    };
+    if (vehiculo_id != null) payload.vehiculo_id = vehiculo_id;
+    if (cobro_express_id != null) payload.cobro_express_id = cobro_express_id;
+
+    const path = joinUrl(BASE, "solicitudes/");
+    return http("POST", path, payload);
   },
+
   async validarFotos(id) {
-    const path = `${BASE}/solicitudes/${id}/validar/`;
-    return http("POST", path, undefined, {
-      fallbacks: [
-        `${API_BASE}/solicitudes/${id}/validar/`,
-        `/api/solicitudes/${id}/validar/`,
-      ],
-    });
+    const path = joinUrl(BASE, `solicitudes/${id}/validar/`);
+    return http("POST", path, undefined);
   },
-  async asignarProveedor(id, proveedor_id, costo_estimado) {
+
+  async asignarProveedor(id, proveedor_id, costo_estimado, vehiculo_id) {
     const body = { proveedor_id };
     if (costo_estimado != null) body.costo_estimado = costo_estimado;
-    const path = `${BASE}/solicitudes/${id}/asignar_proveedor/`;
-    return http("POST", path, body, {
-      fallbacks: [
-        `${API_BASE}/solicitudes/${id}/asignar_proveedor/`,
-        `/api/solicitudes/${id}/asignar_proveedor/`,
-      ],
-    });
+    if (vehiculo_id != null) body.vehiculo_id = vehiculo_id;
+
+    const path = joinUrl(BASE, `solicitudes/${id}/asignar_proveedor/`);
+    return http("POST", path, body);
   },
+
+  async cotizar(id, { proveedor_id, km } = {}) {
+    const path = joinUrl(BASE, `solicitudes/${id}/cotizar/`);
+    return http("POST", path, { proveedor_id, km });
+  },
+
   async cambiarEstado(id, estado, notas = "") {
-    const path = `${BASE}/solicitudes/${id}/cambiar_estado/`;
-    return http("POST", path, { estado, notas }, {
-      fallbacks: [
-        `${API_BASE}/solicitudes/${id}/cambiar_estado/`,
-        `/api/solicitudes/${id}/cambiar_estado/`,
-      ],
-    });
+    const path = joinUrl(BASE, `solicitudes/${id}/cambiar_estado/`);
+    return http("POST", path, { estado, notas });
   },
-  async cerrar(id, km_totales, registrar_copago_en_balances = false) {
-    const path = `${BASE}/solicitudes/${id}/cerrar/`;
-    return http("POST", path, { km_totales, registrar_copago_en_balances }, {
-      fallbacks: [
-        `${API_BASE}/solicitudes/${id}/cerrar/`,
-        `/api/solicitudes/${id}/cerrar/`,
-      ],
-    });
+
+  async cerrar(id, km_totales, registrar_copago_en_balances = false, vehiculo_id) {
+    const path = joinUrl(BASE, `solicitudes/${id}/cerrar/`);
+    const body = { km_totales, registrar_copago_en_balances };
+    if (vehiculo_id != null) body.vehiculo_id = vehiculo_id;
+    return http("POST", path, body);
   },
+
   async enviarWhatsapp(id, { numero, texto }) {
-    const path = `${BASE}/solicitudes/${id}/enviar_whatsapp/`;
-    return http("POST", path, { numero, texto }, {
-      fallbacks: [
-        `${API_BASE}/solicitudes/${id}/enviar_whatsapp/`,
-        `/api/solicitudes/${id}/enviar_whatsapp/`,
-      ],
-    });
+    const path = joinUrl(BASE, `solicitudes/${id}/enviar_whatsapp/`);
+    return http("POST", path, { numero, texto });
   },
 
   // -------- KPIs + Series + Export --------
-  async kpis(params = {}) { return http("GET", `${BASE}/solicitudes/kpis/${buildQuery(params)}`); },
-  async porMes(params = {}) { return http("GET", `${BASE}/solicitudes/por_mes/${buildQuery(params)}`); },
-  exportarExcelURL(params = {}) { return `${BASE}/solicitudes/exportar_excel/${buildQuery(params)}`; },
+  async kpis(params = {}) {
+    return http("GET", joinUrl(BASE, `solicitudes/kpis/${buildQuery(params)}`));
+  },
+
+  async porMes(params = {}) {
+    return http("GET", joinUrl(BASE, `solicitudes/por_mes/${buildQuery(params)}`));
+  },
+
+  exportarExcelURL(params = {}) {
+    return joinUrl(BASE, `solicitudes/exportar_excel/${buildQuery(params)}`);
+  },
 
   // -------- CALCULADORA KM --------
-  async calcularKm(payload) { return http("POST", `${BASE}/solicitudes/calcular_km/`, payload); },
+  async calcularKm(payload) {
+    return http("POST", joinUrl(BASE, "solicitudes/calcular_km/"), payload);
+  },
 
   // -------- POLIZAS / CLIENTES --------
-  // ✅ NUEVO: búsqueda directa en /polizas/ con soporte de nombre de asegurado
   async buscarPolizas({
     q = "",
     asegurado = "",
@@ -375,37 +537,42 @@ export const GruasAPI = {
     solo_activas,
     page,
     page_size,
-    con_grua, // si tu backend lo soporta
+    con_grua,
     ...rest
   } = {}) {
     const params = {
-      // el front puede pasar q; lo usamos tanto en search como en asegurado
       search: search || q || asegurado || "",
       asegurado: asegurado || q || "",
       patente,
       numero_poliza,
       cliente,
       solo_activas: solo_activas ? "1" : "",
-      con_grua: con_grua ? "1" : "", // ignorado si el back no lo soporta
+      con_grua: con_grua ? "1" : "",
       page,
       page_size,
       ...rest,
     };
-    return http("GET", `${POLIZAS_BASE}/${buildQuery(params)}`);
+    return http("GET", joinUrl(POLIZAS_BASE, `${buildQuery(params)}`));
   },
 
-  // ✅ NUEVO: azúcar para buscar por nombre del asegurado
   async buscarPolizasPorAsegurado(nombre, extra = {}) {
     return this.buscarPolizas({ asegurado: nombre, ...extra });
   },
 
-  async asociarGrua(polizaId, {
-    plan, planId, plan_id,
-    fecha_activacion, notas,
-    fotos, fotos_galeria_ids,
-    auto_importar_galeria = false,
-    carencia_dias
-  } = {}) {
+  async asociarGrua(
+    polizaId,
+    {
+      plan,
+      planId,
+      plan_id,
+      fecha_activacion,
+      notas,
+      fotos,
+      fotos_galeria_ids,
+      auto_importar_galeria = false,
+      carencia_dias,
+    } = {}
+  ) {
     const payload = {
       plan_id: plan_id ?? planId ?? plan,
       fecha_activacion,
@@ -416,26 +583,32 @@ export const GruasAPI = {
       carencia_dias,
     };
 
-    const urlPoliza = `${POLIZAS_BASE}/${polizaId}/asociar-grua/`;
+    const urlPoliza = joinUrl(POLIZAS_BASE, `${polizaId}/asociar-grua/`);
     try {
       return await http("POST", urlPoliza, payload);
     } catch (err) {
       if (err?.status !== 404) throw err;
       const payload2 = { ...payload, poliza_id: polizaId };
-      return await http("POST", `${BASE}/adhesiones/activar/`, payload2);
+      return await http("POST", joinUrl(BASE, "adhesiones/activar/"), payload2);
     }
   },
 
-  async getPolizaResumen(polizaId) { return http("GET", `${BASE}/poliza/${polizaId}/resumen/`); },
-  async getClienteResumen(clienteId) { return http("GET", `${BASE}/cliente/${clienteId}/resumen/`); },
+  async getPolizaResumen(polizaId) {
+    return http("GET", joinUrl(BASE, `poliza/${polizaId}/resumen/`));
+  },
+  async getClienteResumen(clienteId) {
+    return http("GET", joinUrl(BASE, `cliente/${clienteId}/resumen/`));
+  },
 
-  // Mantiene endpoint actual y agrega fallback a /polizas/ usando search/asegurado
   async searchPolizasElegibles(q, soloOperables = false) {
     try {
-      const raw = await http("GET", `${BASE}/polizas-elegibles/${buildQuery({ q, solo_operables: soloOperables ? "1" : "" })}`);
+      const raw = await http(
+        "GET",
+        joinUrl(BASE, `polizas-elegibles/${buildQuery({ q, solo_operables: soloOperables ? "1" : "" })}`)
+      );
       const today = new Date().toISOString().slice(0, 10);
       const le = (d) => !d || d <= today;
-      return (raw || []).map(r => {
+      return (raw || []).map((r) => {
         const nombre = r?.cliente?.nombre || "";
         const apellido = r?.cliente?.apellido || "";
         return {
@@ -446,13 +619,11 @@ export const GruasAPI = {
         };
       });
     } catch (err) {
-      // Fallback: usar /polizas/?search=&asegurado=
       const resp = await this.buscarPolizas({ q, asegurado: q, solo_activas: soloOperables });
       const data = Array.isArray(resp?.results) ? resp.results : Array.isArray(resp) ? resp : [];
       return data.map((r) => {
         const nombre = r?.cliente?.nombre || "";
         const apellido = r?.cliente?.apellido || "";
-        // sin campos de carencia/rehabilitar: asumimos operable si está activa
         const operable = String(r?.estado || "").toLowerCase() === "activa";
         return {
           ...r,
