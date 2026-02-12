@@ -1,4 +1,6 @@
-/* src/components/pagos/PagosSearch.jsx — PRO: cache + recientes + "/" + prefetch + anti-stale (cuotas aplanadas) */
+/* src/components/pagos/PagosSearch.jsx — PRO: cache + recientes + "/" + anti-stale (cuotas aplanadas)
+   ✅ Ajustado: SIN prefetch automático (ahorra recursos). Busca solo con Enter o click en Buscar.
+*/
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
@@ -6,17 +8,13 @@ import toast from "react-hot-toast";
 import { HiSearch, HiX } from "react-icons/hi";
 import { fetchPagosBuscar } from "../../store/slices/pagosSlice";
 
-const PREFETCH_DEBOUNCE_MS = 260;
-const PREFETCH_MIN_CHARS = 3;
-const PREFETCH_LIMIT = 20; // liviano: calienta cache de cuotas aplanadas
-
 export default function PagosSearch({ onBuscar }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef(null);
   const dispatch = useDispatch();
 
   const {
-    // ✅ mantenemos compat: searchStatus lo setea el slice también en fetchPagosBuscar
+    // ✅ compat: searchStatus lo setea el slice también en fetchPagosBuscar
     searchStatus = "idle",
 
     // ✅ PRO cache (cuotas aplanadas)
@@ -88,28 +86,6 @@ export default function PagosSearch({ onBuscar }) {
     return out.slice(0, 6);
   }, [buscarCache, buscarCacheOrder, polizasCache, polizasCacheOrder]);
 
-  /* ===================== Prefetch liviano (debounce) ===================== */
-  useEffect(() => {
-    const q = String(query || "").trim();
-    if (q.length < PREFETCH_MIN_CHARS) return;
-
-    const t = setTimeout(() => {
-      // Prefetch rápido: cuotas aplanadas (sin pagadas, liviano)
-      dispatch(
-        fetchPagosBuscar({
-          query: q,
-          page_size: PREFETCH_LIMIT, // ✅ backend entiende page_size
-          limit: PREFETCH_LIMIT, // compat
-          include_pagadas: false,
-          // ordering: "vencimiento",
-          // oficina: ...
-        })
-      );
-    }, PREFETCH_DEBOUNCE_MS);
-
-    return () => clearTimeout(t);
-  }, [dispatch, query]);
-
   const handleSubmit = useCallback(
     async (e, qOverride = null) => {
       e?.preventDefault?.();
@@ -125,7 +101,7 @@ export default function PagosSearch({ onBuscar }) {
       }
 
       try {
-        // ✅ PRO: pedimos CUOTAS APLANADAS (backend: /pagos/buscar/)
+        // ✅ Busca SOLO por submit (Enter / click en botón)
         const promise = dispatch(
           fetchPagosBuscar({
             query: q,
@@ -135,16 +111,16 @@ export default function PagosSearch({ onBuscar }) {
             include_pagadas: false, // => ocultar_pagadas=1 en el slice
             // ordering: "vencimiento",
             // oficina: ...
-            // force: true, // si querés que el botón Buscar SIEMPRE pegue al backend
+            // force: true, // si querés que SIEMPRE pegue al backend
           })
         );
 
-        // ✅ anti-stale real: guardamos requestId antes del await
+        // ✅ anti-stale real
         lastRequestIdRef.current = promise?.requestId || null;
 
         const action = await promise;
 
-        // Si por algún motivo llegó tarde otra respuesta, la ignoramos
+        // Ignorar respuesta si llegó tarde y ya hubo otra búsqueda
         if (
           lastRequestIdRef.current &&
           action?.meta?.requestId &&
@@ -165,7 +141,7 @@ export default function PagosSearch({ onBuscar }) {
             ? payload.meta
             : { count: items.length, next: null, previous: null };
 
-        // 👇 onBuscar recibe CUOTAS (flat) + meta + query (sin romper compat si solo usa el 1er arg)
+        // onBuscar recibe CUOTAS (flat) + meta + query (sin romper compat)
         onBuscar?.(items, meta, q);
 
         if (items.length === 0) {
@@ -178,9 +154,7 @@ export default function PagosSearch({ onBuscar }) {
           lastToastKeyRef.current = "";
         }
       } catch (err) {
-        // si fue abort / stale, no spameamos
         if (err?.payload?._aborted) return;
-
         console.error(err);
         toast.error("Ocurrió un error buscando pagos.");
       }
@@ -194,13 +168,13 @@ export default function PagosSearch({ onBuscar }) {
     inputRef.current?.focus?.();
   }, []);
 
-  const usarReciente = useCallback(
-    (q) => {
-      setQuery(q);
-      handleSubmit({ preventDefault() {} }, q);
-    },
-    [handleSubmit]
-  );
+  // ✅ Recientes ahora SOLO rellenan (no disparan búsqueda)
+  const usarReciente = useCallback((q) => {
+    setQuery(q);
+    lastToastKeyRef.current = "";
+    // foco para que con Enter busques
+    requestAnimationFrame(() => inputRef.current?.focus?.());
+  }, []);
 
   return (
     <motion.div
@@ -282,7 +256,7 @@ export default function PagosSearch({ onBuscar }) {
               type="button"
               onClick={() => usarReciente(q)}
               className="h-9 px-3 rounded-xl border border-neutral-800 bg-neutral-950/60 hover:bg-neutral-900 text-neutral-200 text-sm transition"
-              title={`Buscar: ${q}`}
+              title={`Usar: ${q}`}
             >
               {q}
             </button>

@@ -31,6 +31,10 @@ const keyForSearch = (q, withCuotas) => {
 const BUSCAR_CACHE_TTL_MS = 20 * 1000; // 15–30s recomendado
 const BUSCAR_CACHE_MAX = 30;
 
+/* ===================== CACHE POR ID DE PÓLIZA (ENRIQUECIMIENTO CLIENTE) ===================== */
+const POLIZA_BY_ID_TTL_MS = 5 * 60 * 1000; // 5 min
+const POLIZA_BY_ID_MAX = 250;
+
 /* stable stringify (ordenado) para key de params */
 function stableKey(obj) {
   const o = obj && typeof obj === "object" ? obj : {};
@@ -46,6 +50,67 @@ function stableKey(obj) {
 
 function isFresh(ts, ttlMs) {
   return typeof ts === "number" && Date.now() - ts < ttlMs;
+}
+
+/* Helpers de strings */
+function safeStr(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+function hasRealNameLike(s) {
+  const x = safeStr(s).toLowerCase();
+  if (!x) return false;
+  if (x === "cliente" || x === "asegurado" || x === "client") return false;
+  return true;
+}
+
+/* Detecta si un item ya trae nombre/cliente */
+function itemHasClienteName(item) {
+  const it = item && typeof item === "object" ? item : {};
+  const pol = it?.poliza && typeof it.poliza === "object" ? it.poliza : null;
+
+  // 1) poliza.cliente objeto
+  const cli =
+    pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null;
+  if (cli && (hasRealNameLike(cli?.nombre) || hasRealNameLike(cli?.apellido)))
+    return true;
+
+  // 2) campos flat en poliza
+  if (pol) {
+    if (hasRealNameLike(pol?.cliente_nombre)) return true;
+    if (hasRealNameLike(pol?.cliente_apellido)) return true;
+    if (hasRealNameLike(pol?.cliente_nombre_completo)) return true;
+    if (hasRealNameLike(pol?.cliente_nombre_apellido)) return true;
+    if (hasRealNameLike(pol?.asegurado) || hasRealNameLike(pol?.asegurado_nombre))
+      return true;
+  }
+
+  // 3) campos flat en cuota
+  if (hasRealNameLike(it?.cliente_nombre)) return true;
+  if (hasRealNameLike(it?.cliente_apellido)) return true;
+  if (hasRealNameLike(it?.cliente_nombre_completo)) return true;
+  if (hasRealNameLike(it?.cliente_nombre_apellido)) return true;
+  if (hasRealNameLike(it?.asegurado)) return true;
+
+  return false;
+}
+
+/* Extrae poliza_id robusto */
+function extractPolizaId(item) {
+  const it = item && typeof item === "object" ? item : {};
+  const pol = it?.poliza;
+
+  // casos típicos: poliza: {id}, poliza_id, poliza: id
+  const id1 =
+    pol && typeof pol === "object"
+      ? pol.id ?? pol.pk ?? pol.poliza_id
+      : null;
+
+  const id2 = it?.poliza_id ?? it?.polizaId ?? it?.poliza;
+
+  const id = id1 ?? id2;
+  const n = Number(id);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /* ✅ Params para /pagos/buscar/ (backend PRO) */
@@ -116,7 +181,6 @@ function buildHistorialCacheKey(params) {
 
 function filenameFromDisposition(disposition) {
   const s = String(disposition || "");
-  // filename="algo.csv" o filename=algo.csv o filename*=UTF-8''algo.csv
   const m =
     /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(s);
   const raw = (m && (m[1] || m[2] || m[3])) || "";
@@ -140,19 +204,125 @@ function triggerDownloadBlob(blob, filename) {
 }
 
 /* ===================== CANCELACIÓN GLOBAL (EVITA RESPUESTAS VIEJAS) ===================== */
-/**
- * Si el usuario teclea rápido, abortamos la request anterior para:
- * - historial pagos
- * - búsqueda polizas (legacy)
- * - búsqueda pro (cuotas aplanadas)
- */
 let historialAbort = null;
 let polizasAbort = null;
 let buscarAbort = null;
 
+/* ===================== ENRIQUECIMIENTO CLIENTE EN BUSCAR ===================== */
+async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
+  const list = Array.isArray(items) ? items : [];
+  if (list.length === 0) return list;
+
+  // Solo enriquecemos los que NO traen nombre
+  const needs = [];
+  const polizaIds = new Set();
+
+  for (const it of list) {
+    if (itemHasClienteName(it)) continue;
+    const pid = extractPolizaId(it);
+    if (!pid) continue;
+    needs.push(it);
+    polizaIds.add(pid);
+  }
+
+  if (polizaIds.size === 0) return list;
+
+  const st = getState()?.pagos;
+  const byIdCache = st?.polizaByIdCache || {};
+
+  // ids a pedir (no cache o cache vencido)
+  const toFetch = [];
+  for (const pid of polizaIds) {
+    const hit = byIdCache?.[pid];
+    if (hit && isFresh(hit.ts, POLIZA_BY_ID_TTL_MS) && hit.poliza) continue;
+    toFetch.push(pid);
+  }
+
+  // Si todo estaba en cache, igual armamos el merge
+  const fetchedMap = new Map();
+
+  // 1) tomamos del cache lo que haya
+  for (const pid of polizaIds) {
+    const hit = byIdCache?.[pid];
+    if (hit && hit.poliza && isFresh(hit.ts, POLIZA_BY_ID_TTL_MS)) {
+      fetchedMap.set(pid, hit.poliza);
+    }
+  }
+
+  // 2) pedimos los faltantes con concurrencia controlada
+  if (toFetch.length > 0) {
+    const CONCURRENCY = 6;
+    for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
+      const chunk = toFetch.slice(i, i + CONCURRENCY);
+
+      const results = await Promise.allSettled(
+        chunk.map((id) =>
+          axios
+            .get(API(`polizas/${id}/`), {
+              // NO pedimos cuotas para que sea liviano
+              params: compact({ include_cuotas: 0 }),
+              signal,
+            })
+            .then((r) => r.data)
+        )
+      );
+
+      for (const r of results) {
+        if (r.status !== "fulfilled") continue;
+        const data = r.value && typeof r.value === "object" ? r.value : null;
+        const pol =
+          data && typeof data === "object" && "data" in data ? data.data : data;
+        const pid = Number(pol?.id);
+        if (Number.isFinite(pid) && pid > 0) {
+          fetchedMap.set(pid, pol);
+        }
+      }
+
+      if (signal?.aborted) break;
+    }
+  }
+
+  // 3) merge final: inyectamos poliza.cliente / campos flat si los trae la póliza detalle
+  const out = list.map((it) => {
+    if (itemHasClienteName(it)) return it;
+    const pid = extractPolizaId(it);
+    if (!pid) return it;
+    const polFetched = fetchedMap.get(pid);
+    if (!polFetched || typeof polFetched !== "object") return it;
+
+    const currentPol =
+      it?.poliza && typeof it.poliza === "object"
+        ? it.poliza
+        : { id: pid };
+
+    return {
+      ...it,
+      poliza: {
+        ...polFetched,
+        ...currentPol, // preserva lo que ya venía en el item
+        // si la póliza detalle trae cliente en otro formato, lo mantiene
+        cliente: currentPol?.cliente || polFetched?.cliente,
+        cliente_nombre:
+          currentPol?.cliente_nombre || polFetched?.cliente_nombre,
+        cliente_apellido:
+          currentPol?.cliente_apellido || polFetched?.cliente_apellido,
+        cliente_nombre_completo:
+          currentPol?.cliente_nombre_completo || polFetched?.cliente_nombre_completo,
+        cliente_nombre_apellido:
+          currentPol?.cliente_nombre_apellido || polFetched?.cliente_nombre_apellido,
+        asegurado_nombre:
+          currentPol?.asegurado_nombre || polFetched?.asegurado_nombre,
+        asegurado: currentPol?.asegurado || polFetched?.asegurado,
+      },
+    };
+  });
+
+  // Devolvemos items enriquecidos + un mapa para cachear arriba en el thunk
+  return { items: out, polizasById: fetchedMap };
+}
+
 /* ============== THUNKS ============== */
 
-/** Obtener todas las cuotas (admin) */
 export const fetchTodasLasCuotas = createAsyncThunk(
   "pagos/fetchTodasLasCuotas",
   async (_, { rejectWithValue }) => {
@@ -165,7 +335,6 @@ export const fetchTodasLasCuotas = createAsyncThunk(
   }
 );
 
-/** Marcar cuota como pagada (PATCH /cuotas/{id}/pagar/) */
 export const marcarCuotaComoPagada = createAsyncThunk(
   "pagos/marcarCuotaComoPagada",
   async (payload, { rejectWithValue }) => {
@@ -182,9 +351,9 @@ export const marcarCuotaComoPagada = createAsyncThunk(
       const body = compact({
         fecha_pago: payload?.fecha_pago,
         forma_pago: payload?.forma_pago,
-        metodo: payload?.metodo ?? payload?.medio_pago, // legacy
-        monto: payload?.monto ?? payload?.monto_pagado, // legacy
-        observaciones: payload?.observaciones ?? payload?.notas, // legacy
+        metodo: payload?.metodo ?? payload?.medio_pago,
+        monto: payload?.monto ?? payload?.monto_pagado,
+        observaciones: payload?.observaciones ?? payload?.notas,
 
         medio_cobro_id: payload?.medio_cobro_id,
         medio_cobro_valor:
@@ -206,7 +375,6 @@ export const marcarCuotaComoPagada = createAsyncThunk(
   }
 );
 
-/** Enviar alertas */
 export const enviarAlertas = createAsyncThunk(
   "pagos/enviarAlertas",
   async (_, { rejectWithValue }) => {
@@ -219,14 +387,13 @@ export const enviarAlertas = createAsyncThunk(
   }
 );
 
-/** Enviar recordatorios */
 export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
   async (payload, { rejectWithValue }) => {
     try {
       const body = compact({
         alias: payload?.alias,
-        alias_transferencia: payload?.alias_transferencia, // compat
+        alias_transferencia: payload?.alias_transferencia,
         medio_cobro_id: payload?.medio_cobro_id,
         oficina: payload?.oficina,
       });
@@ -244,7 +411,6 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
   }
 );
 
-/** Historial recordatorios */
 export const fetchHistorialRecordatorios = createAsyncThunk(
   "pagos/fetchHistorialRecordatorios",
   async (_, { rejectWithValue }) => {
@@ -259,7 +425,6 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   }
 );
 
-/** ✅ Historial de pagos (GET /cuotas/pagos/) con filtros día/mes/rango + cache TTL + cancel + force */
 export const fetchHistorialPagos = createAsyncThunk(
   "pagos/fetchHistorialPagos",
   async (params, { rejectWithValue, getState }) => {
@@ -270,7 +435,6 @@ export const fetchHistorialPagos = createAsyncThunk(
       const built = buildHistorialParams(pp);
       const cacheKey = buildHistorialCacheKey(built);
 
-      // ✅ cache hit (rápido) — pero NO si force
       if (!force) {
         const st = getState()?.pagos;
         const hit = st?.historialPagosCache?.[cacheKey];
@@ -291,7 +455,6 @@ export const fetchHistorialPagos = createAsyncThunk(
         }
       }
 
-      // ✅ cancelar request anterior (si el usuario sigue tipeando)
       if (historialAbort) {
         try {
           historialAbort.abort();
@@ -327,7 +490,6 @@ export const fetchHistorialPagos = createAsyncThunk(
         _force: force,
       };
     } catch (error) {
-      // ✅ si fue abort, no lo tratamos como error “real”
       if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
         return rejectWithValue({ _aborted: true });
       }
@@ -341,7 +503,6 @@ export const fetchHistorialPagos = createAsyncThunk(
   }
 );
 
-/** ✅ Descargar CSV de historial de pagos (GET /cuotas/pagos/?export=csv) */
 export const downloadHistorialPagosCSV = createAsyncThunk(
   "pagos/downloadHistorialPagosCSV",
   async (params, { rejectWithValue }) => {
@@ -384,7 +545,6 @@ export const downloadHistorialPagosCSV = createAsyncThunk(
   }
 );
 
-/** ✅ Descargar PDF de historial de pagos (GET /cuotas/pagos/?export=pdf) */
 export const downloadHistorialPagosPDF = createAsyncThunk(
   "pagos/downloadHistorialPagosPDF",
   async (params, { rejectWithValue }) => {
@@ -431,7 +591,9 @@ export const downloadHistorialPagosPDF = createAsyncThunk(
   }
 );
 
-/** ✅ Búsqueda PRO (rápida): GET /pagos/buscar/ => devuelve CUOTAS APLANADAS (flat) */
+/** ✅ Búsqueda PRO (rápida): GET /pagos/buscar/ => devuelve CUOTAS APLANADAS (flat)
+ *  ✅ ahora enriquece con cliente desde /polizas/{id}/ si falta nombre
+ */
 export const fetchPagosBuscar = createAsyncThunk(
   "pagos/fetchPagosBuscar",
   async (arg, { rejectWithValue, getState }) => {
@@ -452,6 +614,7 @@ export const fetchPagosBuscar = createAsyncThunk(
           cacheKey,
           fromCache: true,
           _force: false,
+          _polizaByIdToCache: null,
         };
       }
 
@@ -473,6 +636,7 @@ export const fetchPagosBuscar = createAsyncThunk(
             cacheKey,
             fromCache: true,
             _force: false,
+            _polizaByIdToCache: null,
           };
         }
       }
@@ -490,29 +654,42 @@ export const fetchPagosBuscar = createAsyncThunk(
         signal: buscarAbort.signal,
       });
 
+      // normalize items/meta
+      let items = [];
+      let meta = { count: 0, next: null, previous: null };
+
       if (data && typeof data === "object" && "results" in data) {
-        return {
-          items: Array.isArray(data.results) ? data.results : [],
-          meta: {
-            count: Number(data.count || 0) || 0,
-            next: data.next ?? null,
-            previous: data.previous ?? null,
-          },
-          originalQuery: queryStr,
-          cacheKey,
-          fromCache: false,
-          _force: force,
+        items = Array.isArray(data.results) ? data.results : [];
+        meta = {
+          count: Number(data.count || 0) || 0,
+          next: data.next ?? null,
+          previous: data.previous ?? null,
         };
+      } else {
+        items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
+        meta = { count: items.length, next: null, previous: null };
       }
 
-      const items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
+      // ✅ ENRIQUECER: si faltan nombres de cliente, buscar polizas/{id}/ (cacheado)
+      let polizaByIdToCache = null;
+      const enriched = await enrichBuscarItemsWithPolizaCliente(items, {
+        getState,
+        signal: buscarAbort.signal,
+      });
+
+      if (enriched && typeof enriched === "object" && "items" in enriched) {
+        items = Array.isArray(enriched.items) ? enriched.items : items;
+        polizaByIdToCache = enriched.polizasById || null;
+      }
+
       return {
         items,
-        meta: { count: items.length, next: null, previous: null },
+        meta,
         originalQuery: queryStr,
         cacheKey,
         fromCache: false,
         _force: force,
+        _polizaByIdToCache: polizaByIdToCache,
       };
     } catch (error) {
       if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
@@ -526,7 +703,6 @@ export const fetchPagosBuscar = createAsyncThunk(
   }
 );
 
-/** Buscar pólizas por texto (legacy) — con cache TTL + cancel */
 export const fetchPolizas = createAsyncThunk(
   "pagos/fetchPolizas",
   async (arg, { rejectWithValue, getState }) => {
@@ -581,7 +757,6 @@ export const fetchPolizas = createAsyncThunk(
         };
       }
 
-      // ✅ cancelar request anterior (si se sigue tipeando)
       if (polizasAbort) {
         try {
           polizasAbort.abort();
@@ -639,7 +814,6 @@ export const fetchPolizas = createAsyncThunk(
             if (r.status === "fulfilled") detailed.push(r.value);
           }
 
-          // ✅ si se abortó, cortamos loop
           if (polizasAbort?.signal?.aborted) break;
         }
 
@@ -675,10 +849,6 @@ export const fetchPolizas = createAsyncThunk(
   }
 );
 
-/**
- * Registrar un ingreso en balances (POST /ingresos/)
- * Nota: al pagar una cuota ya NO hace falta (a menos que lo uses por separado)
- */
 export const registrarIngreso = createAsyncThunk(
   "pagos/registrarIngreso",
   async (payload, { rejectWithValue }) => {
@@ -693,7 +863,6 @@ export const registrarIngreso = createAsyncThunk(
   }
 );
 
-/** Obtener cuotas a vencer (✅ ahora acepta params opcionales, sin romper llamadas viejas) */
 export const fetchCuotasAVencer = createAsyncThunk(
   "pagos/fetchCuotasAVencer",
   async (params, { rejectWithValue }) => {
@@ -719,8 +888,6 @@ export const fetchCuotasAVencer = createAsyncThunk(
     }
   }
 );
-
-/* ---------- CRUD de Medios de Cobro (billeteras / MP) ---------- */
 
 export const fetchMediosCobro = createAsyncThunk(
   "pagos/fetchMediosCobro",
@@ -804,6 +971,10 @@ const initialState = {
   buscarCache: {},
   buscarCacheOrder: [],
 
+  // ✅ cache por ID de póliza para enriquecer cliente (rápido)
+  polizaByIdCache: {}, // { [id]: { ts, poliza } }
+  polizaByIdOrder: [],
+
   // medios de cobro
   mediosCobro: [],
   mediosCobroStatus: "idle",
@@ -854,7 +1025,6 @@ function recomputeMedioNombres(state) {
     .filter(Boolean);
 }
 
-/** ✅ guarda cache con la key REAL (incluye |cuotas / |lite) */
 function savePolizasCache(state, cacheKey, originalQuery, polizas) {
   const ck = String(cacheKey || "").trim().toLowerCase();
   if (!ck) return;
@@ -877,7 +1047,6 @@ function savePolizasCache(state, cacheKey, originalQuery, polizas) {
   });
 }
 
-/** ✅ cache para búsqueda PRO (cuotas flat) */
 function saveBuscarCache(state, cacheKey, originalQuery, items, meta) {
   const ck = String(cacheKey || "").trim().toLowerCase();
   if (!ck) return;
@@ -892,7 +1061,11 @@ function saveBuscarCache(state, cacheKey, originalQuery, items, meta) {
             next: meta.next ?? null,
             previous: meta.previous ?? null,
           }
-        : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
+        : {
+            count: Array.isArray(items) ? items.length : 0,
+            next: null,
+            previous: null,
+          },
     originalQuery: String(originalQuery || "").trim(),
   };
 
@@ -941,6 +1114,34 @@ function saveHistorialCache(state, cacheKey, items, meta) {
   });
 }
 
+/* ✅ cache por ID: guardamos pólizas detalle para reusar en búsquedas */
+function savePolizaByIdCache(state, polizasByIdMap) {
+  if (!polizasByIdMap || typeof polizasByIdMap.forEach !== "function") return;
+
+  const now = Date.now();
+
+  polizasByIdMap.forEach((pol, id) => {
+    const pid = Number(id);
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    if (!pol || typeof pol !== "object") return;
+
+    state.polizaByIdCache[pid] = { ts: now, poliza: pol };
+
+    const prev = Array.isArray(state.polizaByIdOrder) ? state.polizaByIdOrder : [];
+    state.polizaByIdOrder = [pid, ...prev.filter((x) => x !== pid)].slice(
+      0,
+      POLIZA_BY_ID_MAX
+    );
+  });
+
+  // limpieza
+  const keep = new Set(state.polizaByIdOrder || []);
+  Object.keys(state.polizaByIdCache || {}).forEach((k) => {
+    const id = Number(k);
+    if (!keep.has(id)) delete state.polizaByIdCache[k];
+  });
+}
+
 const pagosSlice = createSlice({
   name: "pagos",
   initialState,
@@ -958,7 +1159,6 @@ const pagosSlice = createSlice({
       state.buscarStatus = "idle";
       state.buscarError = null;
     },
-    // opcional: para invalidar historial cuando pagás una cuota y querés refrescar
     invalidateHistorialPagosCache(state) {
       state.historialPagosCache = {};
       state.historialPagosCacheOrder = [];
@@ -975,7 +1175,6 @@ const pagosSlice = createSlice({
         state.buscarStatus = "loading";
         state.buscarError = null;
 
-        // también sincronizamos searchStatus para que el botón “Buscando…” del buscador siga funcionando
         state.searchStatus = "loading";
         state.searchError = null;
 
@@ -985,14 +1184,12 @@ const pagosSlice = createSlice({
         const built = buildBuscarParams(arg);
         const ck = buildBuscarCacheKey(built);
 
-        // hidratación optimista desde cache (si no es force)
         if (!force && ck) {
           const hit = state.buscarCache?.[ck];
           if (hit && isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) && Array.isArray(hit.items)) {
             state.buscarItems = hit.items;
             state.buscarMeta =
-              hit.meta ||
-              { count: hit.items.length, next: null, previous: null };
+              hit.meta || { count: hit.items.length, next: null, previous: null };
           }
         }
       })
@@ -1004,9 +1201,9 @@ const pagosSlice = createSlice({
         const items = payload.items ?? payload ?? [];
         state.buscarItems = Array.isArray(items) ? items : [];
         state.buscarMeta =
-          payload.meta ||
-          { count: state.buscarItems.length, next: null, previous: null };
+          payload.meta || { count: state.buscarItems.length, next: null, previous: null };
 
+        // ✅ guardamos cache búsqueda
         saveBuscarCache(
           state,
           payload.cacheKey,
@@ -1014,6 +1211,11 @@ const pagosSlice = createSlice({
           state.buscarItems,
           state.buscarMeta
         );
+
+        // ✅ guardamos cache por ID de póliza (para nombres de cliente)
+        if (payload._polizaByIdToCache) {
+          savePolizaByIdCache(state, payload._polizaByIdToCache);
+        }
       })
       .addCase(fetchPagosBuscar.rejected, (state, action) => {
         if (action?.payload && action.payload._aborted) {
@@ -1041,11 +1243,9 @@ const pagosSlice = createSlice({
         const polizas = payload.polizas ?? payload ?? [];
         state.polizas = Array.isArray(polizas) ? polizas : [];
 
-        // ✅ cache real
         savePolizasCache(state, payload.cacheKey, payload.originalQuery, state.polizas);
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
-        // ✅ si fue abort, no “ensuciamos” con error
         if (action?.payload && action.payload._aborted) {
           state.searchStatus = "idle";
           state.searchError = null;
@@ -1084,13 +1284,10 @@ const pagosSlice = createSlice({
         state.mediosCobroError = action.payload;
       })
 
-      // --- Medios de cobro: crear ---
       .addCase(crearMedioCobro.fulfilled, (state, action) => {
         state.mediosCobro = [action.payload, ...(state.mediosCobro || [])];
         recomputeMedioNombres(state);
       })
-
-      // --- Medios de cobro: actualizar ---
       .addCase(actualizarMedioCobro.fulfilled, (state, action) => {
         const updated = action.payload;
         state.mediosCobro = (state.mediosCobro || []).map((m) =>
@@ -1098,8 +1295,6 @@ const pagosSlice = createSlice({
         );
         recomputeMedioNombres(state);
       })
-
-      // --- Medios de cobro: eliminar ---
       .addCase(eliminarMedioCobro.fulfilled, (state, action) => {
         const id = action.payload;
         state.mediosCobro = (state.mediosCobro || []).filter((m) => m.id !== id);
@@ -1156,8 +1351,6 @@ const pagosSlice = createSlice({
         const arg = action?.meta?.arg;
         const force = Boolean(arg && typeof arg === "object" && arg.force);
 
-        // ✅ hidratación optimista desde cache fresco (evita “parpadeo”)
-        // PERO no si force=true (porque el usuario pidió refresh real)
         if (!force) {
           const built = buildHistorialParams(arg);
           const cacheKey = buildHistorialCacheKey(built);
@@ -1198,7 +1391,6 @@ const pagosSlice = createSlice({
         }
       })
       .addCase(fetchHistorialPagos.rejected, (state, action) => {
-        // ✅ si fue abort, no “limpiamos” la tabla (evita parpadeo)
         if (action?.payload && action.payload._aborted) {
           state.historialPagosStatus = "idle";
           state.historialPagosError = null;

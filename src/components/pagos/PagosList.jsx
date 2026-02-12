@@ -103,15 +103,118 @@ function msUntilNextDay() {
 
 // ✅ helper: normaliza la respuesta del backend al pagar
 function pickCuotaActualizada(resp) {
-  // tolera:
-  // - cuota directa
-  // - { cuotaActualizada: {...} }
-  // - { data: {...} } (por algún wrapper)
   const r = resp && typeof resp === "object" ? resp : null;
   if (!r) return null;
-  if (r.cuotaActualizada && typeof r.cuotaActualizada === "object") return r.cuotaActualizada;
+  if (r.cuotaActualizada && typeof r.cuotaActualizada === "object")
+    return r.cuotaActualizada;
   if (r.data && typeof r.data === "object") return r.data;
-  return r; // asume cuota
+  return r;
+}
+
+/* ================== Resolver robusto de Cliente ==================
+   ✅ FIX: Evita el fallback “Cliente” cuando:
+     - llega poliza.cliente como objeto (ok)
+     - llega poliza.cliente_nombre_apellido / cliente_nombre_completo (flat)
+     - llega el nuevo formato PRO (poliza.cliente con nombre/apellido/dni)
+   y NUNCA toma el string "cliente" como nombre.
+*/
+function safeStr(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+function isBadClienteLabel(s) {
+  const x = safeStr(s).toLowerCase();
+  return !x || x === "cliente" || x === "client" || x === "asegurado";
+}
+function resolveCliente(pol, cuota) {
+  const p = pol && typeof pol === "object" ? pol : {};
+  const c = p?.cliente;
+
+  const isObjCliente = c && typeof c === "object" && !Array.isArray(c);
+
+  const apellido =
+    safeStr(isObjCliente ? c.apellido : "") ||
+    safeStr(p.cliente_apellido) ||
+    safeStr(p.apellido) ||
+    safeStr(cuota?.cliente_apellido);
+
+  const nombre =
+    safeStr(isObjCliente ? c.nombre : "") ||
+    safeStr(p.cliente_nombre) ||
+    safeStr(p.nombre) ||
+    safeStr(cuota?.cliente_nombre);
+
+  // ✅ estos campos vienen en el “cuota flat normalizada” y/o desde el backend
+  const nombreCompletoFlat =
+    safeStr(p.cliente_nombre_completo) ||
+    safeStr(p.cliente_nombre_apellido) ||
+    safeStr(p.cliente_nombre) ||
+    safeStr(p.asegurado_nombre_completo) ||
+    safeStr(cuota?.cliente_nombre_completo) ||
+    safeStr(cuota?.cliente_nombre_apellido);
+
+  const asegurado =
+    safeStr(p.asegurado_nombre) ||
+    safeStr(p.asegurado) ||
+    safeStr(cuota?.asegurado);
+
+  const dni =
+    safeStr(isObjCliente ? c.dni_cuit_cuil : "") ||
+    safeStr(p.cliente_dni) ||
+    safeStr(cuota?.cliente_dni) ||
+    safeStr(p.dni_cuit_cuil) ||
+    safeStr(cuota?.dni_cuit_cuil);
+
+  const id =
+    (isObjCliente && (typeof c.id === "number" || typeof c.id === "string")
+      ? c.id
+      : null) ??
+    p.cliente_id ??
+    cuota?.cliente_id ??
+    null;
+
+  // 1) objeto normal => "Apellido, Nombre"
+  const byObj =
+    [safeStr(isObjCliente ? c.apellido : ""), safeStr(isObjCliente ? c.nombre : "")]
+      .filter(Boolean)
+      .join(", ")
+      .trim();
+
+  // 2) partes => "Apellido, Nombre"
+  const byParts = [apellido, nombre].filter(Boolean).join(", ").trim();
+
+  // 3) flat “nombre completo”
+  const byFlatFull = safeStr(nombreCompletoFlat);
+
+  // 4) asegurado (compat)
+  const byAsegurado = safeStr(asegurado);
+
+  // 5) si cliente viene string y no es "cliente"
+  const byStringCliente =
+    typeof c === "string" && !isBadClienteLabel(c) ? safeStr(c) : "";
+
+  // ✅ orden de preferencia: obj > parts > flat > asegurado > string
+  let nombreCompleto =
+    byObj || byParts || byFlatFull || byAsegurado || byStringCliente;
+
+  // ✅ último resguardo: si igual cayó en “cliente”
+  if (isBadClienteLabel(nombreCompleto)) nombreCompleto = "";
+
+  // ✅ fallback final (pero ya no “Cliente” a secas si hay DNI)
+  if (!nombreCompleto) {
+    nombreCompleto = dni ? `Cliente (${dni})` : "Cliente";
+  }
+
+  // para WhatsApp/modal: "Nombre Apellido"
+  const nombreAp = (() => {
+    if (nombreCompleto.includes(",")) {
+      const [ap, nom] = nombreCompleto.split(",").map((x) => x.trim());
+      return [nom, ap].filter(Boolean).join(" ").trim();
+    }
+    return nombreCompleto;
+  })();
+
+  return { nombreCompleto, nombreAp, dni, id };
 }
 
 export default function PagosList({
@@ -121,7 +224,6 @@ export default function PagosList({
   cuentasMercadoPago = [],
   billeterasVirtuales = [],
   mediosCobro = [],
-  // opcional: forzar modo rápido desde el padre si querés
   preferFast = false,
 }) {
   const dispatch = useDispatch();
@@ -129,10 +231,7 @@ export default function PagosList({
   const [obsAbiertaId, setObsAbiertaId] = useState(null);
   const [detalleAbierto, setDetalleAbierto] = useState(null);
 
-  // datos para el modal de confirmación visual
   const [confirmData, setConfirmData] = useState(null);
-
-  // ✅ evita doble click / doble pago mientras confirma
   const [confirmandoPago, setConfirmandoPago] = useState(false);
 
   const items = useMemo(() => {
@@ -140,7 +239,6 @@ export default function PagosList({
     return ocultarPagadas ? base.filter((c) => !c.pagado) : base;
   }, [cuotas, ocultarPagadas]);
 
-  // hoy “real” que se actualiza automáticamente al cambiar el día
   const [hoyKey, setHoyKey] = useState(todayKey());
   useEffect(() => {
     let t = null;
@@ -188,12 +286,10 @@ export default function PagosList({
   const cerrarPagar = useCallback(() => setCuotaSeleccionada(null), []);
   const abrirDetalle = useCallback((cuota) => setDetalleAbierto(cuota), []);
   const cerrarDetalle = useCallback(() => setDetalleAbierto(null), []);
-
   const toggleObs = useCallback((id) => {
     setObsAbiertaId((prev) => (prev === id ? null : id));
   }, []);
 
-  // Paso 1: desde ModalFormaPago armamos datos y abrimos el modal de confirmación
   const confirmarPago = useCallback(
     (datos) => {
       if (!cuotaSeleccionada) return;
@@ -212,13 +308,11 @@ export default function PagosList({
         cuotaNro: cuota.cuota_nro,
       });
 
-      // cerramos el modal de forma de pago para que se vea solo el de confirmación
       cerrarPagar();
     },
     [cuotaSeleccionada, cerrarPagar]
   );
 
-  // Paso 2: ejecutar el pago realmente después de confirmar
   const ejecutarPagoConfirmado = useCallback(async () => {
     if (!confirmData) return;
     if (confirmandoPago) return;
@@ -253,7 +347,6 @@ export default function PagosList({
 
       const conObs = {
         ...cuotaActualizada,
-        // preserva cosas que quizás no vienen en la respuesta
         poliza: cuotaActualizada.poliza || cuota.poliza,
         cantidad_cuotas:
           cuotaActualizada.cantidad_cuotas ?? cuota.cantidad_cuotas ?? null,
@@ -263,7 +356,6 @@ export default function PagosList({
       setConfirmData(null);
       actualizarCuotas?.([conObs]);
 
-      // si hay observación, abrimos la nota (si la cuota sigue visible)
       if (conObs.observaciones_pago) setObsAbiertaId(conObs.id);
     } catch (e) {
       console.error(e);
@@ -280,16 +372,15 @@ export default function PagosList({
     }
     const { cuota } = confirmData;
     setConfirmData(null);
-    // reabrimos el modal de forma de pago para corregir el monto
     if (cuota) setCuotaSeleccionada(cuota);
   }, [confirmData]);
 
   const datosNoti = useMemo(() => {
     if (!cuotaSeleccionada) return null;
     const pol = cuotaSeleccionada.poliza || {};
-    const cli = pol.cliente || {};
-    const nombreAp = [cli.nombre, cli.apellido].filter(Boolean).join(" ").trim();
-    const dni = (cli.dni_cuit_cuil || "").toString().trim();
+
+    const cliR = resolveCliente(pol, cuotaSeleccionada);
+
     const compania = (
       pol.compania_nombre ||
       pol.compania?.nombre ||
@@ -298,9 +389,9 @@ export default function PagosList({
     )
       .toString()
       .trim();
+
     const cobertura = (pol.cobertura || "").toString().trim();
 
-    // ✅ total de cuotas: prioriza flat (cantidad_cuotas)
     const total =
       cuotaSeleccionada?.cantidad_cuotas ??
       (Array.isArray(pol.cuotas) ? pol.cuotas.length : null);
@@ -312,7 +403,13 @@ export default function PagosList({
           : `Cuota ${cuotaSeleccionada.cuota_nro}`
         : "";
 
-    return { nombreAp, dni, compania, cobertura, cuotaTxt };
+    return {
+      nombreAp: cliR?.nombreAp || "",
+      dni: cliR?.dni || "",
+      compania,
+      cobertura,
+      cuotaTxt,
+    };
   }, [cuotaSeleccionada]);
 
   /* ================== Pre-cálculo por cuota (evita dayjs + format por fila) ================== */
@@ -323,10 +420,10 @@ export default function PagosList({
     for (let i = 0; i < base.length; i++) {
       const cuota = base[i];
       const pol = cuota?.poliza || {};
-      const cliente = pol?.cliente || {};
 
-      const nombreCompleto =
-        [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || "Cliente";
+      const cliR = resolveCliente(pol, cuota);
+
+      const nombreCompleto = cliR?.nombreCompleto || "Cliente";
 
       const patente = (pol?.patente || "").toUpperCase();
       const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
@@ -636,16 +733,15 @@ export default function PagosList({
               {(() => {
                 const c = detalleAbierto;
                 const pol = c?.poliza || {};
-                const cli = pol?.cliente || {};
-                const nombreCompleto =
-                  [cli.apellido, cli.nombre].filter(Boolean).join(", ") ||
-                  "Cliente";
-                const clienteId = cli?.id;
-                const dni = (cli?.dni_cuit_cuil || "").toString().trim();
+
+                const cliR = resolveCliente(pol, c);
+
+                const nombreCompleto = cliR?.nombreCompleto || "Cliente";
+                const clienteId = cliR?.id;
+                const dni = (cliR?.dni || "").toString().trim();
+
                 const patente = (pol?.patente || "").toUpperCase();
-                const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(
-                  " "
-                );
+                const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
                 const cobertura = (pol?.cobertura || "").toString().trim();
                 const compania = (
                   pol?.compania_nombre ||
@@ -656,7 +752,6 @@ export default function PagosList({
                   .toString()
                   .trim();
 
-                // ✅ total cuotas: prioriza flat
                 const total =
                   c?.cantidad_cuotas ??
                   (Array.isArray(pol?.cuotas) ? pol.cuotas.length : null);
@@ -668,7 +763,9 @@ export default function PagosList({
                       <InfoRow
                         label="Cliente ID"
                         value={
-                          typeof clienteId === "number" ? `#${clienteId}` : "—"
+                          clienteId !== null && clienteId !== undefined
+                            ? `#${clienteId}`
+                            : "—"
                         }
                       />
                       <InfoRow label="DNI/CUIT" value={dni || "—"} />
@@ -701,29 +798,22 @@ export default function PagosList({
                           c?.pagado
                             ? "Pagada"
                             : c?.fecha_vencimiento &&
-                              dayjs(c.fecha_vencimiento).isBefore(
-                                dayjs(),
-                                "day"
-                              )
+                              dayjs(c.fecha_vencimiento).isBefore(dayjs(), "day")
                             ? "Vencida"
                             : "Pendiente"
                         }
                       />
                     </div>
 
-                    {(c?.observaciones_pago ||
-                      c?.ultima_observacion_pago) && (
+                    {(c?.observaciones_pago || c?.ultima_observacion_pago) && (
                       <div className="rounded-2xl border border-rose-400 bg-rose-300 p-3 text-rose-950">
                         <div className="flex items-start gap-2">
                           <HiExclamationCircle className="w-5 h-5 mt-0.5 shrink-0" />
                           <div className="whitespace-pre-wrap break-words">
-                            <span className="font-semibold">
-                              Observaciones:{" "}
-                            </span>
+                            <span className="font-semibold">Observaciones: </span>
                             {(c?.observaciones_pago ||
                               c?.ultima_observacion_pago ||
-                              ""
-                            )
+                              "")
                               .toString()
                               .trim()}
                           </div>
@@ -755,7 +845,6 @@ const CuotaRow = memo(
   function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs }) {
     const {
       cuota,
-      pol,
       nombreCompleto,
       patente,
       modelo,
@@ -768,6 +857,7 @@ const CuotaRow = memo(
       venceTxt,
       pagaTxt,
       montoTxt,
+      pol, // ✅ viene del rowModel
     } = model || {};
 
     const S = PALETTE[state || "pending"];
@@ -775,17 +865,13 @@ const CuotaRow = memo(
 
     return (
       <>
-        {/* Línea de estado */}
         <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe}`} aria-hidden />
 
-        {/* Tarjeta oscura con borde acentuado */}
         <div
           className={`mx-0 sm:mx-3 my-2 sm:my-3 rounded-none sm:rounded-2xl border p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border}`}
         >
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
-            {/* Izquierda */}
             <div className="min-w-0">
-              {/* Encabezado fila */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-800 text-neutral-200 ring-1 ring-white/5">
                   <HiUser className="w-5 h-5" />
@@ -807,7 +893,6 @@ const CuotaRow = memo(
                 )}
               </div>
 
-              {/* Estado + fechas */}
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span
                   className={`inline-flex items-center gap-2 rounded-full border px-3 h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder}`}
@@ -832,7 +917,6 @@ const CuotaRow = memo(
                 </div>
               </div>
 
-              {/* Observaciones (pastel sólido sobre dark) */}
               {hasObs && isObsOpen && (
                 <div
                   className={`mt-3 rounded-2xl border px-3 py-3 ${PALETTE.overdue.noteBg} ${PALETTE.overdue.noteText} border-rose-400`}
@@ -848,7 +932,6 @@ const CuotaRow = memo(
               )}
             </div>
 
-            {/* Derecha: monto + acciones */}
             <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
               <p className="text-3xl font-extrabold tracking-tight text-neutral-50 text-right w-full">
                 $ {montoTxt}
@@ -891,9 +974,9 @@ const CuotaRow = memo(
 
                 {cuota?.pagado && (
                   <>
-                    {/* A4 (compartir) */}
                     <DescargarFactura
-                      cliente={pol?.cliente}
+                      // ✅ FIX: siempre pasamos cliente REAL (obj), no “string cliente”
+                      cliente={pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null}
                       poliza={pol}
                       cuota={cuota}
                       tone="neutral"
@@ -901,9 +984,8 @@ const CuotaRow = memo(
                       className="mt-0 w-full sm:w-auto"
                     />
 
-                    {/* Ticket térmico */}
                     <ImprimirFacturaTicket
-                      cliente={pol?.cliente}
+                      cliente={pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null}
                       poliza={pol}
                       cuota={cuota}
                       label="Imprimir factura"
@@ -953,7 +1035,6 @@ const CuotaRow = memo(
   }
 );
 
-/* Subcomponente: fila label/valor para el modal (dark) */
 function InfoRow({ label, value }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2">

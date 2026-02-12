@@ -130,44 +130,110 @@ function fmtRegistro(it) {
  *  - cuota con campos típicos (id, cuota_nro, fecha_vencimiento, pagado, monto...)
  *  - y adentro `poliza` con datos mínimos (numero_poliza, patente, oficina, compania, cliente...)
  *
- * Importante: si ya viene `item.poliza` (por compat), lo respeta.
+ * ✅ Importante: aunque venga `item.poliza` (nuevo backend/slice), igual normalizamos
+ * para que PagosList NO caiga al fallback “Cliente”.
  */
 function normalizeCuotaFlat(item) {
   const it = item && typeof item === "object" ? item : {};
 
-  // si ya viene con poliza embebida, devolvemos tal cual (compat)
-  if (it.poliza && typeof it.poliza === "object") return it;
+  const existingPoliza =
+    it.poliza && typeof it.poliza === "object" ? it.poliza : {};
+
+  const existingCliente =
+    existingPoliza?.cliente && typeof existingPoliza.cliente === "object"
+      ? existingPoliza.cliente
+      : it?.cliente && typeof it.cliente === "object"
+      ? it.cliente
+      : {};
 
   const cliente = {
-    id: it?.cliente_id ?? it?.cliente?.id ?? null,
-    apellido: it?.cliente_apellido ?? it?.cliente?.apellido ?? "",
-    nombre: it?.cliente_nombre ?? it?.cliente?.nombre ?? "",
-    dni_cuit_cuil:
-      it?.cliente_dni ?? it?.cliente?.dni_cuit_cuil ?? it?.dni ?? "",
-    telefono: it?.cliente_telefono ?? it?.cliente?.telefono ?? "",
+    id:
+      existingCliente?.id ??
+      it?.cliente_id ??
+      it?.cliente?.id ??
+      existingPoliza?.cliente_id ??
+      null,
+    apellido: String(
+      existingCliente?.apellido ??
+        it?.cliente_apellido ??
+        it?.cliente?.apellido ??
+        existingPoliza?.cliente_apellido ??
+        ""
+    ).trim(),
+    nombre: String(
+      existingCliente?.nombre ??
+        it?.cliente_nombre ??
+        it?.cliente?.nombre ??
+        existingPoliza?.cliente_nombre ??
+        ""
+    ).trim(),
+    dni_cuit_cuil: String(
+      existingCliente?.dni_cuit_cuil ??
+        it?.cliente_dni ??
+        it?.cliente?.dni_cuit_cuil ??
+        it?.dni ??
+        existingPoliza?.cliente_dni ??
+        ""
+    ).trim(),
+    telefono: String(
+      existingCliente?.telefono ??
+        it?.cliente_telefono ??
+        it?.cliente?.telefono ??
+        existingPoliza?.cliente_telefono ??
+        ""
+    ).trim(),
   };
 
+  const cliente_nombre = cliente.nombre;
+  const cliente_apellido = cliente.apellido;
+  const cliente_nombre_apellido = `${cliente.apellido} ${cliente.nombre}`.trim();
+
   const poliza = {
-    id: it?.poliza_id ?? it?.poliza?.id ?? null,
+    ...existingPoliza,
+    id: existingPoliza?.id ?? it?.poliza_id ?? it?.poliza?.id ?? null,
     numero_poliza:
-      it?.numero_poliza ?? it?.poliza_numero ?? it?.poliza?.numero_poliza ?? "",
-    patente: it?.patente ?? it?.poliza_patente ?? it?.poliza?.patente ?? "",
+      existingPoliza?.numero_poliza ??
+      it?.numero_poliza ??
+      it?.poliza_numero ??
+      it?.poliza?.numero_poliza ??
+      "",
+    patente:
+      existingPoliza?.patente ??
+      it?.patente ??
+      it?.poliza_patente ??
+      it?.poliza?.patente ??
+      "",
     oficina:
+      existingPoliza?.oficina ??
       it?.oficina ??
       it?.oficina_nombre ??
       it?.poliza_oficina ??
       it?.poliza?.oficina ??
       "",
     compania:
+      existingPoliza?.compania ??
       it?.compania ??
       it?.compania_nombre ??
       it?.poliza_compania ??
       it?.poliza?.compania ??
       "",
-    cliente,
+
+    // ✅ cliente embebido
+    cliente: existingPoliza?.cliente || cliente,
+
+    // ✅ compat: muchos componentes usan estos campos “flat”
+    cliente_nombre:
+      existingPoliza?.cliente_nombre || existingCliente?.nombre || cliente_nombre,
+    cliente_apellido:
+      existingPoliza?.cliente_apellido ||
+      existingCliente?.apellido ||
+      cliente_apellido,
+    cliente_nombre_apellido:
+      existingPoliza?.cliente_nombre_apellido ||
+      existingPoliza?.cliente_nombre_completo ||
+      cliente_nombre_apellido,
   };
 
-  // monto: priorizamos lo que ya venga en la cuota flat
   const monto =
     it?.monto ??
     it?.monto_cuota ??
@@ -184,12 +250,20 @@ function normalizeCuotaFlat(item) {
       it?.cantidad_cuotas ??
       it?.total_cuotas ??
       it?.cuotas_total ??
-      it?.poliza_cantidad_cuotas,
-    fecha_vencimiento: it?.fecha_vencimiento ?? it?.vencimiento ?? it?.fecha_vto,
+      it?.poliza_cantidad_cuotas ??
+      existingPoliza?.cantidad_cuotas ??
+      undefined,
+    fecha_vencimiento:
+      it?.fecha_vencimiento ??
+      it?.vencimiento ??
+      it?.fecha_vto ??
+      it?.vto ??
+      null,
     fecha_pago: it?.fecha_pago ?? it?.pago_fecha ?? null,
     pagado: Boolean(it?.pagado ?? it?.is_pagado ?? it?.estado_pagado),
     monto,
-    forma_pago: it?.forma_pago ?? it?.medio ?? it?.metodo ?? it?.pago_metodo ?? "",
+    forma_pago:
+      it?.forma_pago ?? it?.medio ?? it?.metodo ?? it?.pago_metodo ?? "",
     poliza,
   };
 }
@@ -714,7 +788,6 @@ const PagosPage = () => {
                 <span>Ocultar cuotas pagadas</span>
               </button>
 
-              {/* (opcional) Info útil si querés mostrarlo: */}
               {!!lastBuscarQuery && (
                 <div className="text-xs text-slate-500">
                   Última búsqueda:{" "}
