@@ -1,4 +1,6 @@
-/* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos) */
+/* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos)
+   ✅ Nuevo flujo: Buscar → Lista de clientes → Modal con todas las cuotas del cliente → Pagar
+*/
 
 import {
   useState,
@@ -9,7 +11,7 @@ import {
   useTransition,
 } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import {
@@ -27,6 +29,9 @@ import {
   HiChevronRight,
   HiDownload,
   HiCalendar,
+  HiUserGroup,
+  HiIdentification,
+  HiChevronRight as HiChevronRightMini,
 } from "react-icons/hi";
 
 import PagosSearch from "../components/pagos/PagosSearch";
@@ -129,9 +134,6 @@ function fmtRegistro(it) {
  * Normaliza una "cuota flat" para que PagosList siga recibiendo:
  *  - cuota con campos típicos (id, cuota_nro, fecha_vencimiento, pagado, monto...)
  *  - y adentro `poliza` con datos mínimos (numero_poliza, patente, oficina, compania, cliente...)
- *
- * ✅ Importante: aunque venga `item.poliza` (nuevo backend/slice), igual normalizamos
- * para que PagosList NO caiga al fallback “Cliente”.
  */
 function normalizeCuotaFlat(item) {
   const it = item && typeof item === "object" ? item : {};
@@ -218,10 +220,8 @@ function normalizeCuotaFlat(item) {
       it?.poliza?.compania ??
       "",
 
-    // ✅ cliente embebido
     cliente: existingPoliza?.cliente || cliente,
 
-    // ✅ compat: muchos componentes usan estos campos “flat”
     cliente_nombre:
       existingPoliza?.cliente_nombre || existingCliente?.nombre || cliente_nombre,
     cliente_apellido:
@@ -268,6 +268,159 @@ function normalizeCuotaFlat(item) {
   };
 }
 
+function clienteKeyFromCuota(c) {
+  const pol = c?.poliza || {};
+  const cli = pol?.cliente || {};
+  const id = cli?.id ?? pol?.cliente_id ?? c?.cliente_id ?? null;
+  if (id !== null && id !== undefined && String(id).trim() !== "") return `id:${id}`;
+  const dni =
+    cli?.dni_cuit_cuil ??
+    pol?.cliente_dni ??
+    c?.cliente_dni ??
+    c?.dni ??
+    "";
+  const d = String(dni || "").trim();
+  if (d) return `dni:${d}`;
+  // fallback: nombre
+  const nom =
+    pol?.cliente_nombre_apellido ??
+    pol?.cliente_nombre_completo ??
+    `${pol?.cliente_apellido || ""} ${pol?.cliente_nombre || ""}`.trim();
+  const n = String(nom || "").trim().toLowerCase();
+  return n ? `nom:${n}` : "unknown";
+}
+
+function clienteLabelFromCuota(c) {
+  const pol = c?.poliza || {};
+  const cli = pol?.cliente || {};
+  const ap = String(cli?.apellido ?? pol?.cliente_apellido ?? "").trim();
+  const nom = String(cli?.nombre ?? pol?.cliente_nombre ?? "").trim();
+
+  const full =
+    String(pol?.cliente_nombre_apellido || "").trim() ||
+    String(pol?.cliente_nombre_completo || "").trim() ||
+    [ap, nom].filter(Boolean).join(" ").trim();
+
+  return full || "Cliente";
+}
+
+function dniFromCuota(c) {
+  const pol = c?.poliza || {};
+  const cli = pol?.cliente || {};
+  const dni =
+    cli?.dni_cuit_cuil ??
+    pol?.cliente_dni ??
+    c?.cliente_dni ??
+    c?.dni ??
+    "";
+  return String(dni || "").trim();
+}
+
+function uniquePolizaLabel(pol) {
+  const p = pol && typeof pol === "object" ? pol : {};
+  const nro = String(p.numero_poliza || p.numero || p.nro_poliza || "").trim();
+  const pat = String(p.patente || "").trim().toUpperCase();
+  if (nro && pat) return `${nro} • ${pat}`;
+  if (nro) return nro;
+  if (pat) return pat;
+  return "Póliza";
+}
+
+function computeClienteGroups(cuotasList) {
+  const list = Array.isArray(cuotasList) ? cuotasList : [];
+  const hoy = dayjs().startOf("day");
+
+  const map = new Map();
+
+  for (const c of list) {
+    const key = clienteKeyFromCuota(c);
+    const label = clienteLabelFromCuota(c);
+    const dni = dniFromCuota(c);
+
+    const pol = c?.poliza || {};
+    const polId = pol?.id ?? c?.poliza_id ?? null;
+    const polLabel = uniquePolizaLabel(pol);
+
+    const hit =
+      map.get(key) ||
+      {
+        key,
+        label,
+        dni,
+        cuotas: [],
+        polizasSet: new Set(),
+        polizasLabels: new Map(), // id->label
+        total: 0,
+        pagadas: 0,
+        pendientes: 0,
+        vencidas: 0,
+        venceHoy: 0,
+        porVencer: 0,
+        totalMontoPendiente: 0,
+        proximoVto: null, // dayjs
+      };
+
+    hit.cuotas.push(c);
+    hit.total += 1;
+
+    if (polId !== null && polId !== undefined) {
+      hit.polizasSet.add(String(polId));
+      if (!hit.polizasLabels.has(String(polId))) hit.polizasLabels.set(String(polId), polLabel);
+    } else {
+      // igual sumamos label (sin id)
+      const pseudo = `x:${polLabel}`;
+      hit.polizasSet.add(pseudo);
+      if (!hit.polizasLabels.has(pseudo)) hit.polizasLabels.set(pseudo, polLabel);
+    }
+
+    if (c?.pagado) {
+      hit.pagadas += 1;
+    } else {
+      hit.pendientes += 1;
+      const m = Number(c?.monto ?? 0);
+      if (Number.isFinite(m)) hit.totalMontoPendiente += m;
+
+      const fv = c?.fecha_vencimiento ? dayjs(c.fecha_vencimiento).startOf("day") : null;
+      if (fv && fv.isValid()) {
+        if (fv.isBefore(hoy)) hit.vencidas += 1;
+        else if (fv.isSame(hoy)) hit.venceHoy += 1;
+        else hit.porVencer += 1;
+
+        if (!hit.proximoVto || fv.isBefore(hit.proximoVto)) hit.proximoVto = fv;
+      } else {
+        // si no hay vencimiento lo consideramos "por vencer" (no bloquea)
+        hit.porVencer += 1;
+      }
+    }
+
+    map.set(key, hit);
+  }
+
+  const arr = Array.from(map.values());
+
+  // orden: primero con pendientes, más vencidas, luego por próximo vencimiento, luego nombre
+  arr.sort((a, b) => {
+    const ap = a.pendientes > 0 ? 1 : 0;
+    const bp = b.pendientes > 0 ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+
+    if (a.vencidas !== b.vencidas) return b.vencidas - a.vencidas;
+
+    const av = a.proximoVto ? a.proximoVto.valueOf() : Number.POSITIVE_INFINITY;
+    const bv = b.proximoVto ? b.proximoVto.valueOf() : Number.POSITIVE_INFINITY;
+    if (av !== bv) return av - bv;
+
+    return String(a.label).localeCompare(String(b.label));
+  });
+
+  return arr.map((g) => ({
+    ...g,
+    polizasCount: g.polizasSet.size,
+    polizas: Array.from(g.polizasLabels.values()).slice(0, 6),
+    proximoVtoStr: g.proximoVto ? g.proximoVto.format("DD/MM/YYYY") : "—",
+  }));
+}
+
 const PagosPage = () => {
   const dispatch = useDispatch();
 
@@ -282,7 +435,10 @@ const PagosPage = () => {
   const [cuotas, setCuotas] = useState([]);
   const [ocultarPagadas, setOcultarPagadas] = useState(false);
 
-  // ✅ meta + query de la última búsqueda PRO (por si querés mostrar “total” o paginar)
+  // ✅ nuevo: selección de cliente + modal cuotas del cliente
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // { key, label, dni, cuotas... }
+
+  // ✅ meta + query de la última búsqueda PRO
   const [lastBuscarQuery, setLastBuscarQuery] = useState("");
   const [lastBuscarMeta, setLastBuscarMeta] = useState({
     count: 0,
@@ -312,10 +468,8 @@ const PagosPage = () => {
   const [hpPage, setHpPage] = useState(1);
   const hpPageSize = 25;
 
-  // (opcional) ordering explícito (dejamos default)
   const [hpOrdering, setHpOrdering] = useState("-fecha_pago");
 
-  // ✅ React 18: mantener el input fluido aunque haya renders pesados
   const deferredHpQInput = useDeferredValue(hpQInput);
   const [isPending, startTransition] = useTransition();
 
@@ -454,11 +608,13 @@ const PagosPage = () => {
 
   /* ================== HANDLERS ================== */
 
-  // ✅ PRO: PagosSearch devuelve CUOTAS APLANADAS + (opcional) meta + query
+  // ✅ PRO: PagosSearch devuelve CUOTAS APLANADAS + meta + query
   const handleBuscarPolizas = useCallback((cuotasFlat, meta, q) => {
     const lista = Array.isArray(cuotasFlat) ? cuotasFlat : [];
     const normalized = lista.map(normalizeCuotaFlat);
+
     setCuotas(normalized);
+    setClienteSeleccionado(null); // ✅ volvés al listado de clientes
 
     if (meta && typeof meta === "object") {
       setLastBuscarMeta({
@@ -644,6 +800,22 @@ const PagosPage = () => {
     return { count, total };
   }, [historialPagosItems]);
 
+  /* ================== NUEVO: LISTA DE CLIENTES (desde cuotas buscadas) ================== */
+
+  const clienteGroups = useMemo(() => computeClienteGroups(cuotas), [cuotas]);
+
+  const visibleCuotasEnModal = useMemo(() => {
+    if (!clienteSeleccionado) return [];
+    const key = clienteSeleccionado?.key;
+    return (Array.isArray(cuotas) ? cuotas : []).filter((c) => clienteKeyFromCuota(c) === key);
+  }, [cuotas, clienteSeleccionado]);
+
+  const abrirCliente = useCallback((g) => {
+    setClienteSeleccionado(g);
+  }, []);
+
+  const cerrarClienteModal = useCallback(() => setClienteSeleccionado(null), []);
+
   /* ================== RENDER ================== */
 
   return (
@@ -799,25 +971,255 @@ const PagosPage = () => {
                       <span className="text-slate-200 font-semibold tabular-nums">
                         {Number(lastBuscarMeta.count || 0) || 0}
                       </span>
+                      {" "}
+                      • Clientes:{" "}
+                      <span className="text-slate-200 font-semibold tabular-nums">
+                        {clienteGroups.length}
+                      </span>
                     </>
                   ) : null}
                 </div>
               )}
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)]">
-              <PagosList
-                cuotas={cuotas}
-                actualizarCuotas={handleActualizarCuotas}
-                ocultarPagadas={ocultarPagadas}
-                cuentasMercadoPago={mpCuentas}
-                billeterasVirtuales={billeteras}
-                mediosCobro={mediosCobro}
-                preferFast={true}
-              />
+            {/* ✅ NUEVO: lista de clientes encontrados */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-200">
+                    <HiUserGroup className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-100">Resultados por cliente</div>
+                    <div className="text-xs text-slate-400">
+                      Elegí un cliente para ver todas sus cuotas y pagar desde ahí.
+                    </div>
+                  </div>
+                </div>
+
+                {clienteSeleccionado && (
+                  <button
+                    type="button"
+                    onClick={() => setClienteSeleccionado(null)}
+                    className="h-9 px-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-200 hover:bg-slate-900/60 cursor-pointer text-xs"
+                  >
+                    Volver a clientes
+                  </button>
+                )}
+              </div>
+
+              {clienteGroups.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center text-slate-400">
+                  Buscá por cliente, patente o póliza para ver resultados.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
+                  {clienteGroups.map((g) => {
+                    const hasPend = g.pendientes > 0;
+                    return (
+                      <button
+                        key={g.key}
+                        type="button"
+                        onClick={() => abrirCliente(g)}
+                        className={`text-left rounded-2xl border px-3 py-3 sm:px-4 sm:py-4 transition cursor-pointer ${
+                          hasPend
+                            ? "bg-slate-950/40 border-slate-700 hover:bg-slate-950/60"
+                            : "bg-slate-950/25 border-slate-800 hover:bg-slate-950/45"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200">
+                                <HiIdentification className="w-5 h-5" />
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-sm sm:text-base font-semibold text-slate-100 truncate">
+                                  {g.label}
+                                </div>
+                                <div className="text-xs text-slate-400 truncate">
+                                  DNI/CUIT: <span className="text-slate-200">{safe(g.dni, "—")}</span>
+                                  {" "}• Pólizas: <span className="text-slate-200">{g.polizasCount}</span>
+                                  {" "}• Cuotas: <span className="text-slate-200">{g.total}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${
+                                  g.vencidas > 0
+                                    ? "bg-rose-500/15 border-rose-400/30 text-rose-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-300"
+                                }`}
+                              >
+                                Vencidas: <span className="ml-1 tabular-nums">{g.vencidas}</span>
+                              </span>
+
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${
+                                  g.venceHoy > 0
+                                    ? "bg-amber-500/15 border-amber-400/30 text-amber-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-300"
+                                }`}
+                              >
+                                Hoy: <span className="ml-1 tabular-nums">{g.venceHoy}</span>
+                              </span>
+
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${
+                                  g.pendientes > 0
+                                    ? "bg-indigo-500/15 border-indigo-400/30 text-indigo-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-300"
+                                }`}
+                              >
+                                Pendientes: <span className="ml-1 tabular-nums">{g.pendientes}</span>
+                              </span>
+
+                              <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-emerald-500/10 border-emerald-400/25 text-emerald-200">
+                                Total a cobrar: <span className="ml-1 tabular-nums">{fmtMoney(g.totalMontoPendiente)}</span>
+                              </span>
+                            </div>
+
+                            {g.polizas?.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {g.polizas.map((p, idx) => (
+                                  <span
+                                    key={`${g.key}-p-${idx}`}
+                                    className="inline-flex items-center rounded-full px-3 h-8 text-[11px] border bg-slate-900 border-slate-800 text-slate-300"
+                                  >
+                                    {p}
+                                  </span>
+                                ))}
+                                {g.polizasCount > g.polizas.length && (
+                                  <span className="inline-flex items-center rounded-full px-3 h-8 text-[11px] border bg-slate-900 border-slate-800 text-slate-400">
+                                    +{g.polizasCount - g.polizas.length} más
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="mt-3 text-xs text-slate-500">
+                              Próximo vencimiento:{" "}
+                              <span className="text-slate-200 font-semibold tabular-nums">
+                                {g.proximoVtoStr}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300">
+                            <HiChevronRightMini className="w-5 h-5" />
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <CuotasAlertas oficina={alertasOficina} onOficinaChange={setAlertasOficina} />
+
+            {/* ✅ Modal: cuotas del cliente seleccionado */}
+            <AnimatePresence>
+              {!!clienteSeleccionado && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center"
+                >
+                  <div
+                    className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                    onClick={cerrarClienteModal}
+                  />
+
+                  <motion.div
+                    initial={{ y: 22, opacity: 0, scale: 0.98 }}
+                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                    exit={{ y: 22, opacity: 0, scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                    className="relative z-[81] w-full sm:w-[min(980px,92vw)] bg-slate-950 border border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+                    role="dialog"
+                    aria-modal="true"
+                  >
+                    {/* header modal */}
+                    <div className="px-4 sm:px-6 py-4 border-b border-slate-800 bg-slate-950/70">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-base sm:text-lg font-semibold text-slate-50 truncate">
+                            {clienteSeleccionado?.label || "Cliente"}
+                          </div>
+                          <div className="mt-1 text-xs sm:text-sm text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
+                            <span>
+                              DNI/CUIT:{" "}
+                              <span className="text-slate-200 font-semibold">
+                                {safe(clienteSeleccionado?.dni, "—")}
+                              </span>
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Pólizas:{" "}
+                              <span className="text-slate-200 font-semibold tabular-nums">
+                                {clienteSeleccionado?.polizasCount ?? 0}
+                              </span>
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Cuotas:{" "}
+                              <span className="text-slate-200 font-semibold tabular-nums">
+                                {clienteSeleccionado?.total ?? 0}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={cerrarClienteModal}
+                          className="h-10 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 inline-flex items-center gap-2 cursor-pointer"
+                          aria-label="Cerrar"
+                        >
+                          <HiX className="w-5 h-5" />
+                          <span className="hidden sm:inline">Cerrar</span>
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-emerald-500/10 border-emerald-400/25 text-emerald-200">
+                          Total a cobrar:{" "}
+                          <span className="ml-1 tabular-nums">
+                            {fmtMoney(clienteSeleccionado?.totalMontoPendiente || 0)}
+                          </span>
+                        </span>
+                        <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-rose-500/15 border-rose-400/30 text-rose-200">
+                          Vencidas: <span className="ml-1 tabular-nums">{clienteSeleccionado?.vencidas ?? 0}</span>
+                        </span>
+                        <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-amber-500/15 border-amber-400/30 text-amber-200">
+                          Hoy: <span className="ml-1 tabular-nums">{clienteSeleccionado?.venceHoy ?? 0}</span>
+                        </span>
+                        <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-indigo-500/15 border-indigo-400/30 text-indigo-200">
+                          Pendientes: <span className="ml-1 tabular-nums">{clienteSeleccionado?.pendientes ?? 0}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* body modal: PagosList con cuotas del cliente */}
+                    <div className="p-0">
+                      <PagosList
+                        cuotas={visibleCuotasEnModal}
+                        actualizarCuotas={handleActualizarCuotas}
+                        ocultarPagadas={ocultarPagadas}
+                        cuentasMercadoPago={mpCuentas}
+                        billeterasVirtuales={billeteras}
+                        mediosCobro={mediosCobro}
+                        preferFast={true}
+                      />
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         ) : tab === "historial_pagos" ? (
           /* ---- (historial pagos) ---- */

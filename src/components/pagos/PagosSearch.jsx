@@ -1,12 +1,46 @@
-/* src/components/pagos/PagosSearch.jsx — PRO: cache + recientes + "/" + anti-stale (cuotas aplanadas)
-   ✅ Ajustado: SIN prefetch automático (ahorra recursos). Busca solo con Enter o click en Buscar.
+/* src/components/pagos/PagosSearch.jsx — PRO: busca PÓLIZAS (usa fetchPolizas del slice)
+   ✅ Busca solo con Enter o click en Buscar.
+   ✅ Mantiene: recientes, "/", anti-stale, Esc limpia.
+   ✅ NUEVO: devuelve CUOTAS FLAT (aplanadas) para PagosPage (clientes → modal cuotas).
 */
+
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { HiSearch, HiX } from "react-icons/hi";
-import { fetchPagosBuscar } from "../../store/slices/pagosSlice";
+
+import { fetchPolizas } from "../../store/slices/pagosSlice";
+
+// ------- helpers: aplanar cuotas desde pólizas
+function flattenCuotasFromPolizas(polizas) {
+  const out = [];
+  const list = Array.isArray(polizas) ? polizas : [];
+
+  for (const p of list) {
+    if (!p || typeof p !== "object") continue;
+
+    const cuotas = Array.isArray(p.cuotas) ? p.cuotas : [];
+    if (cuotas.length === 0) continue;
+
+    for (const c of cuotas) {
+      if (!c || typeof c !== "object") continue;
+
+      // devolvemos cuota "flat" pero con poliza embebida (para normalizar en PagosPage)
+      out.push({
+        ...c,
+        poliza: p,
+        poliza_id: p?.id ?? c?.poliza_id ?? c?.poliza ?? null,
+        numero_poliza: p?.numero_poliza ?? p?.numero ?? c?.numero_poliza ?? "",
+        patente: p?.patente ?? c?.patente ?? "",
+        compania: p?.compania ?? c?.compania ?? "",
+        oficina: p?.oficina ?? c?.oficina ?? "",
+      });
+    }
+  }
+
+  return out;
+}
 
 export default function PagosSearch({ onBuscar }) {
   const [query, setQuery] = useState("");
@@ -14,24 +48,17 @@ export default function PagosSearch({ onBuscar }) {
   const dispatch = useDispatch();
 
   const {
-    // ✅ compat: searchStatus lo setea el slice también en fetchPagosBuscar
     searchStatus = "idle",
-
-    // ✅ PRO cache (cuotas aplanadas)
-    buscarCache = {},
-    buscarCacheOrder = [],
-
-    // fallback legacy (por si venías con cache viejo)
     polizasCache = {},
     polizasCacheOrder = [],
+    buscarCache = {},
+    buscarCacheOrder = [],
   } = useSelector((state) => state.pagos || {});
 
   const cargando = searchStatus === "loading";
 
-  // ✅ anti-stale real: guardamos el requestId del dispatch *antes* del await
+  // anti-stale
   const lastRequestIdRef = useRef(null);
-
-  // para evitar toasts repetidos
   const lastToastKeyRef = useRef("");
 
   useEffect(() => {
@@ -58,8 +85,7 @@ export default function PagosSearch({ onBuscar }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ✅ Recientes (PRO): dedupe por texto desde buscarCacheOrder
-  // fallback: si no hay cache PRO todavía, usa el legacy de polizas
+  // ✅ Recientes: preferimos buscarCacheOrder, si no, polizasCacheOrder.
   const recientes = useMemo(() => {
     const out = [];
     const seen = new Set();
@@ -79,12 +105,22 @@ export default function PagosSearch({ onBuscar }) {
     };
 
     pushFrom(buscarCacheOrder, buscarCache);
-
-    // fallback legacy
     if (out.length < 6) pushFrom(polizasCacheOrder, polizasCache);
 
     return out.slice(0, 6);
   }, [buscarCache, buscarCacheOrder, polizasCache, polizasCacheOrder]);
+
+  const limpiar = useCallback(() => {
+    setQuery("");
+    lastToastKeyRef.current = "";
+    inputRef.current?.focus?.();
+  }, []);
+
+  const usarReciente = useCallback((q) => {
+    setQuery(q);
+    lastToastKeyRef.current = "";
+    requestAnimationFrame(() => inputRef.current?.focus?.());
+  }, []);
 
   const handleSubmit = useCallback(
     async (e, qOverride = null) => {
@@ -95,32 +131,25 @@ export default function PagosSearch({ onBuscar }) {
         const key = "empty";
         if (lastToastKeyRef.current !== key) {
           lastToastKeyRef.current = key;
-          toast.error("Escribí algo para buscar (cliente, patente, póliza…)");
+          toast.error("Escribí algo para buscar (cliente, patente o póliza).");
         }
         return;
       }
 
       try {
-        // ✅ Busca SOLO por submit (Enter / click en botón)
         const promise = dispatch(
-          fetchPagosBuscar({
+          fetchPolizas({
             query: q,
-            page: 1,
-            page_size: 300,
-            limit: 300, // compat
-            include_pagadas: false, // => ocultar_pagadas=1 en el slice
-            // ordering: "vencimiento",
-            // oficina: ...
-            // force: true, // si querés que SIEMPRE pegue al backend
+            limit: 25,
+            withCuotas: true, // ✅ necesitamos cuotas para pagos (flujo por cliente)
           })
         );
 
-        // ✅ anti-stale real
         lastRequestIdRef.current = promise?.requestId || null;
 
         const action = await promise;
 
-        // Ignorar respuesta si llegó tarde y ya hubo otra búsqueda
+        // Ignorar si llegó tarde
         if (
           lastRequestIdRef.current &&
           action?.meta?.requestId &&
@@ -130,21 +159,21 @@ export default function PagosSearch({ onBuscar }) {
         }
 
         const payload = action?.payload || {};
-        const items = Array.isArray(payload?.items)
-          ? payload.items
+        const polizas = Array.isArray(payload?.polizas)
+          ? payload.polizas
           : Array.isArray(payload)
           ? payload
           : [];
 
-        const meta =
-          payload?.meta && typeof payload.meta === "object"
-            ? payload.meta
-            : { count: items.length, next: null, previous: null };
+        // ✅ aplanar cuotas desde polizas[].cuotas
+        const cuotasFlat = flattenCuotasFromPolizas(polizas);
 
-        // onBuscar recibe CUOTAS (flat) + meta + query (sin romper compat)
-        onBuscar?.(items, meta, q);
+        // meta simple (porque slice no trae paginado real aquí)
+        const meta = { count: cuotasFlat.length, next: null, previous: null };
 
-        if (items.length === 0) {
+        onBuscar?.(cuotasFlat, meta, q);
+
+        if (cuotasFlat.length === 0) {
           const key = `nores:${q.toLowerCase()}`;
           if (lastToastKeyRef.current !== key) {
             lastToastKeyRef.current = key;
@@ -156,25 +185,11 @@ export default function PagosSearch({ onBuscar }) {
       } catch (err) {
         if (err?.payload?._aborted) return;
         console.error(err);
-        toast.error("Ocurrió un error buscando pagos.");
+        toast.error("Ocurrió un error buscando pólizas.");
       }
     },
     [dispatch, onBuscar, query]
   );
-
-  const limpiar = useCallback(() => {
-    setQuery("");
-    lastToastKeyRef.current = "";
-    inputRef.current?.focus?.();
-  }, []);
-
-  // ✅ Recientes ahora SOLO rellenan (no disparan búsqueda)
-  const usarReciente = useCallback((q) => {
-    setQuery(q);
-    lastToastKeyRef.current = "";
-    // foco para que con Enter busques
-    requestAnimationFrame(() => inputRef.current?.focus?.());
-  }, []);
 
   return (
     <motion.div
@@ -187,7 +202,7 @@ export default function PagosSearch({ onBuscar }) {
         onSubmit={handleSubmit}
         className="w-full"
         role="search"
-        aria-label="Buscar cuotas para gestionar pagos"
+        aria-label="Buscar pólizas para gestionar pagos"
       >
         <div className="flex w-full gap-2">
           <label className="relative flex-1">

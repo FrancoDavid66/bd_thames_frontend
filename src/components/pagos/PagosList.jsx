@@ -111,13 +111,7 @@ function pickCuotaActualizada(resp) {
   return r;
 }
 
-/* ================== Resolver robusto de Cliente ==================
-   ✅ FIX: Evita el fallback “Cliente” cuando:
-     - llega poliza.cliente como objeto (ok)
-     - llega poliza.cliente_nombre_apellido / cliente_nombre_completo (flat)
-     - llega el nuevo formato PRO (poliza.cliente con nombre/apellido/dni)
-   y NUNCA toma el string "cliente" como nombre.
-*/
+/* ================== Resolver robusto de Cliente ================== */
 function safeStr(v) {
   if (v === null || v === undefined) return "";
   return String(v).trim();
@@ -144,7 +138,6 @@ function resolveCliente(pol, cuota) {
     safeStr(p.nombre) ||
     safeStr(cuota?.cliente_nombre);
 
-  // ✅ estos campos vienen en el “cuota flat normalizada” y/o desde el backend
   const nombreCompletoFlat =
     safeStr(p.cliente_nombre_completo) ||
     safeStr(p.cliente_nombre_apellido) ||
@@ -173,39 +166,27 @@ function resolveCliente(pol, cuota) {
     cuota?.cliente_id ??
     null;
 
-  // 1) objeto normal => "Apellido, Nombre"
   const byObj =
     [safeStr(isObjCliente ? c.apellido : ""), safeStr(isObjCliente ? c.nombre : "")]
       .filter(Boolean)
       .join(", ")
       .trim();
 
-  // 2) partes => "Apellido, Nombre"
   const byParts = [apellido, nombre].filter(Boolean).join(", ").trim();
-
-  // 3) flat “nombre completo”
   const byFlatFull = safeStr(nombreCompletoFlat);
-
-  // 4) asegurado (compat)
   const byAsegurado = safeStr(asegurado);
-
-  // 5) si cliente viene string y no es "cliente"
   const byStringCliente =
     typeof c === "string" && !isBadClienteLabel(c) ? safeStr(c) : "";
 
-  // ✅ orden de preferencia: obj > parts > flat > asegurado > string
   let nombreCompleto =
     byObj || byParts || byFlatFull || byAsegurado || byStringCliente;
 
-  // ✅ último resguardo: si igual cayó en “cliente”
   if (isBadClienteLabel(nombreCompleto)) nombreCompleto = "";
 
-  // ✅ fallback final (pero ya no “Cliente” a secas si hay DNI)
   if (!nombreCompleto) {
     nombreCompleto = dni ? `Cliente (${dni})` : "Cliente";
   }
 
-  // para WhatsApp/modal: "Nombre Apellido"
   const nombreAp = (() => {
     if (nombreCompleto.includes(",")) {
       const [ap, nom] = nombreCompleto.split(",").map((x) => x.trim());
@@ -590,7 +571,8 @@ export default function PagosList({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[65] flex items-center justify-center"
+            // ✅ z-index más bajo que el ModalFormaPago (para no taparlo si se solapan)
+            className="fixed inset-0 z-[50] flex items-center justify-center"
           >
             <div
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -601,7 +583,7 @@ export default function PagosList({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 12 }}
               transition={{ type: "spring", stiffness: 300, damping: 26 }}
-              className="relative z-[66] w-[min(420px,92vw)] rounded-2xl border border-neutral-800 bg-neutral-950 px-6 py-6 shadow-2xl"
+              className="relative z-[51] w-[min(420px,92vw)] rounded-2xl border border-neutral-800 bg-neutral-950 px-6 py-6 shadow-2xl"
               role="dialog"
               aria-modal="true"
             >
@@ -697,7 +679,8 @@ export default function PagosList({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center"
+            // ✅ bajamos z-index para no tapar el ModalFormaPago
+            className="fixed inset-0 z-[40] flex items-center justify-center"
           >
             <div
               onClick={cerrarDetalle}
@@ -708,7 +691,7 @@ export default function PagosList({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 20, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 26 }}
-              className="relative z-[61] w-[min(680px,92vw)] rounded-2xl border border-neutral-800 bg-neutral-950 p-5 shadow-2xl"
+              className="relative z-[41] w-[min(680px,92vw)] rounded-2xl border border-neutral-800 bg-neutral-950 p-5 shadow-2xl"
               role="dialog"
               aria-modal="true"
               aria-labelledby="modal-detalle-title"
@@ -857,7 +840,7 @@ const CuotaRow = memo(
       venceTxt,
       pagaTxt,
       montoTxt,
-      pol, // ✅ viene del rowModel
+      pol,
     } = model || {};
 
     const S = PALETTE[state || "pending"];
@@ -967,7 +950,10 @@ const CuotaRow = memo(
                     className={`h-10 px-4 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer`}
                     title="Registrar pago"
                   >
-                    <HiCash className="w-5 h-5" />
+                    {/* ✅ Emoji A */}
+                    <span aria-hidden="true" className="text-lg leading-none">
+                      🤑
+                    </span>
                     <span className="hidden sm:inline">Pagar</span>
                   </button>
                 )}
@@ -975,7 +961,6 @@ const CuotaRow = memo(
                 {cuota?.pagado && (
                   <>
                     <DescargarFactura
-                      // ✅ FIX: siempre pasamos cliente REAL (obj), no “string cliente”
                       cliente={pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null}
                       poliza={pol}
                       cuota={cuota}

@@ -1,5 +1,10 @@
-/* src/components/pagos/ModalFormaPago.jsx — Optimizado: recuerda método/destino */
+/* src/components/pagos/ModalFormaPago.jsx — Optimizado: recuerda método/destino
+   ✅ PORTAL + z-index alto (no queda detrás)
+   ✅ Bloquea scroll del body mientras está abierto
+   ✅ Emojis de dinero cuando se paga
+*/
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { createPortal } from "react-dom";
 import { Dialog, Transition } from "@headlessui/react";
 import { motion } from "framer-motion";
 import {
@@ -45,6 +50,17 @@ export default function ModalFormaPago({
   const [verOpciones, setVerOpciones] = useState(false);
 
   const inputMontoRef = useRef(null);
+
+  // ✅ Bloquea scroll del body mientras el modal está abierto (mejora UX)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow || "";
+    };
+  }, [isOpen]);
 
   const placeholderMonto = useMemo(() => {
     return Number.isFinite(Number(defaultMonto))
@@ -214,9 +230,23 @@ export default function ModalFormaPago({
   const selectedRing = "ring-2 ring-primary-400/50";
   const legendCls = "text-sm text-neutral-300 mb-1";
 
-  return (
+  // ✅ emojis “de dinero” (cuando el usuario está pagando)
+  const moneyTitle = useMemo(() => {
+    // si querés que dependa de "monto > 0" también, podemos hacerlo,
+    // pero el modal ya indica intención de pago: ponemos 🤑
+    return `🤑 ${title}`;
+  }, [title]);
+
+  const confirmEmoji = needsDestino ? "🤑💳" : "🤑";
+
+  const content = (
     <Transition appear show={!!isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      {/* ✅ z-index MUY alto para que jamás quede atrás */}
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-[9999]"
+        onClose={onClose}
+      >
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-150"
@@ -242,7 +272,9 @@ export default function ModalFormaPago({
             >
               <Dialog.Panel className="w-full max-w-xl overflow-hidden rounded-2xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800 text-white shadow-xl">
                 <div className="relative px-6 py-5 border-b border-neutral-800">
-                  <Dialog.Title className="text-xl font-bold">{title}</Dialog.Title>
+                  <Dialog.Title className="text-xl font-bold">
+                    {moneyTitle}
+                  </Dialog.Title>
                   <button
                     onClick={onClose}
                     className="absolute right-3 top-3 rounded-lg p-2 hover:bg-neutral-800 border border-transparent hover:border-neutral-700"
@@ -257,7 +289,11 @@ export default function ModalFormaPago({
                   <fieldset className="space-y-3">
                     <legend className={legendCls}>Método</legend>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <label className={`${labelBase} ${metodo === "efectivo" ? selectedRing : ""}`}>
+                      <label
+                        className={`${labelBase} ${
+                          metodo === "efectivo" ? selectedRing : ""
+                        }`}
+                      >
                         <input
                           type="radio"
                           name="metodo"
@@ -270,7 +306,7 @@ export default function ModalFormaPago({
                           <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-neutral-800">
                             <HiCash className="w-4 h-4" />
                           </span>
-                          Efectivo
+                          Efectivo <span className="opacity-80">💵</span>
                         </span>
                       </label>
 
@@ -291,7 +327,7 @@ export default function ModalFormaPago({
                           <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-neutral-800">
                             <HiRefresh className="w-4 h-4" />
                           </span>
-                          Transferencia
+                          Transferencia <span className="opacity-80">💳</span>
                         </span>
                       </label>
                     </div>
@@ -305,8 +341,8 @@ export default function ModalFormaPago({
                         <div className="inline-flex items-center gap-2 text-neutral-300">
                           <HiInformationCircle className="w-4 h-4 opacity-70" />
                           <span>
-                            MP: <span className="font-semibold">{totalMP}</span> •
-                            Billeteras:{" "}
+                            MP: <span className="font-semibold">{totalMP}</span>{" "}
+                            • Billeteras:{" "}
                             <span className="font-semibold">{totalBil}</span>
                           </span>
                           <span className="mx-2 text-neutral-500">|</span>
@@ -334,7 +370,9 @@ export default function ModalFormaPago({
                                 Cuentas de Mercado Pago
                               </p>
                               {mediosMP.length === 0 && mpStrings.length === 0 ? (
-                                <p className="text-sm text-neutral-500">No hay cuentas cargadas.</p>
+                                <p className="text-sm text-neutral-500">
+                                  No hay cuentas cargadas.
+                                </p>
                               ) : (
                                 <div className="flex flex-wrap gap-2">
                                   {mediosMP.length > 0
@@ -363,7 +401,9 @@ export default function ModalFormaPago({
                                 Billeteras virtuales
                               </p>
                               {mediosBil.length === 0 && bilStrings.length === 0 ? (
-                                <p className="text-sm text-neutral-500">No hay billeteras cargadas.</p>
+                                <p className="text-sm text-neutral-500">
+                                  No hay billeteras cargadas.
+                                </p>
                               ) : (
                                 <div className="flex flex-wrap gap-2">
                                   {mediosBil.length > 0
@@ -388,7 +428,8 @@ export default function ModalFormaPago({
                             </div>
                           </div>
                           <p className="mt-3 text-xs text-neutral-500">
-                            * Estas listas vienen de <span className="text-neutral-300">Cuentas y Billeteras</span>.
+                            * Estas listas vienen de{" "}
+                            <span className="text-neutral-300">Cuentas y Billeteras</span>.
                           </p>
                         </div>
                       )}
@@ -474,7 +515,7 @@ export default function ModalFormaPago({
 
                   <div>
                     <label className="block text-sm font-medium text-neutral-300 mb-1">
-                      Monto a pagar
+                      Monto a pagar <span className="opacity-90">💸🤑</span>
                     </label>
                     <div className="flex items-stretch">
                       <span className="rounded-l-2xl border border-neutral-800 bg-neutral-900 px-4 h-14 inline-flex items-center text-sm text-neutral-300">
@@ -542,13 +583,16 @@ export default function ModalFormaPago({
                     whileTap={{ scale: isValid ? 0.98 : 1 }}
                     onClick={confirm}
                     disabled={!isValid}
-                    className={`h-12 px-6 rounded-2xl font-semibold outline-none ring-1 transition
+                    className={`h-12 px-6 rounded-2xl font-semibold outline-none ring-1 transition inline-flex items-center gap-2 justify-center
                       ${
                         isValid
                           ? "bg-primary-500 hover:bg-primary-400 text-white ring-primary-400/40"
                           : "bg-neutral-800 text-neutral-400 border border-neutral-700 cursor-not-allowed ring-neutral-700/50"
                       }`}
                   >
+                    <span aria-hidden="true" className="text-lg leading-none">
+                      {confirmEmoji}
+                    </span>
                     Confirmar
                   </motion.button>
                 </div>
@@ -559,6 +603,10 @@ export default function ModalFormaPago({
       </Dialog>
     </Transition>
   );
+
+  // ✅ Portal al body: evita quedar detrás por stacking contexts (transform, etc.)
+  if (typeof document === "undefined") return null;
+  return createPortal(content, document.body);
 }
 
 /* Utils */
