@@ -1,4 +1,6 @@
-/* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + cancelación + force real + búsqueda PRO (/pagos/buscar/) */
+/* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + cancelación + force real
+   + DNI-first: buscar-cliente + cuotas por póliza (Redux)
+*/
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -35,6 +37,17 @@ const BUSCAR_CACHE_MAX = 30;
 const POLIZA_BY_ID_TTL_MS = 5 * 60 * 1000; // 5 min
 const POLIZA_BY_ID_MAX = 250;
 
+/* ===================== DNI-FIRST: CACHE CLIENTE+PÓLIZAS ===================== */
+const CLIENTE_DNI_CACHE_TTL_MS = 60 * 1000; // 1 min
+const CLIENTE_DNI_CACHE_MAX = 40;
+
+/* ===================== DNI-FIRST: CACHE CUOTAS POR PÓLIZA ===================== */
+const CUOTAS_POLIZA_CACHE_TTL_MS = 20 * 1000;
+const CUOTAS_POLIZA_CACHE_MAX = 60;
+
+/* ===================== RECIENTES (DNI) ===================== */
+const RECIENTES_DNI_MAX = 10;
+
 /* stable stringify (ordenado) para key de params */
 function stableKey(obj) {
   const o = obj && typeof obj === "object" ? obj : {};
@@ -70,10 +83,8 @@ function itemHasClienteName(item) {
   const pol = it?.poliza && typeof it.poliza === "object" ? it.poliza : null;
 
   // 1) poliza.cliente objeto
-  const cli =
-    pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null;
-  if (cli && (hasRealNameLike(cli?.nombre) || hasRealNameLike(cli?.apellido)))
-    return true;
+  const cli = pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null;
+  if (cli && (hasRealNameLike(cli?.nombre) || hasRealNameLike(cli?.apellido))) return true;
 
   // 2) campos flat en poliza
   if (pol) {
@@ -81,8 +92,7 @@ function itemHasClienteName(item) {
     if (hasRealNameLike(pol?.cliente_apellido)) return true;
     if (hasRealNameLike(pol?.cliente_nombre_completo)) return true;
     if (hasRealNameLike(pol?.cliente_nombre_apellido)) return true;
-    if (hasRealNameLike(pol?.asegurado) || hasRealNameLike(pol?.asegurado_nombre))
-      return true;
+    if (hasRealNameLike(pol?.asegurado) || hasRealNameLike(pol?.asegurado_nombre)) return true;
   }
 
   // 3) campos flat en cuota
@@ -100,12 +110,8 @@ function extractPolizaId(item) {
   const it = item && typeof item === "object" ? item : {};
   const pol = it?.poliza;
 
-  // casos típicos: poliza: {id}, poliza_id, poliza: id
   const id1 =
-    pol && typeof pol === "object"
-      ? pol.id ?? pol.pk ?? pol.poliza_id
-      : null;
-
+    pol && typeof pol === "object" ? pol.id ?? pol.pk ?? pol.poliza_id : null;
   const id2 = it?.poliza_id ?? it?.polizaId ?? it?.poliza;
 
   const id = id1 ?? id2;
@@ -125,16 +131,11 @@ function buildBuscarParams(p) {
   const q = String(query || "").trim();
 
   const page = Number(pp?.page ?? 1) || 1;
-  const page_size = Math.max(
-    1,
-    Math.min(500, Number(pp?.page_size ?? pp?.limit ?? 250) || 250)
-  );
+  const page_size = Math.max(1, Math.min(500, Number(pp?.page_size ?? pp?.limit ?? 250) || 250));
 
   const oficina = pp?.oficina;
   const ordering = pp?.ordering;
 
-  // ✅ backend entiende ocultar_pagadas / solo_pendientes
-  // default: ocultar_pagadas=1 (mostramos pendientes)
   const includePagadas = Boolean(pp?.include_pagadas);
   const ocultar_pagadas = includePagadas ? 0 : 1;
 
@@ -145,7 +146,7 @@ function buildBuscarParams(p) {
     ordering,
     page,
     page_size,
-    limit: pp?.limit, // compat (backend también lo tolera)
+    limit: pp?.limit, // compat
     ocultar_pagadas,
   });
 }
@@ -155,16 +156,16 @@ function buildBuscarCacheKey(params) {
 }
 
 /* ===================== CACHE HISTORIAL PAGOS ===================== */
-const HISTORIAL_CACHE_TTL_MS = 25 * 1000; // 20–30s recomendado
+const HISTORIAL_CACHE_TTL_MS = 25 * 1000;
 const HISTORIAL_CACHE_MAX = 40;
 
 function buildHistorialParams(p) {
   const pp = p && typeof p === "object" ? p : {};
   return compact({
-    mes: pp?.mes, // YYYY-MM
-    dia: pp?.dia, // YYYY-MM-DD
-    desde: pp?.desde, // YYYY-MM-DD
-    hasta: pp?.hasta, // YYYY-MM-DD
+    mes: pp?.mes,
+    dia: pp?.dia,
+    desde: pp?.desde,
+    hasta: pp?.hasta,
     oficina: pp?.oficina,
     search: pp?.q ?? pp?.search,
     page: pp?.page ?? 1,
@@ -181,8 +182,7 @@ function buildHistorialCacheKey(params) {
 
 function filenameFromDisposition(disposition) {
   const s = String(disposition || "");
-  const m =
-    /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(s);
+  const m = /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(s);
   const raw = (m && (m[1] || m[2] || m[3])) || "";
   if (!raw) return "";
   try {
@@ -207,30 +207,26 @@ function triggerDownloadBlob(blob, filename) {
 let historialAbort = null;
 let polizasAbort = null;
 let buscarAbort = null;
+let clienteDniAbort = null;
+let cuotasPolizaAbort = null;
 
 /* ===================== ENRIQUECIMIENTO CLIENTE EN BUSCAR ===================== */
 async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
   const list = Array.isArray(items) ? items : [];
   if (list.length === 0) return list;
 
-  // Solo enriquecemos los que NO traen nombre
-  const needs = [];
   const polizaIds = new Set();
-
   for (const it of list) {
     if (itemHasClienteName(it)) continue;
     const pid = extractPolizaId(it);
     if (!pid) continue;
-    needs.push(it);
     polizaIds.add(pid);
   }
-
   if (polizaIds.size === 0) return list;
 
   const st = getState()?.pagos;
   const byIdCache = st?.polizaByIdCache || {};
 
-  // ids a pedir (no cache o cache vencido)
   const toFetch = [];
   for (const pid of polizaIds) {
     const hit = byIdCache?.[pid];
@@ -238,10 +234,8 @@ async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
     toFetch.push(pid);
   }
 
-  // Si todo estaba en cache, igual armamos el merge
   const fetchedMap = new Map();
 
-  // 1) tomamos del cache lo que haya
   for (const pid of polizaIds) {
     const hit = byIdCache?.[pid];
     if (hit && hit.poliza && isFresh(hit.ts, POLIZA_BY_ID_TTL_MS)) {
@@ -249,7 +243,6 @@ async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
     }
   }
 
-  // 2) pedimos los faltantes con concurrencia controlada
   if (toFetch.length > 0) {
     const CONCURRENCY = 6;
     for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
@@ -259,7 +252,6 @@ async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
         chunk.map((id) =>
           axios
             .get(API(`polizas/${id}/`), {
-              // NO pedimos cuotas para que sea liviano
               params: compact({ include_cuotas: 0 }),
               signal,
             })
@@ -270,19 +262,15 @@ async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
       for (const r of results) {
         if (r.status !== "fulfilled") continue;
         const data = r.value && typeof r.value === "object" ? r.value : null;
-        const pol =
-          data && typeof data === "object" && "data" in data ? data.data : data;
+        const pol = data && typeof data === "object" && "data" in data ? data.data : data;
         const pid = Number(pol?.id);
-        if (Number.isFinite(pid) && pid > 0) {
-          fetchedMap.set(pid, pol);
-        }
+        if (Number.isFinite(pid) && pid > 0) fetchedMap.set(pid, pol);
       }
 
       if (signal?.aborted) break;
     }
   }
 
-  // 3) merge final: inyectamos poliza.cliente / campos flat si los trae la póliza detalle
   const out = list.map((it) => {
     if (itemHasClienteName(it)) return it;
     const pid = extractPolizaId(it);
@@ -291,34 +279,38 @@ async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
     if (!polFetched || typeof polFetched !== "object") return it;
 
     const currentPol =
-      it?.poliza && typeof it.poliza === "object"
-        ? it.poliza
-        : { id: pid };
+      it?.poliza && typeof it.poliza === "object" ? it.poliza : { id: pid };
 
     return {
       ...it,
       poliza: {
         ...polFetched,
-        ...currentPol, // preserva lo que ya venía en el item
-        // si la póliza detalle trae cliente en otro formato, lo mantiene
+        ...currentPol,
         cliente: currentPol?.cliente || polFetched?.cliente,
-        cliente_nombre:
-          currentPol?.cliente_nombre || polFetched?.cliente_nombre,
-        cliente_apellido:
-          currentPol?.cliente_apellido || polFetched?.cliente_apellido,
+        cliente_nombre: currentPol?.cliente_nombre || polFetched?.cliente_nombre,
+        cliente_apellido: currentPol?.cliente_apellido || polFetched?.cliente_apellido,
         cliente_nombre_completo:
           currentPol?.cliente_nombre_completo || polFetched?.cliente_nombre_completo,
         cliente_nombre_apellido:
           currentPol?.cliente_nombre_apellido || polFetched?.cliente_nombre_apellido,
-        asegurado_nombre:
-          currentPol?.asegurado_nombre || polFetched?.asegurado_nombre,
+        asegurado_nombre: currentPol?.asegurado_nombre || polFetched?.asegurado_nombre,
         asegurado: currentPol?.asegurado || polFetched?.asegurado,
       },
     };
   });
 
-  // Devolvemos items enriquecidos + un mapa para cachear arriba en el thunk
   return { items: out, polizasById: fetchedMap };
+}
+
+/* ===================== DNI-FIRST HELPERS ===================== */
+const onlyDigits = (s) => String(s || "").replace(/\D+/g, "");
+const dniCacheKey = (dni) => `dni:${onlyDigits(dni)}`;
+function cuotasPolizaCacheKey({ poliza_id, solo_pendientes = 1, page_size = 200 }) {
+  return stableKey({
+    poliza_id: String(poliza_id || "").trim(),
+    solo_pendientes: solo_pendientes ? 1 : 0,
+    page_size: Number(page_size || 200),
+  });
 }
 
 /* ============== THUNKS ============== */
@@ -368,9 +360,7 @@ export const marcarCuotaComoPagada = createAsyncThunk(
       const { data } = await axios.patch(API(`cuotas/${cuotaId}/pagar/`), body);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al marcar como pagada"
-      );
+      return rejectWithValue(error?.response?.data || "Error al marcar como pagada");
     }
   }
 );
@@ -398,15 +388,10 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
         oficina: payload?.oficina,
       });
 
-      const { data } = await axios.post(
-        API("notificaciones/cuotas/recordatorios/"),
-        body
-      );
+      const { data } = await axios.post(API("notificaciones/cuotas/recordatorios/"), body);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al enviar recordatorios"
-      );
+      return rejectWithValue(error?.response?.data || "Error al enviar recordatorios");
     }
   }
 );
@@ -438,27 +423,13 @@ export const fetchHistorialPagos = createAsyncThunk(
       if (!force) {
         const st = getState()?.pagos;
         const hit = st?.historialPagosCache?.[cacheKey];
-        if (
-          hit &&
-          isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
-          Array.isArray(hit.items) &&
-          hit.meta &&
-          typeof hit.meta === "object"
-        ) {
-          return {
-            items: hit.items,
-            meta: hit.meta,
-            _cacheKey: cacheKey,
-            _fromCache: true,
-            _force: false,
-          };
+        if (hit && isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) && Array.isArray(hit.items) && hit.meta) {
+          return { items: hit.items, meta: hit.meta, _cacheKey: cacheKey, _fromCache: true, _force: false };
         }
       }
 
       if (historialAbort) {
-        try {
-          historialAbort.abort();
-        } catch {}
+        try { historialAbort.abort(); } catch {}
       }
       historialAbort = new AbortController();
 
@@ -470,11 +441,7 @@ export const fetchHistorialPagos = createAsyncThunk(
       if (data && typeof data === "object" && "results" in data) {
         return {
           items: Array.isArray(data.results) ? data.results : [],
-          meta: {
-            count: Number(data.count || 0) || 0,
-            next: data.next ?? null,
-            previous: data.previous ?? null,
-          },
+          meta: { count: Number(data.count || 0) || 0, next: data.next ?? null, previous: data.previous ?? null },
           _cacheKey: cacheKey,
           _fromCache: false,
           _force: force,
@@ -482,23 +449,11 @@ export const fetchHistorialPagos = createAsyncThunk(
       }
 
       const items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
-      return {
-        items,
-        meta: { count: items.length, next: null, previous: null },
-        _cacheKey: cacheKey,
-        _fromCache: false,
-        _force: force,
-      };
+      return { items, meta: { count: items.length, next: null, previous: null }, _cacheKey: cacheKey, _fromCache: false, _force: force };
     } catch (error) {
-      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-        return rejectWithValue({ _aborted: true });
-      }
-      if (error?.name === "AbortError") {
-        return rejectWithValue({ _aborted: true });
-      }
-      return rejectWithValue(
-        error?.response?.data || "Error al obtener historial de pagos"
-      );
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return rejectWithValue({ _aborted: true });
+      if (error?.name === "AbortError") return rejectWithValue({ _aborted: true });
+      return rejectWithValue(error?.response?.data || "Error al obtener historial de pagos");
     }
   }
 );
@@ -592,7 +547,7 @@ export const downloadHistorialPagosPDF = createAsyncThunk(
 );
 
 /** ✅ Búsqueda PRO (rápida): GET /pagos/buscar/ => devuelve CUOTAS APLANADAS (flat)
- *  ✅ ahora enriquece con cliente desde /polizas/{id}/ si falta nombre
+ *  ✅ enriquece con cliente desde /polizas/{id}/ si falta nombre
  */
 export const fetchPagosBuscar = createAsyncThunk(
   "pagos/fetchPagosBuscar",
@@ -605,7 +560,6 @@ export const fetchPagosBuscar = createAsyncThunk(
       const cacheKey = buildBuscarCacheKey(built);
 
       const queryStr = String(built?.q || "").trim();
-
       if (!queryStr) {
         return {
           items: [],
@@ -618,17 +572,10 @@ export const fetchPagosBuscar = createAsyncThunk(
         };
       }
 
-      // ✅ cache hit (rápido) — pero NO si force
       if (!force) {
         const st = getState()?.pagos;
         const hit = st?.buscarCache?.[cacheKey];
-        if (
-          hit &&
-          isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) &&
-          Array.isArray(hit.items) &&
-          hit.meta &&
-          typeof hit.meta === "object"
-        ) {
+        if (hit && isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) && Array.isArray(hit.items) && hit.meta) {
           return {
             items: hit.items,
             meta: hit.meta,
@@ -641,11 +588,8 @@ export const fetchPagosBuscar = createAsyncThunk(
         }
       }
 
-      // ✅ cancelar request anterior
       if (buscarAbort) {
-        try {
-          buscarAbort.abort();
-        } catch {}
+        try { buscarAbort.abort(); } catch {}
       }
       buscarAbort = new AbortController();
 
@@ -654,23 +598,17 @@ export const fetchPagosBuscar = createAsyncThunk(
         signal: buscarAbort.signal,
       });
 
-      // normalize items/meta
       let items = [];
       let meta = { count: 0, next: null, previous: null };
 
       if (data && typeof data === "object" && "results" in data) {
         items = Array.isArray(data.results) ? data.results : [];
-        meta = {
-          count: Number(data.count || 0) || 0,
-          next: data.next ?? null,
-          previous: data.previous ?? null,
-        };
+        meta = { count: Number(data.count || 0) || 0, next: data.next ?? null, previous: data.previous ?? null };
       } else {
         items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
         meta = { count: items.length, next: null, previous: null };
       }
 
-      // ✅ ENRIQUECER: si faltan nombres de cliente, buscar polizas/{id}/ (cacheado)
       let polizaByIdToCache = null;
       const enriched = await enrichBuscarItemsWithPolizaCliente(items, {
         getState,
@@ -692,13 +630,107 @@ export const fetchPagosBuscar = createAsyncThunk(
         _polizaByIdToCache: polizaByIdToCache,
       };
     } catch (error) {
-      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-        return rejectWithValue({ _aborted: true });
-      }
-      if (error?.name === "AbortError") {
-        return rejectWithValue({ _aborted: true });
-      }
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return rejectWithValue({ _aborted: true });
+      if (error?.name === "AbortError") return rejectWithValue({ _aborted: true });
       return rejectWithValue(error?.response?.data || "Error al buscar pagos");
+    }
+  }
+);
+
+/* ✅ DNI-FIRST: trae cliente + pólizas */
+export const fetchBuscarClientePorDni = createAsyncThunk(
+  "pagos/fetchBuscarClientePorDni",
+  async ({ dni, force } = {}, { rejectWithValue, getState }) => {
+    try {
+      const dniDigits = onlyDigits(dni);
+      if (!dniDigits) {
+        return rejectWithValue("DNI inválido.");
+      }
+
+      const ck = dniCacheKey(dniDigits);
+
+      if (!force) {
+        const st = getState()?.pagos;
+        const hit = st?.buscarClienteCache?.[ck];
+        if (hit && isFresh(hit.ts, CLIENTE_DNI_CACHE_TTL_MS) && hit.data) {
+          return { ...hit.data, _cacheKey: ck, _fromCache: true };
+        }
+      }
+
+      if (clienteDniAbort) {
+        try { clienteDniAbort.abort(); } catch {}
+      }
+      clienteDniAbort = new AbortController();
+
+      const resp = await axios.get(API("pagos/buscar-cliente/"), {
+        params: { dni: dniDigits },
+        signal: clienteDniAbort.signal,
+        timeout: 30000,
+      });
+
+      const data = resp?.data || {};
+      const cliente = data?.cliente || null;
+      const polizas = Array.isArray(data?.polizas) ? data.polizas : [];
+
+      return { cliente, polizas, _cacheKey: ck, _fromCache: false };
+    } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return rejectWithValue({ _aborted: true });
+      if (error?.name === "AbortError") return rejectWithValue({ _aborted: true });
+
+      if (error?.response?.status === 404) {
+        return rejectWithValue("No se encontró cliente con ese DNI.");
+      }
+      return rejectWithValue("Ocurrió un error buscando por DNI.");
+    }
+  }
+);
+
+/* ✅ DNI-FIRST: trae cuotas pendientes de una póliza */
+export const fetchCuotasPorPoliza = createAsyncThunk(
+  "pagos/fetchCuotasPorPoliza",
+  async ({ poliza_id, solo_pendientes = 1, page_size = 200, force, dni } = {}, { rejectWithValue, getState }) => {
+    try {
+      const pid = String(poliza_id || "").trim();
+      if (!pid) return rejectWithValue("Falta poliza_id.");
+
+      const builtKey = cuotasPolizaCacheKey({ poliza_id: pid, solo_pendientes, page_size });
+
+      if (!force) {
+        const st = getState()?.pagos;
+        const hit = st?.cuotasPolizaCache?.[builtKey];
+        if (hit && isFresh(hit.ts, CUOTAS_POLIZA_CACHE_TTL_MS) && Array.isArray(hit.items) && hit.meta) {
+          return { items: hit.items, meta: hit.meta, _cacheKey: builtKey, _fromCache: true, _dni: dni || "" };
+        }
+      }
+
+      if (cuotasPolizaAbort) {
+        try { cuotasPolizaAbort.abort(); } catch {}
+      }
+      cuotasPolizaAbort = new AbortController();
+
+      const resp = await axios.get(API("pagos/buscar/"), {
+        params: compact({
+          poliza_id: pid,
+          solo_pendientes: solo_pendientes ? 1 : 0,
+          page_size: Math.max(1, Math.min(500, Number(page_size || 200))),
+        }),
+        signal: cuotasPolizaAbort.signal,
+        timeout: 30000,
+      });
+
+      const data = resp?.data || {};
+      const items = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      const meta = {
+        count: typeof data?.count === "number" ? data.count : items.length,
+        next: data?.next ?? null,
+        previous: data?.previous ?? null,
+      };
+
+      return { items, meta, _cacheKey: builtKey, _fromCache: false, _dni: dni || "" };
+    } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return rejectWithValue({ _aborted: true });
+      if (error?.name === "AbortError") return rejectWithValue({ _aborted: true });
+      return rejectWithValue("Ocurrió un error trayendo cuotas.");
     }
   }
 );
@@ -712,29 +744,15 @@ export const fetchPolizas = createAsyncThunk(
           ? String(arg)
           : String(arg?.query || "");
 
-      const withCuotas = Boolean(
-        typeof arg === "object" && arg ? arg.withCuotas : false
-      );
+      const withCuotas = Boolean(typeof arg === "object" && arg ? arg.withCuotas : false);
 
-      const limit = Math.max(
-        1,
-        Math.min(
-          100,
-          Number(typeof arg === "object" && arg ? arg.limit : 25) || 25
-        )
-      );
+      const limit = Math.max(1, Math.min(100, Number(typeof arg === "object" && arg ? arg.limit : 25) || 25));
 
       const q = String(query || "").trim();
       const cacheKey = keyForSearch(q, withCuotas);
 
       if (!cacheKey) {
-        return {
-          polizas: [],
-          originalQuery: q,
-          cacheKey,
-          fromCache: true,
-          withCuotas,
-        };
+        return { polizas: [], originalQuery: q, cacheKey, fromCache: true, withCuotas };
       }
 
       const st = getState()?.pagos;
@@ -742,25 +760,12 @@ export const fetchPolizas = createAsyncThunk(
       const hit = cache?.[cacheKey];
       const now = Date.now();
 
-      if (
-        hit &&
-        typeof hit.ts === "number" &&
-        now - hit.ts < POLIZAS_CACHE_TTL_MS &&
-        Array.isArray(hit.polizas)
-      ) {
-        return {
-          polizas: hit.polizas,
-          originalQuery: hit.originalQuery || q,
-          cacheKey,
-          fromCache: true,
-          withCuotas,
-        };
+      if (hit && typeof hit.ts === "number" && now - hit.ts < POLIZAS_CACHE_TTL_MS && Array.isArray(hit.polizas)) {
+        return { polizas: hit.polizas, originalQuery: hit.originalQuery || q, cacheKey, fromCache: true, withCuotas };
       }
 
       if (polizasAbort) {
-        try {
-          polizasAbort.abort();
-        } catch {}
+        try { polizasAbort.abort(); } catch {}
       }
       polizasAbort = new AbortController();
 
@@ -777,21 +782,11 @@ export const fetchPolizas = createAsyncThunk(
 
       if (withCuotas) {
         const needsHydrate = polizasList.some((p) => !Array.isArray(p?.cuotas));
-
         if (!needsHydrate) {
-          return {
-            polizas: polizasList,
-            originalQuery: q,
-            cacheKey,
-            fromCache: false,
-            withCuotas,
-          };
+          return { polizas: polizasList, originalQuery: q, cacheKey, fromCache: false, withCuotas };
         }
 
-        const ids = polizasList
-          .map((p) => p?.id)
-          .filter((id) => id !== undefined && id !== null);
-
+        const ids = polizasList.map((p) => p?.id).filter((id) => id !== undefined && id !== null);
         const idsToFetch = ids.slice(0, limit);
         const CONCURRENCY = 6;
 
@@ -817,33 +812,15 @@ export const fetchPolizas = createAsyncThunk(
           if (polizasAbort?.signal?.aborted) break;
         }
 
-        const detailedPolizas = detailed.map((x) =>
-          x && typeof x === "object" && "data" in x ? x.data : x
-        );
+        const detailedPolizas = detailed.map((x) => (x && typeof x === "object" && "data" in x ? x.data : x));
 
-        return {
-          polizas: detailedPolizas,
-          originalQuery: q,
-          cacheKey,
-          fromCache: false,
-          withCuotas,
-        };
+        return { polizas: detailedPolizas, originalQuery: q, cacheKey, fromCache: false, withCuotas };
       }
 
-      return {
-        polizas: polizasList,
-        originalQuery: q,
-        cacheKey,
-        fromCache: false,
-        withCuotas,
-      };
+      return { polizas: polizasList, originalQuery: q, cacheKey, fromCache: false, withCuotas };
     } catch (error) {
-      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-        return rejectWithValue({ _aborted: true });
-      }
-      if (error?.name === "AbortError") {
-        return rejectWithValue({ _aborted: true });
-      }
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return rejectWithValue({ _aborted: true });
+      if (error?.name === "AbortError") return rejectWithValue({ _aborted: true });
       return rejectWithValue(error?.response?.data || "Error al buscar pólizas");
     }
   }
@@ -856,9 +833,7 @@ export const registrarIngreso = createAsyncThunk(
       const { data } = await axios.post(API("ingresos/"), payload);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al registrar ingreso"
-      );
+      return rejectWithValue(error?.response?.data || "Error al registrar ingreso");
     }
   }
 );
@@ -876,15 +851,10 @@ export const fetchCuotasAVencer = createAsyncThunk(
         modo: p?.modo,
       });
 
-      const { data } = await axios.get(API("cuotas/a-vencer/"), {
-        params: built,
-      });
-
+      const { data } = await axios.get(API("cuotas/a-vencer/"), { params: built });
       return unwrap(data);
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al obtener cuotas a vencer"
-      );
+      return rejectWithValue(error?.response?.data || "Error al obtener cuotas a vencer");
     }
   }
 );
@@ -896,9 +866,7 @@ export const fetchMediosCobro = createAsyncThunk(
       const { data } = await axios.get(API("medios-cobro/"));
       return unwrap(data);
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al obtener medios de cobro"
-      );
+      return rejectWithValue(error?.response?.data || "Error al obtener medios de cobro");
     }
   }
 );
@@ -910,9 +878,7 @@ export const crearMedioCobro = createAsyncThunk(
       const { data } = await axios.post(API("medios-cobro/"), payload);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al crear medio de cobro"
-      );
+      return rejectWithValue(error?.response?.data || "Error al crear medio de cobro");
     }
   }
 );
@@ -924,9 +890,7 @@ export const actualizarMedioCobro = createAsyncThunk(
       const { data } = await axios.patch(API(`medios-cobro/${id}/`), payload);
       return data;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al actualizar medio de cobro"
-      );
+      return rejectWithValue(error?.response?.data || "Error al actualizar medio de cobro");
     }
   }
 );
@@ -938,9 +902,7 @@ export const eliminarMedioCobro = createAsyncThunk(
       await axios.delete(API(`medios-cobro/${id}/`));
       return id;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || "Error al eliminar medio de cobro"
-      );
+      return rejectWithValue(error?.response?.data || "Error al eliminar medio de cobro");
     }
   }
 );
@@ -974,6 +936,24 @@ const initialState = {
   // ✅ cache por ID de póliza para enriquecer cliente (rápido)
   polizaByIdCache: {}, // { [id]: { ts, poliza } }
   polizaByIdOrder: [],
+
+  // ✅ DNI-first: cliente + pólizas
+  buscarClienteData: null, // { cliente, polizas }
+  buscarClienteStatus: "idle",
+  buscarClienteError: null,
+  buscarClienteCache: {},
+  buscarClienteCacheOrder: [],
+
+  // ✅ DNI-first: cuotas por póliza
+  cuotasPolizaItems: [],
+  cuotasPolizaMeta: { count: 0, next: null, previous: null },
+  cuotasPolizaStatus: "idle",
+  cuotasPolizaError: null,
+  cuotasPolizaCache: {},
+  cuotasPolizaCacheOrder: [],
+
+  // ✅ recientes DNI
+  recientesDni: [],
 
   // medios de cobro
   mediosCobro: [],
@@ -1035,9 +1015,7 @@ function savePolizasCache(state, cacheKey, originalQuery, polizas) {
     originalQuery: String(originalQuery || "").trim(),
   };
 
-  const prev = Array.isArray(state.polizasCacheOrder)
-    ? state.polizasCacheOrder
-    : [];
+  const prev = Array.isArray(state.polizasCacheOrder) ? state.polizasCacheOrder : [];
   const next = [ck, ...prev.filter((x) => x !== ck)].slice(0, POLIZAS_CACHE_MAX);
   state.polizasCacheOrder = next;
 
@@ -1056,16 +1034,8 @@ function saveBuscarCache(state, cacheKey, originalQuery, items, meta) {
     items: Array.isArray(items) ? items : [],
     meta:
       meta && typeof meta === "object"
-        ? {
-            count: Number(meta.count || 0) || 0,
-            next: meta.next ?? null,
-            previous: meta.previous ?? null,
-          }
-        : {
-            count: Array.isArray(items) ? items.length : 0,
-            next: null,
-            previous: null,
-          },
+        ? { count: Number(meta.count || 0) || 0, next: meta.next ?? null, previous: meta.previous ?? null }
+        : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
     originalQuery: String(originalQuery || "").trim(),
   };
 
@@ -1087,25 +1057,12 @@ function saveHistorialCache(state, cacheKey, items, meta) {
     items: Array.isArray(items) ? items : [],
     meta:
       meta && typeof meta === "object"
-        ? {
-            count: Number(meta.count || 0) || 0,
-            next: meta.next ?? null,
-            previous: meta.previous ?? null,
-          }
-        : {
-            count: Array.isArray(items) ? items.length : 0,
-            next: null,
-            previous: null,
-          },
+        ? { count: Number(meta.count || 0) || 0, next: meta.next ?? null, previous: meta.previous ?? null }
+        : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
   };
 
-  const prev = Array.isArray(state.historialPagosCacheOrder)
-    ? state.historialPagosCacheOrder
-    : [];
-  const next = [cacheKey, ...prev.filter((x) => x !== cacheKey)].slice(
-    0,
-    HISTORIAL_CACHE_MAX
-  );
+  const prev = Array.isArray(state.historialPagosCacheOrder) ? state.historialPagosCacheOrder : [];
+  const next = [cacheKey, ...prev.filter((x) => x !== cacheKey)].slice(0, HISTORIAL_CACHE_MAX);
   state.historialPagosCacheOrder = next;
 
   const keep = new Set(next);
@@ -1128,17 +1085,53 @@ function savePolizaByIdCache(state, polizasByIdMap) {
     state.polizaByIdCache[pid] = { ts: now, poliza: pol };
 
     const prev = Array.isArray(state.polizaByIdOrder) ? state.polizaByIdOrder : [];
-    state.polizaByIdOrder = [pid, ...prev.filter((x) => x !== pid)].slice(
-      0,
-      POLIZA_BY_ID_MAX
-    );
+    state.polizaByIdOrder = [pid, ...prev.filter((x) => x !== pid)].slice(0, POLIZA_BY_ID_MAX);
   });
 
-  // limpieza
   const keep = new Set(state.polizaByIdOrder || []);
   Object.keys(state.polizaByIdCache || {}).forEach((k) => {
     const id = Number(k);
     if (!keep.has(id)) delete state.polizaByIdCache[k];
+  });
+}
+
+/* ✅ DNI cache */
+function saveClienteDniCache(state, cacheKey, data) {
+  const ck = String(cacheKey || "").trim();
+  if (!ck) return;
+
+  state.buscarClienteCache[ck] = { ts: Date.now(), data: data || null };
+
+  const prev = Array.isArray(state.buscarClienteCacheOrder) ? state.buscarClienteCacheOrder : [];
+  const next = [ck, ...prev.filter((x) => x !== ck)].slice(0, CLIENTE_DNI_CACHE_MAX);
+  state.buscarClienteCacheOrder = next;
+
+  const keep = new Set(next);
+  Object.keys(state.buscarClienteCache || {}).forEach((key) => {
+    if (!keep.has(key)) delete state.buscarClienteCache[key];
+  });
+}
+
+/* ✅ Cuotas por póliza cache */
+function saveCuotasPolizaCache(state, cacheKey, items, meta) {
+  const ck = String(cacheKey || "").trim();
+  if (!ck) return;
+
+  state.cuotasPolizaCache[ck] = {
+    ts: Date.now(),
+    items: Array.isArray(items) ? items : [],
+    meta: meta && typeof meta === "object"
+      ? { count: Number(meta.count || 0) || 0, next: meta.next ?? null, previous: meta.previous ?? null }
+      : { count: Array.isArray(items) ? items.length : 0, next: null, previous: null },
+  };
+
+  const prev = Array.isArray(state.cuotasPolizaCacheOrder) ? state.cuotasPolizaCacheOrder : [];
+  const next = [ck, ...prev.filter((x) => x !== ck)].slice(0, CUOTAS_POLIZA_CACHE_MAX);
+  state.cuotasPolizaCacheOrder = next;
+
+  const keep = new Set(next);
+  Object.keys(state.cuotasPolizaCache || {}).forEach((key) => {
+    if (!keep.has(key)) delete state.cuotasPolizaCache[key];
   });
 }
 
@@ -1149,6 +1142,29 @@ const pagosSlice = createSlice({
     setCuotas(state, action) {
       state.cuotas = Array.isArray(action.payload) ? action.payload : [];
     },
+
+    // ✅ para PagosSearch
+    clearBuscarCliente(state) {
+      state.buscarClienteData = null;
+      state.buscarClienteStatus = "idle";
+      state.buscarClienteError = null;
+
+      state.cuotasPolizaItems = [];
+      state.cuotasPolizaMeta = { count: 0, next: null, previous: null };
+      state.cuotasPolizaStatus = "idle";
+      state.cuotasPolizaError = null;
+    },
+
+    pushRecienteDni(state, action) {
+      const dni = String(action.payload || "").trim();
+      if (!dni) return;
+      const norm = dni.toLowerCase();
+
+      const prev = Array.isArray(state.recientesDni) ? state.recientesDni : [];
+      const next = [dni, ...prev.filter((x) => String(x).toLowerCase() !== norm)].slice(0, RECIENTES_DNI_MAX);
+      state.recientesDni = next;
+    },
+
     clearSearch(state) {
       state.polizas = [];
       state.searchStatus = "idle";
@@ -1158,7 +1174,18 @@ const pagosSlice = createSlice({
       state.buscarMeta = { count: 0, next: null, previous: null };
       state.buscarStatus = "idle";
       state.buscarError = null;
+
+      // DNI-first también se limpia cuando “clearSearch”
+      state.buscarClienteData = null;
+      state.buscarClienteStatus = "idle";
+      state.buscarClienteError = null;
+
+      state.cuotasPolizaItems = [];
+      state.cuotasPolizaMeta = { count: 0, next: null, previous: null };
+      state.cuotasPolizaStatus = "idle";
+      state.cuotasPolizaError = null;
     },
+
     invalidateHistorialPagosCache(state) {
       state.historialPagosCache = {};
       state.historialPagosCacheOrder = [];
@@ -1168,8 +1195,86 @@ const pagosSlice = createSlice({
       state.buscarCacheOrder = [];
     },
   },
+
   extraReducers: (builder) => {
     builder
+
+      // --- DNI-FIRST: buscar cliente + pólizas ---
+      .addCase(fetchBuscarClientePorDni.pending, (state, action) => {
+        state.buscarClienteStatus = "loading";
+        state.buscarClienteError = null;
+        state.buscarClienteData = null;
+
+        const arg = action?.meta?.arg || {};
+        const force = Boolean(arg?.force);
+        const ck = dniCacheKey(arg?.dni);
+
+        if (!force && ck) {
+          const hit = state.buscarClienteCache?.[ck];
+          if (hit && isFresh(hit.ts, CLIENTE_DNI_CACHE_TTL_MS) && hit.data) {
+            state.buscarClienteData = hit.data;
+          }
+        }
+      })
+      .addCase(fetchBuscarClientePorDni.fulfilled, (state, action) => {
+        state.buscarClienteStatus = "succeeded";
+        const p = action.payload || {};
+        state.buscarClienteData = { cliente: p.cliente || null, polizas: Array.isArray(p.polizas) ? p.polizas : [] };
+
+        if (p._cacheKey) {
+          saveClienteDniCache(state, p._cacheKey, state.buscarClienteData);
+        }
+      })
+      .addCase(fetchBuscarClientePorDni.rejected, (state, action) => {
+        if (action?.payload && action.payload._aborted) {
+          state.buscarClienteStatus = "idle";
+          state.buscarClienteError = null;
+          return;
+        }
+        state.buscarClienteStatus = "failed";
+        state.buscarClienteError = action.payload || "Error buscando por DNI";
+        state.buscarClienteData = null;
+      })
+
+      // --- DNI-FIRST: cuotas por póliza ---
+      .addCase(fetchCuotasPorPoliza.pending, (state, action) => {
+        state.cuotasPolizaStatus = "loading";
+        state.cuotasPolizaError = null;
+
+        const arg = action?.meta?.arg || {};
+        const force = Boolean(arg?.force);
+        const ck = cuotasPolizaCacheKey(arg);
+
+        if (!force && ck) {
+          const hit = state.cuotasPolizaCache?.[ck];
+          if (hit && isFresh(hit.ts, CUOTAS_POLIZA_CACHE_TTL_MS) && Array.isArray(hit.items)) {
+            state.cuotasPolizaItems = hit.items;
+            state.cuotasPolizaMeta = hit.meta || { count: hit.items.length, next: null, previous: null };
+          }
+        }
+      })
+      .addCase(fetchCuotasPorPoliza.fulfilled, (state, action) => {
+        state.cuotasPolizaStatus = "succeeded";
+        const p = action.payload || {};
+        state.cuotasPolizaItems = Array.isArray(p.items) ? p.items : [];
+        state.cuotasPolizaMeta = p.meta || { count: state.cuotasPolizaItems.length, next: null, previous: null };
+
+        if (p._cacheKey) {
+          saveCuotasPolizaCache(state, p._cacheKey, state.cuotasPolizaItems, state.cuotasPolizaMeta);
+        }
+      })
+      .addCase(fetchCuotasPorPoliza.rejected, (state, action) => {
+        if (action?.payload && action.payload._aborted) {
+          state.cuotasPolizaStatus = "idle";
+          state.cuotasPolizaError = null;
+          return;
+        }
+        state.cuotasPolizaStatus = "failed";
+        state.cuotasPolizaError = action.payload || "Error trayendo cuotas";
+        state.cuotasPolizaItems = [];
+        state.cuotasPolizaMeta = { count: 0, next: null, previous: null };
+      })
+
       // --- Buscar PRO (cuotas aplanadas) ---
       .addCase(fetchPagosBuscar.pending, (state, action) => {
         state.buscarStatus = "loading";
@@ -1188,8 +1293,7 @@ const pagosSlice = createSlice({
           const hit = state.buscarCache?.[ck];
           if (hit && isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) && Array.isArray(hit.items)) {
             state.buscarItems = hit.items;
-            state.buscarMeta =
-              hit.meta || { count: hit.items.length, next: null, previous: null };
+            state.buscarMeta = hit.meta || { count: hit.items.length, next: null, previous: null };
           }
         }
       })
@@ -1200,19 +1304,10 @@ const pagosSlice = createSlice({
         const payload = action.payload || {};
         const items = payload.items ?? payload ?? [];
         state.buscarItems = Array.isArray(items) ? items : [];
-        state.buscarMeta =
-          payload.meta || { count: state.buscarItems.length, next: null, previous: null };
+        state.buscarMeta = payload.meta || { count: state.buscarItems.length, next: null, previous: null };
 
-        // ✅ guardamos cache búsqueda
-        saveBuscarCache(
-          state,
-          payload.cacheKey,
-          payload.originalQuery,
-          state.buscarItems,
-          state.buscarMeta
-        );
+        saveBuscarCache(state, payload.cacheKey, payload.originalQuery, state.buscarItems, state.buscarMeta);
 
-        // ✅ guardamos cache por ID de póliza (para nombres de cliente)
         if (payload._polizaByIdToCache) {
           savePolizaByIdCache(state, payload._polizaByIdToCache);
         }
@@ -1242,7 +1337,6 @@ const pagosSlice = createSlice({
         const payload = action.payload || {};
         const polizas = payload.polizas ?? payload ?? [];
         state.polizas = Array.isArray(polizas) ? polizas : [];
-
         savePolizasCache(state, payload.cacheKey, payload.originalQuery, state.polizas);
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
@@ -1283,16 +1377,13 @@ const pagosSlice = createSlice({
         state.mediosCobroStatus = "failed";
         state.mediosCobroError = action.payload;
       })
-
       .addCase(crearMedioCobro.fulfilled, (state, action) => {
         state.mediosCobro = [action.payload, ...(state.mediosCobro || [])];
         recomputeMedioNombres(state);
       })
       .addCase(actualizarMedioCobro.fulfilled, (state, action) => {
         const updated = action.payload;
-        state.mediosCobro = (state.mediosCobro || []).map((m) =>
-          m.id === updated?.id ? updated : m
-        );
+        state.mediosCobro = (state.mediosCobro || []).map((m) => (m.id === updated?.id ? updated : m));
         recomputeMedioNombres(state);
       })
       .addCase(eliminarMedioCobro.fulfilled, (state, action) => {
@@ -1334,9 +1425,7 @@ const pagosSlice = createSlice({
       })
       .addCase(fetchHistorialRecordatorios.fulfilled, (state, action) => {
         state.historialRecordatoriosStatus = "succeeded";
-        state.historialRecordatorios = Array.isArray(action.payload)
-          ? action.payload
-          : [];
+        state.historialRecordatorios = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchHistorialRecordatorios.rejected, (state, action) => {
         state.historialRecordatoriosStatus = "failed";
@@ -1355,40 +1444,19 @@ const pagosSlice = createSlice({
           const built = buildHistorialParams(arg);
           const cacheKey = buildHistorialCacheKey(built);
           const hit = state.historialPagosCache?.[cacheKey];
-          if (
-            hit &&
-            isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) &&
-            Array.isArray(hit.items)
-          ) {
+          if (hit && isFresh(hit.ts, HISTORIAL_CACHE_TTL_MS) && Array.isArray(hit.items)) {
             state.historialPagosItems = hit.items;
-            state.historialPagosMeta = hit.meta || {
-              count: hit.items.length,
-              next: null,
-              previous: null,
-            };
+            state.historialPagosMeta = hit.meta || { count: hit.items.length, next: null, previous: null };
           }
         }
       })
       .addCase(fetchHistorialPagos.fulfilled, (state, action) => {
         state.historialPagosStatus = "succeeded";
-        state.historialPagosItems = Array.isArray(action.payload?.items)
-          ? action.payload.items
-          : [];
-        state.historialPagosMeta = action.payload?.meta || {
-          count: state.historialPagosItems.length,
-          next: null,
-          previous: null,
-        };
+        state.historialPagosItems = Array.isArray(action.payload?.items) ? action.payload.items : [];
+        state.historialPagosMeta = action.payload?.meta || { count: state.historialPagosItems.length, next: null, previous: null };
 
         const cacheKey = action.payload?._cacheKey;
-        if (cacheKey) {
-          saveHistorialCache(
-            state,
-            cacheKey,
-            state.historialPagosItems,
-            state.historialPagosMeta
-          );
-        }
+        if (cacheKey) saveHistorialCache(state, cacheKey, state.historialPagosItems, state.historialPagosMeta);
       })
       .addCase(fetchHistorialPagos.rejected, (state, action) => {
         if (action?.payload && action.payload._aborted) {
@@ -1435,6 +1503,8 @@ export const {
   clearSearch,
   invalidateHistorialPagosCache,
   invalidateBuscarCache,
+  pushRecienteDni,
+  clearBuscarCliente,
 } = pagosSlice.actions;
 
 export default pagosSlice.reducer;

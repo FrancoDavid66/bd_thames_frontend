@@ -1,15 +1,9 @@
 /* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos)
-   ✅ Nuevo flujo: Buscar → Lista de clientes → Modal con todas las cuotas del cliente → Pagar
+   ✅ Flujo: Buscar → Lista de clientes → Modal con cuotas del cliente → Pagar
+   ✅ OPT: usa solo campos necesarios (asume payload /pagos/buscar/ con CuotaFlatSerializer)
 */
 
-import {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  useDeferredValue,
-  useTransition,
-} from "react";
+import { useState, useEffect, useMemo, useCallback, useDeferredValue, useTransition } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
@@ -52,7 +46,7 @@ import {
 
 dayjs.locale("es");
 
-// ---------- helpers UI
+/* ---------- helpers UI ---------- */
 const monthKey = (d) => dayjs(d).format("YYYY-MM");
 const monthLabel = (ym) => {
   const [y, m] = String(ym || "").split("-");
@@ -82,7 +76,7 @@ const safe = (v, fallback = "—") => {
 
 const ymd = (d) => dayjs(d).format("YYYY-MM-DD");
 
-// ✅ helpers historial pagos: timestamp real
+/* ---------- helpers historial pagos: timestamp real ---------- */
 function pickRegistroTs(it) {
   const v = it?.pago_registrado_en ?? it?.registrado_en ?? it?.pago_ts ?? null;
   if (v) return v;
@@ -91,10 +85,7 @@ function pickRegistroTs(it) {
   const h = it?.hora_guardado_pago || it?.pago_hora || "";
   if (f && h) {
     const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(f).trim());
-    if (m) {
-      const iso = `${m[3]}-${m[2]}-${m[1]}T${String(h).trim()}:00`;
-      return iso;
-    }
+    if (m) return `${m[3]}-${m[2]}-${m[1]}T${String(h).trim()}:00`;
   }
   return null;
 }
@@ -130,195 +121,98 @@ function fmtRegistro(it) {
 }
 
 /**
- * ✅ PRO (cuotas aplanadas):
- * Normaliza una "cuota flat" para que PagosList siga recibiendo:
- *  - cuota con campos típicos (id, cuota_nro, fecha_vencimiento, pagado, monto...)
- *  - y adentro `poliza` con datos mínimos (numero_poliza, patente, oficina, compania, cliente...)
+ * ✅ NORMALIZACIÓN MINIMAL (según CuotaFlatSerializer)
+ * Esperado:
+ *  - cuota: { id, cuota_nro, monto, pagado, fecha_vencimiento, fecha_pago, forma_pago,
+ *             observaciones, ultima_observacion_pago, total_cuotas, cuota_label,
+ *             poliza:{poliza_id, numero_poliza, patente, marca, modelo, cobertura, compania_nombre, oficina},
+ *             cliente:{cliente_id, apellido, nombre, dni_cuit_cuil, telefono} }
+ *
+ * PagosList espera: cuota.poliza.cliente (obj). Lo inyectamos para compatibilidad.
  */
 function normalizeCuotaFlat(item) {
   const it = item && typeof item === "object" ? item : {};
 
-  const existingPoliza =
-    it.poliza && typeof it.poliza === "object" ? it.poliza : {};
-
-  const existingCliente =
-    existingPoliza?.cliente && typeof existingPoliza.cliente === "object"
-      ? existingPoliza.cliente
-      : it?.cliente && typeof it.cliente === "object"
-      ? it.cliente
-      : {};
+  const cliIn = it.cliente && typeof it.cliente === "object" ? it.cliente : {};
+  const polIn = it.poliza && typeof it.poliza === "object" ? it.poliza : {};
 
   const cliente = {
-    id:
-      existingCliente?.id ??
-      it?.cliente_id ??
-      it?.cliente?.id ??
-      existingPoliza?.cliente_id ??
-      null,
-    apellido: String(
-      existingCliente?.apellido ??
-        it?.cliente_apellido ??
-        it?.cliente?.apellido ??
-        existingPoliza?.cliente_apellido ??
-        ""
-    ).trim(),
-    nombre: String(
-      existingCliente?.nombre ??
-        it?.cliente_nombre ??
-        it?.cliente?.nombre ??
-        existingPoliza?.cliente_nombre ??
-        ""
-    ).trim(),
-    dni_cuit_cuil: String(
-      existingCliente?.dni_cuit_cuil ??
-        it?.cliente_dni ??
-        it?.cliente?.dni_cuit_cuil ??
-        it?.dni ??
-        existingPoliza?.cliente_dni ??
-        ""
-    ).trim(),
-    telefono: String(
-      existingCliente?.telefono ??
-        it?.cliente_telefono ??
-        it?.cliente?.telefono ??
-        existingPoliza?.cliente_telefono ??
-        ""
-    ).trim(),
+    id: cliIn?.cliente_id ?? null,
+    apellido: String(cliIn?.apellido ?? "").trim(),
+    nombre: String(cliIn?.nombre ?? "").trim(),
+    dni_cuit_cuil: String(cliIn?.dni_cuit_cuil ?? "").trim(),
+    telefono: String(cliIn?.telefono ?? "").trim(),
   };
-
-  const cliente_nombre = cliente.nombre;
-  const cliente_apellido = cliente.apellido;
-  const cliente_nombre_apellido = `${cliente.apellido} ${cliente.nombre}`.trim();
 
   const poliza = {
-    ...existingPoliza,
-    id: existingPoliza?.id ?? it?.poliza_id ?? it?.poliza?.id ?? null,
-    numero_poliza:
-      existingPoliza?.numero_poliza ??
-      it?.numero_poliza ??
-      it?.poliza_numero ??
-      it?.poliza?.numero_poliza ??
-      "",
-    patente:
-      existingPoliza?.patente ??
-      it?.patente ??
-      it?.poliza_patente ??
-      it?.poliza?.patente ??
-      "",
-    oficina:
-      existingPoliza?.oficina ??
-      it?.oficina ??
-      it?.oficina_nombre ??
-      it?.poliza_oficina ??
-      it?.poliza?.oficina ??
-      "",
-    compania:
-      existingPoliza?.compania ??
-      it?.compania ??
-      it?.compania_nombre ??
-      it?.poliza_compania ??
-      it?.poliza?.compania ??
-      "",
-
-    cliente: existingPoliza?.cliente || cliente,
-
-    cliente_nombre:
-      existingPoliza?.cliente_nombre || existingCliente?.nombre || cliente_nombre,
-    cliente_apellido:
-      existingPoliza?.cliente_apellido ||
-      existingCliente?.apellido ||
-      cliente_apellido,
-    cliente_nombre_apellido:
-      existingPoliza?.cliente_nombre_apellido ||
-      existingPoliza?.cliente_nombre_completo ||
-      cliente_nombre_apellido,
+    id: polIn?.poliza_id ?? null,
+    numero_poliza: String(polIn?.numero_poliza ?? "").trim(),
+    patente: String(polIn?.patente ?? "").trim(),
+    marca: String(polIn?.marca ?? "").trim(),
+    modelo: String(polIn?.modelo ?? "").trim(),
+    cobertura: String(polIn?.cobertura ?? "").trim(),
+    compania_nombre: String(polIn?.compania_nombre ?? "").trim(),
+    oficina: String(polIn?.oficina ?? "").trim(),
+    cliente, // ✅ compat PagosList / resolveCliente()
+    cliente_id: cliente.id ?? null,
+    cliente_nombre: cliente.nombre,
+    cliente_apellido: cliente.apellido,
+    cliente_nombre_apellido: `${cliente.apellido} ${cliente.nombre}`.trim(),
   };
 
-  const monto =
-    it?.monto ??
-    it?.monto_cuota ??
-    it?.importe ??
-    it?.precio_cuota ??
-    it?.monto_pagado ??
-    null;
-
   return {
-    ...it,
-    id: it?.cuota_id ?? it?.id,
-    cuota_nro: it?.cuota_nro ?? it?.nro ?? it?.numero ?? it?.cuota_numero,
-    cantidad_cuotas:
-      it?.cantidad_cuotas ??
-      it?.total_cuotas ??
-      it?.cuotas_total ??
-      it?.poliza_cantidad_cuotas ??
-      existingPoliza?.cantidad_cuotas ??
-      undefined,
-    fecha_vencimiento:
-      it?.fecha_vencimiento ??
-      it?.vencimiento ??
-      it?.fecha_vto ??
-      it?.vto ??
-      null,
-    fecha_pago: it?.fecha_pago ?? it?.pago_fecha ?? null,
-    pagado: Boolean(it?.pagado ?? it?.is_pagado ?? it?.estado_pagado),
-    monto,
-    forma_pago:
-      it?.forma_pago ?? it?.medio ?? it?.metodo ?? it?.pago_metodo ?? "",
+    id: it?.id ?? null,
+    cuota_nro: it?.cuota_nro ?? null,
+    monto: it?.monto ?? null,
+    pagado: Boolean(it?.pagado),
+    fecha_vencimiento: it?.fecha_vencimiento ?? null,
+    fecha_pago: it?.fecha_pago ?? null,
+    forma_pago: String(it?.forma_pago ?? "").trim(),
+
+    // observaciones (compat)
+    observaciones: String(it?.observaciones ?? "").trim(),
+    observaciones_pago: String(it?.observaciones ?? "").trim(),
+    ultima_observacion_pago: String(it?.ultima_observacion_pago ?? "").trim(),
+
+    total_cuotas: it?.total_cuotas ?? null,
+    cuota_label: String(it?.cuota_label ?? "").trim(),
+    cantidad_cuotas: it?.total_cuotas ?? null, // para PagosList (label 1/12)
+
     poliza,
+    cliente, // queda top-level también (para agrupación)
   };
 }
 
+/* ---------- agrupación por cliente (solo campos usados) ---------- */
 function clienteKeyFromCuota(c) {
-  const pol = c?.poliza || {};
-  const cli = pol?.cliente || {};
-  const id = cli?.id ?? pol?.cliente_id ?? c?.cliente_id ?? null;
+  const cli = c?.cliente || c?.poliza?.cliente || {};
+  const id = cli?.id ?? null;
   if (id !== null && id !== undefined && String(id).trim() !== "") return `id:${id}`;
-  const dni =
-    cli?.dni_cuit_cuil ??
-    pol?.cliente_dni ??
-    c?.cliente_dni ??
-    c?.dni ??
-    "";
-  const d = String(dni || "").trim();
-  if (d) return `dni:${d}`;
-  // fallback: nombre
-  const nom =
-    pol?.cliente_nombre_apellido ??
-    pol?.cliente_nombre_completo ??
-    `${pol?.cliente_apellido || ""} ${pol?.cliente_nombre || ""}`.trim();
-  const n = String(nom || "").trim().toLowerCase();
-  return n ? `nom:${n}` : "unknown";
+
+  const dni = String(cli?.dni_cuit_cuil ?? "").trim();
+  if (dni) return `dni:${dni}`;
+
+  const nom = `${String(cli?.apellido ?? "").trim()} ${String(cli?.nombre ?? "").trim()}`
+    .trim()
+    .toLowerCase();
+  return nom ? `nom:${nom}` : "unknown";
 }
 
 function clienteLabelFromCuota(c) {
-  const pol = c?.poliza || {};
-  const cli = pol?.cliente || {};
-  const ap = String(cli?.apellido ?? pol?.cliente_apellido ?? "").trim();
-  const nom = String(cli?.nombre ?? pol?.cliente_nombre ?? "").trim();
-
-  const full =
-    String(pol?.cliente_nombre_apellido || "").trim() ||
-    String(pol?.cliente_nombre_completo || "").trim() ||
-    [ap, nom].filter(Boolean).join(" ").trim();
-
-  return full || "Cliente";
+  const cli = c?.cliente || c?.poliza?.cliente || {};
+  const ap = String(cli?.apellido ?? "").trim();
+  const nom = String(cli?.nombre ?? "").trim();
+  return [ap, nom].filter(Boolean).join(" ").trim() || "Cliente";
 }
 
 function dniFromCuota(c) {
-  const pol = c?.poliza || {};
-  const cli = pol?.cliente || {};
-  const dni =
-    cli?.dni_cuit_cuil ??
-    pol?.cliente_dni ??
-    c?.cliente_dni ??
-    c?.dni ??
-    "";
-  return String(dni || "").trim();
+  const cli = c?.cliente || c?.poliza?.cliente || {};
+  return String(cli?.dni_cuit_cuil ?? "").trim();
 }
 
 function uniquePolizaLabel(pol) {
   const p = pol && typeof pol === "object" ? pol : {};
-  const nro = String(p.numero_poliza || p.numero || p.nro_poliza || "").trim();
+  const nro = String(p.numero_poliza || "").trim();
   const pat = String(p.patente || "").trim().toUpperCase();
   if (nro && pat) return `${nro} • ${pat}`;
   if (nro) return nro;
@@ -329,7 +223,6 @@ function uniquePolizaLabel(pol) {
 function computeClienteGroups(cuotasList) {
   const list = Array.isArray(cuotasList) ? cuotasList : [];
   const hoy = dayjs().startOf("day");
-
   const map = new Map();
 
   for (const c of list) {
@@ -338,7 +231,7 @@ function computeClienteGroups(cuotasList) {
     const dni = dniFromCuota(c);
 
     const pol = c?.poliza || {};
-    const polId = pol?.id ?? c?.poliza_id ?? null;
+    const polId = pol?.id ?? null;
     const polLabel = uniquePolizaLabel(pol);
 
     const hit =
@@ -349,7 +242,7 @@ function computeClienteGroups(cuotasList) {
         dni,
         cuotas: [],
         polizasSet: new Set(),
-        polizasLabels: new Map(), // id->label
+        polizasLabels: new Map(),
         total: 0,
         pagadas: 0,
         pendientes: 0,
@@ -357,17 +250,17 @@ function computeClienteGroups(cuotasList) {
         venceHoy: 0,
         porVencer: 0,
         totalMontoPendiente: 0,
-        proximoVto: null, // dayjs
+        proximoVto: null,
       };
 
     hit.cuotas.push(c);
     hit.total += 1;
 
     if (polId !== null && polId !== undefined) {
-      hit.polizasSet.add(String(polId));
-      if (!hit.polizasLabels.has(String(polId))) hit.polizasLabels.set(String(polId), polLabel);
+      const pid = String(polId);
+      hit.polizasSet.add(pid);
+      if (!hit.polizasLabels.has(pid)) hit.polizasLabels.set(pid, polLabel);
     } else {
-      // igual sumamos label (sin id)
       const pseudo = `x:${polLabel}`;
       hit.polizasSet.add(pseudo);
       if (!hit.polizasLabels.has(pseudo)) hit.polizasLabels.set(pseudo, polLabel);
@@ -388,7 +281,6 @@ function computeClienteGroups(cuotasList) {
 
         if (!hit.proximoVto || fv.isBefore(hit.proximoVto)) hit.proximoVto = fv;
       } else {
-        // si no hay vencimiento lo consideramos "por vencer" (no bloquea)
         hit.porVencer += 1;
       }
     }
@@ -397,13 +289,10 @@ function computeClienteGroups(cuotasList) {
   }
 
   const arr = Array.from(map.values());
-
-  // orden: primero con pendientes, más vencidas, luego por próximo vencimiento, luego nombre
   arr.sort((a, b) => {
     const ap = a.pendientes > 0 ? 1 : 0;
     const bp = b.pendientes > 0 ? 1 : 0;
     if (ap !== bp) return bp - ap;
-
     if (a.vencidas !== b.vencidas) return b.vencidas - a.vencidas;
 
     const av = a.proximoVto ? a.proximoVto.valueOf() : Number.POSITIVE_INFINITY;
@@ -421,59 +310,42 @@ function computeClienteGroups(cuotasList) {
   }));
 }
 
+/* ================== PAGE ================== */
 const PagosPage = () => {
   const dispatch = useDispatch();
 
-  // Tabs: "pagos" | "historial_pagos" | "historial_recordatorios"
   const [tab, setTab] = useState("pagos");
 
-  // Modales
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
 
-  // Estado local de cuotas (resultado de la búsqueda)
   const [cuotas, setCuotas] = useState([]);
   const [ocultarPagadas, setOcultarPagadas] = useState(false);
 
-  // ✅ nuevo: selección de cliente + modal cuotas del cliente
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // { key, label, dni, cuotas... }
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
 
-  // ✅ meta + query de la última búsqueda PRO
   const [lastBuscarQuery, setLastBuscarQuery] = useState("");
-  const [lastBuscarMeta, setLastBuscarMeta] = useState({
-    count: 0,
-    next: null,
-    previous: null,
-  });
+  const [lastBuscarMeta, setLastBuscarMeta] = useState({ count: 0, next: null, previous: null });
 
-  // Filtro de oficina para alertas
   const [alertasOficina, setAlertasOficina] = useState("ALL");
-
-  // Envío masivo de recordatorios
   const [sendingRecordatorios, setSendingRecordatorios] = useState(false);
 
-  // ---- Historial Pagos (filtros locales)
+  // ---- Historial Pagos
   const [hpModo, setHpModo] = useState("MES"); // "MES" | "DIA" | "RANGO"
-  const [hpMes, setHpMes] = useState(monthKey(new Date())); // YYYY-MM
-  const [hpDia, setHpDia] = useState(ymd(new Date())); // YYYY-MM-DD
-  const [hpDesde, setHpDesde] = useState(ymd(dayjs().startOf("month"))); // YYYY-MM-DD
-  const [hpHasta, setHpHasta] = useState(ymd(new Date())); // YYYY-MM-DD
-
-  const [hpOficina, setHpOficina] = useState("ALL"); // ALL | 1 | 2 | 3
-
-  // ✅ Debounce: input vs applied
+  const [hpMes, setHpMes] = useState(monthKey(new Date()));
+  const [hpDia, setHpDia] = useState(ymd(new Date()));
+  const [hpDesde, setHpDesde] = useState(ymd(dayjs().startOf("month")));
+  const [hpHasta, setHpHasta] = useState(ymd(new Date()));
+  const [hpOficina, setHpOficina] = useState("ALL");
   const [hpQInput, setHpQInput] = useState("");
   const [hpQApplied, setHpQApplied] = useState("");
-
   const [hpPage, setHpPage] = useState(1);
   const hpPageSize = 25;
-
   const [hpOrdering, setHpOrdering] = useState("-fecha_pago");
-
   const deferredHpQInput = useDeferredValue(hpQInput);
   const [isPending, startTransition] = useTransition();
 
-  // Estado global desde Redux (slice pagos)
+  // Redux
   const {
     mediosCobro = [],
     mpCuentas = [],
@@ -494,14 +366,12 @@ const PagosPage = () => {
     historialPagosDownloadPdfError = null,
   } = useSelector((state) => state.pagos || {});
 
-  const loadingHistorialRecordatorios =
-    historialRecordatoriosStatus === "loading";
+  const loadingHistorialRecordatorios = historialRecordatoriosStatus === "loading";
   const loadingHistorialPagos = historialPagosStatus === "loading";
   const downloadingCSV = historialPagosDownloadStatus === "loading";
   const downloadingPDF = historialPagosDownloadPdfStatus === "loading";
 
   /* ================== EFFECTS ================== */
-
   useEffect(() => {
     dispatch(fetchMediosCobro({ activo: true }));
   }, [dispatch]);
@@ -509,15 +379,12 @@ const PagosPage = () => {
   const mesesOptions = useMemo(() => {
     const out = [];
     const base = dayjs().startOf("month");
-    for (let i = 0; i < 18; i++)
-      out.push(base.subtract(i, "month").format("YYYY-MM"));
+    for (let i = 0; i < 18; i++) out.push(base.subtract(i, "month").format("YYYY-MM"));
     return out;
   }, []);
 
-  // ✅ Debounce de búsqueda (solo cuando estás en historial_pagos)
   useEffect(() => {
     if (tab !== "historial_pagos") return;
-
     const t = setTimeout(() => {
       const next = String(deferredHpQInput || "").trim();
       startTransition(() => {
@@ -525,24 +392,19 @@ const PagosPage = () => {
         setHpPage(1);
       });
     }, 350);
-
     return () => clearTimeout(t);
   }, [deferredHpQInput, tab, startTransition]);
 
   const handleChangeTab = useCallback(
     (nuevoTab) => {
       if (nuevoTab === tab) return;
-
       setTab(nuevoTab);
 
       if (nuevoTab === "historial_recordatorios") {
         dispatch(fetchHistorialRecordatorios());
         return;
       }
-
-      if (nuevoTab === "historial_pagos") {
-        setHpPage(1);
-      }
+      if (nuevoTab === "historial_pagos") setHpPage(1);
     },
     [dispatch, tab]
   );
@@ -559,46 +421,17 @@ const PagosPage = () => {
 
       let out;
       if (hpModo === "DIA") {
-        out = {
-          ...base,
-          dia: hpDia,
-          mes: undefined,
-          desde: undefined,
-          hasta: undefined,
-        };
+        out = { ...base, dia: hpDia, mes: undefined, desde: undefined, hasta: undefined };
       } else if (hpModo === "RANGO") {
-        out = {
-          ...base,
-          desde: hpDesde || undefined,
-          hasta: hpHasta || undefined,
-          mes: undefined,
-          dia: undefined,
-        };
+        out = { ...base, desde: hpDesde || undefined, hasta: hpHasta || undefined, mes: undefined, dia: undefined };
       } else {
-        out = {
-          ...base,
-          mes: hpMes,
-          dia: undefined,
-          desde: undefined,
-          hasta: undefined,
-        };
+        out = { ...base, mes: hpMes, dia: undefined, desde: undefined, hasta: undefined };
       }
 
       if (extra && typeof extra === "object") out = { ...out, ...extra };
       return out;
     },
-    [
-      hpModo,
-      hpOficina,
-      hpQApplied,
-      hpPage,
-      hpPageSize,
-      hpMes,
-      hpDia,
-      hpDesde,
-      hpHasta,
-      hpOrdering,
-    ]
+    [hpModo, hpOficina, hpQApplied, hpPage, hpPageSize, hpMes, hpDia, hpDesde, hpHasta, hpOrdering]
   );
 
   useEffect(() => {
@@ -607,14 +440,12 @@ const PagosPage = () => {
   }, [dispatch, tab, buildHistorialParams]);
 
   /* ================== HANDLERS ================== */
-
-  // ✅ PRO: PagosSearch devuelve CUOTAS APLANADAS + meta + query
   const handleBuscarPolizas = useCallback((cuotasFlat, meta, q) => {
     const lista = Array.isArray(cuotasFlat) ? cuotasFlat : [];
     const normalized = lista.map(normalizeCuotaFlat);
 
     setCuotas(normalized);
-    setClienteSeleccionado(null); // ✅ volvés al listado de clientes
+    setClienteSeleccionado(null);
 
     if (meta && typeof meta === "object") {
       setLastBuscarMeta({
@@ -623,11 +454,7 @@ const PagosPage = () => {
         previous: meta?.previous ?? null,
       });
     } else {
-      setLastBuscarMeta({
-        count: normalized.length,
-        next: null,
-        previous: null,
-      });
+      setLastBuscarMeta({ count: normalized.length, next: null, previous: null });
     }
 
     setLastBuscarQuery(String(q || "").trim());
@@ -641,16 +468,11 @@ const PagosPage = () => {
       const map = new Map();
 
       actualizadas.forEach((item) => {
-        if (item?.cuotaActualizada?.id) {
-          map.set(item.cuotaActualizada.id, {
-            ...item.cuotaActualizada,
-            observaciones_pago:
-              item.observaciones_pago ??
-              item.cuotaActualizada.observaciones_pago,
-          });
-        } else if (item?.id) {
-          map.set(item.id, item);
-        }
+        const obj = item?.cuotaActualizada && typeof item.cuotaActualizada === "object"
+          ? item.cuotaActualizada
+          : item;
+
+        if (obj?.id) map.set(obj.id, obj);
       });
 
       if (map.size === 0) return prevList;
@@ -661,18 +483,6 @@ const PagosPage = () => {
       });
     });
   }, []);
-
-  const handleOpenCuentas = useCallback(() => setShowCuentasModal(true), []);
-  const handleCloseCuentas = useCallback(() => setShowCuentasModal(false), []);
-
-  const handleOpenRecordatorios = useCallback(
-    () => setShowRecordatoriosModal(true),
-    []
-  );
-  const handleCloseRecordatorios = useCallback(
-    () => setShowRecordatoriosModal(false),
-    []
-  );
 
   const handleRefreshHistorialRecordatorios = useCallback(() => {
     dispatch(fetchHistorialRecordatorios());
@@ -688,10 +498,8 @@ const PagosPage = () => {
       q: hpQApplied || undefined,
       ordering: hpOrdering || "-fecha_pago",
     };
-
     if (hpModo === "DIA") return { ...base, dia: hpDia };
-    if (hpModo === "RANGO")
-      return { ...base, desde: hpDesde || undefined, hasta: hpHasta || undefined };
+    if (hpModo === "RANGO") return { ...base, desde: hpDesde || undefined, hasta: hpHasta || undefined };
     return { ...base, mes: hpMes };
   }, [hpModo, hpOficina, hpQApplied, hpMes, hpDia, hpDesde, hpHasta, hpOrdering]);
 
@@ -738,16 +546,9 @@ const PagosPage = () => {
   );
 
   /* ================== KPIs (tab pagos) ================== */
-
   const { totalCuotas, alDia, porVencer, venceHoy, vencidas } = useMemo(() => {
     const hoy = dayjs().startOf("day");
-    const stats = {
-      totalCuotas: 0,
-      alDia: 0,
-      porVencer: 0,
-      venceHoy: 0,
-      vencidas: 0,
-    };
+    const stats = { totalCuotas: 0, alDia: 0, porVencer: 0, venceHoy: 0, vencidas: 0 };
 
     (cuotas || []).forEach((c) => {
       stats.totalCuotas += 1;
@@ -785,23 +586,20 @@ const PagosPage = () => {
   );
 
   /* ================== KPIs (tab historial pagos) ================== */
-
   const hpKpis = useMemo(() => {
     const items = Array.isArray(historialPagosItems) ? historialPagosItems : [];
     let total = 0;
     let count = 0;
     items.forEach((it) => {
       count += 1;
-      const monto =
-        it?.monto_pagado ?? it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
+      const monto = it?.monto_pagado ?? it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
       const n = Number(monto);
       if (Number.isFinite(n)) total += n;
     });
     return { count, total };
   }, [historialPagosItems]);
 
-  /* ================== NUEVO: LISTA DE CLIENTES (desde cuotas buscadas) ================== */
-
+  /* ================== LISTA DE CLIENTES ================== */
   const clienteGroups = useMemo(() => computeClienteGroups(cuotas), [cuotas]);
 
   const visibleCuotasEnModal = useMemo(() => {
@@ -810,14 +608,10 @@ const PagosPage = () => {
     return (Array.isArray(cuotas) ? cuotas : []).filter((c) => clienteKeyFromCuota(c) === key);
   }, [cuotas, clienteSeleccionado]);
 
-  const abrirCliente = useCallback((g) => {
-    setClienteSeleccionado(g);
-  }, []);
-
+  const abrirCliente = useCallback((g) => setClienteSeleccionado(g), []);
   const cerrarClienteModal = useCallback(() => setClienteSeleccionado(null), []);
 
   /* ================== RENDER ================== */
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-10 2xl:px-12 py-4 sm:py-6">
@@ -839,7 +633,7 @@ const PagosPage = () => {
           <div className="flex items-center gap-2">
             <motion.button
               type="button"
-              onClick={handleOpenCuentas}
+              onClick={() => setShowCuentasModal(true)}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-800/70 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-slate-200 shadow-sm hover:bg-slate-700/80 cursor-pointer"
@@ -850,16 +644,14 @@ const PagosPage = () => {
 
             <motion.button
               type="button"
-              onClick={handleOpenRecordatorios}
+              onClick={() => setShowRecordatoriosModal(true)}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.96 }}
               className="inline-flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80"
               style={{ backgroundColor: "#25D366" }}
             >
               <HiSpeakerphone className="text-base sm:text-lg" />
-              <span>
-                {sendingRecordatorios ? "Enviando recordatorios..." : "Enviar recordatorios"}
-              </span>
+              <span>{sendingRecordatorios ? "Enviando recordatorios..." : "Enviar recordatorios"}</span>
             </motion.button>
           </div>
         </div>
@@ -889,16 +681,14 @@ const PagosPage = () => {
           </div>
         )}
 
-        {/* Tabs navegación */}
+        {/* Tabs */}
         <div className="mb-3 sm:mb-4">
           <div className="inline-flex p-1 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-[0_0_18px_rgba(15,23,42,0.85)]">
             <button
               type="button"
               onClick={() => handleChangeTab("pagos")}
               className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
-                tab === "pagos"
-                  ? "bg-slate-800 text-slate-50"
-                  : "text-slate-400 hover:text-slate-100"
+                tab === "pagos" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"
               }`}
             >
               <HiBadgeCheck className="text-sm sm:text-base" />
@@ -962,8 +752,7 @@ const PagosPage = () => {
 
               {!!lastBuscarQuery && (
                 <div className="text-xs text-slate-500">
-                  Última búsqueda:{" "}
-                  <span className="text-slate-300 font-semibold">{lastBuscarQuery}</span>
+                  Última búsqueda: <span className="text-slate-300 font-semibold">{lastBuscarQuery}</span>
                   {Number(lastBuscarMeta?.count || 0) > 0 ? (
                     <>
                       {" "}
@@ -982,7 +771,7 @@ const PagosPage = () => {
               )}
             </div>
 
-            {/* ✅ NUEVO: lista de clientes encontrados */}
+            {/* Lista de clientes */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
@@ -1077,7 +866,8 @@ const PagosPage = () => {
                               </span>
 
                               <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-emerald-500/10 border-emerald-400/25 text-emerald-200">
-                                Total a cobrar: <span className="ml-1 tabular-nums">{fmtMoney(g.totalMontoPendiente)}</span>
+                                Total a cobrar:{" "}
+                                <span className="ml-1 tabular-nums">{fmtMoney(g.totalMontoPendiente)}</span>
                               </span>
                             </div>
 
@@ -1101,9 +891,7 @@ const PagosPage = () => {
 
                             <div className="mt-3 text-xs text-slate-500">
                               Próximo vencimiento:{" "}
-                              <span className="text-slate-200 font-semibold tabular-nums">
-                                {g.proximoVtoStr}
-                              </span>
+                              <span className="text-slate-200 font-semibold tabular-nums">{g.proximoVtoStr}</span>
                             </div>
                           </div>
 
@@ -1120,7 +908,7 @@ const PagosPage = () => {
 
             <CuotasAlertas oficina={alertasOficina} onOficinaChange={setAlertasOficina} />
 
-            {/* ✅ Modal: cuotas del cliente seleccionado */}
+            {/* Modal cliente */}
             <AnimatePresence>
               {!!clienteSeleccionado && (
                 <motion.div
@@ -1129,10 +917,7 @@ const PagosPage = () => {
                   exit={{ opacity: 0 }}
                   className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center"
                 >
-                  <div
-                    className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                    onClick={cerrarClienteModal}
-                  />
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={cerrarClienteModal} />
 
                   <motion.div
                     initial={{ y: 22, opacity: 0, scale: 0.98 }}
@@ -1143,7 +928,6 @@ const PagosPage = () => {
                     role="dialog"
                     aria-modal="true"
                   >
-                    {/* header modal */}
                     <div className="px-4 sm:px-6 py-4 border-b border-slate-800 bg-slate-950/70">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1204,7 +988,6 @@ const PagosPage = () => {
                       </div>
                     </div>
 
-                    {/* body modal: PagosList con cuotas del cliente */}
                     <div className="p-0">
                       <PagosList
                         cuotas={visibleCuotasEnModal}
@@ -1222,18 +1005,16 @@ const PagosPage = () => {
             </AnimatePresence>
           </motion.div>
         ) : tab === "historial_pagos" ? (
-          /* ---- (historial pagos) ---- */
+          /* ---- historial pagos ---- */
           <motion.div
             key="tab-historial-pagos"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-3 sm:space-y-4"
           >
-            {/* === tu historial (SIN CAMBIOS) === */}
             {/* Filtros */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
               <div className="flex flex-col lg:flex-row gap-2 lg:items-end">
-                {/* Modo */}
                 <div className="w-full lg:w-56">
                   <label className="block text-xs text-slate-400 mb-1">Filtro</label>
                   <select
@@ -1250,7 +1031,6 @@ const PagosPage = () => {
                   </select>
                 </div>
 
-                {/* Inputs según modo */}
                 {hpModo === "MES" ? (
                   <div className="flex-1">
                     <label className="block text-xs text-slate-400 mb-1">Mes</label>
@@ -1360,12 +1140,9 @@ const PagosPage = () => {
                       </button>
                     )}
                   </div>
-                  {!!hpQInput &&
-                    (hpQApplied !== String(hpQInput || "").trim() || isPending) && (
-                      <div className="mt-1 text-[0.72rem] text-slate-500">
-                        Aplicando búsqueda…
-                      </div>
-                    )}
+                  {!!hpQInput && (hpQApplied !== String(hpQInput || "").trim() || isPending) && (
+                    <div className="mt-1 text-[0.72rem] text-slate-500">Aplicando búsqueda…</div>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
@@ -1416,39 +1193,24 @@ const PagosPage = () => {
                 </div>
               </div>
 
-              {(historialPagosError ||
-                historialPagosDownloadError ||
-                historialPagosDownloadPdfError) && (
+              {(historialPagosError || historialPagosDownloadError || historialPagosDownloadPdfError) && (
                 <div className="mt-3 text-sm text-rose-300 bg-rose-500/10 border border-rose-400/20 rounded-2xl px-3 py-2">
-                  {safe(
-                    historialPagosDownloadError ||
-                      historialPagosDownloadPdfError ||
-                      historialPagosError,
-                    "Error"
-                  )}
+                  {safe(historialPagosDownloadError || historialPagosDownloadPdfError || historialPagosError, "Error")}
                 </div>
               )}
 
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="rounded-2xl bg-slate-950/50 border border-slate-800 px-3 py-2">
-                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">
-                    Pagos (página)
-                  </div>
+                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">Pagos (página)</div>
                   <div className="text-lg font-semibold tabular-nums">{hpKpis.count}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-950/50 border border-slate-800 px-3 py-2">
-                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">
-                    Total (página)
-                  </div>
+                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">Total (página)</div>
                   <div className="text-lg font-semibold tabular-nums">{fmtMoney(hpKpis.total)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-950/50 border border-slate-800 px-3 py-2">
-                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">
-                    Total backend
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums">
-                    {Number(historialPagosMeta?.count || 0) || 0}
-                  </div>
+                  <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">Total backend</div>
+                  <div className="text-lg font-semibold tabular-nums">{Number(historialPagosMeta?.count || 0) || 0}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-950/50 border border-slate-800 px-3 py-2">
                   <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">Estado</div>
@@ -1465,7 +1227,7 @@ const PagosPage = () => {
               </div>
             </div>
 
-            {/* Tabla (SIN CAMBIOS) */}
+            {/* Tabla */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] overflow-hidden">
               <div className="overflow-auto">
                 <table className="min-w-[1120px] w-full text-sm">
@@ -1509,9 +1271,7 @@ const PagosPage = () => {
                         const cuotaLabel =
                           it?.cuota_label ||
                           it?.cuota_va ||
-                          (it?.cuota_nro !== undefined && it?.cuota_nro !== null
-                            ? String(it.cuota_nro)
-                            : "");
+                          (it?.cuota_nro !== undefined && it?.cuota_nro !== null ? String(it.cuota_nro) : "");
 
                         return (
                           <tr
@@ -1531,9 +1291,7 @@ const PagosPage = () => {
                               {safe(cuotaLabel, "—")}
                             </td>
 
-                            <td className="px-3 py-2 text-slate-100 font-medium">
-                              {safe(clienteNombre)}
-                            </td>
+                            <td className="px-3 py-2 text-slate-100 font-medium">{safe(clienteNombre)}</td>
                             <td className="px-3 py-2 text-slate-300">{safe(dni)}</td>
                             <td className="px-3 py-2 text-slate-200">{safe(patente)}</td>
                             <td className="px-3 py-2 text-slate-300">{safe(numeroPoliza)}</td>
@@ -1549,9 +1307,7 @@ const PagosPage = () => {
                     ) : (
                       <tr>
                         <td colSpan={11} className="px-3 py-10 text-center text-slate-400">
-                          {loadingHistorialPagos
-                            ? "Cargando historial de pagos..."
-                            : "No hay pagos registrados con esos filtros."}
+                          {loadingHistorialPagos ? "Cargando historial de pagos..." : "No hay pagos registrados con esos filtros."}
                         </td>
                       </tr>
                     )}
