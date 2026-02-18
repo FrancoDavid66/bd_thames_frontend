@@ -1,5 +1,6 @@
 /* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + cancelación + force real
    + DNI-first: buscar-cliente + cuotas por póliza (Redux)
+   + ✅ Patente/texto: cuotas directo por /api/pagos/buscar/?q=... (nuevo thunk fetchCuotasBuscar)
 */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
@@ -131,13 +132,20 @@ function buildBuscarParams(p) {
   const q = String(query || "").trim();
 
   const page = Number(pp?.page ?? 1) || 1;
-  const page_size = Math.max(1, Math.min(500, Number(pp?.page_size ?? pp?.limit ?? 250) || 250));
+  const page_size = Math.max(
+    1,
+    Math.min(500, Number(pp?.page_size ?? pp?.limit ?? 250) || 250)
+  );
 
   const oficina = pp?.oficina;
   const ordering = pp?.ordering;
 
   const includePagadas = Boolean(pp?.include_pagadas);
   const ocultar_pagadas = includePagadas ? 0 : 1;
+
+  // ✅ compat: si te pasan solo_pendientes, lo traducimos a ocultar_pagadas
+  const solo_pendientes =
+    pp?.solo_pendientes === undefined ? undefined : Boolean(pp?.solo_pendientes);
 
   return compact({
     q,
@@ -147,7 +155,9 @@ function buildBuscarParams(p) {
     page,
     page_size,
     limit: pp?.limit, // compat
-    ocultar_pagadas,
+    ocultar_pagadas:
+      solo_pendientes === undefined ? ocultar_pagadas : solo_pendientes ? 1 : 0,
+    solo_pendientes: solo_pendientes ? 1 : solo_pendientes === false ? 0 : undefined, // por si backend lo usa
   });
 }
 
@@ -209,6 +219,8 @@ let polizasAbort = null;
 let buscarAbort = null;
 let clienteDniAbort = null;
 let cuotasPolizaAbort = null;
+// ✅ nuevo: para búsqueda por patente/texto (cuotas directo)
+let cuotasBuscarAbort = null;
 
 /* ===================== ENRIQUECIMIENTO CLIENTE EN BUSCAR ===================== */
 async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
@@ -637,6 +649,98 @@ export const fetchPagosBuscar = createAsyncThunk(
   }
 );
 
+/* ✅ NUEVO: cuotas directo por PATENTE (o texto) -> /pagos/buscar/?q=...&solo_pendientes=1
+   (no pisa buscarItems/buscarStatus, solo expone cuotasBuscarStatus/error para el botón)
+*/
+export const fetchCuotasBuscar = createAsyncThunk(
+  "pagos/fetchCuotasBuscar",
+  async (arg, { rejectWithValue, getState }) => {
+    try {
+      const pp = arg && typeof arg === "object" ? arg : {};
+      const force = Boolean(pp?.force);
+
+      const built = buildBuscarParams(pp);
+      const cacheKey = buildBuscarCacheKey(built);
+
+      const queryStr = String(built?.q || "").trim();
+      if (!queryStr) {
+        return {
+          items: [],
+          meta: { count: 0, next: null, previous: null },
+          originalQuery: "",
+          cacheKey,
+          fromCache: true,
+          _force: false,
+          _polizaByIdToCache: null,
+        };
+      }
+
+      if (!force) {
+        const st = getState()?.pagos;
+        const hit = st?.buscarCache?.[cacheKey];
+        if (hit && isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) && Array.isArray(hit.items) && hit.meta) {
+          return {
+            items: hit.items,
+            meta: hit.meta,
+            originalQuery: hit.originalQuery || queryStr,
+            cacheKey,
+            fromCache: true,
+            _force: false,
+            _polizaByIdToCache: null,
+          };
+        }
+      }
+
+      if (cuotasBuscarAbort) {
+        try { cuotasBuscarAbort.abort(); } catch {}
+      }
+      cuotasBuscarAbort = new AbortController();
+
+      const { data } = await axios.get(API("pagos/buscar/"), {
+        params: built,
+        signal: cuotasBuscarAbort.signal,
+      });
+
+      let items = [];
+      let meta = { count: 0, next: null, previous: null };
+
+      if (data && typeof data === "object" && "results" in data) {
+        items = Array.isArray(data.results) ? data.results : [];
+        meta = { count: Number(data.count || 0) || 0, next: data.next ?? null, previous: data.previous ?? null };
+      } else {
+        items = Array.isArray(unwrap(data)) ? unwrap(data) : [];
+        meta = { count: items.length, next: null, previous: null };
+      }
+
+      // opcional: mismo enriquecimiento (queda prolijo en UI)
+      let polizaByIdToCache = null;
+      const enriched = await enrichBuscarItemsWithPolizaCliente(items, {
+        getState,
+        signal: cuotasBuscarAbort.signal,
+      });
+
+      if (enriched && typeof enriched === "object" && "items" in enriched) {
+        items = Array.isArray(enriched.items) ? enriched.items : items;
+        polizaByIdToCache = enriched.polizasById || null;
+      }
+
+      return {
+        items,
+        meta,
+        originalQuery: queryStr,
+        cacheKey,
+        fromCache: false,
+        _force: force,
+        _polizaByIdToCache: polizaByIdToCache,
+      };
+    } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return rejectWithValue({ _aborted: true });
+      if (error?.name === "AbortError") return rejectWithValue({ _aborted: true });
+      return rejectWithValue(error?.response?.data || "Error al buscar cuotas");
+    }
+  }
+);
+
 /* ✅ DNI-FIRST: trae cliente + pólizas */
 export const fetchBuscarClientePorDni = createAsyncThunk(
   "pagos/fetchBuscarClientePorDni",
@@ -933,6 +1037,10 @@ const initialState = {
   buscarCache: {},
   buscarCacheOrder: [],
 
+  // ✅ NUEVO: status/error para cuotas directo (patente/texto)
+  cuotasBuscarStatus: "idle",
+  cuotasBuscarError: null,
+
   // ✅ cache por ID de póliza para enriquecer cliente (rápido)
   polizaByIdCache: {}, // { [id]: { ts, poliza } }
   polizaByIdOrder: [],
@@ -1153,6 +1261,9 @@ const pagosSlice = createSlice({
       state.cuotasPolizaMeta = { count: 0, next: null, previous: null };
       state.cuotasPolizaStatus = "idle";
       state.cuotasPolizaError = null;
+
+      state.cuotasBuscarStatus = "idle";
+      state.cuotasBuscarError = null;
     },
 
     pushRecienteDni(state, action) {
@@ -1174,6 +1285,9 @@ const pagosSlice = createSlice({
       state.buscarMeta = { count: 0, next: null, previous: null };
       state.buscarStatus = "idle";
       state.buscarError = null;
+
+      state.cuotasBuscarStatus = "idle";
+      state.cuotasBuscarError = null;
 
       // DNI-first también se limpia cuando “clearSearch”
       state.buscarClienteData = null;
@@ -1198,6 +1312,34 @@ const pagosSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
+
+      // --- ✅ CUOTAS DIRECTO (patente/texto) ---
+      .addCase(fetchCuotasBuscar.pending, (state) => {
+        state.cuotasBuscarStatus = "loading";
+        state.cuotasBuscarError = null;
+      })
+      .addCase(fetchCuotasBuscar.fulfilled, (state, action) => {
+        state.cuotasBuscarStatus = "succeeded";
+        state.cuotasBuscarError = null;
+
+        // reutilizamos cache global de buscar (misma key)
+        const p = action.payload || {};
+        if (p.cacheKey) {
+          saveBuscarCache(state, p.cacheKey, p.originalQuery, p.items || [], p.meta);
+        }
+        if (p._polizaByIdToCache) {
+          savePolizaByIdCache(state, p._polizaByIdToCache);
+        }
+      })
+      .addCase(fetchCuotasBuscar.rejected, (state, action) => {
+        if (action?.payload && action.payload._aborted) {
+          state.cuotasBuscarStatus = "idle";
+          state.cuotasBuscarError = null;
+          return;
+        }
+        state.cuotasBuscarStatus = "failed";
+        state.cuotasBuscarError = action.payload || "Error buscando cuotas";
+      })
 
       // --- DNI-FIRST: buscar cliente + pólizas ---
       .addCase(fetchBuscarClientePorDni.pending, (state, action) => {

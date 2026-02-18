@@ -1,7 +1,8 @@
-/* src/components/pagos/PagosSearch.jsx — DNI-first (rápido, con Redux)
-   ✅ Busca CLIENTE + PÓLIZAS por DNI: thunk fetchBuscarClientePorDni -> GET /api/pagos/buscar-cliente/?dni=...
-   ✅ Luego trae SOLO CUOTAS por póliza: thunk fetchCuotasPorPoliza -> GET /api/pagos/buscar/?poliza_id=...&solo_pendientes=1
-   ✅ Mantiene: recientes, "/", anti-stale (via abort en thunks), Esc limpia.
+/* src/components/pagos/PagosSearch.jsx — DNI-first + Patente (rápido, con Redux)
+   ✅ DNI: fetchBuscarClientePorDni -> GET /api/pagos/buscar-cliente/?dni=...
+   ✅ Cuotas por póliza: fetchCuotasPorPoliza -> GET /api/pagos/buscar/?poliza_id=...&solo_pendientes=1
+   ✅ Patente: fetchCuotasBuscar -> GET /api/pagos/buscar/?q=...&solo_pendientes=1   (NUEVO)
+   ✅ Mantiene: recientes DNI, "/", anti-stale (via abort en thunks), Esc limpia.
 */
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -13,12 +14,29 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   fetchBuscarClientePorDni,
   fetchCuotasPorPoliza,
+  // ✅ NUEVO thunk (lo agregamos en pagosSlice.js)
+  fetchCuotasBuscar,
   pushRecienteDni,
   clearBuscarCliente,
 } from "../../store/slices/pagosSlice";
 
 /* Solo dígitos (para DNI) */
 const onlyDigits = (s) => String(s || "").replace(/\D+/g, "");
+
+/* Normaliza patente: AAA123 o AA123BB, etc */
+const normalizePatente = (s) =>
+  String(s || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ""); // saca espacios/guiones/puntos
+
+/* Heurística: si (solo) dígitos => DNI */
+const isLikelyDni = (raw) => {
+  const d = onlyDigits(raw);
+  if (!d) return false;
+  // DNI típico 7-9 dígitos (Argentina)
+  return d.length >= 6 && d.length <= 11 && d === String(raw || "").replace(/\D+/g, "");
+};
 
 export default function PagosSearch({ onBuscar }) {
   const dispatch = useDispatch();
@@ -34,10 +52,16 @@ export default function PagosSearch({ onBuscar }) {
     buscarClienteError,
     cuotasPolizaStatus,
     cuotasPolizaError,
+    // ⚠️ si no existe en tu slice, no pasa nada (queda undefined)
+    cuotasBuscarStatus,
+    cuotasBuscarError,
     recientesDni,
-  } = useSelector((s) => s.pagos);
+  } = useSelector((s) => s.pagos || {});
 
-  const busy = buscarClienteStatus === "loading" || cuotasPolizaStatus === "loading";
+  const busy =
+    buscarClienteStatus === "loading" ||
+    cuotasPolizaStatus === "loading" ||
+    cuotasBuscarStatus === "loading";
 
   useEffect(() => {
     inputRef.current?.focus?.();
@@ -75,12 +99,15 @@ export default function PagosSearch({ onBuscar }) {
     requestAnimationFrame(() => inputRef.current?.focus?.());
   }, [dispatch]);
 
-  const usarReciente = useCallback((q) => {
-    setQuery(String(q || ""));
-    setSelectedPolizaId("");
-    dispatch(clearBuscarCliente());
-    requestAnimationFrame(() => inputRef.current?.focus?.());
-  }, [dispatch]);
+  const usarReciente = useCallback(
+    (q) => {
+      setQuery(String(q || ""));
+      setSelectedPolizaId("");
+      dispatch(clearBuscarCliente());
+      requestAnimationFrame(() => inputRef.current?.focus?.());
+    },
+    [dispatch]
+  );
 
   // 1) Buscar cliente + pólizas (por DNI)
   const buscarClientePorDni = useCallback(
@@ -134,7 +161,6 @@ export default function PagosSearch({ onBuscar }) {
           poliza_id: pid,
           solo_pendientes: 1,
           page_size: 200,
-          // opcional: usar dni para key/caché (y para devolverlo al onBuscar)
           dni: dniDigitsForMeta,
         })
       ).unwrap();
@@ -151,27 +177,75 @@ export default function PagosSearch({ onBuscar }) {
     [dispatch, onBuscar]
   );
 
+  // ✅ NUEVO: Traer cuotas directo por PATENTE (o cualquier q general)
+  const traerCuotasPorPatente = useCallback(
+    async (patenteRaw) => {
+      const q = normalizePatente(patenteRaw);
+      if (!q) {
+        toast.error("Escribí una patente.");
+        return;
+      }
+
+      // importante: si venías de un DNI, limpiamos el bloque de cliente
+      dispatch(clearBuscarCliente());
+      setSelectedPolizaId("");
+
+      const res = await dispatch(
+        fetchCuotasBuscar({
+          q,
+          solo_pendientes: 1,
+          page_size: 200,
+        })
+      ).unwrap();
+
+      const items = Array.isArray(res?.items) ? res.items : [];
+      const meta = res?.meta || { count: items.length, next: null, previous: null };
+
+      onBuscar?.(items, meta, q);
+
+      if (!items || items.length === 0) {
+        toast("No hay cuotas pendientes para esa patente.");
+      }
+    },
+    [dispatch, onBuscar]
+  );
+
   const handleSubmit = useCallback(
     async (e, qOverride = null) => {
       e?.preventDefault?.();
       const q = String(qOverride ?? query).trim();
-      await buscarClientePorDni(q);
+      if (!q) return;
+
+      // DNI (solo números) => flujo actual
+      if (isLikelyDni(q)) {
+        await buscarClientePorDni(q);
+        return;
+      }
+
+      // Patente / texto => cuotas directo
+      await traerCuotasPorPatente(q);
     },
-    [buscarClientePorDni, query]
+    [buscarClientePorDni, query, traerCuotasPorPatente]
   );
 
-  // Mensajes de error (si querés verlos)
+  // Mensajes de error (opcionales)
   useEffect(() => {
     if (buscarClienteError && typeof buscarClienteError === "string") {
-      // opcional: toast.error(buscarClienteError)
+      // toast.error(buscarClienteError)
     }
   }, [buscarClienteError]);
 
   useEffect(() => {
     if (cuotasPolizaError && typeof cuotasPolizaError === "string") {
-      // opcional: toast.error(cuotasPolizaError)
+      // toast.error(cuotasPolizaError)
     }
   }, [cuotasPolizaError]);
+
+  useEffect(() => {
+    if (cuotasBuscarError && typeof cuotasBuscarError === "string") {
+      // toast.error(cuotasBuscarError)
+    }
+  }, [cuotasBuscarError]);
 
   const clienteLabel = useMemo(() => {
     const c = buscarClienteData?.cliente;
@@ -198,7 +272,7 @@ export default function PagosSearch({ onBuscar }) {
         onSubmit={handleSubmit}
         className="w-full"
         role="search"
-        aria-label="Buscar cliente por DNI para gestionar pagos"
+        aria-label="Buscar cliente por DNI o patente para gestionar pagos"
       >
         <div className="flex w-full gap-2">
           <label className="relative flex-1">
@@ -214,8 +288,8 @@ export default function PagosSearch({ onBuscar }) {
               onKeyDown={(e) => {
                 if (e.key === "Escape") limpiar();
               }}
-              placeholder="Buscar por DNI…"
-              inputMode="numeric"
+              placeholder="Buscar por DNI o Patente…"
+              inputMode="text"
               className="w-full h-14 bg-neutral-900/70 border border-neutral-700/70 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 rounded-2xl pl-12 pr-12 text-base md:text-lg outline-none transition"
             />
 
@@ -238,7 +312,7 @@ export default function PagosSearch({ onBuscar }) {
             disabled={busy}
             className="h-14 px-6 rounded-2xl bg-primary-500/90 hover:bg-primary-500 text-white font-semibold shadow-sm ring-1 ring-primary-400/40 disabled:opacity-60 disabled:cursor-not-allowed transition flex items-center gap-2"
           >
-            {buscarClienteStatus === "loading" ? (
+            {busy ? (
               <span className="inline-flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
                 Buscando…
@@ -261,7 +335,7 @@ export default function PagosSearch({ onBuscar }) {
 
       {recientes.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-500 mr-1">Recientes:</span>
+          <span className="text-xs text-neutral-500 mr-1">Recientes (DNI):</span>
           {recientes.map((q) => (
             <button
               key={q}
@@ -276,7 +350,7 @@ export default function PagosSearch({ onBuscar }) {
         </div>
       )}
 
-      {/* Resultados: Cliente + Pólizas */}
+      {/* Resultados: Cliente + Pólizas (solo para DNI) */}
       {buscarClienteData?.cliente && (
         <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950/50 p-4">
           <div className="flex items-start justify-between gap-3">
