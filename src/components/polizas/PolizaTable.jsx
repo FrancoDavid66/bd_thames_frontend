@@ -22,19 +22,43 @@ function startOfDay(d) {
 }
 
 function diffDays(a, b) {
-  // a - b en días, ambos startOfDay
   return Math.floor((a.getTime() - b.getTime()) / 86400000);
 }
 
 function normalizeEstadoCuotasKey(raw) {
   const v = (raw || "").toString().trim().toLowerCase();
-  // soporta backend: al_dia, por_vencer, vence_hoy, vencida_7, vencida_30, vencidas
-  // soporta variantes: mora_*, etc (si aparecieran)
   if (!v) return "";
   return v;
 }
 
-function computeCuotasBadge(poliza) {
+const CUOTAS_STYLES = {
+  al_dia: {
+    label: "AL DÍA",
+    clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/5",
+  },
+  por_vencer: {
+    label: "POR VENCER",
+    clase: "border-amber-500/60 text-amber-300 bg-amber-500/5",
+  },
+  vence_hoy: {
+    label: "VENCE HOY",
+    clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
+  },
+  vencida_7: {
+    label: "VENCIDA (7 días)",
+    clase: "border-amber-500/70 text-amber-300 bg-amber-500/10",
+  },
+  vencida_30: {
+    label: "VENCIDA (30 días)",
+    clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
+  },
+  vencidas: {
+    label: "VENCIDAS",
+    clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
+  },
+};
+
+function computeCuotasBadgeFast(poliza) {
   const keyFromBackend = normalizeEstadoCuotasKey(poliza?.estado_cuotas);
 
   const impagasCount = toIntOrNaN(poliza?.impagas_count ?? poliza?.impagasCount);
@@ -50,10 +74,8 @@ function computeCuotasBadge(poliza) {
 
   const impagas = countImpagas();
 
-  // Si backend ya nos dice el estado → usarlo
   let key = keyFromBackend;
 
-  // Si no vino key, intentamos con proxima_vencimiento_impaga (barato)
   if (!key) {
     const proxRaw =
       poliza?.proxima_vencimiento_impaga ||
@@ -68,7 +90,7 @@ function computeCuotasBadge(poliza) {
       if (Number.isNaN(prox.getTime())) {
         key = "vencidas";
       } else {
-        const d = diffDays(hoy, prox); // >0 vencida | 0 hoy | <0 futura
+        const d = diffDays(hoy, prox);
         if (d === 0) key = "vence_hoy";
         else if (d > 0) {
           if (d <= 7) key = "vencida_7";
@@ -80,7 +102,6 @@ function computeCuotasBadge(poliza) {
         }
       }
     } else if (cuotasArr) {
-      // Fallback caro (solo si no vino nada útil)
       if (impagas <= 0) key = "al_dia";
       else {
         const hoy = startOfDay(new Date());
@@ -113,34 +134,7 @@ function computeCuotasBadge(poliza) {
     }
   }
 
-  const styles = {
-    al_dia: {
-      label: "AL DÍA",
-      clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/5",
-    },
-    por_vencer: {
-      label: "POR VENCER",
-      clase: "border-amber-500/60 text-amber-300 bg-amber-500/5",
-    },
-    vence_hoy: {
-      label: "VENCE HOY",
-      clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
-    },
-    vencida_7: {
-      label: "VENCIDA (7 días)",
-      clase: "border-amber-500/70 text-amber-300 bg-amber-500/10",
-    },
-    vencida_30: {
-      label: "VENCIDA (30 días)",
-      clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
-    },
-    vencidas: {
-      label: "VENCIDAS",
-      clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
-    },
-  };
-
-  const st = styles[key] || styles.vencidas;
+  const st = CUOTAS_STYLES[key] || CUOTAS_STYLES.vencidas;
 
   return {
     key,
@@ -148,6 +142,27 @@ function computeCuotasBadge(poliza) {
     clase: st.clase,
     extra: `${impagas} impagas`,
   };
+}
+
+function useCuotasBadge(poliza) {
+  const id = poliza?.id;
+  const estado_cuotas = poliza?.estado_cuotas || "";
+  const impagas_count = poliza?.impagas_count ?? poliza?.impagasCount ?? "";
+  const prox =
+    poliza?.proxima_vencimiento_impaga ||
+    poliza?.proximaVencimientoImpaga ||
+    poliza?.proxima_vencimiento ||
+    "";
+
+  const cuotasRef = poliza?.cuotas;
+
+  return useMemo(() => computeCuotasBadgeFast(poliza), [
+    id,
+    estado_cuotas,
+    impagas_count,
+    prox,
+    cuotasRef,
+  ]);
 }
 
 /* ---------------- UI Pieces ---------------- */
@@ -189,8 +204,8 @@ const SortHeader = memo(function SortHeader({
   );
 });
 
-const CuotasBadge = memo(function CuotasBadge({ poliza }) {
-  const est = computeCuotasBadge(poliza);
+const CuotasBadge = memo(function CuotasBadge({ est }) {
+  if (!est) return null;
   return (
     <div className="flex flex-col gap-1 text-xs">
       <span
@@ -206,198 +221,224 @@ const CuotasBadge = memo(function CuotasBadge({ poliza }) {
 
 /* ---------------- Rows (memo) ---------------- */
 
-const DesktopRow = memo(function DesktopRow({
-  poliza,
-  zebra,
-  isDeleting,
-  onEditClick,
-  onDeleteClick,
-}) {
-  const activa = (poliza?.estado || "").toString().toLowerCase() === "activa";
+const DesktopRow = memo(
+  function DesktopRow({ poliza, zebra, isDeleting, onEditClick, onDeleteClick }) {
+    const activa = (poliza?.estado || "").toString().toLowerCase() === "activa";
+    const clienteNombre = `${poliza?.cliente?.nombre || ""} ${
+      poliza?.cliente?.apellido || ""
+    }`.trim();
 
-  const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
+    const cuotasEst = useCuotasBadge(poliza);
 
-  return (
-    <tr
-      className={`transition-colors ${zebra} hover:bg-gray-850`}
-    >
-      {/* N° Póliza */}
-      <td className="p-3 border-b border-gray-850 align-top">
-        <Link
-          to={`/polizas/${poliza.id}`}
-          className="text-primary-300 hover:text-primary-200 font-medium text-sm"
-          title="Ver detalle de póliza"
-        >
-          {poliza.numero_poliza || "-"}
-        </Link>
-        {poliza.compania && (
-          <div className="mt-0.5 text-[11px] text-gray-400">
-            {poliza.compania}
+    return (
+      <tr className={`transition-colors ${zebra} hover:bg-gray-850`}>
+        <td className="p-3 border-b border-gray-850 align-top">
+          <Link
+            to={`/polizas/${poliza.id}`}
+            className="text-primary-300 hover:text-primary-200 font-medium text-sm"
+            title="Ver detalle de póliza"
+          >
+            {poliza.numero_poliza || "-"}
+          </Link>
+          {poliza.compania && (
+            <div className="mt-0.5 text-[11px] text-gray-400">{poliza.compania}</div>
+          )}
+        </td>
+
+        <td className="p-3 border-b border-gray-850 align-top">
+          <Link
+            to={`/clientes/${poliza.cliente?.id}`}
+            className="text-sm text-primary-200 hover:text-primary-100"
+            title="Ver perfil de cliente"
+          >
+            {clienteNombre || "-"}
+          </Link>
+          {poliza.cliente?.dni_cuit_cuil && (
+            <div className="mt-0.5 text-[11px] text-gray-400">
+              {poliza.cliente.dni_cuit_cuil}
+            </div>
+          )}
+        </td>
+
+        <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
+          {poliza.patente || "-"}
+        </td>
+        <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
+          {poliza.marca || "-"}
+        </td>
+        <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
+          {poliza.modelo || "-"}
+        </td>
+
+        <td className="p-3 border-b border-gray-850 align-top">
+          <CuotasBadge est={cuotasEst} />
+        </td>
+
+        <td className="p-3 border-b border-gray-850 align-top text-center">
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              activa
+                ? "border-emerald-500/60 text-emerald-300 bg-emerald-500/5"
+                : "border-rose-500/60 text-rose-300 bg-rose-500/5"
+            }`}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+            {activa ? "Activa" : "Inactiva"}
+          </span>
+        </td>
+
+        <td className="p-3 border-b border-gray-850 align-top text-center">
+          <div className="inline-flex items-center gap-2">
+            <button
+              className="p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs transition disabled:opacity-50"
+              onClick={() => onEditClick(poliza)}
+              title="Editar póliza"
+              aria-label="Editar póliza"
+              disabled={isDeleting}
+            >
+              <FaEdit className="w-3.5 h-3.5" />
+            </button>
+            <button
+              className={`p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs transition disabled:opacity-50 ${
+                isDeleting
+                  ? "opacity-60 cursor-wait text-rose-300"
+                  : "text-rose-400 hover:text-rose-300"
+              }`}
+              onClick={() => onDeleteClick(poliza)}
+              title="Eliminar póliza"
+              aria-label="Eliminar póliza"
+              disabled={isDeleting}
+            >
+              <FaTrash className="w-3.5 h-3.5" />
+            </button>
           </div>
-        )}
-      </td>
+        </td>
+      </tr>
+    );
+  },
+  (prev, next) =>
+    prev.poliza === next.poliza &&
+    prev.isDeleting === next.isDeleting &&
+    prev.zebra === next.zebra
+);
 
-      {/* Cliente */}
-      <td className="p-3 border-b border-gray-850 align-top">
-        <Link
-          to={`/clientes/${poliza.cliente?.id}`}
-          className="text-sm text-primary-200 hover:text-primary-100"
-          title="Ver perfil de cliente"
-        >
-          {clienteNombre || "-"}
-        </Link>
-        {poliza.cliente?.dni_cuit_cuil && (
-          <div className="mt-0.5 text-[11px] text-gray-400">
-            {poliza.cliente.dni_cuit_cuil}
+const MobileCard = memo(
+  function MobileCard({ poliza, isDeleting, onEditClick, onDeleteClick }) {
+    const clienteNombre = `${poliza?.cliente?.nombre || ""} ${
+      poliza?.cliente?.apellido || ""
+    }`.trim();
+
+    const cuotasEst = useCuotasBadge(poliza);
+
+    return (
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] text-gray-400">N° Póliza</div>
+            <Link
+              to={`/polizas/${poliza.id}`}
+              className="font-semibold text-sm text-primary-300 hover:text-primary-200"
+            >
+              {poliza.numero_poliza || "-"}
+            </Link>
+            {poliza.compania && (
+              <div className="mt-0.5 text-[11px] text-gray-500">{poliza.compania}</div>
+            )}
           </div>
-        )}
-      </td>
+          <div className={isDeleting ? "opacity-60 shrink-0" : "shrink-0"}>
+            <CuotasBadge est={cuotasEst} />
+          </div>
+        </div>
 
-      {/* Patente / Marca / Modelo */}
-      <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-        {poliza.patente || "-"}
-      </td>
-      <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-        {poliza.marca || "-"}
-      </td>
-      <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-        {poliza.modelo || "-"}
-      </td>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <div className="text-[11px] text-gray-400">Cliente</div>
+            <Link
+              to={`/clientes/${poliza.cliente?.id}`}
+              className="text-sm text-primary-200 hover:text-primary-100"
+            >
+              {clienteNombre || "-"}
+            </Link>
+            {poliza.cliente?.dni_cuit_cuil && (
+              <div className="mt-0.5 text-[11px] text-gray-500">
+                {poliza.cliente.dni_cuit_cuil}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-[11px] text-gray-400">Patente</div>
+            <div className="text-sm text-gray-100">{poliza.patente || "-"}</div>
+          </div>
+          <div>
+            <div className="text-[11px] text-gray-400">Marca</div>
+            <div className="text-sm text-gray-100">{poliza.marca || "-"}</div>
+          </div>
+          <div>
+            <div className="text-[11px] text-gray-400">Modelo</div>
+            <div className="text-sm text-gray-100">{poliza.modelo || "-"}</div>
+          </div>
+        </div>
 
-      {/* Cuotas */}
-      <td className="p-3 border-b border-gray-850 align-top">
-        <CuotasBadge poliza={poliza} />
-      </td>
-
-      {/* Estado */}
-      <td className="p-3 border-b border-gray-850 align-top text-center">
-        <span
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-            activa
-              ? "border-emerald-500/60 text-emerald-300 bg-emerald-500/5"
-              : "border-rose-500/60 text-rose-300 bg-rose-500/5"
-          }`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {activa ? "Activa" : "Inactiva"}
-        </span>
-      </td>
-
-      {/* Acciones */}
-      <td className="p-3 border-b border-gray-850 align-top text-center">
-        <div className="inline-flex items-center gap-2">
+        <div className="mt-4 flex items-center gap-2">
           <button
-            className="p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs transition disabled:opacity-50"
+            className="flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs font-medium transition disabled:opacity-50"
             onClick={() => onEditClick(poliza)}
             title="Editar póliza"
-            aria-label="Editar póliza"
             disabled={isDeleting}
           >
-            <FaEdit className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-2 justify-center">
+              <FaEdit className="w-3.5 h-3.5" /> Editar
+            </span>
           </button>
           <button
-            className={`p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs transition disabled:opacity-50 ${
+            className={`flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs font-medium transition ${
               isDeleting
                 ? "opacity-60 cursor-wait text-rose-300"
                 : "text-rose-400 hover:text-rose-300"
             }`}
             onClick={() => onDeleteClick(poliza)}
             title="Eliminar póliza"
-            aria-label="Eliminar póliza"
             disabled={isDeleting}
           >
-            <FaTrash className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-2 justify-center">
+              <FaTrash className="w-3.5 h-3.5" /> Eliminar
+            </span>
           </button>
         </div>
-      </td>
+      </div>
+    );
+  },
+  (prev, next) => prev.poliza === next.poliza && prev.isDeleting === next.isDeleting
+);
+
+/* ---------------- Skeleton ---------------- */
+
+const SkeletonRow = memo(function SkeletonRow({ zebra = "bg-gray-900" }) {
+  return (
+    <tr className={`${zebra}`}>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <td key={i} className="p-3 border-b border-gray-850">
+          <div className="h-4 w-full max-w-[160px] rounded bg-gray-800/80 animate-pulse" />
+        </td>
+      ))}
     </tr>
   );
 });
 
-const MobileCard = memo(function MobileCard({
-  poliza,
-  isDeleting,
-  onEditClick,
-  onDeleteClick,
-}) {
-  const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
-
+const SkeletonCard = memo(function SkeletonCard() {
   return (
     <div className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] text-gray-400">N° Póliza</div>
-          <Link
-            to={`/polizas/${poliza.id}`}
-            className="font-semibold text-sm text-primary-300 hover:text-primary-200"
-          >
-            {poliza.numero_poliza || "-"}
-          </Link>
-          {poliza.compania && (
-            <div className="mt-0.5 text-[11px] text-gray-500">
-              {poliza.compania}
-            </div>
-          )}
-        </div>
-        <div className={isDeleting ? "opacity-60 shrink-0" : "shrink-0"}>
-          <CuotasBadge poliza={poliza} />
-        </div>
+      <div className="h-4 w-40 rounded bg-gray-800/80 animate-pulse" />
+      <div className="mt-2 h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
+        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
+        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
+        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
       </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <div className="text-[11px] text-gray-400">Cliente</div>
-          <Link
-            to={`/clientes/${poliza.cliente?.id}`}
-            className="text-sm text-primary-200 hover:text-primary-100"
-          >
-            {clienteNombre || "-"}
-          </Link>
-          {poliza.cliente?.dni_cuit_cuil && (
-            <div className="mt-0.5 text-[11px] text-gray-500">
-              {poliza.cliente.dni_cuit_cuil}
-            </div>
-          )}
-        </div>
-        <div>
-          <div className="text-[11px] text-gray-400">Patente</div>
-          <div className="text-sm text-gray-100">{poliza.patente || "-"}</div>
-        </div>
-        <div>
-          <div className="text-[11px] text-gray-400">Marca</div>
-          <div className="text-sm text-gray-100">{poliza.marca || "-"}</div>
-        </div>
-        <div>
-          <div className="text-[11px] text-gray-400">Modelo</div>
-          <div className="text-sm text-gray-100">{poliza.modelo || "-"}</div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          className="flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs font-medium transition disabled:opacity-50"
-          onClick={() => onEditClick(poliza)}
-          title="Editar póliza"
-          disabled={isDeleting}
-        >
-          <span className="inline-flex items-center gap-2 justify-center">
-            <FaEdit className="w-3.5 h-3.5" /> Editar
-          </span>
-        </button>
-        <button
-          className={`flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs font-medium transition ${
-            isDeleting
-              ? "opacity-60 cursor-wait text-rose-300"
-              : "text-rose-400 hover:text-rose-300"
-          }`}
-          onClick={() => onDeleteClick(poliza)}
-          title="Eliminar póliza"
-          disabled={isDeleting}
-        >
-          <span className="inline-flex items-center gap-2 justify-center">
-            <FaTrash className="w-3.5 h-3.5" /> Eliminar
-          </span>
-        </button>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="h-8 rounded bg-gray-800/70 animate-pulse" />
+        <div className="h-8 rounded bg-gray-800/70 animate-pulse" />
       </div>
     </div>
   );
@@ -408,19 +449,28 @@ const MobileCard = memo(function MobileCard({
 const PolizaTable = ({
   polizas = [],
   status = "idle",
+
+  // page-mode
   page = 1,
   pageSize = 10,
   total = 0,
+
   ordering,
   onOrderingChange,
   onPageChange,
   onPageSizeChange,
   onEdit,
   onDelete,
+
+  // ✅ cursor-mode
+  cursorEnabled = false,
+  hasNext = false,
+  hasPrev = false,
+  onNext,
+  onPrev,
 }) => {
   const dispatch = useDispatch();
 
-  // Fallbacks locales para editar/eliminar si no vienen handlers desde el padre
   const [editing, setEditing] = useState(null);
   const [openEdit, setOpenEdit] = useState(false);
   const [deleting, setDeleting] = useState(null);
@@ -428,12 +478,19 @@ const PolizaTable = ({
   const [deletingId, setDeletingId] = useState(null);
 
   const totalPages = useMemo(() => {
+    if (cursorEnabled) return 1; // no aplica
     const t = Number(total) || 0;
     const ps = Number(pageSize) || 1;
     return Math.max(1, Math.ceil(t / ps));
-  }, [total, pageSize]);
+  }, [total, pageSize, cursorEnabled]);
 
   const { startIdx, endIdx } = useMemo(() => {
+    // cursor-mode: no conocemos el offset real; mostramos el tamaño actual
+    if (cursorEnabled) {
+      const n = polizas.length || 0;
+      return { startIdx: n ? 1 : 0, endIdx: n };
+    }
+
     const ps = Number(pageSize) || 1;
     const p = Number(page) || 1;
     const t = Number(total) || 0;
@@ -442,7 +499,7 @@ const PolizaTable = ({
     const start = (p - 1) * ps + 1;
     const end = Math.min(start + polizas.length - 1, t);
     return { startIdx: start, endIdx: end };
-  }, [polizas.length, page, pageSize, total]);
+  }, [polizas.length, page, pageSize, total, cursorEnabled, polizas]);
 
   const handleEditClick = useCallback(
     (poliza) => {
@@ -469,8 +526,12 @@ const PolizaTable = ({
 
       setDeletingId(id);
 
+      // page-mode: si era la única fila, volvemos una página
       const shouldGoPrev =
-        polizas.length === 1 && page > 1 && typeof onPageChange === "function";
+        !cursorEnabled &&
+        polizas.length === 1 &&
+        page > 1 &&
+        typeof onPageChange === "function";
 
       await dispatch(deletePoliza(id)).unwrap();
       toast.success("Póliza eliminada");
@@ -484,18 +545,18 @@ const PolizaTable = ({
       setDeleting(null);
       setDeletingId(null);
     }
-  }, [deleting, dispatch, onPageChange, page, polizas.length]);
+  }, [deleting, dispatch, onPageChange, page, polizas.length, cursorEnabled]);
+
+  const isLoading = status === "loading";
 
   return (
     <div className="rounded-2xl border border-gray-800 bg-gray-900/95 text-white shadow-sm overflow-hidden">
-      {/* Estado de carga */}
-      {status === "loading" && (
+      {isLoading && (
         <div className="px-4 py-2 text-sm text-primary-300 border-b border-gray-800">
           Cargando pólizas…
         </div>
       )}
 
-      {/* Tabla (md y arriba) */}
       <div className="overflow-x-auto hidden md:block">
         <table className="min-w-full text-left border-collapse">
           <thead className="sticky top-0 z-10">
@@ -547,90 +608,155 @@ const PolizaTable = ({
           </thead>
 
           <tbody>
-            {polizas.map((poliza, idx) => (
-              <DesktopRow
-                key={poliza.id}
-                poliza={poliza}
-                zebra={idx % 2 === 0 ? "bg-gray-900" : "bg-gray-900/90"}
-                isDeleting={!!deletingId}
-                onEditClick={handleEditClick}
-                onDeleteClick={handleDeleteClick}
-              />
-            ))}
+            {isLoading && polizas.length === 0 ? (
+              <>
+                <SkeletonRow zebra="bg-gray-900" />
+                <SkeletonRow zebra="bg-gray-900/90" />
+                <SkeletonRow zebra="bg-gray-900" />
+                <SkeletonRow zebra="bg-gray-900/90" />
+              </>
+            ) : (
+              polizas.map((poliza, idx) => (
+                <DesktopRow
+                  key={poliza.id}
+                  poliza={poliza}
+                  zebra={idx % 2 === 0 ? "bg-gray-900" : "bg-gray-900/90"}
+                  isDeleting={deletingId === poliza.id}
+                  onEditClick={handleEditClick}
+                  onDeleteClick={handleDeleteClick}
+                />
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Lista responsiva (mobile) */}
       <div className="md:hidden divide-y divide-gray-850">
-        {polizas.map((poliza) => (
-          <MobileCard
-            key={poliza.id}
-            poliza={poliza}
-            isDeleting={!!deletingId}
-            onEditClick={handleEditClick}
-            onDeleteClick={handleDeleteClick}
-          />
-        ))}
+        {isLoading && polizas.length === 0 ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : (
+          polizas.map((poliza) => (
+            <MobileCard
+              key={poliza.id}
+              poliza={poliza}
+              isDeleting={deletingId === poliza.id}
+              onEditClick={handleEditClick}
+              onDeleteClick={handleDeleteClick}
+            />
+          ))
+        )}
       </div>
 
-      {/* Footer de paginación (server-side) */}
+      {/* Footer paginación */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-3 bg-gray-900 border-t border-gray-800">
         <div className="text-xs sm:text-sm text-gray-300">
-          Mostrando <strong>{startIdx || 0}</strong>–<strong>{endIdx || 0}</strong> de{" "}
-          <strong>{total || 0}</strong>
+          Mostrando <strong>{startIdx || 0}</strong>–<strong>{endIdx || 0}</strong>{" "}
+          {cursorEnabled ? (
+            <>
+              (en pantalla <strong>{polizas.length || 0}</strong>)
+              {Number(total) > 0 ? (
+                <>
+                  {" "}
+                  · total aprox <strong>{total}</strong>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {" "}
+              de <strong>{total || 0}</strong>
+            </>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 text-sm">
-          <button
-            onClick={() => onPageChange?.(1)}
-            disabled={page <= 1}
-            className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-            title="Primera página"
-          >
-            «
-          </button>
-          <button
-            onClick={() => onPageChange?.(page - 1)}
-            disabled={page <= 1}
-            className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-            title="Página anterior"
-          >
-            ‹
-          </button>
-          <span className="text-xs sm:text-sm text-gray-300 px-2">
-            Página <strong>{page}</strong> de <strong>{totalPages}</strong>
-          </span>
-          <button
-            onClick={() => onPageChange?.(page + 1)}
-            disabled={page >= totalPages}
-            className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-            title="Página siguiente"
-          >
-            ›
-          </button>
-          <button
-            onClick={() => onPageChange?.(totalPages)}
-            disabled={page >= totalPages}
-            className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-            title="Última página"
-          >
-            »
-          </button>
+        {cursorEnabled ? (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => (onPrev ? onPrev() : onPageChange?.("prev"))}
+              disabled={!hasPrev || isLoading}
+              className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
+              title="Anterior"
+            >
+              ‹ Anterior
+            </button>
+            <button
+              onClick={() => (onNext ? onNext() : onPageChange?.("next"))}
+              disabled={!hasNext || isLoading}
+              className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
+              title="Siguiente"
+            >
+              Siguiente ›
+            </button>
 
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-            className="ml-2 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1 text-xs sm:text-sm"
-            title="Tamaño de página"
-          >
-            {[10, 25, 50, 100].map((n) => (
-              <option key={n} value={n}>
-                {n} / pág.
-              </option>
-            ))}
-          </select>
-        </div>
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
+              className="ml-2 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1 text-xs sm:text-sm"
+              title="Tamaño de página"
+            >
+              {[10, 25, 50, 100, 200].map((n) => (
+                <option key={n} value={n}>
+                  {n} / pág.
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => onPageChange?.(1)}
+              disabled={page <= 1 || isLoading}
+              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
+              title="Primera página"
+            >
+              «
+            </button>
+            <button
+              onClick={() => onPageChange?.(page - 1)}
+              disabled={page <= 1 || isLoading}
+              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
+              title="Página anterior"
+            >
+              ‹
+            </button>
+            <span className="text-xs sm:text-sm text-gray-300 px-2">
+              Página <strong>{page}</strong> de <strong>{totalPages}</strong>
+            </span>
+            <button
+              onClick={() => onPageChange?.(page + 1)}
+              disabled={page >= totalPages || isLoading}
+              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
+              title="Página siguiente"
+            >
+              ›
+            </button>
+            <button
+              onClick={() => onPageChange?.(totalPages)}
+              disabled={page >= totalPages || isLoading}
+              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
+              title="Última página"
+            >
+              »
+            </button>
+
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
+              className="ml-2 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1 text-xs sm:text-sm"
+              title="Tamaño de página"
+            >
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n}>
+                  {n} / pág.
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Modales integrados (fallback interno) */}
