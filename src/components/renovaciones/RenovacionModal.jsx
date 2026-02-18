@@ -22,19 +22,23 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
   const [nuevoPrecio, setNuevoPrecio] = useState("");
   const [nuevaFecha, setNuevaFecha] = useState("");
 
+  // ✅ NUEVO: transferir servicio de grúa a la póliza renovada
+  const [transferirGrua, setTransferirGrua] = useState(true);
+
   useEffect(() => {
     if (!open) return;
 
     setNuevoNumero(item?.numero_poliza || "");
     setNuevaCompania(item?.compania || "");
     setNuevoPrecio(
-      item?.precio_cuota != null && item?.precio_cuota !== ""
-        ? String(item?.precio_cuota)
-        : ""
+      item?.precio_cuota != null && item?.precio_cuota !== "" ? String(item?.precio_cuota) : ""
     );
 
     const base = pickVtoRef(item) || item?.primer_pago || null;
     setNuevaFecha(base ? dayjs(base).format("YYYY-MM-DD") : "");
+
+    // ✅ por defecto: sí (para que no se “pierda” la grúa al renovar)
+    setTransferirGrua(true);
   }, [open, item]);
 
   if (!open) return null;
@@ -62,8 +66,8 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <div className="mt-1 text-sm text-white/80">
                 {item?.patente ? (
                   <>
-                    <span className="font-semibold text-white">{item.patente}</span>{" "}
-                    · {item?.cliente?.apellido}, {item?.cliente?.nombre}
+                    <span className="font-semibold text-white">{item.patente}</span> ·{" "}
+                    {item?.cliente?.apellido}, {item?.cliente?.nombre}
                   </>
                 ) : (
                   <>
@@ -86,9 +90,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
 
           <div className="grid gap-3 p-4">
             <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">
-                Nuevo número (opcional)
-              </label>
+              <label className="text-xs font-semibold text-white/90">Nuevo número (opcional)</label>
               <input
                 value={nuevoNumero}
                 onChange={(e) => setNuevoNumero(e.target.value)}
@@ -101,9 +103,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
             </div>
 
             <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">
-                Nueva compañía (opcional)
-              </label>
+              <label className="text-xs font-semibold text-white/90">Nueva compañía (opcional)</label>
               <input
                 value={nuevaCompania}
                 onChange={(e) => setNuevaCompania(e.target.value)}
@@ -114,9 +114,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-xs font-semibold text-white/90">
-                  Nuevo precio cuota (opcional)
-                </label>
+                <label className="text-xs font-semibold text-white/90">Nuevo precio cuota (opcional)</label>
                 <input
                   value={nuevoPrecio}
                   onChange={(e) => setNuevoPrecio(e.target.value)}
@@ -127,15 +125,52 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               </div>
 
               <div className="grid gap-2">
-                <label className="text-xs font-semibold text-white/90">
-                  Nueva fecha (primer pago)
-                </label>
+                <label className="text-xs font-semibold text-white/90">Nueva fecha (primer pago)</label>
                 <input
                   type="date"
                   value={nuevaFecha}
                   onChange={(e) => setNuevaFecha(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
                 />
+              </div>
+            </div>
+
+            {/* ✅ NUEVO: Switch “transferir grúa” */}
+            <div className="mt-1 rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-extrabold text-white">🚛 Mantener grúa en la renovación</div>
+                  <div className="text-xs text-white/65 mt-1">
+                    Si está activado, la póliza nueva queda con el servicio de grúa también (se transfiere la adhesión).
+                    Si lo apagás, la póliza nueva se renueva sin grúa.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setTransferirGrua((v) => !v)}
+                  className={cx(
+                    "relative inline-flex h-9 w-[74px] items-center rounded-full border transition",
+                    transferirGrua
+                      ? "bg-emerald-400/25 border-emerald-300/30"
+                      : "bg-white/10 border-white/15",
+                    submitting ? "opacity-70" : "hover:bg-white/15"
+                  )}
+                  aria-pressed={transferirGrua}
+                  title={transferirGrua ? "Se mantiene la grúa" : "No se transfiere la grúa"}
+                >
+                  <span
+                    className={cx(
+                      "absolute left-1 top-1 h-7 w-7 rounded-full shadow transition",
+                      transferirGrua ? "translate-x-[38px] bg-emerald-200" : "translate-x-0 bg-white/70"
+                    )}
+                  />
+                  <span className="sr-only">Transferir grúa</span>
+                  <span className="w-full text-[11px] font-extrabold text-white/80">
+                    {transferirGrua ? "SI" : "NO"}
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -162,6 +197,8 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                     nuevaCompania: (nuevaCompania || "").trim() || undefined,
                     nuevoPrecio: nuevoPrecio === "" ? undefined : Number(nuevoPrecio),
                     nuevaFecha: nuevaFecha || undefined,
+                    // ✅ NUEVO: el backend/handler puede leerlo
+                    transferir_grua: transferirGrua ? 1 : 0,
                   })
                 }
               >

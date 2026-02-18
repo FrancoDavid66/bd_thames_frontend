@@ -1,682 +1,1045 @@
 // src/store/slices/gruasSlice.js
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { GruasAPI } from "../../api/gruas";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import GruasAPI from "../../api/gruas";
 
-// ---------- Helpers ----------
-const normalizeError = (e) => {
+/* =========================
+   Debug helper (solo DEV)
+========================= */
+const __DEV__ = (() => {
   try {
-    if (!e) return "Error";
-    if (typeof e === "string") return e;
-
-    if (e?.payload) {
-      const detail = e.payload?.detail || e.payload?.message || e.payload?.error || null;
-      if (detail) return String(detail);
-      try {
-        return JSON.stringify(e.payload);
-      } catch {}
-    }
-
-    if (e?.response?.data?.detail) return String(e.response.data.detail);
-    if (e?.response?.data) {
-      try {
-        return JSON.stringify(e.response.data);
-      } catch {
-        return "Error";
-      }
-    }
-
-    if (e?.message) return String(e.message);
-
-    try {
-      return JSON.stringify(e);
-    } catch {
-      return "Error";
-    }
+    return Boolean(import.meta?.env?.DEV);
   } catch {
-    return "Error";
+    return false;
   }
+})();
+
+function dbg(...args) {
+  if (!__DEV__) return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
+}
+function dbgWarn(...args) {
+  if (!__DEV__) return;
+  // eslint-disable-next-line no-console
+  console.warn(...args);
+}
+function dbgErr(...args) {
+  if (!__DEV__) return;
+  // eslint-disable-next-line no-console
+  console.error(...args);
+}
+
+/* =========================
+   Utils
+========================= */
+function isInternalKey(k) {
+  if (!k) return false;
+  if (k === "force") return true;
+  if (k === "_ts") return true;
+  return String(k).startsWith("_");
+}
+
+function sanitizeParams(obj = {}) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (isInternalKey(k)) continue;
+    if (v === undefined || v === null || v === "") continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+function stableKey(obj = {}) {
+  const clean = sanitizeParams(obj);
+  const keys = Object.keys(clean).sort();
+  const out = {};
+  for (const k of keys) out[k] = clean[k];
+  return JSON.stringify(out);
+}
+
+function normalizeArrayPayload(res) {
+  if (Array.isArray(res)) return res;
+  if (res && typeof res === "object") {
+    for (const k of ["results", "items", "data", "rows"]) {
+      if (Array.isArray(res[k])) return res[k];
+    }
+  }
+  return [];
+}
+
+function normalizePagedPayload(res) {
+  let payload = { items: [], count: 0, next: null, previous: null };
+  if (Array.isArray(res)) {
+    payload.items = res;
+    payload.count = res.length;
+    return payload;
+  }
+  if (res && typeof res === "object") {
+    payload.items = Array.isArray(res.results)
+      ? res.results
+      : Array.isArray(res.items)
+      ? res.items
+      : [];
+    payload.count = typeof res.count === "number" ? res.count : payload.items.length;
+    payload.next = res.next ?? null;
+    payload.previous = res.previous ?? null;
+  }
+  return payload;
+}
+
+/**
+ * ✅ Normaliza “póliza adherida” para que SIEMPRE tenga adhesion_id cuando venga
+ * con otro nombre (adhesion, adhesionId, adhesion_activa_id, etc).
+ */
+function toIntOrNull(v) {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizePolizaAdherida(p) {
+  if (!p || typeof p !== "object") return p;
+
+  const out = { ...p };
+
+  const candidates = [
+    out.adhesion_id,
+    out.adhesionId,
+    out.adhesion,
+    out.adhesion_activa_id,
+    out.adhesion_activa,
+    out.adhesion_activa?.id,
+    out.adhesion_obj?.id,
+  ];
+
+  // si algún día backend manda array/obj de adhesiones
+  if (out.adhesiones_grua && Array.isArray(out.adhesiones_grua)) {
+    const act = out.adhesiones_grua.find((a) => String(a?.estado || "").toUpperCase() === "ACTIVA");
+    if (act?.id != null) candidates.push(act.id);
+  }
+  if (out.adhesiones && Array.isArray(out.adhesiones)) {
+    const act = out.adhesiones.find((a) => String(a?.estado || "").toUpperCase() === "ACTIVA");
+    if (act?.id != null) candidates.push(act.id);
+  }
+
+  const found = candidates.map(toIntOrNull).find((x) => x != null);
+  if (found != null) out.adhesion_id = found;
+
+  return out;
+}
+
+/**
+ * ✅ FIX CLAVE:
+ * El backend exige adhesion (adhesion o adhesion_id).
+ * Si el front manda poliza, lo convertimos automáticamente a adhesion cuando exista adhesion_id.
+ */
+function normalizeCreateSolicitudPayload(payload = {}) {
+  const p = { ...(payload || {}) };
+
+  const adhesionId =
+    toIntOrNull(p.adhesion) ??
+    toIntOrNull(p.adhesion_id) ??
+    (p.polizaSel ? toIntOrNull(p.polizaSel?.adhesion_id) : null);
+
+  if (adhesionId != null) {
+    p.adhesion = adhesionId;
+  }
+
+  if ("km_estimados" in p) delete p.km_estimados;
+  if ("polizaSel" in p) delete p.polizaSel;
+
+  return p;
+}
+
+const initialState = {
+  polizasBuscar: {
+    q: "",
+    items: [],
+    status: "idle",
+    error: null,
+    cache: {},
+    ttlMs: 20_000,
+  },
+
+  polizasAdheridasBuscar: {
+    q: "",
+    items: [],
+    status: "idle",
+    error: null,
+    cache: {},
+    ttlMs: 20_000,
+  },
+
+  planes: {
+    params: { q: "", activo: "" },
+    items: [],
+    status: "idle",
+    error: null,
+    cache: {},
+    ttlMs: 60_000,
+  },
+
+  proveedores: {
+    params: { q: "", activo: "" },
+    items: [],
+    count: 0,
+    next: null,
+    previous: null,
+    status: "idle",
+    error: null,
+    cache: {},
+    ttlMs: 60_000,
+  },
+
+  adhesiones: {
+    params: { q: "", estado: "TODAS", page: 1, page_size: 25 },
+    items: [],
+    count: 0,
+    next: null,
+    previous: null,
+    status: "idle",
+    error: null,
+    cache: {},
+    ttlMs: 20_000,
+  },
+
+  solicitudes: {
+    params: { q: "", estado: "TODAS", page: 1, page_size: 25 },
+    items: [],
+    count: 0,
+    next: null,
+    previous: null,
+    status: "idle",
+    error: null,
+    cache: {},
+    ttlMs: 20_000,
+  },
+
+  createAdhesion: { status: "idle", error: null },
+
+  createSolicitud: { status: "idle", error: null },
+  asignarProveedorSolicitud: { status: "idle", error: null }, // ✅ nuevo
+  updateSolicitud: { status: "idle", error: null },
+  deleteSolicitud: { status: "idle", error: null },
+
+  createPlan: { status: "idle", error: null },
+  updatePlan: { status: "idle", error: null },
+  deletePlan: { status: "idle", error: null },
+
+  createProveedor: { status: "idle", error: null },
+  updateProveedor: { status: "idle", error: null },
+  deleteProveedor: { status: "idle", error: null },
 };
 
-const rejectErr = (rejectWithValue, e) => rejectWithValue(normalizeError(e));
+/* =========================
+   THUNKS
+========================= */
 
-// ---------- Thunks (Planes) ----------
-export const fetchPlanesGrua = createAsyncThunk("gruas/fetchPlanes", async (_, { rejectWithValue }) => {
-  try {
-    return await GruasAPI.getPlanes();
-  } catch (e) {
-    return rejectErr(rejectWithValue, e);
-  }
-});
-
-export const createPlanGrua = createAsyncThunk("gruas/createPlan", async (plan, { rejectWithValue }) => {
-  try {
-    return await GruasAPI.createPlan(plan);
-  } catch (e) {
-    return rejectErr(rejectWithValue, e);
-  }
-});
-
-// ---------- Thunks (Proveedores) ----------
-export const fetchProveedoresGrua = createAsyncThunk("gruas/fetchProveedores", async (_, { rejectWithValue }) => {
-  try {
-    return await GruasAPI.getProveedores();
-  } catch (e) {
-    return rejectErr(rejectWithValue, e);
-  }
-});
-
-export const fetchProveedorPerfil = createAsyncThunk(
-  "gruas/fetchProveedorPerfil",
-  async ({ proveedorId, params }, { rejectWithValue }) => {
+// Buscar pólizas para el modal (adhesiones)
+export const buscarPolizas = createAsyncThunk(
+  "gruas/buscarPolizas",
+  async ({ q, ...extra } = {}, { rejectWithValue, getState }) => {
     try {
-      return await GruasAPI.getProveedorPerfil(proveedorId, params || {});
+      const state = getState().gruas?.polizasBuscar;
+      const key = stableKey({ q, ...extra });
+      const cached = state?.cache?.[key];
+
+      dbg("[GRUAS][buscarPolizas] start", { q, extra: sanitizeParams(extra), key });
+
+      if (cached && Date.now() - cached.ts < (state?.ttlMs ?? 20_000)) {
+        dbg("[GRUAS][buscarPolizas] cache HIT", { key, count: cached.items?.length || 0 });
+        return { key, items: cached.items, fromCache: true };
+      }
+
+      const res = await GruasAPI.buscarPolizas(q, sanitizeParams(extra));
+      const items = normalizeArrayPayload(res);
+
+      dbg("[GRUAS][buscarPolizas] api OK", {
+        key,
+        rawType: Array.isArray(res) ? "array" : typeof res,
+        rawKeys: res && typeof res === "object" ? Object.keys(res) : null,
+        count: items?.length || 0,
+        first: items?.[0] || null,
+      });
+
+      return { key, items, fromCache: false };
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][buscarPolizas] api ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "Error buscando pólizas" });
     }
   }
 );
 
-// ---------- Thunks (Flota real) ----------
-export const fetchProveedorVehiculos = createAsyncThunk(
-  "gruas/fetchProveedorVehiculos",
-  async ({ proveedorId, params }, { rejectWithValue }) => {
+// ✅ Buscar pólizas ADHERIDAS (para Solicitudes)
+export const buscarPolizasAdheridas = createAsyncThunk(
+  "gruas/buscarPolizasAdheridas",
+  async ({ q, ...extra } = {}, { rejectWithValue, getState }) => {
     try {
-      return await GruasAPI.listProveedorVehiculos(proveedorId, params || {});
+      const state = getState().gruas?.polizasAdheridasBuscar;
+      const key = stableKey({ q, ...extra });
+      const cached = state?.cache?.[key];
+
+      dbg("[GRUAS][buscarPolizasAdheridas] start", { q, extra: sanitizeParams(extra), key });
+
+      if (cached && Date.now() - cached.ts < (state?.ttlMs ?? 20_000)) {
+        dbg("[GRUAS][buscarPolizasAdheridas] cache HIT", { key, count: cached.items?.length || 0 });
+        return { key, items: cached.items, fromCache: true };
+      }
+
+      const res = await GruasAPI.buscarPolizasAdheridas(q, sanitizeParams(extra));
+      const raw = normalizeArrayPayload(res);
+      const items = (raw || []).map(normalizePolizaAdherida);
+
+      const missingAdhesion = (items || []).filter((x) => !x?.adhesion_id);
+
+      dbg("[GRUAS][buscarPolizasAdheridas] api OK", {
+        key,
+        rawType: Array.isArray(res) ? "array" : typeof res,
+        rawKeys: res && typeof res === "object" ? Object.keys(res) : null,
+        count: items?.length || 0,
+        first: items?.[0] || null,
+        missingAdhesionCount: missingAdhesion.length,
+      });
+
+      if (missingAdhesion.length && __DEV__) {
+        dbgWarn("[GRUAS][buscarPolizasAdheridas] WARNING: items sin adhesion_id", {
+          example: missingAdhesion[0],
+        });
+      }
+
+      return { key, items, fromCache: false };
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][buscarPolizasAdheridas] api ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "Error buscando pólizas adheridas" });
     }
   }
 );
 
-export const createProveedorVehiculo = createAsyncThunk(
-  "gruas/createProveedorVehiculo",
-  async ({ proveedorId, data }, { rejectWithValue }) => {
+// ✅ Planes: listar
+export const fetchPlanes = createAsyncThunk(
+  "gruas/fetchPlanes",
+  async (params = {}, { rejectWithValue, getState }) => {
     try {
-      return await GruasAPI.createProveedorVehiculo(proveedorId, data || {});
+      const state = getState().gruas?.planes;
+      const merged = { ...(state?.params || {}), ...(params || {}) };
+      const key = stableKey(merged);
+
+      if (state?.cache?.[key] && Date.now() - state.cache[key].ts < (state?.ttlMs ?? 60_000)) {
+        dbg("[GRUAS][fetchPlanes] cache HIT", { key });
+        return { key, payload: state.cache[key].payload, params: merged, fromCache: true };
+      }
+
+      dbg("[GRUAS][fetchPlanes] api start", { merged: sanitizeParams(merged), key });
+
+      const res = await GruasAPI.getPlanes(sanitizeParams(merged));
+      const payload = normalizePagedPayload(res);
+
+      dbg("[GRUAS][fetchPlanes] api OK", { key, count: payload.items?.length || 0 });
+
+      return { key, payload, params: merged, fromCache: false };
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][fetchPlanes] api ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "Error cargando planes" });
     }
   }
 );
 
-export const updateProveedorVehiculo = createAsyncThunk(
-  "gruas/updateProveedorVehiculo",
-  async ({ proveedorId, vehiculoId, data }, { rejectWithValue }) => {
-    try {
-      return await GruasAPI.updateProveedorVehiculo(proveedorId, vehiculoId, data || {});
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-export const deleteProveedorVehiculo = createAsyncThunk(
-  "gruas/deleteProveedorVehiculo",
-  async ({ proveedorId, vehiculoId }, { rejectWithValue }) => {
-    try {
-      await GruasAPI.deleteProveedorVehiculo(proveedorId, vehiculoId);
-      return { proveedorId, vehiculoId };
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-// ---------- Thunks (Adhesiones) ----------
-export const activarAdhesionGrua = createAsyncThunk(
-  "gruas/activarAdhesion",
+// ✅ Planes: crear
+export const createPlan = createAsyncThunk(
+  "gruas/createPlan",
   async (payload, { rejectWithValue }) => {
     try {
-      return await GruasAPI.activarAdhesion(payload);
+      dbg("[GRUAS][createPlan] payload", payload);
+      const res = await GruasAPI.createPlan(payload);
+      dbg("[GRUAS][createPlan] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][createPlan] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo crear el plan" });
     }
   }
 );
 
-// ✅ Asociar grúa a póliza (usa fallback: /polizas/{id}/asociar-grua/ o /gruas/adhesiones/activar/)
-export const asociarGrua = createAsyncThunk(
-  "gruas/asociarGrua",
-  async ({ polizaId, data }, { rejectWithValue }) => {
+// ✅ Planes: editar
+export const updatePlan = createAsyncThunk(
+  "gruas/updatePlan",
+  async ({ id, data }, { rejectWithValue }) => {
     try {
-      return await GruasAPI.asociarGrua(polizaId, data || {});
+      dbg("[GRUAS][updatePlan] start", { id, data });
+      const res = await GruasAPI.updatePlan(id, data);
+      dbg("[GRUAS][updatePlan] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][updatePlan] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo actualizar el plan" });
     }
   }
 );
 
-export const firmarContratoAdhesion = createAsyncThunk(
-  "gruas/firmarContratoAdhesion",
-  async ({ adhesionId, archivo_url }, { rejectWithValue }) => {
+// ✅ Planes: borrar
+export const deletePlan = createAsyncThunk("gruas/deletePlan", async (id, { rejectWithValue }) => {
+  try {
+    dbg("[GRUAS][deletePlan] start", { id });
+    await GruasAPI.deletePlan(id);
+    dbg("[GRUAS][deletePlan] OK", { id });
+    return { id };
+  } catch (e) {
+    dbgErr("[GRUAS][deletePlan] ERROR", e);
+    return rejectWithValue(e?.data || { detail: e?.message || "No se pudo eliminar el plan" });
+  }
+});
+
+// ✅ Proveedores: listar
+export const fetchProveedores = createAsyncThunk(
+  "gruas/fetchProveedores",
+  async (params = {}, { rejectWithValue, getState }) => {
     try {
-      return await GruasAPI.firmarContrato(adhesionId, { archivo_url });
+      const state = getState().gruas?.proveedores;
+      const merged = { ...(state?.params || {}), ...(params || {}) };
+      const key = stableKey(merged);
+
+      if (state?.cache?.[key] && Date.now() - state.cache[key].ts < (state?.ttlMs ?? 60_000)) {
+        dbg("[GRUAS][fetchProveedores] cache HIT", { key });
+        return { key, payload: state.cache[key].payload, params: merged, fromCache: true };
+      }
+
+      dbg("[GRUAS][fetchProveedores] api start", { merged: sanitizeParams(merged), key });
+
+      const res = await GruasAPI.getProveedores(sanitizeParams(merged));
+      const payload = normalizePagedPayload(res);
+
+      dbg("[GRUAS][fetchProveedores] api OK", { key, count: payload.items?.length || 0 });
+
+      return { key, payload, params: merged, fromCache: false };
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][fetchProveedores] api ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "Error cargando proveedores" });
     }
   }
 );
 
-export const firmarContratoAdhesionUpload = createAsyncThunk(
-  "gruas/firmarContratoAdhesionUpload",
-  async ({ adhesionId, file }, { rejectWithValue }) => {
+// ✅ Proveedores: crear
+export const createProveedor = createAsyncThunk(
+  "gruas/createProveedor",
+  async (payload, { rejectWithValue }) => {
     try {
-      return await GruasAPI.firmarContratoUpload(adhesionId, file);
+      dbg("[GRUAS][createProveedor] payload", payload);
+      const res = await GruasAPI.createProveedor(payload);
+      dbg("[GRUAS][createProveedor] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][createProveedor] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo crear el proveedor" });
     }
   }
 );
 
-export const fetchAdhesionesByPoliza = createAsyncThunk(
-  "gruas/fetchAdhesionesByPoliza",
-  async (polizaId, { rejectWithValue }) => {
+// ✅ Proveedores: editar
+export const updateProveedor = createAsyncThunk(
+  "gruas/updateProveedor",
+  async ({ id, data }, { rejectWithValue }) => {
     try {
-      return await GruasAPI.getAdhesionesByPoliza(polizaId);
+      dbg("[GRUAS][updateProveedor] start", { id, data });
+      const res = await GruasAPI.updateProveedor(id, data);
+      dbg("[GRUAS][updateProveedor] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][updateProveedor] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo actualizar el proveedor" });
     }
   }
 );
 
-// ---------- Thunks (Solicitudes) ----------
+// ✅ Proveedores: borrar
+export const deleteProveedor = createAsyncThunk(
+  "gruas/deleteProveedor",
+  async (id, { rejectWithValue }) => {
+    try {
+      dbg("[GRUAS][deleteProveedor] start", { id });
+      await GruasAPI.deleteProveedor(id);
+      dbg("[GRUAS][deleteProveedor] OK", { id });
+      return { id };
+    } catch (e) {
+      dbgErr("[GRUAS][deleteProveedor] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo eliminar el proveedor" });
+    }
+  }
+);
+
+// Listado de adhesiones
+export const fetchAdhesiones = createAsyncThunk(
+  "gruas/fetchAdhesiones",
+  async (params = {}, { rejectWithValue, getState }) => {
+    try {
+      const state = getState().gruas?.adhesiones;
+      const merged = { ...(state?.params || {}), ...(params || {}) };
+      const key = stableKey(merged);
+
+      if (state?.cache?.[key] && Date.now() - state.cache[key].ts < (state?.ttlMs ?? 20_000)) {
+        dbg("[GRUAS][fetchAdhesiones] cache HIT", { key });
+        return { key, payload: state.cache[key].payload, params: merged, fromCache: true };
+      }
+
+      dbg("[GRUAS][fetchAdhesiones] api start", { merged: sanitizeParams(merged), key });
+
+      const res = await GruasAPI.getAdhesiones(sanitizeParams(merged));
+      const payload = normalizePagedPayload(res);
+
+      dbg("[GRUAS][fetchAdhesiones] api OK", {
+        key,
+        count: payload.items?.length || 0,
+        first: payload.items?.[0] || null,
+      });
+
+      return { key, payload, params: merged, fromCache: false };
+    } catch (e) {
+      dbgErr("[GRUAS][fetchAdhesiones] api ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "Error cargando adhesiones" });
+    }
+  }
+);
+
+// Crear adhesión
+export const createAdhesion = createAsyncThunk(
+  "gruas/createAdhesion",
+  async (payload, { rejectWithValue }) => {
+    try {
+      dbg("[GRUAS][createAdhesion] payload", payload);
+      const res = await GruasAPI.createAdhesion(payload);
+      dbg("[GRUAS][createAdhesion] OK", res);
+      return res;
+    } catch (e) {
+      dbgErr("[GRUAS][createAdhesion] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo crear la adhesión" });
+    }
+  }
+);
+
+// ✅ Solicitudes: listar (agrega force para saltar cache)
 export const fetchSolicitudes = createAsyncThunk(
   "gruas/fetchSolicitudes",
-  async (params, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue, getState }) => {
     try {
-      return await GruasAPI.getSolicitudes(params || {});
+      const state = getState().gruas?.solicitudes;
+      const merged = { ...(state?.params || {}), ...(params || {}) };
+      const force = merged?.force === true;
+
+      const key = stableKey(merged);
+      const cached = state?.cache?.[key];
+
+      if (!force && cached && Date.now() - cached.ts < (state?.ttlMs ?? 20_000)) {
+        dbg("[GRUAS][fetchSolicitudes] cache HIT", { key });
+        return { key, payload: cached.payload, params: merged, fromCache: true };
+      }
+
+      dbg("[GRUAS][fetchSolicitudes] api start", { merged: sanitizeParams(merged), key, force });
+
+      const res = await GruasAPI.getSolicitudes(sanitizeParams(merged));
+      const payload = normalizePagedPayload(res);
+
+      dbg("[GRUAS][fetchSolicitudes] api OK", { key, count: payload.items?.length || 0 });
+
+      return { key, payload, params: merged, fromCache: false };
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][fetchSolicitudes] api ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "Error cargando solicitudes" });
     }
   }
 );
 
+// ✅ Solicitudes: crear (FIX: mapear adhesion automáticamente + logs)
 export const createSolicitud = createAsyncThunk(
   "gruas/createSolicitud",
   async (payload, { rejectWithValue }) => {
     try {
-      return await GruasAPI.crearSolicitud(payload || {});
+      const normalized = normalizeCreateSolicitudPayload(payload);
+
+      dbg("[GRUAS][createSolicitud] payload", payload);
+      dbg("[GRUAS][createSolicitud] normalized", normalized);
+
+      if (!normalized?.adhesion) {
+        dbgWarn("[GRUAS][createSolicitud] WARNING: falta adhesion en payload normalizado", normalized);
+      }
+
+      const res = await GruasAPI.createSolicitud(normalized);
+      dbg("[GRUAS][createSolicitud] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][createSolicitud] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo crear la solicitud" });
     }
   }
 );
 
+// ✅ Solicitudes: asignar proveedor (usa action si existe; fallback PATCH)
 export const asignarProveedorSolicitud = createAsyncThunk(
   "gruas/asignarProveedorSolicitud",
-  async ({ solicitudId, proveedorId, costo_estimado, vehiculo_id }, { rejectWithValue }) => {
+  async ({ id, proveedorId }, { rejectWithValue }) => {
     try {
-      return await GruasAPI.asignarProveedor(solicitudId, proveedorId, costo_estimado, vehiculo_id);
+      dbg("[GRUAS][asignarProveedorSolicitud] start", { id, proveedorId });
+      const res = await GruasAPI.asignarProveedorSolicitud(id, proveedorId);
+      dbg("[GRUAS][asignarProveedorSolicitud] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][asignarProveedorSolicitud] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo asignar el proveedor" });
     }
   }
 );
 
-export const cambiarEstadoSolicitud = createAsyncThunk(
-  "gruas/cambiarEstadoSolicitud",
-  async ({ solicitudId, estado, notas }, { rejectWithValue }) => {
+// ✅ Solicitudes: editar
+export const updateSolicitud = createAsyncThunk(
+  "gruas/updateSolicitud",
+  async ({ id, data }, { rejectWithValue }) => {
     try {
-      return await GruasAPI.cambiarEstado(solicitudId, estado, notas || "");
+      dbg("[GRUAS][updateSolicitud] start", { id, data });
+      const res = await GruasAPI.updateSolicitud(id, data);
+      dbg("[GRUAS][updateSolicitud] OK", res);
+      return res;
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][updateSolicitud] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo actualizar la solicitud" });
     }
   }
 );
 
-export const cerrarSolicitud = createAsyncThunk(
-  "gruas/cerrarSolicitud",
-  async ({ solicitudId, km_totales, registrar_copago_en_balances, vehiculo_id }, { rejectWithValue }) => {
+// ✅ Solicitudes: borrar
+export const deleteSolicitud = createAsyncThunk(
+  "gruas/deleteSolicitud",
+  async (id, { rejectWithValue }) => {
     try {
-      return await GruasAPI.cerrar(
-        solicitudId,
-        km_totales,
-        !!registrar_copago_en_balances,
-        vehiculo_id
-      );
+      dbg("[GRUAS][deleteSolicitud] start", { id });
+      await GruasAPI.deleteSolicitud(id);
+      dbg("[GRUAS][deleteSolicitud] OK", { id });
+      return { id };
     } catch (e) {
-      return rejectErr(rejectWithValue, e);
+      dbgErr("[GRUAS][deleteSolicitud] ERROR", e);
+      return rejectWithValue(e?.data || { detail: e?.message || "No se pudo eliminar la solicitud" });
     }
   }
 );
 
-// ---------- Thunks (KPIs / Series / Resúmenes) ----------
-export const fetchKpisSolicitudes = createAsyncThunk(
-  "gruas/fetchKpis",
-  async (params, { rejectWithValue }) => {
-    try {
-      return await GruasAPI.kpis(params || {});
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-export const fetchSeriePorMes = createAsyncThunk(
-  "gruas/fetchSeriePorMes",
-  async (params, { rejectWithValue }) => {
-    try {
-      return await GruasAPI.porMes(params || {});
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-export const fetchClienteResumen = createAsyncThunk(
-  "gruas/fetchClienteResumen",
-  async (clienteId, { rejectWithValue }) => {
-    try {
-      return await GruasAPI.getClienteResumen(clienteId);
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-export const fetchPolizaResumen = createAsyncThunk(
-  "gruas/fetchPolizaResumen",
-  async (polizaId, { rejectWithValue }) => {
-    try {
-      return await GruasAPI.getPolizaResumen(polizaId);
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-export const searchPolizasElegibles = createAsyncThunk(
-  "gruas/searchPolizasElegibles",
-  async ({ q, soloOperables = false }, { rejectWithValue }) => {
-    try {
-      return await GruasAPI.searchPolizasElegibles(q, soloOperables);
-    } catch (e) {
-      return rejectErr(rejectWithValue, e);
-    }
-  }
-);
-
-// ---------- Estado ----------
-const initialState = {
-  planes: {
-    list: [],
-    loading: false,
-    error: null,
-    creating: false,
-    createError: null,
-  },
-
-  proveedores: {
-    list: [],
-    loading: false,
-    error: null,
-  },
-
-  proveedorPerfil: {
-    byId: {},
-    loading: false,
-    error: null,
-  },
-
-  flota: {
-    // { [proveedorId]: { mes, items, total_vehiculos, total_viajes_mes } }
-    byProveedor: {},
-    loading: false,
-    error: null,
-  },
-
-  activacion: { loading: false, success: false, error: null, adhesion: null },
-
-  asociacion: { loading: false, success: false, error: null, adhesion: null },
-
-  adhesiones: { byPoliza: {}, loading: false, error: null },
-
-  solicitudes: {
-    list: [],
-    loading: false,
-    error: null,
-    updating: false,
-    updateError: null,
-  },
-
-  // ✅ Root shape para GruasPage (simple)
-  kpis: {},
-  series: {
-    por_mes: [],
-  },
-
-  kpisMeta: { loading: false, error: null },
-  seriesMeta: { loading: false, error: null },
-
-  clienteResumen: { byId: {}, loading: false, error: null },
-  polizaResumen: { byId: {}, loading: false, error: null },
-
-  polizasBusqueda: { list: [], loading: false, error: null },
-};
+/* =========================
+   SLICE
+========================= */
 
 const gruasSlice = createSlice({
   name: "gruas",
   initialState,
   reducers: {
-    resetActivacion(state) {
-      state.activacion = { loading: false, success: false, error: null, adhesion: null };
+    clearPolizasBuscar(state) {
+      state.polizasBuscar.q = "";
+      state.polizasBuscar.items = [];
+      state.polizasBuscar.status = "idle";
+      state.polizasBuscar.error = null;
     },
-    resetAsociacion(state) {
-      state.asociacion = { loading: false, success: false, error: null, adhesion: null };
+    clearPolizasAdheridasBuscar(state) {
+      state.polizasAdheridasBuscar.q = "";
+      state.polizasAdheridasBuscar.items = [];
+      state.polizasAdheridasBuscar.status = "idle";
+      state.polizasAdheridasBuscar.error = null;
     },
-    resetBusquedaPolizas(state) {
-      state.polizasBusqueda = { list: [], loading: false, error: null };
+    invalidateAdhesionesCache(state) {
+      state.adhesiones.cache = {};
+    },
+    invalidatePlanesCache(state) {
+      state.planes.cache = {};
+    },
+    invalidateProveedoresCache(state) {
+      state.proveedores.cache = {};
+    },
+    invalidateSolicitudesCache(state) {
+      state.solicitudes.cache = {};
     },
   },
   extraReducers: (builder) => {
-    // Planes (listado)
-    builder.addCase(fetchPlanesGrua.pending, (state) => {
-      state.planes.loading = true;
-      state.planes.error = null;
-    });
-    builder.addCase(fetchPlanesGrua.fulfilled, (state, action) => {
-      state.planes.loading = false;
-      state.planes.list = Array.isArray(action.payload) ? action.payload : [];
-    });
-    builder.addCase(fetchPlanesGrua.rejected, (state, action) => {
-      state.planes.loading = false;
-      state.planes.error = normalizeError(action.payload || action.error);
-    });
+    builder
+      // buscarPolizas
+      .addCase(buscarPolizas.pending, (state, action) => {
+        state.polizasBuscar.status = "loading";
+        state.polizasBuscar.error = null;
+        state.polizasBuscar.q = action.meta.arg?.q || "";
+      })
+      .addCase(buscarPolizas.fulfilled, (state, action) => {
+        state.polizasBuscar.status = "success";
+        state.polizasBuscar.items = action.payload.items || [];
+        const key = action.payload.key;
+        state.polizasBuscar.cache[key] = {
+          ts: Date.now(),
+          items: state.polizasBuscar.items,
+        };
+      })
+      .addCase(buscarPolizas.rejected, (state, action) => {
+        state.polizasBuscar.status = "error";
+        state.polizasBuscar.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Planes (crear)
-    builder.addCase(createPlanGrua.pending, (state) => {
-      state.planes.creating = true;
-      state.planes.createError = null;
-    });
-    builder.addCase(createPlanGrua.fulfilled, (state, action) => {
-      state.planes.creating = false;
-      const nuevo = action.payload;
-      if (nuevo) state.planes.list = [nuevo, ...(state.planes.list || [])];
-    });
-    builder.addCase(createPlanGrua.rejected, (state, action) => {
-      state.planes.creating = false;
-      state.planes.createError = normalizeError(action.payload || action.error);
-    });
+      // buscarPolizasAdheridas
+      .addCase(buscarPolizasAdheridas.pending, (state, action) => {
+        state.polizasAdheridasBuscar.status = "loading";
+        state.polizasAdheridasBuscar.error = null;
+        state.polizasAdheridasBuscar.q = action.meta.arg?.q || "";
+      })
+      .addCase(buscarPolizasAdheridas.fulfilled, (state, action) => {
+        state.polizasAdheridasBuscar.status = "success";
+        state.polizasAdheridasBuscar.items = action.payload.items || [];
+        const key = action.payload.key;
+        state.polizasAdheridasBuscar.cache[key] = {
+          ts: Date.now(),
+          items: state.polizasAdheridasBuscar.items,
+        };
+      })
+      .addCase(buscarPolizasAdheridas.rejected, (state, action) => {
+        state.polizasAdheridasBuscar.status = "error";
+        state.polizasAdheridasBuscar.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Proveedores (listado)
-    builder.addCase(fetchProveedoresGrua.pending, (state) => {
-      state.proveedores.loading = true;
-      state.proveedores.error = null;
-    });
-    builder.addCase(fetchProveedoresGrua.fulfilled, (state, action) => {
-      state.proveedores.loading = false;
-      state.proveedores.list = Array.isArray(action.payload) ? action.payload : [];
-    });
-    builder.addCase(fetchProveedoresGrua.rejected, (state, action) => {
-      state.proveedores.loading = false;
-      state.proveedores.error = normalizeError(action.payload || action.error);
-    });
+      // fetchPlanes
+      .addCase(fetchPlanes.pending, (state, action) => {
+        state.planes.status = "loading";
+        state.planes.error = null;
+        state.planes.params = {
+          ...(state.planes.params || {}),
+          ...(action.meta.arg || {}),
+        };
+      })
+      .addCase(fetchPlanes.fulfilled, (state, action) => {
+        state.planes.status = "success";
+        state.planes.items = action.payload.payload.items || [];
+        const key = action.payload.key;
+        state.planes.cache[key] = {
+          ts: Date.now(),
+          payload: action.payload.payload,
+        };
+      })
+      .addCase(fetchPlanes.rejected, (state, action) => {
+        state.planes.status = "error";
+        state.planes.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Proveedor perfil
-    builder.addCase(fetchProveedorPerfil.pending, (state) => {
-      state.proveedorPerfil.loading = true;
-      state.proveedorPerfil.error = null;
-    });
-    builder.addCase(fetchProveedorPerfil.fulfilled, (state, action) => {
-      state.proveedorPerfil.loading = false;
-      const d = action.payload || {};
-      const prov = d?.proveedor;
-      const provId = prov?.id ?? action.meta?.arg?.proveedorId;
-      if (provId != null) state.proveedorPerfil.byId[provId] = d;
-    });
-    builder.addCase(fetchProveedorPerfil.rejected, (state, action) => {
-      state.proveedorPerfil.loading = false;
-      state.proveedorPerfil.error = normalizeError(action.payload || action.error);
-    });
+      // createPlan
+      .addCase(createPlan.pending, (state) => {
+        state.createPlan.status = "loading";
+        state.createPlan.error = null;
+      })
+      .addCase(createPlan.fulfilled, (state, action) => {
+        state.createPlan.status = "success";
+        state.createPlan.error = null;
+        state.planes.cache = {};
+        if (action.payload) {
+          state.planes.items = [action.payload, ...(state.planes.items || [])];
+        }
+      })
+      .addCase(createPlan.rejected, (state, action) => {
+        state.createPlan.status = "error";
+        state.createPlan.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Flota real (listar)
-    builder.addCase(fetchProveedorVehiculos.pending, (state) => {
-      state.flota.loading = true;
-      state.flota.error = null;
-    });
-    builder.addCase(fetchProveedorVehiculos.fulfilled, (state, action) => {
-      state.flota.loading = false;
-      const proveedorId = action.meta?.arg?.proveedorId;
-      const resp = action.payload || {};
-      if (proveedorId != null) state.flota.byProveedor[proveedorId] = resp;
-    });
-    builder.addCase(fetchProveedorVehiculos.rejected, (state, action) => {
-      state.flota.loading = false;
-      state.flota.error = normalizeError(action.payload || action.error);
-    });
+      // updatePlan
+      .addCase(updatePlan.pending, (state) => {
+        state.updatePlan.status = "loading";
+        state.updatePlan.error = null;
+      })
+      .addCase(updatePlan.fulfilled, (state, action) => {
+        state.updatePlan.status = "success";
+        state.updatePlan.error = null;
+        state.planes.cache = {};
+        const upd = action.payload;
+        if (upd?.id != null) {
+          state.planes.items = (state.planes.items || []).map((p) => (p.id === upd.id ? upd : p));
+        }
+      })
+      .addCase(updatePlan.rejected, (state, action) => {
+        state.updatePlan.status = "error";
+        state.updatePlan.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Flota real (crear/update/delete)
-    builder.addCase(createProveedorVehiculo.fulfilled, (state, action) => {
-      const proveedorId = action.meta?.arg?.proveedorId;
-      if (proveedorId == null) return;
-      const cur = state.flota.byProveedor[proveedorId];
-      if (!cur || !Array.isArray(cur.items)) return;
-      cur.items = [action.payload, ...cur.items];
-      cur.total_vehiculos = (cur.total_vehiculos || 0) + 1;
-    });
+      // deletePlan
+      .addCase(deletePlan.pending, (state) => {
+        state.deletePlan.status = "loading";
+        state.deletePlan.error = null;
+      })
+      .addCase(deletePlan.fulfilled, (state, action) => {
+        state.deletePlan.status = "success";
+        state.deletePlan.error = null;
+        state.planes.cache = {};
+        const id = action.payload?.id;
+        if (id != null) {
+          state.planes.items = (state.planes.items || []).filter((p) => p.id !== id);
+        }
+      })
+      .addCase(deletePlan.rejected, (state, action) => {
+        state.deletePlan.status = "error";
+        state.deletePlan.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    builder.addCase(updateProveedorVehiculo.fulfilled, (state, action) => {
-      const proveedorId = action.meta?.arg?.proveedorId;
-      if (proveedorId == null) return;
-      const cur = state.flota.byProveedor[proveedorId];
-      if (!cur || !Array.isArray(cur.items)) return;
-      const updated = action.payload;
-      const idx = cur.items.findIndex((x) => String(x?.id) === String(updated?.id));
-      if (idx >= 0) cur.items[idx] = updated;
-    });
+      // fetchProveedores
+      .addCase(fetchProveedores.pending, (state, action) => {
+        state.proveedores.status = "loading";
+        state.proveedores.error = null;
+        state.proveedores.params = {
+          ...(state.proveedores.params || {}),
+          ...(action.meta.arg || {}),
+        };
+      })
+      .addCase(fetchProveedores.fulfilled, (state, action) => {
+        state.proveedores.status = "success";
+        state.proveedores.items = action.payload.payload.items || [];
+        state.proveedores.count = action.payload.payload.count || 0;
+        state.proveedores.next = action.payload.payload.next ?? null;
+        state.proveedores.previous = action.payload.payload.previous ?? null;
+        const key = action.payload.key;
+        state.proveedores.cache[key] = {
+          ts: Date.now(),
+          payload: action.payload.payload,
+        };
+      })
+      .addCase(fetchProveedores.rejected, (state, action) => {
+        state.proveedores.status = "error";
+        state.proveedores.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    builder.addCase(deleteProveedorVehiculo.fulfilled, (state, action) => {
-      const { proveedorId, vehiculoId } = action.payload || {};
-      const cur = state.flota.byProveedor[proveedorId];
-      if (!cur || !Array.isArray(cur.items)) return;
-      cur.items = cur.items.filter((x) => String(x?.id) !== String(vehiculoId));
-      cur.total_vehiculos = Math.max((cur.total_vehiculos || 1) - 1, 0);
-    });
+      // createProveedor
+      .addCase(createProveedor.pending, (state) => {
+        state.createProveedor.status = "loading";
+        state.createProveedor.error = null;
+      })
+      .addCase(createProveedor.fulfilled, (state, action) => {
+        state.createProveedor.status = "success";
+        state.createProveedor.error = null;
+        state.proveedores.cache = {};
+        if (action.payload) {
+          state.proveedores.items = [action.payload, ...(state.proveedores.items || [])];
+          state.proveedores.count = (state.proveedores.count || 0) + 1;
+        }
+      })
+      .addCase(createProveedor.rejected, (state, action) => {
+        state.createProveedor.status = "error";
+        state.createProveedor.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Activación
-    builder.addCase(activarAdhesionGrua.pending, (state) => {
-      state.activacion = { loading: true, success: false, error: null, adhesion: null };
-    });
-    builder.addCase(activarAdhesionGrua.fulfilled, (state, action) => {
-      state.activacion = { loading: false, success: true, error: null, adhesion: action.payload };
-    });
-    builder.addCase(activarAdhesionGrua.rejected, (state, action) => {
-      state.activacion = { loading: false, success: false, error: normalizeError(action.payload || action.error), adhesion: null };
-    });
+      // updateProveedor
+      .addCase(updateProveedor.pending, (state) => {
+        state.updateProveedor.status = "loading";
+        state.updateProveedor.error = null;
+      })
+      .addCase(updateProveedor.fulfilled, (state, action) => {
+        state.updateProveedor.status = "success";
+        state.updateProveedor.error = null;
+        state.proveedores.cache = {};
+        const upd = action.payload;
+        if (upd?.id != null) {
+          state.proveedores.items = (state.proveedores.items || []).map((p) => (p.id === upd.id ? upd : p));
+        }
+      })
+      .addCase(updateProveedor.rejected, (state, action) => {
+        state.updateProveedor.status = "error";
+        state.updateProveedor.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Asociación
-    builder.addCase(asociarGrua.pending, (state) => {
-      state.asociacion = { loading: true, success: false, error: null, adhesion: null };
-    });
-    builder.addCase(asociarGrua.fulfilled, (state, action) => {
-      state.asociacion = { loading: false, success: true, error: null, adhesion: action.payload };
+      // deleteProveedor
+      .addCase(deleteProveedor.pending, (state) => {
+        state.deleteProveedor.status = "loading";
+        state.deleteProveedor.error = null;
+      })
+      .addCase(deleteProveedor.fulfilled, (state, action) => {
+        state.deleteProveedor.status = "success";
+        state.deleteProveedor.error = null;
+        state.proveedores.cache = {};
+        const id = action.payload?.id;
+        if (id != null) {
+          state.proveedores.items = (state.proveedores.items || []).filter((p) => p.id !== id);
+          state.proveedores.count = Math.max(0, (state.proveedores.count || 0) - 1);
+        }
+      })
+      .addCase(deleteProveedor.rejected, (state, action) => {
+        state.deleteProveedor.status = "error";
+        state.deleteProveedor.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-      const adhesion = action.payload || {};
-      const polizaId = action.meta?.arg?.polizaId ?? adhesion?.poliza;
-      if (polizaId != null) {
-        const list = state.adhesiones.byPoliza[polizaId] || [];
-        state.adhesiones.byPoliza[polizaId] = [adhesion, ...list];
-      }
-    });
-    builder.addCase(asociarGrua.rejected, (state, action) => {
-      state.asociacion = { loading: false, success: false, error: normalizeError(action.payload || action.error), adhesion: null };
-    });
+      // fetchAdhesiones
+      .addCase(fetchAdhesiones.pending, (state, action) => {
+        state.adhesiones.status = "loading";
+        state.adhesiones.error = null;
+        state.adhesiones.params = {
+          ...(state.adhesiones.params || {}),
+          ...(action.meta.arg || {}),
+        };
+      })
+      .addCase(fetchAdhesiones.fulfilled, (state, action) => {
+        state.adhesiones.status = "success";
+        state.adhesiones.items = action.payload.payload.items || [];
+        state.adhesiones.count = action.payload.payload.count || 0;
+        state.adhesiones.next = action.payload.payload.next ?? null;
+        state.adhesiones.previous = action.payload.payload.previous ?? null;
+        const key = action.payload.key;
+        state.adhesiones.cache[key] = {
+          ts: Date.now(),
+          payload: action.payload.payload,
+        };
+      })
+      .addCase(fetchAdhesiones.rejected, (state, action) => {
+        state.adhesiones.status = "error";
+        state.adhesiones.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Firmar contrato
-    builder.addCase(firmarContratoAdhesion.pending, (state) => {
-      state.activacion.loading = true;
-      state.activacion.error = null;
-    });
-    builder.addCase(firmarContratoAdhesion.fulfilled, (state, action) => {
-      state.activacion.loading = false;
-      state.activacion.adhesion = action.payload;
-    });
-    builder.addCase(firmarContratoAdhesion.rejected, (state, action) => {
-      state.activacion.loading = false;
-      state.activacion.error = normalizeError(action.payload || action.error);
-    });
+      // createAdhesion
+      .addCase(createAdhesion.pending, (state) => {
+        state.createAdhesion.status = "loading";
+        state.createAdhesion.error = null;
+      })
+      .addCase(createAdhesion.fulfilled, (state) => {
+        state.createAdhesion.status = "success";
+        state.createAdhesion.error = null;
+        state.adhesiones.cache = {};
+      })
+      .addCase(createAdhesion.rejected, (state, action) => {
+        state.createAdhesion.status = "error";
+        state.createAdhesion.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    builder.addCase(firmarContratoAdhesionUpload.pending, (state) => {
-      state.activacion.loading = true;
-      state.activacion.error = null;
-    });
-    builder.addCase(firmarContratoAdhesionUpload.fulfilled, (state, action) => {
-      state.activacion.loading = false;
-      state.activacion.adhesion = action.payload;
-    });
-    builder.addCase(firmarContratoAdhesionUpload.rejected, (state, action) => {
-      state.activacion.loading = false;
-      state.activacion.error = normalizeError(action.payload || action.error);
-    });
+      // fetchSolicitudes
+      .addCase(fetchSolicitudes.pending, (state, action) => {
+        state.solicitudes.status = "loading";
+        state.solicitudes.error = null;
+        state.solicitudes.params = {
+          ...(state.solicitudes.params || {}),
+          ...(action.meta.arg || {}),
+        };
+      })
+      .addCase(fetchSolicitudes.fulfilled, (state, action) => {
+        state.solicitudes.status = "success";
+        state.solicitudes.items = action.payload.payload.items || [];
+        state.solicitudes.count = action.payload.payload.count || 0;
+        state.solicitudes.next = action.payload.payload.next ?? null;
+        state.solicitudes.previous = action.payload.payload.previous ?? null;
+        const key = action.payload.key;
+        state.solicitudes.cache[key] = {
+          ts: Date.now(),
+          payload: action.payload.payload,
+        };
+      })
+      .addCase(fetchSolicitudes.rejected, (state, action) => {
+        state.solicitudes.status = "error";
+        state.solicitudes.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Adhesiones por póliza
-    builder.addCase(fetchAdhesionesByPoliza.pending, (state) => {
-      state.adhesiones.loading = true;
-      state.adhesiones.error = null;
-    });
-    builder.addCase(fetchAdhesionesByPoliza.fulfilled, (state, action) => {
-      state.adhesiones.loading = false;
-      const list = Array.isArray(action.payload) ? action.payload : [];
-      const polizaId = action.meta?.arg;
-      if (polizaId != null) {
-        state.adhesiones.byPoliza[polizaId] = list;
-      } else if (list.length) {
-        const pId = list[0].poliza;
-        state.adhesiones.byPoliza[pId] = list;
-      }
-    });
-    builder.addCase(fetchAdhesionesByPoliza.rejected, (state, action) => {
-      state.adhesiones.loading = false;
-      state.adhesiones.error = normalizeError(action.payload || action.error);
-    });
+      // createSolicitud
+      .addCase(createSolicitud.pending, (state) => {
+        state.createSolicitud.status = "loading";
+        state.createSolicitud.error = null;
+      })
+      .addCase(createSolicitud.fulfilled, (state, action) => {
+        state.createSolicitud.status = "success";
+        state.createSolicitud.error = null;
+        state.solicitudes.cache = {};
+        if (action.payload) {
+          state.solicitudes.items = [action.payload, ...(state.solicitudes.items || [])];
+          state.solicitudes.count = (state.solicitudes.count || 0) + 1;
+        }
+      })
+      .addCase(createSolicitud.rejected, (state, action) => {
+        state.createSolicitud.status = "error";
+        state.createSolicitud.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    // Solicitudes (listado)
-    builder.addCase(fetchSolicitudes.pending, (state) => {
-      state.solicitudes.loading = true;
-      state.solicitudes.error = null;
-    });
-    builder.addCase(fetchSolicitudes.fulfilled, (state, action) => {
-      state.solicitudes.loading = false;
-      // backend devuelve list (ModelViewSet) -> normalmente array
-      state.solicitudes.list = Array.isArray(action.payload) ? action.payload : [];
-    });
-    builder.addCase(fetchSolicitudes.rejected, (state, action) => {
-      state.solicitudes.loading = false;
-      state.solicitudes.error = normalizeError(action.payload || action.error);
-      state.solicitudes.list = [];
-    });
+      // ✅ asignarProveedorSolicitud
+      .addCase(asignarProveedorSolicitud.pending, (state) => {
+        state.asignarProveedorSolicitud.status = "loading";
+        state.asignarProveedorSolicitud.error = null;
+      })
+      .addCase(asignarProveedorSolicitud.fulfilled, (state, action) => {
+        state.asignarProveedorSolicitud.status = "success";
+        state.asignarProveedorSolicitud.error = null;
 
-    // Solicitudes (acciones que “updatean” una solicitud)
-    const onSolicitudUpdatePending = (state) => {
-      state.solicitudes.updating = true;
-      state.solicitudes.updateError = null;
-    };
-    const onSolicitudUpdateRejected = (state, action) => {
-      state.solicitudes.updating = false;
-      state.solicitudes.updateError = normalizeError(action.payload || action.error);
-    };
-    const onSolicitudUpdateFulfilled = (state, action) => {
-      state.solicitudes.updating = false;
-      const upd = action.payload;
-      if (!upd?.id) return;
-      const idx = (state.solicitudes.list || []).findIndex((x) => String(x?.id) === String(upd.id));
-      if (idx >= 0) state.solicitudes.list[idx] = upd;
-      else state.solicitudes.list = [upd, ...(state.solicitudes.list || [])];
-    };
+        state.solicitudes.cache = {};
+        const upd = action.payload;
+        if (upd?.id != null) {
+          state.solicitudes.items = (state.solicitudes.items || []).map((x) => (x.id === upd.id ? upd : x));
+        }
+      })
+      .addCase(asignarProveedorSolicitud.rejected, (state, action) => {
+        state.asignarProveedorSolicitud.status = "error";
+        state.asignarProveedorSolicitud.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    builder.addCase(createSolicitud.pending, onSolicitudUpdatePending);
-    builder.addCase(createSolicitud.fulfilled, onSolicitudUpdateFulfilled);
-    builder.addCase(createSolicitud.rejected, onSolicitudUpdateRejected);
+      // updateSolicitud
+      .addCase(updateSolicitud.pending, (state) => {
+        state.updateSolicitud.status = "loading";
+        state.updateSolicitud.error = null;
+      })
+      .addCase(updateSolicitud.fulfilled, (state, action) => {
+        state.updateSolicitud.status = "success";
+        state.updateSolicitud.error = null;
+        state.solicitudes.cache = {};
+        const upd = action.payload;
+        if (upd?.id != null) {
+          state.solicitudes.items = (state.solicitudes.items || []).map((x) => (x.id === upd.id ? upd : x));
+        }
+      })
+      .addCase(updateSolicitud.rejected, (state, action) => {
+        state.updateSolicitud.status = "error";
+        state.updateSolicitud.error = action.payload?.detail || action.error?.message || "Error";
+      })
 
-    builder.addCase(asignarProveedorSolicitud.pending, onSolicitudUpdatePending);
-    builder.addCase(asignarProveedorSolicitud.fulfilled, onSolicitudUpdateFulfilled);
-    builder.addCase(asignarProveedorSolicitud.rejected, onSolicitudUpdateRejected);
-
-    builder.addCase(cambiarEstadoSolicitud.pending, onSolicitudUpdatePending);
-    builder.addCase(cambiarEstadoSolicitud.fulfilled, onSolicitudUpdateFulfilled);
-    builder.addCase(cambiarEstadoSolicitud.rejected, onSolicitudUpdateRejected);
-
-    builder.addCase(cerrarSolicitud.pending, onSolicitudUpdatePending);
-    builder.addCase(cerrarSolicitud.fulfilled, onSolicitudUpdateFulfilled);
-    builder.addCase(cerrarSolicitud.rejected, onSolicitudUpdateRejected);
-
-    // KPIs
-    builder.addCase(fetchKpisSolicitudes.pending, (state) => {
-      state.kpisMeta.loading = true;
-      state.kpisMeta.error = null;
-    });
-    builder.addCase(fetchKpisSolicitudes.fulfilled, (state, action) => {
-      state.kpisMeta.loading = false;
-      state.kpis = action.payload || {};
-    });
-    builder.addCase(fetchKpisSolicitudes.rejected, (state, action) => {
-      state.kpisMeta.loading = false;
-      state.kpisMeta.error = normalizeError(action.payload || action.error);
-      state.kpis = {};
-    });
-
-    // Series por mes
-    builder.addCase(fetchSeriePorMes.pending, (state) => {
-      state.seriesMeta.loading = true;
-      state.seriesMeta.error = null;
-    });
-    builder.addCase(fetchSeriePorMes.fulfilled, (state, action) => {
-      state.seriesMeta.loading = false;
-      const arr = Array.isArray(action.payload?.series) ? action.payload.series : [];
-      state.series.por_mes = arr;
-    });
-    builder.addCase(fetchSeriePorMes.rejected, (state, action) => {
-      state.seriesMeta.loading = false;
-      state.seriesMeta.error = normalizeError(action.payload || action.error);
-      state.series.por_mes = [];
-    });
-
-    // Resumen cliente
-    builder.addCase(fetchClienteResumen.pending, (state) => {
-      state.clienteResumen.loading = true;
-      state.clienteResumen.error = null;
-    });
-    builder.addCase(fetchClienteResumen.fulfilled, (state, action) => {
-      state.clienteResumen.loading = false;
-      const d = action.payload || {};
-      if (d?.cliente_id != null) state.clienteResumen.byId[d.cliente_id] = d;
-    });
-    builder.addCase(fetchClienteResumen.rejected, (state, action) => {
-      state.clienteResumen.loading = false;
-      state.clienteResumen.error = normalizeError(action.payload || action.error);
-    });
-
-    // Resumen póliza
-    builder.addCase(fetchPolizaResumen.pending, (state) => {
-      state.polizaResumen.loading = true;
-      state.polizaResumen.error = null;
-    });
-    builder.addCase(fetchPolizaResumen.fulfilled, (state, action) => {
-      state.polizaResumen.loading = false;
-      const d = action.payload || {};
-      if (d?.poliza_id != null) state.polizaResumen.byId[d.poliza_id] = d;
-    });
-    builder.addCase(fetchPolizaResumen.rejected, (state, action) => {
-      state.polizaResumen.loading = false;
-      state.polizaResumen.error = normalizeError(action.payload || action.error);
-    });
-
-    // Búsqueda de pólizas
-    builder.addCase(searchPolizasElegibles.pending, (state) => {
-      state.polizasBusqueda.loading = true;
-      state.polizasBusqueda.error = null;
-    });
-    builder.addCase(searchPolizasElegibles.fulfilled, (state, action) => {
-      state.polizasBusqueda.loading = false;
-      state.polizasBusqueda.list = Array.isArray(action.payload) ? action.payload : [];
-    });
-    builder.addCase(searchPolizasElegibles.rejected, (state, action) => {
-      state.polizasBusqueda.loading = false;
-      state.polizasBusqueda.error = normalizeError(action.payload || action.error);
-    });
+      // deleteSolicitud
+      .addCase(deleteSolicitud.pending, (state) => {
+        state.deleteSolicitud.status = "loading";
+        state.deleteSolicitud.error = null;
+      })
+      .addCase(deleteSolicitud.fulfilled, (state, action) => {
+        state.deleteSolicitud.status = "success";
+        state.deleteSolicitud.error = null;
+        state.solicitudes.cache = {};
+        const id = action.payload?.id;
+        if (id != null) {
+          state.solicitudes.items = (state.solicitudes.items || []).filter((x) => x.id !== id);
+          state.solicitudes.count = Math.max(0, (state.solicitudes.count || 0) - 1);
+        }
+      })
+      .addCase(deleteSolicitud.rejected, (state, action) => {
+        state.deleteSolicitud.status = "error";
+        state.deleteSolicitud.error = action.payload?.detail || action.error?.message || "Error";
+      });
   },
 });
 
-export const { resetActivacion, resetAsociacion, resetBusquedaPolizas } = gruasSlice.actions;
+export const {
+  clearPolizasBuscar,
+  clearPolizasAdheridasBuscar,
+  invalidateAdhesionesCache,
+  invalidatePlanesCache,
+  invalidateProveedoresCache,
+  invalidateSolicitudesCache,
+} = gruasSlice.actions;
 
 export default gruasSlice.reducer;
+
+/* =========================
+   SELECTORS
+========================= */
+export const selectPolizasBuscar = (s) => s.gruas?.polizasBuscar?.items || [];
+export const selectPolizasBuscarStatus = (s) => s.gruas?.polizasBuscar?.status || "idle";
+
+export const selectPolizasAdheridasBuscar = (s) => s.gruas?.polizasAdheridasBuscar?.items || [];
+export const selectPolizasAdheridasBuscarStatus = (s) =>
+  s.gruas?.polizasAdheridasBuscar?.status || "idle";
+
+export const selectAdhesiones = (s) => s.gruas?.adhesiones?.items || [];
+export const selectAdhesionesStatus = (s) => s.gruas?.adhesiones?.status || "idle";
+
+export const selectPlanes = (s) => s.gruas?.planes?.items || [];
+export const selectPlanesStatus = (s) => s.gruas?.planes?.status || "idle";
+
+export const selectProveedores = (s) => s.gruas?.proveedores?.items || [];
+export const selectProveedoresStatus = (s) => s.gruas?.proveedores?.status || "idle";
+
+export const selectSolicitudes = (s) => s.gruas?.solicitudes?.items || [];
+export const selectSolicitudesStatus = (s) => s.gruas?.solicitudes?.status || "idle";
+
+/* =========================
+   COMPAT
+========================= */
+export const fetchPlanesGrua = fetchPlanes;
+export const selectPlanesGrua = selectPlanes;
+export const selectPlanesGruaStatus = selectPlanesStatus;

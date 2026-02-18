@@ -12,7 +12,7 @@ import toast from "react-hot-toast";
 
 /**
  * Props esperadas:
- * - MAX_FOTOS: number (opcional)
+ * - MAX_FOTOS: number (opcional) -> si 0/undefined => sin límite
  * - fotoSlotDefs: Array<{ key, label }>
  * - fotoSlots: Record<key, { url, public_id, mime?, file? }|null>
  * - setFotoSlots: fn
@@ -33,41 +33,36 @@ const REQUIRED_BY_RULE = {
     color: "from-emerald-200/80 to-teal-200/80",
   },
   A_GRUA: {
-    docs: ["CEDULA_VERDE_FRENTE", "VTV"],
-    fotos: ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"],
+    // ⚠ Backend no tiene VTV como tipo doc => NO exigirlo acá
+    docs: ["CEDULA_VERDE_FRENTE"],
+    fotos: ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA", "PATENTE"],
     title: "Requisitos para A + GRÚA",
-    note: "Cédula verde (frente), VTV y 4 lados del vehículo.",
+    note: "Cédula verde (frente) y fotos (frente, laterales, trasera y patente).",
     color: "from-sky-200/80 to-cyan-200/80",
   },
   OTRAS: {
-    docs: ["CEDULA_VERDE_FRENTE"], // VTV/OBLEA/TÍTULO pueden aplicar según caso
-    fotos: ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"],
+    docs: ["CEDULA_VERDE_FRENTE"],
+    fotos: ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA", "PATENTE"],
     title: "Requisitos para otras coberturas",
-    note: "Se recomiendan 4 lados; interiores/auxilio y papeles extra si corresponde.",
+    note: "Se recomiendan 4 lados + patente; papeles extra si corresponde.",
     color: "from-amber-200/80 to-yellow-200/80",
   },
 };
 
 // Inferencia básica si no viene coverageRuleKey
-function inferRuleKey(fotoSlotDefs = [], docSlotDefs = []) {
-  const docKeys = new Set(docSlotDefs.map((d) => d.key));
-  if (!fotoSlotDefs.length) {
-    if (docKeys.has("VTV")) return "A_GRUA";
-    return "A";
-  }
+function inferRuleKey(fotoSlotDefs = []) {
+  // Si no hay fotos → suele ser A
+  if (!fotoSlotDefs.length) return "A";
+
+  // Si hay fotos de 4 lados + patente → suele ser A_GRUA o OTRAS
   const fotoKeys = new Set(fotoSlotDefs.map((f) => f.key));
-  const sides = ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"];
-  const hasSides = sides.every((k) => fotoKeys.has(k));
-  if (hasSides && docKeys.has("VTV")) return "A_GRUA";
+  const must = ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"];
+  const hasSides = must.every((k) => fotoKeys.has(k));
+  if (hasSides) return "A_GRUA";
   return "OTRAS";
 }
 
-function isHttpUrl(u) {
-  const s = String(u || "");
-  return s.startsWith("http://") || s.startsWith("https://");
-}
-
-/* ====== Label helpers (lado → conductor / acompañante, cédula frente/dorso) ====== */
+/* ====== Label helpers ====== */
 function mapFotoLabel(key, fallback) {
   switch (key) {
     case "LATERAL_IZQ":
@@ -78,6 +73,14 @@ function mapFotoLabel(key, fallback) {
       return "Frente";
     case "TRASERA":
       return "Parte trasera";
+    case "PATENTE":
+      return "Patente";
+    case "TUBO_GNC":
+      return "Equipo GNC";
+    case "EQUIPO_GNC":
+      return "Equipo GNC";
+    case "OBLEA_GNC":
+      return "Oblea GNC";
     default:
       return fallback || pretty(key);
   }
@@ -89,13 +92,23 @@ function mapDocLabel(key, fallback) {
       return "Cédula verde (frente)";
     case "CEDULA_VERDE_DORSO":
       return "Cédula verde (dorso)";
+    case "TITULO":
+      return "Título del vehículo";
+    case "OBLEA_GNC":
+      return "Oblea GNC";
     default:
       return fallback || pretty(key);
   }
 }
 
+// firma simple para dedupe pre-upload
+function fileSig(file) {
+  if (!file) return "";
+  return `${file.name || ""}__${file.size || 0}__${file.type || ""}`;
+}
+
 export default function ImagenesDocsStep({
-  MAX_FOTOS = 0,
+  MAX_FOTOS, // 0/undefined => sin límite
   fotoSlotDefs = [],
   fotoSlots = {},
   setFotoSlots = () => {},
@@ -115,25 +128,18 @@ export default function ImagenesDocsStep({
     [fotoSlots]
   );
 
-  const allUrls = useMemo(() => {
-    const s = new Set();
+  const allIds = useMemo(() => {
+    const out = new Set();
     const add = (v) => {
-      const u = v?.url;
-      const p = v?.public_id;
-      if (u) s.add(`u:${u}`);
-      if (p) s.add(`p:${p}`);
+      if (!v) return;
+      if (v.url) out.add(`u:${v.url}`);
+      if (v.public_id) out.add(`p:${v.public_id}`);
+      if (v.file) out.add(`f:${fileSig(v.file)}`);
     };
     Object.values(fotoSlots || {}).forEach(add);
     Object.values(docSlots || {}).forEach(add);
-    return s;
+    return out;
   }, [fotoSlots, docSlots]);
-
-  const isDuplicate = (candidate) => {
-    const u = candidate?.url;
-    const p = candidate?.public_id;
-    if (!u && !p) return false;
-    return (u && allUrls.has(`u:${u}`)) || (p && allUrls.has(`p:${p}`));
-  };
 
   const missingDocs = useMemo(() => {
     const have = new Set(
@@ -165,37 +171,30 @@ export default function ImagenesDocsStep({
     if (!file) return;
 
     // Límite de fotos (si aplica)
-    if (type === "foto" && MAX_FOTOS > 0) {
-      const nextCount =
-        totalFotosCargadas + (fotoSlots?.[key]?.url ? 0 : 1);
-      if (nextCount > MAX_FOTOS) {
+    if (type === "foto" && Number(MAX_FOTOS) > 0) {
+      const nextCount = totalFotosCargadas + (fotoSlots?.[key]?.url ? 0 : 1);
+      if (nextCount > Number(MAX_FOTOS)) {
         toast.error(`Solo podés adjuntar hasta ${MAX_FOTOS} fotos.`);
         e.target.value = "";
         return;
       }
     }
 
+    // dedupe pre-upload (por firma)
+    const sig = fileSig(file);
+    if (sig && allIds.has(`f:${sig}`)) {
+      toast.error("Ese archivo ya está cargado en otro campo.");
+      e.target.value = "";
+      return;
+    }
+
+    // ✅ mapeo: TUBO_GNC -> EQUIPO_GNC (backend)
+    const normalizedKey = type === "foto" && key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
+
     const doUpload = type === "foto" ? onUploadFotoVehiculo : onUploadDocVehiculo;
+
     try {
-      await doUpload(file, key);
-      // El padre setea (url/public_id) en el slot.
-      // Como dedupe depende del post-upload, validamos con un micro-delay.
-      setTimeout(() => {
-        const slotMap = type === "foto" ? fotoSlots : docSlots;
-        const value = slotMap?.[key];
-        if (
-          value &&
-          isDuplicate(value) &&
-          !sameSlotOnly(value, key, type, fotoSlots, docSlots)
-        ) {
-          if (type === "foto") {
-            setFotoSlots((prev) => ({ ...prev, [key]: null }));
-          } else {
-            setDocSlots((prev) => ({ ...prev, [key]: null }));
-          }
-          toast.error("Ese archivo ya está cargado en otro campo.");
-        }
-      }, 50);
+      await doUpload(file, normalizedKey);
     } catch {
       toast.error("No se pudo subir el archivo.");
     } finally {
@@ -241,9 +240,7 @@ export default function ImagenesDocsStep({
 
         {ruleRequiresPhotosButHidden && (
           <div className="mt-2 text-xs text-amber-200/90">
-            ⚠ Esta cobertura requiere fotos del vehículo (frente, laterales,
-            trasera), pero no están habilitadas aquí. Revisá la configuración de
-            la pantalla o la cobertura seleccionada.
+            ⚠ Esta cobertura requiere fotos del vehículo, pero no están habilitadas aquí.
           </div>
         )}
       </div>
@@ -264,9 +261,7 @@ export default function ImagenesDocsStep({
                 label={mapDocLabel(key, label)}
                 value={v}
                 required={required}
-                onRemove={() =>
-                  setDocSlots((prev) => ({ ...prev, [key]: null }))
-                }
+                onRemove={() => setDocSlots((prev) => ({ ...prev, [key]: null }))}
                 onPick={(e) => handlePick(e, "doc", key)}
               />
             );
@@ -287,8 +282,9 @@ export default function ImagenesDocsStep({
         ) : (
           <div className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {fotoSlotDefs.map(({ key, label }) => {
-              const v = fotoSlots?.[key] || null;
-              const required = rule.fotos.includes(key);
+              const normalizedKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
+              const v = fotoSlots?.[normalizedKey] || fotoSlots?.[key] || null; // tolerante
+              const required = rule.fotos.includes(key) || rule.fotos.includes(normalizedKey);
               return (
                 <FotoSlotCard
                   key={key}
@@ -296,7 +292,7 @@ export default function ImagenesDocsStep({
                   value={v}
                   required={required}
                   onRemove={() =>
-                    setFotoSlots((prev) => ({ ...prev, [key]: null }))
+                    setFotoSlots((prev) => ({ ...prev, [normalizedKey]: null, [key]: null }))
                   }
                   onPick={(e) => handlePick(e, "foto", key)}
                 />
@@ -305,7 +301,7 @@ export default function ImagenesDocsStep({
           </div>
         )}
 
-        {MAX_FOTOS > 0 && (
+        {Number(MAX_FOTOS) > 0 && (
           <p className="mt-2 text-xs text-white/60">
             {totalFotosCargadas}/{MAX_FOTOS} fotos adjuntas.
           </p>
@@ -319,8 +315,7 @@ export default function ImagenesDocsStep({
 function DocSlotCard({ label, value, required, onPick, onRemove }) {
   const filled = Boolean(value?.url);
   const isPdf =
-    String(value?.mime || "").includes("pdf") ||
-    /\.pdf$/i.test(value?.url || "");
+    String(value?.mime || "").includes("pdf") || /\.pdf$/i.test(value?.url || "");
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -343,7 +338,6 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
                 PDF adjunto
               </div>
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={value.url}
                 alt={label}
@@ -362,12 +356,7 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
         </div>
       ) : (
         <label className="block">
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            className="hidden"
-            onChange={onPick}
-          />
+          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onPick} />
           <div className="h-28 rounded-lg border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition grid place-items-center text-white/70 text-xs sm:text-sm cursor-pointer px-3 text-center">
             <div className="flex flex-col items-center gap-1">
               <HiDocumentText className="text-base opacity-80" />
@@ -398,12 +387,7 @@ function FotoSlotCard({ label, value, required, onPick, onRemove }) {
       {filled ? (
         <div className="relative group">
           <div className="rounded-lg overflow-hidden border border-white/10 bg-[#0f1324]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={value.url}
-              alt={label}
-              className="w-full h-32 object-cover"
-            />
+            <img src={value.url} alt={label} className="w-full h-32 object-cover" />
           </div>
           <button
             type="button"
@@ -416,13 +400,7 @@ function FotoSlotCard({ label, value, required, onPick, onRemove }) {
         </div>
       ) : (
         <label className="block">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={onPick}
-          />
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onPick} />
           <div className="h-28 rounded-lg border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition grid place-items-center text-white/70 text-xs sm:text-sm cursor-pointer px-3 text-center">
             <div className="flex flex-col items-center gap-1">
               <HiPhotograph className="text-base opacity-80" />
@@ -442,16 +420,4 @@ function pretty(k) {
     .replace(/\bGRUA\b/g, "GRÚA")
     .toLowerCase()
     .replace(/^\w/, (c) => c.toUpperCase());
-}
-
-// Chequea si el duplicado está en el mismo slot (permitimos re-subir al mismo campo)
-function sameSlotOnly(value, key, type, fotoSlots, docSlots) {
-  const pack = type === "foto" ? fotoSlots : docSlots;
-  const same = pack?.[key];
-  if (!same) return false;
-  const sameU = same?.url ? `u:${same.url}` : "";
-  const sameP = same?.public_id ? `p:${same.public_id}` : "";
-  const valU = value?.url ? `u:${value.url}` : "";
-  const valP = value?.public_id ? `p:${value.public_id}` : "";
-  return (sameU && sameU === valU) || (sameP && sameP === valP);
 }

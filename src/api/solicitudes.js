@@ -1,4 +1,5 @@
 // src/api/solicitudes.js
+
 /* ===================== URL helpers ===================== */
 function normalizeBase(raw) {
   if (!raw) return "";
@@ -13,7 +14,9 @@ function normalizeBase(raw) {
       u.protocol = "https:";
       base = u.toString().replace(/\/+$/g, "");
     }
-  } catch {/* ignore bad base */ }
+  } catch {
+    /* ignore */
+  }
   return base;
 }
 
@@ -82,7 +85,7 @@ async function jsonOrThrow(res, opName = "") {
     err.op = opName;
     try {
       err.requestId = res.headers?.get?.("X-Request-Id") || res.headers?.get?.("x-request-id") || null;
-    } catch { }
+    } catch {}
 
     if (import.meta?.env?.DEV) {
       console.error(`[API] ${opName || "request"} failed`, {
@@ -96,10 +99,7 @@ async function jsonOrThrow(res, opName = "") {
     throw err;
   }
 
-  // 204 → devolvemos true (éxito sin cuerpo)
   if (isNoContent) return true;
-
-  // Respuesta sin JSON válido → devolvemos {} para no romper consumidores
   return data ?? {};
 }
 
@@ -108,10 +108,18 @@ function qsFrom(params = {}) {
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null || v === "") return;
     if (Array.isArray(v)) v.forEach((it) => q.append(k, it));
-    else q.append(k, v);
+    else q.append(k, String(v));
   });
   const s = q.toString();
   return s ? `?${s}` : "";
+}
+
+function withSignal(opts = {}, signal) {
+  const o = opts && typeof opts === "object" ? opts : {};
+  if (!signal) return o;
+  // no pisar si ya viene uno
+  if (o.signal) return o;
+  return { ...o, signal };
 }
 
 /* ===================== Domain helpers ===================== */
@@ -127,17 +135,10 @@ function assertVencimientoIfRequired({ tipo, vencimiento } = {}) {
   }
 }
 
-function normalizeDocsResponse(data) {
-  const map = (it) => ({ ...it, url: toHttps(it.secure_url || it.url) });
+function normalizeItemsWithHttps(data) {
+  const map = (it) => ({ ...it, url: toHttps(it?.secure_url || it?.url) });
   if (Array.isArray(data)) return data.map(map);
-  if (data?.results?.length) data.results = data.results.map(map);
-  return data;
-}
-
-function normalizeFotosResponse(data) {
-  const map = (it) => ({ ...it, url: toHttps(it.secure_url || it.url) });
-  if (Array.isArray(data)) return data.map(map);
-  if (data?.results?.length) data.results = data.results.map(map);
+  if (data?.results?.length) return { ...data, results: data.results.map(map) };
   return data;
 }
 
@@ -145,148 +146,182 @@ function normalizeFotosResponse(data) {
 const SOL_BASE = joinUrl(API_BASE, "solicitudes");
 const DOCS_BASE = joinUrl(API_BASE, "documentos");
 const EMP_BASE = joinUrl(API_BASE, "empleados");
+
+// Polizas
 const POL_BASE = joinUrl(API_BASE, "polizas");
-const POL_DOCS_BASE = joinUrl(POL_BASE, "documentos");
-const POL_FOTOS_BASE = joinUrl(POL_BASE, "fotos");
+const POL_DOCS_BASE = joinUrl(API_BASE, "polizas/documentos");
+const POL_FOTOS_BASE = joinUrl(API_BASE, "polizas/fotos");
 
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
 
 /* ===================== Raw API ===================== */
 export const SolicitudesAPI = {
   async list(params = {}) {
-    const r = await fetch(`${SOL_BASE}/${qsFrom(params)}`, { headers: { Accept: "application/json" } });
+    const { signal, ...rest } = params || {};
+    const r = await fetch(`${SOL_BASE}/${qsFrom(rest)}`, withSignal({ headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "solicitudes.list");
   },
-  async getById(id) {
-    const r = await fetch(`${SOL_BASE}/${id}/`, { headers: { Accept: "application/json" } });
+
+  async getById(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${SOL_BASE}/${id}/`, withSignal({ headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "solicitudes.getById");
   },
-  async create(payload) {
-    const r = await fetch(`${SOL_BASE}/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(payload),
-    });
+
+  async create(payload, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${SOL_BASE}/`,
+      withSignal(
+        { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) },
+        signal
+      )
+    );
     return jsonOrThrow(r, "solicitudes.create");
   },
-  async patch(id, patch) {
-    const r = await fetch(`${SOL_BASE}/${id}/`, {
-      method: "PATCH",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(patch),
-    });
+
+  async patch(id, patch, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${SOL_BASE}/${id}/`,
+      withSignal(
+        { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(patch) },
+        signal
+      )
+    );
     return jsonOrThrow(r, "solicitudes.patch");
   },
-  async update(id, payload) {
-    return this.patch(id, payload);
+
+  async update(id, payload, opts = {}) {
+    return this.patch(id, payload, opts);
   },
-  async remove(id) {
-    const r = await fetch(`${SOL_BASE}/${id}/`, { method: "DELETE", headers: { Accept: "application/json" } });
+
+  async remove(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${SOL_BASE}/${id}/`,
+      withSignal({ method: "DELETE", headers: { Accept: "application/json" } }, signal)
+    );
     if (r.status === 204) return true;
     return jsonOrThrow(r, "solicitudes.remove");
   },
-  async crearCompleto(payload) {
-    const r = await fetch(`${SOL_BASE}/crear-completo/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(payload),
-    });
-    const data = await jsonOrThrow(r, "solicitudes.crearCompleto");
-    if (import.meta?.env?.DEV) {
-      console.debug("[API] crear-completo OK → shape preview:", {
-        solicitud_id: data?.solicitud_id ?? data?.solicitud?.id ?? null,
-        poliza_id: data?.poliza_id ?? data?.poliza?.id ?? null,
-        cliente_id: data?.cliente_id ?? data?.cliente?.id ?? null,
-        primera_cuota_id:
-          data?.primera_cuota_id ??
-          data?.cuota_id ??
-          data?.cuota?.id ??
-          data?.cuotas?.[0]?.id ??
-          data?.poliza?.cuotas?.[0]?.id ??
-          null,
-      });
-    }
-    return data;
+
+  async crearCompleto(payload, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${SOL_BASE}/crear-completo/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) }, signal)
+    );
+    return jsonOrThrow(r, "solicitudes.crearCompleto");
   },
-  async asociarAPoliza(id, payload) {
-    const r = await fetch(`${SOL_BASE}/${id}/asociar_a_poliza/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(payload || {}),
-    });
+
+  async asociarAPoliza(id, payload, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${SOL_BASE}/${id}/asociar_a_poliza/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload || {}) }, signal)
+    );
     return jsonOrThrow(r, "solicitudes.asociarAPoliza");
   },
-  async getPolizaById(polizaId) {
-    const r = await fetch(`${POL_BASE}/${polizaId}/`, { headers: { Accept: "application/json" } });
+
+  /* ---------- Poliza helpers ---------- */
+  async getPolizaById(polizaId, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${POL_BASE}/${polizaId}/`,
+      withSignal({ headers: { Accept: "application/json" } }, signal)
+    );
     return jsonOrThrow(r, "polizas.getById");
   },
+
   async listPolizaDocumentos(polizaId, params = {}) {
-    const r = await fetch(`${POL_DOCS_BASE}/${qsFrom({ poliza: polizaId, ...params })}`, {
-      headers: { Accept: "application/json" },
-    });
+    const { signal, ...rest } = params || {};
+    const r = await fetch(
+      `${POL_DOCS_BASE}/${qsFrom({ poliza: polizaId, ...rest })}`,
+      withSignal({ headers: { Accept: "application/json" } }, signal)
+    );
     const data = await jsonOrThrow(r, "polizas.listDocumentos");
-    return normalizeDocsResponse(data);
+    return normalizeItemsWithHttps(data);
   },
+
   async listPolizaFotos(polizaId, params = {}) {
-    const r = await fetch(`${POL_FOTOS_BASE}/${qsFrom({ poliza: polizaId, ...params })}`, {
-      headers: { Accept: "application/json" },
-    });
+    const { signal, ...rest } = params || {};
+    const r = await fetch(
+      `${POL_FOTOS_BASE}/${qsFrom({ poliza: polizaId, ...rest })}`,
+      withSignal({ headers: { Accept: "application/json" } }, signal)
+    );
     const data = await jsonOrThrow(r, "polizas.listFotos");
-    return normalizeFotosResponse(data);
+    return normalizeItemsWithHttps(data);
   },
-  async tomar(id, { responsable, empleado_id } = {}) {
-    const r = await fetch(`${SOL_BASE}/${id}/tomar/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ responsable, empleado_id }),
-    });
+
+  /* ---------- Acciones solicitud ---------- */
+  async tomar(id, { responsable, empleado_id, signal } = {}) {
+    const r = await fetch(
+      `${SOL_BASE}/${id}/tomar/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ responsable, empleado_id }) }, signal)
+    );
     return jsonOrThrow(r, "solicitudes.tomar");
   },
-  async reasignar(id, { responsable, empleado_id } = {}) {
-    const r = await fetch(`${SOL_BASE}/${id}/reasignar/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ responsable, empleado_id }),
-    });
+
+  async reasignar(id, { responsable, empleado_id, signal } = {}) {
+    const r = await fetch(
+      `${SOL_BASE}/${id}/reasignar/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ responsable, empleado_id }) }, signal)
+    );
     return jsonOrThrow(r, "solicitudes.reasignar");
   },
-  async enviar(id) {
-    const r = await fetch(`${SOL_BASE}/${id}/enviar/`, { method: "POST", headers: { Accept: "application/json" } });
+
+  async enviar(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${SOL_BASE}/${id}/enviar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "solicitudes.enviar");
   },
-  async emitirConstancia(id, base_verify_url) {
-    const r = await fetch(`${SOL_BASE}/${id}/emitir_constancia/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(base_verify_url ? { base_verify_url } : {}),
-    });
+
+  async emitirConstancia(id, base_verify_url, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${SOL_BASE}/${id}/emitir_constancia/`,
+      withSignal(
+        { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(base_verify_url ? { base_verify_url } : {}) },
+        signal
+      )
+    );
     return jsonOrThrow(r, "solicitudes.emitirConstancia");
   },
-  async terminar(id) {
-    const r = await fetch(`${SOL_BASE}/${id}/terminar/`, { method: "POST", headers: { Accept: "application/json" } });
+
+  async terminar(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${SOL_BASE}/${id}/terminar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "solicitudes.terminar");
   },
-  async cancelar(id) {
-    const r = await fetch(`${SOL_BASE}/${id}/cancelar/`, { method: "POST", headers: { Accept: "application/json" } });
+
+  async cancelar(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${SOL_BASE}/${id}/cancelar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "solicitudes.cancelar");
   },
-  async convertir(id, { poliza_id } = {}) {
-    const r = await fetch(`${SOL_BASE}/${id}/convertir/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(poliza_id ? { poliza_id } : {}),
-    });
+
+  async convertir(id, { poliza_id, signal } = {}) {
+    const r = await fetch(
+      `${SOL_BASE}/${id}/convertir/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(poliza_id ? { poliza_id } : {}) }, signal)
+    );
     return jsonOrThrow(r, "solicitudes.convertir");
   },
-  async resumen() {
-    const r = await fetch(`${SOL_BASE}/resumen/`, { headers: { Accept: "application/json" } });
+
+  async resumen(opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${SOL_BASE}/resumen/`, withSignal({ headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "solicitudes.resumen");
   },
+
   comprobantePngUrl(id) {
     return `${SOL_BASE}/${id}/comprobante_png/`;
   },
-  async descargarComprobantePng(id) {
-    const r = await fetch(`${SOL_BASE}/${id}/comprobante_png/`, { method: "GET" });
+
+  async descargarComprobantePng(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${SOL_BASE}/${id}/comprobante_png/`, withSignal({ method: "GET" }, signal));
     if (!r.ok) {
       try {
         const j = await r.json();
@@ -299,63 +334,87 @@ export const SolicitudesAPI = {
     }
     return r.blob();
   },
+
+  /* ---------- Documentos Solicitud (/api/documentos/) ---------- */
   async listDocumentos(params = {}) {
-    const r = await fetch(`${DOCS_BASE}/${qsFrom(params)}`, { headers: { Accept: "application/json" } });
+    const { signal, ...rest } = params || {};
+    const r = await fetch(`${DOCS_BASE}/${qsFrom(rest)}`, withSignal({ headers: { Accept: "application/json" } }, signal));
     const data = await jsonOrThrow(r, "documentos.list");
-    return normalizeDocsResponse(data);
+    return normalizeItemsWithHttps(data);
   },
-  async crearDocumento(payload) {
+
+  async crearDocumento(payload, opts = {}) {
     assertVencimientoIfRequired(payload);
-    const r = await fetch(`${DOCS_BASE}/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(payload),
-    });
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${DOCS_BASE}/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) }, signal)
+    );
     return jsonOrThrow(r, "documentos.create");
   },
-  async updateDocumento(id, patch) {
+
+  async updateDocumento(id, patch, opts = {}) {
     assertVencimientoIfRequired(patch || {});
-    const r = await fetch(`${DOCS_BASE}/${id}/`, {
-      method: "PATCH",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(patch),
-    });
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${DOCS_BASE}/${id}/`,
+      withSignal({ method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(patch) }, signal)
+    );
     return jsonOrThrow(r, "documentos.update");
   },
-  async deleteDocumento(id) {
-    const r = await fetch(`${DOCS_BASE}/${id}/`, { method: "DELETE", headers: { Accept: "application/json" } });
+
+  async deleteDocumento(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${DOCS_BASE}/${id}/`,
+      withSignal({ method: "DELETE", headers: { Accept: "application/json" } }, signal)
+    );
     if (r.status === 204) return true;
     return jsonOrThrow(r, "documentos.delete");
   },
+
+  /* ---------- Empleados ---------- */
   async listEmpleados(params = {}) {
-    const r = await fetch(`${EMP_BASE}/${qsFrom(params)}`, { headers: { Accept: "application/json" } });
+    const { signal, ...rest } = params || {};
+    const r = await fetch(`${EMP_BASE}/${qsFrom(rest)}`, withSignal({ headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "empleados.list");
   },
-  async empleadosActivos() {
-    const r = await fetch(`${EMP_BASE}/activos/`, { headers: { Accept: "application/json" } });
+
+  async empleadosActivos(opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${EMP_BASE}/activos/`, withSignal({ headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "empleados.activos");
   },
-  async crearEmpleado(payload) {
-    const r = await fetch(`${EMP_BASE}/`, {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(payload || {}),
-    });
+
+  async crearEmpleado(payload, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${EMP_BASE}/`,
+      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload || {}) }, signal)
+    );
     return jsonOrThrow(r, "empleados.create");
   },
-  async activarEmpleado(id) {
-    const r = await fetch(`${EMP_BASE}/${id}/activar/`, { method: "POST", headers: { Accept: "application/json" } });
+
+  async activarEmpleado(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(`${EMP_BASE}/${id}/activar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
     return jsonOrThrow(r, "empleados.activar");
   },
-  async desactivarEmpleado(id) {
-    const r = await fetch(`${EMP_BASE}/${id}/desactivar/`, { method: "POST", headers: { Accept: "application/json" } });
+
+  async desactivarEmpleado(id, opts = {}) {
+    const { signal } = opts || {};
+    const r = await fetch(
+      `${EMP_BASE}/${id}/desactivar/`,
+      withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal)
+    );
     return jsonOrThrow(r, "empleados.desactivar");
   },
 };
 
 /* ===================== Facade (nombres actuales) ===================== */
 export const solicitudesApi = {
-  listar: (...args) => SolicitudesAPI.list(...args),
+  // ✅ ahora soporta: solicitudesApi.listar({ signal })
+  listar: (params = {}) => SolicitudesAPI.list(params),
 
   listarDocs: (solicitudId, extra = {}) =>
     SolicitudesAPI.listDocumentos({ solicitud: solicitudId, ...extra }).then((data) =>
@@ -372,54 +431,40 @@ export const solicitudesApi = {
       Array.isArray(data) ? data : data?.results || data?.data || []
     ),
 
-  listarDocsCliente: (clienteId, extra = {}) =>
-    SolicitudesAPI.listDocumentos({ cliente: clienteId, ...extra }).then((data) =>
-      Array.isArray(data) ? data : data?.results || data?.data || []
-    ),
+  crearDoc: (payload, opts) => SolicitudesAPI.crearDocumento(payload, opts),
+  actualizarDoc: (id, patch, opts) => SolicitudesAPI.updateDocumento(id, patch, opts),
+  eliminarDoc: (id, opts) => SolicitudesAPI.deleteDocumento(id, opts),
 
-  crearDoc: (payload) => SolicitudesAPI.crearDocumento(payload),
-  actualizarDoc: (id, patch) => SolicitudesAPI.updateDocumento(id, patch),
-  eliminarDoc: (id) => SolicitudesAPI.deleteDocumento(id),
+  crearCompleto: (payload, opts) => SolicitudesAPI.crearCompleto(payload, opts),
 
-  crearDocPoliza: (poliza, rest) =>
-    (async () => {
-      const body = { poliza, ...(rest || {}) };
-      assertVencimientoIfRequired(body);
-      const r = await fetch(`${POL_DOCS_BASE}/`, {
-        method: "POST",
-        headers: JSON_HEADERS,
-        body: JSON.stringify(body),
-      });
-      return jsonOrThrow(r, "polizas.crearDocumento");
-    })(),
-
-  crearCompleto: (payload) => SolicitudesAPI.crearCompleto(payload),
-
-  empleadosActivos: () => SolicitudesAPI.empleadosActivos(),
-  crearEmpleado: (payload) => SolicitudesAPI.crearEmpleado(payload),
+  empleadosActivos: (opts) => SolicitudesAPI.empleadosActivos(opts),
+  crearEmpleado: (payload, opts) => SolicitudesAPI.crearEmpleado(payload, opts),
 
   tomar: (id, body) => SolicitudesAPI.tomar(id, body),
   reasignar: (id, body) => SolicitudesAPI.reasignar(id, body),
-  enviar: (id) => SolicitudesAPI.enviar(id),
-  terminar: (id) => SolicitudesAPI.terminar(id),
-  cancelar: (id) => SolicitudesAPI.cancelar(id),
+  enviar: (id, opts) => SolicitudesAPI.enviar(id, opts),
+  terminar: (id, opts) => SolicitudesAPI.terminar(id, opts),
+  cancelar: (id, opts) => SolicitudesAPI.cancelar(id, opts),
   convertir: (id, body) => SolicitudesAPI.convertir(id, body),
 
-  resumen: () => SolicitudesAPI.resumen(),
+  resumen: (opts) => SolicitudesAPI.resumen(opts),
 
   comprobantePngUrl: (id) => SolicitudesAPI.comprobantePngUrl(id),
-  descargarComprobantePng: (id) => SolicitudesAPI.descargarComprobantePng(id),
+  descargarComprobantePng: (id, opts) => SolicitudesAPI.descargarComprobantePng(id, opts),
 
-  asociarAPoliza: (id, body) => SolicitudesAPI.asociarAPoliza(id, body),
+  asociarAPoliza: (id, body, opts) => SolicitudesAPI.asociarAPoliza(id, body, opts),
 
-  async asociarAPolizaYRefrescar(id, body = {}) {
-    const summary = await SolicitudesAPI.asociarAPoliza(id, body);
+  // ✅ NO refresca por defecto (evita 3 requests extra)
+  async asociarAPolizaYRefrescar(id, body = {}, opts = {}) {
+    const { refresh = false, signal } = opts || {};
+    const summary = await SolicitudesAPI.asociarAPoliza(id, body, { signal });
     const polizaId = summary?.poliza_id;
-    if (!polizaId) return { summary };
+    if (!refresh || !polizaId) return { summary };
+
     const [poliza, documentos, fotos] = await Promise.all([
-      SolicitudesAPI.getPolizaById(polizaId),
-      SolicitudesAPI.listPolizaDocumentos(polizaId).then((d) => (Array.isArray(d) ? d : d?.results || d || [])),
-      SolicitudesAPI.listPolizaFotos(polizaId).then((f) => (Array.isArray(f) ? f : f?.results || f || [])),
+      SolicitudesAPI.getPolizaById(polizaId, { signal }),
+      SolicitudesAPI.listPolizaDocumentos(polizaId, { signal }).then((d) => (Array.isArray(d) ? d : d?.results || d || [])),
+      SolicitudesAPI.listPolizaFotos(polizaId, { signal }).then((f) => (Array.isArray(f) ? f : f?.results || f || [])),
     ]);
     return { summary, poliza, documentos, fotos };
   },

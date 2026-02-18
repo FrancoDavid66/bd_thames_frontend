@@ -561,8 +561,18 @@ export default function RenovacionesPage() {
           if (!selected?.id) return;
           setSubmitting(true);
 
+          // ✅ CAMBIO: por defecto mandamos “transferir_grua=1”
+          // - Si RenovacionModal ya lo manda, lo respetamos.
+          // - Si el backend lo ignora, no rompe.
+          // - Cuando hagamos el switch en RenovacionModal, ya queda compatible.
+          const finalPayload = {
+            ...(payload || {}),
+            transferir_grua:
+              payload?.transferir_grua ?? payload?.transferirGrua ?? payload?.grua ?? 1,
+          };
+
           try {
-            const res = await dispatch(renovarPoliza({ id: selected.id, payload })).unwrap();
+            const res = await dispatch(renovarPoliza({ id: selected.id, payload: finalPayload })).unwrap();
             const nuevaId = res?.data?.id;
 
             toast.success("Póliza renovada ✅");
