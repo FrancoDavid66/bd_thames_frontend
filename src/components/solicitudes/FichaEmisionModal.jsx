@@ -1,8 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { HiX, HiClipboardCopy, HiExternalLink, HiCheck } from "react-icons/hi";
 import toast from "react-hot-toast";
 import { solicitudesApi } from "../../services/solicitudes";
+
+// Definimos variants inline para animaciones profesionales
+const modalVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
+};
+
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const fieldVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const imageVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.5 } },
+};
 
 /* ---------- helpers ---------- */
 function isImage(doc) {
@@ -99,189 +129,233 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50">
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-
-      {/* Contenedor principal */}
+    <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative w-full h-[100dvh] md:h-auto md:max-w-6xl md:mx-auto md:my-8 md:rounded-2xl md:border md:border-white/10 shadow-2xl"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(14,11,43,0.98) 0%, rgba(10,9,32,0.98) 100%)",
-        }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
       >
-        {/* Header sticky (mobile app) */}
-        <div
-          className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[#0f0c28]/90 backdrop-blur"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        {/* Overlay */}
+        <motion.div
+          className="absolute inset-0 bg-black/70"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        />
+
+        {/* Contenedor principal */}
+        <motion.div
+          variants={modalVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="relative w-full max-w-md sm:max-w-6xl h-[90vh] sm:h-auto mx-auto rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(14,11,43,0.98) 0%, rgba(10,9,32,0.98) 100%)",
+          }}
         >
-          <h3 className="text-white font-semibold">
-            Ficha para Emisión · {solicitud?.codigo || `ID ${solicitud?.id}`}
-          </h3>
-          <button
-            onClick={onClose}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20"
-            aria-label="Cerrar"
-            title="Cerrar"
+          {/* Header sticky (mobile app) */}
+          <div
+            className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[#0f0c28]/90 backdrop-blur"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
-            <HiX className="text-lg text-white" />
-          </button>
-        </div>
-
-        {/* Área scrollable */}
-        <div className="px-4 pb-28 pt-3 overflow-y-auto h-[calc(100dvh-56px)] md:max-h-[78vh] md:pb-4">
-          {/* Cliente / Vehículo */}
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <h4 className="text-white/90 font-medium mb-2">Cliente</h4>
-              <dl className="grid grid-cols-3 gap-2 text-white/80 text-sm">
-                <dt className="col-span-1 text-white/60">Nombre</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={nombreSolo} />
-                </dd>
-
-                <dt className="col-span-1 text-white/60">Apellido</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={apellidoSolo} />
-                </dd>
-
-                <dt className="col-span-1 text-white/60">DNI</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={solicitud?.cliente_dni} />
-                </dd>
-
-                <dt className="col-span-1 text-white/60">Teléfono</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={solicitud?.telefono} />
-                </dd>
-              </dl>
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <h4 className="text-white/90 font-medium mb-2">Vehículo</h4>
-              <dl className="grid grid-cols-3 gap-2 text-white/80 text-sm">
-                <dt className="col-span-1 text-white/60">Marca</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={solicitud?.vehiculo_marca} />
-                </dd>
-
-                <dt className="col-span-1 text-white/60">Modelo</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={solicitud?.vehiculo_modelo} />
-                </dd>
-
-                <dt className="col-span-1 text-white/60">Año</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={solicitud?.vehiculo_anio} />
-                </dd>
-
-                <dt className="col-span-1 text-white/60">Patente</dt>
-                <dd className="col-span-2">
-                  <CopyValue text={solicitud?.vehiculo_patente} />
-                </dd>
-              </dl>
-            </section>
+            <h3 className="text-white font-semibold text-base sm:text-lg">
+              Ficha para Emisión · {solicitud?.codigo || `ID ${solicitud?.id}`}
+            </h3>
+            <motion.button
+              onClick={onClose}
+              className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 text-white transition-colors hover:bg-white/20"
+              aria-label="Cerrar"
+              title="Cerrar"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
+            >
+              <HiX className="text-lg" />
+            </motion.button>
           </div>
 
-          {/* Datos de la solicitud */}
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-4">
-            <h4 className="text-white/90 font-medium mb-2">Solicitud</h4>
-            <div className="grid md:grid-cols-4 gap-2 text-white/80 text-sm">
-              <FieldBox label="Cobertura" value={solicitud?.cobertura_solicitada} />
-              <FieldBox
-                label="Compañía preferida"
-                value={solicitud?.compania_preferida}
-              />
-              <FieldBox label="Estado" value={estadoLabel(solicitud?.estado)} />
-              <FieldBox label="Código" value={solicitud?.codigo || solicitud?.id} />
-            </div>
+          {/* Área scrollable */}
+          <div className="px-4 pb-28 pt-3 overflow-y-auto h-[calc(90vh-56px)] sm:max-h-[78vh] sm:pb-4">
+            {/* Cliente / Vehículo */}
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4"
+              variants={sectionVariants}
+              initial="initial"
+              animate="animate"
+            >
+              <section className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
+                <h4 className="text-white/90 font-medium mb-2 text-sm sm:text-base">Cliente</h4>
+                <dl className="grid grid-cols-3 gap-2 text-white/80 text-xs sm:text-sm">
+                  <dt className="col-span-1 text-white/60">Nombre</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={nombreSolo} />
+                  </dd>
 
-            {solicitud?.observaciones ? (
-              <div className="mt-2 text-white/80 text-sm">
-                <div className="text-white/60">Observaciones</div>
-                <div className="mt-0.5">
-                  <CopyValue text={solicitud.observaciones} />
-                </div>
+                  <dt className="col-span-1 text-white/60">Apellido</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={apellidoSolo} />
+                  </dd>
+
+                  <dt className="col-span-1 text-white/60">DNI</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={solicitud?.cliente_dni} />
+                  </dd>
+
+                  <dt className="col-span-1 text-white/60">Teléfono</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={solicitud?.telefono} />
+                  </dd>
+                </dl>
+              </section>
+
+              <section className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
+                <h4 className="text-white/90 font-medium mb-2 text-sm sm:text-base">Vehículo</h4>
+                <dl className="grid grid-cols-3 gap-2 text-white/80 text-xs sm:text-sm">
+                  <dt className="col-span-1 text-white/60">Marca</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={solicitud?.vehiculo_marca} />
+                  </dd>
+
+                  <dt className="col-span-1 text-white/60">Modelo</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={solicitud?.vehiculo_modelo} />
+                  </dd>
+
+                  <dt className="col-span-1 text-white/60">Año</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={solicitud?.vehiculo_anio} />
+                  </dd>
+
+                  <dt className="col-span-1 text-white/60">Patente</dt>
+                  <dd className="col-span-2">
+                    <CopyValue text={solicitud?.vehiculo_patente} />
+                  </dd>
+                </dl>
+              </section>
+            </motion.div>
+
+            {/* Datos de la solicitud */}
+            <motion.section
+              className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 mb-3 sm:mb-4"
+              variants={sectionVariants}
+              initial="initial"
+              animate="animate"
+            >
+              <h4 className="text-white/90 font-medium mb-2 text-sm sm:text-base">Solicitud</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-white/80 text-xs sm:text-sm">
+                <FieldBox label="Cobertura" value={solicitud?.cobertura_solicitada} />
+                <FieldBox label="Compañía preferida" value={solicitud?.compania_preferida} />
+                <FieldBox label="Estado" value={estadoLabel(solicitud?.estado)} />
+                <FieldBox label="Código" value={solicitud?.codigo || solicitud?.id} />
               </div>
-            ) : null}
-          </section>
 
-          {/* Galería de imágenes */}
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-white/90 font-medium">
-                Fotos ({imagenes.length})
-              </h4>
-              {otros.length > 0 && (
-                <div className="text-xs text-white/60">
-                  También hay {otros.length} documento/s no imagen (DNI, PDFs, etc.).
+              {solicitud?.observaciones ? (
+                <div className="mt-2 text-white/80 text-xs sm:text-sm">
+                  <div className="text-white/60">Observaciones</div>
+                  <div className="mt-0.5">
+                    <CopyValue text={solicitud.observaciones} />
+                  </div>
+                </div>
+              ) : null}
+            </motion.section>
+
+            {/* Galería de imágenes */}
+            <motion.section
+              className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4"
+              variants={sectionVariants}
+              initial="initial"
+              animate="animate"
+            >
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <h4 className="text-white/90 font-medium text-sm sm:text-base">
+                  Fotos ({imagenes.length})
+                </h4>
+                {otros.length > 0 && (
+                  <div className="text-xs text-white/60">
+                    También hay {otros.length} documento/s no imagen (DNI, PDFs, etc.).
+                  </div>
+                )}
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-36 sm:h-40 rounded-xl bg-white/5 border border-white/10 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : imagenes.length === 0 ? (
+                <div className="text-white/70 text-sm">No hay imágenes cargadas.</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {imagenes.map((d) => (
+                    <motion.a
+                      key={d.id}
+                      href={d.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-xl overflow-hidden border border-white/10 bg-white/5"
+                      title={`${d.nombre || d.tipo || "Imagen"} — abrir en pestaña`}
+                      variants={fieldVariants}
+                      initial="initial"
+                      animate="animate"
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      <motion.img
+                        src={d.url}
+                        alt={d.nombre || ""}
+                        className="w-full h-36 sm:h-40 object-cover"
+                        variants={imageVariants}
+                        initial="initial"
+                        animate="animate"
+                      />
+                      <div className="px-2 py-1 text-xs text-white/70 flex items-center justify-between">
+                        <span className="truncate">
+                          {d.nombre || d.tipo || "Imagen"}
+                        </span>
+                        <HiExternalLink />
+                      </div>
+                    </motion.a>
+                  ))}
                 </div>
               )}
-            </div>
+            </motion.section>
+          </div>
 
-            {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-36 rounded-xl bg-white/5 border border-white/10 animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : imagenes.length === 0 ? (
-              <div className="text-white/70 text-sm">No hay imágenes cargadas.</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {imagenes.map((d) => (
-                  <a
-                    key={d.id}
-                    href={d.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-xl overflow-hidden border border-white/10 bg-white/5"
-                    title={`${d.nombre || d.tipo || "Imagen"} — abrir en pestaña`}
-                  >
-                    <img
-                      src={d.url}
-                      alt={d.nombre || ""}
-                      className="w-full h-36 object-cover"
-                    />
-                    <div className="px-2 py-1 text-xs text-white/70 flex items-center justify-between">
-                      <span className="truncate">
-                        {d.nombre || d.tipo || "Imagen"}
-                      </span>
-                      <HiExternalLink />
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* Acciones inferiores sticky (mobile) */}
-        <div
-          className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-4 py-3 border-t border-white/10 bg-[#0f0c28]/90 backdrop-blur"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        >
-          <button
-            onClick={copiarResumen}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm text-white"
+          {/* Acciones inferiores sticky (mobile) */}
+          <div
+            className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-4 py-3 border-t border-white/10 bg-[#0f0c28]/90 backdrop-blur"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
-            <HiClipboardCopy /> Copiar resumen
-          </button>
-          <button
-            onClick={onClose}
-            className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm text-white"
-          >
-            Cerrar
-          </button>
-        </div>
+            <motion.button
+              onClick={copiarResumen}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-sm text-white transition-colors hover:bg-white/20"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
+            >
+              <HiClipboardCopy /> Copiar resumen
+            </motion.button>
+            <motion.button
+              onClick={onClose}
+              className="px-3 py-2 rounded-xl bg-white/10 text-sm text-white transition-colors hover:bg-white/20"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
+            >
+              Cerrar
+            </motion.button>
+          </div>
+        </motion.div>
       </motion.div>
-    </div>
+    </AnimatePresence>
   );
 }
 
@@ -289,10 +363,10 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
 
 function FieldBox({ label, value }) {
   return (
-    <div>
-      <div className="text-white/60">{label}</div>
+    <motion.div variants={fieldVariants} initial="initial" animate="animate">
+      <div className="text-white/60 text-xs sm:text-sm">{label}</div>
       <CopyValue text={value} />
-    </div>
+    </motion.div>
   );
 }
 
@@ -314,8 +388,13 @@ function CopyValue({ text }) {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="truncate">{String(display)}</span>
+    <motion.div
+      className="flex items-center gap-2"
+      variants={buttonVariants}
+      whileHover="hover"
+      whileTap="tap"
+    >
+      <span className="truncate text-xs sm:text-sm">{String(display)}</span>
       <button
         onClick={onCopy}
         title="Copiar"
@@ -323,6 +402,6 @@ function CopyValue({ text }) {
       >
         {ok ? <HiCheck /> : <HiClipboardCopy />}
       </button>
-    </div>
+    </motion.div>
   );
 }

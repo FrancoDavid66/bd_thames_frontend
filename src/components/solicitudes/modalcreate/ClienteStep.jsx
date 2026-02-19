@@ -3,9 +3,35 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { HiIdentification, HiTrash, HiUpload } from "react-icons/hi";
 
+// Definimos variants inline para animaciones profesionales
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const inputVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const cardVariants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
 /* ===================== UI bits locales ===================== */
 function Note({ children }) {
-  return <p className="mt-1.5 text-xs md:text-[13px] text-white/70">{children}</p>;
+  return <p className="mt-1.5 text-xs sm:text-[13px] text-white/70">{children}</p>;
 }
 function Input({
   label,
@@ -21,7 +47,14 @@ function Input({
   pattern,
 }) {
   return (
-    <label className={`text-sm ${className}`}>
+    <motion.label
+      className={`text-xs sm:text-sm ${className}`}
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span className="block text-white/85 mb-1">{label}</span>
       <input
         type={type}
@@ -32,28 +65,35 @@ function Input({
         autoCapitalize={autoCapitalize}
         pattern={pattern}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 sm:py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
       />
       {helper ? <span className="mt-1 block text-xs text-white/65">{helper}</span> : null}
-    </label>
+    </motion.label>
   );
 }
 function Textarea({ label, value, onChange, className = "" }) {
   return (
-    <label className={`text-sm ${className}`}>
+    <motion.label
+      className={`text-xs sm:text-sm ${className}`}
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span className="block text-white/85 mb-1">{label}</span>
       <textarea
         rows={4}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 md:py-3 outline-none focus:ring-4 ring-rose-200/30 text-white placeholder:text-white/40 transition resize-none"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 sm:py-2.5 md:py-3 outline-none focus:ring-4 ring-rose-200/30 text-white placeholder:text-white/40 transition resize-none"
       />
-    </label>
+    </motion.label>
   );
 }
 function RadioPill({ checked, onChange, label }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onChange}
       className={`px-3 py-1.5 rounded-xl border text-xs sm:text-sm transition ${
@@ -61,9 +101,13 @@ function RadioPill({ checked, onChange, label }) {
           ? "bg-gradient-to-br from-violet-200 to-indigo-200 text-[#0b0f1e] border-white/40"
           : "bg-white/5 text-white border-white/10 hover:bg-white/10"
       }`}
+      variants={buttonVariants}
+      initial="initial"
+      whileHover="hover"
+      whileTap="tap"
     >
       {label}
-    </button>
+    </motion.button>
   );
 }
 function FotoSlot({
@@ -81,22 +125,29 @@ function FotoSlot({
     (slot?.url || "").toLowerCase().endsWith(".pdf");
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-white/10 bg-gradient-to-br from-white/5 to-white/[.03] p-2 shadow-sm"
+      variants={cardVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+      className="rounded-xl border border-white/10 bg-white/5 p-2 shadow-sm"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-xs text-white/85">
+        <span className="text-white/90 text-xs sm:text-sm">
           {label} {required ? <span className="text-rose-300">*</span> : null}
         </span>
         {has && (
-          <button
+          <motion.button
             type="button"
             onClick={onRemove}
             className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-rose-200/20 text-rose-100 hover:bg-rose-200/30 transition"
+            variants={buttonVariants}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
           >
             <HiTrash /> Quitar
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -200,8 +251,13 @@ export default function ClienteStep({
   };
 
   return (
-    <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
-      <legend className="px-1 text-white/85 text-sm">Cliente</legend>
+    <motion.fieldset
+      className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
+      variants={sectionVariants}
+      initial="initial"
+      animate="animate"
+    >
+      <legend className="px-1 text-white/85 text-xs sm:text-sm">Cliente</legend>
 
       {/* Toggle modo (responsive) */}
       <div className="flex flex-wrap gap-2 mb-3">
@@ -284,10 +340,10 @@ export default function ClienteStep({
           </div>
 
           {/* DNI – grid adaptable con targets grandes táctiles */}
-          <div className="mt-3 md:mt-4 rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
+          <div className="mt-3 sm:mt-4 rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4">
             <div className="flex items-center gap-2 text-white/80 mb-2">
               <HiIdentification />
-              <span className="text-sm">Documentación (DNI)</span>
+              <span className="text-xs sm:text-sm">Documentación (DNI)</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {TIPO_DNI_SLOTS.map(({ key, label }) => (
@@ -311,7 +367,7 @@ export default function ClienteStep({
           </div>
         </>
       )}
-    </fieldset>
+    </motion.fieldset>
   );
 }
 

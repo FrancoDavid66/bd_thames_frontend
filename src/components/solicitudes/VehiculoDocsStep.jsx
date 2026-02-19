@@ -20,6 +20,35 @@ import SolicitudStep from "./modalcreate/SolicitudStep";
 /* === Email (centralizado, sin correo hardcodeado) === */
 import { sendAdminNuevaSolicitud } from "../../services/notifications/email.js";
 
+// Definimos variants inline para animaciones profesionales
+const modalVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
+};
+
+const headerVariants = {
+  initial: { opacity: 0, y: -10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+};
+
+const stepVariants = {
+  hidden: { opacity: 0, x: 50 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+  exit: { opacity: 0, x: -50, transition: { duration: 0.3 } },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const progressBarVariants = {
+  initial: { width: "0%" },
+  animate: { width: "100%", transition: { duration: 0.4, ease: "easeOut" } },
+};
+
 /* =====================  Constantes  ===================== */
 const MAX_FOTOS = Number(import.meta.env.VITE_MAX_FOTOS || 0);
 const DEFAULT_COBERTURAS = ["A","A + GRUA","B","B1","C","C1","C TOTAL","C FRANQUICIA"];
@@ -474,8 +503,11 @@ export default function CreateSolicitudModal({
         aria-hidden="true"
       />
       <motion.div
-        variants={safeVariants} initial="hidden" animate="show" exit="exit"
-        className="relative w-full h-[100dvh] md:h-auto md:max-w-5xl md:mx-auto md:my-8 md:rounded-2xl md:border md:border-white/10 shadow-[0_20px_80px_rgba(0,0,0,.5)]"
+        variants={modalVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="relative w-full max-w-md sm:max-w-5xl md:max-w-6xl h-[90vh] sm:h-auto mx-auto rounded-2xl border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,.5)] overflow-hidden"
         style={{ background:"linear-gradient(180deg, rgba(17,20,35,.96) 0%, rgba(12,15,28,.98) 100%)" }}
         role="dialog" aria-modal="true" aria-label="Crear nueva solicitud"
       >
@@ -499,13 +531,35 @@ export default function CreateSolicitudModal({
                   </button>
                 </span>
               )}
-              <button ref={closeBtnRef} onClick={()=> !saving && onClose?.()} disabled={saving} className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-50 transition" aria-label="Cerrar">
+              <motion.button
+                ref={closeBtnRef}
+                onClick={()=> !saving && onClose?.()}
+                disabled={saving}
+                className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-50 transition"
+                aria-label="Cerrar"
+                variants={buttonVariants}
+                initial="initial"
+                whileHover="hover"
+                whileTap="tap"
+              >
                 <HiX className="text-lg text-white" />
-              </button>
+              </motion.button>
             </div>
           </div>
 
           <div className="px-3 md:px-4 pb-2 md:pb-3">
+            {/* Barra de progreso visual (opcional pero profesional) */}
+            <div className="hidden md:block mb-2">
+              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-sky-400 to-cyan-400"
+                  initial={{ width: "25%" }}
+                  animate={{ width: `${(step / 4) * 100}%` }}
+                  variants={progressBarVariants}
+                />
+              </div>
+            </div>
+
             <div className="md:hidden -mx-3 px-3 overflow-x-auto no-scrollbar snap-x snap-mandatory">
               <div className="min-w-max flex gap-2">
                 <StepChip active={step===1} done={step>1} icon={<HiUser/>} label="Cliente" onClick={()=>goToStep(1)} />
@@ -523,10 +577,16 @@ export default function CreateSolicitudModal({
           </div>
         </div>
 
-        <div className="px-3 md:px-4 pt-2 pb-[104px] md:pb-4 overflow-y-auto h-[calc(100dvh-112px)] md:h-auto">
+        <div className="px-3 md:px-4 pt-2 pb-[104px] md:pb-4 overflow-y-auto h-[calc(100dvh-112px)] md:h-auto md:flex-1">
           <AnimatePresence mode="wait">
             {step===1 && (
-              <motion.div key="paso1" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso1"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <ClienteStep
                   clienteModo={clienteModo} setClienteModo={setClienteModo}
                   clienteId={clienteId} setClienteId={setClienteId}
@@ -539,7 +599,13 @@ export default function CreateSolicitudModal({
             )}
 
             {step===2 && (
-              <motion.div key="paso2" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso2"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <PolizaStep
                   polizaModo={polizaModo} setPolizaModo={setPolizaModo}
                   polizaId={polizaId} setPolizaId={setPolizaId}
@@ -552,7 +618,13 @@ export default function CreateSolicitudModal({
             )}
 
             {step===3 && (
-              <motion.div key="paso3" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso3"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <VehiculoDocsStep
                   MAX_FOTOS={MAX_FOTOS}
                   fotoSlotDefs={FOTO_SLOTS}
@@ -567,7 +639,13 @@ export default function CreateSolicitudModal({
             )}
 
             {step===4 && (
-              <motion.div key="paso4" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso4"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <SolicitudStep
                   responsableNombre={responsableId ? `#${responsableId}` : ""}
                   onCambiarResponsable={()=>setAskResponsable(true)}
@@ -580,28 +658,35 @@ export default function CreateSolicitudModal({
 
         <div className="sticky bottom-0 z-30 border-t border-white/10 bg-[#0f0c28]/80 backdrop-blur" style={{ paddingBottom:"env(safe-area-inset-bottom)" }}>
           <div className="flex items-center justify-between gap-2 px-3 md:px-4 py-3">
-            <button
+            <motion.button
               onClick={()=> !saving && onClose?.()}
               disabled={saving}
               className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-sm md:text-base text-white disabled:opacity-60 transition w-[44%] md:w-auto"
+              variants={buttonVariants}
+              initial="initial"
+              whileHover="hover"
+              whileTap="tap"
             >
               Cancelar
-            </button>
+            </motion.button>
 
             <div className="flex items-center gap-2 w-[56%] md:w-auto">
               {step>1 && (
-                <button
+                <motion.button
                   onClick={()=> setStep(s=>Math.max(1,s-1))}
                   disabled={saving}
                   className="flex-1 md:flex-none px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-sm md:text-base text-white inline-flex items-center justify-center gap-2 transition"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   <HiChevronLeft className="text-lg md:text-xl" /> Atrás
-                </button>
+                </motion.button>
               )}
 
               {step<4 && (
                 <motion.button
-                  whileTap={{ scale:0.98 }}
                   onClick={()=>{
                     if (askResponsable) return toast.error("Elegí el responsable antes de continuar.");
                     if (step===1 && !canNext1) return toast.error("Completá los datos del cliente");
@@ -610,6 +695,10 @@ export default function CreateSolicitudModal({
                   }}
                   disabled={saving}
                   className="flex-1 md:flex-none px-4 py-3 rounded-2xl text-[#0b0f1e] font-semibold bg-gradient-to-br from-sky-200 to-cyan-200 shadow-lg hover:brightness-105 active:brightness-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/40 inline-flex items-center justify-center gap-2 transition text-sm md:text-base"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   Siguiente <HiChevronRight className="text-lg md:text-xl" />
                 </motion.button>
@@ -617,10 +706,13 @@ export default function CreateSolicitudModal({
 
               {step===4 && (
                 <motion.button
-                  whileTap={{ scale:0.98 }}
                   onClick={onSubmit}
                   disabled={!canSubmit}
                   className="flex-1 md:flex-none px-4 py-3 rounded-2xl text-[#0b0f1e] font-semibold bg-gradient-to-br from-emerald-200 to-teal-200 shadow-lg hover:brightness-105 active:brightness-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/50 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition text-sm md:text-base"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   {saving && <span className="inline-block w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />}
                   {saving ? "Creando…" : "Crear (todo en 1 paso)"}
@@ -647,23 +739,27 @@ export default function CreateSolicitudModal({
 /* =====================  UI bits  ===================== */
 function StepChip({ active, done, icon, label, onClick }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2 border text-sm transition min-w-[140px] snap-center ${
+      className={`flex items-center gap-2 rounded-xl px-3 py-2 border text-xs sm:text-sm transition min-w-[120px] sm:min-w-[140px] snap-center ${
         active ? "border-white/20 bg-gradient-to-br from-violet-200/80 to-indigo-200/80 text-[#0b0f1e]"
                : "border-white/10 bg-white/5 text-white/85"
       }`}
       aria-current={active ? "step" : undefined}
+      variants={buttonVariants}
+      initial="initial"
+      whileHover="hover"
+      whileTap="tap"
     >
-      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${
+      <span className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-md ${
         active ? "bg-black/10 text-black"
                : done ? "bg-emerald-300/30 text-emerald-200" : "bg-white/10 text-white"
       }`}>
         {done ? <HiCheckCircle className="text-base" /> : icon}
       </span>
       <span className="truncate">{label}</span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -677,13 +773,13 @@ function StepBadge({ active, done, icon, label, onClick, color="from-emerald-200
                : "border-white/10 bg-white/5 text-white/85 hover:bg-white/10"
       }`}
     >
-      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${
+      <span className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-md ${
         active ? "bg-black/10 text-black"
                : done ? "bg-emerald-300/30 text-emerald-200" : "bg-white/10 text-white"
       }`}>
         {done ? <HiCheckCircle className="text-base" /> : icon}
       </span>
-      <span className="text-sm">{label}</span>
+      <span className="text-xs sm:text-sm">{label}</span>
     </motion.button>
   );
 }

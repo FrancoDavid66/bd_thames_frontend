@@ -10,6 +10,31 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiX, HiUpload, HiCalendar, HiLockClosed } from "react-icons/hi";
 
+// Definimos variants inline para animaciones profesionales
+const modalVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
+};
+
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const slotVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
 // Helpers mínimos
 const cn = (...s) => s.filter(Boolean).join(" ");
 const fmtDMY = (d) => {
@@ -39,22 +64,27 @@ function FileSlot({
   id,
 }) {
   return (
-    <div
+    <motion.div
       className={cn(
-        "rounded-xl border border-white/10 bg-white/[0.04] p-3",
+        "rounded-xl border border-white/10 bg-white/[0.04] p-3 sm:p-4",
         required && "ring-1 ring-amber-300/20"
       )}
+      variants={slotVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium">{label}</span>
+        <span className="text-sm sm:text-base font-medium">{label}</span>
         {required && (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-200 border border-amber-400/30">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-200 border border-amber-400/30">
             Obligatoria
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <input
           id={id}
           type="file"
@@ -66,8 +96,8 @@ function FileSlot({
         <label
           htmlFor={id}
           className={cn(
-            "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm hover:bg-white/20 cursor-pointer",
-            disabled && "opacity-60 pointer-events-none"
+            "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm sm:text-base cursor-pointer transition-colors",
+            disabled ? "opacity-60 pointer-events-none" : "hover:bg-white/20"
           )}
           title={`Elegir archivo para ${label}`}
         >
@@ -78,8 +108,8 @@ function FileSlot({
         <button
           type="button"
           className={cn(
-            "text-xs rounded-md border border-white/10 px-2 py-1 hover:bg-white/10",
-            !value && "opacity-50 cursor-not-allowed"
+            "text-xs sm:text-sm rounded-md border border-white/10 px-2 py-1 transition-colors",
+            !value ? "opacity-50 cursor-not-allowed" : "hover:bg-white/10"
           )}
           disabled={!value}
           onClick={() => onChange(null)}
@@ -89,12 +119,12 @@ function FileSlot({
         </button>
 
         {value && (
-          <span className="text-xs opacity-80 truncate max-w-[260px]">{value.name}</span>
+          <span className="text-xs sm:text-sm opacity-80 truncate max-w-[200px] sm:max-w-[260px]">{value.name}</span>
         )}
       </div>
 
-      {help && <p className="mt-2 text-xs opacity-70">{help}</p>}
-    </div>
+      {help && <p className="mt-2 text-xs sm:text-sm opacity-70">{help}</p>}
+    </motion.div>
   );
 }
 
@@ -175,41 +205,51 @@ export default function SolicitudDocsModal({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <motion.div
+          className="absolute inset-0 bg-black/60"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        />
 
         {/* Modal */}
         <motion.div
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 30, opacity: 0 }}
-          className="relative w-full max-w-5xl mx-auto rounded-2xl border border-white/10 bg-[#1b1630] p-6 shadow-2xl"
+          variants={modalVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="relative w-full max-w-md sm:max-w-4xl mx-auto rounded-2xl border border-white/10 bg-[#1b1630] p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
         >
           {/* Header */}
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-4 sm:mb-5">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold">Nueva solicitud (wizard)</span>
-              <span className="text-sm opacity-80">· Imágenes &amp; Docs</span>
+              <span className="text-base sm:text-lg font-semibold">Nueva solicitud (wizard)</span>
+              <span className="text-xs sm:text-sm opacity-80">· Imágenes &amp; Docs</span>
             </div>
-            <button
+            <motion.button
               onClick={onClose}
-              className="p-2 rounded-lg border border-white/10 hover:bg-white/10"
+              className="p-2 rounded-lg border border-white/10 transition-colors hover:bg-white/10"
               title="Cerrar"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
             >
               <HiX className="w-5 h-5" />
-            </button>
+            </motion.button>
           </div>
 
           {/* FOTOS del vehículo */}
-          <section className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
+          <motion.section className="mb-5 sm:mb-6" variants={sectionVariants} initial="initial" animate="animate">
+            <div className="flex items-center gap-2 mb-2 sm:mb-3">
               <HiLockClosed className="text-amber-300" />
-              <h3 className="text-sm font-semibold">Fotos del vehículo (partes)</h3>
+              <h3 className="text-sm sm:text-base font-semibold">Fotos del vehículo (partes)</h3>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -234,16 +274,16 @@ export default function SolicitudDocsModal({
               <FileSlot id="slot-vin" label="VIN / chasis" value={VIN} onChange={setVIN} />
             </div>
 
-            <p className="mt-2 text-xs opacity-70">
+            <p className="mt-2 text-xs sm:text-sm opacity-70">
               Las fotos obligatorias son <b>Patente</b> y <b>Entorno</b>.
             </p>
-          </section>
+          </motion.section>
 
           {/* DOCUMENTOS del vehículo (vigentes) */}
-          <section className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
+          <motion.section className="mb-5 sm:mb-6" variants={sectionVariants} initial="initial" animate="animate">
+            <div className="flex items-center gap-2 mb-2 sm:mb-3">
               <HiLockClosed className="text-amber-300" />
-              <h3 className="text-sm font-semibold">Documentos del vehículo</h3>
+              <h3 className="text-sm sm:text-base font-semibold">Documentos del vehículo</h3>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
@@ -266,8 +306,15 @@ export default function SolicitudDocsModal({
               </div>
 
               {/* Vencimiento SOLO para REGISTRO */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                <label className="text-sm font-medium flex items-center gap-2 mb-2">
+              <motion.div
+                className="rounded-xl border border-white/10 bg-white/[0.04] p-3 sm:p-4"
+                variants={slotVariants}
+                initial="initial"
+                animate="animate"
+                whileHover="hover"
+                whileTap="tap"
+              >
+                <label className="text-sm sm:text-base font-medium flex items-center gap-2 mb-2">
                   <HiCalendar className="opacity-80" />
                   Vencimiento Registro de conducir
                 </label>
@@ -284,37 +331,43 @@ export default function SolicitudDocsModal({
                       const out = [dd, mm, yyyy].filter(Boolean).join("/");
                       setREGISTRO_VTO_DMY(out);
                     }}
-                    className="w-full bg-transparent text-sm border border-white/10 rounded-lg px-3 py-2"
+                    className="w-full bg-transparent text-sm sm:text-base border border-white/10 rounded-lg px-3 py-2"
                   />
                 </div>
-                <p className="mt-2 text-xs opacity-70">
+                <p className="mt-2 text-xs sm:text-sm opacity-70">
                   Solo requerido si adjuntás el Registro.
                 </p>
-              </div>
+              </motion.div>
             </div>
-          </section>
+          </motion.section>
 
           {/* Footer */}
-          <div className="mt-6 flex items-center justify-between">
-            <button
+          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <motion.button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/10"
+              className="w-full sm:w-auto px-4 py-2 sm:py-3 rounded-xl border border-white/10 transition-colors hover:bg-white/10"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
             >
               Cancelar
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={handleConfirm}
               disabled={!puedeConfirmar}
               className={cn(
-                "px-4 py-2 rounded-xl font-semibold transition",
+                "w-full sm:w-auto px-4 py-2 sm:py-3 rounded-xl font-semibold transition",
                 puedeConfirmar
                   ? "bg-amber-500/90 hover:bg-amber-500 text-neutral-900"
                   : "bg-white/10 opacity-60 cursor-not-allowed"
               )}
               title={!puedeConfirmar ? "Completá lo obligatorio" : "Siguiente"}
+              variants={buttonVariants}
+              whileHover={puedeConfirmar ? "hover" : "initial"}
+              whileTap={puedeConfirmar ? "tap" : "initial"}
             >
               Siguiente
-            </button>
+            </motion.button>
           </div>
         </motion.div>
       </motion.div>

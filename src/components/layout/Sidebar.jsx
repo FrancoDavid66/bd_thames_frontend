@@ -103,28 +103,40 @@ export default function Sidebar({
     if (polizasActive) setPolizasOpen(true);
   }, [polizasActive]);
 
-  const sidebarClass = isOpen ? "translate-x-0" : "-translate-x-full";
+  // ✅ FIX mobile overflow: en pantallas chicas, sidebar no debe ser "w-64" fijo (puede empujar/overflow)
+  //    usamos ancho responsivo: 85vw en mobile, 16rem en sm+
+  // ✅ Animación de entrada/salida: seguimos usando transform + transition-transform (no se toca la UX)
+  const sidebarClass = isOpen ? "translate-x-0" : "-translate-x-[110%]";
 
   return (
     <>
       {/* Overlay móvil */}
       <div
-        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity ${
+        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
       />
 
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-blue-900 dark:bg-gray-900 text-white z-50 transform transition-transform duration-300 ${sidebarClass}`}
+        className={`
+          fixed top-0 left-0 z-50
+          h-[100dvh] max-h-[100dvh]
+          w-[85vw] sm:w-64
+          bg-blue-900 dark:bg-gray-900 text-white
+          transform transition-transform duration-300 will-change-transform
+          overflow-x-hidden
+          ${sidebarClass}
+        `}
+        aria-label="Sidebar"
       >
-        <div className="p-4 border-b border-blue-800 dark:border-gray-800 flex items-center justify-between">
-          <h1 className="text-lg font-bold">Thames Seguros</h1>
+        <div className="p-4 border-b border-blue-800 dark:border-gray-800 flex items-center justify-between gap-3 min-w-0">
+          <h1 className="text-lg font-bold truncate">Thames Seguros</h1>
 
           {/* Botón cerrar (visible también en desktop) */}
           <button
             onClick={onClose}
-            className="text-white bg-blue-800 dark:bg-gray-800 hover:bg-blue-700 dark:hover:bg-gray-700 px-2 py-2 rounded-md inline-flex items-center justify-center"
+            className="shrink-0 text-white bg-blue-800 dark:bg-gray-800 hover:bg-blue-700 dark:hover:bg-gray-700 px-2 py-2 rounded-md inline-flex items-center justify-center"
             title="Cerrar sidebar"
             aria-label="Cerrar sidebar"
           >
@@ -147,16 +159,16 @@ export default function Sidebar({
                   >
                     <NavLink
                       to="/polizas"
-                      className="flex-1 flex items-center gap-3 px-4 py-2"
+                      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-2"
                     >
-                      <item.icon className="text-lg" />
-                      <span className="font-medium">Pólizas</span>
+                      <item.icon className="text-lg shrink-0" />
+                      <span className="font-medium truncate">Pólizas</span>
                     </NavLink>
 
                     <button
                       type="button"
                       onClick={() => setPolizasOpen((v) => !v)}
-                      className="px-3 py-2 text-white/80 hover:text-white"
+                      className="px-3 py-2 text-white/80 hover:text-white shrink-0"
                       title={polizasOpen ? "Cerrar" : "Abrir"}
                       aria-label={
                         polizasOpen ? "Cerrar Pólizas" : "Abrir Pólizas"
@@ -178,8 +190,8 @@ export default function Sidebar({
                           }`
                         }
                       >
-                        <FaFileAlt className="text-base" />
-                        <span>Listado</span>
+                        <FaFileAlt className="text-base shrink-0" />
+                        <span className="truncate">Listado</span>
                       </NavLink>
 
                       {/* ✅🆕 Vencimientos */}
@@ -193,8 +205,8 @@ export default function Sidebar({
                           }`
                         }
                       >
-                        <FaClock className="text-base" />
-                        <span>Vencimientos</span>
+                        <FaClock className="text-base shrink-0" />
+                        <span className="truncate">Vencimientos</span>
                       </NavLink>
 
                       {/* ✅🆕 Bajas */}
@@ -208,8 +220,8 @@ export default function Sidebar({
                           }`
                         }
                       >
-                        <FaBan className="text-base" />
-                        <span>Bajas</span>
+                        <FaBan className="text-base shrink-0" />
+                        <span className="truncate">Bajas</span>
                       </NavLink>
 
                       <NavLink
@@ -222,8 +234,8 @@ export default function Sidebar({
                           }`
                         }
                       >
-                        <FaSyncAlt className="text-base" />
-                        <span>Renovaciones</span>
+                        <FaSyncAlt className="text-base shrink-0" />
+                        <span className="truncate">Renovaciones</span>
                         <Badge value={renovacionesPendientes} tone="amber" />
                       </NavLink>
                     </div>
@@ -241,15 +253,15 @@ export default function Sidebar({
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 rounded-lg transition ${
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition min-w-0 ${
                     isActive
                       ? "bg-blue-800 dark:bg-gray-800"
                       : "hover:bg-blue-800/60 dark:hover:bg-gray-800/60"
                   }`
                 }
               >
-                <item.icon className="text-lg" />
-                <span className="font-medium">{item.label}</span>
+                <item.icon className="text-lg shrink-0" />
+                <span className="font-medium truncate">{item.label}</span>
 
                 {isSolicitudes && <Badge value={solTotal} tone="red" />}
 

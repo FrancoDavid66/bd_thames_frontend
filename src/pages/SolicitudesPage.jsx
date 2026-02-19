@@ -115,6 +115,7 @@ export default function SolicitudesPage() {
   const [tab, setTab] = useState(initialTab);
 
   const [search, setSearch] = useState("");
+  // ✅ en móvil “Filtros” abre/cierra SOLO la fila de filtros (no los tabs)
   const [toolbarOpen, setToolbarOpen] = useState(false);
 
   // 🔎 filtro por oficina (por ID: "1", "2", "3" o "TODAS")
@@ -361,36 +362,44 @@ export default function SolicitudesPage() {
 
   return (
     <PageTransition>
-      <section className="min-h-[calc(100vh-4rem)] bg-[#0b0f19] text-white flex flex-col">
-        <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ✅ FIX MOBILE:
+          - NO usar 100vh/calc() acá (ya lo maneja App + main)
+          - min-h-0 para no empujar el layout
+          - overflow-hidden para que el scroll quede en el contenedor interno */}
+      <section className="min-h-0 bg-[#0b0f19] text-white flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div
             className="sticky top-0 z-20 border-b border-white/10 bg-[#0b0f19]/90 backdrop-blur"
-            style={{ paddingTop: "env(safe-area-inset-top)" }}
+            /* ✅ FIX: igual que en Navbar, NO sumar padding-top (inflaba el alto).
+               El sticky ya está dentro del main que arranca debajo del navbar. */
           >
             <div className="px-3 sm:px-4 lg:px-6">
               <div className="flex items-center justify-between py-2">
                 <motion.div
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-3 min-w-0"
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.35 }}
                 >
-                  <span className="p-2 rounded-xl bg-white/10 border border-white/10">
+                  <span className="p-2 rounded-xl bg-white/10 border border-white/10 shrink-0">
                     <HiShieldCheck className="w-5 h-5 text-white" />
                   </span>
-                  <h1 className="text-base sm:text-lg font-semibold text-white">Solicitudes de Seguro</h1>
+                  <h1 className="text-base sm:text-lg font-semibold text-white truncate">
+                    Solicitudes de Seguro
+                  </h1>
                 </motion.div>
 
-                <div className="flex items-center gap-2">
-                  {/* ✅ BOTÓN NUEVO: Cargar solicitudes (más grande, otro color, otro lugar) */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* ✅ Cargar solicitudes: en celular, botón compacto (solo icono + texto corto) */}
                   <motion.button
                     type="button"
                     onClick={() => cargar({ silent: false, force: true })}
                     disabled={loading || refreshing}
                     title="Cargar solicitudes"
+                    aria-label="Cargar solicitudes"
                     className="
                       inline-flex items-center gap-2
-                      px-4 py-2.5 rounded-2xl
+                      px-3 sm:px-4 py-2.5 rounded-2xl
                       text-[#0b0f1e] font-semibold
                       bg-gradient-to-br from-sky-200 to-cyan-200
                       border border-cyan-200/60
@@ -404,8 +413,11 @@ export default function SolicitudesPage() {
                     whileTap="tap"
                   >
                     <HiRefresh className={(loading || refreshing) ? "animate-spin" : ""} />
-                    <span className="text-sm md:text-[13px]">
+                    <span className="text-sm md:text-[13px] hidden sm:inline">
                       {loading || refreshing ? "Cargando…" : "Cargar solicitudes"}
+                    </span>
+                    <span className="text-sm md:text-[13px] sm:hidden">
+                      {loading || refreshing ? "…" : "Cargar"}
                     </span>
                   </motion.button>
 
@@ -445,23 +457,23 @@ export default function SolicitudesPage() {
                     <HiPlus className="text-xl" /> Nueva solicitud
                   </motion.button>
 
+                  {/* ✅ En móvil este botón abre SOLO filtros (la fila de inputs) */}
                   <button
                     className="sm:hidden inline-flex items-center px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs"
                     onClick={() => setToolbarOpen((v) => !v)}
                     aria-expanded={toolbarOpen}
-                    aria-controls="toolbar-secundaria"
+                    aria-controls="toolbar-filtros"
                     title="Mostrar/Ocultar filtros"
                   >
                     {toolbarOpen ? "Ocultar" : "Filtros"}
                   </button>
                 </div>
               </div>
-            </div>
 
-            <div id="toolbar-secundaria" className={`${toolbarOpen ? "block" : "hidden"} sm:block pb-3`}>
-              <div className="px-3 sm:px-4 lg:px-6">
-                <div className="flex flex-col lg:flex-row gap-2">
-                  <div className="inline-flex rounded-xl overflow-hidden border border-white/10 bg-white/5">
+              {/* ✅ Tabs SIEMPRE visibles (mobile friendly: scroll horizontal) */}
+              <div className="pb-2">
+                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                  <div className="flex overflow-x-auto no-scrollbar whitespace-nowrap">
                     {[
                       { id: "proceso", label: "En proceso" },
                       { id: "pendiente_alta", label: `Pendiente alta (${counts.alta})` },
@@ -471,7 +483,7 @@ export default function SolicitudesPage() {
                       <button
                         key={t.id}
                         onClick={() => cambiarTab(t.id)}
-                        className={`px-3 py-2 text-xs sm:text-sm transition-colors ${
+                        className={`shrink-0 px-3 py-2 text-xs sm:text-sm transition-colors ${
                           tab === t.id ? "bg-white/20 text-white" : "bg-white/10 text-white/70 hover:text-white"
                         }`}
                         title={t.label}
@@ -480,8 +492,15 @@ export default function SolicitudesPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
 
-                  <div className="flex flex-1 gap-2">
+            {/* ✅ Filtros: en móvil plegables; en sm+ siempre visibles */}
+            <div id="toolbar-filtros" className={`${toolbarOpen ? "block" : "hidden"} sm:block pb-3`}>
+              <div className="px-3 sm:px-4 lg:px-6">
+                <div className="flex flex-col lg:flex-row gap-2">
+                  <div className="flex flex-1 gap-2 flex-col sm:flex-row">
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -512,7 +531,7 @@ export default function SolicitudesPage() {
                     </select>
                   </div>
 
-                  {/* Auto-refresh toggle (mobile in toolbar) */}
+                  {/* Auto-refresh toggle (mobile in filtros) */}
                   <div className="md:hidden">
                     <button
                       type="button"
@@ -524,7 +543,7 @@ export default function SolicitudesPage() {
                         setAutoRefresh((v) => !v);
                         toast(!autoRefresh ? "Auto-actualizar: ON" : "Auto-actualizar: OFF", { icon: "⏱️" });
                       }}
-                      className="w-full mt-2 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 text-white/90"
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 text-white/90"
                       title="Auto-actualizar"
                     >
                       <span className={`h-2.5 w-2.5 rounded-full ${autoRefresh ? "bg-emerald-400" : "bg-white/30"}`} />
@@ -538,13 +557,13 @@ export default function SolicitudesPage() {
 
           <div
             className="
-              flex-1 overflow-y-auto
+              flex-1 min-h-0 overflow-y-auto
               px-3 sm:px-4 lg:px-6
               pt-3
               pb-[calc(env(safe-area-inset-bottom,0px)+120px)]
             "
           >
-            <MotionList as="div" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-4">
+            <MotionList as="div" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-4">
               <MotionListItem as="div" className="xl:col-span-2">
                 <Kpi label="Activas" value={kpis.activas} />
               </MotionListItem>
@@ -566,7 +585,7 @@ export default function SolicitudesPage() {
                   <motion.button
                     type="button"
                     className="
-                      mt-4 inline-flex items-center gap-2
+                      mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2
                       rounded-2xl px-4 py-3
                       text-[#0b0f1e] font-semibold
                       bg-gradient-to-br from-sky-200 to-cyan-200

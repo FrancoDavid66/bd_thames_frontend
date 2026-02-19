@@ -377,7 +377,8 @@ function App() {
   }, []); // mount once
 
   return (
-    <div className="flex min-h-screen bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
+    // ✅ FIX MOBILE: overflow-x-hidden + min-w-0 para evitar que padding/children empujen el ancho
+    <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
@@ -390,7 +391,7 @@ function App() {
       />
 
       <motion.div
-        className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${
+        className={`flex-1 min-h-[100dvh] min-h-0 min-w-0 flex flex-col transition-all duration-300 ${
           sidebarOpen ? "lg:ml-64" : ""
         }`}
         initial={{ opacity: 0 }}
@@ -400,7 +401,9 @@ function App() {
         <Navbar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
         <motion.main
-          className="flex-1 px-4 sm:px-6 md:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
+          // ✅ en mobile: SIN padding horizontal (las Pages ya manejan px)
+          // ✅ en sm+: vuelve el padding normal
+          className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -30, opacity: 0 }}

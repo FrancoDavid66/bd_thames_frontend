@@ -14,6 +14,31 @@ import {
 import toast from "react-hot-toast";
 import { solicitudesApi } from "../../../services/solicitudes";
 
+// Definimos variants inline para animaciones profesionales
+const modalVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
+};
+
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const itemVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
 /**
  * CRUD compacto de Responsables (empleados)
  *
@@ -149,109 +174,136 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
   // ====== Render ======
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[96] grid place-items-center bg-black/70 backdrop-blur" onClick={onClose}>
+      <motion.div
+        className="fixed inset-0 z-[96] grid place-items-center bg-black/70 backdrop-blur p-4 sm:p-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.98, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.98, y: 8 }}
-          className="w-[94%] max-w-2xl rounded-2xl border border-white/10 bg-[#0f0c28] p-4 shadow-2xl"
+          variants={modalVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="w-full max-w-md sm:max-w-2xl rounded-2xl border border-white/10 bg-[#0f0c28] p-3 sm:p-4 shadow-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
           aria-label="Administrar responsables"
         >
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-white font-semibold flex items-center gap-2">
+            <h4 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-sky-200 to-cyan-200 text-[#0b0f1e]">
                 <HiCog />
               </span>
               Administrar responsables
             </h4>
             <div className="flex items-center gap-2">
-              <button
+              <motion.button
                 onClick={fetchAll}
-                className="h-8 w-8 grid place-items-center rounded-lg bg-white/10 hover:bg-white/20"
+                className="h-8 w-8 grid place-items-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
                 title="Refrescar"
+                variants={buttonVariants}
+                initial="initial"
+                whileHover="hover"
+                whileTap="tap"
               >
-                <HiRefresh className="text-white" />
-              </button>
-              <button
+                <HiRefresh />
+              </motion.button>
+              <motion.button
                 onClick={onClose}
-                className="h-8 w-8 grid place-items-center rounded-lg bg-white/10 hover:bg-white/20"
+                className="h-8 w-8 grid place-items-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
                 title="Cerrar"
+                variants={buttonVariants}
+                initial="initial"
+                whileHover="hover"
+                whileTap="tap"
               >
-                <HiX className="text-white" />
-              </button>
+                <HiX />
+              </motion.button>
             </div>
           </div>
 
           {/* Buscar + Crear */}
-          <div className="grid gap-3 mb-3">
-            <div className="flex gap-2">
+          <motion.div className="grid gap-3 mb-3" variants={sectionVariants} initial="initial" animate="animate">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Buscar por nombre…"
-                  className="w-full pl-9 pr-3 py-3 rounded-xl bg-white/10 border border-white/10 text-white outline-none focus:ring-2 ring-cyan-200/30"
+                  className="w-full pl-9 pr-3 py-2.5 sm:py-3 rounded-xl bg-white/10 border border-white/10 text-white outline-none focus:ring-2 ring-cyan-200/30"
                 />
               </div>
               {!creating ? (
-                <button
+                <motion.button
                   onClick={() => setCreating(true)}
-                  className="px-3 rounded-xl bg-emerald-400/90 hover:bg-emerald-400 text-[#0b0f1e] inline-flex items-center gap-2 font-semibold"
+                  className="px-3 py-2.5 sm:py-3 rounded-xl bg-emerald-400/90 text-[#0b0f1e] inline-flex items-center gap-2 font-semibold hover:brightness-95"
                   title="Nuevo responsable"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   <HiPlus />
                   <span className="hidden sm:inline">Nuevo</span>
-                </button>
+                </motion.button>
               ) : (
-                <div className="flex gap-2 flex-1">
+                <div className="flex flex-col sm:flex-row gap-2 flex-1">
                   <input
                     ref={inputNuevoRef}
                     value={nuevoNombre}
                     onChange={(e) => setNuevoNombre(e.target.value)}
                     placeholder="Nombre del responsable"
-                    className="flex-1 px-3 py-3 rounded-xl bg-white/10 border border-white/10 text-white outline-none focus:ring-2 ring-emerald-200/30"
+                    className="flex-1 px-3 py-2.5 sm:py-3 rounded-xl bg-white/10 border border-white/10 text-white outline-none focus:ring-2 ring-emerald-200/30"
                   />
-                  <label className="inline-flex items-center gap-2 px-3 rounded-xl bg-white/10 border border-white/10">
+                  <label className="inline-flex items-center gap-2 px-2 sm:px-3 py-2.5 sm:py-3 rounded-xl bg-white/10 border border-white/10">
                     <input
                       type="checkbox"
                       checked={nuevoActivo}
                       onChange={(e) => setNuevoActivo(e.target.checked)}
-                      className="h-4 w-4 rounded border-white/20 bg-transparent"
+                      className="w-4 h-4 accent-current"
                     />
-                    <span className="text-sm text-white/85">Activo</span>
+                    <span className="text-xs sm:text-sm text-white/85">Activo</span>
                   </label>
-                  <button
+                  <motion.button
                     onClick={onCreate}
                     disabled={saving}
-                    className="px-3 rounded-xl bg-gradient-to-br from-emerald-200 to-teal-200 text-[#0b0f1e] font-semibold disabled:opacity-60"
+                    className="px-3 py-2.5 sm:py-3 rounded-xl bg-gradient-to-br from-emerald-200 to-teal-200 text-[#0b0f1e] font-semibold disabled:opacity-60"
+                    variants={buttonVariants}
+                    initial="initial"
+                    whileHover="hover"
+                    whileTap="tap"
                   >
                     {saving ? "Creando…" : "Crear"}
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
                     onClick={() => {
                       setCreating(false);
                       setNuevoNombre("");
                       setNuevoActivo(true);
                     }}
-                    className="px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white"
+                    className="px-3 py-2.5 sm:py-3 rounded-xl bg-white/10 text-white hover:bg-white/20"
+                    variants={buttonVariants}
+                    initial="initial"
+                    whileHover="hover"
+                    whileTap="tap"
                   >
                     Cancelar
-                  </button>
+                  </motion.button>
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Lista */}
-          <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+          <motion.div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden" variants={sectionVariants} initial="initial" animate="animate">
             <div className="px-3 py-2 text-xs text-white/60 border-b border-white/10">
               {loading ? "Cargando…" : `Responsables (${filtered.length})`}
             </div>
-            <div className="max-h-[56vh] overflow-auto divide-y divide-white/10">
+            <div className="max-h-[50vh] sm:max-h-[56vh] overflow-auto divide-y divide-white/10">
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="px-3 py-4 animate-pulse">
@@ -262,7 +314,15 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
                 : filtered.map((it) => {
                     const isEditing = editId === it.id;
                     return (
-                      <div key={it.id} className="px-3 py-2 flex items-center gap-2">
+                      <motion.div
+                        key={it.id}
+                        className="px-3 py-2 flex items-center gap-2 flex-wrap sm:flex-nowrap"
+                        variants={itemVariants}
+                        initial="initial"
+                        animate="animate"
+                        whileHover="hover"
+                        whileTap="tap"
+                      >
                         {!isEditing ? (
                           <>
                             <div className="flex-1 min-w-0">
@@ -278,20 +338,28 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
                             >
                               {it.activo ? "Activo" : "Inactivo"}
                             </span>
-                            <button
-                              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center text-white"
+                            <motion.button
+                              className="w-8 h-8 rounded-lg bg-white/10 text-white grid place-items-center hover:bg-white/20"
                               title="Editar"
                               onClick={() => onEdit(it)}
+                              variants={buttonVariants}
+                              initial="initial"
+                              whileHover="hover"
+                              whileTap="tap"
                             >
                               <HiPencil />
-                            </button>
-                            <button
-                              className="w-8 h-8 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 grid place-items-center text-rose-100"
+                            </motion.button>
+                            <motion.button
+                              className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-100 grid place-items-center hover:bg-rose-500/30"
                               title="Eliminar"
                               onClick={() => onDelete(it)}
+                              variants={buttonVariants}
+                              initial="initial"
+                              whileHover="hover"
+                              whileTap="tap"
                             >
                               <HiTrash />
-                            </button>
+                            </motion.button>
                           </>
                         ) : (
                           <>
@@ -309,37 +377,52 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
                               />
                               <span className="text-[12px] text-white/85">Activo</span>
                             </label>
-                            <button
+                            <motion.button
                               onClick={onSave}
                               disabled={saving}
                               className="px-3 h-8 rounded-lg bg-gradient-to-br from-emerald-200 to-teal-200 text-[#0b0f1e] font-semibold disabled:opacity-60"
+                              variants={buttonVariants}
+                              initial="initial"
+                              whileHover="hover"
+                              whileTap="tap"
                             >
                               <HiCheck />
-                            </button>
-                            <button
+                            </motion.button>
+                            <motion.button
                               onClick={onCancelEdit}
-                              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center text-white"
+                              className="w-8 h-8 rounded-lg bg-white/10 text-white grid place-items-center hover:bg-white/20"
+                              variants={buttonVariants}
+                              initial="initial"
+                              whileHover="hover"
+                              whileTap="tap"
                             >
                               <HiX />
-                            </button>
+                            </motion.button>
                           </>
                         )}
-                      </div>
+                      </motion.div>
                     );
                   })}
               {!loading && filtered.length === 0 && (
                 <div className="px-3 py-6 text-sm text-white/60">Sin resultados.</div>
               )}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="mt-3 flex items-center justify-end">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white">
+          <motion.div className="mt-3 flex items-center justify-end" variants={sectionVariants} initial="initial" animate="animate">
+            <motion.button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20"
+              variants={buttonVariants}
+              initial="initial"
+              whileHover="hover"
+              whileTap="tap"
+            >
               Cerrar
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </motion.div>
-      </div>
+      </motion.div>
     </AnimatePresence>
   );
 }

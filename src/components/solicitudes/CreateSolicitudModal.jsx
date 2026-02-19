@@ -25,6 +25,30 @@ import SolicitudStep from "./modalcreate/SolicitudStep";
 
 import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
 
+// Definimos variants inline para animaciones profesionales
+const modalVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const stepVariants = {
+  hidden: { opacity: 0, x: 50 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+  exit: { opacity: 0, x: -50, transition: { duration: 0.3 } },
+};
+
 /* =====================  Constantes  ===================== */
 // si no está definido, no bloqueamos carga (12 es buen default)
 const MAX_FOTOS_RAW = import.meta.env.VITE_MAX_FOTOS;
@@ -542,11 +566,11 @@ export default function CreateSolicitudModal({
       />
 
       <motion.div
-        variants={safeVariants}
-        initial="hidden"
-        animate="show"
+        variants={modalVariants}
+        initial="initial"
+        animate="animate"
         exit="exit"
-        className="relative w-full h-[100dvh] md:h-auto md:max-w-5xl lg:max-w-6xl md:mx-auto md:my-8 md:rounded-2xl md:border md:border-white/10 shadow-[0_20px_80px_rgba(0,0,0,.5)] flex flex-col md:max-h-[90vh] md:overflow-hidden"
+        className="relative w-full max-w-md sm:max-w-5xl lg:max-w-6xl h-[90vh] sm:h-auto mx-auto rounded-2xl border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,.5)] flex flex-col overflow-hidden"
         style={{ background: "linear-gradient(180deg, rgba(17,20,35,.96) 0%, rgba(12,15,28,.98) 100%)" }}
         role="dialog"
         aria-modal="true"
@@ -581,15 +605,19 @@ export default function CreateSolicitudModal({
                 </span>
               )}
 
-              <button
+              <motion.button
                 ref={closeBtnRef}
                 onClick={() => !saving && onClose?.()}
                 disabled={saving}
-                className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-50 transition"
+                className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-50"
                 aria-label="Cerrar"
+                variants={buttonVariants}
+                initial="initial"
+                whileHover="hover"
+                whileTap="tap"
               >
-                <HiX className="text-lg text-white" />
-              </button>
+                <HiX className="text-lg" />
+              </motion.button>
             </div>
           </div>
 
@@ -615,7 +643,13 @@ export default function CreateSolicitudModal({
         <div className="px-3 md:px-4 pt-2 pb-[104px] md:pb-4 overflow-y-auto h-[calc(100dvh-112px)] md:h-auto md:flex-1">
           <AnimatePresence mode="wait">
             {step === 1 && (
-              <motion.div key="paso1" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso1"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <ClienteStep
                   clienteModo={clienteModo}
                   setClienteModo={setClienteModo}
@@ -632,7 +666,13 @@ export default function CreateSolicitudModal({
             )}
 
             {step === 2 && (
-              <motion.div key="paso2" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso2"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <PolizaStep
                   polizaModo={polizaModo}
                   setPolizaModo={setPolizaModo}
@@ -651,7 +691,13 @@ export default function CreateSolicitudModal({
             )}
 
             {step === 3 && (
-              <motion.div key="paso3" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso3"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <ImagenesDocsStep
                   MAX_FOTOS={MAX_FOTOS}
                   fotoSlotDefs={FOTO_SLOTS}
@@ -667,7 +713,13 @@ export default function CreateSolicitudModal({
             )}
 
             {step === 4 && (
-              <motion.div key="paso4" variants={sectionVariants} initial="hidden" animate="show" exit="exit">
+              <motion.div
+                key="paso4"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 <SolicitudStep
                   responsableNombre={responsableId ? `#${responsableId}` : ""}
                   onCambiarResponsable={() => setAskResponsable(true)}
@@ -681,28 +733,35 @@ export default function CreateSolicitudModal({
 
         <div className="sticky bottom-0 z-30 border-t border-white/10 bg-[#0f0c28]/80 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="flex items-center justify-between gap-2 px-3 md:px-4 py-3">
-            <button
+            <motion.button
               onClick={() => !saving && onClose?.()}
               disabled={saving}
-              className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-sm md:text-base text-white disabled:opacity-60 transition w-[44%] md:w-auto"
+              className="px-4 py-3 rounded-2xl bg-white/10 text-sm md:text-base text-white transition w-[44%] md:w-auto hover:bg-white/20 disabled:opacity-60"
+              variants={buttonVariants}
+              initial="initial"
+              whileHover="hover"
+              whileTap="tap"
             >
               Cancelar
-            </button>
+            </motion.button>
 
             <div className="flex items-center gap-2 w-[56%] md:w-auto">
               {step > 1 && (
-                <button
+                <motion.button
                   onClick={() => setStep((s) => Math.max(1, s - 1))}
                   disabled={saving}
-                  className="flex-1 md:flex-none px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-sm md:text-base text-white inline-flex items-center justify-center gap-2 transition"
+                  className="flex-1 md:flex-none px-4 py-3 rounded-2xl bg-white/10 text-sm md:text-base text-white inline-flex items-center justify-center gap-2 transition hover:bg-white/20"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   <HiChevronLeft className="text-lg md:text-xl" /> Atrás
-                </button>
+                </motion.button>
               )}
 
               {step < 4 && (
                 <motion.button
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     if (askResponsable) return toast.error("Elegí el responsable antes de continuar.");
                     if (step === 1 && !canNext1) return toast.error("Completá los datos del cliente");
@@ -710,7 +769,11 @@ export default function CreateSolicitudModal({
                     setStep((s) => Math.min(4, s + 1));
                   }}
                   disabled={saving}
-                  className="flex-1 md:flex-none px-4 py-3 rounded-2xl text-[#0b0f1e] font-semibold bg-gradient-to-br from-sky-200 to-cyan-200 shadow-lg hover:brightness-105 active:brightness-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/40 inline-flex items-center justify-center gap-2 transition text-sm md:text-base"
+                  className="flex-1 md:flex-none px-4 py-3 rounded-2xl text-[#0b0f1e] font-semibold bg-gradient-to-br from-sky-200 to-cyan-200 shadow-lg inline-flex items-center justify-center gap-2 transition text-sm md:text-base hover:brightness-105 disabled:opacity-60"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   Siguiente <HiChevronRight className="text-lg md:text-xl" />
                 </motion.button>
@@ -718,10 +781,13 @@ export default function CreateSolicitudModal({
 
               {step === 4 && (
                 <motion.button
-                  whileTap={{ scale: 0.98 }}
                   onClick={onSubmit}
                   disabled={!canSubmit}
-                  className="flex-1 md:flex-none px-4 py-3 rounded-2xl text-[#0b0f1e] font-semibold bg-gradient-to-br from-emerald-200 to-teal-200 shadow-lg hover:brightness-105 active:brightness-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/50 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition text-sm md:text-base"
+                  className="flex-1 md:flex-none px-4 py-3 rounded-2xl text-[#0b0f1e] font-semibold bg-gradient-to-br from-emerald-200 to-teal-200 shadow-lg inline-flex items-center justify-center gap-2 transition text-sm md:text-base hover:brightness-105 disabled:opacity-60"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
                 >
                   {saving && <span className="inline-block w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />}
                   {saving ? "Creando…" : "Crear (todo en 1 paso)"}
@@ -748,13 +814,17 @@ export default function CreateSolicitudModal({
 /* =====================  UI bits  ===================== */
 function StepChip({ active, done, icon, label, onClick }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       className={`flex items-center gap-2 rounded-xl px-3 py-2 border text-sm transition min-w-[140px] snap-center ${
         active ? "border-white/20 bg-gradient-to-br from-violet-200/80 to-indigo-200/80 text-[#0b0f1e]" : "border-white/10 bg-white/5 text-white/85"
       }`}
       aria-current={active ? "step" : undefined}
+      variants={buttonVariants}
+      initial="initial"
+      whileHover="hover"
+      whileTap="tap"
     >
       <span
         className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${
@@ -764,7 +834,7 @@ function StepChip({ active, done, icon, label, onClick }) {
         {done ? <HiCheckCircle className="text-base" /> : icon}
       </span>
       <span className="truncate">{label}</span>
-    </button>
+    </motion.button>
   );
 }
 

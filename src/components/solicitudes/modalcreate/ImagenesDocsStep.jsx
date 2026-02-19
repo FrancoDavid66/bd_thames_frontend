@@ -10,6 +10,25 @@ import {
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
+// Definimos variants inline para animaciones profesionales
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const cardVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
 /**
  * Props esperadas:
  * - MAX_FOTOS: number (opcional) -> si 0/undefined => sin límite
@@ -217,7 +236,12 @@ export default function ImagenesDocsStep({
       className="space-y-3"
     >
       {/* Banner de requisitos */}
-      <div className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
+      <motion.div
+        className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4"
+        variants={sectionVariants}
+        initial="initial"
+        animate="animate"
+      >
         <div
           className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#0b0f1e] bg-gradient-to-br ${rule.color} mb-2`}
         >
@@ -243,7 +267,7 @@ export default function ImagenesDocsStep({
             ⚠ Esta cobertura requiere fotos del vehículo, pero no están habilitadas aquí.
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Documentos del vehículo */}
       <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
@@ -251,7 +275,7 @@ export default function ImagenesDocsStep({
           <HiDocumentText /> Documentos
         </legend>
 
-        <div className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {docSlotDefs.map(({ key, label }) => {
             const v = docSlots?.[key] || null;
             const required = rule.docs.includes(key);
@@ -280,7 +304,7 @@ export default function ImagenesDocsStep({
             No hay campos de fotos habilitados para esta cobertura.
           </p>
         ) : (
-          <div className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {fotoSlotDefs.map(({ key, label }) => {
               const normalizedKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
               const v = fotoSlots?.[normalizedKey] || fotoSlots?.[key] || null; // tolerante
@@ -318,7 +342,14 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
     String(value?.mime || "").includes("pdf") || /\.pdf$/i.test(value?.url || "");
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+    <motion.div
+      className="rounded-xl border border-white/10 bg-white/5 p-3"
+      variants={cardVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-white/90 text-sm">
           {label} {required && <span className="ml-1 text-rose-200">*</span>}
@@ -345,14 +376,18 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
               />
             )}
           </div>
-          <button
+          <motion.button
             type="button"
             onClick={onRemove}
             className="absolute top-2 right-2 inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 transition"
             title="Quitar"
+            variants={buttonVariants}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
           >
             <HiX className="text-white" />
-          </button>
+          </motion.button>
         </div>
       ) : (
         <label className="block">
@@ -365,14 +400,21 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
           </div>
         </label>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 function FotoSlotCard({ label, value, required, onPick, onRemove }) {
   const filled = Boolean(value?.url);
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+    <motion.div
+      className="rounded-xl border border-white/10 bg-white/5 p-3"
+      variants={cardVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-white/90 text-sm">
           {label} {required && <span className="ml-1 text-rose-200">*</span>}
@@ -389,14 +431,18 @@ function FotoSlotCard({ label, value, required, onPick, onRemove }) {
           <div className="rounded-lg overflow-hidden border border-white/10 bg-[#0f1324]">
             <img src={value.url} alt={label} className="w-full h-32 object-cover" />
           </div>
-          <button
+          <motion.button
             type="button"
             onClick={onRemove}
             className="absolute top-2 right-2 inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 transition"
             title="Quitar"
+            variants={buttonVariants}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
           >
             <HiX className="text-white" />
-          </button>
+          </motion.button>
         </div>
       ) : (
         <label className="block">
@@ -409,7 +455,7 @@ function FotoSlotCard({ label, value, required, onPick, onRemove }) {
           </div>
         </label>
       )}
-    </div>
+    </motion.div>
   );
 }
 

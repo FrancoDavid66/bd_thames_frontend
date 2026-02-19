@@ -9,8 +9,34 @@ import {
   HiExclamationCircle,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
 import { PolizasAPI } from "../../api/polizas";
 import { solicitudesApi } from "../../api/solicitudes";
+
+// Definimos variants inline para animaciones profesionales
+const modalVariants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
+};
+
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const cardVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
 
 /* ========= Helpers ========= */
 // Política vigente: SOLO Cédula (verde/azul) y Título
@@ -357,9 +383,14 @@ export default function AsociarAPolizaModal({ solicitud, onClose, onDone }) {
     const eraFoto = rawTypeU && !VALID_SELECT_KEYS.has(rawTypeU);
 
     return (
-      <div
+      <motion.div
         key={d.id}
         className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_12px_40px_-20px_rgba(0,0,0,0.6)]"
+        variants={cardVariants}
+        initial="initial"
+        animate="animate"
+        whileHover="hover"
+        whileTap="tap"
       >
         <div className="aspect-[4/3] bg-white/5 flex items-center justify-center overflow-hidden">
           {pdf ? (
@@ -405,7 +436,7 @@ export default function AsociarAPolizaModal({ solicitud, onClose, onDone }) {
               </optgroup>
             </select>
             {eraFoto && (
-              <p className="mt-1 text<[11px] text-amber-200 flex items-center gap-1">
+              <p className="mt-1 text-xs text-amber-200 flex items-center gap-1">
                 <HiExclamationCircle /> Este archivo estaba etiquetado como foto (p. ej. PATENTE). Elegí un tipo de documento.
               </p>
             )}
@@ -435,7 +466,7 @@ export default function AsociarAPolizaModal({ solicitud, onClose, onDone }) {
             </div>
           </details>
         </div>
-      </div>
+      </motion.div>
     );
   });
 
@@ -449,189 +480,239 @@ export default function AsociarAPolizaModal({ solicitud, onClose, onDone }) {
   }, [byTipo]);
 
   return (
-    <div className="fixed inset-0 z-50">
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-
-      {/* === Estilos SCOPED para selects oscuros === */}
-      <style>{`
-        .bd-select,
-        .bd-select:focus {
-          background-color: rgba(255,255,255,0.08) !important;
-          color: #fff !important;
-          border-color: rgba(255,255,255,0.15) !important;
-        }
-        .bd-select option,
-        .bd-select optgroup {
-          background-color: #0f0c28;
-          color: #fff;
-        }
-        .bd-select optgroup[label] { font-weight: 600; }
-      `}</style>
-
-      {/* Contenedor principal */}
-      <div
-        className="relative w-full h-[100dvh] md:h-auto md:max-w-6xl md:mx-auto md:my-8 md:rounded-2xl md:border md:border-white/10 shadow-2xl"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(14,11,43,0.98) 0%, rgba(10,9,32,0.98) 100%)",
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Asociar documentos a póliza"
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
       >
-        {/* Header */}
-        <div
-          className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[#0f0c28]/90 backdrop-blur"
+        {/* Overlay */}
+        <motion.div
+          className="absolute inset-0 bg-black/70"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        />
+
+        {/* === Estilos SCOPED para selects oscuros === */}
+        <style>{`
+          .bd-select,
+          .bd-select:focus {
+            background-color: rgba(255,255,255,0.08) !important;
+            color: #fff !important;
+            border-color: rgba(255,255,255,0.15) !important;
+          }
+          .bd-select option,
+          .bd-select optgroup {
+            background-color: #0f0c28;
+            color: #fff;
+          }
+          .bd-select optgroup[label] { font-weight: 600; }
+        `}</style>
+
+        {/* Contenedor principal */}
+        <motion.div
+          variants={modalVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="relative w-full max-w-md sm:max-w-6xl h-[90vh] sm:h-auto mx-auto rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(14,11,43,0.98) 0%, rgba(10,9,32,0.98) 100%)",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Asociar documentos a póliza"
         >
-          <h3 className="text-white font-semibold flex items-center gap-2">
-            <HiLink className="opacity-80" />
-            Asociar a póliza
-          </h3>
-          <button
-            onClick={onClose}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20"
-            aria-label="Cerrar"
-            title="Cerrar"
+          {/* Header */}
+          <div
+            className="sticky top-0 z-10 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 border-b border-white/10 bg-[#0f0c28]/90 backdrop-blur"
           >
-            <HiX className="text-lg text-white" />
-          </button>
-        </div>
-
-        {/* Contenido */}
-        <div className="px-4 pb-28 pt-3 overflow-y-auto h-[calc(100dvh-56px)] md:max-h-[78vh] md:pb-3">
-          {/* Póliza destino */}
-          <fieldset className="rounded-2xl border border-white/10 p-3 bg-white/5">
-            <legend className="px-1 text-white/80 text-sm">
-              Póliza destino <span className="text-red-300">*</span>
-            </legend>
-
-            <label className="text-xs text-white/70">ID póliza</label>
-            <input
-              value={polizaId}
-              onChange={(e) => setPolizaId(e.target.value.replace(/\D/g, ""))}
-              placeholder="Ej: 101"
-              className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 outline-none text-white"
-            />
-
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                value={qPoliza}
-                onChange={(e) => setQPoliza(e.target.value)}
-                placeholder="Buscar por patente, cliente o nro. póliza"
-                className="flex-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 outline-none text-white"
-              />
-              <button
-                onClick={buscarPolizas}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white text-black font-semibold hover:brightness-95"
-              >
-                <HiSearch /> Buscar
-              </button>
-            </div>
-
-            {polizasRes.length > 0 && (
-              <div className="mt-2 max-h-40 overflow-auto rounded-xl border border-white/10 bg-white/5">
-                {polizasRes.map((p) => (
-                  <button
-                    type="button"
-                    key={p.id}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 ${
-                      String(polizaId) === String(p.id) ? "bg-white/10" : ""
-                    }`}
-                    onClick={() => setPolizaId(String(p.id))}
-                    title={`Elegir póliza #${p.id}`}
-                  >
-                    #{p.id} • {p?.cliente?.apellido} {p?.cliente?.nombre} · {p?.patente || "—"}
-                  </button>
-                ))}
-              </div>
-            )}
-          </fieldset>
-
-          {/* Opciones de asociación */}
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-            <label className="flex items-center gap-2 text-sm text-white/80">
-              <input
-                type="checkbox"
-                checked={setPerfil}
-                onChange={(e) => setSetPerfil(e.target.checked)}
-              />
-              Usar foto FRENTE como foto de perfil
-            </label>
-            <label className="flex items-center gap-2 text-sm text-white/80">
-              <input
-                type="checkbox"
-                checked={overwritePerfil}
-                onChange={(e) => setOverwritePerfil(e.target.checked)}
-              />
-              Sobrescribir foto de perfil si ya existe
-            </label>
-            <label className="flex items-center gap-2 text-sm text-white/80">
-              <input
-                type="checkbox"
-                checked={modoMover}
-                onChange={(e) => setModoMover(e.target.checked)}
-              />
-              Mover (no copiar) archivos usados
-            </label>
-          </div>
-
-          {/* Grilla */}
-          <div className="mt-4">
-            <div className="flex items-baseline justify-between">
-              <h4 className="text-white/90 font-semibold">Documentos detectados</h4>
-              <div className="text-xs text-white/60">
-                {loading ? "Cargando…" : netErr ? "Error de red" : tiposResumen}
-              </div>
-            </div>
-
-            <div className="mt-1 text-[12px] text-white/65">
-              Tip: Para <b>Cédula verde</b>, podés subir frente y dorso como piezas separadas usando la misma etiqueta.
-            </div>
-
-            <div className="mt-2 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {docCards}
-            </div>
-
-            {docs.length === 0 && !loading && !netErr && (
-              <div className="mt-6 text-sm text-white/70 text-center">
-                — No hay documentos en esta solicitud —
-              </div>
-            )}
-            {netErr && (
-              <div className="mt-6 text-sm text-rose-200/90 text-center">{netErr}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom actions */}
-        <div
-          className="sticky bottom-0 z-10 flex items-center justify-between gap-2 px-4 py-3 border-t border-white/10 bg-[#0f0c28]/90 backdrop-blur"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        >
-          <div className="text-[11px] text-white/70 flex items-center gap-2">
-            <HiCloudUpload className="opacity-80" />
-            <span>
-              POST <b>/api/solicitudes/{solicitudId}/asociar_a_poliza/</b>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
+            <h3 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
+              <HiLink className="opacity-80" />
+              Asociar a póliza
+            </h3>
+            <motion.button
               onClick={onClose}
-              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm text-white"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+              aria-label="Cerrar"
+              title="Cerrar"
+              variants={buttonVariants}
+              initial="initial"
+              whileHover="hover"
+              whileTap="tap"
             >
-              Cancelar
-            </button>
-            <button
-              onClick={guardarYAsociar}
-              disabled={!polizaId || loading}
-              className="px-4 py-2 rounded-xl bg-primary-400 text-white font-semibold hover:brightness-95 disabled:opacity-60"
-            >
-              Guardar y asociar
-            </button>
+              <HiX className="text-lg" />
+            </motion.button>
           </div>
-        </div>
-      </div>
-    </div>
+
+          {/* Contenido */}
+          <div className="px-3 sm:px-4 pb-28 pt-3 overflow-y-auto h-[calc(90vh-56px)] sm:max-h-[78vh] sm:pb-3">
+            {/* Póliza destino */}
+            <motion.fieldset
+              className="rounded-2xl border border-white/10 p-3 bg-white/5"
+              variants={sectionVariants}
+              initial="initial"
+              animate="animate"
+            >
+              <legend className="px-1 text-white/80 text-xs sm:text-sm">
+                Póliza destino <span className="text-red-300">*</span>
+              </legend>
+
+              <label className="text-xs text-white/70">ID póliza</label>
+              <input
+                value={polizaId}
+                onChange={(e) => setPolizaId(e.target.value.replace(/\D/g, ""))}
+                placeholder="Ej: 101"
+                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 outline-none text-white"
+              />
+
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  value={qPoliza}
+                  onChange={(e) => setQPoliza(e.target.value)}
+                  placeholder="Buscar por patente, cliente o nro. póliza"
+                  className="flex-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 outline-none text-white"
+                />
+                <motion.button
+                  onClick={buscarPolizas}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white text-black font-semibold hover:brightness-95"
+                  variants={buttonVariants}
+                  initial="initial"
+                  whileHover="hover"
+                  whileTap="tap"
+                >
+                  <HiSearch /> Buscar
+                </motion.button>
+              </div>
+
+              {polizasRes.length > 0 && (
+                <div className="mt-2 max-h-40 overflow-auto rounded-xl border border-white/10 bg-white/5">
+                  {polizasRes.map((p) => (
+                    <motion.button
+                      type="button"
+                      key={p.id}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 ${
+                        String(polizaId) === String(p.id) ? "bg-white/10" : ""
+                      }`}
+                      onClick={() => setPolizaId(String(p.id))}
+                      title={`Elegir póliza #${p.id}`}
+                      variants={buttonVariants}
+                      initial="initial"
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      #{p.id} • {p?.cliente?.apellido} {p?.cliente?.nombre} · {p?.patente || "—"}
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </motion.fieldset>
+
+            {/* Opciones de asociación */}
+            <motion.div
+              className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2"
+              variants={sectionVariants}
+              initial="initial"
+              animate="animate"
+            >
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={setPerfil}
+                  onChange={(e) => setSetPerfil(e.target.checked)}
+                  className="w-4 h-4 accent-current"
+                />
+                Usar foto FRENTE como foto de perfil
+              </label>
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={overwritePerfil}
+                  onChange={(e) => setOverwritePerfil(e.target.checked)}
+                  className="w-4 h-4 accent-current"
+                />
+                Sobrescribir foto de perfil si ya existe
+              </label>
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={modoMover}
+                  onChange={(e) => setModoMover(e.target.checked)}
+                  className="w-4 h-4 accent-current"
+                />
+                Mover (no copiar) archivos usados
+              </label>
+            </motion.div>
+
+            {/* Grilla */}
+            <motion.div className="mt-4" variants={sectionVariants} initial="initial" animate="animate">
+              <div className="flex items-baseline justify-between">
+                <h4 className="text-white/90 font-semibold text-sm sm:text-base">Documentos detectados</h4>
+                <div className="text-xs text-white/60">
+                  {loading ? "Cargando…" : netErr ? "Error de red" : tiposResumen}
+                </div>
+              </div>
+
+              <div className="mt-1 text-xs text-white/65">
+                Tip: Para <b>Cédula verde</b>, podés subir frente y dorso como piezas separadas usando la misma etiqueta.
+              </div>
+
+              <div className="mt-2 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {docCards}
+              </div>
+
+              {docs.length === 0 && !loading && !netErr && (
+                <div className="mt-6 text-sm text-white/70 text-center">
+                  — No hay documentos en esta solicitud —
+                </div>
+              )}
+              {netErr && (
+                <div className="mt-6 text-sm text-rose-200/90 text-center">{netErr}</div>
+              )}
+            </motion.div>
+          </div>
+
+          {/* Bottom actions */}
+          <div
+            className="sticky bottom-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 sm:py-3 border-t border-white/10 bg-[#0f0c28]/90 backdrop-blur"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          >
+            <div className="text-xs text-white/70 flex items-center gap-2">
+              <HiCloudUpload className="opacity-80" />
+              <span>
+                POST <b>/api/solicitudes/{solicitudId}/asociar_a_poliza/</b>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <motion.button
+                onClick={onClose}
+                className="px-3 py-2 rounded-xl bg-white/10 text-sm text-white transition hover:bg-white/20"
+                variants={buttonVariants}
+                initial="initial"
+                whileHover="hover"
+                whileTap="tap"
+              >
+                Cancelar
+              </motion.button>
+              <motion.button
+                onClick={guardarYAsociar}
+                disabled={!polizaId || loading}
+                className="px-4 py-2 rounded-xl bg-primary-400 text-white font-semibold hover:brightness-95 disabled:opacity-60"
+                variants={buttonVariants}
+                initial="initial"
+                whileHover="hover"
+                whileTap="tap"
+              >
+                Guardar y asociar
+              </motion.button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

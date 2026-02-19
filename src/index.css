@@ -1,16 +1,47 @@
 @import "tailwindcss";
 
 @font-face {
-    font-family: 'MiFuentePersonalizada';
-    /* RUTAS ABSOLUTAS DESDE LA RAÍZ DEL SITIO */
-    src: url('/assets/fonts/MiFuente.woff2') format('woff2'),
-         url('/assets/fonts/MiFuente.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
+  font-family: "MiFuentePersonalizada";
+  /* RUTAS ABSOLUTAS DESDE LA RAÍZ DEL SITIO */
+  src: url("/assets/fonts/MiFuente.woff2") format("woff2"),
+    url("/assets/fonts/MiFuente.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* ✅ FIX MOBILE HEIGHT/SCROLL:
+   - evita que “se agrande” la app por 100vh en mobile
+   - asegura que el scroll quede dentro del main
+   - evita overflow horizontal */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  /* soporte moderno (Chrome/Android/iOS nuevos) */
+  height: 100dvh;
+  /* fallback */
+  min-height: 100%;
 }
 
 body {
-    font-family: 'MiFuentePersonalizada', sans-serif;
-    background-color: #2f3b4d; /* Color oscuro neutro */
-    color: #f2f2f2; /* Texto claro */
+  margin: 0;
+  font-family: "MiFuentePersonalizada", sans-serif;
+  background-color: #2f3b4d; /* Color oscuro neutro */
+  color: #f2f2f2; /* Texto claro */
+
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* iOS Safari: evita scroll raro / rebote visual */
+@supports (-webkit-touch-callout: none) {
+  body {
+    min-height: -webkit-fill-available;
+  }
+  #root {
+    min-height: -webkit-fill-available;
+  }
 }

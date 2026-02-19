@@ -1,6 +1,7 @@
 // src/components/layout/MobileTopBar.jsx
 import { useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FaHome,
   FaClipboardList,
@@ -37,14 +38,25 @@ export default function MobileTopBar({
   const [moreOpen, setMoreOpen] = useState(false);
 
   const MOBILE_NAV_H = 68; // px
-  const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
+  const solTotal =
+    (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
   const primaryTabs = useMemo(
     () => [
       { to: "/", label: "Inicio", icon: FaHome },
-      { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList, badge: solTotal },
+      {
+        to: "/solicitudes",
+        label: "Solicitudes",
+        icon: FaClipboardList,
+        badge: solTotal,
+      },
       { to: "/clientes", label: "Clientes", icon: FaUsers },
-      { to: "/polizas", label: "Pólizas", icon: FaFileAlt, badge: renovacionesPendientes },
+      {
+        to: "/polizas",
+        label: "Pólizas",
+        icon: FaFileAlt,
+        badge: renovacionesPendientes,
+      },
       { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
     ],
     [solTotal, renovacionesPendientes]
@@ -52,7 +64,12 @@ export default function MobileTopBar({
 
   const moreItems = useMemo(
     () => [
-      { to: "/polizas/renovaciones", label: "Renovaciones", icon: FaSyncAlt, badge: renovacionesPendientes },
+      {
+        to: "/polizas/renovaciones",
+        label: "Renovaciones",
+        icon: FaSyncAlt,
+        badge: renovacionesPendientes,
+      },
       { to: "/marketing", label: "Campañas", icon: FaBullhorn },
       { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
       { to: "/competencia", label: "Competencia", icon: FaChartBar },
@@ -62,69 +79,103 @@ export default function MobileTopBar({
     [renovacionesPendientes]
   );
 
-  const isPrimaryActive = (to) => location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+  const isPrimaryActive = (to) =>
+    location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+
+  const sheetBottom = `calc(${MOBILE_NAV_H}px + env(safe-area-inset-bottom, 0px) + 10px)`;
 
   return (
     <>
-      {/* Menú "Más" */}
-      {moreOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-[60] bg-black/60"
-          onClick={() => setMoreOpen(false)}
-        >
-          <div
-            className="absolute bottom-[76px] left-3 right-3 rounded-2xl border border-blue-700/40 dark:border-gray-800 bg-blue-900/95 dark:bg-gray-900/95 backdrop-blur p-3"
-            onClick={(e) => e.stopPropagation()}
+      {/* Menú "Más" con animación pro */}
+      <AnimatePresence>
+        {moreOpen && (
+          <motion.div
+            className="lg:hidden fixed inset-0 z-[60] bg-black/60"
+            onClick={() => setMoreOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-extrabold text-white">Más opciones</div>
-              <button
-                className="rounded-xl border border-white/10 px-3 py-2 text-white/90"
-                onClick={() => setMoreOpen(false)}
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {moreItems.map(({ to, label, icon: Icon, badge }) => (
+            <motion.div
+              className="
+                absolute left-3 right-3
+                rounded-2xl border border-blue-700/40 dark:border-gray-800
+                bg-blue-900/95 dark:bg-gray-900/95 backdrop-blur p-3
+                shadow-2xl
+              "
+              style={{ bottom: sheetBottom }}
+              onClick={(e) => e.stopPropagation()}
+              initial={{ y: 18, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 14, opacity: 0, scale: 0.985 }}
+              transition={{
+                type: "spring",
+                stiffness: 520,
+                damping: 36,
+                mass: 0.9,
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-extrabold text-white">
+                  Más opciones
+                </div>
                 <button
-                  key={to}
-                  onClick={() => {
-                    setMoreOpen(false);
-                    navigate(to);
-                  }}
-                  className="relative flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/10"
+                  className="rounded-xl border border-white/10 px-3 py-2 text-white/90 hover:bg-white/10"
+                  onClick={() => setMoreOpen(false)}
+                  aria-label="Cerrar"
+                  title="Cerrar"
                 >
-                  <span className="relative inline-flex items-center justify-center h-7 w-7 rounded-lg bg-white/10">
-                    <Icon />
-                    <Badge value={badge} />
-                  </span>
-                  <span className="min-w-0 truncate">{label}</span>
+                  <FaTimes />
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
 
-      <nav
+              <div className="grid grid-cols-2 gap-2">
+                {moreItems.map(({ to, label, icon: Icon, badge }) => (
+                  <button
+                    key={to}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      navigate(to);
+                    }}
+                    className="relative flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 active:scale-[0.99] transition"
+                  >
+                    <span className="relative inline-flex items-center justify-center h-7 w-7 rounded-lg bg-white/10">
+                      <Icon />
+                      <Badge value={badge} />
+                    </span>
+                    <span className="min-w-0 truncate">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom tabs (entrada suave) */}
+      <motion.nav
         className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-blue-800/95 dark:bg-gray-900/95 border-t border-blue-700 dark:border-gray-800 backdrop-blur"
         role="navigation"
         aria-label="Tabs principales"
         style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 4px)",
-          minHeight: `calc(${MOBILE_NAV_H}px + env(safe-area-inset-bottom, 0px))`,
+          height: `${MOBILE_NAV_H}px`,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
+        initial={{ y: 18, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
       >
-        <ul className="flex">
+        <ul className="flex h-full">
           {primaryTabs.map(({ to, label, icon: Icon, badge }) => (
             <li key={to} className="flex-1">
               <NavLink
                 to={to}
                 className={() =>
-                  `group relative flex flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium transition-colors ${
-                    isPrimaryActive(to) ? "text-yellow-300" : "text-gray-300 hover:text-white"
+                  `group relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+                    isPrimaryActive(to)
+                      ? "text-yellow-300"
+                      : "text-gray-300 hover:text-white"
                   }`
                 }
               >
@@ -141,7 +192,7 @@ export default function MobileTopBar({
           <li className="flex-1">
             <button
               onClick={() => setMoreOpen(true)}
-              className="group relative flex w-full flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium text-gray-300 hover:text-white"
+              className="group relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-gray-300 hover:text-white"
             >
               <span className="inline-flex items-center justify-center h-6 w-6 rounded-md">
                 <FaEllipsisH />
@@ -150,7 +201,7 @@ export default function MobileTopBar({
             </button>
           </li>
         </ul>
-      </nav>
+      </motion.nav>
     </>
   );
 }

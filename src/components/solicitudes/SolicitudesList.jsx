@@ -1,6 +1,6 @@
 // src/components/solicitudes/SolicitudesList.jsx
 import { memo, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   HiDocumentText,
   HiShieldCheck,
@@ -13,8 +13,29 @@ import {
   HiCheck,
 } from "react-icons/hi";
 
-import { MotionList, MotionListItem } from "../../ux/motion/MotionList";
-import { pressable, listItem } from "../../ux/motion/variants";
+// Definimos variants inline para no agregar archivos externos
+const pressable = {
+  initial: { scale: 1, opacity: 1 },
+  hover: { scale: 1.02, opacity: 0.95 },
+  tap: { scale: 0.98 },
+};
+
+const listItem = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+};
+
+const cardVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
+  hover: { scale: 1.01, boxShadow: "0 4px 20px rgba(255,255,255,0.1)" },
+  tap: { scale: 0.99 },
+};
+
+const progressVariants = {
+  initial: { width: 0 },
+  animate: { width: (pct) => `${pct}%`, transition: { duration: 0.6, ease: "easeOut" } },
+};
 
 /* ======================
    Constantes / helpers
@@ -91,19 +112,29 @@ const EstadoBadge = memo(function EstadoBadge({ estado }) {
   const cls = ESTILO_ESTADO[estado] || "bg-white/10 text-white/80";
   const label = ESTADO_LABEL[estado] || estado || "-";
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[12px] md:text-[11px] rounded-lg ${cls}`}>
+    <motion.span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs sm:text-[12px] rounded-lg ${cls}`}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2 }}
+    >
       <span className="inline-block h-2 w-2 rounded-full bg-current/80" />
       {label}
-    </span>
+    </motion.span>
   );
 });
 
 const Chip = memo(function Chip({ children, icon: Icon }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] md:text-[11px] rounded-lg bg-white/10 text-white/80 border border-white/10">
-      {Icon ? <Icon className="opacity-80 text-base md:text-sm" /> : null}
+    <motion.span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs sm:text-[12px] rounded-lg bg-white/10 text-white/80 border border-white/10"
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      {Icon ? <Icon className="opacity-80 text-base sm:text-sm" /> : null}
       {children}
-    </span>
+    </motion.span>
   );
 });
 
@@ -126,14 +157,12 @@ function useProgressive(items, enabled) {
       });
     };
 
-    // sube de a poco cuando el navegador está libre
     const tick = () => {
       step();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (limit < items.length) rafRef.current = requestAnimationFrame(tick);
+      rafRef.current = requestAnimationFrame(tick);
     };
 
-    // arrancar luego de pintar algo
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
@@ -157,30 +186,7 @@ export default function SolicitudesList({
   onToggleTarea,
   onTerminar,
 }) {
-  if (loading && !refreshing) return <SkeletonList />;
-
-  if (!items?.length) {
-    return (
-      <div className="mt-8 grid place-items-center text-center text-white/70">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-6 md:p-8">
-          <p className="text-sm md:text-base">No hay solicitudes para mostrar.</p>
-          <motion.button
-            type="button"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 border border-white/10 px-4 py-3 md:px-4 md:py-2.5 text-white text-sm md:text-[13px]"
-            onClick={() => onRefrescar?.()}
-            variants={pressable}
-            initial="initial"
-            whileHover="hover"
-            whileTap="tap"
-          >
-            Recargar
-          </motion.button>
-        </div>
-      </div>
-    );
-  }
-
-  // highlight: una sola vez, NO por card
+  // ✅ Hooks SIEMPRE arriba (para evitar "Rendered more hooks...")
   const highlightId = useMemo(() => {
     const hash = typeof window !== "undefined" ? window.location.hash?.replace(/^#/, "") : "";
     if (!hash) return null;
@@ -188,7 +194,6 @@ export default function SolicitudesList({
     return id || null;
   }, []);
 
-  // Precompute liviano para evitar trabajo repetido en cada render
   const prepared = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
     return arr.map((s) => {
@@ -215,36 +220,68 @@ export default function SolicitudesList({
     });
   }, [items, highlightId]);
 
-  // Si hay muchas cards: render progresivo + menos animación
   const bigList = prepared.length >= 60;
+
+  // ✅ custom hook SIEMPRE llamado (aunque prepared esté vacío)
   const shown = useProgressive(prepared, bigList);
+
+  // ✅ returns DESPUÉS de hooks
+  if (loading && !refreshing) return <SkeletonList />;
+
+  if (!items?.length) {
+    return (
+      <div className="mt-8 grid place-items-center text-center text-white/70">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-6 md:p-8">
+          <p className="text-sm md:text-base">No hay solicitudes para mostrar.</p>
+          <motion.button
+            type="button"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 border border-white/10 px-4 py-3 md:px-4 md:py-2.5 text-white text-sm md:text-[13px]"
+            onClick={() => onRefrescar?.()}
+            variants={pressable}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
+          >
+            Recargar
+          </motion.button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
       {refreshing ? (
         <div className="absolute -top-2 left-0 right-0 h-0.5 overflow-hidden">
-          <div className="h-full w-full bg-white/30 animate-[pulse_1.2s_ease-in-out_infinite]" />
+          <motion.div
+            className="h-full w-full bg-white/30"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          />
         </div>
       ) : null}
 
-      <MotionList as="div" className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 md:gap-5">
-        {shown.map((row) => (
-          <MotionListItem
-            as="div"
-            key={row.s.id}
-            className="min-w-0"
-            // en listas grandes, evitamos animación pesada
-            variants={bigList ? undefined : listItem}
-          >
-            <SolicitudCard
-              row={row}
-              onEliminar={onEliminar}
-              onToggleTarea={onToggleTarea}
-              onTerminar={onTerminar}
-            />
-          </MotionListItem>
-        ))}
-      </MotionList>
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+        initial="initial"
+        animate="animate"
+      >
+        <AnimatePresence>
+          {shown.map((row) => (
+            <motion.div
+              key={row.s.id}
+              className="min-w-0"
+              variants={listItem}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              layout
+            >
+              <SolicitudCard row={row} onEliminar={onEliminar} onToggleTarea={onToggleTarea} onTerminar={onTerminar} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
 
       {bigList && shown.length < prepared.length ? (
         <div className="mt-5 flex justify-center">
@@ -252,9 +289,6 @@ export default function SolicitudesList({
             type="button"
             className="inline-flex items-center gap-2 rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white text-sm"
             onClick={() => {
-              // “boost” manual: mostramos todo al toque si el usuario quiere
-              // (sin recalcular items)
-              // eslint-disable-next-line no-restricted-globals
               window.requestAnimationFrame?.(() => {});
             }}
             variants={pressable}
@@ -298,15 +332,19 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onToggleTar
     typeof onTerminar === "function" && s?.estado !== "TERMINADA" && tareas.alta_compania && tareas.enviar_poliza;
 
   return (
-    <div
+    <motion.div
       id={String(s?.id ?? "")}
       data-anchor={`sol-${String(s?.id ?? "")}`}
       className={`
         rounded-2xl border bg-white/[0.06]
         p-4 sm:p-5 text-white transition
-        min-h-[232px] md:min-h-[248px]
         ${flash ? "border-amber-300 ring-2 ring-amber-300/50" : "border-white/12 hover:border-white/20"}
       `}
+      variants={cardVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
@@ -314,24 +352,24 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onToggleTar
           <div className="flex items-center gap-2.5 flex-wrap">
             <EstadoBadge estado={s?.estado || "BORRADOR"} />
             <Chip icon={HiCollection}>#{s?.codigo || s?.id}</Chip>
-            {s?.poliza_fase ? <Chip icon={HiShieldCheck}>Póliza: {s.poliza_fase}</Chip> : null}
+            {s?.poliza_fase ? <Chip icon={HiShieldCheck} className="hidden sm:inline-flex">Póliza: {s.poliza_fase}</Chip> : null}
             {s?.cliente_estado ? (
-              <Chip icon={s.cliente_estado === "COMPLETO" ? HiCheckCircle : HiXCircle}>
+              <Chip icon={s.cliente_estado === "COMPLETO" ? HiCheckCircle : HiXCircle} className="hidden sm:inline-flex">
                 Cliente: {s.cliente_estado}
               </Chip>
             ) : null}
-            {oficinaLabel ? <Chip>Oficina: {oficinaLabel}</Chip> : null}
+            {oficinaLabel ? <Chip className="hidden sm:inline-flex">Oficina: {oficinaLabel}</Chip> : null}
           </div>
 
-          <div className="mt-2 text-[13px] md:text-sm text-white/85 truncate">
-            {s?.cliente_nombre || "—"} · {s?.vehiculo_marca || ""} {s?.vehiculo_modelo || ""}{" "}
-            {s?.vehiculo_anio || ""} · {s?.vehiculo_patente || ""}
+          <div className="mt-2 text-[13px] sm:text-sm text-white/85 truncate">
+            {s?.cliente_nombre || "—"} · {s?.vehiculo_marca || ""} {s?.vehiculo_modelo || ""} {s?.vehiculo_anio || ""} ·{" "}
+            {s?.vehiculo_patente || ""}
           </div>
         </div>
       </div>
 
       {/* Body */}
-      <div className="mt-3 grid grid-cols-2 gap-3 md:gap-2 text-[12.5px] md:text-xs text-white/75">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2 text-[12.5px] sm:text-xs text-white/75">
         <div className="flex items-center gap-2 min-w-0">
           <HiAdjustments className="opacity-80" />
           <span className="truncate">
@@ -357,7 +395,7 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onToggleTar
           </span>
         </div>
         {s?.estado === "VIGENTE_24H" ? (
-          <div className="flex items-center gap-2 col-span-2">
+          <div className="flex items-center gap-2 col-span-1 sm:col-span-2">
             <HiClock className="opacity-80" />
             <span className="truncate">
               <b>Vence:</b> {vence || "-"}
@@ -375,7 +413,12 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onToggleTar
           </span>
         </div>
         <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          <motion.div
+            className="h-full bg-emerald-400 rounded-full"
+            variants={progressVariants}
+            initial="initial"
+            animate="animate"
+          />
         </div>
 
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -398,7 +441,7 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onToggleTar
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {puedeTerminar ? (
           <MotionBtn onClick={() => onTerminar?.(s)} tone="ok" title="Marcar como terminada">
-            <HiCheck className="text-lg md:text-base" /> Marcar terminada
+            <HiCheck className="text-lg sm:text-base" /> Marcar terminada
           </MotionBtn>
         ) : (
           <div className="hidden sm:block" />
@@ -413,10 +456,10 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onToggleTar
           title="Eliminar solicitud"
           disabled={!puedeEliminar}
         >
-          <HiTrash className="text-lg md:text-base" /> Eliminar
+          <HiTrash className="text-lg sm:text-base" /> Eliminar
         </MotionBtn>
       </div>
-    </div>
+    </motion.div>
   );
 });
 
@@ -462,7 +505,7 @@ function MotionBtn({ children, onClick, title, tone = "neutral", disabled }) {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full inline-flex items-center justify-center gap-2 rounded-lg text-[13px] px-4 py-3 md:px-3 md:py-2 h-12 md:h-10 ${
+      className={`w-full inline-flex items-center justify-center gap-2 rounded-lg text-[13px] px-4 py-3 sm:px-3 sm:py-2 h-12 sm:h-10 ${
         palettes[tone]
       } disabled:opacity-50 disabled:cursor-not-allowed`}
       title={title}
@@ -479,15 +522,18 @@ function MotionBtn({ children, onClick, title, tone = "neutral", disabled }) {
 function SkeletonList() {
   const arr = Array.from({ length: 6 });
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 md:gap-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
       {arr.map((_, i) => (
-        <div
+        <motion.div
           key={i}
-          className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 sm:p-5 animate-pulse min-h-[232px] md:min-h-[248px]"
+          className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 sm:p-5 animate-pulse min-h-[232px] sm:min-h-[248px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: i * 0.1 }}
         >
           <div className="h-5 w-1/3 bg-white/10 rounded mb-3" />
           <div className="h-4 w-2/3 bg-white/10 rounded mb-4" />
-          <div className="grid grid-cols-2 gap-3 md:gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
             <div className="h-4 bg-white/10 rounded" />
             <div className="h-4 bg-white/10 rounded" />
             <div className="h-4 bg-white/10 rounded" />
@@ -502,7 +548,7 @@ function SkeletonList() {
             <div className="h-12 bg-white/10 rounded-lg" />
             <div className="h-12 bg-white/10 rounded-lg" />
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );

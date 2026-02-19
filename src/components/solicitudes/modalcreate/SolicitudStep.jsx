@@ -1,5 +1,25 @@
 // src/components/solicitudes/modalcreate/SolicitudStep.jsx
 import { HiUser } from "react-icons/hi";
+import { motion } from "framer-motion";
+
+// Definimos variants inline para animaciones profesionales
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const inputVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
 
 /**
  * Paso 4: Datos de la Solicitud
@@ -17,13 +37,18 @@ export default function SolicitudStep({
   setSolicitud = () => {},
 }) {
   return (
-    <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 md:p-4">
-      <legend className="px-1 text-white/85 text-sm">Solicitud</legend>
+    <motion.fieldset
+      className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4"
+      variants={sectionVariants}
+      initial="initial"
+      animate="animate"
+    >
+      <legend className="px-1 text-white/85 text-xs sm:text-sm">Solicitud</legend>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         {/* Responsable */}
-        <div className="space-y-1.5">
-          <span className="block text-white/80 text-sm">Responsable</span>
+        <motion.div className="space-y-1.5" variants={inputVariants} initial="initial" animate="animate">
+          <span className="block text-white/80 text-xs sm:text-sm">Responsable</span>
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border border-white/15 text-white/90 bg-white/5">
               <HiUser className="opacity-80" />
@@ -31,7 +56,7 @@ export default function SolicitudStep({
                 {responsableNombre || "—"}
               </span>
             </span>
-            <button
+            <motion.button
               type="button"
               onClick={onCambiarResponsable}
               className="
@@ -42,11 +67,15 @@ export default function SolicitudStep({
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
               "
               title="Cambiar responsable"
+              variants={buttonVariants}
+              initial="initial"
+              whileHover="hover"
+              whileTap="tap"
             >
               Cambiar
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Prioridad */}
         <Select
@@ -65,17 +94,24 @@ export default function SolicitudStep({
           label="Observaciones"
           value={solicitud.observaciones || ""}
           onChange={(v) => setSolicitud((s) => ({ ...s, observaciones: v }))}
-          className="md:col-span-2"
+          className="sm:col-span-2"
         />
       </div>
-    </fieldset>
+    </motion.fieldset>
   );
 }
 
 /* ============== UI Bits locales (estilo oscuro consistente) ============== */
 function Textarea({ label, value, onChange, className = "" }) {
   return (
-    <label className={`text-sm ${className}`}>
+    <motion.label
+      className={`text-xs sm:text-sm ${className}`}
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span className="block text-white/85 mb-1">{label}</span>
       <textarea
         rows={4}
@@ -83,7 +119,7 @@ function Textarea({ label, value, onChange, className = "" }) {
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-3 outline-none focus:ring-4 ring-rose-200/30 text-white placeholder:text-white/40 transition"
       />
-    </label>
+    </motion.label>
   );
 }
 
@@ -92,7 +128,14 @@ function Select({ label, value, onChange, options = [], className = "" }) {
     ? options.map((op) => (typeof op === "string" ? { id: op, nombre: op } : op))
     : [];
   return (
-    <label className={`text-sm ${className}`}>
+    <motion.label
+      className={`text-xs sm:text-sm ${className}`}
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span className="block text-white/85 mb-1">{label}</span>
       <div className="relative">
         <select
@@ -113,6 +156,6 @@ function Select({ label, value, onChange, options = [], className = "" }) {
           ▾
         </span>
       </div>
-    </label>
+    </motion.label>
   );
 }

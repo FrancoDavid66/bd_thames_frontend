@@ -17,8 +17,33 @@ import {
 } from "react-icons/hi";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { motion } from "framer-motion";
 import { generateSolicitudPDF } from "../../utils/solicitudPdf";
 import { solicitudesApi } from "../../services/solicitudes";
+
+// Definimos variants inline para animaciones profesionales
+const cardVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+  hover: { scale: 1.02, transition: { duration: 0.2 } },
+  tap: { scale: 0.98 },
+};
+
+const expandVariants = {
+  collapsed: { height: 0, opacity: 0 },
+  expanded: { height: "auto", opacity: 1, transition: { duration: 0.3, ease: "easeOut" } },
+};
+
+const buttonVariants = {
+  initial: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const dropdownVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: -10 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.2 } },
+};
 
 /* --------- Estilos de tarjeta según estado ---------- */
 const cardClassesByStatus = ({ asignada, terminada }) => {
@@ -51,12 +76,15 @@ function SmallBadge({ tone = "neutral", children, title }) {
     neutral: "bg-white/10 text-white/80 border-white/20",
   };
   return (
-    <span
-      className={`text-[11px] leading-none px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${tones[tone]}`}
+    <motion.span
+      className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${tones[tone]}`}
       title={title}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2 }}
     >
       {children}
-    </span>
+    </motion.span>
   );
 }
 
@@ -150,14 +178,14 @@ function ResponsableSelect({
   };
 
   const baseBtn =
-    "relative w-full sm:w-56 h-10 text-left inline-flex items-center justify-between gap-2 px-3 rounded-xl border " +
-    "bg-white/10 border-white/10 text-xs sm:text-sm text-white hover:bg-white/20 " +
+    "relative w-full h-10 sm:h-11 text-left inline-flex items-center justify-between gap-2 px-3 rounded-xl border " +
+    "bg-white/10 border-white/10 text-white hover:bg-white/20 " +
     "focus:outline-none focus:ring-2 focus:ring-white/30 " +
-    "disabled:opacity-50 disabled:cursor-not-allowed";
+    "disabled:opacity-50 disabled:cursor-not-allowed text-sm";
 
   return (
-    <div className="relative w-full sm:w-auto" ref={ref}>
-      <button
+    <div className="relative w-full" ref={ref}>
+      <motion.button
         type="button"
         className={baseBtn}
         onClick={() => {
@@ -168,18 +196,25 @@ function ResponsableSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         title={loading ? "Cargando…" : "Seleccionar responsable"}
+        variants={buttonVariants}
+        initial="initial"
+        whileHover="hover"
+        whileTap="tap"
       >
         <span className={`truncate ${selected ? "text-white" : "text-white/70"}`}>
           {placeholderText}
         </span>
         <HiChevronDown className={`transition ${open ? "rotate-180" : ""}`} />
-      </button>
+      </motion.button>
 
       {open && (
-        <div
-          className="absolute z-30 mt-1 min-w-full sm:w-56 max-h-64 overflow-auto rounded-xl border border-white/10 bg-[#111827] shadow-xl shadow-black/30"
+        <motion.div
+          className="absolute z-30 mt-1 w-full max-h-64 overflow-auto rounded-xl border border-white/10 bg-[#111827] shadow-xl shadow-black/30"
           role="listbox"
           tabIndex={-1}
+          variants={dropdownVariants}
+          initial="hidden"
+          animate="visible"
         >
           {items.length === 0 ? (
             <div className="px-3 py-2 text-sm text-white/70">Sin responsables</div>
@@ -188,7 +223,7 @@ function ResponsableSelect({
               const isSel = String(emp.id) === String(value);
               const isHi = idx === highlight;
               return (
-                <button
+                <motion.button
                   key={emp.id}
                   type="button"
                   onMouseEnter={() => setHighlight(idx)}
@@ -196,19 +231,20 @@ function ResponsableSelect({
                     onChange(String(emp.id));
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 text-xs sm:text-sm transition
+                  className={`w-full text-left px-3 py-2 text-sm transition
                     ${isSel ? "bg-white/20 text-white" : "text-white/90"}
                     ${isHi && !isSel ? "bg-white/10" : ""}
                     hover:bg-white/15`}
                   role="option"
                   aria-selected={isSel}
+                  whileHover={{ backgroundColor: "rgba(255,255,255,0.15)" }}
                 >
                   {emp.nombre}
-                </button>
+                </motion.button>
               );
             })
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );
@@ -354,20 +390,25 @@ export default function SolicitudCard({
   const polizaTone = polizaFase === "DEFINITIVA" ? "success" : "info";
 
   return (
-    <div
-      className={`rounded-2xl border transition-colors ${cardClassesByStatus({
+    <motion.div
+      className={`rounded-2xl border p-3 sm:p-4 transition-colors ${cardClassesByStatus({
         asignada: isAsignada,
         terminada: isTerminada,
       })}`}
+      variants={cardVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
     >
       {/* HEADER */}
-      <div className="px-4 py-3 flex items-start gap-3">
+      <div className="flex items-start gap-3">
         {/* Asegurado */}
         <div className="min-w-0 flex-1">
-          <div className="text-white font-semibold truncate">
+          <div className="text-white font-semibold truncate text-sm sm:text-base">
             {s?.cliente_nombre || "—"}
           </div>
-          <div className="text-white/70 text-xs sm:text-sm truncate">
+          <div className="text-white/70 text-xs truncate">
             {s?.vehiculo_marca || "—"} {s?.vehiculo_modelo || ""} ·{" "}
             {s?.vehiculo_patente || "—"}
           </div>
@@ -394,26 +435,34 @@ export default function SolicitudCard({
         </div>
 
         {/* Toggle */}
-        <button
+        <motion.button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           title={expanded ? "Ocultar detalles" : "Ver detalles"}
           className="
             shrink-0 inline-flex items-center justify-center
-            w-9 h-9 rounded-xl bg-white/10 border border-white/10 text-white
+            w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/10 border border-white/10 text-white
             hover:bg-white/20 transition
           "
+          variants={buttonVariants}
+          whileHover="hover"
+          whileTap="tap"
         >
           <HiChevronDown className={`transition ${expanded ? "rotate-180" : ""}`} />
-        </button>
+        </motion.button>
       </div>
 
       {/* CONTENIDO EXPANDIDO */}
-      {expanded && (
-        <div className="px-4 pb-4">
+      <motion.div
+        variants={expandVariants}
+        initial="collapsed"
+        animate={expanded ? "expanded" : "collapsed"}
+        className="overflow-hidden"
+      >
+        <div className="mt-3">
           {/* Teléfono + estado + responsable (mobile) */}
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 sm:hidden">
             <div className="min-w-0">
               {s?.telefono ? (
                 <div className="text-white/70 text-xs flex items-center gap-1">
@@ -422,7 +471,7 @@ export default function SolicitudCard({
               ) : null}
             </div>
 
-            <div className="flex flex-col items-end gap-1 sm:hidden">
+            <div className="flex flex-col items-end gap-1">
               {badge && (
                 <span className={`text-xs px-2 py-1 rounded-lg border ${badge.cls}`}>
                   {badge.label}
@@ -562,8 +611,8 @@ export default function SolicitudCard({
             </Btn>
           </div>
         </div>
-      )}
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -580,7 +629,7 @@ function Btn({
   className = "",
 }) {
   const base =
-    "inline-flex items-center gap-2 px-3 py-2 h-10 rounded-xl border text-xs sm:text-sm transition whitespace-nowrap";
+    "inline-flex items-center gap-2 px-3 py-2 h-10 sm:h-11 rounded-xl border text-xs sm:text-sm transition whitespace-nowrap";
   const tones = {
     default: "bg-white/10 border-white/10 hover:bg-white/20 text-white",
     danger: "bg-red-500/20 border-red-500/30 hover:bg-red-500/30 text-red-50",
@@ -588,7 +637,7 @@ function Btn({
   const cn = `${base} ${tones[tone]} disabled:opacity-50 disabled:cursor-not-allowed ${className}`;
   if (as === "a") {
     return (
-      <a
+      <motion.a
         className={cn}
         href={disabled ? undefined : href}
         target={target}
@@ -596,14 +645,28 @@ function Btn({
         aria-disabled={disabled}
         title={title}
         onClick={(e) => disabled && e.preventDefault()}
+        variants={buttonVariants}
+        initial="initial"
+        whileHover="hover"
+        whileTap="tap"
       >
         {children}
-      </a>
+      </motion.a>
     );
   }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cn}>
+    <motion.button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn}
+      variants={buttonVariants}
+      initial="initial"
+      whileHover="hover"
+      whileTap="tap"
+    >
       {children}
-    </button>
+    </motion.button>
   );
 }

@@ -2,6 +2,19 @@
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 
+// Definimos variants inline para animaciones profesionales
+const sectionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
+};
+
+const inputVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
 /**
  * Props:
  * - poliza, setPoliza
@@ -205,8 +218,13 @@ export default function PolizaStep({
       exit="exit"
       className="space-y-3"
     >
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4">
-        <legend className="px-1 text-white/85 text-sm">Póliza</legend>
+      <motion.fieldset
+        className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4"
+        variants={sectionVariants}
+        initial="initial"
+        animate="animate"
+      >
+        <legend className="px-1 text-white/85 text-xs sm:text-sm">Póliza</legend>
 
         {/* Datos principales: 1 col en mobile, 2 en sm+ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -241,7 +259,14 @@ export default function PolizaStep({
         </div>
 
         {/* Reglas dinámicas por cobertura (guía) */}
-        <div className="mt-3 rounded-xl border border-white/10 p-3 sm:p-4 bg-white/[.05]">
+        <motion.div
+          className="mt-3 rounded-xl border border-white/10 p-3 sm:p-4 bg-white/[.05]"
+          variants={inputVariants}
+          initial="initial"
+          animate="animate"
+          whileHover="hover"
+          whileTap="tap"
+        >
           <div
             className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] sm:text-xs font-medium text-[#0b0f1e] bg-gradient-to-br ${requisitos.color} mb-2`}
           >
@@ -255,7 +280,7 @@ export default function PolizaStep({
           {requisitos.note ? (
             <p className="mt-2 text-white/70 text-xs">{requisitos.note}</p>
           ) : null}
-        </div>
+        </motion.div>
 
         {/* Datos del vehículo + fechas: responsive */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
@@ -337,7 +362,7 @@ export default function PolizaStep({
             inputMode="numeric"
           />
         </div>
-      </fieldset>
+      </motion.fieldset>
     </motion.div>
   );
 }
@@ -345,7 +370,14 @@ export default function PolizaStep({
 /* ===================== UI bits ===================== */
 function Toggle({ label, checked, onChange }) {
   return (
-    <label className="inline-flex items-center gap-3 text-white/90">
+    <motion.label
+      className="inline-flex items-center gap-3 text-white/90"
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span>{label}</span>
       <button
         type="button"
@@ -360,7 +392,7 @@ function Toggle({ label, checked, onChange }) {
           }`}
         />
       </button>
-    </label>
+    </motion.label>
   );
 }
 
@@ -378,7 +410,14 @@ function Input({
   pattern,
 }) {
   return (
-    <label className={`text-sm ${className}`}>
+    <motion.label
+      className={`text-xs sm:text-sm ${className}`}
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span className="block text-white/85 mb-1">{label}</span>
       <input
         type={type}
@@ -389,12 +428,12 @@ function Input({
         autoCapitalize={autoCapitalize}
         pattern={pattern}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 sm:py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
       />
       {helper ? (
         <span className="mt-1 block text-xs text-white/65">{helper}</span>
       ) : null}
-    </label>
+    </motion.label>
   );
 }
 
@@ -405,13 +444,20 @@ function Select({ label, value, onChange, options = [], className = "" }) {
       )
     : [];
   return (
-    <label className={`text-sm ${className}`}>
+    <motion.label
+      className={`text-xs sm:text-sm ${className}`}
+      variants={inputVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+      whileTap="tap"
+    >
       <span className="block text-white/85 mb-1">{label}</span>
       <div className="relative">
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-xl border border-white/10 px-3 py-2.5 md:py-3 pr-9 outline-none focus:ring-4 ring-violet-200/30 text-white appearance-none transition"
+          className="w-full rounded-xl border border-white/10 px-3 py-2 sm:py-2.5 md:py-3 pr-9 outline-none focus:ring-4 ring-violet-200/30 text-white appearance-none transition"
           style={{ backgroundColor: "#141827" }}
           data-theme="dark"
         >
@@ -430,6 +476,6 @@ function Select({ label, value, onChange, options = [], className = "" }) {
           ▾
         </span>
       </div>
-    </label>
+    </motion.label>
   );
 }
