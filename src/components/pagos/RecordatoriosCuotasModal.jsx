@@ -25,6 +25,9 @@ function proveedorLabel(proveedor) {
   return "Otro";
 }
 
+const LS_KEY = "pagos_recordatorios_oficina";
+const isValidOfi = (v) => v === "1" || v === "2" || v === "3";
+
 export default function RecordatoriosCuotasModal({
   isOpen,
   onClose,
@@ -50,13 +53,13 @@ export default function RecordatoriosCuotasModal({
 
   const [selectedId, setSelectedId] = useState(null);
 
-  // Oficina desde la que se envían los mensajes (1 = 5 esquinas, 2 = Axion)
-  const [oficinaSeleccionada, setOficinaSeleccionada] = useState("");
+  // ✅ Oficina obligatoria (persistida)
+  const [oficinaSeleccionada, setOficinaSeleccionada] = useState("2");
 
   // Formulario CRUD
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
-    proveedor: "mercado_pago", // tipo de billetera
+    proveedor: "mercado_pago",
     aliasCbu: "",
     titular: "",
   });
@@ -72,31 +75,58 @@ export default function RecordatoriosCuotasModal({
     });
   };
 
-  // Al abrir, preseleccionamos el primero disponible y reseteamos oficina
+  // ✅ Al abrir: preselecciona medio + oficina (desde localStorage o default "2")
   useEffect(() => {
-    if (isOpen) {
-      const first = mediosAptos[0];
-      setSelectedId(first ? first.id : null);
-      setOficinaSeleccionada("");
-      resetForm();
+    if (!isOpen) return;
+
+    const first = mediosAptos[0];
+    setSelectedId(first ? first.id : null);
+
+    let saved = "";
+    try {
+      saved = String(window?.localStorage?.getItem(LS_KEY) || "").trim();
+    } catch {
+      saved = "";
     }
+    setOficinaSeleccionada(isValidOfi(saved) ? saved : "2");
+
+    resetForm();
   }, [isOpen, mediosAptos]);
+
+  const setOfi = (v) => {
+    const next = String(v || "").trim();
+    if (!isValidOfi(next)) return;
+    setOficinaSeleccionada(next);
+    try {
+      window?.localStorage?.setItem(LS_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
 
   const handleConfirm = async () => {
     if (!onEnviar) return;
-    if (!oficinaSeleccionada) {
-      toast.error("Seleccioná una oficina para enviar los mensajes.");
+
+    const ofi = String(oficinaSeleccionada || "").trim();
+    if (!isValidOfi(ofi)) {
+      toast.error("Seleccioná una oficina (1, 2 o 3).");
       return;
     }
 
     try {
-      const result = await onEnviar(selectedId || null, oficinaSeleccionada);
+      const result = await onEnviar(selectedId || null, ofi);
 
-      // ✅ Backend devuelve mensajes_enviados / cuotas_procesadas
       const enviados =
-        result?.mensajes_enviados ?? result?.enviados ?? result?.mensajesEnviados ?? 0;
+        result?.mensajes_enviados ??
+        result?.enviados ??
+        result?.mensajesEnviados ??
+        0;
+
       const procesadas =
-        result?.cuotas_procesadas ?? result?.procesadas ?? result?.cuotasProcesadas ?? 0;
+        result?.cuotas_procesadas ??
+        result?.procesadas ??
+        result?.cuotasProcesadas ??
+        0;
 
       const errores = result?.errores || [];
       const erroresCount = Array.isArray(errores) ? errores.length : 0;
@@ -115,7 +145,9 @@ export default function RecordatoriosCuotasModal({
   };
 
   const canConfirm =
-    !sending && !!oficinaSeleccionada && (selectedId || mediosAptos.length === 0);
+    !sending &&
+    isValidOfi(String(oficinaSeleccionada || "").trim()) &&
+    (selectedId || mediosAptos.length === 0);
 
   const handleEditClick = (medio) => {
     setEditingId(medio.id);
@@ -140,8 +172,8 @@ export default function RecordatoriosCuotasModal({
       setSaving(true);
 
       const payload = {
-        proveedor, // "mercado_pago" | "billetera_virtual"
-        valor: aliasCbu, // alias o CBU
+        proveedor,
+        valor: aliasCbu,
         titular_nombre: titular,
         activo: true,
       };
@@ -157,13 +189,9 @@ export default function RecordatoriosCuotasModal({
         toast.success("Billetera creada");
       }
 
-      // Refrescamos la lista global
       dispatch(fetchMediosCobro({ activo: true }));
 
-      // Seleccionamos la nueva/actualizada
-      if (data?.id) {
-        setSelectedId(data.id);
-      }
+      if (data?.id) setSelectedId(data.id);
 
       resetForm();
     } catch (err) {
@@ -187,12 +215,8 @@ export default function RecordatoriosCuotasModal({
       toast.success("Billetera eliminada");
       dispatch(fetchMediosCobro({ activo: true }));
 
-      if (selectedId === medio.id) {
-        setSelectedId(null);
-      }
-      if (editingId === medio.id) {
-        resetForm();
-      }
+      if (selectedId === medio.id) setSelectedId(null);
+      if (editingId === medio.id) resetForm();
     } catch (err) {
       console.error("[PAGOS][MediosCobro] Error al eliminar:", err);
       toast.error("No se pudo eliminar la billetera");
@@ -208,7 +232,6 @@ export default function RecordatoriosCuotasModal({
         className="relative z-50"
         onClose={sending ? () => {} : onClose}
       >
-        {/* overlay */}
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-150"
@@ -221,7 +244,6 @@ export default function RecordatoriosCuotasModal({
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
         </Transition.Child>
 
-        {/* panel */}
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
             <Transition.Child
@@ -234,7 +256,6 @@ export default function RecordatoriosCuotasModal({
               leaveTo="opacity-0 translate-y-2 scale-95"
             >
               <Dialog.Panel className="w-full max-w-lg rounded-3xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800/80 text-white shadow-2xl">
-                {/* header */}
                 <div className="relative px-6 pt-6 pb-4 border-b border-neutral-800">
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
@@ -245,8 +266,7 @@ export default function RecordatoriosCuotasModal({
                         Enviar recordatorios de cuotas
                       </Dialog.Title>
                       <p className="mt-1 text-xs text-neutral-300">
-                        Elegí y gestioná las billeteras/alias que se van a mostrar como
-                        medio de pago por transferencia en el WhatsApp.
+                        Elegí la billetera/alias y la oficina. En producción es obligatorio enviar por oficina.
                       </p>
                     </div>
                   </div>
@@ -256,12 +276,12 @@ export default function RecordatoriosCuotasModal({
                     className="absolute right-4 top-4 rounded-full p-2 hover:bg-neutral-900 border border-neutral-800/80"
                     aria-label="Cerrar"
                     title="Cerrar"
+                    disabled={sending}
                   >
                     <HiX className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* body */}
                 <div className="px-6 py-5 space-y-4">
                   {/* Form CRUD */}
                   <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 space-y-3">
@@ -282,7 +302,6 @@ export default function RecordatoriosCuotasModal({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Tipo de billetera */}
                       <div className="flex flex-col gap-1">
                         <label className="text-[11px] text-neutral-300">
                           Tipo de billetera
@@ -299,7 +318,6 @@ export default function RecordatoriosCuotasModal({
                         </select>
                       </div>
 
-                      {/* Alias / CBU */}
                       <div className="flex flex-col gap-1">
                         <label className="text-[11px] text-neutral-300">
                           Alias o CBU
@@ -315,7 +333,6 @@ export default function RecordatoriosCuotasModal({
                         />
                       </div>
 
-                      {/* Titular */}
                       <div className="flex flex-col gap-1">
                         <label className="text-[11px] text-neutral-300">
                           Nombre de la persona
@@ -358,15 +375,13 @@ export default function RecordatoriosCuotasModal({
                         No tenés alias ni billeteras configuradas para recordatorios.
                       </p>
                       <p className="text-xs text-neutral-300">
-                        Usá el cuadro de arriba para cargar tu primera billetera. Luego
-                        elegila para que aparezca en el WhatsApp.
+                        Usá el cuadro de arriba para cargar tu primera billetera.
                       </p>
                     </div>
                   ) : (
                     <>
                       <p className="text-xs text-neutral-300">
-                        Elegí cuál de estas billeteras/alias se va a incluir en el mensaje
-                        como medio de pago por transferencia.
+                        Elegí cuál billetera/alias se va a incluir en el mensaje.
                       </p>
 
                       <div className="space-y-2">
@@ -427,7 +442,6 @@ export default function RecordatoriosCuotasModal({
                               </div>
 
                               <div className="flex items-center gap-2">
-                                {/* Botones editar/eliminar */}
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -454,7 +468,6 @@ export default function RecordatoriosCuotasModal({
                                   )}
                                 </button>
 
-                                {/* Radio de selección */}
                                 <div
                                   className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                                     isSelected
@@ -474,7 +487,7 @@ export default function RecordatoriosCuotasModal({
                     </>
                   )}
 
-                  {/* Selección de oficina */}
+                  {/* Oficina */}
                   <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 space-y-2">
                     <p className="text-xs text-neutral-200 font-medium">
                       ¿Desde qué oficina se envían los mensajes?
@@ -482,7 +495,7 @@ export default function RecordatoriosCuotasModal({
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         type="button"
-                        onClick={() => setOficinaSeleccionada("1")}
+                        onClick={() => setOfi("1")}
                         className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
                           oficinaSeleccionada === "1"
                             ? "border-emerald-400 bg-emerald-500/20 text-emerald-100"
@@ -491,9 +504,10 @@ export default function RecordatoriosCuotasModal({
                       >
                         <span>Oficina 1 – 5 esquinas</span>
                       </button>
+
                       <button
                         type="button"
-                        onClick={() => setOficinaSeleccionada("2")}
+                        onClick={() => setOfi("2")}
                         className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
                           oficinaSeleccionada === "2"
                             ? "border-emerald-400 bg-emerald-500/20 text-emerald-100"
@@ -502,9 +516,10 @@ export default function RecordatoriosCuotasModal({
                       >
                         <span>Oficina 2 – Axion</span>
                       </button>
+
                       <button
                         type="button"
-                        onClick={() => setOficinaSeleccionada("3")}
+                        onClick={() => setOfi("3")}
                         className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
                           oficinaSeleccionada === "3"
                             ? "border-emerald-400 bg-emerald-500/20 text-emerald-100"
@@ -514,20 +529,21 @@ export default function RecordatoriosCuotasModal({
                         <span>Oficina 3 – Km 39</span>
                       </button>
                     </div>
+                    <div className="text-[11px] text-neutral-400">
+                      Seleccionada: <span className="text-neutral-200 font-semibold">{oficinaSeleccionada}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* footer */}
                 <div className="px-6 pb-5 pt-2 flex items-center justify-between gap-3 border-t border-neutral-800">
                   <p className="text-[11px] text-neutral-400 max-w-xs">
-                    Se enviará un solo WhatsApp por cliente agrupando sus cuotas.
-                    El alias elegido y la oficina seleccionada se usan en el mensaje.
+                    Se enviará un WhatsApp por cliente agrupando cuotas. En producción siempre se envía por oficina.
                   </p>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={onClose}
-                      disabled={saving && sending}
+                      disabled={sending}
                       className="h-10 px-4 rounded-2xl bg-neutral-900 border border-neutral-700 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
                     >
                       Cancelar
