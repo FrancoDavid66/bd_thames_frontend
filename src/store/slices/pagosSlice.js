@@ -393,14 +393,27 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
   async (payload, { rejectWithValue }) => {
     try {
+      // ✅ IMPORTANTE: async:false por defecto para recibir contadores reales
+      const asyncFlag =
+        payload?.async === undefined || payload?.async === null
+          ? false
+          : Boolean(payload?.async);
+
       const body = compact({
         alias: payload?.alias,
         alias_transferencia: payload?.alias_transferencia,
         medio_cobro_id: payload?.medio_cobro_id,
         oficina: payload?.oficina,
+
+        // ✅ nuevo
+        async: asyncFlag,
       });
 
-      const { data } = await axios.post(API("notificaciones/cuotas/recordatorios/"), body);
+      const { data } = await axios.post(
+        API("notificaciones/cuotas/recordatorios/"),
+        body,
+        { timeout: 60000 }
+      );
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al enviar recordatorios");
@@ -1078,6 +1091,9 @@ const initialState = {
   recordatoriosStatus: "idle",
   recordatoriosError: null,
 
+  // ✅ NUEVO: último resultado del envío (para mostrar contadores en UI)
+  recordatoriosLast: null,
+
   historialRecordatorios: [],
   historialRecordatoriosStatus: "idle",
   historialRecordatoriosError: null,
@@ -1551,13 +1567,16 @@ const pagosSlice = createSlice({
       .addCase(enviarRecordatoriosCuotas.pending, (state) => {
         state.recordatoriosStatus = "loading";
         state.recordatoriosError = null;
+        state.recordatoriosLast = null; // ✅ limpiar
       })
-      .addCase(enviarRecordatoriosCuotas.fulfilled, (state) => {
+      .addCase(enviarRecordatoriosCuotas.fulfilled, (state, action) => {
         state.recordatoriosStatus = "succeeded";
+        state.recordatoriosLast = action.payload || null; // ✅ guardar contadores
       })
       .addCase(enviarRecordatoriosCuotas.rejected, (state, action) => {
         state.recordatoriosStatus = "failed";
         state.recordatoriosError = action.payload;
+        state.recordatoriosLast = null;
       })
 
       // --- Historial recordatorios ---
