@@ -9,6 +9,9 @@ import {
   HiPencil,
   HiTrash,
   HiPlus,
+  HiExclamation,
+  HiCheckCircle,
+  HiClock,
 } from "react-icons/hi";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
@@ -28,12 +31,62 @@ function proveedorLabel(proveedor) {
 const LS_KEY = "pagos_recordatorios_oficina";
 const isValidOfi = (v) => v === "1" || v === "2" || v === "3";
 
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function pickFirst(obj, keys, fallback) {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+  }
+  return fallback;
+}
+
+function normalizeDeltaMap(m) {
+  if (!m || typeof m !== "object") return {};
+  const out = {};
+  for (const [k, v] of Object.entries(m)) {
+    const kk = Number(k);
+    if (!Number.isFinite(kk)) continue;
+    out[kk] = safeNum(v, 0);
+  }
+  return out;
+}
+
+function deltaLabel(delta) {
+  const d = Number(delta);
+  if (!Number.isFinite(d)) return String(delta);
+  if (d === 0) return "Vence hoy";
+  if (d > 0) return `Vence en ${d} día${d === 1 ? "" : "s"}`;
+  const a = Math.abs(d);
+  return `Venció hace ${a} día${a === 1 ? "" : "s"}`;
+}
+
+function ErrorPill({ children }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/10 px-2 py-1 text-[11px] text-red-200">
+      <HiExclamation className="w-3.5 h-3.5" />
+      {children}
+    </span>
+  );
+}
+
+function OkPill({ children }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">
+      <HiCheckCircle className="w-3.5 h-3.5" />
+      {children}
+    </span>
+  );
+}
+
 export default function RecordatoriosCuotasModal({
   isOpen,
   onClose,
   mediosCobro = [],
   sending = false,
-  // onEnviar(medio_cobro_id | null, oficina: "1" | "2" | "3") => {hoy, cuotas_procesadas, mensajes_enviados, errores}
+  // onEnviar(medio_cobro_id | null, oficina: "1" | "2" | "3") => payload backend
   onEnviar,
 }) {
   const dispatch = useDispatch();
@@ -66,6 +119,9 @@ export default function RecordatoriosCuotasModal({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  // ✅ resultado visible dentro del modal (debug)
+  const [lastResult, setLastResult] = useState(null);
+
   const resetForm = () => {
     setEditingId(null);
     setForm({
@@ -90,6 +146,7 @@ export default function RecordatoriosCuotasModal({
     }
     setOficinaSeleccionada(isValidOfi(saved) ? saved : "2");
 
+    setLastResult(null);
     resetForm();
   }, [isOpen, mediosAptos]);
 
@@ -116,20 +173,42 @@ export default function RecordatoriosCuotasModal({
     try {
       const result = await onEnviar(selectedId || null, ofi);
 
-      const enviados =
-        result?.mensajes_enviados ??
-        result?.enviados ??
-        result?.mensajesEnviados ??
-        0;
+      setLastResult(result || null);
 
-      const procesadas =
-        result?.cuotas_procesadas ??
-        result?.procesadas ??
-        result?.cuotasProcesadas ??
-        0;
+      const okFlag = result?.ok;
+      const asyncFlag = Boolean(result?.async);
 
-      const errores = result?.errores || [];
-      const erroresCount = Array.isArray(errores) ? errores.length : 0;
+      const enviados = safeNum(
+        pickFirst(result, ["mensajes_enviados", "enviados", "mensajesEnviados"], 0),
+        0
+      );
+      const procesadas = safeNum(
+        pickFirst(result, ["cuotas_procesadas", "procesadas", "cuotasProcesadas"], 0),
+        0
+      );
+
+      const errores = Array.isArray(result?.errores) ? result.errores : [];
+      const erroresCount = errores.length;
+
+      // Caso lock
+      const yaEnviado =
+        errores.some((e) => (e?.error || "").toString().toUpperCase() === "YA_ENVIADO_HOY") ||
+        (result?.error || "").toString().toUpperCase() === "YA_ENVIADO_HOY";
+
+      if (okFlag === false) {
+        toast.error(result?.error || "No se pudieron enviar los recordatorios.");
+        return;
+      }
+
+      if (yaEnviado) {
+        toast.success("Hoy ya se enviaron recordatorios para esa oficina (lock).");
+        return;
+      }
+
+      if (asyncFlag) {
+        toast.success("Envío en proceso (async).");
+        return;
+      }
 
       if (erroresCount > 0) {
         toast.success(
@@ -140,6 +219,7 @@ export default function RecordatoriosCuotasModal({
       }
     } catch (e) {
       console.error("[PAGOS][RecordatoriosCuotas] Error al enviar:", e);
+      setLastResult({ ok: false, error: "No se pudieron enviar los recordatorios.", raw: e });
       toast.error("No se pudieron enviar los recordatorios.");
     }
   };
@@ -225,6 +305,55 @@ export default function RecordatoriosCuotasModal({
     }
   };
 
+  // ---------- UI helpers del resultado ----------
+  const resultUi = useMemo(() => {
+    const r = lastResult;
+    if (!r) return null;
+
+    const okFlag = r?.ok;
+    const asyncFlag = Boolean(r?.async);
+    const jobId = r?.job_id ? String(r.job_id) : "";
+
+    const enviados = safeNum(pickFirst(r, ["mensajes_enviados", "enviados"], 0), 0);
+    const procesadas = safeNum(pickFirst(r, ["cuotas_procesadas", "procesadas"], 0), 0);
+    const tMs = safeNum(r?.t_ms, 0);
+
+    const errores = Array.isArray(r?.errores) ? r.errores : [];
+    const yaEnviado = errores.some(
+      (e) => (e?.error || "").toString().toUpperCase() === "YA_ENVIADO_HOY"
+    );
+
+    const candidatas = normalizeDeltaMap(r?.candidatas_por_delta);
+    const seleccionadas = normalizeDeltaMap(r?.seleccionadas_por_delta);
+
+    // union de keys para render
+    const deltaKeys = Array.from(
+      new Set([
+        ...Object.keys(candidatas).map((x) => Number(x)),
+        ...Object.keys(seleccionadas).map((x) => Number(x)),
+        ...(Array.isArray(r?.trigger_deltas) ? r.trigger_deltas.map((x) => Number(x)) : []),
+      ])
+    )
+      .filter((x) => Number.isFinite(x))
+      .sort((a, b) => b - a); // +3 arriba, -30 abajo
+
+    return {
+      okFlag,
+      asyncFlag,
+      jobId,
+      enviados,
+      procesadas,
+      tMs,
+      errores,
+      yaEnviado,
+      deltaKeys,
+      candidatas,
+      seleccionadas,
+      oficina: r?.oficina ? String(r.oficina) : "",
+      nota: r?.nota ? String(r.nota) : "",
+    };
+  }, [lastResult]);
+
   return (
     <Transition appear show={!!isOpen} as={Fragment}>
       <Dialog
@@ -283,6 +412,119 @@ export default function RecordatoriosCuotasModal({
                 </div>
 
                 <div className="px-6 py-5 space-y-4">
+                  {/* Resultado / Debug */}
+                  {resultUi && (
+                    <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="text-sm font-semibold flex items-center gap-2">
+                            Resultado del envío
+                            {resultUi.okFlag === false ? (
+                              <ErrorPill>Falló</ErrorPill>
+                            ) : resultUi.yaEnviado ? (
+                              <ErrorPill>Ya enviado hoy</ErrorPill>
+                            ) : resultUi.asyncFlag ? (
+                              <OkPill>Async</OkPill>
+                            ) : (
+                              <OkPill>OK</OkPill>
+                            )}
+                          </div>
+
+                          <div className="text-[12px] text-neutral-200">
+                            <span className="text-neutral-400">Oficina:</span>{" "}
+                            <span className="font-semibold">{resultUi.oficina || oficinaSeleccionada}</span>
+                            <span className="mx-2 text-neutral-600">•</span>
+                            <span className="text-neutral-400">Procesadas:</span>{" "}
+                            <span className="font-semibold">{resultUi.procesadas}</span>
+                            <span className="mx-2 text-neutral-600">•</span>
+                            <span className="text-neutral-400">Enviados:</span>{" "}
+                            <span className="font-semibold">{resultUi.enviados}</span>
+                          </div>
+
+                          <div className="text-[11px] text-neutral-400 flex items-center gap-2">
+                            <HiClock className="w-3.5 h-3.5" />
+                            <span>{resultUi.tMs ? `${resultUi.tMs} ms` : "—"}</span>
+                            {resultUi.jobId ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                <span className="truncate max-w-[14rem]">
+                                  job_id: {resultUi.jobId}
+                                </span>
+                              </>
+                            ) : null}
+                          </div>
+
+                          {resultUi.nota ? (
+                            <div className="text-[11px] text-neutral-300">
+                              {resultUi.nota}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setLastResult(null)}
+                          className="text-[11px] text-neutral-300 hover:text-neutral-100 border border-neutral-700 rounded-full px-2 py-1"
+                        >
+                          Ocultar
+                        </button>
+                      </div>
+
+                      {/* Deltas */}
+                      {resultUi.deltaKeys.length > 0 && (
+                        <div className="rounded-xl border border-neutral-800 bg-neutral-950/60 overflow-hidden">
+                          <div className="grid grid-cols-3 gap-0 text-[11px] text-neutral-300 border-b border-neutral-800">
+                            <div className="px-3 py-2 font-semibold">Delta</div>
+                            <div className="px-3 py-2 font-semibold">Candidatas</div>
+                            <div className="px-3 py-2 font-semibold">Seleccionadas</div>
+                          </div>
+                          {resultUi.deltaKeys.map((d) => (
+                            <div
+                              key={d}
+                              className="grid grid-cols-3 gap-0 text-[11px] text-neutral-200 border-b border-neutral-900/70 last:border-b-0"
+                            >
+                              <div className="px-3 py-2 text-neutral-300">{deltaLabel(d)}</div>
+                              <div className="px-3 py-2">{safeNum(resultUi.candidatas[d], 0)}</div>
+                              <div className="px-3 py-2">{safeNum(resultUi.seleccionadas[d], 0)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Errores */}
+                      {Array.isArray(resultUi.errores) && resultUi.errores.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-[11px] text-neutral-300 font-semibold">
+                            Errores ({resultUi.errores.length})
+                          </div>
+                          <div className="space-y-1">
+                            {resultUi.errores.slice(0, 8).map((e, idx) => (
+                              <div
+                                key={idx}
+                                className="text-[11px] text-neutral-200 rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1"
+                              >
+                                <span className="text-red-200 font-semibold">
+                                  {(e?.error || "ERROR").toString()}
+                                </span>
+                                {e?.hint ? (
+                                  <span className="text-neutral-300"> — {String(e.hint)}</span>
+                                ) : null}
+                                {e?.numero ? (
+                                  <span className="text-neutral-400"> — {String(e.numero)}</span>
+                                ) : null}
+                              </div>
+                            ))}
+                            {resultUi.errores.length > 8 && (
+                              <div className="text-[11px] text-neutral-400">
+                                … y {resultUi.errores.length - 8} más
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Form CRUD */}
                   <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
@@ -530,7 +772,10 @@ export default function RecordatoriosCuotasModal({
                       </button>
                     </div>
                     <div className="text-[11px] text-neutral-400">
-                      Seleccionada: <span className="text-neutral-200 font-semibold">{oficinaSeleccionada}</span>
+                      Seleccionada:{" "}
+                      <span className="text-neutral-200 font-semibold">
+                        {oficinaSeleccionada}
+                      </span>
                     </div>
                   </div>
                 </div>

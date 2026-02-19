@@ -520,30 +520,60 @@ const PagosPage = () => {
   }, [dispatch, buildExportParams]);
 
   const handleEnviarRecordatorios = useCallback(
-    async (medioCobroId, oficina) => {
-      setSendingRecordatorios(true);
-      try {
-        const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
-        const alias = medio ? medio.etiqueta || medio.valor : undefined;
+  async (medioCobroId, oficina) => {
+    setSendingRecordatorios(true);
+    try {
+      const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
+      const alias = medio ? medio.etiqueta || medio.valor : undefined;
 
-        const result = await dispatch(
-          enviarRecordatoriosCuotas({
-            medio_cobro_id: medioCobroId || undefined,
-            alias,
-            oficina,
-          })
-        ).unwrap();
+      const result = await dispatch(
+        enviarRecordatoriosCuotas({
+          medio_cobro_id: medioCobroId || undefined,
+          alias,
+          oficina,
+        })
+      ).unwrap();
 
-        return result;
-      } catch (err) {
-        console.error("[PagosPage] Error enviando recordatorios:", err);
-        throw err;
-      } finally {
-        setSendingRecordatorios(false);
-      }
-    },
-    [dispatch, mediosCobro]
-  );
+      // opcional: refrescar historial (si después vas a esa tab ya está fresco)
+      dispatch(fetchHistorialRecordatorios());
+
+      return result;
+    } catch (err) {
+      console.error("[PagosPage] Error enviando recordatorios:", err);
+
+      // Normaliza error para que el modal lo muestre lindo
+      const data =
+        err?.data ||
+        err?.response?.data ||
+        err?.payload ||
+        null;
+
+      const msg =
+        (typeof data === "string" && data) ||
+        data?.detail ||
+        data?.error ||
+        err?.message ||
+        "No se pudieron enviar los recordatorios.";
+
+      const errores = Array.isArray(data?.errores)
+        ? data.errores
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      return {
+        ok: false,
+        error: msg,
+        errores,
+        raw: data || err,
+      };
+    } finally {
+      setSendingRecordatorios(false);
+    }
+  },
+  [dispatch, mediosCobro]
+);
+
 
   /* ================== KPIs (tab pagos) ================== */
   const { totalCuotas, alDia, porVencer, venceHoy, vencidas } = useMemo(() => {

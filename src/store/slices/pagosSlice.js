@@ -393,7 +393,6 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
   "pagos/enviarRecordatoriosCuotas",
   async (payload, { rejectWithValue }) => {
     try {
-      // ✅ IMPORTANTE: async:false por defecto para recibir contadores reales
       const asyncFlag =
         payload?.async === undefined || payload?.async === null
           ? false
@@ -404,8 +403,6 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
         alias_transferencia: payload?.alias_transferencia,
         medio_cobro_id: payload?.medio_cobro_id,
         oficina: payload?.oficina,
-
-        // ✅ nuevo
         async: asyncFlag,
       });
 
@@ -414,12 +411,19 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
         body,
         { timeout: 60000 }
       );
+
+      // ✅ si backend decide responder ok:false con 200, lo tratamos como error
+      if (data && typeof data === "object" && data.ok === false) {
+        return rejectWithValue(data);
+      }
+
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al enviar recordatorios");
     }
   }
 );
+
 
 export const fetchHistorialRecordatorios = createAsyncThunk(
   "pagos/fetchHistorialRecordatorios",
