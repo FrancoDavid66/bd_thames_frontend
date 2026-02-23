@@ -1,7 +1,7 @@
 /* src/components/pagos/PagosSearch.jsx — DNI-first + Patente (rápido, con Redux)
    ✅ DNI: fetchBuscarClientePorDni -> GET /api/pagos/buscar-cliente/?dni=...
-   ✅ Cuotas por póliza: fetchCuotasPorPoliza -> GET /api/pagos/buscar/?poliza_id=...&solo_pendientes=1
-   ✅ Patente: fetchCuotasBuscar -> GET /api/pagos/buscar/?q=...&solo_pendientes=1   (NUEVO)
+   ✅ Cuotas por póliza: fetchCuotasPorPoliza -> GET /api/pagos/buscar/?poliza_id=...&solo_pendientes=0
+   ✅ Patente: fetchCuotasBuscar -> GET /api/pagos/buscar/?q=...&solo_pendientes=0   (NUEVO)
    ✅ Mantiene: recientes DNI, "/", anti-stale (via abort en thunks), Esc limpia.
 */
 
@@ -159,7 +159,7 @@ export default function PagosSearch({ onBuscar }) {
       const res = await dispatch(
         fetchCuotasPorPoliza({
           poliza_id: pid,
-          solo_pendientes: 1,
+          solo_pendientes: 0, // ✅ MODIFICADO A 0
           page_size: 200,
           dni: dniDigitsForMeta,
         })
@@ -193,7 +193,7 @@ export default function PagosSearch({ onBuscar }) {
       const res = await dispatch(
         fetchCuotasBuscar({
           q,
-          solo_pendientes: 1,
+          solo_pendientes: 0, // ✅ MODIFICADO A 0
           page_size: 200,
         })
       ).unwrap();
