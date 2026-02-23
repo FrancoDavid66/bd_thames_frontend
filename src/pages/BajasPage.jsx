@@ -6,14 +6,15 @@ import { HiCog, HiX, HiPlus, HiTrash, HiMail, HiChevronRight } from "react-icons
 import {
   fetchBajas,
   fetchBajasOficinas,
+  fetchBajasCorreos,
+  createBajaCorreo,
+  deleteBajaCorreo,
   selectBajas,
   selectBajasCount,
   selectBajasError,
-  selectBajasNext,
   selectBajasOficinas,
-  selectBajasOficinasStatus,
-  selectBajasPrevious,
   selectBajasStatus,
+  selectBajasCorreos,
 } from "../store/slices/bajasSlice";
 
 import BajasTable from "../components/bajas/BajasTable";
@@ -38,7 +39,7 @@ function loadStatusMap() {
 }
 
 function saveStatusMap(map) {
-  try { localStorage.setItem(LS.statusById, JSON.stringify(map || {})); } catch {}
+  try { localStorage.setItem(LS.statusById, JSON.stringify(map || {})); } catch { }
 }
 
 function parseDateRobusta(v) {
@@ -66,12 +67,20 @@ function pickFirstNonEmpty(...vals) {
 }
 
 function getImpagasCount(p) {
-  const vals = [p?.impagas_count, p?.impagas, p?.cuotas_impagas];
-  return Number(vals.find(v => !isNaN(Number(v)))) || 0;
+  const cand = [p?.impagas_count, p?.impagas, p?.cuotas_impagas];
+  for (const v of cand) {
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return 0;
 }
 
 function getProximaVencImpagaRaw(p) {
-  return pickFirstNonEmpty(p?.proxima_vencimiento_impaga, p?.vencimiento_impaga_mas_proximo, p?.min_vto_impaga);
+  return pickFirstNonEmpty(
+    p?.proxima_vencimiento_impaga, 
+    p?.vencimiento_impaga_mas_proximo, 
+    p?.min_vto_impaga
+  );
 }
 
 function getClienteInfo(p) {
@@ -83,17 +92,15 @@ function getClienteInfo(p) {
 export default function BajasPage() {
   const dispatch = useDispatch();
 
-  // Selectores
+  // Selectores de Redux
   const items = useSelector(selectBajas);
   const count = useSelector(selectBajasCount);
-  const next = useSelector(selectBajasNext);
-  const previous = useSelector(selectBajasPrevious);
   const status = useSelector(selectBajasStatus);
   const error = useSelector(selectBajasError);
   const oficinas = useSelector(selectBajasOficinas);
-  const oficinasStatus = useSelector(selectBajasOficinasStatus);
+  const correosDB = useSelector(selectBajasCorreos);
 
-  // Estados
+  // Estados locales
   const [oficina, setOficina] = useState(() => localStorage.getItem(LS.oficina) || "");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState(STATUS.ENVIAR);
@@ -103,57 +110,53 @@ export default function BajasPage() {
   const [statusById, setStatusById] = useState(() => loadStatusMap());
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  // Gestión de Correos
-  const [correosDB, setCorreosDB] = useState([]);
+  // Modales
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [showPickerModal, setShowPickerModal] = useState(false); // Modal para elegir correo al enviar
+  const [showPickerModal, setShowPickerModal] = useState(false); 
   const [newMail, setNewMail] = useState({ compania: "", email: "" });
 
-  const fetchCorreos = useCallback(async () => {
-    try {
-      const res = await fetch("/api/bajas/correos/", { credentials: "include" });
-      if (res.ok) setCorreosDB(await res.json());
-    } catch (e) { console.error(e); }
-  }, []);
-
-  const addCorreo = async () => {
+  // Acciones de correos via Redux
+  const handleAddCorreo = async () => {
     if (!newMail.compania || !newMail.email) return;
-    await fetch("/api/bajas/correos/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newMail),
-      credentials: "include"
-    });
+    dispatch(createBajaCorreo(newMail));
     setNewMail({ compania: "", email: "" });
-    fetchCorreos();
   };
 
-  const deleteCorreo = async (id) => {
-    await fetch(`/api/bajas/correos/${id}/`, { method: "DELETE", credentials: "include" });
-    fetchCorreos();
+  const handleDeleteCorreo = (id) => {
+    dispatch(deleteBajaCorreo(id));
   };
 
+  // Carga inicial
   useEffect(() => { 
     dispatch(fetchBajasOficinas({ force: false }));
-    fetchCorreos(); 
-  }, [dispatch, fetchCorreos]);
+    dispatch(fetchBajasCorreos()); 
+  }, [dispatch]);
 
   useEffect(() => { saveStatusMap(statusById); }, [statusById]);
   useEffect(() => { localStorage.setItem(LS.oficina, oficina); }, [oficina]);
 
-  const load = (opts = {}) => {
+  const load = useCallback((opts = {}) => {
     dispatch(fetchBajas({ 
-      params: { modo: "vencidas", page: String(page), page_size: String(pageSize), oficina, search, include_finalizadas: "0" }, 
+      params: { 
+        modo: "vencidas", 
+        page: String(page), 
+        page_size: String(pageSize), 
+        oficina, 
+        search, 
+        include_finalizadas: "0" 
+      }, 
       force: !!opts.force 
     }));
-  };
+  }, [dispatch, page, pageSize, oficina, search]);
 
-  useEffect(() => { load(); }, [page, pageSize, oficina]);
+  useEffect(() => { load(); }, [load]);
+
   useEffect(() => {
     const t = setTimeout(() => { setPage(1); load({ force: true }); }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, load]);
 
+  // Enriquecimiento de datos
   const enriched = useMemo(() => {
     const hoy = new Date();
     return (items || []).map((p) => {
@@ -161,7 +164,12 @@ export default function BajasPage() {
       const diasMora = proximaImpaga ? daysBetween(hoy, proximaImpaga) : null;
       const requiereBaja = (p?.estado || "").toLowerCase() !== "finalizada" && getImpagasCount(p) > 0 && (diasMora ?? 0) >= umbralDias;
       const saved = statusById?.[String(p?.id)];
-      return { ...p, _diasMora: diasMora, _requiereBaja: requiereBaja, _bajaStatus: requiereBaja ? (saved?.status || STATUS.ENVIAR) : "IGNORAR" };
+      return { 
+        ...p, 
+        _diasMora: diasMora, 
+        _requiereBaja: requiereBaja, 
+        _bajaStatus: requiereBaja ? (saved?.status || STATUS.ENVIAR) : "IGNORAR" 
+      };
     }).sort((a, b) => (b._diasMora ?? -1) - (a._diasMora ?? -1));
   }, [items, umbralDias, statusById]);
 
@@ -180,31 +188,27 @@ export default function BajasPage() {
 
   const filtered = enriched.filter(x => x._requiereBaja && (activeTab === "TODAS" || x._bajaStatus === activeTab));
 
-  // --- LÓGICA DE ENVÍO CON SELECCIÓN DE CORREO ---
   const handleComposeClick = () => {
     if (selectedIds.size === 0) return;
     if (correosDB.length === 0) {
-      alert("No tenés correos configurados. Agregá uno en el botón de la tuerca ⚙️");
+      alert("No tenés correos configurados. Agregá uno en el botón de configuración ⚙️");
       setShowConfigModal(true);
       return;
     }
-    setShowPickerModal(true); // Abrimos el selector de correo
+    setShowPickerModal(true);
   };
 
   const executeComposeEmail = (emailDestino) => {
     const ids = Array.from(selectedIds);
     const rows = enriched.filter(p => ids.includes(String(p.id)));
-    
     const today = new Date().toLocaleDateString("es-AR");
     const subject = `Solicitud de baja por mora - ${today} (${rows.length} pólizas)`;
     const lines = rows.map(p => {
       const { nombre, dni } = getClienteInfo(p);
       return `- Cía: ${p.compania} | Pol: ${p.numero_poliza} | Pat: ${p.patente} | Asegurado: ${nombre} | DNI: ${dni} | Mora: ${p._diasMora}d`;
     });
-
     const body = `Hola equipo,\n\nSolicitamos gestionar la baja de las siguientes pólizas por mora:\n\n${lines.join("\n")}\n\nSaludos.`;
     window.location.href = `mailto:${encodeURIComponent(emailDestino)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
     setShowPickerModal(false);
   };
 
@@ -280,7 +284,7 @@ export default function BajasPage() {
         onSetStatus={(id, s) => setStatusById(prev => ({...prev, [id]: {status: s, updatedAt: new Date().toISOString()}}))}
       />
 
-      {/* MODAL 1: SELECTOR DE CORREO (Se abre al hacer clic en Redactar Mail) */}
+      {/* MODAL Selector de Correo */}
       <AnimatePresence>
         {showPickerModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
@@ -304,15 +308,12 @@ export default function BajasPage() {
                   </button>
                 ))}
               </div>
-              <div className="p-4 bg-slate-950/50 text-center">
-                <p className="text-[10px] text-slate-500 italic">Elegí una compañía de tu lista configurada para enviar el mail de {selectedIds.size} pólizas.</p>
-              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* MODAL 2: CONFIGURACIÓN DE CORREOS (Administrar lista) */}
+      {/* MODAL Configuración de Correos */}
       <AnimatePresence>
         {showConfigModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -327,10 +328,10 @@ export default function BajasPage() {
                   <div className="flex gap-2">
                     <input placeholder="Nombre Cía." value={newMail.compania} onChange={e => setNewMail({...newMail, compania: e.target.value})} className="flex-1 bg-slate-800 text-white rounded-lg px-3 py-2 text-sm" />
                     <input placeholder="Correo electrónico" value={newMail.email} onChange={e => setNewMail({...newMail, email: e.target.value})} className="flex-1 bg-slate-800 text-white rounded-lg px-3 py-2 text-sm" />
-                    <button onClick={addCorreo} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition"><HiPlus /></button>
+                    <button onClick={handleAddCorreo} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition"><HiPlus /></button>
                   </div>
                 </div>
-                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                <div className="max-h-60 overflow-y-auto space-y-2 pr-1 text-white">
                   {correosDB.length === 0 ? (
                     <div className="text-center py-8 text-slate-500 text-sm italic">No hay correos guardados.</div>
                   ) : (
@@ -340,7 +341,7 @@ export default function BajasPage() {
                           <div className="text-sm font-bold text-white">{c.compania}</div>
                           <div className="text-xs text-slate-500">{c.email}</div>
                         </div>
-                        <button onClick={() => deleteCorreo(c.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition"><HiTrash /></button>
+                        <button onClick={() => handleDeleteCorreo(c.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition"><HiTrash /></button>
                       </div>
                     ))
                   )}
