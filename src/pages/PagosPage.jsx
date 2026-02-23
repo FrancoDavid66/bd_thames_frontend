@@ -1,6 +1,6 @@
 /* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos)
    ✅ Flujo: Buscar → Lista de clientes → Modal con cuotas del cliente → Pagar
-   ✅ OPT: usa solo campos necesarios (asume payload /pagos/buscar/ con CuotaFlatSerializer)
+   ✅ OPT: usa solo campos necesarios (asume payload /pagos/buscar/ con Cuot aFlatSerializer)
 */
 
 import { useState, useEffect, useMemo, useCallback, useDeferredValue, useTransition } from "react";
