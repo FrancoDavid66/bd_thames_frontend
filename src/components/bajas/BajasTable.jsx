@@ -34,7 +34,7 @@ function getClienteObject(p) {
   return c && typeof c === "object" ? c : null;
 }
 
-function resolveAsegurado(p) {
+export function resolveAsegurado(p) {
   const c = getClienteObject(p);
 
   const nombreCompleto =
@@ -93,23 +93,22 @@ function resolveAsegurado(p) {
 }
 
 const STATUS_LABEL = {
-  ENVIAR_BAJA: "Enviar la baja",
-  BAJA_ENVIADA: "Baja enviada",
-  BAJA_REALIZADA: "Baja realizada",
+  ENVIAR_BAJA: "Pendiente (Enviar Baja)",
+  BAJA_ENVIADA: "Baja Enviada",
+  BAJA_REALIZADA: "Baja Realizada",
   OK: "OK",
 };
 
 function statusPill(status) {
   const s = String(status || "ENVIAR_BAJA");
-  if (s === "BAJA_REALIZADA") return "bg-emerald-500/15 text-emerald-200";
-  if (s === "BAJA_ENVIADA") return "bg-amber-500/20 text-amber-100";
-  if (s === "ENVIAR_BAJA") return "bg-red-500/15 text-red-200";
-  return "bg-white/10 text-white";
+  if (s === "BAJA_REALIZADA") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+  if (s === "BAJA_ENVIADA") return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+  if (s === "ENVIAR_BAJA") return "bg-red-500/15 text-red-300 border-red-500/30";
+  return "bg-white/10 text-white border-white/20";
 }
 
 export default function BajasTable({
   items = [],
-  destinatario = "",
   selectedIds,
   onToggleSelect,
   onSelectAllVisible,
@@ -119,30 +118,23 @@ export default function BajasTable({
   const rows = Array.isArray(items) ? items : [];
   const sel = selectedIds || new Set();
 
-  const allVisibleSelected =
-    rows.length > 0 && rows.every((p) => sel.has(String(p.id)));
-
-  const someVisibleSelected =
-    rows.length > 0 && rows.some((p) => sel.has(String(p.id)));
+  const allVisibleSelected = rows.length > 0 && rows.every((p) => sel.has(String(p.id)));
+  const someVisibleSelected = rows.length > 0 && rows.some((p) => sel.has(String(p.id)));
 
   const handleSelectAll = (checked) => {
     onSelectAllVisible && onSelectAllVisible(checked);
   };
 
   const sendSingleEmail = (p) => {
-    if (!destinatario || !String(destinatario).trim()) {
-      alert("Falta el Hotmail destino (campo 'Enviar a').");
-      return;
-    }
     onComposeEmail && onComposeEmail([String(p.id)]);
-    // al “enviar”, lo pasamos a “baja enviada”
+    // al “enviar”, lo pasamos automáticamente a “baja enviada”
     onSetStatus && onSetStatus(p.id, "BAJA_ENVIADA");
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 overflow-hidden">
-      <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-white/5 text-xs font-bold opacity-80">
-        <div className="col-span-1 flex items-center gap-2">
+    <div className="rounded-2xl border border-white/10 bg-black/20 overflow-hidden shadow-xl">
+      <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-white/5 text-xs font-bold text-white/70 uppercase tracking-wider">
+        <div className="col-span-1 flex items-center justify-center">
           <input
             type="checkbox"
             checked={allVisibleSelected}
@@ -150,139 +142,164 @@ export default function BajasTable({
               if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected;
             }}
             onChange={(e) => handleSelectAll(e.target.checked)}
+            className="w-4 h-4 cursor-pointer accent-blue-500"
             aria-label="Seleccionar todas las visibles"
           />
-          <span>Sel</span>
         </div>
-        <div className="col-span-3">Asegurado</div>
-        <div className="col-span-2">Póliza</div>
-        <div className="col-span-2">Estado baja</div>
-        <div className="col-span-2">Próx. impaga</div>
-        <div className="col-span-1">Impagas</div>
-        <div className="col-span-1">Mora</div>
+        <div className="col-span-3">Asegurado / Contacto</div>
+        <div className="col-span-2">Vehículo / Póliza</div>
+        <div className="col-span-3">Estado y Acciones</div>
+        <div className="col-span-2">Últ. Vto Impago</div>
+        <div className="col-span-1 text-center">Imp. / Mora</div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="p-5 text-sm opacity-80">Sin resultados.</div>
+        <div className="p-8 text-center text-white/50 bg-black/10">No hay pólizas en este estado.</div>
       ) : (
-        rows.map((p) => {
-          const { nombre, dni, tel } = resolveAsegurado(p);
-          const wa = waUrl(tel);
-          const call = telUrl(tel);
+        <div className="divide-y divide-white/5">
+          {rows.map((p) => {
+            const { nombre, dni, tel } = resolveAsegurado(p);
+            const wa = waUrl(tel);
+            const call = telUrl(tel);
 
-          const bajaStatus = p?._bajaStatus || "ENVIAR_BAJA";
-          const statusText = STATUS_LABEL[bajaStatus] || String(bajaStatus);
+            const bajaStatus = p?._bajaStatus || "ENVIAR_BAJA";
+            const statusText = STATUS_LABEL[bajaStatus] || String(bajaStatus);
+            const isSelected = sel.has(String(p.id));
 
-          const isSelected = sel.has(String(p.id));
+            return (
+              <div
+                key={p.id}
+                className={`grid grid-cols-12 gap-2 px-4 py-4 transition-colors ${
+                  isSelected ? "bg-blue-500/10" : "bg-black/10 hover:bg-white/5"
+                }`}
+              >
+                {/* Checkbox */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleSelect && onToggleSelect(p.id)}
+                    className="w-4 h-4 cursor-pointer accent-blue-500"
+                    aria-label={`Seleccionar póliza ${p?.numero_poliza || p.id}`}
+                  />
+                </div>
 
-          return (
-            <div
-              key={p.id}
-              className="grid grid-cols-12 gap-2 px-4 py-3 border-t border-white/10 bg-black/10 hover:bg-black/20"
-            >
-              <div className="col-span-1 flex items-center">
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggleSelect && onToggleSelect(p.id)}
-                  aria-label={`Seleccionar póliza ${p?.numero_poliza || p.id}`}
-                />
-              </div>
-
-              <div className="col-span-3">
-                <div className="font-semibold">{nombre}</div>
-                <div className="text-xs opacity-75">
-                  DNI: {dni}
-                  {tel ? (
-                    <>
-                      {" "}
-                      ·{" "}
-                      {wa ? (
-                        <a className="underline hover:opacity-90" href={wa} target="_blank" rel="noreferrer">
+                {/* Asegurado */}
+                <div className="col-span-3">
+                  <div className="font-bold text-sm text-white/90 truncate" title={nombre}>
+                    {nombre}
+                  </div>
+                  <div className="text-xs text-white/50 mt-1">
+                    DNI: <span className="text-white/70">{dni}</span>
+                  </div>
+                  {tel && (
+                    <div className="flex items-center gap-3 mt-1.5">
+                      {wa && (
+                        <a
+                          href={wa}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
+                        >
                           WhatsApp
                         </a>
-                      ) : (
-                        <span>{tel}</span>
                       )}
-                      {call ? (
-                        <>
-                          {" "}
-                          ·{" "}
-                          <a className="underline hover:opacity-90" href={call}>
-                            Llamar
-                          </a>
-                        </>
-                      ) : null}
-                    </>
-                  ) : null}
+                      {call && (
+                        <a
+                          href={call}
+                          className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                        >
+                          Llamar
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <div className="col-span-2 text-sm">
-                <div className="font-semibold">{p?.numero_poliza || "—"}</div>
-                <div className="text-xs opacity-75">{p?.compania || "—"}</div>
-                <a
-                  href={`/polizas/${p.id}`}
-                  className="text-xs underline opacity-90 hover:opacity-100"
-                >
-                  Ver póliza
-                </a>
-              </div>
+                {/* Póliza */}
+                <div className="col-span-2">
+                  <div className="font-semibold text-sm text-white/90">{p?.numero_poliza || "S/N"}</div>
+                  <div className="text-xs font-bold text-white/60 mt-0.5 tracking-wide uppercase">
+                    {p?.patente || "—"}
+                  </div>
+                  <div className="text-[11px] text-white/50 mt-0.5 truncate" title={p?.compania}>
+                    {p?.compania || "—"}
+                  </div>
+                  <a
+                    href={`/polizas/${p.id}`}
+                    className="text-[11px] text-blue-400 hover:text-blue-300 underline mt-1.5 inline-block transition-colors"
+                  >
+                    Ver Póliza
+                  </a>
+                </div>
 
-              <div className="col-span-2">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-bold ${statusPill(bajaStatus)}`}>
+                {/* Estado y Acciones */}
+                <div className="col-span-3">
+                  <span
+                    className={`inline-flex px-2.5 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wider ${statusPill(
+                      bajaStatus
+                    )}`}
+                  >
                     {statusText}
                   </span>
+
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    <button
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                        bajaStatus === "ENVIAR_BAJA"
+                          ? "bg-blue-600 hover:bg-blue-500 text-white"
+                          : "bg-white/10 hover:bg-white/20 text-white/70"
+                      }`}
+                      onClick={() => sendSingleEmail(p)}
+                    >
+                      Mail (Único)
+                    </button>
+                    <button
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                        bajaStatus === "BAJA_ENVIADA"
+                          ? "bg-amber-500/30 text-amber-200 ring-1 ring-amber-500/50"
+                          : "bg-white/5 hover:bg-white/15 text-white/50"
+                      }`}
+                      onClick={() => onSetStatus && onSetStatus(p.id, "BAJA_ENVIADA")}
+                    >
+                      Marcar Enviada
+                    </button>
+                    <button
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                        bajaStatus === "BAJA_REALIZADA"
+                          ? "bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-500/50"
+                          : "bg-white/5 hover:bg-white/15 text-white/50"
+                      }`}
+                      onClick={() => onSetStatus && onSetStatus(p.id, "BAJA_REALIZADA")}
+                    >
+                      Marcar Realizada
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                      bajaStatus === "ENVIAR_BAJA"
-                        ? "bg-red-500/20 hover:bg-red-500/30 text-red-100"
-                        : "bg-white/10 hover:bg-white/15"
-                    }`}
-                    onClick={() => sendSingleEmail(p)}
-                    title="Abrir mail y marcar como 'Baja enviada'"
-                  >
-                    Enviar la baja
-                  </button>
+                {/* Fechas */}
+                <div className="col-span-2">
+                  <div className="text-sm font-semibold text-rose-300">
+                    {p?.proxima_vencimiento_impaga || p?.min_vto_impaga || "—"}
+                  </div>
+                  <div className="text-[10px] text-white/40 mt-1 uppercase tracking-wider">
+                    Fecha del Vto.
+                  </div>
+                </div>
 
-                  <button
-                    className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                      bajaStatus === "BAJA_ENVIADA"
-                        ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-100"
-                        : "bg-white/10 hover:bg-white/15"
-                    }`}
-                    onClick={() => onSetStatus && onSetStatus(p.id, "BAJA_ENVIADA")}
-                  >
-                    Baja enviada
-                  </button>
-
-                  <button
-                    className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                      bajaStatus === "BAJA_REALIZADA"
-                        ? "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100"
-                        : "bg-white/10 hover:bg-white/15"
-                    }`}
-                    onClick={() => onSetStatus && onSetStatus(p.id, "BAJA_REALIZADA")}
-                  >
-                    Baja realizada
-                  </button>
+                {/* Impagas y Mora */}
+                <div className="col-span-1 text-center">
+                  <div className="text-lg font-extrabold text-rose-400">
+                    {p?._impagas ?? Number(p?.impagas_count) ?? 0}
+                  </div>
+                  <div className="text-[10px] text-white/60 font-semibold bg-rose-500/10 rounded-md py-0.5 mt-1 border border-rose-500/20 mx-auto w-12">
+                    {p?._diasMora == null ? "—" : `${p._diasMora}d`}
+                  </div>
                 </div>
               </div>
-
-              <div className="col-span-2 text-sm">{p?.proxima_vencimiento_impaga || "—"}</div>
-
-              <div className="col-span-1 text-sm">{Number(p?.impagas_count) || 0}</div>
-
-              <div className="col-span-1 text-sm">
-                {p?._diasMora == null ? "—" : `${p._diasMora}d`}
-              </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );

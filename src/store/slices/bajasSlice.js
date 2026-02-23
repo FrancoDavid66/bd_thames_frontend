@@ -110,11 +110,8 @@ function normalizeOficinasPayload(payload) {
 export const fetchBajas = createAsyncThunk(
   "bajas/fetchBajas",
   async ({ params = {}, force = false } = {}) => {
-    // Defaults: usamos vencimientos como fuente
+    // Apuntamos al nuevo endpoint de Bajas
     const merged = {
-      modo: "vencidas",
-      past_days: "365",
-      future_days: "0",
       page: "1",
       page_size: "25",
       ...params,
@@ -124,7 +121,9 @@ export const fetchBajas = createAsyncThunk(
     if (!force) {
       // cache hit (hidrata en pending si hay cache fresco)
     }
-    const data = await apiGet("polizas/vencimientos/", merged);
+    
+    // ✅ CAMBIADO: Ahora consume directo del nuevo endpoint del backend
+    const data = await apiGet("bajas/", merged); 
     return { key, data };
   }
 );
@@ -172,9 +171,6 @@ const bajasSlice = createSlice({
 
         const params = action?.meta?.arg?.params || {};
         const merged = {
-          modo: "vencidas",
-          past_days: "365",
-          future_days: "0",
           page: "1",
           page_size: "25",
           ...params,
@@ -212,7 +208,7 @@ const bajasSlice = createSlice({
       })
       .addCase(fetchBajas.rejected, (state, action) => {
         state.status = "failed";
-        state.error = action.error?.message || "Error";
+        state.error = action.error?.message || "Error al cargar las bajas";
       })
 
       // ===== OFICINAS =====
@@ -234,7 +230,7 @@ const bajasSlice = createSlice({
       })
       .addCase(fetchBajasOficinas.rejected, (state, action) => {
         state.oficinasStatus = "failed";
-        state.oficinasError = action.error?.message || "Error";
+        state.oficinasError = action.error?.message || "Error al cargar oficinas";
       });
   },
 });
