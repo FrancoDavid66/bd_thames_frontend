@@ -14,8 +14,8 @@ import {
   selectBajas,
   selectBajasCount,
   selectBajasOficinas,
-  apiGet,    // ✅ Importamos la utilidad oficial corregida para producción
-  apiAction  // ✅ Importamos la utilidad oficial corregida para producción
+  apiGet,
+  apiAction
 } from "../store/slices/bajasSlice";
 
 import BajasTable from "../components/bajas/BajasTable";
@@ -117,14 +117,18 @@ export default function BajasPage() {
   const [historyData, setHistoryData] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-  // ✅ USAMOS apiGet PARA LOS CONTADORES (Soluciona el error 404)
+  // ✅ KPI CARDS: Representan la totalidad (ignoramos filtros de oficina y búsqueda)
   const fetchGlobalCounters = useCallback(async () => {
     try {
-      const data = await apiGet("bajas/operativo/counters/", { dias: umbralDias, oficina, search });
+      const data = await apiGet("bajas/operativo/counters/", { 
+        dias: umbralDias,
+        // No enviamos oficina ni search aquí para que los contadores sean globales
+      });
       if (data) setGlobalKpis(data);
     } catch (e) { console.error("Error cargando contadores:", e); }
-  }, [umbralDias, oficina, search]);
+  }, [umbralDias]); // Solo re-calcula si cambia el umbral de días
 
+  // ✅ TABLA: Representa lo filtrado por el usuario
   const load = useCallback((opts = {}) => {
     dispatch(fetchBajas({ 
       params: { 
@@ -137,6 +141,8 @@ export default function BajasPage() {
       }, 
       force: !!opts.force 
     }));
+    // Actualizamos KPIs cada vez que hay un cambio estructural (como días),
+    // pero fetchGlobalCounters por su cuenta ignorará los filtros de texto.
     fetchGlobalCounters();
   }, [dispatch, page, pageSize, oficina, search, umbralDias, fetchGlobalCounters]);
 
@@ -147,17 +153,14 @@ export default function BajasPage() {
   useEffect(() => {
     const t = setTimeout(() => { setPage(1); load({ force: true }); }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, load]);
 
-  // ✅ USAMOS apiGet PARA EL HISTORIAL (Soluciona el error 404)
   const handleOpenHistory = async () => {
     setHistoryModalOpen(true);
     setIsHistoryLoading(true);
     try {
       const data = await apiGet("bajas/historial/");
-      if (data) {
-        setHistoryData(data.results || data); 
-      }
+      if (data) setHistoryData(data.results || data); 
     } catch (e) {
       console.error("Error cargando historial", e);
     } finally {
@@ -182,7 +185,6 @@ export default function BajasPage() {
   const filtered = enriched.filter(x => x._requiereBaja && (activeTab === "TODAS" || x._bajaStatus === activeTab));
   const totalPages = Math.ceil(totalItemsCount / pageSize) || 1;
 
-  // ✅ USAMOS apiAction PARA ACTUALIZAR EL ESTADO (Soluciona el error 404)
   const updateBajaStatus = async (idsArray, nuevoEstado) => {
     try {
       await Promise.all(idsArray.map(id => 
@@ -328,7 +330,8 @@ export default function BajasPage() {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-extrabold text-white">Bajas por Mora</h1>
-          <p className="text-sm text-slate-400">Total detectado: {globalKpis.total} pólizas.</p>
+          {/* ✅ Título ahora siempre mostrará el total global de pólizas detectadas */}
+          <p className="text-sm text-slate-400">Totales en la empresa: {globalKpis.total} pólizas detectadas.</p>
         </div>
         
         <button 
@@ -339,6 +342,7 @@ export default function BajasPage() {
         </button>
       </div>
 
+      {/* ✅ KPIs GLOBALES: No cambian al filtrar la tabla */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { id: STATUS.ENVIAR, label: "Pendientes", val: globalKpis.pendiente_envio, col: "text-red-400" },
@@ -371,6 +375,7 @@ export default function BajasPage() {
         {selectedIds.size > 0 && <button onClick={() => setSelectedIds(new Set())} className="text-slate-400 hover:text-white text-sm underline">Limpiar</button>}
       </div>
 
+      {/* ✅ FILTROS: Estos afectan solo a la tabla y su paginación */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-900/50 p-4 rounded-xl border border-white/5">
         <select value={oficina} onChange={e => { setOficina(e.target.value); setPage(1); }} className="md:col-span-3 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-2">
           <option value="">Todas las Oficinas</option>
@@ -418,7 +423,7 @@ export default function BajasPage() {
         </div>
       </div>
 
-      {/* --- MODAL DE HISTORIAL --- */}
+      {/* Modales se mantienen igual */}
       <AnimatePresence>
         {historyModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
@@ -481,7 +486,6 @@ export default function BajasPage() {
         )}
       </AnimatePresence>
 
-      {/* --- MODAL UNIVERSAL DE CONFIRMACIÓN --- */}
       <AnimatePresence>
         {confirmModal.isOpen && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
