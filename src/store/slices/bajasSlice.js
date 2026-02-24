@@ -48,7 +48,8 @@ function buildQuery(params) {
   return qs ? `?${qs}` : "";
 }
 
-async function apiGet(path, params) {
+// ✅ Exportada para uso directo en componentes (evita errores 404 en producción)
+export async function apiGet(path, params) {
   const url = `${API_ROOT}${path}${buildQuery(params)}`;
   const res = await fetch(url, { credentials: "include" });
   if (!res.ok) {
@@ -62,7 +63,8 @@ async function apiGet(path, params) {
   return await res.json();
 }
 
-async function apiAction(path, method, body) {
+// ✅ Exportada para uso directo en componentes
+export async function apiAction(path, method, body) {
   const url = `${API_ROOT}${path}`;
   const res = await fetch(url, {
     method,

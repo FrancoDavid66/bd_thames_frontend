@@ -14,13 +14,11 @@ import {
   selectBajas,
   selectBajasCount,
   selectBajasOficinas,
+  apiGet,    // ✅ Importamos la utilidad oficial corregida para producción
+  apiAction  // ✅ Importamos la utilidad oficial corregida para producción
 } from "../store/slices/bajasSlice";
 
 import BajasTable from "../components/bajas/BajasTable";
-
-// ✅ DETECTAMOS LA URL DEL BACKEND EN PRODUCCIÓN
-// (Si tu variable se llama distinto, por ejemplo VITE_BACKEND_URL, cámbiala aquí)
-const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 
 const STATUS = {
   ENVIAR: "PENDIENTE_ENVIO",
@@ -119,12 +117,11 @@ export default function BajasPage() {
   const [historyData, setHistoryData] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
+  // ✅ USAMOS apiGet PARA LOS CONTADORES (Soluciona el error 404)
   const fetchGlobalCounters = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ dias: umbralDias, oficina, search });
-      // ✅ USAMOS API_URL
-      const res = await fetch(`${API_URL}/api/bajas/operativo/counters/?${params.toString()}`, { credentials: "include" });
-      if (res.ok) setGlobalKpis(await res.json());
+      const data = await apiGet("bajas/operativo/counters/", { dias: umbralDias, oficina, search });
+      if (data) setGlobalKpis(data);
     } catch (e) { console.error("Error cargando contadores:", e); }
   }, [umbralDias, oficina, search]);
 
@@ -152,15 +149,13 @@ export default function BajasPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // --- CARGAR HISTORIAL ---
+  // ✅ USAMOS apiGet PARA EL HISTORIAL (Soluciona el error 404)
   const handleOpenHistory = async () => {
     setHistoryModalOpen(true);
     setIsHistoryLoading(true);
     try {
-      // ✅ USAMOS API_URL
-      const res = await fetch(`${API_URL}/api/bajas/historial/`, { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await apiGet("bajas/historial/");
+      if (data) {
         setHistoryData(data.results || data); 
       }
     } catch (e) {
@@ -187,16 +182,11 @@ export default function BajasPage() {
   const filtered = enriched.filter(x => x._requiereBaja && (activeTab === "TODAS" || x._bajaStatus === activeTab));
   const totalPages = Math.ceil(totalItemsCount / pageSize) || 1;
 
+  // ✅ USAMOS apiAction PARA ACTUALIZAR EL ESTADO (Soluciona el error 404)
   const updateBajaStatus = async (idsArray, nuevoEstado) => {
     try {
       await Promise.all(idsArray.map(id => 
-        // ✅ USAMOS API_URL
-        fetch(`${API_URL}/api/bajas/operativo/${id}/estado/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ estado: nuevoEstado }),
-          credentials: "include"
-        })
+        apiAction(`bajas/operativo/${id}/estado/`, "POST", { estado: nuevoEstado })
       ));
       setSelectedIds(new Set());
       load({ force: true });
