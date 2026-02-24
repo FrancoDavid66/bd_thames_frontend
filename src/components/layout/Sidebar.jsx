@@ -15,39 +15,24 @@ import {
   FaChevronRight,
   FaChevronLeft,
   FaSyncAlt,
-  FaClock, // ✅🆕 Vencimientos
-  FaBan, // ✅🆕 Bajas
-  FaTruckMoving, // ✅🆕 Gruas
+  FaClock, 
+  FaBan, 
+  FaTruckMoving, 
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
 
 const navItems = [
-  // Core
   { to: "/", label: "Inicio", icon: FaHome },
-
-  // Operación
   { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
   { to: "/clientes", label: "Clientes", icon: FaUsers },
-
-  // Grupo
   { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
-
-  // ✅ Grúas (simple)
   { to: "/gruas", label: "Grúas", icon: FaTruckMoving },
-
-  // Cobranza / gestión
   { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt },
   { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
-
-  // Comunicación
   { to: "/marketing", label: "Campañas", icon: FaBullhorn },
-
-  // Análisis / admin
   { to: "/estadisticas", label: "Estadísticas", icon: FaChartBar },
   { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
-
-  // Extras
   { to: "/competencia", label: "Competencia", icon: FaChartBar },
   { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
 ];
@@ -78,12 +63,11 @@ export default function Sidebar({
   onClose,
   solPendienteAlta = 0,
   solPendienteEnvio = 0,
-
   cuponPendientes = 0,
   cuponPorVencer7 = 0,
   cuponVencidas = 0,
-
   renovacionesPendientes = 0,
+  bajasPendientes = 0, // ✅ NUEVA PROP RECIBIDA
 }) {
   const location = useLocation();
 
@@ -103,14 +87,10 @@ export default function Sidebar({
     if (polizasActive) setPolizasOpen(true);
   }, [polizasActive]);
 
-  // ✅ FIX mobile overflow: en pantallas chicas, sidebar no debe ser "w-64" fijo (puede empujar/overflow)
-  //    usamos ancho responsivo: 85vw en mobile, 16rem en sm+
-  // ✅ Animación de entrada/salida: seguimos usando transform + transition-transform (no se toca la UX)
   const sidebarClass = isOpen ? "translate-x-0" : "-translate-x-[110%]";
 
   return (
     <>
-      {/* Overlay móvil */}
       <div
         className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -132,13 +112,9 @@ export default function Sidebar({
       >
         <div className="p-4 border-b border-blue-800 dark:border-gray-800 flex items-center justify-between gap-3 min-w-0">
           <h1 className="text-lg font-bold truncate">Thames Seguros</h1>
-
-          {/* Botón cerrar (visible también en desktop) */}
           <button
             onClick={onClose}
             className="shrink-0 text-white bg-blue-800 dark:bg-gray-800 hover:bg-blue-700 dark:hover:bg-gray-700 px-2 py-2 rounded-md inline-flex items-center justify-center"
-            title="Cerrar sidebar"
-            aria-label="Cerrar sidebar"
           >
             <FaChevronLeft />
           </button>
@@ -146,7 +122,6 @@ export default function Sidebar({
 
         <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100%-80px)]">
           {navItems.map((item) => {
-            // Grupo desplegable de Pólizas
             if (item.to === "/polizas") {
               return (
                 <div key="polizas-group" className="space-y-1">
@@ -169,10 +144,6 @@ export default function Sidebar({
                       type="button"
                       onClick={() => setPolizasOpen((v) => !v)}
                       className="px-3 py-2 text-white/80 hover:text-white shrink-0"
-                      title={polizasOpen ? "Cerrar" : "Abrir"}
-                      aria-label={
-                        polizasOpen ? "Cerrar Pólizas" : "Abrir Pólizas"
-                      }
                     >
                       {polizasOpen ? <FaChevronDown /> : <FaChevronRight />}
                     </button>
@@ -194,7 +165,6 @@ export default function Sidebar({
                         <span className="truncate">Listado</span>
                       </NavLink>
 
-                      {/* ✅🆕 Vencimientos */}
                       <NavLink
                         to="/polizas/vencimientos"
                         className={({ isActive }) =>
@@ -209,7 +179,7 @@ export default function Sidebar({
                         <span className="truncate">Vencimientos</span>
                       </NavLink>
 
-                      {/* ✅🆕 Bajas */}
+                      {/* ✅ BADGE AÑADIDO EN BAJAS */}
                       <NavLink
                         to="/polizas/bajas"
                         className={({ isActive }) =>
@@ -222,6 +192,7 @@ export default function Sidebar({
                       >
                         <FaBan className="text-base shrink-0" />
                         <span className="truncate">Bajas</span>
+                        <Badge value={bajasPendientes} tone="red" />
                       </NavLink>
 
                       <NavLink
@@ -244,7 +215,6 @@ export default function Sidebar({
               );
             }
 
-            // Items normales
             const isCuponeras = item.to === "/cuponeras";
             const isSolicitudes = item.to === "/solicitudes";
 

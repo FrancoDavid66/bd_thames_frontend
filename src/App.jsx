@@ -82,6 +82,9 @@ function App() {
   // ✅ Contador Renovaciones (para badge en sidebar)
   const [renovacionesPendientes, setRenovacionesPendientes] = useState(0);
 
+  // ✅🆕 Contador Bajas (NUEVO)
+  const [bajasPendientes, setBajasPendientes] = useState(0);
+
   // ====== Helper: API ROOT (siempre /api/) ======
   const getApiRoot = () => {
     const raw = (
@@ -103,7 +106,6 @@ function App() {
 
   // ====== 🆕 Helper: oficina scope por URL (?oficina=) + fallback localStorage ======
   const getScopedOficina = (key) => {
-    // 1) si viene por querystring, la persistimos
     try {
       const sp = new URLSearchParams(location.search || "");
       const fromUrl = (sp.get("oficina") || "").toString().trim();
@@ -115,7 +117,6 @@ function App() {
       }
     } catch {}
 
-    // 2) fallback a localStorage (última elegida)
     try {
       return (localStorage.getItem(key) || "").toString().trim();
     } catch {
@@ -141,7 +142,7 @@ function App() {
       (window.__API_URL__ || "");
 
     const base = raw.toString().trim();
-    if (!base) return ""; // permite proxy /api en dev
+    if (!base) return ""; 
     return base.endsWith("/") ? base : `${base}/`;
   }, []);
 
@@ -160,174 +161,114 @@ function App() {
     }
   };
 
-  // ====== Solicitudes: fallback HTTP solo si está habilitado ======
+  // ====== Solicitudes: fetch ======
   const tryFetchCounters = async () => {
     if (DISABLE_POLL) return;
-
     if (EXPLICIT_COUNTERS_URL) {
       const data = await fetchJSON(EXPLICIT_COUNTERS_URL);
       if (data) {
         const root = data?.solicitudes ?? data ?? {};
-        const alta =
-          root.pendiente_alta ??
-          root.pendienteAlta ??
-          root.alta ??
-          root.toRegister ??
-          0;
-        const envio =
-          root.pendiente_envio ??
-          root.pendienteEnvio ??
-          root.envio ??
-          root.toSend ??
-          0;
+        const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? root.toRegister ?? 0;
+        const envio = root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? root.toSend ?? 0;
         setSolPendienteAlta(Number(alta) || 0);
         setSolPendienteEnvio(Number(envio) || 0);
       }
       return;
     }
-
     if (!PROBE_COUNTERS) return;
-
     const candidates = [
       API_BASE ? `${API_BASE}solicitudes/counters` : null,
       "/api/solicitudes/counters",
       "/solicitudes/counters",
     ].filter(Boolean);
-
     for (const url of candidates) {
       const data = await fetchJSON(url);
       if (!data) continue;
       const root = data?.solicitudes ?? data ?? {};
-      const alta =
-        root.pendiente_alta ??
-        root.pendienteAlta ??
-        root.alta ??
-        root.toRegister ??
-        0;
-      const envio =
-        root.pendiente_envio ??
-        root.pendienteEnvio ??
-        root.envio ??
-        root.toSend ??
-        0;
+      const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? root.toRegister ?? 0;
+      const envio = root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? root.toSend ?? 0;
       setSolPendienteAlta(Number(alta) || 0);
       setSolPendienteEnvio(Number(envio) || 0);
       return;
     }
   };
 
-  // ====== Cuponeras: fetch de counters (🆕 soporta oficina por query/localStorage) ======
+  // ====== Cuponeras: fetch ======
   const fetchCuponerasCounters = async () => {
     try {
       const apiRoot = getApiRoot();
       const key = "scope.cuponeras.oficina";
-
-      const shouldScope =
-        location.pathname === "/cuponeras" ||
-        location.pathname.startsWith("/cuponeras/");
-
+      const shouldScope = location.pathname === "/cuponeras" || location.pathname.startsWith("/cuponeras/");
       const oficina = shouldScope ? getScopedOficina(key) : "";
-
-      const qs = new URLSearchParams();
-      if (oficina) qs.set("oficina", oficina);
-
-      const url = `${apiRoot}polizas/cupones-robo/counters/${
-        qs.toString() ? `?${qs.toString()}` : ""
-      }`;
-
+      const url = `${apiRoot}polizas/cupones-robo/counters/${oficina ? `?oficina=${oficina}` : ""}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
-
       const data = await res.json();
-      const pendientes = data.pendientes ?? data.totalPendientes ?? 0;
-      const por7 = data.por_vencer_7 ?? data.porVencer7 ?? 0;
-      const vencidas = data.vencidas ?? 0;
-
-      setCuponPendientes(Number(pendientes) || 0);
-      setCuponPorVencer7(Number(por7) || 0);
-      setCuponVencidas(Number(vencidas) || 0);
-    } catch {
-      // silencio
-    }
+      setCuponPendientes(Number(data.pendientes || data.totalPendientes || 0));
+      setCuponPorVencer7(Number(data.por_vencer_7 || data.porVencer7 || 0));
+      setCuponVencidas(Number(data.vencidas || 0));
+    } catch {}
   };
 
-  // ✅ Renovaciones: contador (🆕 soporta oficina por query/localStorage)
+  // ✅ Renovaciones: fetch
   const fetchRenovacionesCounters = async () => {
     try {
       const apiRoot = getApiRoot();
       const key = "scope.renovaciones.oficina";
-
-      const shouldScope =
-        location.pathname === "/polizas/renovaciones" ||
-        location.pathname.startsWith("/polizas/renovaciones/");
-
+      const shouldScope = location.pathname === "/polizas/renovaciones" || location.pathname.startsWith("/polizas/renovaciones/");
       const oficina = shouldScope ? getScopedOficina(key) : "";
-
       const qs = new URLSearchParams();
       qs.set("dias", "30");
       qs.set("solo_pendientes", "1");
       qs.set("page", "1");
       qs.set("page_size", "1");
       if (oficina) qs.set("oficina", oficina);
-
       const url = `${apiRoot}polizas/renovaciones/?${qs.toString()}`;
-
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
-
       const data = await res.json();
-      const count =
-        Number(data?.count ?? (Array.isArray(data) ? data.length : 0)) || 0;
-      setRenovacionesPendientes(count);
-    } catch {
-      // silencio
-    }
+      setRenovacionesPendientes(Number(data?.count ?? 0));
+    } catch {}
+  };
+
+  // ✅🆕 Bajas: fetch (NUEVO)
+  const fetchBajasCountersApp = async () => {
+    try {
+      const apiRoot = getApiRoot();
+      const url = `${apiRoot}bajas/operativo/counters/?dias=15`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Usamos el campo 'pendiente_envio' para la notificación naranja
+      setBajasPendientes(Number(data.pendiente_envio) || 0);
+    } catch {}
   };
 
   // Suscripción realtime (BroadcastChannel) para Solicitudes
   useEffect(() => {
     const unsub = solicitudesRealtime.subscribe((evt) => {
       if (!evt) return;
-
-      if (evt.type === "solicitudes.counters" && evt.data) {
-        const { alta = 0, envio = 0 } = evt.data || {};
-        setSolPendienteAlta(Number(alta) || 0);
-        setSolPendienteEnvio(Number(envio) || 0);
-        return;
-      }
-
-      if (evt.type === "solicitudes.counters.backend" && evt.data) {
+      if ((evt.type === "solicitudes.counters" || evt.type === "solicitudes.counters.backend") && evt.data) {
         const root = evt.data?.solicitudes ?? evt.data ?? {};
         const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? 0;
-        const envio =
-          root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? 0;
-        if (alta != null || envio != null) {
-          setSolPendienteAlta(Number(alta) || 0);
-          setSolPendienteEnvio(Number(envio) || 0);
-        }
+        const envio = root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? 0;
+        setSolPendienteAlta(Number(alta) || 0);
+        setSolPendienteEnvio(Number(envio) || 0);
       }
     });
 
-    // Primer intento en frío
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
+    fetchBajasCountersApp(); // ✅🆕 Primer intento de bajas
 
-    return () => {
-      try {
-        unsub && unsub();
-      } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount once
+    return () => { try { unsub && unsub(); } catch {} };
+  }, []); 
 
   const toggleSidebar = () => {
     setSidebarOpen((prev) => {
       const next = !prev;
-      if (
-        typeof window !== "undefined" &&
-        window.matchMedia("(min-width: 1024px)").matches
-      ) {
+      if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
         localStorage.setItem("sidebarOpen", String(next));
       }
       return next;
@@ -342,42 +283,34 @@ function App() {
   }, [mode]);
 
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") closeSidebar();
-    };
+    const onKey = (e) => { if (e.key === "Escape") closeSidebar(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useEffect(() => {
-    if (isMobile) closeSidebar();
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (isMobile) closeSidebar(); }, [location.pathname]); 
 
-  // Refrescar contadores al navegar (incluye querystring)
+  // Refrescar contadores al navegar
   useEffect(() => {
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchBajasCountersApp(); // ✅🆕 Refrescar bajas al navegar
   }, [location.pathname, location.search]);
 
   // Refresco periódico
   useEffect(() => {
-    tryFetchCounters();
-    fetchCuponerasCounters();
-    fetchRenovacionesCounters();
     if (DISABLE_POLL) return;
     const id = setInterval(() => {
       tryFetchCounters();
       fetchCuponerasCounters();
       fetchRenovacionesCounters();
+      fetchBajasCountersApp(); // ✅🆕 Refrescar bajas periódicamente
     }, 60_000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount once
+  }, [DISABLE_POLL]);
 
   return (
-    // ✅ FIX MOBILE: overflow-x-hidden + min-w-0 para evitar que padding/children empujen el ancho
     <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
       <Sidebar
         isOpen={sidebarOpen}
@@ -388,6 +321,7 @@ function App() {
         cuponPorVencer7={cuponPorVencer7}
         cuponVencidas={cuponVencidas}
         renovacionesPendientes={renovacionesPendientes}
+        bajasPendientes={bajasPendientes} // ✅🆕 Pasado al Sidebar
       />
 
       <motion.div
@@ -401,8 +335,6 @@ function App() {
         <Navbar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
         <motion.main
-          // ✅ en mobile: SIN padding horizontal (las Pages ya manejan px)
-          // ✅ en sm+: vuelve el padding normal
           className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -412,52 +344,24 @@ function App() {
           <AnimatePresence mode="wait">
             <Routes>
               <Route path="/" element={<HomePage />} />
-
-              {/* Clientes */}
               <Route path="/clientes" element={<ClientesPage />} />
               <Route path="/clientes/:id" element={<ClienteProfilePage />} />
-
-              {/* Pólizas */}
               <Route path="/polizas" element={<PolizasPage />} />
               <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
-
-              {/* ✅🆕 Vencimientos */}
               <Route path="/polizas/vencimientos" element={<VencimientosPage />} />
-
-              {/* ✅🆕 Bajas */}
               <Route path="/polizas/bajas" element={<BajasPage />} />
-
               <Route path="/polizas/:id" element={<PolizaDetails />} />
-
               <Route path="/pagos" element={<PagosPage />} />
               <Route path="/balanzes" element={<BalanzesPage />} />
               <Route path="/siniestros" element={<SiniestrosPage />} />
-
-              {/* Cuponeras */}
               <Route path="/cuponeras" element={<CuponerasPage />} />
-
-              {/* Geo habilitado */}
               <Route path="/geo" element={<GeoPage />} />
-
-              {/* Competencia */}
               <Route path="/competencia" element={<CompetenciaPage />} />
-
-              {/* Estadísticas */}
               <Route path="/estadisticas" element={<EstadisticasPage />} />
-
-              {/* Marketing / Campañas */}
               <Route path="/marketing" element={<MarketingPage />} />
-
-              {/* Propiedades / Alquileres aún bloqueadas */}
-              <Route path="/propiedades" element={<Navigate to="/" />} />
-              <Route path="/alquileres" element={<Navigate to="/" />} />
-              <Route path="/alquileres/:id" element={<Navigate to="/" />} />
-
-              {/* Solicitudes */}
               <Route path="/solicitudes" element={<SolicitudesPage />} />
-
-              {/* Gruas */}
               <Route path="/gruas" element={<GruasPage />} />
+              <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </AnimatePresence>
         </motion.main>
@@ -466,6 +370,7 @@ function App() {
           solPendienteAlta={solPendienteAlta}
           solPendienteEnvio={solPendienteEnvio}
           renovacionesPendientes={renovacionesPendientes}
+          bajasPendientes={bajasPendientes} // ✅🆕 Pasado al MobileTopBar
         />
       </motion.div>
     </div>
