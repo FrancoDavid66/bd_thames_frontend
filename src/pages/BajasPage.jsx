@@ -18,6 +18,10 @@ import {
 
 import BajasTable from "../components/bajas/BajasTable";
 
+// ✅ DETECTAMOS LA URL DEL BACKEND EN PRODUCCIÓN
+// (Si tu variable se llama distinto, por ejemplo VITE_BACKEND_URL, cámbiala aquí)
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+
 const STATUS = {
   ENVIAR: "PENDIENTE_ENVIO",
   ENVIADA: "ENVIADA",
@@ -82,7 +86,6 @@ function formatDateTime(isoString) {
   });
 }
 
-// Mini-componente visual para los estados en el historial
 function StatusBadge({ status }) {
   const s = String(status || "");
   if (s === "REALIZADA") return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Realizada</span>;
@@ -109,7 +112,6 @@ export default function BajasPage() {
   
   const [globalKpis, setGlobalKpis] = useState({ total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 });
 
-  // --- ESTADOS PARA MODALES ---
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: "", ids: [] });
   const [includeExcel, setIncludeExcel] = useState(false);
   
@@ -120,7 +122,8 @@ export default function BajasPage() {
   const fetchGlobalCounters = useCallback(async () => {
     try {
       const params = new URLSearchParams({ dias: umbralDias, oficina, search });
-      const res = await fetch(`/api/bajas/operativo/counters/?${params.toString()}`, { credentials: "include" });
+      // ✅ USAMOS API_URL
+      const res = await fetch(`${API_URL}/api/bajas/operativo/counters/?${params.toString()}`, { credentials: "include" });
       if (res.ok) setGlobalKpis(await res.json());
     } catch (e) { console.error("Error cargando contadores:", e); }
   }, [umbralDias, oficina, search]);
@@ -154,10 +157,10 @@ export default function BajasPage() {
     setHistoryModalOpen(true);
     setIsHistoryLoading(true);
     try {
-      const res = await fetch(`/api/bajas/historial/`, { credentials: "include" });
+      // ✅ USAMOS API_URL
+      const res = await fetch(`${API_URL}/api/bajas/historial/`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        // Django REST Framework con paginación devuelve los datos dentro de "results"
         setHistoryData(data.results || data); 
       }
     } catch (e) {
@@ -187,7 +190,8 @@ export default function BajasPage() {
   const updateBajaStatus = async (idsArray, nuevoEstado) => {
     try {
       await Promise.all(idsArray.map(id => 
-        fetch(`/api/bajas/operativo/${id}/estado/`, {
+        // ✅ USAMOS API_URL
+        fetch(`${API_URL}/api/bajas/operativo/${id}/estado/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ estado: nuevoEstado }),
@@ -337,7 +341,6 @@ export default function BajasPage() {
           <p className="text-sm text-slate-400">Total detectado: {globalKpis.total} pólizas.</p>
         </div>
         
-        {/* ✅ NUEVO: BOTÓN DE HISTORIAL */}
         <button 
           onClick={handleOpenHistory} 
           className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-200 rounded-lg hover:bg-slate-700 transition font-semibold"
