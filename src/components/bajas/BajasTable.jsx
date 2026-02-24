@@ -1,5 +1,7 @@
 // src/components/bajas/BajasTable.jsx
+import { HiSortAscending, HiSortDescending } from "react-icons/hi";
 
+// --- Helpers ---
 function formatDateStr(dateStr) {
   if (!dateStr) return "—";
   if (dateStr.includes("/")) return dateStr;
@@ -116,6 +118,8 @@ function statusPill(status) {
 export default function BajasTable({
   items = [],
   selectedIds,
+  sortConfig,    // ✅ Recibido de BajasPage
+  onSort,        // ✅ Recibido de BajasPage
   onToggleSelect,
   onSelectAllVisible,
   onComposeEmail,
@@ -135,6 +139,14 @@ export default function BajasTable({
     onComposeEmail && onComposeEmail([String(p.id)]);
   };
 
+  // ✅ Mini-componente para mostrar el ícono de orden
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) return <div className="w-4 h-4 opacity-10" />;
+    return sortConfig.direction === 'asc' 
+      ? <HiSortAscending className="text-blue-400 text-lg" /> 
+      : <HiSortDescending className="text-blue-400 text-lg" />;
+  };
+
   return (
     <div className="rounded-2xl border border-white/10 bg-black/20 overflow-hidden shadow-xl">
       <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-white/5 text-xs font-bold text-white/70 uppercase tracking-wider">
@@ -150,15 +162,36 @@ export default function BajasTable({
             aria-label="Seleccionar todas las visibles"
           />
         </div>
-        <div className="col-span-3">Asegurado / Contacto</div>
-        <div className="col-span-2">Vehículo / Póliza</div>
+
+        {/* ✅ ENCABEZADOS CLICKEABLES CON ICONO DE ORDEN */}
+        <div 
+          className="col-span-3 flex items-center gap-2 cursor-pointer hover:text-white transition-colors group"
+          onClick={() => onSort('_clienteNombre')}
+        >
+          Asegurado / Contacto <SortIcon columnKey="_clienteNombre" />
+        </div>
+
+        <div 
+          className="col-span-2 flex items-center gap-2 cursor-pointer hover:text-white transition-colors group"
+          onClick={() => onSort('compania')}
+        >
+          Vehículo / Póliza <SortIcon columnKey="compania" />
+        </div>
+
         <div className="col-span-3">Estado y Acciones</div>
+        
         <div className="col-span-2">Últ. Vto Impago</div>
-        <div className="col-span-1 text-center">Mora / Imp.</div>
+
+        <div 
+          className="col-span-1 text-center flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors group"
+          onClick={() => onSort('_diasMora')}
+        >
+          Mora <SortIcon columnKey="_diasMora" />
+        </div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="p-8 text-center text-white/50 bg-black/10">No hay pólizas en este estado.</div>
+        <div className="p-8 text-center text-white/50 bg-black/10">No hay pólizas que coincidan con los filtros.</div>
       ) : (
         <div className="divide-y divide-white/5">
           {rows.map((p) => {
@@ -272,10 +305,10 @@ export default function BajasTable({
 
                 <div className="col-span-1 text-center">
                   <div className="text-lg font-extrabold text-rose-400">
-                    {p?._diasMora ?? "—"}
+                    {p?._diasMora ?? "0"}
                   </div>
                   <div className="text-[10px] text-white/60 font-semibold bg-rose-500/10 rounded-md py-0.5 mt-1 border border-rose-500/20 mx-auto w-12">
-                    {p?._impagas ?? Number(p?.impagas_count) ?? 0} ct.
+                    {p?.impagas_count ?? 0} ct.
                   </div>
                 </div>
               </div>

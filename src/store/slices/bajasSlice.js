@@ -123,6 +123,14 @@ export const fetchBajas = createAsyncThunk(
   }
 );
 
+// ✅ NUEVO: Thunk para obtener los KPIs globales de la empresa
+export const fetchBajasCounters = createAsyncThunk(
+  "bajas/fetchBajasCounters",
+  async ({ dias = 15 } = {}) => {
+    return await apiGet("bajas/operativo/counters/", { dias });
+  }
+);
+
 export const fetchBajasOficinas = createAsyncThunk(
   "bajas/fetchBajasOficinas",
   async ({ force = false } = {}) => {
@@ -164,6 +172,10 @@ const bajasSlice = createSlice({
     previous: null,
     status: "idle",
     error: null,
+
+    // ✅ NUEVO: Estado para contadores globales
+    counters: { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 },
+    countersStatus: "idle",
 
     oficinas: [],
     oficinasStatus: "idle",
@@ -213,6 +225,15 @@ const bajasSlice = createSlice({
         state.error = action.error?.message || "Error al cargar las bajas";
       })
 
+      // ✅ NUEVO: Manejo de contadores
+      .addCase(fetchBajasCounters.pending, (state) => {
+        state.countersStatus = "loading";
+      })
+      .addCase(fetchBajasCounters.fulfilled, (state, action) => {
+        state.countersStatus = "succeeded";
+        state.counters = action.payload || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
+      })
+
       // ===== OFICINAS =====
       .addCase(fetchBajasOficinas.pending, (state) => {
         state.oficinasStatus = "loading";
@@ -228,9 +249,6 @@ const bajasSlice = createSlice({
       })
 
       // ===== CORREOS =====
-      .addCase(fetchBajasCorreos.pending, (state) => {
-        state.correosStatus = "loading";
-      })
       .addCase(fetchBajasCorreos.fulfilled, (state, action) => {
         state.correosStatus = "succeeded";
         state.correos = action.payload || [];
@@ -250,10 +268,12 @@ export default bajasSlice.reducer;
 // Selectors
 export const selectBajas = (s) => s?.bajas?.items || [];
 export const selectBajasCount = (s) => Number(s?.bajas?.count) || 0;
-export const selectBajasNext = (s) => s?.bajas?.next ?? null;
-export const selectBajasPrevious = (s) => s?.bajas?.previous ?? null;
 export const selectBajasStatus = (s) => s?.bajas?.status || "idle";
 export const selectBajasError = (s) => s?.bajas?.error || null;
+
+// ✅ NUEVO: Selectores para contadores
+export const selectBajasCounters = (s) => s?.bajas?.counters;
+export const selectBajasCountersStatus = (s) => s?.bajas?.countersStatus;
 
 export const selectBajasOficinas = (s) => s?.bajas?.oficinas || [];
 export const selectBajasOficinasStatus = (s) => s?.bajas?.oficinasStatus || "idle";
