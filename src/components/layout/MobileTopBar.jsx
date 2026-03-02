@@ -16,14 +16,16 @@ import {
   FaDatabase,
   FaSyncAlt,
   FaTimes,
+  FaBan,
 } from "react-icons/fa";
 
+// ✅ BADGE CORREGIDO: Ya no tiene el límite de 9+
 const Badge = ({ value = 0 }) => {
   const v = Number(value) || 0;
   if (v <= 0) return null;
   return (
     <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white shadow-lg">
-      {v > 9 ? "9+" : v}
+      {v}
     </span>
   );
 };
@@ -32,6 +34,8 @@ export default function MobileTopBar({
   solPendienteAlta = 0,
   solPendienteEnvio = 0,
   renovacionesPendientes = 0,
+  bajasPendientes = 0,
+  cuponVencidas = 0, 
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,20 +59,31 @@ export default function MobileTopBar({
         to: "/polizas",
         label: "Pólizas",
         icon: FaFileAlt,
-        badge: renovacionesPendientes,
       },
       { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
     ],
-    [solTotal, renovacionesPendientes]
+    [solTotal]
   );
 
   const moreItems = useMemo(
     () => [
       {
+        to: "/cuponeras",
+        label: "Cuponeras",
+        icon: FaFileAlt,
+        badge: cuponVencidas,
+      },
+      {
         to: "/polizas/renovaciones",
         label: "Renovaciones",
         icon: FaSyncAlt,
         badge: renovacionesPendientes,
+      },
+      {
+        to: "/polizas/bajas",
+        label: "Bajas",
+        icon: FaBan,
+        badge: bajasPendientes,
       },
       { to: "/marketing", label: "Campañas", icon: FaBullhorn },
       { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
@@ -76,7 +91,7 @@ export default function MobileTopBar({
       { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie },
       { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
     ],
-    [renovacionesPendientes]
+    [renovacionesPendientes, bajasPendientes, cuponVencidas]
   );
 
   const isPrimaryActive = (to) =>

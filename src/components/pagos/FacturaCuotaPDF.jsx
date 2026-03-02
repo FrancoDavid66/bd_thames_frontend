@@ -5,36 +5,61 @@ import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
 
-/* Paleta bordó */
-const PRIMARY = "#8B1E3F";       // bordó
-const PRIMARY_DARK = "#5E1329";  // bordó oscuro
-const BORDER = "#E6C9D2";        // borde suave rosado
-const TEXT = "#111827";          // slate-900
-const MUTED_BG = "#FBEFF3";      // fondo muy claro con tinte bordó
+/* Paleta bordó y alertas */
+const PRIMARY = "#8B1E3F"; // bordó
+const PRIMARY_DARK = "#5E1329"; // bordó oscuro
+const BORDER = "#E6C9D2"; // borde suave rosado
+const TEXT = "#111827"; // slate-900
+const MUTED_BG = "#FBEFF3"; // fondo muy claro con tinte bordó
+const ALERT_BG = "#FEF2F2"; // fondo rojo muy claro para advertencia
+const ALERT_TEXT = "#991B1B"; // texto rojo oscuro
 
 /* Utils */
 const safe = (v, d = "—") =>
   v === null || v === undefined || v === "" ? d : String(v);
 
 /**
- * Formatea fechas SIN romper por timezone.
- * - Si viene "YYYY-MM-DD" → la formatea a "DD/MM/YYYY" manualmente (sin Date).
- * - Si viene Date o algo raro → intenta construir un Date y devolver DD/MM/YYYY.
+ * ✅ REGLA NUEVA (pedido usuario): mostrar HORA y MINUTOS en el recibo.
+ * Priorizamos strings ya formateados del backend/props:
+ *  - pago_hm_full (DD/MM/YYYY HH:MM)
+ *  - si no hay, usamos pago_registrado_en (ISO) y formateamos a DD/MM/YYYY HH:MM
+ *  - si solo hay fecha (YYYY-MM-DD), mostramos solo fecha (sin hora)
  */
-const fmtDate = (d) => {
+const fmtDateTimeHM = (d) => {
   if (!d) return "—";
   try {
-    if (typeof d === "string") {
-      const dateStr = d.slice(0, 10); // soporta "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm..."
-      const parts = dateStr.split("-");
-      if (parts.length === 3) {
-        const [yyyy, mm, dd] = parts;
-        if (yyyy && mm && dd) {
-          return `${dd.padStart(2, "0")}/${mm.padStart(2, "0")}/${yyyy}`;
-        }
-      }
+    let dateObj;
+    // Si es un string YYYY-MM-DD (10 caracteres), forzamos mediodía para evitar saltos de día
+    if (typeof d === "string" && d.length === 10) {
+      dateObj = new Date(d + "T12:00:00");
+    } else {
+      dateObj = new Date(d);
     }
-    const dt = d instanceof Date ? d : new Date(d);
+
+    if (Number.isNaN(dateObj.getTime())) return "—";
+
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const year = dateObj.getFullYear();
+    const hours = String(dateObj.getHours()).padStart(2, "0");
+    const mins = String(dateObj.getMinutes()).padStart(2, "0");
+
+    // Si era solo fecha (forzada a 12:00), mostramos solo la fecha.
+    const tieneHoraReal = dateObj.getHours() !== 12 || dateObj.getMinutes() !== 0;
+    const horaTxt = tieneHoraReal ? ` ${hours}:${mins} hs` : "";
+
+    return `${day}/${month}/${year}${horaTxt}`;
+  } catch {
+    return "—";
+  }
+};
+
+/** Formatea solo fecha (DD/MM/YYYY) para vencimientos */
+const fmtDateOnly = (d) => {
+  if (!d) return "—";
+  try {
+    // Forzamos mediodía para evitar desfase de zona horaria en fechas sin hora
+    const dt = new Date(d + "T12:00:00");
     if (Number.isNaN(dt.getTime())) return "—";
     const day = String(dt.getDate()).padStart(2, "0");
     const month = String(dt.getMonth() + 1).padStart(2, "0");
@@ -57,41 +82,18 @@ const fmtMoney = (n) => {
   }
 };
 
-/** Normaliza una fecha a número YYYYMMDD para poder comparar fácil */
-const toYMDNumber = (d) => {
-  if (!d) return null;
-  try {
-    if (typeof d === "string") {
-      const dateStr = d.slice(0, 10);
-      const parts = dateStr.split("-");
-      if (parts.length === 3) {
-        const [yyyy, mm, dd] = parts;
-        const y = Number(yyyy);
-        const m = Number(mm);
-        const day = Number(dd);
-        if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(day)) {
-          return y * 10000 + m * 100 + day;
-        }
-      }
-    }
-    const dt = d instanceof Date ? d : new Date(d);
-    if (Number.isNaN(dt.getTime())) return null;
-    const y = dt.getFullYear();
-    const m = dt.getMonth() + 1;
-    const day = dt.getDate();
-    return y * 10000 + m * 100 + day;
-  } catch {
-    return null;
-  }
-};
-
-/** Determina si la cuota se pagó después del vencimiento */
+/** Compara fechas para detectar pago atrasado */
 const isPagoAtrasado = (cuota) => {
   if (!cuota || !cuota.pagado) return false;
-  const v = toYMDNumber(cuota.fecha_vencimiento);
-  const p = toYMDNumber(cuota.fecha_pago);
-  if (v == null || p == null) return false;
-  return p > v;
+  // Comparamos el inicio del día del vencimiento con el inicio del día del pago
+  const v = new Date(cuota.fecha_vencimiento + "T00:00:00");
+  const ref = cuota.pago_registrado_en || cuota.fecha_pago || new Date();
+  const pStr =
+    typeof ref === "string"
+      ? ref.slice(0, 10)
+      : new Date(ref).toISOString().slice(0, 10);
+  const p = new Date(pStr + "T00:00:00");
+  return p.getTime() > v.getTime();
 };
 
 const styles = StyleSheet.create({
@@ -105,8 +107,6 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     fontSize: 11,
   },
-
-  /* Encabezado */
   header: {
     borderRadius: 10,
     borderWidth: 1.2,
@@ -129,8 +129,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4,
   },
-
-  /* Bloque destacado de Vencimiento */
   dueBox: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -150,16 +148,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   dueValue: {
-    fontSize: 18,
+    fontSize: 16,
     color: PRIMARY,
     fontWeight: "bold",
   },
-
-  /* Grid 2 columnas */
   grid2: { flexDirection: "row", gap: 12, marginBottom: 12 },
   col: { flexGrow: 1, flexBasis: 0 },
-
-  /* Secciones */
   section: {
     borderRadius: 10,
     borderWidth: 1.2,
@@ -176,17 +170,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   sectionBody: { padding: 10, backgroundColor: "#FFFFFF" },
-
   label: { fontSize: 10, color: PRIMARY_DARK, fontWeight: "bold", marginTop: 6 },
   value: { fontSize: 11, marginTop: 2 },
-
-  /* Tabla */
   table: {
     marginTop: 4,
     borderRadius: 10,
     borderWidth: 1.2,
     borderColor: BORDER,
     overflow: "hidden",
+    marginBottom: 12,
   },
   tableHeader: {
     flexDirection: "row",
@@ -216,142 +208,149 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     backgroundColor: "#FCF7F9",
   },
-
-  /* Leyenda por pago atrasado */
-  lateNotice: {
-    marginTop: 16,
-    paddingHorizontal: 4,
+  alertBox: {
+    marginTop: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: ALERT_TEXT,
+    backgroundColor: ALERT_BG,
+    padding: 12,
   },
-  lateNoticeText: {
-    fontSize: 9,
-    color: PRIMARY_DARK,
+  alertTitle: {
+    fontSize: 12,
+    color: ALERT_TEXT,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+    marginBottom: 6,
     textAlign: "center",
+  },
+  alertText: {
+    fontSize: 10,
+    color: ALERT_TEXT,
+    textAlign: "center",
+    lineHeight: 1.4,
+  },
+  // ✅ Nuevo estilo para resaltar palabras clave
+  alertBoldUnderline: {
+    fontWeight: "bold",
+    textDecoration: "underline",
   },
 });
 
-const FacturaCuotaPDF = ({ cliente, poliza, cuota }) => {
-  if (!cliente || !poliza || !cuota) {
-    return (
-      <Document>
-        <Page size={{ width: A4_WIDTH, height: A4_HEIGHT }} style={styles.page}>
-          <Text>Faltan datos para generar el comprobante.</Text>
-        </Page>
-      </Document>
-    );
-  }
+const FacturaCuotaPDF = ({
+  cliente = {},
+  poliza = {},
+  cuota = {},
+  // ✅ nuevos props opcionales (desde DescargarFactura.jsx / ImprimirFacturaTicket.jsx)
+  pago_hm,
+  pago_hm_full,
+  pago_dt_iso,
+}) => {
+  const titularFinal =
+    `${safe(cliente.nombre || poliza.cliente_nombre, "")} ${safe(
+      cliente.apellido || poliza.cliente_apellido,
+      ""
+    )}`.trim() || "—";
+  const dniFinal = safe(cliente.dni_cuit_cuil || poliza.cliente_dni || cliente.dni);
+  const marca = safe(poliza.marca || poliza.poliza__marca);
+  const modelo = safe(poliza.modelo || poliza.poliza__modelo);
+  const patente = safe(poliza.patente || poliza.poliza__patente);
 
-  /* Requisitos: SOLO datos del asegurado (Nombre y DNI/CUIT), del auto, fecha de pago,
-     fecha de vencimiento y número de cuota. No se muestra número de póliza ni datos de contacto. */
   const cuotaNro = safe(cuota.cuota_nro);
-  const fechaVenc = fmtDate(cuota.fecha_vencimiento);
-  const fechaPago = fmtDate(cuota.fecha_pago);
+  const monto = cuota.monto || 0;
 
-  const subtotal = Number(
-    cuota.subtotal !== undefined && cuota.subtotal !== null
-      ? cuota.subtotal
-      : cuota.monto || 0
-  );
-  const recargo = Number(cuota.recargo || 0);
-  const descuento = Number(cuota.descuento || 0);
-  const total =
-    cuota.total !== undefined && cuota.total !== null
-      ? Number(cuota.total)
-      : subtotal + recargo - descuento;
+  // ✅ REGLA: hora/minutos en el recibo
+  // 1) si viene string formateado full (DD/MM/YYYY HH:MM) desde backend/props, usarlo
+  // 2) si no, si viene timestamp ISO, formatear a HM
+  // 3) si no, usar pago_registrado_en/fecha_pago como fallback
+  const fechaHoraOperacion =
+    (pago_hm_full && String(pago_hm_full).trim()) ||
+    (cuota.pago_hm_full && String(cuota.pago_hm_full).trim()) ||
+    fmtDateTimeHM(
+      pago_dt_iso || cuota.pago_registrado_en || cuota.fecha_pago || new Date()
+    );
 
-  const pagoAtrasado = isPagoAtrasado(cuota);
+  const fechaVencimiento = fmtDateOnly(cuota.fecha_vencimiento);
+  const pagoFueraDeTermino = isPagoAtrasado(cuota);
 
   return (
     <Document>
       <Page size={{ width: A4_WIDTH, height: A4_HEIGHT }} style={styles.page}>
-        {/* Encabezado con subtítulo solicitado */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>FACTURA</Text>
+          <Text style={styles.headerTitle}>COMPROBANTE DE PAGO</Text>
           <Text style={styles.headerSubtitle}>
             Factura por servicios jurídicos y seguros
           </Text>
         </View>
 
-        {/* Bloque destacado de vencimiento */}
+        {/* ✅ Bloque destacado con Hora y Minutos */}
         <View style={styles.dueBox}>
-          <Text style={styles.dueLabel}>Fecha de vencimiento</Text>
-          <Text style={styles.dueValue}>{fechaVenc}</Text>
+          <Text style={styles.dueLabel}>Fecha y Hora de Operación</Text>
+          <Text style={styles.dueValue}>{fechaHoraOperacion}</Text>
         </View>
 
-        {/* Titular + Auto */}
         <View style={styles.grid2}>
-          {/* Titular (SIN dirección ni teléfono) */}
           <View style={[styles.section, styles.col]}>
             <Text style={styles.sectionHead}>Titular</Text>
             <View style={styles.sectionBody}>
               <Text style={styles.label}>Nombre</Text>
-              <Text style={styles.value}>
-                {safe(cliente.nombre)} {safe(cliente.apellido)}
-              </Text>
-
+              <Text style={styles.value}>{titularFinal}</Text>
               <Text style={styles.label}>DNI / CUIT</Text>
-              <Text style={styles.value}>{safe(cliente.dni_cuit_cuil)}</Text>
+              <Text style={styles.value}>{dniFinal}</Text>
             </View>
           </View>
 
-          {/* Datos del Auto */}
           <View style={[styles.section, styles.col]}>
             <Text style={styles.sectionHead}>Datos del Auto</Text>
             <View style={styles.sectionBody}>
               <Text style={styles.label}>Marca / Modelo</Text>
               <Text style={styles.value}>
-                {safe(poliza.marca)} {safe(poliza.modelo)}
+                {marca} {modelo}
               </Text>
-
-              <Text style={styles.label}>Año</Text>
-              <Text style={styles.value}>{safe(poliza.anio)}</Text>
-
               <Text style={styles.label}>Patente</Text>
-              <Text style={styles.value}>{safe(poliza.patente)}</Text>
-
-              <Text style={styles.label}>Fecha de pago</Text>
-              <Text style={styles.value}>{fechaPago}</Text>
+              <Text style={styles.value}>{patente}</Text>
             </View>
           </View>
         </View>
 
-        {/* Concepto / Valor a pagar */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <Text>Concepto</Text>
             <Text>Valor a Pagar</Text>
           </View>
-
           <View style={styles.tableRow}>
+            {/* ✅ REGLA: Sin número de póliza aquí */}
             <Text>Cuota Nº {cuotaNro}</Text>
-            <Text>{fmtMoney(subtotal)}</Text>
+            <Text>{fmtMoney(monto)}</Text>
           </View>
-
-          {Number(recargo) !== 0 ? (
-            <View style={styles.tableRow}>
-              <Text>Recargos / Intereses</Text>
-              <Text>{fmtMoney(recargo)}</Text>
-            </View>
-          ) : null}
-
-          {Number(descuento) !== 0 ? (
-            <View style={styles.tableRow}>
-              <Text>Descuentos</Text>
-              <Text>- {fmtMoney(Math.abs(descuento))}</Text>
-            </View>
-          ) : null}
-
           <View style={styles.totalRow}>
-            <Text>TOTAL</Text>
-            <Text>{fmtMoney(total)}</Text>
+            <Text>TOTAL ABONADO</Text>
+            <Text>{fmtMoney(monto)}</Text>
           </View>
         </View>
 
-        {/* Leyenda por pago atrasado */}
-        {pagoAtrasado && (
-          <View style={styles.lateNotice}>
-            <Text style={styles.lateNoticeText}>
-              Por haber abonado el seguro en forma atrasada, la cobertura se
-              restablecerá en 2 días hábiles.
+        <View style={styles.dueBox}>
+          <Text style={styles.dueLabel}>Próximo Vencimiento</Text>
+          <Text style={styles.dueValue}>{fechaVencimiento}</Text>
+        </View>
+
+        {pagoFueraDeTermino && (
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>
+              AVISO IMPORTANTE - PAGO FUERA DE TÉRMINO
+            </Text>
+            <Text style={styles.alertText}>
+              Por haber abonado el seguro en forma{" "}
+              <Text style={styles.alertBoldUnderline}>atrasada</Text>, la cobertura
+              se restablecerá dentro de las{" "}
+              <Text style={styles.alertBoldUnderline}>48 horas hábiles</Text>. El
+              asegurado deja constancia y declara{" "}
+              <Text style={styles.alertBoldUnderline}>bajo juramento</Text> que{" "}
+              <Text style={styles.alertBoldUnderline}>NO</Text> ha tenido ningún
+              tipo de{" "}
+              <Text style={styles.alertBoldUnderline}>siniestro ni reclamo</Text>{" "}
+              durante el período en el cual la cuota se encontraba{" "}
+              <Text style={styles.alertBoldUnderline}>impaga</Text>.
             </Text>
           </View>
         )}

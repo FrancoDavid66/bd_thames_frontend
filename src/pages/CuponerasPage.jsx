@@ -1,6 +1,6 @@
 // src/pages/CuponerasPage.jsx
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import {
   HiRefresh,
@@ -11,9 +11,19 @@ import {
   HiChevronLeft,
   HiChevronRight,
   HiChatAlt2,
+  HiFilter,
+  HiCurrencyDollar,
+  HiX,
+  HiPhotograph,
 } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import axios from "axios";
+
+import { useDispatch } from "react-redux";
+import { actualizarEstadoCuponRobo } from "../store/slices/cuponesRoboSlice";
+
+// ✅ IMPORTAMOS TU FUNCIÓN PARA SUBIR A CLOUDINARY
+import { uploadToCloudinary } from "../utils/cloudinary";
 
 const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
 const BASE = RAW_BASE.endsWith("/") ? RAW_BASE : `${RAW_BASE}/`;
@@ -23,10 +33,6 @@ const http = axios.create({
   withCredentials: true,
 });
 
-/**
- * ✅ REGLA: estos estados deberían salir de los valores reales del backend (c.estado).
- * Pasame los valores exactos cuando puedas y los dejamos “oficiales” acá.
- */
 const badgeByEstado = {
   PENDIENTE: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
   AL_DIA: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
@@ -107,9 +113,6 @@ function buildPages(current, total) {
   return pages.filter((v, i) => pages.indexOf(v) === i);
 }
 
-/* =========================
-   WhatsApp helpers (AR)
-========================= */
 function digitsOnly(v) {
   return String(v || "").replace(/\D+/g, "");
 }
@@ -117,33 +120,19 @@ function digitsOnly(v) {
 function normalizePhoneAR(raw) {
   let d = digitsOnly(raw);
   if (!d) return "";
-
-  // quita 00
   if (d.startsWith("00")) d = d.slice(2);
-
-  // si ya tiene 54 (lo dejamos en formato wa.me sin +)
-  if (d.startsWith("54")) {
-    d = d.slice(2);
-  }
-
-  // quita 0 inicial (larga distancia)
+  if (d.startsWith("54")) d = d.slice(2);
   if (d.startsWith("0")) d = d.slice(1);
-
-  // quita 15 (celular) heurística
   d = d.replace(/^(\d{2,4})15/, "$1");
-
   return `54${d}`;
 }
 
 function resolvePhoneFromCupon(c) {
-  // 1) si backend ya manda e164 “+54...”, lo respetamos
   const e164 = String(c?.asegurado_telefono_e164 || "").trim();
   if (e164.startsWith("+")) {
     const wa = digitsOnly(e164);
-    if (wa) return wa; // wa.me va SIN "+"
+    if (wa) return wa;
   }
-
-  // 2) candidatos comunes
   const candidates = [
     c?.asegurado_telefono,
     c?.cliente_telefono,
@@ -159,40 +148,15 @@ function resolvePhoneFromCupon(c) {
   return "";
 }
 
-/* =========================
-   Datos vehículo (robusto)
-========================= */
 function resolveVehiculoFromCupon(c) {
-  // soporta varias convenciones (por si backend cambia)
-  const anio =
-    c?.poliza_anio ??
-    c?.anio ??
-    c?.vehiculo_anio ??
-    c?.auto_anio ??
-    c?.poliza?.anio ??
-    "";
-
-  const modelo =
-    c?.poliza_modelo ??
-    c?.modelo ??
-    c?.vehiculo_modelo ??
-    c?.auto_modelo ??
-    c?.poliza?.modelo ??
-    "";
-
-  const patente =
-    c?.poliza_patente ??
-    c?.patente ??
-    c?.vehiculo_patente ??
-    c?.auto_patente ??
-    c?.poliza?.patente ??
-    "";
+  const anio = c?.poliza_anio ?? c?.anio ?? c?.vehiculo_anio ?? c?.auto_anio ?? c?.poliza?.anio ?? "";
+  const modelo = c?.poliza_modelo ?? c?.modelo ?? c?.vehiculo_modelo ?? c?.auto_modelo ?? c?.poliza?.modelo ?? "";
+  const patente = c?.poliza_patente ?? c?.patente ?? c?.vehiculo_patente ?? c?.auto_patente ?? c?.poliza?.patente ?? "";
 
   const a = String(anio || "").trim();
   const m = String(modelo || "").trim();
   const p = String(patente || "").trim();
 
-  // queremos: año, modelo y patente (en ese orden)
   const parts = [];
   if (a) parts.push(a);
   if (m) parts.push(m);
@@ -203,7 +167,7 @@ function resolveVehiculoFromCupon(c) {
 
 function buildMensajeCuota(c) {
   const nombre = (c?.asegurado_nombre || "").trim() || "¿Cómo estás?";
-  const vehiculoTxt = resolveVehiculoFromCupon(c); // "año · modelo · patente"
+  const vehiculoTxt = resolveVehiculoFromCupon(c);
 
   const hoy = dayjs().startOf("day");
   const vto = c?.fecha_vencimiento ? dayjs(c.fecha_vencimiento) : null;
@@ -237,10 +201,20 @@ function buildWaUrl(phoneWa, message) {
 }
 
 export default function CuponerasPage() {
+  const dispatch = useDispatch();
+  const fileInputRef = useRef(null);
+
   const [cupones, setCupones] = useState([]);
   const [count, setCount] = useState(0);
 
   const [counters, setCounters] = useState({
+    total: 0,
+    pendientes: 0,
+    por_vencer_7: 0,
+    vencidas: 0,
+  });
+
+  const [countersFiltrados, setCountersFiltrados] = useState({
     total: 0,
     pendientes: 0,
     por_vencer_7: 0,
@@ -252,10 +226,30 @@ export default function CuponerasPage() {
   const [lastLoadedAt, setLastLoadedAt] = useState(null);
 
   const [search, setSearch] = useState("");
-  const [scope, setScope] = useState("ALL"); // ALL | PENDIENTE | POR_VENCER_7 | VENCIDA
+  const [compania, setCompania] = useState("");
+  const [companiasOpciones, setCompaniasOpciones] = useState([]);
+  
+  const [scope, setScope] = useState("ALL"); 
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  // ✅ ESTADOS PARA EL MODAL DE PAGO
+  const [pagoModal, setPagoModal] = useState(null);
+  const [montoPago, setMontoPago] = useState("");
+  const [fotoComprobante, setFotoComprobante] = useState(null); // Nuevo estado para la foto
+  const [procesandoPago, setProcesandoPago] = useState(false);
+
+  useEffect(() => {
+    http.get("polizas/companias/")
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          const mapped = res.data.map(d => typeof d === 'string' ? d : (d?.nombre || d?.id || '')).filter(Boolean);
+          setCompaniasOpciones([...new Set(mapped)]);
+        }
+      })
+      .catch(() => console.warn("No se pudo cargar la lista de compañías."));
+  }, []);
 
   const stats = useMemo(() => {
     const total = Number(counters?.total || 0);
@@ -273,7 +267,7 @@ export default function CuponerasPage() {
 
   const pages = useMemo(() => buildPages(page, totalPages), [page, totalPages]);
 
-  const loadDashboard = async (term = "", opts = {}) => {
+  const loadDashboard = async (term = "", cmp = "", opts = {}) => {
     const { page: p = page, pageSize: ps = pageSize, scope: sc = scope } = opts;
 
     setLoading(true);
@@ -285,19 +279,19 @@ export default function CuponerasPage() {
         page_size: ps,
       };
 
-      // ✅ scope SOLO para tabla
       if (sc && sc !== "ALL") params.scope = sc;
 
       const q = term.trim();
       if (q) params.search = q;
+      
+      const c = cmp.trim();
+      if (c) params.compania = c;
 
       const res = await http.get("polizas/cupones-robo/dashboard/", { params });
       const data = res.data || {};
 
-      // ✅ counters SIEMPRE globales
-      setCounters(
-        data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 }
-      );
+      setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
+      setCountersFiltrados(data.counters_filtrados || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
 
       setCount(Number(data.count || 0));
       setCupones(Array.isArray(data.results) ? data.results : []);
@@ -306,6 +300,7 @@ export default function CuponerasPage() {
       console.error(e);
       setError("No se pudieron cargar las cuponeras de robo.");
       setCounters({ total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
+      setCountersFiltrados({ total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
       setCount(0);
       setCupones([]);
     } finally {
@@ -313,25 +308,24 @@ export default function CuponerasPage() {
     }
   };
 
-  // debounce search => page 1 + dashboard
   useEffect(() => {
     const id = setTimeout(() => {
       setPage(1);
-      loadDashboard(search, { page: 1, pageSize, scope });
+      loadDashboard(search, compania, { page: 1, pageSize, scope });
     }, 350);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search, compania]);
 
-  // page / pageSize / scope => dashboard
   useEffect(() => {
-    loadDashboard(search, { page, pageSize, scope });
+    loadDashboard(search, compania, { page, pageSize, scope });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, scope]);
 
-  const refreshAll = () => loadDashboard(search, { page, pageSize, scope });
+  const refreshAll = () => loadDashboard(search, compania, { page, pageSize, scope });
 
   const hasAny = (count || 0) > 0;
+  const isFiltering = search.trim() !== "" || compania.trim() !== "";
 
   const canPrev = page > 1 && !loading;
   const canNext = page < totalPages && !loading;
@@ -344,9 +338,89 @@ export default function CuponerasPage() {
   const onWhatsApp = (c) => {
     const phone = resolvePhoneFromCupon(c);
     if (!phone) return;
-    const msg = buildMensajeCuota(c); // ✅ ahora dice “cuota” y muestra año/modelo/patente
+    const msg = buildMensajeCuota(c); 
     const url = buildWaUrl(phone, msg);
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // ✅ Función para formatear el input en tiempo real
+  const handleMontoChange = (e) => {
+    let val = e.target.value;
+    val = val.replace(/[^0-9,]/g, "");
+    
+    const parts = val.split(",");
+    let integerPart = parts[0];
+    let decimalPart = parts.length > 1 ? "," + parts[1].slice(0, 2) : ""; 
+
+    if (integerPart) {
+      integerPart = new Intl.NumberFormat("es-AR").format(Number(integerPart));
+    }
+
+    setMontoPago(integerPart + decimalPart);
+  };
+
+  // ✅ Manejar selección de foto
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFotoComprobante(e.target.files[0]);
+    }
+  };
+
+  // ✅ FUNCION PARA CONFIRMAR EL PAGO AL BACKEND (CON FOTO)
+  const confirmarPago = async () => {
+    if (!pagoModal || !fotoComprobante) return;
+    
+    setProcesandoPago(true);
+    try {
+      // 1. Subir la foto a Cloudinary primero
+      const { secure_url, public_id } = await uploadToCloudinary(
+        fotoComprobante,
+        "rc-admin/cupones-robo"
+      );
+
+      // 2. Limpiar el texto "66.000,50" -> "66000.50"
+      const montoLimpio = montoPago 
+        ? parseFloat(montoPago.replace(/\./g, "").replace(",", ".")) 
+        : 0;
+        
+      // 3. Mandar todo a Redux
+      await dispatch(
+        actualizarEstadoCuponRobo({
+          id: pagoModal.id,
+          polizaId: pagoModal.poliza,
+          estado: "PAGADA",
+          monto: montoLimpio,
+          foto_url: secure_url,
+          foto_public_id: public_id,
+        })
+      ).unwrap();
+
+      // Reset y refresh
+      setPagoModal(null);
+      setMontoPago("");
+      setFotoComprobante(null);
+      refreshAll(); 
+    } catch (err) {
+      console.error("Error al procesar pago:", err);
+      // Aquí el error se muestra en pantalla gracias a los Toasts de Redux
+    } finally {
+      setProcesandoPago(false);
+    }
+  };
+
+  // ✅ Función para abrir el modal y formatear data
+  const openModalPago = (c) => {
+    setPagoModal(c);
+    setFotoComprobante(null); // Limpiamos si quedó alguna foto de antes
+    if (c.monto) {
+      const m = String(c.monto).replace(".", ",");
+      const parts = m.split(",");
+      let intP = new Intl.NumberFormat("es-AR").format(Number(parts[0]));
+      let decP = parts.length > 1 ? "," + parts[1] : "";
+      setMontoPago(intP + decP);
+    } else {
+      setMontoPago("");
+    }
   };
 
   return (
@@ -379,7 +453,7 @@ export default function CuponerasPage() {
         </div>
       </div>
 
-      {/* KPIs (SIEMPRE TOTALES) */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.button
           type="button"
@@ -389,7 +463,7 @@ export default function CuponerasPage() {
             ${scope === "ALL" ? "ring-2 ring-sky-400/60 shadow-md" : "hover:-translate-y-0.5 hover:shadow-md"}`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
-            Total (1 por póliza)
+            Total Global
           </span>
           <div className="flex items-end justify-between mt-1">
             <span className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
@@ -406,7 +480,7 @@ export default function CuponerasPage() {
             ${scope === "PENDIENTE" ? "ring-2 ring-emerald-400/70 shadow-md" : "hover:-translate-y-0.5 hover:shadow-md"}`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-emerald-300">
-            Pendientes (estado)
+            Pendientes Global
           </span>
           <div className="flex items-center justify-between mt-1">
             <span className="text-2xl font-semibold text-emerald-200">
@@ -424,7 +498,7 @@ export default function CuponerasPage() {
             ${scope === "POR_VENCER_7" ? "ring-2 ring-amber-300/80 shadow-md" : "hover:-translate-y-0.5 hover:shadow-md"}`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-amber-200">
-            Por vencer (≤ 7 días)
+            Por vencer Global
           </span>
           <div className="flex items-center justify-between mt-1">
             <span className="text-2xl font-semibold text-amber-100">
@@ -442,7 +516,7 @@ export default function CuponerasPage() {
             ${scope === "VENCIDA" ? "ring-2 ring-rose-300/80 shadow-md" : "hover:-translate-y-0.5 hover:shadow-md"}`}
         >
           <span className="text-xs uppercase tracking-[0.15em] text-rose-200">
-            Vencidas
+            Vencidas Global
           </span>
           <div className="flex items-center justify-between mt-1">
             <span className="text-2xl font-semibold text-rose-100">
@@ -453,19 +527,72 @@ export default function CuponerasPage() {
         </motion.button>
       </div>
 
-      {/* Buscador */}
-      <div className="max-w-lg">
-        <div className="relative mt-2">
+      {/* Buscador y Filtros */}
+      <div className="flex flex-col sm:flex-row items-center gap-3 max-w-3xl mt-2">
+        <div className="relative w-full sm:max-w-md">
           <HiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
             className="w-full rounded-full border border-slate-300/40 bg-white/80 px-9 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 dark:bg-slate-900/80 dark:text-slate-100 dark:border-slate-700/60"
-            placeholder="Buscar por número de póliza, patente o asegurado..."
+            placeholder="Buscar por póliza, patente o asegurado..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <div className="w-full sm:w-56 shrink-0">
+          <select
+            value={compania}
+            onChange={(e) => setCompania(e.target.value)}
+            className="w-full rounded-full border border-slate-300/40 bg-white/80 px-4 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 dark:bg-slate-900/80 dark:text-slate-100 dark:border-slate-700/60"
+          >
+            <option value="">Todas las compañías</option>
+            {companiasOpciones.map((c, idx) => (
+              <option key={`${c}-${idx}`} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {/* SUB-TARJETAS ELEGANTES DE BÚSQUEDA */}
+      <AnimatePresence>
+        {isFiltering && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -10 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -10 }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center gap-4 bg-sky-500/10 border border-sky-500/20 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-widest md:border-r md:border-sky-500/30 md:pr-4">
+                <HiFilter className="h-4 w-4" />
+                Tu Búsqueda
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                  <span>Encontradas:</span>
+                  <span className="font-bold text-base">{countersFiltrados.total}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <span>Pendientes:</span>
+                  <span className="font-bold text-base">{countersFiltrados.pendientes}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                  <span>Por Vencer:</span>
+                  <span className="font-bold text-base">{countersFiltrados.por_vencer_7}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                  <span>Vencidas:</span>
+                  <span className="font-bold text-base">{countersFiltrados.vencidas}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {error && (
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-100 px-4 py-3 text-sm flex items-center gap-2">
@@ -509,6 +636,9 @@ export default function CuponerasPage() {
               <tr className="text-left text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                 <th className="px-4 py-2">ID</th>
                 <th className="px-4 py-2">Póliza</th>
+                <th className="px-4 py-2">Compañía</th>
+                <th className="px-4 py-2">Modelo</th>
+                <th className="px-4 py-2">Patente</th>
                 <th className="px-4 py-2">Asegurado</th>
                 <th className="px-4 py-2">Periodo</th>
                 <th className="px-4 py-2">Vencimiento</th>
@@ -520,7 +650,7 @@ export default function CuponerasPage() {
               {loading && cupones.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={10}
                     className="px-4 py-6 text-center text-slate-500 dark:text-slate-400 text-sm"
                   >
                     Cargando...
@@ -531,10 +661,10 @@ export default function CuponerasPage() {
               {!loading && cupones.length === 0 && !error && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={10}
                     className="px-4 py-6 text-center text-slate-500 dark:text-slate-400 text-sm"
                   >
-                    {hasAny ? "No hay cuponeras en esta página." : "No hay cuponeras registradas."}
+                    {hasAny ? "No hay cuponeras en esta página." : "No hay resultados para tu búsqueda."}
                   </td>
                 </tr>
               )}
@@ -575,6 +705,18 @@ export default function CuponerasPage() {
                     </td>
 
                     <td className="px-4 py-3 text-xs text-slate-200 dark:text-slate-100">
+                      {c.poliza_compania || "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-xs text-slate-200 dark:text-slate-100">
+                      {c.poliza_modelo || "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-xs font-mono font-medium text-slate-700 dark:text-slate-200">
+                      {c.poliza_patente || "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-xs text-slate-200 dark:text-slate-100">
                       {c.asegurado_nombre || "—"}
                     </td>
 
@@ -591,21 +733,37 @@ export default function CuponerasPage() {
                     </td>
 
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => onWhatsApp(c)}
-                        disabled={!canWa}
-                        title={canWa ? `WhatsApp: +${phone}` : "Sin teléfono"}
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs border transition
-                          ${
-                            canWa
-                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
-                              : "border-slate-400/20 bg-slate-500/5 text-slate-400 cursor-not-allowed opacity-60"
-                          }`}
-                      >
-                        <HiChatAlt2 className="h-4 w-4" />
-                        Enviar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {/* ✅ BOTÓN DE PAGAR */}
+                        {visual !== "PAGADA" && (
+                          <button
+                            type="button"
+                            onClick={() => openModalPago(c)}
+                            title="Subir comprobante y marcar pagada"
+                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs border border-sky-400/40 bg-sky-500/10 text-sky-600 hover:bg-sky-500/20 dark:text-sky-300 transition"
+                          >
+                            <HiCurrencyDollar className="h-4 w-4" />
+                            Pagar
+                          </button>
+                        )}
+
+                        {/* BOTÓN WHATSAPP */}
+                        <button
+                          type="button"
+                          onClick={() => onWhatsApp(c)}
+                          disabled={!canWa}
+                          title={canWa ? `WhatsApp: +${phone}` : "Sin teléfono"}
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs border transition
+                            ${
+                              canWa
+                                ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
+                                : "border-slate-400/20 bg-slate-500/5 text-slate-400 cursor-not-allowed opacity-60"
+                            }`}
+                        >
+                          <HiChatAlt2 className="h-4 w-4" />
+                          Enviar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -664,6 +822,127 @@ export default function CuponerasPage() {
           </div>
         </div>
       </div>
+
+      {/* ✅ MODAL DE PAGO CON FOTO OBLIGATORIA */}
+      <AnimatePresence>
+        {pagoModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                  Registrar Pago de Cuponera
+                </h3>
+                <button
+                  onClick={() => setPagoModal(null)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition"
+                  disabled={procesandoPago}
+                >
+                  <HiX className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-5 text-sm text-slate-600 dark:text-slate-300">
+                <p>
+                  Vas a marcar como <strong>PAGADA</strong> la cuota del asegurado{" "}
+                  <span className="font-semibold">{pagoModal.asegurado_nombre || "—"}</span>{" "}
+                  (Póliza: {pagoModal.poliza_numero || pagoModal.poliza}).
+                </p>
+                
+                {/* Monto */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    Monto abonado ($)
+                  </label>
+                  <div className="relative">
+                    <HiCurrencyDollar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={montoPago}
+                      onChange={handleMontoChange}
+                      placeholder="Ej: 66.000"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white transition"
+                      disabled={procesandoPago}
+                    />
+                  </div>
+                </div>
+
+                {/* ✅ Comprobante de pago OBLIGATORIO */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span>Comprobante de Pago</span>
+                    <span className="text-[10px] text-rose-500 font-bold bg-rose-500/10 px-2 py-0.5 rounded-md">Obligatorio</span>
+                  </label>
+                  
+                  <div
+                    onClick={() => !procesandoPago && fileInputRef.current?.click()}
+                    className={`relative overflow-hidden w-full h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer
+                      ${fotoComprobante 
+                        ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' 
+                        : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                  >
+                    <HiPhotograph className="h-6 w-6" />
+                    <span className="text-xs font-medium px-2 text-center">
+                      {fotoComprobante ? fotoComprobante.name : "Hacé clic para subir la foto del comprobante"}
+                    </span>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={procesandoPago}
+                  />
+                </div>
+
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-900/50 px-5 py-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
+                <button
+                  onClick={() => setPagoModal(null)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition"
+                  disabled={procesandoPago}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarPago}
+                  disabled={procesandoPago || !montoPago || !fotoComprobante}
+                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition shadow-sm shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {procesandoPago ? (
+                    <HiRefresh className="animate-spin h-4 w-4" />
+                  ) : (
+                    <HiCheckCircle className="h-4 w-4" /> 
+                  )}
+                  {procesandoPago ? "Subiendo foto y guardando..." : "Confirmar Pago"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function HiCheckCircle(props) {
+  return (
+    <svg fill="currentColor" viewBox="0 0 20 20" {...props}>
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    </svg>
   );
 }

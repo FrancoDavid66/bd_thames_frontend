@@ -1,6 +1,7 @@
 /* src/pages/PagosPage.jsx — Panel Pagos + Recordatorios (integrado con slice pagos)
    ✅ Flujo: Buscar → Lista de clientes → Modal con cuotas del cliente → Pagar
-   ✅ OPT: usa solo campos necesarios (asume payload /pagos/buscar/ con Cuot aFlatSerializer)
+   ✅ OPT: usa solo campos necesarios (asume payload /pagos/buscar/ con CuotaFlatSerializer)
+   ✅ FIX: conservar pago_registrado_en + pago_hm + pago_hm_full para reimprimir post-refresh
 */
 
 import { useState, useEffect, useMemo, useCallback, useDeferredValue, useTransition } from "react";
@@ -120,6 +121,7 @@ function fmtRegistro(it) {
   }
 }
 
+/* ===================== FIX: mantener timestamps para reimpresión ===================== */
 function normalizeCuotaFlat(item) {
   const it = item && typeof item === "object" ? item : {};
 
@@ -143,12 +145,17 @@ function normalizeCuotaFlat(item) {
     cobertura: String(polIn?.cobertura ?? "").trim(),
     compania_nombre: String(polIn?.compania_nombre ?? "").trim(),
     oficina: String(polIn?.oficina ?? "").trim(),
-    cliente, 
+    cliente,
     cliente_id: cliente.id ?? null,
     cliente_nombre: cliente.nombre,
     cliente_apellido: cliente.apellido,
     cliente_nombre_apellido: `${cliente.apellido} ${cliente.nombre}`.trim(),
   };
+
+  // ✅ NUEVO: estos 3 son los que necesitás para que post-refresh siga figurando hora/minuto
+  const pago_registrado_en = it?.pago_registrado_en ?? null;
+  const pago_hm = String(it?.pago_hm ?? "").trim(); // HH:MM (si backend lo manda)
+  const pago_hm_full = String(it?.pago_hm_full ?? "").trim(); // DD/MM/YYYY HH:MM (si backend lo manda)
 
   return {
     id: it?.id ?? null,
@@ -159,6 +166,11 @@ function normalizeCuotaFlat(item) {
     fecha_pago: it?.fecha_pago ?? null,
     forma_pago: String(it?.forma_pago ?? "").trim(),
 
+    // ✅ FIX: timestamp real del pago (persiste para PDF)
+    pago_registrado_en,
+    pago_hm,
+    pago_hm_full,
+
     observaciones: String(it?.observaciones ?? "").trim(),
     observaciones_pago: String(it?.observaciones ?? "").trim(),
     ultima_observacion_pago: String(it?.ultima_observacion_pago ?? "").trim(),
@@ -168,7 +180,7 @@ function normalizeCuotaFlat(item) {
     cantidad_cuotas: it?.total_cuotas ?? null,
 
     poliza,
-    cliente, 
+    cliente,
   };
 }
 

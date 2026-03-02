@@ -166,6 +166,7 @@ export default function PolizaCuotasCard({ poliza }) {
                   forma_pago: formaPago,
                   monto: monto ?? c.monto,
                   fecha_pago: dayjs().toISOString(),
+                  pago_registrado_en: dayjs().toISOString(), // ✅ FIX: Agregado para el PDF inmediato
                 }
               : c
           )
@@ -211,14 +212,18 @@ export default function PolizaCuotasCard({ poliza }) {
               {poliza?.marca} {poliza?.modelo}{" "}
               <span className="opacity-70">({poliza?.patente})</span>
             </h3>
-            <p className={`text-sm ${P.subtitle}`}>
-              Póliza:{" "}
-              <span className="font-semibold">
-                {poliza?.numero_poliza || "—"}
-              </span>{" "}
-              • Cobertura:{" "}
-              <span className="font-semibold">
-                {poliza?.cobertura || "—"}
+            {/* ✅ DÍA DE ALTA ACÁ */}
+            <p className={`text-sm ${P.subtitle} flex flex-wrap gap-x-2`}>
+              <span>
+                Póliza: <span className="font-semibold">{poliza?.numero_poliza || "—"}</span>
+              </span>
+              <span className="opacity-50">•</span>
+              <span>
+                Alta: <span className="font-semibold text-indigo-600">{poliza?.fecha_emision ? dayjs(poliza.fecha_emision).format("DD/MM/YYYY") : "—"}</span>
+              </span>
+              <span className="opacity-50">•</span>
+              <span>
+                Cobertura: <span className="font-semibold">{poliza?.cobertura || "—"}</span>
               </span>
             </p>
             {poliza?.cliente && (
@@ -269,12 +274,23 @@ export default function PolizaCuotasCard({ poliza }) {
                       </span>
                     </p>
                   </div>
-                  <p>
-                    Vencimiento:{" "}
-                    {cuota.fecha_vencimiento
-                      ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY")
-                      : "—"}
-                  </p>
+                  
+                  {/* ✅ Lógica de fechas clara: Día de pago y Cobertura mensual */}
+                  <div className="grid grid-cols-2 gap-2 mt-1 mb-1 max-w-[280px]">
+                    <div className="bg-rose-50/80 rounded-lg p-2 border border-rose-100/50">
+                      <div className="text-[10px] uppercase tracking-wide text-rose-500 font-extrabold mb-0.5">Día de Pago (Vto)</div>
+                      <div className="font-bold text-neutral-900 text-xs sm:text-sm">
+                        {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY") : "—"}
+                      </div>
+                    </div>
+                    <div className="bg-indigo-50/80 rounded-lg p-2 border border-indigo-100/50">
+                      <div className="text-[10px] uppercase tracking-wide text-indigo-500 font-extrabold mb-0.5">Cubre del:</div>
+                      <div className="font-medium text-indigo-900 text-[10px] sm:text-xs">
+                        {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY") : "—"} <span className="text-indigo-400 mx-0.5">al</span> {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).add(1, "month").format("DD/MM/YYYY") : "—"}
+                      </div>
+                    </div>
+                  </div>
+
                   {cuota.pagado && cuota.fecha_pago && (
                     <p>
                       Pagado el:{" "}

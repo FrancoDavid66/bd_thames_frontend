@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { HiShieldCheck, HiTruck, HiExclamation } from "react-icons/hi";
+import { HiShieldCheck, HiTruck, HiExclamation, HiChartBar } from "react-icons/hi";
 
 import { OFICINAS, getOficinaNombre } from "../components/estadisticas/oficinas";
 
@@ -124,7 +124,115 @@ async function fetchFirstOkJson(urls, fetchOptions) {
 }
 
 /* =========================
-   ✅ NUEVO: DUPLICADOS (PÓLIZAS)
+   ✅ NUEVO: PANEL DE DISTRIBUCIÓN
+========================= */
+function DistribucionPanel({ apiBase, oficina }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [soloActivas, setSoloActivas] = useState(true);
+
+  const fetchDistribucion = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (oficina) params.set("oficina", oficina);
+      if (soloActivas) params.set("solo_activas", "1");
+
+      const url = `${apiBase}estadisticas/vehiculos/resumen/?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      const json = await res.json();
+      setData(json);
+    } catch (e) {
+      console.error("Error al cargar distribución:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDistribucion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oficina, soloActivas]);
+
+  const total = data?.total_polizas || 0;
+
+  const RankingCard = ({ title, items = {}, icon: Icon, color = "bg-sky-500" }) => (
+    <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-900/50 p-5 shadow-xl">
+      <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+        <Icon className="text-sky-400 text-lg" />
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">{title}</h3>
+      </div>
+      <div className="space-y-4">
+        {Object.entries(items || {}).length > 0 ? (
+          Object.entries(items).map(([key, value]) => (
+            <div key={key} className="group flex flex-col gap-1.5">
+              <div className="flex justify-between items-end px-0.5">
+                <span className="text-[13px] font-medium text-slate-200 group-hover:text-white transition-colors">{key}</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-sm font-bold text-slate-50">{value.toLocaleString("es-AR")}</span>
+                  <span className="text-[10px] font-medium text-slate-500">{formatMixPercent(value, total)}</span>
+                </div>
+              </div>
+              <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: formatMixPercent(value, total) }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className={`h-full rounded-full ${color} opacity-70 group-hover:opacity-100 transition-opacity`}
+                />
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="py-10 text-center text-xs text-slate-500 italic">Sin datos disponibles.</div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid gap-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/20 text-sky-400">
+            <HiChartBar className="text-xl" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-100 tracking-tight">Distribución de Cartera</h2>
+            <p className="text-[11px] text-slate-400">Desglose detallado por compañía y tipo de cobertura.</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 transition hover:bg-white/5">
+            <input 
+              type="checkbox" 
+              checked={soloActivas} 
+              onChange={e => setSoloActivas(e.target.checked)}
+              className="w-4 h-4 rounded border-white/20 bg-transparent text-sky-500 focus:ring-sky-500/30 accent-sky-500"
+            />
+            <span className="text-xs font-semibold text-slate-200">Solo Activas</span>
+          </label>
+          <button 
+            onClick={fetchDistribucion}
+            disabled={loading}
+            className="h-9 rounded-xl bg-sky-500 px-5 text-xs font-bold text-white transition hover:bg-sky-400 shadow-lg shadow-sky-500/20 active:scale-95 disabled:opacity-50"
+          >
+            {loading ? "Cargando..." : "Actualizar"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <RankingCard title="Ranking por Compañía" items={data?.por_compania} icon={HiTruck} color="bg-sky-500" />
+        <RankingCard title="Distribución por Cobertura" items={data?.por_cobertura} icon={HiShieldCheck} color="bg-emerald-500" />
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   ✅ DUPLICADOS (PÓLIZAS)
 ========================= */
 function DuplicadosPolizasPanel({ apiBase, oficina, setOficina }) {
   const navigate = useNavigate();
@@ -560,10 +668,10 @@ function DuplicadosPolizasPanel({ apiBase, oficina, setOficina }) {
 }
 
 /* =========================
-   ✅ NUEVO: CALIDAD DE DATOS
+   ✅ CALIDAD DE DATOS
 ========================= */
 function CalidadDatosPanel({ apiBase, oficina, setOficina }) {
-  const navigate = useNavigate(); // ✅ NUEVO: para "Abrir" cliente
+  const navigate = useNavigate();
 
   const [resumen, setResumen] = useState(null);
   const [loadingResumen, setLoadingResumen] = useState(false);
@@ -878,11 +986,7 @@ function CalidadDatosPanel({ apiBase, oficina, setOficina }) {
 
       {/* Listado */}
       <AnimatedCard index={3} glow="from-emerald-500/35 via-cyan-500/15 to-transparent">
-        {/* ... (resto igual) ... */}
         <div className="flex flex-col gap-3">
-          {/* (tu código original sin cambios debajo) */}
-          {/* ⚠️ Por tamaño, no cambié nada más: queda igual que tu versión */}
-          {/* --- */}
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-col gap-1">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">
@@ -1026,7 +1130,7 @@ function CalidadDatosPanel({ apiBase, oficina, setOficina }) {
 }
 
 /* =========================
-   ✅ GENERAL (tu página original)
+   ✅ GENERAL (Tu página original)
 ========================= */
 function EstadisticasGeneralPanel({ apiBase, oficina, setOficina }) {
   const navigate = useNavigate();
@@ -1052,8 +1156,6 @@ function EstadisticasGeneralPanel({ apiBase, oficina, setOficina }) {
   const [agroKpis, setAgroKpis] = useState(null);
   const [agroLoading, setAgroLoading] = useState(false);
   const [agroError, setAgroError] = useState("");
-
-  // ✅ duplicados se movió a tab "Duplicados"
 
   const fetchEstadisticas = async () => {
     setLoading(true);
@@ -1114,18 +1216,6 @@ function EstadisticasGeneralPanel({ apiBase, oficina, setOficina }) {
     } finally {
       setAgroLoading(false);
     }
-  };
-
-  const goCliente = (id) => {
-    const n = Number(id);
-    if (!Number.isFinite(n) || n <= 0) return;
-    navigate(`/clientes/${n}`);
-  };
-
-  const goPolizasPorPatente = (patenteRaw) => {
-    const p = normalizePatente(patenteRaw);
-    if (!p) return;
-    navigate(`/polizas?patente=${encodeURIComponent(p)}`);
   };
 
   useEffect(() => {
@@ -1226,8 +1316,6 @@ function EstadisticasGeneralPanel({ apiBase, oficina, setOficina }) {
 
       <EstadisticasSummaryCards totales={totales} churnPromedio={churnPromedio} />
 
-      {/* ... el resto EXACTAMENTE igual que tu archivo original ... */}
-      {/* Para no romper nada, no toqué nada más fuera del panel de Duplicados */}
       <OficinasTable
         oficinasData={oficinasData}
         getOficinaNombre={getOficinaNombre}
@@ -1395,16 +1483,14 @@ export default function EstadisticasPage() {
           {tab === "asegurados" && (
             <motion.div
               key="asegurados"
-              className="rounded-2xl border border-white/10 bg-white/5 p-5 text-slate-200"
+              className="flex flex-col gap-6"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="text-sm font-semibold">Asegurados</div>
-              <div className="mt-2 text-[12px] text-slate-400">
-                Próximo paso: totales, altas por mes, distribución por oficina, etc.
-              </div>
+              {/* ✅ INTEGRADO: Nuevo panel de distribución */}
+              <DistribucionPanel apiBase={apiBase} oficina={oficina} />
             </motion.div>
           )}
 

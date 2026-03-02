@@ -1,5 +1,5 @@
 /* src/components/pagos/DescargarFactura.jsx — Botón pill con ring/borde + generación PDF en front */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { HiDownload } from "react-icons/hi";
 import FacturaCuotaPDF from "./FacturaCuotaPDF";
@@ -13,6 +13,72 @@ function slug(s) {
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .toLowerCase();
+}
+
+/* ===================== helpers hora/minuto ===================== */
+
+function safeDateFromAny(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === "string") {
+    const d = new Date(v); // ISO esperado (backend manda isoformat)
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function fmtHM(dt) {
+  const d = safeDateFromAny(dt);
+  if (!d) return "";
+  try {
+    // HH:MM (local)
+    return new Intl.DateTimeFormat("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+}
+
+function fmtFull(dt) {
+  const d = safeDateFromAny(dt);
+  if (!d) return "";
+  try {
+    const fecha = new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(d);
+
+    const hm = fmtHM(d);
+    return hm ? `${fecha} ${hm}` : fecha;
+  } catch {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear());
+    const hm = fmtHM(d);
+    return hm ? `${dd}/${mo}/${yy} ${hm}` : `${dd}/${mo}/${yy}`;
+  }
+}
+
+function pickPagoInfo(cuota) {
+  if (!cuota) return { pago_hm: "", pago_hm_full: "", pago_dt_iso: null };
+
+  // Backend nuevo
+  const pago_hm = (cuota.pago_hm || "").toString();
+  const pago_hm_full = (cuota.pago_hm_full || "").toString();
+
+  const dtIso = cuota.pago_registrado_en || null;
+  const d = safeDateFromAny(dtIso);
+
+  const hm = pago_hm || (d ? fmtHM(d) : "");
+  const full = pago_hm_full || (d ? fmtFull(d) : "");
+
+  return { pago_hm: hm, pago_hm_full: full, pago_dt_iso: dtIso };
 }
 
 /**
@@ -32,21 +98,43 @@ export default function DescargarFactura({
 }) {
   const [downloading, setDownloading] = useState(false);
 
+  const pagoInfo = useMemo(() => pickPagoInfo(cuota), [cuota]);
+
   const handleDownload = async () => {
     if (!cliente || !poliza || !cuota) return;
     try {
       setDownloading(true);
 
       // 1) Construir el documento PDF en el FRONT
-      const doc = <FacturaCuotaPDF cliente={cliente} poliza={poliza} cuota={cuota} />;
+      // ✅ Le pasamos pago_hm/pago_hm_full para que el recibo muestre hora:minuto sin recalcular
+      const doc = (
+        <FacturaCuotaPDF
+          cliente={cliente}
+          poliza={poliza}
+          cuota={cuota}
+          pago_hm={pagoInfo.pago_hm}
+          pago_hm_full={pagoInfo.pago_hm_full}
+          pago_dt_iso={pagoInfo.pago_dt_iso}
+        />
+      );
 
       // 2) Render a Blob y descargar
       const blob = await pdf(doc).toBlob();
       const url = URL.createObjectURL(blob);
 
+      // ✅ Nombre incluye hora/minuto del pago si existe (sino usa hora local actual)
+      const hmForName =
+        (pagoInfo.pago_hm || "").replace(":", "") ||
+        (() => {
+          const now = new Date();
+          const hh = String(now.getHours()).padStart(2, "0");
+          const mm = String(now.getMinutes()).padStart(2, "0");
+          return `${hh}${mm}`;
+        })();
+
       const nombre = `Factura_Cuota_${slug(cuota?.cuota_nro)}_${slug(
         poliza?.patente
-      )}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      )}_${new Date().toISOString().slice(0, 10)}_${hmForName}.pdf`;
 
       const a = document.createElement("a");
       a.href = url;

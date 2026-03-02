@@ -200,7 +200,13 @@ function App() {
       const key = "scope.cuponeras.oficina";
       const shouldScope = location.pathname === "/cuponeras" || location.pathname.startsWith("/cuponeras/");
       const oficina = shouldScope ? getScopedOficina(key) : "";
-      const url = `${apiRoot}polizas/cupones-robo/counters/${oficina ? `?oficina=${oficina}` : ""}`;
+      
+      // ✅ Agregamos solo_ultimo=1 para que los counters coincidan con el dashboard
+      const qs = new URLSearchParams();
+      qs.set("solo_ultimo", "1");
+      if (oficina) qs.set("oficina", oficina);
+
+      const url = `${apiRoot}polizas/cupones-robo/counters/?${qs.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();

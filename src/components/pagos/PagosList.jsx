@@ -291,11 +291,14 @@ export default function PagosList({
       }
 
       toast.success("Cuota marcada como pagada");
+      
+      // ✅ FIX: Seteamos pago_registrado_en para que el PDF renderice con SEGUNDOS exactos sin recargar
       const conObs = {
         ...cuotaActualizada,
         poliza: cuotaActualizada.poliza || cuota.poliza,
         cantidad_cuotas: cuotaActualizada.cantidad_cuotas ?? cuota.cantidad_cuotas ?? null,
         observaciones_pago: (datos.observaciones || "").trim(),
+        pago_registrado_en: dayjs().toISOString(), 
       };
 
       setConfirmData(null);
@@ -345,16 +348,24 @@ export default function PagosList({
       const patente = (pol?.patente || "").toUpperCase();
       const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
       const observacion = ((cuota?.observaciones_pago || cuota?.ultima_observacion_pago || "") || "").toString().trim();
+      
       const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
       const dias = fv ? fv.diff(hoy, "day") : null;
       const state = cuota?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
       const label = state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
+      
+      const cubreHastaTxt = fv ? fv.add(1, "month").format("DD/MM/YYYY") : null;
+      // ✅ Alta agregada acá
+      const altaTxt = pol?.fecha_emision ? fmtDate(pol.fecha_emision) : null;
 
       out[i] = {
         cuota, pol, nombreCompleto, patente, modelo, observacion, hasObs: !!observacion,
         isObsOpen: obsAbiertaId === cuota?.id, state, label, dias,
-        venceTxt: fmtDate(cuota?.fecha_vencimiento), pagaTxt: cuota?.fecha_pago ? fmtDate(cuota?.fecha_pago) : null,
+        venceTxt: fmtDate(cuota?.fecha_vencimiento), 
+        pagaTxt: cuota?.fecha_pago ? fmtDate(cuota?.fecha_pago) : null,
         montoTxt: fmtMoney(cuota?.monto),
+        cubreHastaTxt,
+        altaTxt, // Lo pasamos al modelo
       };
     }
     return out;
@@ -395,7 +406,6 @@ export default function PagosList({
         </div>
       </div>
 
-      {/* ✅ SOLUCIÓN AL SCROLL MÓVIL: max-h y overflow controlados directamente aquí */}
       <div className="max-h-[60vh] sm:max-h-[65vh] overflow-y-auto overscroll-contain pb-6">
         <ul role="list" className={`divide-y sm:divide-y-0 ${PALETTE.divider}`}>
           {rowModels.map((m, idx) => {
@@ -564,6 +574,7 @@ export default function PagosList({
                       <InfoRow label="Vehículo" value={[pol?.marca, pol?.modelo].filter(Boolean).join(" ") || "—"} />
                       <InfoRow label="Cobertura" value={pol?.cobertura || "—"} />
                       <InfoRow label="Compañía" value={pol?.compania_nombre || pol?.compania?.nombre || pol?.compania || "—"} />
+                      <InfoRow label="Fecha de Alta" value={fmtDate(pol?.fecha_emision)} /> {/* ✅ ALTA ACÁ TAMBIÉN */}
                       <InfoRow label="Cuota" value={typeof c?.cuota_nro === "number" ? (total ? `${c.cuota_nro}/${total}` : `${c.cuota_nro}`) : "—"} />
                       <InfoRow label="Monto" value={`$ ${fmtMoney(c?.monto)}`} />
                       <InfoRow label="Vencimiento" value={fmtDate(c?.fecha_vencimiento)} />
@@ -597,7 +608,7 @@ const CuotaRow = memo(
   function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs }) {
     const {
       cuota, nombreCompleto, patente, modelo, observacion, hasObs, isObsOpen,
-      state, label, dias, venceTxt, pagaTxt, montoTxt,
+      state, label, dias, venceTxt, pagaTxt, montoTxt, cubreHastaTxt, altaTxt // ✅ NUEVO
     } = model || {};
 
     const S = PALETTE[state || "pending"];
@@ -632,8 +643,16 @@ const CuotaRow = memo(
                     {modelo}
                   </span>
                 )}
+                
+                {/* ✅ BADGE DE ALTA DE LA PÓLIZA */}
+                {altaTxt && (
+                  <span className="inline-flex items-center rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 bg-neutral-800 border-neutral-700 text-indigo-300 text-[10px] sm:text-xs font-medium">
+                    Alta: {altaTxt}
+                  </span>
+                )}
               </div>
 
+              {/* ✅ CAJONCITOS DE LAS FECHAS */}
               <div className="mt-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
                 <span className={`inline-flex items-center gap-1 sm:gap-2 rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder} text-[10px] sm:text-xs font-medium`}>
                   <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${S.dot}`} />
@@ -643,8 +662,20 @@ const CuotaRow = memo(
 
                 <span className="text-neutral-500 hidden sm:inline">•</span>
 
-                <div className="text-[11px] sm:text-sm text-neutral-300 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1">
-                  <span>Vence: {venceTxt}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="bg-rose-500/10 rounded-md px-2 py-1 border border-rose-500/20 flex items-center gap-1 w-fit">
+                    <span className="text-[10px] uppercase tracking-wider text-rose-400/80 font-bold">Día Pago:</span>
+                    <span className="text-xs font-bold text-white">{venceTxt || "—"}</span>
+                  </div>
+                  <div className="bg-sky-500/10 rounded-md px-2 py-1 border border-sky-500/20 flex items-center gap-1 w-fit">
+                    <span className="text-[10px] uppercase tracking-wider text-sky-400/80 font-bold">Cubre del:</span>
+                    <span className="text-xs font-medium text-sky-200">{venceTxt || "—"}</span>
+                    <span className="text-[10px] text-sky-400/80">al</span>
+                    <span className="text-xs font-medium text-sky-200">{cubreHastaTxt || "—"}</span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] sm:text-sm text-neutral-300 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 w-full sm:w-auto">
                   {!!pagaTxt && <span>Pagada: {pagaTxt}</span>}
                   {dias !== null && !cuota?.pagado && (
                     <span>{dias < 0 ? `Atraso: ${Math.abs(dias)} días` : `Faltan: ${dias} días`}</span>

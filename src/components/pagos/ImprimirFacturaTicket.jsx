@@ -1,11 +1,86 @@
 // src/components/pagos/ImprimirFacturaTicket.jsx
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { HiPrinter } from "react-icons/hi";
 import toast from "react-hot-toast";
 import { pdf } from "@react-pdf/renderer";
 
 import FacturaCuotaTicketPDF from "./FacturaCuotaTicketPDF";
+
+/* ===================== helpers hora/minuto ===================== */
+
+function safeDateFromAny(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === "string") {
+    const d = new Date(v); // ISO esperado (backend manda isoformat)
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function fmtHM(dt) {
+  const d = safeDateFromAny(dt);
+  if (!d) return "";
+  try {
+    // HH:MM (local)
+    return new Intl.DateTimeFormat("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    // fallback
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+}
+
+function fmtFull(dt) {
+  const d = safeDateFromAny(dt);
+  if (!d) return "";
+  try {
+    // DD/MM/YYYY HH:MM (local)
+    const fecha = new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(d);
+
+    const hm = fmtHM(d);
+    return hm ? `${fecha} ${hm}` : fecha;
+  } catch {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear());
+    const hm = fmtHM(d);
+    return hm ? `${dd}/${mo}/${yy} ${hm}` : `${dd}/${mo}/${yy}`;
+  }
+}
+
+function pickPagoDateTime(cuota) {
+  // Priorizamos lo que ya manda el backend (nuevo)
+  // - cuota.pago_hm / pago_hm_full si existen
+  // - cuota.pago_registrado_en (ISO)
+  // - fallback fecha_pago (sin hora)
+  if (!cuota) return { pago_hm: "", pago_hm_full: "", pago_dt_iso: null };
+
+  // Si ya viene formateado del backend, lo usamos
+  const pago_hm = (cuota.pago_hm || "").toString();
+  const pago_hm_full = (cuota.pago_hm_full || "").toString();
+
+  // Si vienen vacíos, intentamos desde timestamp
+  const dtIso = cuota.pago_registrado_en || null;
+  const d = safeDateFromAny(dtIso);
+
+  const hm = pago_hm || (d ? fmtHM(d) : "");
+  const full = pago_hm_full || (d ? fmtFull(d) : "");
+
+  return { pago_hm: hm, pago_hm_full: full, pago_dt_iso: dtIso };
+}
+
+/* ===================== componente ===================== */
 
 export default function ImprimirFacturaTicket({
   cliente,
@@ -20,6 +95,8 @@ export default function ImprimirFacturaTicket({
   const iframeRef = useRef(null);
   const urlRef = useRef(null);
   const cleanupTimerRef = useRef(null);
+
+  const pagoInfo = useMemo(() => pickPagoDateTime(cuota), [cuota]);
 
   const cleanup = useCallback(() => {
     try {
@@ -72,7 +149,17 @@ export default function ImprimirFacturaTicket({
         cleanup();
 
         // 1) Construir PDF (ticket) en memoria
-        const doc = <FacturaCuotaTicketPDF cliente={cli} poliza={pol} cuota={c} />;
+        // ✅ Le pasamos pago_hm/pago_hm_full para que el recibo lo muestre sin recalcular
+        const doc = (
+          <FacturaCuotaTicketPDF
+            cliente={cli}
+            poliza={pol}
+            cuota={c}
+            pago_hm={pagoInfo.pago_hm}
+            pago_hm_full={pagoInfo.pago_hm_full}
+            pago_dt_iso={pagoInfo.pago_dt_iso}
+          />
+        );
         const blob = await pdf(doc).toBlob();
 
         // 2) Crear URL y cargarla en un iframe oculto
@@ -132,7 +219,7 @@ export default function ImprimirFacturaTicket({
         cleanup();
       }
     },
-    [cliente, poliza, cuota, cleanup]
+    [cliente, poliza, cuota, cleanup, pagoInfo]
   );
 
   return (

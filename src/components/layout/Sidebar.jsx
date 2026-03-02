@@ -37,6 +37,7 @@ const navItems = [
   { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
 ];
 
+// ✅ BADGE CORREGIDO: Ya no tiene el límite de 99+
 const Badge = ({ value = 0, tone = "red" }) => {
   const v = Number(value) || 0;
   if (v <= 0) return null;
@@ -53,7 +54,7 @@ const Badge = ({ value = 0, tone = "red" }) => {
       className={`ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-extrabold shadow ${toneCls}`}
       title={`${v}`}
     >
-      {v > 99 ? "99+" : v}
+      {v}
     </span>
   );
 };
@@ -67,7 +68,7 @@ export default function Sidebar({
   cuponPorVencer7 = 0,
   cuponVencidas = 0,
   renovacionesPendientes = 0,
-  bajasPendientes = 0, // ✅ NUEVA PROP RECIBIDA
+  bajasPendientes = 0,
 }) {
   const location = useLocation();
 
@@ -179,7 +180,6 @@ export default function Sidebar({
                         <span className="truncate">Vencimientos</span>
                       </NavLink>
 
-                      {/* ✅ BADGE AÑADIDO EN BAJAS */}
                       <NavLink
                         to="/polizas/bajas"
                         className={({ isActive }) =>
@@ -237,12 +237,8 @@ export default function Sidebar({
 
                 {isCuponeras && (
                   <Badge
-                    value={
-                      (Number(cuponPendientes) || 0) +
-                      (Number(cuponPorVencer7) || 0) +
-                      (Number(cuponVencidas) || 0)
-                    }
-                    tone="sky"
+                    value={Number(cuponVencidas) || 0}
+                    tone="red"
                   />
                 )}
               </NavLink>
