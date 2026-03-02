@@ -115,11 +115,19 @@ function normalizeOficinasPayload(payload) {
 
 export const fetchBajas = createAsyncThunk(
   "bajas/fetchBajas",
-  async ({ params = {}, force = false } = {}) => {
+  async ({ params = {}, force = false } = {}, thunkAPI) => {
     const merged = { page: "1", page_size: "25", ...params };
     const key = stableKey({ ...merged, _list: 1 });
-    const data = await apiGet("bajas/operativo/", merged); 
-    return { key, data };
+
+    // ✅ FIX: respetar force y usar cache SOLO si no es force
+    const state = thunkAPI.getState?.();
+    const cacheEntry = state?.bajas?.cache?.[key];
+    if (!force && isFresh(cacheEntry, TTL_LIST_MS)) {
+      return { key, data: cacheEntry.data, fromCache: true };
+    }
+
+    const data = await apiGet("bajas/operativo/", merged);
+    return { key, data, fromCache: false };
   }
 );
 
@@ -133,35 +141,34 @@ export const fetchBajasCounters = createAsyncThunk(
 
 export const fetchBajasOficinas = createAsyncThunk(
   "bajas/fetchBajasOficinas",
-  async ({ force = false } = {}) => {
+  async ({ force = false } = {}, thunkAPI) => {
     const key = stableKey({ _oficinas: 1 });
+
+    // (opcional) cache hit aquí también
+    const state = thunkAPI.getState?.();
+    const cacheEntry = state?.bajas?.cache?.[key];
+    if (!force && isFresh(cacheEntry, TTL_OFICINAS_MS)) {
+      return { key, data: cacheEntry.data, fromCache: true };
+    }
+
     const data = await apiGet("polizas/oficinas/", { flat: "0" });
-    return { key, data };
+    return { key, data, fromCache: false };
   }
 );
 
 // --- Correos Dinámicos ---
-export const fetchBajasCorreos = createAsyncThunk(
-  "bajas/fetchBajasCorreos",
-  async () => {
-    return await apiGet("bajas/correos/");
-  }
-);
+export const fetchBajasCorreos = createAsyncThunk("bajas/fetchBajasCorreos", async () => {
+  return await apiGet("bajas/correos/");
+});
 
-export const createBajaCorreo = createAsyncThunk(
-  "bajas/createBajaCorreo",
-  async (data) => {
-    return await apiAction("bajas/correos/", "POST", data);
-  }
-);
+export const createBajaCorreo = createAsyncThunk("bajas/createBajaCorreo", async (data) => {
+  return await apiAction("bajas/correos/", "POST", data);
+});
 
-export const deleteBajaCorreo = createAsyncThunk(
-  "bajas/deleteBajaCorreo",
-  async (id) => {
-    await apiAction(`bajas/correos/${id}/`, "DELETE");
-    return id;
-  }
-);
+export const deleteBajaCorreo = createAsyncThunk("bajas/deleteBajaCorreo", async (id) => {
+  await apiAction(`bajas/correos/${id}/`, "DELETE");
+  return id;
+});
 
 const bajasSlice = createSlice({
   name: "bajas",
@@ -173,7 +180,6 @@ const bajasSlice = createSlice({
     status: "idle",
     error: null,
 
-    // ✅ NUEVO: Estado para contadores globales
     counters: { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 },
     countersStatus: "idle",
 
@@ -184,7 +190,7 @@ const bajasSlice = createSlice({
     correos: [],
     correosStatus: "idle",
 
-    cache: {}, 
+    cache: {},
   },
   reducers: {
     invalidateBajasCache(state) {
@@ -197,6 +203,10 @@ const bajasSlice = createSlice({
       .addCase(fetchBajas.pending, (state, action) => {
         state.status = "loading";
         state.error = null;
+
+        const force = !!action?.meta?.arg?.force;
+        if (force) return; // ✅ FIX: si es force, no hidratar desde cache en pending
+
         const params = action?.meta?.arg?.params || {};
         const merged = { page: "1", page_size: "25", ...params };
         const key = stableKey({ ...merged, _list: 1 });
@@ -225,7 +235,7 @@ const bajasSlice = createSlice({
         state.error = action.error?.message || "Error al cargar las bajas";
       })
 
-      // ✅ NUEVO: Manejo de contadores
+      // ===== COUNTERS =====
       .addCase(fetchBajasCounters.pending, (state) => {
         state.countersStatus = "loading";
       })
@@ -235,8 +245,11 @@ const bajasSlice = createSlice({
       })
 
       // ===== OFICINAS =====
-      .addCase(fetchBajasOficinas.pending, (state) => {
+      .addCase(fetchBajasOficinas.pending, (state, action) => {
         state.oficinasStatus = "loading";
+        const force = !!action?.meta?.arg?.force;
+        if (force) return;
+
         const key = stableKey({ _oficinas: 1 });
         const cache = state.cache?.[key];
         if (isFresh(cache, TTL_OFICINAS_MS)) state.oficinas = normalizeOficinasPayload(cache.data);
@@ -257,7 +270,7 @@ const bajasSlice = createSlice({
         state.correos.push(action.payload);
       })
       .addCase(deleteBajaCorreo.fulfilled, (state, action) => {
-        state.correos = state.correos.filter(c => c.id !== action.payload);
+        state.correos = state.correos.filter((c) => c.id !== action.payload);
       });
   },
 });
@@ -271,7 +284,6 @@ export const selectBajasCount = (s) => Number(s?.bajas?.count) || 0;
 export const selectBajasStatus = (s) => s?.bajas?.status || "idle";
 export const selectBajasError = (s) => s?.bajas?.error || null;
 
-// ✅ NUEVO: Selectores para contadores
 export const selectBajasCounters = (s) => s?.bajas?.counters;
 export const selectBajasCountersStatus = (s) => s?.bajas?.countersStatus;
 
