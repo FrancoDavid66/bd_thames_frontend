@@ -1,4 +1,4 @@
-// src/pages/BajasPage.jsx
+// src/pages/BajasPage.js x
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
