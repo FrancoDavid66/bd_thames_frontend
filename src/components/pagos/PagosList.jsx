@@ -1,5 +1,7 @@
 /* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos, full-width móvil (OPTIMIZADO PARA CELULAR)
    ✅ FIX: calcular proximo_vencimiento real para imprimir/descargar (no usar vencimiento de la misma cuota)
+   ✅ FIX: "Cubre del" correcto: (vencimiento - 1 mes) al vencimiento
+   ✅ FIX: label "Vence" (no "Día Pago")
 */
 import { useDispatch } from "react-redux";
 import { useMemo, useState, useCallback, useEffect, memo } from "react";
@@ -460,7 +462,10 @@ export default function PagosList({
       const state = cuota?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
       const label = state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
 
-      const cubreHastaTxt = fv ? fv.add(1, "month").format("DD/MM/YYYY") : null;
+      // ✅ FIX: cobertura correcta: (vencimiento - 1 mes) al vencimiento
+      const cubreDesdeTxt = fv ? fv.subtract(1, "month").format("DD/MM/YYYY") : null;
+      const cubreHastaTxt = fv ? fv.format("DD/MM/YYYY") : null;
+
       const altaTxt = pol?.fecha_emision ? fmtDate(pol.fecha_emision) : null;
 
       // ✅ FIX: próximo vencimiento real (siguiente cuota) para PDF/ticket
@@ -490,6 +495,7 @@ export default function PagosList({
         venceTxt: fmtDate(cuota?.fecha_vencimiento),
         pagaTxt: cuota?.fecha_pago ? fmtDate(cuota?.fecha_pago) : null,
         montoTxt: fmtMoney(cuota?.monto),
+        cubreDesdeTxt,
         cubreHastaTxt,
         altaTxt,
         proximoVtoTxt,
@@ -748,6 +754,7 @@ const CuotaRow = memo(
       venceTxt,
       pagaTxt,
       montoTxt,
+      cubreDesdeTxt,
       cubreHastaTxt,
       altaTxt,
     } = model || {};
@@ -805,12 +812,13 @@ const CuotaRow = memo(
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="bg-rose-500/10 rounded-md px-2 py-1 border border-rose-500/20 flex items-center gap-1 w-fit">
-                    <span className="text-[10px] uppercase tracking-wider text-rose-400/80 font-bold">Día Pago:</span>
+                    <span className="text-[10px] uppercase tracking-wider text-rose-400/80 font-bold">Vence:</span>
                     <span className="text-xs font-bold text-white">{venceTxt || "—"}</span>
                   </div>
+
                   <div className="bg-sky-500/10 rounded-md px-2 py-1 border border-sky-500/20 flex items-center gap-1 w-fit">
                     <span className="text-[10px] uppercase tracking-wider text-sky-400/80 font-bold">Cubre del:</span>
-                    <span className="text-xs font-medium text-sky-200">{venceTxt || "—"}</span>
+                    <span className="text-xs font-medium text-sky-200">{cubreDesdeTxt || "—"}</span>
                     <span className="text-[10px] text-sky-400/80">al</span>
                     <span className="text-xs font-medium text-sky-200">{cubreHastaTxt || "—"}</span>
                   </div>

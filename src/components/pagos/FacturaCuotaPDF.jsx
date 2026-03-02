@@ -18,6 +18,42 @@ const ALERT_TEXT = "#991B1B";
 const safe = (v, d = "—") =>
   v === null || v === undefined || v === "" ? d : String(v);
 
+const ymd = (d) => {
+  if (!d) return "";
+  const s = String(d).trim();
+  if (!s) return "";
+  return s.length >= 10 ? s.slice(0, 10) : s;
+};
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/** Suma meses de forma segura en YYYY-MM-DD (mantiene día si se puede, clamp si no) */
+const addMonthsYmd = (ymdStr, deltaMonths) => {
+  const s = ymd(ymdStr);
+  if (!s || s.length < 10) return "";
+  const base = new Date(`${s}T12:00:00`);
+  if (Number.isNaN(base.getTime())) return "";
+
+  const target = new Date(base.getTime());
+  target.setMonth(target.getMonth() + Number(deltaMonths || 0));
+
+  const intendedMonth = (base.getMonth() + Number(deltaMonths || 0) + 1200) % 12;
+  const actualMonth = target.getMonth();
+  if (actualMonth !== intendedMonth) {
+    const y2 = target.getFullYear();
+    const m2 = intendedMonth; // 0-based
+    const lastDay = new Date(y2, m2 + 1, 0, 12, 0, 0);
+    target.setFullYear(lastDay.getFullYear());
+    target.setMonth(lastDay.getMonth());
+    target.setDate(lastDay.getDate());
+  }
+
+  const yy = target.getFullYear();
+  const mm = pad2(target.getMonth() + 1);
+  const dd = pad2(target.getDate());
+  return `${yy}-${mm}-${dd}`;
+};
+
 const fmtDateTimeHM = (d) => {
   if (!d) return "—";
   try {
@@ -48,7 +84,9 @@ const fmtDateTimeHM = (d) => {
 const fmtDateOnly = (d) => {
   if (!d) return "—";
   try {
-    const dt = new Date(String(d).slice(0, 10) + "T12:00:00");
+    const s = ymd(d);
+    if (!s) return "—";
+    const dt = new Date(s + "T12:00:00");
     if (Number.isNaN(dt.getTime())) return "—";
     const day = String(dt.getDate()).padStart(2, "0");
     const month = String(dt.getMonth() + 1).padStart(2, "0");
@@ -251,9 +289,14 @@ const FacturaCuotaPDF = ({
       pago_dt_iso || cuota.pago_registrado_en || cuota.fecha_pago || new Date()
     );
 
-  // ✅ FIX: próximo vencimiento real
-  const proximoVto = cuota?.proximo_vencimiento || cuota?.proximoVencimiento || null;
-  const fechaVencimiento = fmtDateOnly(proximoVto || cuota.fecha_vencimiento);
+  // ✅ Vencimiento ACTUAL (no próximo)
+  const vencimientoActualTxt = fmtDateOnly(cuota.fecha_vencimiento);
+
+  // ✅ Cobertura (igual que la card): (vencimiento - 1 mes) al vencimiento
+  const vtoBase = ymd(cuota?.fecha_vencimiento || "");
+  const cubreDesde = vtoBase ? fmtDateOnly(addMonthsYmd(vtoBase, -1)) : "—";
+  const cubreHasta = vtoBase ? fmtDateOnly(vtoBase) : "—";
+  const coberturaTxt = vtoBase ? `${cubreDesde} al ${cubreHasta}` : "—";
 
   const pagoFueraDeTermino = isPagoAtrasado(cuota);
 
@@ -270,6 +313,11 @@ const FacturaCuotaPDF = ({
         <View style={styles.dueBox}>
           <Text style={styles.dueLabel}>Fecha y Hora de Operación</Text>
           <Text style={styles.dueValue}>{fechaHoraOperacion}</Text>
+        </View>
+
+        <View style={styles.dueBox}>
+          <Text style={styles.dueLabel}>Cobertura</Text>
+          <Text style={styles.dueValue}>{coberturaTxt}</Text>
         </View>
 
         <View style={styles.grid2}>
@@ -311,9 +359,10 @@ const FacturaCuotaPDF = ({
           </View>
         </View>
 
+        {/* ✅ CAMBIO: mostrar vencimiento actual */}
         <View style={styles.dueBox}>
-          <Text style={styles.dueLabel}>Próximo Vencimiento</Text>
-          <Text style={styles.dueValue}>{fechaVencimiento}</Text>
+          <Text style={styles.dueLabel}>Vencimiento</Text>
+          <Text style={styles.dueValue}>{vencimientoActualTxt}</Text>
         </View>
 
         {pagoFueraDeTermino && (

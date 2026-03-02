@@ -60,17 +60,15 @@ function fmtFull(dt) {
 }
 
 function pickPagoDateTime(cuota) {
-  // Priorizamos lo que ya manda el backend (nuevo)
+  // Priorizamos lo que ya manda el backend
   // - cuota.pago_hm / pago_hm_full si existen
   // - cuota.pago_registrado_en (ISO)
   // - fallback fecha_pago (sin hora)
   if (!cuota) return { pago_hm: "", pago_hm_full: "", pago_dt_iso: null };
 
-  // Si ya viene formateado del backend, lo usamos
   const pago_hm = (cuota.pago_hm || "").toString();
   const pago_hm_full = (cuota.pago_hm_full || "").toString();
 
-  // Si vienen vacíos, intentamos desde timestamp
   const dtIso = cuota.pago_registrado_en || null;
   const d = safeDateFromAny(dtIso);
 
@@ -107,7 +105,6 @@ export default function ImprimirFacturaTicket({
       if (iframeRef.current) {
         iframeRef.current.onload = null;
         try {
-          // algunos browsers tiran error si ya no existe
           iframeRef.current.remove();
         } catch {}
         iframeRef.current = null;
@@ -126,7 +123,6 @@ export default function ImprimirFacturaTicket({
 
   const handlePrint = useCallback(
     async (e) => {
-      // clave: que no se dispare "cerrar modal" por click bubbling
       e?.preventDefault?.();
       e?.stopPropagation?.();
 
@@ -142,20 +138,18 @@ export default function ImprimirFacturaTicket({
       }
 
       try {
+        // ✅ IMPORTANTE: limpiar ANTES de marcar printingRef/printing
+        cleanup();
+
         printingRef.current = true;
         setPrinting(true);
 
-        // Limpiar cualquier intento previo (por seguridad)
-        cleanup();
-
         // 1) Construir PDF (ticket) en memoria
-        // ✅ Le pasamos pago_hm/pago_hm_full para que el recibo lo muestre sin recalcular
         const doc = (
           <FacturaCuotaTicketPDF
             cliente={cli}
             poliza={pol}
             cuota={c}
-            pago_hm={pagoInfo.pago_hm}
             pago_hm_full={pagoInfo.pago_hm_full}
             pago_dt_iso={pagoInfo.pago_dt_iso}
           />
@@ -181,7 +175,6 @@ export default function ImprimirFacturaTicket({
         document.body.appendChild(iframe);
 
         // 3) Esperar a que cargue y mandar a imprimir.
-        //    IMPORTANTE: NO remover iframe/url hasta AFTERPRINT (si existe) o timeout.
         iframe.onload = () => {
           try {
             const w = iframe.contentWindow;
@@ -191,16 +184,12 @@ export default function ImprimirFacturaTicket({
               return;
             }
 
-            // algunos navegadores necesitan foco antes de print
             w.focus();
 
-            // cleanup post impresión (cuando el browser lo soporte)
-            // onafterprint a veces no dispara en iframes -> dejamos fallback timeout.
             w.onafterprint = () => {
               cleanup();
             };
 
-            // Disparar impresión
             w.print();
 
             // Fallback: si onafterprint no ocurre, limpiamos después de 60s

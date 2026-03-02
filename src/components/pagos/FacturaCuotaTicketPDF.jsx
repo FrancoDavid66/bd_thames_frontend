@@ -11,6 +11,44 @@ const PAD_Y = mmToPt(8);
 const safe = (v, d = "—") =>
   v === null || v === undefined || v === "" ? d : String(v);
 
+/* ===== helpers fechas ===== */
+
+const ymd = (d) => {
+  if (!d) return "";
+  const s = String(d).trim();
+  if (!s) return "";
+  return s.length >= 10 ? s.slice(0, 10) : s;
+};
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/** Suma meses de forma segura en YYYY-MM-DD (mantiene día si se puede, clamp si no) */
+const addMonthsYmd = (ymdStr, deltaMonths) => {
+  const s = ymd(ymdStr);
+  if (!s || s.length < 10) return "";
+  const base = new Date(`${s}T12:00:00`);
+  if (Number.isNaN(base.getTime())) return "";
+
+  const target = new Date(base.getTime());
+  target.setMonth(target.getMonth() + Number(deltaMonths || 0));
+
+  const intendedMonth = (base.getMonth() + Number(deltaMonths || 0) + 1200) % 12;
+  const actualMonth = target.getMonth();
+  if (actualMonth !== intendedMonth) {
+    const y2 = target.getFullYear();
+    const m2 = intendedMonth;
+    const lastDay = new Date(y2, m2 + 1, 0, 12, 0, 0);
+    target.setFullYear(lastDay.getFullYear());
+    target.setMonth(lastDay.getMonth());
+    target.setDate(lastDay.getDate());
+  }
+
+  const yy = target.getFullYear();
+  const mm = pad2(target.getMonth() + 1);
+  const dd = pad2(target.getDate());
+  return `${yy}-${mm}-${dd}`;
+};
+
 const fmtDateTimeHM = (d) => {
   if (!d) return "—";
   try {
@@ -129,9 +167,14 @@ const FacturaCuotaTicketPDF = ({ cliente, poliza, cuota, pago_hm_full, pago_dt_i
     (cuota.pago_hm_full && String(cuota.pago_hm_full).trim()) ||
     fmtDateTimeHM(pago_dt_iso || cuota.pago_registrado_en || cuota.fecha_pago || new Date());
 
-  // ✅ FIX: próximo vencimiento real
-  const proximoVto = cuota?.proximo_vencimiento || cuota?.proximoVencimiento || null;
-  const proximoVtoTxt = fmtDateOnly(proximoVto || cuota.fecha_vencimiento);
+  // ✅ Cobertura igual a UI/PDF: (vencimiento - 1 mes) al vencimiento
+  const vtoBase = ymd(cuota?.fecha_vencimiento || "");
+  const cubreDesde = vtoBase ? fmtDateOnly(addMonthsYmd(vtoBase, -1)) : "—";
+  const cubreHasta = vtoBase ? fmtDateOnly(vtoBase) : "—";
+  const coberturaTxt = vtoBase ? `${cubreDesde} al ${cubreHasta}` : "—";
+
+  // ✅ Vencimiento ACTUAL (no próximo)
+  const vtoActualTxt = fmtDateOnly(cuota.fecha_vencimiento);
 
   return (
     <Document>
@@ -151,8 +194,14 @@ const FacturaCuotaTicketPDF = ({ cliente, poliza, cuota, pago_hm_full, pago_dt_i
           </View>
 
           <View style={styles.line}>
-            <Text style={styles.label}>Próx. vto:</Text>
-            <Text style={styles.value}>{proximoVtoTxt}</Text>
+            <Text style={styles.label}>Cobertura:</Text>
+            <Text style={styles.value}>{coberturaTxt}</Text>
+          </View>
+
+          {/* ✅ CAMBIO: vencimiento actual */}
+          <View style={styles.line}>
+            <Text style={styles.label}>Vencimiento:</Text>
+            <Text style={styles.value}>{vtoActualTxt}</Text>
           </View>
 
           <View style={styles.line}>
