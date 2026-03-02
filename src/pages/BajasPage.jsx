@@ -1,4 +1,4 @@
-// src/pages/BajasPage.js x
+// src/pages/BajasPage.js
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -132,6 +132,9 @@ export default function BajasPage() {
   const [historyData, setHistoryData] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
+  // ✅ NUEVO: loading para Excel total
+  const [excelAllLoading, setExcelAllLoading] = useState(false);
+
   const companiasUnicas = useMemo(() => {
     const names = (items || []).map((p) => p.compania).filter(Boolean);
     return Array.from(new Set(names)).sort();
@@ -254,7 +257,9 @@ export default function BajasPage() {
 
   const updateBajaStatus = async (idsArray, nuevoEstado) => {
     try {
-      await Promise.all(idsArray.map((id) => apiAction(`bajas/operativo/${id}/estado/`, "POST", { estado: nuevoEstado })));
+      await Promise.all(
+        idsArray.map((id) => apiAction(`bajas/operativo/${id}/estado/`, "POST", { estado: nuevoEstado }))
+      );
       setSelectedIds(new Set());
       loadTableData({ force: true });
     } catch (e) {
@@ -262,6 +267,7 @@ export default function BajasPage() {
     }
   };
 
+  // ✅ EXCEL: genera archivo
   const generateAndDownloadExcel = async (rows) => {
     if (!rows || rows.length === 0) return;
     const workbook = new ExcelJS.Workbook();
@@ -277,7 +283,12 @@ export default function BajasPage() {
     });
 
     rows.forEach((p) => {
-      sheet.addRow([p._clienteNombre, p.patente || "S/D", p.numero_poliza || "S/N", p.compania || "S/D"]);
+      sheet.addRow([
+        p._clienteNombre || `${p?.cliente_apellido || ""} ${p?.cliente_nombre || ""}`.trim() || "Asegurado",
+        p.patente || "S/D",
+        p.numero_poliza || "S/N",
+        p.compania || "S/D",
+      ]);
     });
 
     sheet.columns = [{ width: 35 }, { width: 15 }, { width: 25 }, { width: 25 }];
@@ -286,10 +297,66 @@ export default function BajasPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Bajas_Mora_${new Date().toLocaleDateString()}.xlsx`);
+    link.setAttribute("download", `Bajas_${activeTab}_${new Date().toLocaleDateString()}.xlsx`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // ✅ NUEVO: traer TODO lo del tab (sin paginar) para que coincida con la TARJETA
+  const fetchAllForActiveTab = useCallback(async () => {
+    // Igual a counters: solo dias + baja_estado (no oficina/compañía/search)
+    const tab = activeTab && activeTab !== "TODAS" ? activeTab : "";
+    const baseParams = {
+      dias: umbralDias,
+      include_finalizadas: "0",
+      ...(tab ? { baja_estado: tab } : {}),
+      page: "1",
+      page_size: "500",
+    };
+
+    let pageN = 1;
+    let all = [];
+    for (;;) {
+      const data = await apiGet("bajas/operativo/", { ...baseParams, page: String(pageN) });
+      const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      all = all.concat(results);
+
+      // corte: si DRF paginado trae next
+      if (data && typeof data === "object" && "next" in data) {
+        if (!data.next) break;
+      } else {
+        // fallback por tamaño
+        if (results.length < Number(baseParams.page_size)) break;
+      }
+
+      pageN += 1;
+      if (pageN > 2000) break; // guard-rail
+    }
+    return all;
+  }, [activeTab, umbralDias]);
+
+  const handleExcelTotalTab = async () => {
+    try {
+      setExcelAllLoading(true);
+      const allRows = await fetchAllForActiveTab();
+
+      // enriquecemos nombre para el excel (igual que tu enriched)
+      const hoy = new Date();
+      const rows = allRows.map((p) => {
+        const proximaImpaga = parseDateRobusta(p.min_vto_impaga || p.proxima_vencimiento_impaga);
+        const diasMora = proximaImpaga ? daysBetween(hoy, proximaImpaga) : 0;
+        const { nombre } = getClienteInfo(p);
+        return { ...p, _clienteNombre: nombre, _diasMora: diasMora };
+      });
+
+      await generateAndDownloadExcel(rows);
+    } catch (e) {
+      console.error("Error exportando Excel total:", e);
+      alert(`Error exportando Excel total: ${e?.message || e}`);
+    } finally {
+      setExcelAllLoading(false);
+    }
   };
 
   const executeAction = async () => {
@@ -321,7 +388,7 @@ export default function BajasPage() {
   const MODAL_CONFIG = {
     EXCEL: {
       title: "Confirmar Descarga",
-      desc: "Generar Excel profesional con Nombre, Patente, Póliza y Compañía.",
+      desc: "Generar Excel profesional con Nombre, Patente, Póliza y Compañía (solo seleccionadas).",
       btnText: "Sí, Descargar Excel",
       btnColor: "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20",
       icon: <HiDownload className="text-xl" />,
@@ -375,7 +442,6 @@ export default function BajasPage() {
               setActiveTab(t.id);
               setPage(1);
               setSelectedIds(new Set());
-              // ✅ FIX: recarga usando el TAB NUEVO (no el viejo)
               loadTableData({ force: true, overrides: { activeTab: t.id, page: 1 } });
             }}
             className={`p-4 rounded-xl border transition ${
@@ -388,15 +454,31 @@ export default function BajasPage() {
         ))}
       </div>
 
+      {/* ✅ Barra acciones */}
       <div className="bg-slate-900 p-4 rounded-xl border border-white/10 flex flex-wrap gap-3 items-center">
         <div className="text-sm font-semibold text-slate-300 mr-auto">{selectedIds.size} pólizas seleccionadas</div>
+
+        {/* ✅ NUEVO: Excel total para que coincida con la tarjeta */}
+        <button
+          disabled={excelAllLoading || (activeTab === "TODAS")}
+          onClick={handleExcelTotalTab}
+          className="px-5 py-2.5 bg-white/10 text-white font-bold rounded-lg hover:bg-white/15 disabled:opacity-30 transition flex items-center gap-2"
+          title={activeTab === "TODAS" ? "Elegí una tarjeta (Pendientes/Enviadas/Realizadas) para exportar el total" : "Exporta TODO el total del tab (sin paginación) igual que la tarjeta"}
+        >
+          <HiDownload className="text-xl" />
+          {excelAllLoading ? "Exportando total..." : "Excel (Total de la Tarjeta)"}
+        </button>
+
+        {/* Excel seleccionadas (igual que antes) */}
         <button
           disabled={!selectedIds.size}
           onClick={() => openConfirmModal("EXCEL", Array.from(selectedIds))}
           className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500 disabled:opacity-30 transition flex items-center gap-2"
+          title="Exporta solo lo seleccionado (normalmente una página)"
         >
-          <HiDownload className="text-xl" /> Descargar Excel
+          <HiDownload className="text-xl" /> Descargar Excel (Seleccionadas)
         </button>
+
         <button
           disabled={!selectedIds.size}
           onClick={() => openConfirmModal("ENVIADA", Array.from(selectedIds))}

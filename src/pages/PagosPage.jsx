@@ -2,6 +2,7 @@
    ✅ Flujo: Buscar → Lista de clientes → Modal con cuotas del cliente → Pagar
    ✅ OPT: usa solo campos necesarios (asume payload /pagos/buscar/ con CuotaFlatSerializer)
    ✅ FIX: conservar pago_registrado_en + pago_hm + pago_hm_full para reimprimir post-refresh
+   ✅ NUEVO: Historial de pagos completo (filtros + lista + paginación + export CSV/PDF)
 */
 
 import { useState, useEffect, useMemo, useCallback, useDeferredValue, useTransition } from "react";
@@ -310,6 +311,101 @@ function computeClienteGroups(cuotasList) {
   }));
 }
 
+/* ===================== helpers historial pagos (UI) ===================== */
+const OFICINAS_OPTS = [
+  { value: "ALL", label: "Todas" },
+  { value: "1", label: "5 esquinas (1)" },
+  { value: "2", label: "Axion (2)" },
+  { value: "3", label: "39 (3)" },
+];
+
+function extractHpMonto(it) {
+  const monto = it?.monto_pagado ?? it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
+  const n = Number(monto);
+  return Number.isFinite(n) ? n : null;
+}
+
+function extractHpCliente(it) {
+  const pol = it?.poliza && typeof it.poliza === "object" ? it.poliza : {};
+  const cli = pol?.cliente && typeof pol.cliente === "object" ? pol.cliente : null;
+
+  const apellido =
+    String(cli?.apellido ?? pol?.cliente_apellido ?? it?.cliente_apellido ?? "").trim();
+  const nombre =
+    String(cli?.nombre ?? pol?.cliente_nombre ?? it?.cliente_nombre ?? "").trim();
+
+  const asegurado =
+    String(
+      pol?.cliente_nombre_apellido ??
+        pol?.cliente_nombre_completo ??
+        it?.cliente_nombre_apellido ??
+        it?.cliente_nombre_completo ??
+        pol?.asegurado_nombre ??
+        pol?.asegurado ??
+        it?.asegurado ??
+        ""
+    ).trim();
+
+  const full = `${apellido} ${nombre}`.trim();
+  const label = full || asegurado || "Cliente";
+
+  const dni =
+    String(
+      cli?.dni_cuit_cuil ??
+        pol?.cliente_dni ??
+        it?.cliente_dni ??
+        it?.dni ??
+        it?.dni_cuit_cuil ??
+        ""
+    ).trim();
+
+  const tel =
+    String(cli?.telefono ?? pol?.cliente_telefono ?? it?.cliente_telefono ?? it?.telefono ?? "").trim();
+
+  return { label, dni, tel };
+}
+
+function extractHpPoliza(it) {
+  const pol = it?.poliza && typeof it.poliza === "object" ? it.poliza : {};
+  const polizaId = pol?.id ?? it?.poliza_id ?? null;
+
+  const patente = String(pol?.patente ?? it?.patente ?? "").trim().toUpperCase();
+  const numero = String(pol?.numero_poliza ?? it?.numero_poliza ?? "").trim();
+  const compania = String(pol?.compania_nombre ?? it?.compania_nombre ?? it?.compania ?? "").trim();
+  const oficina = String(pol?.oficina ?? it?.oficina ?? "").trim();
+
+  const marca = String(pol?.marca ?? it?.marca ?? "").trim();
+  const modelo = String(pol?.modelo ?? it?.modelo ?? "").trim();
+
+  const titulo = [
+    patente || null,
+    numero ? `N° ${numero}` : null,
+    compania || null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  const subtitulo = [marca || null, modelo || null].filter(Boolean).join(" ");
+
+  return { polizaId, patente, numero, compania, oficina, titulo: titulo || "Póliza", subtitulo };
+}
+
+function extractHpCuota(it) {
+  const cuotaNro = it?.cuota_nro ?? it?.nro ?? it?.numero ?? null;
+  const cuotaLabel = String(it?.cuota_label ?? it?.label ?? "").trim();
+  const vto = it?.fecha_vencimiento ?? it?.vencimiento ?? null;
+  const fpago = it?.fecha_pago ?? it?.pago_fecha ?? null;
+  const forma = String(it?.forma_pago ?? it?.metodo ?? it?.medio ?? it?.medio_pago ?? "").trim();
+
+  return {
+    cuotaNro,
+    cuotaLabel,
+    vto,
+    fpago,
+    forma,
+  };
+}
+
 /* ================== PAGE ================== */
 const PagosPage = () => {
   const dispatch = useDispatch();
@@ -454,9 +550,10 @@ const PagosPage = () => {
       const prevList = Array.isArray(prev) ? prev : [];
       const map = new Map();
       actualizadas.forEach((item) => {
-        const obj = item?.cuotaActualizada && typeof item.cuotaActualizada === "object"
-          ? item.cuotaActualizada
-          : item;
+        const obj =
+          item?.cuotaActualizada && typeof item.cuotaActualizada === "object"
+            ? item.cuotaActualizada
+            : item;
         if (obj?.id) map.set(obj.id, obj);
       });
       if (map.size === 0) return prevList;
@@ -502,38 +599,52 @@ const PagosPage = () => {
     }
   }, [dispatch, buildExportParams]);
 
-  const handleEnviarRecordatorios = useCallback(async (medioCobroId, oficina) => {
-    setSendingRecordatorios(true);
-    try {
-      const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
-      const alias = medio ? medio.etiqueta || medio.valor : undefined;
-      const result = await dispatch(
-        enviarRecordatoriosCuotas({
-          medio_cobro_id: medioCobroId || undefined,
-          alias,
-          oficina,
-        })
-      ).unwrap();
-      dispatch(fetchHistorialRecordatorios());
-      return result;
-    } catch (err) {
-      console.error("[PagosPage] Error enviando recordatorios:", err);
-      const data = err?.data || err?.response?.data || err?.payload || null;
-      const msg = (typeof data === "string" && data) || data?.detail || data?.error || err?.message || "No se pudieron enviar los recordatorios.";
-      const errores = Array.isArray(data?.errores) ? data.errores : Array.isArray(data) ? data : [];
-      return { ok: false, error: msg, errores, raw: data || err };
-    } finally {
-      setSendingRecordatorios(false);
-    }
-  }, [dispatch, mediosCobro]);
+  const handleEnviarRecordatorios = useCallback(
+    async (medioCobroId, oficina) => {
+      setSendingRecordatorios(true);
+      try {
+        const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
+        const alias = medio ? medio.etiqueta || medio.valor : undefined;
+        const result = await dispatch(
+          enviarRecordatoriosCuotas({
+            medio_cobro_id: medioCobroId || undefined,
+            alias,
+            oficina,
+          })
+        ).unwrap();
+        dispatch(fetchHistorialRecordatorios());
+        return result;
+      } catch (err) {
+        console.error("[PagosPage] Error enviando recordatorios:", err);
+        const data = err?.data || err?.response?.data || err?.payload || null;
+        const msg =
+          (typeof data === "string" && data) ||
+          data?.detail ||
+          data?.error ||
+          err?.message ||
+          "No se pudieron enviar los recordatorios.";
+        const errores = Array.isArray(data?.errores) ? data.errores : Array.isArray(data) ? data : [];
+        return { ok: false, error: msg, errores, raw: data || err };
+      } finally {
+        setSendingRecordatorios(false);
+      }
+    },
+    [dispatch, mediosCobro]
+  );
 
   const { totalCuotas, alDia, porVencer, venceHoy, vencidas } = useMemo(() => {
     const hoy = dayjs().startOf("day");
     const stats = { totalCuotas: 0, alDia: 0, porVencer: 0, venceHoy: 0, vencidas: 0 };
     (cuotas || []).forEach((c) => {
       stats.totalCuotas += 1;
-      if (c.pagado) { stats.alDia += 1; return; }
-      if (!c.fecha_vencimiento) { stats.porVencer += 1; return; }
+      if (c.pagado) {
+        stats.alDia += 1;
+        return;
+      }
+      if (!c.fecha_vencimiento) {
+        stats.porVencer += 1;
+        return;
+      }
       const fv = dayjs(c.fecha_vencimiento).startOf("day");
       if (!fv.isValid()) return;
       if (fv.isBefore(hoy)) stats.vencidas += 1;
@@ -543,25 +654,46 @@ const PagosPage = () => {
     return stats;
   }, [cuotas]);
 
-  const kpis = useMemo(() => [
-    { label: "Cuotas", value: totalCuotas, icon: HiBadgeCheck, hint: "Total cuotas" },
-    { label: "Al día", value: alDia, icon: HiSparkles, hint: "Pagadas" },
-    { label: "Por vencer", value: porVencer, icon: HiClock, hint: "Próximas" },
-    { label: "Vence hoy", value: venceHoy, icon: HiSearch, hint: "Hoy" },
-    { label: "Vencidas", value: vencidas, icon: HiX, hint: "Atrasadas" },
-  ], [totalCuotas, alDia, porVencer, venceHoy, vencidas]);
+  const kpis = useMemo(
+    () => [
+      { label: "Cuotas", value: totalCuotas, icon: HiBadgeCheck, hint: "Total cuotas" },
+      { label: "Al día", value: alDia, icon: HiSparkles, hint: "Pagadas" },
+      { label: "Por vencer", value: porVencer, icon: HiClock, hint: "Próximas" },
+      { label: "Vence hoy", value: venceHoy, icon: HiSearch, hint: "Hoy" },
+      { label: "Vencidas", value: vencidas, icon: HiX, hint: "Atrasadas" },
+    ],
+    [totalCuotas, alDia, porVencer, venceHoy, vencidas]
+  );
 
   const hpKpis = useMemo(() => {
     const items = Array.isArray(historialPagosItems) ? historialPagosItems : [];
-    let total = 0; let count = 0;
+    let total = 0;
+    let count = 0;
     items.forEach((it) => {
       count += 1;
-      const monto = it?.monto_pagado ?? it?.monto ?? it?.importe ?? it?.precio_cuota ?? null;
-      const n = Number(monto);
+      const n = extractHpMonto(it);
       if (Number.isFinite(n)) total += n;
     });
     return { count, total };
   }, [historialPagosItems]);
+
+  const totalPagesHistorial = useMemo(() => {
+    const count = Number(historialPagosMeta?.count || 0) || 0;
+    const ps = Number(hpPageSize || 25) || 25;
+    return Math.max(1, Math.ceil(count / ps));
+  }, [historialPagosMeta, hpPageSize]);
+
+  // clamp página cuando cambia count/filtros
+  useEffect(() => {
+    if (tab !== "historial_pagos") return;
+    setHpPage((p) => {
+      const n = Number(p || 1) || 1;
+      const max = Number(totalPagesHistorial || 1) || 1;
+      if (n < 1) return 1;
+      if (n > max) return max;
+      return n;
+    });
+  }, [tab, totalPagesHistorial]);
 
   const clienteGroups = useMemo(() => computeClienteGroups(cuotas), [cuotas]);
   const visibleCuotasEnModal = useMemo(() => {
@@ -572,6 +704,31 @@ const PagosPage = () => {
 
   const abrirCliente = useCallback((g) => setClienteSeleccionado(g), []);
   const cerrarClienteModal = useCallback(() => setClienteSeleccionado(null), []);
+
+  // handlers filtros historial
+  const setModo = useCallback((m) => {
+    setHpModo(m);
+    setHpPage(1);
+  }, []);
+
+  const onChangeOficina = useCallback((e) => {
+    setHpOficina(String(e.target.value || "ALL"));
+    setHpPage(1);
+  }, []);
+
+  const onChangeOrdering = useCallback((e) => {
+    setHpOrdering(String(e.target.value || "-fecha_pago"));
+    setHpPage(1);
+  }, []);
+
+  const onPrevPage = useCallback(() => {
+    setHpPage((p) => Math.max(1, (Number(p) || 1) - 1));
+  }, []);
+  const onNextPage = useCallback(() => {
+    setHpPage((p) => Math.min(totalPagesHistorial, (Number(p) || 1) + 1));
+  }, [totalPagesHistorial]);
+
+  const historialItems = Array.isArray(historialPagosItems) ? historialPagosItems : [];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
@@ -590,11 +747,24 @@ const PagosPage = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <motion.button type="button" onClick={() => setShowCuentasModal(true)} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-flex items-center gap-2 rounded-2xl bg-slate-800/70 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-slate-200 shadow-sm hover:bg-slate-700/80 cursor-pointer">
+            <motion.button
+              type="button"
+              onClick={() => setShowCuentasModal(true)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-800/70 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-slate-200 shadow-sm hover:bg-slate-700/80 cursor-pointer"
+            >
               <HiCog className="text-base sm:text-lg" />
               <span>Medios de cobro</span>
             </motion.button>
-            <motion.button type="button" onClick={() => setShowRecordatoriosModal(true)} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.96 }} className="inline-flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80" style={{ backgroundColor: "#25D366" }}>
+            <motion.button
+              type="button"
+              onClick={() => setShowRecordatoriosModal(true)}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.96 }}
+              className="inline-flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80"
+              style={{ backgroundColor: "#25D366" }}
+            >
               <HiSpeakerphone className="text-base sm:text-lg" />
               <span>{sendingRecordatorios ? "Enviando..." : "Enviar recordatorios"}</span>
             </motion.button>
@@ -604,9 +774,16 @@ const PagosPage = () => {
         {tab === "pagos" && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4 sm:mb-4">
             {kpis.map(({ label, value, icon: Icon, hint }) => (
-              <motion.div key={label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-2.5 sm:px-4 sm:py-3 flex flex-col justify-between shadow-[0_0_18px_rgba(15,23,42,0.75)]">
+              <motion.div
+                key={label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-2.5 sm:px-4 sm:py-3 flex flex-col justify-between shadow-[0_0_18px_rgba(15,23,42,0.75)]"
+              >
                 <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">{label}</span>
+                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">
+                    {label}
+                  </span>
                   <Icon className="text-slate-400 text-sm sm:text-base" />
                 </div>
                 <div className="flex items-baseline justify-between">
@@ -620,24 +797,62 @@ const PagosPage = () => {
 
         <div className="mb-3 sm:mb-4">
           <div className="inline-flex p-1 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-[0_0_18px_rgba(15,23,42,0.85)]">
-            <button type="button" onClick={() => handleChangeTab("pagos")} className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${tab === "pagos" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"}`}>
-              <HiBadgeCheck className="text-sm sm:text-base" /><span>Pagos y cuotas</span>
+            <button
+              type="button"
+              onClick={() => handleChangeTab("pagos")}
+              className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                tab === "pagos" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              <HiBadgeCheck className="text-sm sm:text-base" />
+              <span>Pagos y cuotas</span>
             </button>
-            <button type="button" onClick={() => handleChangeTab("historial_pagos")} className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${tab === "historial_pagos" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"}`}>
-              <HiReceiptTax className="text-sm sm:text-base" /><span>Historial de pagos</span>
+            <button
+              type="button"
+              onClick={() => handleChangeTab("historial_pagos")}
+              className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                tab === "historial_pagos"
+                  ? "bg-slate-800 text-slate-50"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              <HiReceiptTax className="text-sm sm:text-base" />
+              <span>Historial de pagos</span>
             </button>
-            <button type="button" onClick={() => handleChangeTab("historial_recordatorios")} className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${tab === "historial_recordatorios" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"}`}>
-              <HiClock className="text-sm sm:text-base" /><span>Historial recordatorios</span>
+            <button
+              type="button"
+              onClick={() => handleChangeTab("historial_recordatorios")}
+              className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                tab === "historial_recordatorios"
+                  ? "bg-slate-800 text-slate-50"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              <HiClock className="text-sm sm:text-base" />
+              <span>Historial recordatorios</span>
             </button>
           </div>
         </div>
 
         {tab === "pagos" ? (
-          <motion.div key="tab-pagos" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 sm:space-y-4">
+          <motion.div
+            key="tab-pagos"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3 sm:space-y-4"
+          >
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4 space-y-3">
               <PagosSearch onBuscar={handleBuscarPolizas} />
-              <button type="button" onClick={() => setOcultarPagadas((v) => !v)} className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer">
-                <span className={`w-4 h-4 rounded border flex items-center justify-center ${ocultarPagadas ? "bg-slate-200 border-slate-100" : "border-slate-500"}`}>
+              <button
+                type="button"
+                onClick={() => setOcultarPagadas((v) => !v)}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer"
+              >
+                <span
+                  className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    ocultarPagadas ? "bg-slate-200 border-slate-100" : "border-slate-500"
+                  }`}
+                >
                   {ocultarPagadas && <span className="w-2 h-2 rounded bg-slate-900" />}
                 </span>
                 <HiEyeOff className="w-4 h-4 opacity-70" />
@@ -645,7 +860,8 @@ const PagosPage = () => {
               </button>
               {!!lastBuscarQuery && (
                 <div className="text-xs text-slate-500">
-                  Última búsqueda: <span className="text-slate-300 font-semibold">{lastBuscarQuery}</span>
+                  Última búsqueda:{" "}
+                  <span className="text-slate-300 font-semibold">{lastBuscarQuery}</span>
                 </div>
               )}
             </div>
@@ -662,7 +878,11 @@ const PagosPage = () => {
                   </div>
                 </div>
                 {clienteSeleccionado && (
-                  <button type="button" onClick={() => setClienteSeleccionado(null)} className="h-9 px-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-200 hover:bg-slate-900/60 cursor-pointer text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setClienteSeleccionado(null)}
+                    className="h-9 px-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-200 hover:bg-slate-900/60 cursor-pointer text-xs"
+                  >
                     Volver
                   </button>
                 )}
@@ -677,7 +897,16 @@ const PagosPage = () => {
                   {clienteGroups.map((g) => {
                     const hasPend = g.pendientes > 0;
                     return (
-                      <button key={g.key} type="button" onClick={() => abrirCliente(g)} className={`text-left rounded-2xl border px-3 py-3 sm:px-4 sm:py-4 transition cursor-pointer ${hasPend ? "bg-slate-950/40 border-slate-700 hover:bg-slate-950/60" : "bg-slate-950/25 border-slate-800 hover:bg-slate-950/45"}`}>
+                      <button
+                        key={g.key}
+                        type="button"
+                        onClick={() => abrirCliente(g)}
+                        className={`text-left rounded-2xl border px-3 py-3 sm:px-4 sm:py-4 transition cursor-pointer ${
+                          hasPend
+                            ? "bg-slate-950/40 border-slate-700 hover:bg-slate-950/60"
+                            : "bg-slate-950/25 border-slate-800 hover:bg-slate-950/45"
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -685,17 +914,42 @@ const PagosPage = () => {
                                 <HiIdentification className="w-5 h-5" />
                               </span>
                               <div className="min-w-0">
-                                <div className="text-sm sm:text-base font-semibold text-slate-100 truncate">{g.label}</div>
-                                <div className="text-xs text-slate-400 truncate">DNI: <span className="text-slate-200">{safe(g.dni, "—")}</span> • Cuotas: <span className="text-slate-200">{g.total}</span></div>
+                                <div className="text-sm sm:text-base font-semibold text-slate-100 truncate">
+                                  {g.label}
+                                </div>
+                                <div className="text-xs text-slate-400 truncate">
+                                  DNI: <span className="text-slate-200">{safe(g.dni, "—")}</span> • Cuotas:{" "}
+                                  <span className="text-slate-200">{g.total}</span>
+                                </div>
                               </div>
                             </div>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <span className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${g.vencidas > 0 ? "bg-rose-500/15 border-rose-400/30 text-rose-200" : "bg-slate-900 border-slate-800 text-slate-300"}`}>Vencidas: <span className="ml-1">{g.vencidas}</span></span>
-                              <span className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${g.pendientes > 0 ? "bg-indigo-500/15 border-indigo-400/30 text-indigo-200" : "bg-slate-900 border-slate-800 text-slate-300"}`}>Pendientes: <span className="ml-1">{g.pendientes}</span></span>
-                              <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-emerald-500/10 border-emerald-400/25 text-emerald-200">Cobrar: <span className="ml-1">{fmtMoney(g.totalMontoPendiente)}</span></span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${
+                                  g.vencidas > 0
+                                    ? "bg-rose-500/15 border-rose-400/30 text-rose-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-300"
+                                }`}
+                              >
+                                Vencidas: <span className="ml-1">{g.vencidas}</span>
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border ${
+                                  g.pendientes > 0
+                                    ? "bg-indigo-500/15 border-indigo-400/30 text-indigo-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-300"
+                                }`}
+                              >
+                                Pendientes: <span className="ml-1">{g.pendientes}</span>
+                              </span>
+                              <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-semibold border bg-emerald-500/10 border-emerald-400/25 text-emerald-200">
+                                Cobrar: <span className="ml-1">{fmtMoney(g.totalMontoPendiente)}</span>
+                              </span>
                             </div>
                           </div>
-                          <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300"><HiChevronRightMini className="w-5 h-5" /></span>
+                          <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300">
+                            <HiChevronRightMini className="w-5 h-5" />
+                          </span>
                         </div>
                       </button>
                     );
@@ -709,7 +963,12 @@ const PagosPage = () => {
             {/* ✅ MODAL CLIENTE CORREGIDO (max-h, flex-col, overflow-auto adentro) */}
             <AnimatePresence>
               {!!clienteSeleccionado && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center"
+                >
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={cerrarClienteModal} />
 
                   <motion.div
@@ -725,14 +984,31 @@ const PagosPage = () => {
                     <div className="px-4 sm:px-6 py-4 border-b border-slate-800 bg-slate-950/70 shrink-0">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-base sm:text-lg font-semibold text-slate-50 truncate">{clienteSeleccionado?.label || "Cliente"}</div>
+                          <div className="text-base sm:text-lg font-semibold text-slate-50 truncate">
+                            {clienteSeleccionado?.label || "Cliente"}
+                          </div>
                           <div className="mt-1 text-xs sm:text-sm text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
-                            <span>DNI: <span className="text-slate-200 font-semibold">{safe(clienteSeleccionado?.dni, "—")}</span></span>
-                            <span>• Cuotas: <span className="text-slate-200 font-semibold">{clienteSeleccionado?.total ?? 0}</span></span>
+                            <span>
+                              DNI:{" "}
+                              <span className="text-slate-200 font-semibold">
+                                {safe(clienteSeleccionado?.dni, "—")}
+                              </span>
+                            </span>
+                            <span>
+                              • Cuotas:{" "}
+                              <span className="text-slate-200 font-semibold">
+                                {clienteSeleccionado?.total ?? 0}
+                              </span>
+                            </span>
                           </div>
                         </div>
-                        <button type="button" onClick={cerrarClienteModal} className="h-10 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 inline-flex items-center gap-2 cursor-pointer">
-                          <HiX className="w-5 h-5" /><span className="hidden sm:inline">Cerrar</span>
+                        <button
+                          type="button"
+                          onClick={cerrarClienteModal}
+                          className="h-10 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 inline-flex items-center gap-2 cursor-pointer"
+                        >
+                          <HiX className="w-5 h-5" />
+                          <span className="hidden sm:inline">Cerrar</span>
                         </button>
                       </div>
                     </div>
@@ -755,21 +1031,519 @@ const PagosPage = () => {
             </AnimatePresence>
           </motion.div>
         ) : tab === "historial_pagos" ? (
-          <motion.div key="tab-historial-pagos" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 sm:space-y-4">
-            {/* Filtros Historial... */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4 text-center text-slate-400">
-              Historial de pagos (Filtros omitidos por brevedad en este snippet, tu código original los mantiene intactos).
+          <motion.div
+            key="tab-historial-pagos"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3 sm:space-y-4"
+          >
+            {/* ✅ KPIs Historial */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-3 sm:px-4 shadow-[0_0_18px_rgba(15,23,42,0.75)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">Registros</span>
+                  <HiReceiptTax className="text-slate-400 text-sm sm:text-base" />
+                </div>
+                <div className="mt-1 text-lg sm:text-2xl font-semibold tabular-nums">{hpKpis.count}</div>
+                <div className="text-[0.7rem] text-slate-500">Página actual</div>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-3 sm:px-4 shadow-[0_0_18px_rgba(15,23,42,0.75)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">Total</span>
+                  <HiSparkles className="text-slate-400 text-sm sm:text-base" />
+                </div>
+                <div className="mt-1 text-lg sm:text-2xl font-semibold tabular-nums">{fmtMoney(hpKpis.total)}</div>
+                <div className="text-[0.7rem] text-slate-500">Suma página</div>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-3 sm:px-4 shadow-[0_0_18px_rgba(15,23,42,0.75)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">Total backend</span>
+                  <HiUserGroup className="text-slate-400 text-sm sm:text-base" />
+                </div>
+                <div className="mt-1 text-lg sm:text-2xl font-semibold tabular-nums">
+                  {Number(historialPagosMeta?.count || 0) || 0}
+                </div>
+                <div className="text-[0.7rem] text-slate-500">Count</div>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-3 sm:px-4 shadow-[0_0_18px_rgba(15,23,42,0.75)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">Página</span>
+                  <HiChevronRight className="text-slate-400 text-sm sm:text-base" />
+                </div>
+                <div className="mt-1 text-lg sm:text-2xl font-semibold tabular-nums">
+                  {hpPage} / {totalPagesHistorial}
+                </div>
+                <div className="text-[0.7rem] text-slate-500">Navegación</div>
+              </div>
+            </div>
+
+            {/* ✅ Filtros Historial */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
+              <div className="flex flex-col gap-3">
+                {/* modo */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex p-1 rounded-2xl bg-slate-950/60 border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setModo("MES")}
+                      className={`px-3 py-1.5 rounded-2xl text-xs sm:text-sm cursor-pointer ${
+                        hpModo === "MES" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <HiCalendar className="w-4 h-4" /> Mes
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModo("DIA")}
+                      className={`px-3 py-1.5 rounded-2xl text-xs sm:text-sm cursor-pointer ${
+                        hpModo === "DIA" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <HiClock className="w-4 h-4" /> Día
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModo("RANGO")}
+                      className={`px-3 py-1.5 rounded-2xl text-xs sm:text-sm cursor-pointer ${
+                        hpModo === "RANGO"
+                          ? "bg-slate-800 text-slate-50"
+                          : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <HiSearch className="w-4 h-4" /> Rango
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRefreshHistorialPagos}
+                      disabled={loadingHistorialPagos}
+                      className={`h-10 px-3 rounded-2xl border text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer ${
+                        loadingHistorialPagos
+                          ? "bg-slate-950/30 border-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-slate-950/60 border-slate-800 text-slate-200 hover:bg-slate-900/60"
+                      }`}
+                      title="Actualizar"
+                    >
+                      <HiRefresh className="w-4 h-4" />
+                      <span className="hidden sm:inline">{loadingHistorialPagos ? "Cargando..." : "Actualizar"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadCSV}
+                      disabled={downloadingCSV}
+                      className={`h-10 px-3 rounded-2xl border text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer ${
+                        downloadingCSV
+                          ? "bg-slate-950/30 border-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-slate-950/60 border-slate-800 text-slate-200 hover:bg-slate-900/60"
+                      }`}
+                      title="Descargar CSV"
+                    >
+                      <HiDownload className="w-4 h-4" />
+                      <span className="hidden sm:inline">{downloadingCSV ? "CSV..." : "CSV"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadPDF}
+                      disabled={downloadingPDF}
+                      className={`h-10 px-3 rounded-2xl border text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer ${
+                        downloadingPDF
+                          ? "bg-slate-950/30 border-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-slate-950/60 border-slate-800 text-slate-200 hover:bg-slate-900/60"
+                      }`}
+                      title="Descargar PDF"
+                    >
+                      <HiDownload className="w-4 h-4" />
+                      <span className="hidden sm:inline">{downloadingPDF ? "PDF..." : "PDF"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* selector fecha (según modo) + oficina + ordering + search */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+                  {/* fecha */}
+                  <div className="lg:col-span-4">
+                    {hpModo === "MES" ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={hpMes}
+                          onChange={(e) => {
+                            setHpMes(String(e.target.value || monthKey(new Date())));
+                            setHpPage(1);
+                          }}
+                          className="w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm outline-none"
+                        >
+                          {mesesOptions.map((ym) => (
+                            <option key={ym} value={ym}>
+                              {monthLabel(ym)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : hpModo === "DIA" ? (
+                      <input
+                        type="date"
+                        value={hpDia}
+                        onChange={(e) => {
+                          setHpDia(String(e.target.value || ymd(new Date())));
+                          setHpPage(1);
+                        }}
+                        className="w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm outline-none"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={hpDesde}
+                          onChange={(e) => {
+                            setHpDesde(String(e.target.value || ""));
+                            setHpPage(1);
+                          }}
+                          className="w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm outline-none"
+                        />
+                        <input
+                          type="date"
+                          value={hpHasta}
+                          onChange={(e) => {
+                            setHpHasta(String(e.target.value || ""));
+                            setHpPage(1);
+                          }}
+                          className="w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* oficina */}
+                  <div className="lg:col-span-2">
+                    <select
+                      value={hpOficina}
+                      onChange={onChangeOficina}
+                      className="w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm outline-none"
+                    >
+                      {OFICINAS_OPTS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* ordering */}
+                  <div className="lg:col-span-3">
+                    <select
+                      value={hpOrdering}
+                      onChange={onChangeOrdering}
+                      className="w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm outline-none"
+                    >
+                      <option value="-fecha_pago">Más nuevos</option>
+                      <option value="fecha_pago">Más viejos</option>
+                      <option value="-monto">Mayor monto</option>
+                      <option value="monto">Menor monto</option>
+                    </select>
+                  </div>
+
+                  {/* search */}
+                  <div className="lg:col-span-3">
+                    <div className="relative">
+                      <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        value={hpQInput}
+                        onChange={(e) => setHpQInput(e.target.value)}
+                        placeholder="Buscar (DNI, nombre, patente, póliza...)"
+                        className="w-full h-10 pl-10 pr-10 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-100 placeholder:text-slate-500 text-sm outline-none"
+                      />
+                      {!!hpQInput && (
+                        <button
+                          type="button"
+                          onClick={() => setHpQInput("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-900/60 text-slate-200 inline-flex items-center justify-center cursor-pointer"
+                          title="Limpiar"
+                        >
+                          <HiX className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* hint */}
+                <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
+                  <span>
+                    Filtro activo:{" "}
+                    <span className="text-slate-200 font-semibold">
+                      {hpModo === "MES"
+                        ? `Mes ${hpMes}`
+                        : hpModo === "DIA"
+                        ? `Día ${hpDia}`
+                        : `Rango ${hpDesde || "—"} → ${hpHasta || "—"}`}
+                    </span>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Oficina:{" "}
+                    <span className="text-slate-200 font-semibold">
+                      {(OFICINAS_OPTS.find((x) => x.value === hpOficina) || OFICINAS_OPTS[0]).label}
+                    </span>
+                  </span>
+                  {!!hpQApplied && (
+                    <>
+                      <span>•</span>
+                      <span>
+                        Búsqueda: <span className="text-slate-200 font-semibold">{hpQApplied}</span>
+                      </span>
+                    </>
+                  )}
+                  {isPending && <span className="text-slate-400">• Aplicando búsqueda…</span>}
+                </div>
+
+                {/* errores descarga */}
+                {(historialPagosDownloadError || historialPagosDownloadPdfError) && (
+                  <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                    {String(historialPagosDownloadError || historialPagosDownloadPdfError)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ✅ Lista Historial */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="text-sm font-semibold text-slate-100">Pagos</div>
+                <div className="text-xs text-slate-400">
+                  Mostrando <span className="text-slate-200 font-semibold">{historialItems.length}</span> de{" "}
+                  <span className="text-slate-200 font-semibold">{Number(historialPagosMeta?.count || 0) || 0}</span>
+                </div>
+              </div>
+
+              {loadingHistorialPagos && historialItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center text-slate-400">
+                  Cargando historial…
+                </div>
+              ) : historialPagosError ? (
+                <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+                  {typeof historialPagosError === "string"
+                    ? historialPagosError
+                    : historialPagosError?.detail || "Error cargando historial."}
+                </div>
+              ) : historialItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center text-slate-400">
+                  No hay pagos para esos filtros.
+                </div>
+              ) : (
+                <>
+                  {/* Mobile cards */}
+                  <div className="grid grid-cols-1 gap-2 sm:hidden">
+                    {historialItems.map((it, idx) => {
+                      const c = extractHpCliente(it);
+                      const p = extractHpPoliza(it);
+                      const q = extractHpCuota(it);
+                      const monto = extractHpMonto(it);
+                      const fecha = fmtRegistro(it);
+                      const oficina = p.oficina || it?.oficina || "—";
+
+                      return (
+                        <div
+                          key={it?.id ?? `hp-${idx}`}
+                          className="rounded-2xl bg-slate-950/40 border border-slate-800 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-slate-100 truncate">{c.label}</div>
+                              <div className="text-xs text-slate-400 truncate">
+                                DNI: <span className="text-slate-200">{safe(c.dni)}</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-emerald-200 tabular-nums">
+                                {monto === null ? "—" : fmtMoney(monto)}
+                              </div>
+                              <div className="text-[0.7rem] text-slate-500">{fecha}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 text-xs text-slate-300">
+                            <div className="truncate">
+                              <span className="text-slate-500">Póliza:</span>{" "}
+                              <span className="text-slate-100 font-semibold">{p.titulo}</span>
+                            </div>
+                            {!!p.subtitulo && <div className="truncate text-slate-400">{p.subtitulo}</div>}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center rounded-full px-3 h-7 text-[0.7rem] font-semibold border bg-slate-900 border-slate-800 text-slate-200">
+                              Oficina: <span className="ml-1">{safe(oficina)}</span>
+                            </span>
+                            <span className="inline-flex items-center rounded-full px-3 h-7 text-[0.7rem] font-semibold border bg-indigo-500/15 border-indigo-400/25 text-indigo-200">
+                              {q.cuotaLabel || (q.cuotaNro ? `Cuota ${q.cuotaNro}` : "Cuota")}
+                            </span>
+                            {!!q.forma && (
+                              <span className="inline-flex items-center rounded-full px-3 h-7 text-[0.7rem] font-semibold border bg-slate-900 border-slate-800 text-slate-200">
+                                {q.forma}
+                              </span>
+                            )}
+                          </div>
+
+                          {!!it?.observaciones && (
+                            <div className="mt-2 text-xs text-slate-400 line-clamp-2">
+                              <span className="text-slate-500">Obs:</span> {String(it.observaciones)}
+                            </div>
+                          )}
+
+                          {!!p.polizaId && (
+                            <div className="mt-3">
+                              <a
+                                href={`/polizas/${p.polizaId}`}
+                                className="inline-flex items-center gap-2 text-xs text-slate-200 hover:text-slate-50"
+                              >
+                                Ver póliza <HiChevronRightMini className="w-4 h-4" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop table */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-slate-400">
+                          <th className="py-2 pr-3">Fecha</th>
+                          <th className="py-2 pr-3">Cliente</th>
+                          <th className="py-2 pr-3">DNI</th>
+                          <th className="py-2 pr-3">Póliza</th>
+                          <th className="py-2 pr-3">Oficina</th>
+                          <th className="py-2 pr-3">Cuota</th>
+                          <th className="py-2 pr-3">Medio</th>
+                          <th className="py-2 pr-0 text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historialItems.map((it, idx) => {
+                          const c = extractHpCliente(it);
+                          const p = extractHpPoliza(it);
+                          const q = extractHpCuota(it);
+                          const monto = extractHpMonto(it);
+                          const fecha = fmtRegistro(it);
+                          const oficina = p.oficina || it?.oficina || "—";
+
+                          return (
+                            <tr key={it?.id ?? `hp-row-${idx}`} className="border-t border-slate-800/70">
+                              <td className="py-2 pr-3 text-slate-200 whitespace-nowrap">{fecha}</td>
+                              <td className="py-2 pr-3 text-slate-100">
+                                <div className="max-w-[260px] truncate font-semibold">{c.label}</div>
+                              </td>
+                              <td className="py-2 pr-3 text-slate-300 whitespace-nowrap">{safe(c.dni)}</td>
+                              <td className="py-2 pr-3 text-slate-200">
+                                {p.polizaId ? (
+                                  <a
+                                    href={`/polizas/${p.polizaId}`}
+                                    className="hover:text-slate-50 underline underline-offset-4 decoration-slate-700"
+                                    title="Ver póliza"
+                                  >
+                                    {p.titulo}
+                                  </a>
+                                ) : (
+                                  <span>{p.titulo}</span>
+                                )}
+                              </td>
+                              <td className="py-2 pr-3 text-slate-300 whitespace-nowrap">{safe(oficina)}</td>
+                              <td className="py-2 pr-3 text-slate-300 whitespace-nowrap">
+                                {q.cuotaLabel || (q.cuotaNro ? `Cuota ${q.cuotaNro}` : "—")}
+                              </td>
+                              <td className="py-2 pr-3 text-slate-300 whitespace-nowrap">{safe(q.forma)}</td>
+                              <td className="py-2 pr-0 text-right text-emerald-200 font-semibold tabular-nums whitespace-nowrap">
+                                {monto === null ? "—" : fmtMoney(monto)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Paginación */}
+                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="text-xs text-slate-500">
+                      Página <span className="text-slate-200 font-semibold">{hpPage}</span> de{" "}
+                      <span className="text-slate-200 font-semibold">{totalPagesHistorial}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={onPrevPage}
+                        disabled={hpPage <= 1}
+                        className={`h-10 px-3 rounded-2xl border text-xs sm:text-sm inline-flex items-center gap-2 ${
+                          hpPage <= 1
+                            ? "bg-slate-950/30 border-slate-800 text-slate-600 cursor-not-allowed"
+                            : "bg-slate-950/60 border-slate-800 text-slate-200 hover:bg-slate-900/60 cursor-pointer"
+                        }`}
+                      >
+                        <HiChevronLeft className="w-4 h-4" />
+                        Anterior
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={onNextPage}
+                        disabled={hpPage >= totalPagesHistorial}
+                        className={`h-10 px-3 rounded-2xl border text-xs sm:text-sm inline-flex items-center gap-2 ${
+                          hpPage >= totalPagesHistorial
+                            ? "bg-slate-950/30 border-slate-800 text-slate-600 cursor-not-allowed"
+                            : "bg-slate-950/60 border-slate-800 text-slate-200 hover:bg-slate-900/60 cursor-pointer"
+                        }`}
+                      >
+                        Siguiente
+                        <HiChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         ) : (
-          <motion.div key="tab-historial-recordatorios" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
-            <HistorialRecordatorios items={historialRecordatorios} loading={loadingHistorialRecordatorios} onRefresh={handleRefreshHistorialRecordatorios} />
+          <motion.div
+            key="tab-historial-recordatorios"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4"
+          >
+            <HistorialRecordatorios
+              items={historialRecordatorios}
+              loading={loadingHistorialRecordatorios}
+              onRefresh={handleRefreshHistorialRecordatorios}
+            />
           </motion.div>
         )}
       </div>
 
-      <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
-      <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} />
+      <CuentasCobroModal
+        open={showCuentasModal}
+        onClose={() => setShowCuentasModal(false)}
+        mpCuentas={mpCuentas}
+        billeteras={billeteras}
+        mediosCobro={mediosCobro}
+      />
+      <RecordatoriosCuotasModal
+        isOpen={showRecordatoriosModal}
+        onClose={() => setShowRecordatoriosModal(false)}
+        mediosCobro={mediosCobro}
+        sending={sendingRecordatorios}
+        onEnviar={handleEnviarRecordatorios}
+      />
     </div>
   );
 };

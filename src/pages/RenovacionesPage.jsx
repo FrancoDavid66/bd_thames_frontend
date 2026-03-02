@@ -18,7 +18,6 @@ import {
   selectRenovacionesError,
   selectRenovacionesCount,
   selectRenovacionesOficinas,
-  selectRenovacionesOficinasStatus,
   selectRenovacionesResumen,
 } from "../store/slices/renovacionesSlice";
 
@@ -76,6 +75,86 @@ function calcUrgencyTone(dias) {
   return "neutral";
 }
 
+/* ===================== helpers robustos payload ===================== */
+
+function getClienteNombreApellido(p) {
+  const ap =
+    p?.cliente?.apellido ??
+    p?.cliente_apellido ??
+    p?.clienteApellido ??
+    p?.apellido ??
+    "";
+  const no =
+    p?.cliente?.nombre ??
+    p?.cliente_nombre ??
+    p?.clienteNombre ??
+    p?.nombre ??
+    "";
+  const full = `${ap} ${no}`.trim();
+  return full || "Asegurado desconocido";
+}
+
+function getPatente(p) {
+  return p?.patente || p?.vehiculo_patente || p?.vehiculo?.patente || "SIN PATENTE";
+}
+
+function getOficinaLabel(p, oficinasOptions) {
+  const raw = p?.oficina;
+  if (!raw) return "—";
+
+  if (typeof raw === "object") {
+    return raw?.nombre || raw?.label || raw?.value || "—";
+  }
+
+  const s = String(raw);
+  const match =
+    (Array.isArray(oficinasOptions) ? oficinasOptions : []).find(
+      (o) => String(o?.value) === s || String(o?.label) === s
+    ) || null;
+
+  return match?.label || s;
+}
+
+/* ✅ Normaliza oficinas del slice (strings/objects) a [{value,label}] */
+function normalizeOficinaOption(x) {
+  if (x == null) return null;
+
+  if (typeof x === "string" || typeof x === "number") {
+    const s = String(x).trim();
+    if (!s) return null;
+    return { value: s, label: s };
+  }
+
+  if (typeof x === "object") {
+    const value =
+      x.value ??
+      x.id ??
+      x.pk ??
+      x.codigo ??
+      x.key ??
+      x.nombre ??
+      x.name ??
+      x.label ??
+      "";
+    const label =
+      x.label ??
+      x.nombre ??
+      x.name ??
+      x.descripcion ??
+      x.value ??
+      x.id ??
+      "";
+
+    const v = String(value || "").trim();
+    const l = String(label || "").trim();
+
+    if (!v && !l) return null;
+    return { value: v || l, label: l || v };
+  }
+
+  return null;
+}
+
 export default function RenovacionesPage() {
   dayjs.locale("es");
   const dispatch = useDispatch();
@@ -111,13 +190,31 @@ export default function RenovacionesPage() {
 
   const oficinasOptions = useMemo(() => {
     const arr = Array.isArray(oficinas) ? oficinas : [];
-    return arr.filter((o) => o && o.value && o.label);
+
+    const seen = new Map();
+    const out = [];
+
+    for (const raw of arr) {
+      const opt = normalizeOficinaOption(raw);
+      if (!opt) continue;
+
+      const key = String(opt.value || "").trim();
+      if (!key) continue;
+
+      if (!seen.has(key)) {
+        seen.set(key, true);
+        out.push({ value: key, label: String(opt.label || key).trim() || key });
+      }
+    }
+
+    out.sort((a, b) => String(a.label).localeCompare(String(b.label), "es"));
+    return out;
   }, [oficinas]);
 
   const load = useCallback(
     async (opts = {}) => {
       const payload = {
-        dias: 30, // Dejamos 30 por defecto como margen amplio
+        dias: 30,
         solo_pendientes: soloPendientes,
         search: (search || "").trim(),
         ordering: "vto_referencia",
@@ -176,11 +273,11 @@ export default function RenovacionesPage() {
 
   useEffect(() => {
     if (page !== safePage) setPage(safePage);
-  }, [safePage]);
+  }, [safePage, page]);
 
   const applyFilters = () => {
     setPage(1);
-    load({ force: true });
+    load({ force: true, page: 1 });
     loadResumen({ force: true });
   };
 
@@ -189,11 +286,7 @@ export default function RenovacionesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
-      
-      {/* TARJETA SUPERIOR: TÍTULO Y FILTROS */}
       <div className="mb-4 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-lg">
-        
-        {/* Cabecera limpia */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-white">Renovaciones</h1>
@@ -221,7 +314,6 @@ export default function RenovacionesPage() {
           </div>
         </div>
 
-        {/* Nueva barra unificada */}
         <RenovacionesFiltersBar
           loading={loading}
           search={search}
@@ -237,7 +329,6 @@ export default function RenovacionesPage() {
           onApply={applyFilters}
         />
 
-        {/* Mensajes de error minimalistas */}
         {!!error && (
           <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-200 flex items-center gap-2">
             <HiExclamation className="text-lg" />
@@ -246,14 +337,13 @@ export default function RenovacionesPage() {
         )}
       </div>
 
-      {/* BARRA DE PAGINACIÓN SUPERIOR */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/65">
           Página <span className="text-white font-semibold">{safePage}</span> de{" "}
           <span className="text-white font-semibold">{totalPages}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5">
             <span className="text-xs font-semibold text-white/50">Ver:</span>
             <select
@@ -263,9 +353,12 @@ export default function RenovacionesPage() {
                 setPage(1);
               }}
               className="bg-transparent text-sm font-bold text-white outline-none cursor-pointer"
+              aria-label="Tamaño de página"
             >
               {[10, 25, 50, 100].map((n) => (
-                <option key={n} value={n} className="bg-slate-900 text-white">{n}</option>
+                <option key={n} value={n} className="bg-slate-900 text-white">
+                  {n}
+                </option>
               ))}
             </select>
           </div>
@@ -287,7 +380,6 @@ export default function RenovacionesPage() {
         </div>
       </div>
 
-      {/* LISTADO DE TARJETAS */}
       <div className="grid gap-3">
         {loading && receivedCount === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white/60">
@@ -304,6 +396,10 @@ export default function RenovacionesPage() {
             const diasVto = p?.dias_para_vencer_poliza;
             const tone = calcUrgencyTone(diasVto);
 
+            const patente = getPatente(p);
+            const asegurado = getClienteNombreApellido(p);
+            const oficinaLabel = getOficinaLabel(p, oficinasOptions);
+
             return (
               <motion.div
                 key={p.id}
@@ -317,23 +413,22 @@ export default function RenovacionesPage() {
                       <Link
                         to={`/polizas/${p.id}`}
                         className="inline-flex items-center gap-2 text-lg font-black text-sky-300 hover:text-sky-200 transition-colors"
+                        title={`${patente} — ${asegurado}`}
                       >
-                        {p?.patente || "SIN PATENTE"} <HiArrowRight className="opacity-60" />
+                        {patente} <HiArrowRight className="opacity-60" />
                       </Link>
 
                       <Badge tone={tone}>
                         Vence: {fmtDate(vtoRef)} {diasVto != null ? `(${diasVto}d)` : ""}
                       </Badge>
 
-                      <Badge tone="neutral">Oficina: {p?.oficina || "—"}</Badge>
+                      <Badge tone="neutral">Oficina: {oficinaLabel}</Badge>
                     </div>
 
                     <div className="grid gap-1.5 text-sm text-white/80">
                       <div className="truncate">
                         <span className="text-white/50">Asegurado:</span>{" "}
-                        <span className="font-semibold text-white">
-                          {p?.cliente?.apellido || ""} {p?.cliente?.nombre || ""}
-                        </span>
+                        <span className="font-semibold text-white">{asegurado}</span>
                       </div>
 
                       <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -342,7 +437,9 @@ export default function RenovacionesPage() {
                         </span>
                         <span>
                           <span className="text-white/50">Compañía:</span>{" "}
-                          <span className="font-medium text-amber-200">{p?.compania_nombre || p?.compania || "—"}</span>
+                          <span className="font-medium text-amber-200">
+                            {p?.compania_nombre || p?.compania || "—"}
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -375,7 +472,6 @@ export default function RenovacionesPage() {
         )}
       </div>
 
-      {/* MODAL DE RENOVACIÓN */}
       <RenovacionModal
         open={modalOpen}
         item={selected}
