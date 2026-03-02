@@ -1,4 +1,6 @@
-/* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos, full-width móvil (OPTIMIZADO PARA CELULAR) */
+/* src/components/pagos/PagosList.jsx — Dark theme con acentos pasteles sólidos, full-width móvil (OPTIMIZADO PARA CELULAR)
+   ✅ FIX: calcular proximo_vencimiento real para imprimir/descargar (no usar vencimiento de la misma cuota)
+*/
 import { useDispatch } from "react-redux";
 import { useMemo, useState, useCallback, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -174,6 +176,107 @@ function resolveCliente(pol, cuota) {
   return { nombreCompleto, nombreAp, dni, id };
 }
 
+/* ===================== FIX: calcular próximo vencimiento por póliza ===================== */
+function getPolizaId(pol, cuota) {
+  const p = pol && typeof pol === "object" ? pol : {};
+  const pid =
+    p?.id ??
+    p?.poliza_id ??
+    cuota?.poliza_id ??
+    cuota?.polizaId ??
+    null;
+
+  const n = Number(pid);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function toYmd(d) {
+  const s = String(d || "").trim();
+  if (!s) return "";
+  // si viene ISO, cortamos YYYY-MM-DD
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
+/** arma un índice {polizaId -> cuotas ordenadas} usando el LISTADO ACTUAL */
+function buildPolizaCuotasIndex(list) {
+  const base = Array.isArray(list) ? list : [];
+  const map = new Map();
+
+  for (const c of base) {
+    const pol = c?.poliza || {};
+    const pid = getPolizaId(pol, c);
+    if (!pid) continue;
+
+    const arr = map.get(pid) || [];
+    arr.push(c);
+    map.set(pid, arr);
+  }
+
+  // ordenar por cuota_nro si existe, sino por fecha_vencimiento
+  for (const [pid, arr] of map.entries()) {
+    arr.sort((a, b) => {
+      const an = Number(a?.cuota_nro);
+      const bn = Number(b?.cuota_nro);
+      const aHas = Number.isFinite(an);
+      const bHas = Number.isFinite(bn);
+
+      if (aHas && bHas && an !== bn) return an - bn;
+
+      const af = toYmd(a?.fecha_vencimiento);
+      const bf = toYmd(b?.fecha_vencimiento);
+      if (af && bf && af !== bf) return af.localeCompare(bf);
+
+      return Number(a?.id || 0) - Number(b?.id || 0);
+    });
+  }
+
+  return map;
+}
+
+/** dado una cuota, devuelve el vencimiento de la siguiente cuota de esa póliza (YYYY-MM-DD) */
+function pickNextVencimientoFromIndex(cuota, polizaId, indexMap) {
+  if (!cuota || !polizaId || !indexMap) return null;
+
+  const arr = indexMap.get(polizaId);
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+
+  const curN = Number(cuota?.cuota_nro);
+  const hasN = Number.isFinite(curN);
+
+  // 1) si hay cuota_nro, buscamos la menor cuota_nro > curN
+  if (hasN) {
+    let best = null;
+    let bestN = Infinity;
+    for (const c of arr) {
+      const n = Number(c?.cuota_nro);
+      if (!Number.isFinite(n)) continue;
+      if (n > curN && n < bestN) {
+        bestN = n;
+        best = c;
+      }
+    }
+    if (best?.fecha_vencimiento) return toYmd(best.fecha_vencimiento);
+  }
+
+  // 2) fallback: usar fecha_vencimiento (la más próxima posterior)
+  const curF = toYmd(cuota?.fecha_vencimiento);
+  if (curF) {
+    let best = null;
+    let bestF = "";
+    for (const c of arr) {
+      const f = toYmd(c?.fecha_vencimiento);
+      if (!f) continue;
+      if (f > curF && (!bestF || f < bestF)) {
+        bestF = f;
+        best = c;
+      }
+    }
+    if (best?.fecha_vencimiento) return toYmd(best.fecha_vencimiento);
+  }
+
+  return null;
+}
+
 export default function PagosList({
   cuotas = [],
   actualizarCuotas,
@@ -195,6 +298,9 @@ export default function PagosList({
     const base = Array.isArray(cuotas) ? cuotas : [];
     return ocultarPagadas ? base.filter((c) => !c.pagado) : base;
   }, [cuotas, ocultarPagadas]);
+
+  // ✅ índice por póliza para calcular próximo vencimiento real
+  const polizaIndex = useMemo(() => buildPolizaCuotasIndex(items), [items]);
 
   const [hoyKey, setHoyKey] = useState(todayKey());
   useEffect(() => {
@@ -291,14 +397,14 @@ export default function PagosList({
       }
 
       toast.success("Cuota marcada como pagada");
-      
-      // ✅ FIX: Seteamos pago_registrado_en para que el PDF renderice con SEGUNDOS exactos sin recargar
+
+      // ✅ mantenemos el timestamp real (si backend lo trae) y no inventamos si ya existe
       const conObs = {
         ...cuotaActualizada,
         poliza: cuotaActualizada.poliza || cuota.poliza,
         cantidad_cuotas: cuotaActualizada.cantidad_cuotas ?? cuota.cantidad_cuotas ?? null,
         observaciones_pago: (datos.observaciones || "").trim(),
-        pago_registrado_en: dayjs().toISOString(), 
+        pago_registrado_en: cuotaActualizada.pago_registrado_en || dayjs().toISOString(),
       };
 
       setConfirmData(null);
@@ -348,28 +454,49 @@ export default function PagosList({
       const patente = (pol?.patente || "").toUpperCase();
       const modelo = [pol?.marca, pol?.modelo].filter(Boolean).join(" ");
       const observacion = ((cuota?.observaciones_pago || cuota?.ultima_observacion_pago || "") || "").toString().trim();
-      
+
       const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
       const dias = fv ? fv.diff(hoy, "day") : null;
       const state = cuota?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
       const label = state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
-      
+
       const cubreHastaTxt = fv ? fv.add(1, "month").format("DD/MM/YYYY") : null;
-      // ✅ Alta agregada acá
       const altaTxt = pol?.fecha_emision ? fmtDate(pol.fecha_emision) : null;
 
+      // ✅ FIX: próximo vencimiento real (siguiente cuota) para PDF/ticket
+      const polId = getPolizaId(pol, cuota);
+      const proximoVtoYmd = pickNextVencimientoFromIndex(cuota, polId, polizaIndex);
+      const proximoVtoTxt = proximoVtoYmd ? fmtDate(proximoVtoYmd) : null;
+
+      // cuota enriquecida SOLO para imprimir (no rompe tu UI)
+      const cuotaPdf = {
+        ...cuota,
+        proximo_vencimiento: proximoVtoYmd || cuota?.proximo_vencimiento || null,
+      };
+
       out[i] = {
-        cuota, pol, nombreCompleto, patente, modelo, observacion, hasObs: !!observacion,
-        isObsOpen: obsAbiertaId === cuota?.id, state, label, dias,
-        venceTxt: fmtDate(cuota?.fecha_vencimiento), 
+        cuota,
+        cuotaPdf,
+        pol,
+        nombreCompleto,
+        patente,
+        modelo,
+        observacion,
+        hasObs: !!observacion,
+        isObsOpen: obsAbiertaId === cuota?.id,
+        state,
+        label,
+        dias,
+        venceTxt: fmtDate(cuota?.fecha_vencimiento),
         pagaTxt: cuota?.fecha_pago ? fmtDate(cuota?.fecha_pago) : null,
         montoTxt: fmtMoney(cuota?.monto),
         cubreHastaTxt,
-        altaTxt, // Lo pasamos al modelo
+        altaTxt,
+        proximoVtoTxt,
       };
     }
     return out;
-  }, [visibleItems, hoy, obsAbiertaId]);
+  }, [visibleItems, hoy, obsAbiertaId, polizaIndex]);
 
   if (items.length === 0) {
     return (
@@ -574,7 +701,7 @@ export default function PagosList({
                       <InfoRow label="Vehículo" value={[pol?.marca, pol?.modelo].filter(Boolean).join(" ") || "—"} />
                       <InfoRow label="Cobertura" value={pol?.cobertura || "—"} />
                       <InfoRow label="Compañía" value={pol?.compania_nombre || pol?.compania?.nombre || pol?.compania || "—"} />
-                      <InfoRow label="Fecha de Alta" value={fmtDate(pol?.fecha_emision)} /> {/* ✅ ALTA ACÁ TAMBIÉN */}
+                      <InfoRow label="Fecha de Alta" value={fmtDate(pol?.fecha_emision)} />
                       <InfoRow label="Cuota" value={typeof c?.cuota_nro === "number" ? (total ? `${c.cuota_nro}/${total}` : `${c.cuota_nro}`) : "—"} />
                       <InfoRow label="Monto" value={`$ ${fmtMoney(c?.monto)}`} />
                       <InfoRow label="Vencimiento" value={fmtDate(c?.fecha_vencimiento)} />
@@ -607,8 +734,22 @@ export default function PagosList({
 const CuotaRow = memo(
   function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs }) {
     const {
-      cuota, nombreCompleto, patente, modelo, observacion, hasObs, isObsOpen,
-      state, label, dias, venceTxt, pagaTxt, montoTxt, cubreHastaTxt, altaTxt // ✅ NUEVO
+      cuota,
+      cuotaPdf,
+      nombreCompleto,
+      patente,
+      modelo,
+      observacion,
+      hasObs,
+      isObsOpen,
+      state,
+      label,
+      dias,
+      venceTxt,
+      pagaTxt,
+      montoTxt,
+      cubreHastaTxt,
+      altaTxt,
     } = model || {};
 
     const S = PALETTE[state || "pending"];
@@ -643,7 +784,7 @@ const CuotaRow = memo(
                     {modelo}
                   </span>
                 )}
-                
+
                 {/* ✅ BADGE DE ALTA DE LA PÓLIZA */}
                 {altaTxt && (
                   <span className="inline-flex items-center rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 bg-neutral-800 border-neutral-700 text-indigo-300 text-[10px] sm:text-xs font-medium">
@@ -736,7 +877,7 @@ const CuotaRow = memo(
                       <DescargarFactura
                         cliente={model?.pol?.cliente}
                         poliza={model?.pol}
-                        cuota={cuota}
+                        cuota={cuotaPdf || cuota}   // ✅ acá va el próximo vencimiento real
                         tone="neutral"
                         label="Bajar"
                         className="w-full h-8 sm:h-10 text-[11px] sm:text-sm px-1 sm:px-3 rounded-lg sm:rounded-xl"
@@ -747,7 +888,7 @@ const CuotaRow = memo(
                       <ImprimirFacturaTicket
                         cliente={model?.pol?.cliente}
                         poliza={model?.pol}
-                        cuota={cuota}
+                        cuota={cuotaPdf || cuota}   // ✅ acá va el próximo vencimiento real
                         label="Ticket"
                         className={`w-full h-8 sm:h-10 px-1 sm:px-3 rounded-lg sm:rounded-xl border transition inline-flex items-center justify-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm ${PALETTE.ticketBtn}`}
                       />

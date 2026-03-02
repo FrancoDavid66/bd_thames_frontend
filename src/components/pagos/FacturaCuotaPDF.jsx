@@ -6,30 +6,22 @@ const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
 
 /* Paleta bordó y alertas */
-const PRIMARY = "#8B1E3F"; // bordó
-const PRIMARY_DARK = "#5E1329"; // bordó oscuro
-const BORDER = "#E6C9D2"; // borde suave rosado
-const TEXT = "#111827"; // slate-900
-const MUTED_BG = "#FBEFF3"; // fondo muy claro con tinte bordó
-const ALERT_BG = "#FEF2F2"; // fondo rojo muy claro para advertencia
-const ALERT_TEXT = "#991B1B"; // texto rojo oscuro
+const PRIMARY = "#8B1E3F";
+const PRIMARY_DARK = "#5E1329";
+const BORDER = "#E6C9D2";
+const TEXT = "#111827";
+const MUTED_BG = "#FBEFF3";
+const ALERT_BG = "#FEF2F2";
+const ALERT_TEXT = "#991B1B";
 
 /* Utils */
 const safe = (v, d = "—") =>
   v === null || v === undefined || v === "" ? d : String(v);
 
-/**
- * ✅ REGLA NUEVA (pedido usuario): mostrar HORA y MINUTOS en el recibo.
- * Priorizamos strings ya formateados del backend/props:
- *  - pago_hm_full (DD/MM/YYYY HH:MM)
- *  - si no hay, usamos pago_registrado_en (ISO) y formateamos a DD/MM/YYYY HH:MM
- *  - si solo hay fecha (YYYY-MM-DD), mostramos solo fecha (sin hora)
- */
 const fmtDateTimeHM = (d) => {
   if (!d) return "—";
   try {
     let dateObj;
-    // Si es un string YYYY-MM-DD (10 caracteres), forzamos mediodía para evitar saltos de día
     if (typeof d === "string" && d.length === 10) {
       dateObj = new Date(d + "T12:00:00");
     } else {
@@ -44,7 +36,6 @@ const fmtDateTimeHM = (d) => {
     const hours = String(dateObj.getHours()).padStart(2, "0");
     const mins = String(dateObj.getMinutes()).padStart(2, "0");
 
-    // Si era solo fecha (forzada a 12:00), mostramos solo la fecha.
     const tieneHoraReal = dateObj.getHours() !== 12 || dateObj.getMinutes() !== 0;
     const horaTxt = tieneHoraReal ? ` ${hours}:${mins} hs` : "";
 
@@ -54,12 +45,10 @@ const fmtDateTimeHM = (d) => {
   }
 };
 
-/** Formatea solo fecha (DD/MM/YYYY) para vencimientos */
 const fmtDateOnly = (d) => {
   if (!d) return "—";
   try {
-    // Forzamos mediodía para evitar desfase de zona horaria en fechas sin hora
-    const dt = new Date(d + "T12:00:00");
+    const dt = new Date(String(d).slice(0, 10) + "T12:00:00");
     if (Number.isNaN(dt.getTime())) return "—";
     const day = String(dt.getDate()).padStart(2, "0");
     const month = String(dt.getMonth() + 1).padStart(2, "0");
@@ -82,11 +71,9 @@ const fmtMoney = (n) => {
   }
 };
 
-/** Compara fechas para detectar pago atrasado */
 const isPagoAtrasado = (cuota) => {
   if (!cuota || !cuota.pagado) return false;
-  // Comparamos el inicio del día del vencimiento con el inicio del día del pago
-  const v = new Date(cuota.fecha_vencimiento + "T00:00:00");
+  const v = new Date(String(cuota.fecha_vencimiento).slice(0, 10) + "T00:00:00");
   const ref = cuota.pago_registrado_en || cuota.fecha_pago || new Date();
   const pStr =
     typeof ref === "string"
@@ -230,7 +217,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 1.4,
   },
-  // ✅ Nuevo estilo para resaltar palabras clave
   alertBoldUnderline: {
     fontWeight: "bold",
     textDecoration: "underline",
@@ -241,7 +227,6 @@ const FacturaCuotaPDF = ({
   cliente = {},
   poliza = {},
   cuota = {},
-  // ✅ nuevos props opcionales (desde DescargarFactura.jsx / ImprimirFacturaTicket.jsx)
   pago_hm,
   pago_hm_full,
   pago_dt_iso,
@@ -259,10 +244,6 @@ const FacturaCuotaPDF = ({
   const cuotaNro = safe(cuota.cuota_nro);
   const monto = cuota.monto || 0;
 
-  // ✅ REGLA: hora/minutos en el recibo
-  // 1) si viene string formateado full (DD/MM/YYYY HH:MM) desde backend/props, usarlo
-  // 2) si no, si viene timestamp ISO, formatear a HM
-  // 3) si no, usar pago_registrado_en/fecha_pago como fallback
   const fechaHoraOperacion =
     (pago_hm_full && String(pago_hm_full).trim()) ||
     (cuota.pago_hm_full && String(cuota.pago_hm_full).trim()) ||
@@ -270,7 +251,10 @@ const FacturaCuotaPDF = ({
       pago_dt_iso || cuota.pago_registrado_en || cuota.fecha_pago || new Date()
     );
 
-  const fechaVencimiento = fmtDateOnly(cuota.fecha_vencimiento);
+  // ✅ FIX: próximo vencimiento real
+  const proximoVto = cuota?.proximo_vencimiento || cuota?.proximoVencimiento || null;
+  const fechaVencimiento = fmtDateOnly(proximoVto || cuota.fecha_vencimiento);
+
   const pagoFueraDeTermino = isPagoAtrasado(cuota);
 
   return (
@@ -283,7 +267,6 @@ const FacturaCuotaPDF = ({
           </Text>
         </View>
 
-        {/* ✅ Bloque destacado con Hora y Minutos */}
         <View style={styles.dueBox}>
           <Text style={styles.dueLabel}>Fecha y Hora de Operación</Text>
           <Text style={styles.dueValue}>{fechaHoraOperacion}</Text>
@@ -319,7 +302,6 @@ const FacturaCuotaPDF = ({
             <Text>Valor a Pagar</Text>
           </View>
           <View style={styles.tableRow}>
-            {/* ✅ REGLA: Sin número de póliza aquí */}
             <Text>Cuota Nº {cuotaNro}</Text>
             <Text>{fmtMoney(monto)}</Text>
           </View>
