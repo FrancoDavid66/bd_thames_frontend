@@ -36,7 +36,15 @@ export default function MarketingPage() {
   const historialStatus = useSelector(selectMarketingHistorialStatus);
   const sendStatus = useSelector(selectMarketingSendStatus);
 
-  const [form, setForm] = useState({ oficina: "1", anio: "", marca: "", modelo: "", compania: "" });
+  // ✅ FIX: Ahora los filtros inicializan como arrays vacíos para soportar múltiple selección
+  const [form, setForm] = useState({ 
+    oficina: "1", 
+    anio: [], 
+    marca: [], 
+    modelo: [], 
+    compania: [] 
+  });
+  
   const [mensaje, setMensaje] = useState("Hola {nombre} 😊, te escribimos de Thames por tu {marca} {modelo}...");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -113,7 +121,7 @@ export default function MarketingPage() {
     }
   };
 
-  // ✅ Solo tomamos el primer elemento para mostrar como ejemplo
+  // Solo tomamos el primer elemento para mostrar como ejemplo
   const sampleData = audiencia?.sample && audiencia.sample.length > 0 ? [audiencia.sample[0]] : [];
 
   return (
@@ -269,7 +277,7 @@ export default function MarketingPage() {
                      </div>
                    )}
                    
-                   {/* ✅ MUESTRA REAL RENDERIZADA: SOLO 1 MENSAJE */}
+                   {/* MUESTRA REAL RENDERIZADA: SOLO 1 MENSAJE */}
                    <div className="flex items-center justify-between mb-4 ml-2">
                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Muestra Real Renderizada</span>
                      <span className="text-[9px] text-slate-400 italic">
