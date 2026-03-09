@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaBullhorn, FaPaperPlane, FaSyncAlt, FaTimes, FaHistory, 
   FaChevronDown, FaSpinner, FaWhatsapp, FaImage, 
-  FaUpload, FaTrash, FaEye, FaEyeSlash
+  FaUpload, FaTrash, FaEye, FaEyeSlash, FaCheckCircle
 } from "react-icons/fa";
 
 import MarketingFilters from "../components/marketing/MarketingFilters";
@@ -54,6 +54,9 @@ export default function MarketingPage() {
   // ESTADOS PARA PAGINACIÓN Y OCULTAMIENTO
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [visibleItemsCount, setVisibleItemsCount] = useState(5);
+
+  // ✅ NUEVO ESTADO PARA EL CARTEL DE ÉXITO
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const loadingAud = audienciaStatus === "loading";
   const sendingNow = sendStatus === "loading";
@@ -108,6 +111,13 @@ export default function MarketingPage() {
       // Volvemos a mostrar los primeros 5 elementos al enviar uno nuevo
       setVisibleItemsCount(5);
       setIsHistoryVisible(true);
+
+      // ✅ MOSTRAMOS EL CARTEL DE ÉXITO POR 3 SEGUNDOS
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 3000);
+      
     } else {
         alert("Error al enviar campaña: " + res.payload);
     }
@@ -141,6 +151,23 @@ export default function MarketingPage() {
         )}
       </AnimatePresence>
 
+      {/* ✅ NUEVO: OVERLAY DE ÉXITO (Misión Cumplida) */}
+      <AnimatePresence>
+        {showSuccess && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5, duration: 0.6 }} className="w-32 h-32 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/50 mb-8 shadow-[0_0_50px_rgba(16,185,129,0.5)]">
+              <FaCheckCircle className="text-6xl text-emerald-400" />
+            </motion.div>
+            <motion.h3 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="text-4xl font-black italic uppercase tracking-tighter text-white">
+              ¡Campaña Enviada!
+            </motion.h3>
+            <motion.p initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="text-slate-400 mt-3 text-lg">
+              Los mensajes fueron procesados correctamente.
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center gap-3">
         <div className="h-11 w-11 rounded-2xl bg-yellow-400/20 flex items-center justify-center text-yellow-300"><FaBullhorn /></div>
         <div className="flex-1">
@@ -155,7 +182,7 @@ export default function MarketingPage() {
       <motion.button 
         whileHover={{ scale: 1.005 }} 
         onClick={() => setIsComposeOpen(true)} 
-        className="w-full bg-gradient-to-r from-yellow-400 to-amber-500 p-8 rounded-[30px] text-gray-950 font-black text-3xl italic uppercase shadow-xl hover:shadow-yellow-500/20 transition-all"
+        className="w-full bg-gradient-to-r from-yellow-400 to-amber-500 cursor-pointer p-8 rounded-[30px] text-gray-950 font-black text-3xl italic uppercase shadow-xl hover:shadow-yellow-500/20 transition-all"
       >
         Lanzar nueva campaña
       </motion.button>
