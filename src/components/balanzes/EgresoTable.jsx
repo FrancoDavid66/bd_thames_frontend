@@ -55,15 +55,22 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
   const data = Array.isArray(egresosProp) ? egresosProp : egresosStore;
 
   // ---- Helpers ----
-  const fmtMoney = (n) =>
-    (Number(n) || 0).toLocaleString("es-AR", {
+  const fmtMoney = (n) => {
+    // Forzamos a que reemplace comas por puntos para que JavaScript lo entienda
+    const numeroLimpio = Number(String(n || "0").replace(",", "."));
+    return (Number.isFinite(numeroLimpio) ? numeroLimpio : 0).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
   const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "—");
 
+  // 🚀 FIX: El totalizador de egresos también estaba expuesto a las comas
   const totalVisible = useMemo(
-    () => (data || []).reduce((acc, it) => acc + (Number(it?.monto) || 0), 0),
+    () => (data || []).reduce((acc, it) => {
+      const val = Number(String(it?.monto || "0").replace(",", "."));
+      return acc + (Number.isFinite(val) ? val : 0);
+    }, 0),
     [data]
   );
 

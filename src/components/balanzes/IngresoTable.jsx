@@ -59,11 +59,14 @@ const IngresoTable = ({ ingresos: ingresosProp, className = "" }) => {
   const data = Array.isArray(ingresosProp) ? ingresosProp : ingresosStore;
 
   // ---- Helpers de formato ----
-  const fmtMoney = (n) =>
-    (Number(n) || 0).toLocaleString("es-AR", {
+  const fmtMoney = (n) => {
+    // Forzamos a que reemplace comas por puntos para que JavaScript lo entienda
+    const numeroLimpio = Number(String(n || "0").replace(",", "."));
+    return (Number.isFinite(numeroLimpio) ? numeroLimpio : 0).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
     
   const renderFechaConHora = (item) => {
     if (!item?.fecha) return "—";
@@ -107,8 +110,12 @@ const IngresoTable = ({ ingresos: ingresosProp, className = "" }) => {
     return descripcion;
   };
 
+  // 🚀 FIX: El totalizador también se rompía por las comas, ahora está blindado
   const totalVisible = useMemo(
-    () => (data || []).reduce((acc, it) => acc + (Number(it?.monto) || 0), 0),
+    () => (data || []).reduce((acc, it) => {
+      const val = Number(String(it?.monto || "0").replace(",", "."));
+      return acc + (Number.isFinite(val) ? val : 0);
+    }, 0),
     [data]
   );
 
