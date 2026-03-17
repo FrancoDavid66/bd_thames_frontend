@@ -2,8 +2,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
-import { HiUser, HiOutlinePhotograph, HiDocumentDownload } from "react-icons/hi";
+import { HiUser, HiOutlinePhotograph, HiDocumentDownload, HiShieldCheck, HiExclamation, HiLockClosed } from "react-icons/hi";
 import { Link } from "react-router-dom";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
+import toast from "react-hot-toast";
 
 /* ===================== Animations ===================== */
 const containerVariants = {
@@ -24,16 +29,128 @@ const cardVariants = {
   },
 };
 
-/* 🎯 Card simple, sin tilt, dark y amigable */
+/* ===================== PolizaStatusBanner con Cambio Manual Protegido ===================== */
+function PolizaStatusBanner({ estadoInicial, polizaId }) {
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
+  const [estado, setEstado] = useState(estadoInicial || "activa");
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (estadoInicial) setEstado(estadoInicial);
+  }, [estadoInicial]);
+
+  const statusMap = {
+    activa: {
+      label: "PÓLIZA ACTIVA",
+      sub: "La cobertura se encuentra vigente",
+      color: "bg-emerald-500/10 border-emerald-500/50 text-emerald-400",
+      icon: <HiShieldCheck className="w-8 h-8 md:w-10 md:h-10 animate-pulse" />,
+    },
+    vencida: {
+      label: "PÓLIZA VENCIDA",
+      sub: "Atención: Cobertura fuera de término",
+      color: "bg-rose-500/10 border-rose-500/50 text-rose-400",
+      icon: <HiExclamation className="w-8 h-8 md:w-10 md:h-10 animate-bounce" />,
+    },
+    cancelada: {
+      label: "PÓLIZA CANCELADA",
+      sub: "Este seguro ha sido dado de baja",
+      color: "bg-gray-800 border-gray-600 text-gray-400",
+      icon: <HiLockClosed className="w-8 h-8 md:w-10 md:h-10" />,
+    },
+    finalizada: {
+      label: "PÓLIZA FINALIZADA",
+      sub: "Ciclo de vigencia completado",
+      color: "bg-blue-500/10 border-blue-500/50 text-blue-400",
+      icon: <HiShieldCheck className="w-8 h-8 md:w-10 md:h-10" />,
+    },
+  };
+
+  const current = statusMap[estado?.toLowerCase()] || {
+    label: "ESTADO DESCONOCIDO",
+    sub: "Verificar datos en la compañía",
+    color: "bg-white/5 border-white/20 text-white/70",
+    icon: <HiExclamation className="w-8 h-8 md:w-10 md:h-10" />,
+  };
+
+  // 🛡️ Solo el Admin puede cambiar el estado manualmente
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
+
+  const handleCambiarEstado = async (e) => {
+    const nuevoEstado = e.target.value;
+    if (nuevoEstado === estado) return;
+    
+    if (!window.confirm(`¿Estás seguro de cambiar el estado a ${nuevoEstado.toUpperCase()}?`)) {
+      e.target.value = estado;
+      return;
+    }
+
+    setCargando(true);
+    try {
+      // 🚀 Usamos la instancia 'api' segura
+      await api.patch(`/polizas/${polizaId}/`, { estado: nuevoEstado });
+      setEstado(nuevoEstado);
+      toast.success("Estado actualizado");
+    } catch (error) {
+      console.error("Error cambiando estado:", error);
+      toast.error("Error al actualizar el estado");
+      e.target.value = estado;
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ scale: 0.95, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className={`w-full mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 md:p-6 rounded-3xl border-2 shadow-xl ${current.color} transition-colors duration-300`}
+    >
+      <div className="flex items-center gap-4">
+        <div className="flex-shrink-0">{current.icon}</div>
+        <div className="flex-col">
+          <h2 className="text-2xl md:text-4xl font-black tracking-tighter">
+            {current.label}
+          </h2>
+          <p className="text-sm md:text-lg font-medium opacity-80 italic">
+            {current.sub}
+          </p>
+        </div>
+      </div>
+
+      {polizaId && (
+        <div className="flex flex-col w-full sm:w-auto mt-2 sm:mt-0 items-start sm:items-end">
+          <label className="text-xs font-bold mb-1 opacity-70 uppercase tracking-wide">
+            {isWebAdmin ? "Cambiar estado:" : "Estado actual:"}
+          </label>
+          <select
+            value={estado}
+            onChange={handleCambiarEstado}
+            disabled={cargando || !isWebAdmin} // 🛡️ Bloqueado para no-admins
+            className={`w-full sm:w-auto bg-black/40 border border-white/20 rounded-xl px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all ${
+              !isWebAdmin ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+            }`}
+          >
+            <option value="activa">🟢 Activa</option>
+            <option value="vencida">🔴 Vencida</option>
+            <option value="cancelada">⚫ Cancelada</option>
+            <option value="finalizada">🔵 Finalizada</option>
+          </select>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* 🎯 Card base */
 function Card({ children, className = "" }) {
   return (
     <motion.div
       variants={cardVariants}
-      className={`relative h-full rounded-2xl border border-gray-800 bg-gray-900/95 shadow-sm ${className}`}
+      className={`relative h-full rounded-2xl border border-gray-800 bg-gray-900/95 shadow-sm flex flex-col ${className}`}
     >
-      {/* Barra sutil arriba para dar identidad */}
       <div className="pointer-events-none absolute inset-x-0 -top-px h-1 rounded-t-2xl bg-gradient-to-r from-primary-400/80 via-emerald-400/80 to-amber-400/80" />
-      <div className="relative px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+      <div className="relative px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6 flex-1">
         {children}
       </div>
     </motion.div>
@@ -220,11 +337,10 @@ const pick = (...arr) =>
 const safe = (v, dash = "—") => (pick(v) ?? dash);
 const upper = (s) => (typeof s === "string" ? s.toUpperCase() : s);
 
-/* ===================== estilos locales (botón / link) ===================== */
+/* ===================== estilos locales ===================== */
 const btnBase =
   "inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold cursor-pointer select-none transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:ring-offset-1 focus:ring-offset-gray-900";
 
-/* 👉 más contraste: fondo visible y texto blanco */
 const btnPrimary =
   "bg-primary-400 text-white hover:bg-primary-300 active:scale-[0.98] shadow-sm";
 
@@ -244,15 +360,11 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
   );
 
   /* ---- Compañía + Cobertura ---- */
-  const companiaNombreInit =
-    poliza?.compania_nombre ?? poliza?.compania?.nombre ?? null;
-  const [companiaNombre, setCompaniaNombre] = useState(companiaNombreInit);
+  const [companiaNombre, setCompaniaNombre] = useState(poliza?.compania_nombre ?? poliza?.compania?.nombre ?? null);
   const [cobertura, setCobertura] = useState(poliza?.cobertura ?? null);
 
   useEffect(() => {
-    setCompaniaNombre(
-      poliza?.compania_nombre ?? poliza?.compania?.nombre ?? null
-    );
+    setCompaniaNombre(poliza?.compania_nombre ?? poliza?.compania?.nombre ?? null);
     setCobertura(poliza?.cobertura ?? null);
   }, [poliza?.compania_nombre, poliza?.compania, poliza?.cobertura]);
 
@@ -260,19 +372,14 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
     if ((!companiaNombre || !cobertura) && polizaId) {
       (async () => {
         try {
-          const res = await fetch(`/api/polizas/${polizaId}/`, {
-            credentials: "include",
-          });
-          if (!res.ok) return;
-          const data = await res.json();
-          const name =
-            data?.compania_nombre ?? data?.compania?.nombre ?? null;
+          // 🚀 Usamos 'api' segura
+          const res = await api.get(`/polizas/${polizaId}/`);
+          const data = res.data;
+          const name = data?.compania_nombre ?? data?.compania?.nombre ?? null;
           const cov = data?.cobertura ?? null;
           if (name && !companiaNombre) setCompaniaNombre(name);
           if (cov && !cobertura) setCobertura(cov);
-        } catch {
-          /* noop */
-        }
+        } catch { /* noop */ }
       })();
     }
   }, [polizaId, companiaNombre, cobertura]);
@@ -320,26 +427,20 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
       ? documentoPolizaRaw
       : documentoPolizaRaw?.url || null;
 
-  /* ---- Grúas: estado simple ---- */
-  const [grua, setGrua] = useState({
-    cargando: false,
-    activa: null,
-    plan: null,
-  });
+  /* ---- Grúas ---- */
+  const [grua, setGrua] = useState({ cargando: false, activa: null, plan: null });
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!polizaId) return;
       try {
         if (alive) setGrua((g) => ({ ...g, cargando: true }));
-        const res = await fetch(`/api/gruas/poliza/${polizaId}/resumen/`);
-        if (!res.ok) throw new Error("HTTP");
-        const data = await res.json();
-        const adhesion =
-          data?.adhesion || data?.adhesión || data?.adhesion_grua || null;
+        // 🚀 Usamos 'api' segura
+        const res = await api.get(`/gruas/poliza/${polizaId}/resumen/`);
+        const data = res.data;
+        const adhesion = data?.adhesion || data?.adhesión || data?.adhesion_grua || null;
         const estadoAdh = adhesion?.estado || adhesion?.status || null;
-        const planNombre =
-          adhesion?.plan?.nombre || adhesion?.plan_nombre || null;
+        const planNombre = adhesion?.plan?.nombre || adhesion?.plan_nombre || null;
         if (!alive) return;
         setGrua({
           cargando: false,
@@ -347,23 +448,20 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
           plan: planNombre,
         });
       } catch {
-        if (alive)
-          setGrua({ cargando: false, activa: null, plan: null });
+        if (alive) setGrua({ cargando: false, activa: null, plan: null });
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [polizaId]);
 
   /* ---- Vehículo ---- */
   const marca = safe(poliza?.marca);
   const modelo = safe(poliza?.modelo);
-  const patente = safe(
-    upper(pick(poliza?.patente, poliza?.dominio, poliza?.matricula))
-  );
+  const patente = safe(upper(pick(poliza?.patente, poliza?.dominio, poliza?.matricula)));
+  const anio = safe(poliza?.anio);
+  const tipoVehiculo = safe(poliza?.tipo, "Auto");
 
-  /* ---- ID de cliente para navegar al perfil ---- */
+  /* ---- ID de cliente ---- */
   const clienteId = poliza?.cliente_id ?? c?.id ?? null;
 
   return (
@@ -371,183 +469,135 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="grid gap-5 2xl:gap-6 xl:grid-cols-12 items-start"
+      className="flex flex-col"
     >
-      {/* ===================== Columna izquierda: PAGOS ===================== */}
-      <div className="xl:col-span-8">
-        <Card>
-          <SectionHeader
-            emoji="📊"
-            title="Resumen de pagos"
-            subtitle={
-              numeroPoliza ? `Póliza ${numeroPoliza}` : undefined
-            }
-          />
+      {/* 🚀 BANNER DE ESTADO SEGURO */}
+      <PolizaStatusBanner estadoInicial={poliza?.estado} polizaId={polizaId} />
 
-          {/* Métricas compactas */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
-            <Stat label="Cuotas pagadas" value={`${pagadas}/${total}`} />
-            <Stat
-              label="Progreso"
-              value={`${progresoPct}%`}
-              hint={
-                typeof saldoPendiente === "number"
-                  ? `Saldo: ${fmtMoney(saldoPendiente)}`
-                  : undefined
-              }
+      <div className="grid gap-5 2xl:gap-6 xl:grid-cols-12 items-start">
+        <div className="xl:col-span-8">
+          <Card>
+            <SectionHeader
+              emoji="📊"
+              title="Resumen de pagos"
+              subtitle={numeroPoliza ? `Póliza ${numeroPoliza}` : undefined}
             />
-            <Stat
-              label="Próximo vencimiento"
-              value={
-                proximoVtoMostrar
-                  ? proximoVtoMostrar.format("DD/MM/YYYY")
-                  : "—"
-              }
-              hint={
-                ultimaFechaPago
-                  ? `Último pago: ${ultimaFechaPagoStr}`
-                  : undefined
-              }
-            />
-            <div className="flex items-center justify-start md:justify-center">
-              <EstadoPagosChip estado={estado} diff={diff} />
-            </div>
-          </div>
 
-          {/* Barra de progreso */}
-          <div className="h-2.5 rounded-full bg-gray-800 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-primary-400 to-amber-400 transition-all duration-500 ease-out"
-              style={{ width: `${progresoPct}%` }}
-            />
-          </div>
-
-          {/* Acciones */}
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            <button
-              type="button"
-              onClick={onOpenCuotas}
-              className={`${btnBase} ${btnPrimary}`}
-            >
-              📄 Ver cuotas
-            </button>
-
-            {documentoPoliza ? (
-              <a
-                href={documentoPoliza}
-                target="_blank"
-                rel="noreferrer noopener"
-                className={`${btnBase} ${btnSecondary} ${linkHover}`}
-                title="Descargar póliza"
-              >
-                <HiDocumentDownload className="w-4 h-4" />
-                Descargar póliza
-              </a>
-            ) : null}
-          </div>
-        </Card>
-      </div>
-
-      {/* ===================== Columna derecha: 3 tarjetas ===================== */}
-      <div className="xl:col-span-4 grid gap-4 2xl:gap-5 content-start">
-        {/* Aseguradora + Cobertura */}
-        <Card>
-          <SectionHeader emoji="🛡️" title="Aseguradora" />
-          <div className="space-y-2">
-            <div className="text-base sm:text-lg font-semibold text-white leading-tight">
-              {companiaNombre || "—"}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs sm:text-sm text-white/75">
-                Cobertura:
-              </span>
-              <Chip tone={coberturaTone} title="Tipo de cobertura">
-                {cobertura || "—"}
-              </Chip>
-            </div>
-          </div>
-        </Card>
-
-        {/* Vehículo */}
-        <Card>
-          <SectionHeader emoji="🚗" title="Vehículo" />
-          <div className="space-y-2">
-            <div className="text-base sm:text-lg font-semibold text-white flex items-center gap-2 leading-tight">
-              <HiOutlinePhotograph className="w-4 h-4 text-white/80" />
-              {marca} {modelo}
-            </div>
-            <div className="text-xs sm:text-sm text-white/80">
-              Patente:{" "}
-              <span className="font-mono tracking-wide">{patente}</span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Servicio de grúas */}
-        <Card>
-          <SectionHeader emoji="🚨" title="Servicio de grúas" />
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Chip
-                tone={
-                  grua.activa === true
-                    ? "green"
-                    : grua.activa === false
-                    ? "red"
-                    : "gray"
-                }
-                title="Estado"
-              >
-                {grua.cargando
-                  ? "⏳ Cargando..."
-                  : grua.activa === true
-                  ? "✅ Activa"
-                  : grua.activa === false
-                  ? "❌ Inactiva"
-                  : "—"}
-              </Chip>
-            </div>
-            <div className="text-xs sm:text-sm text-white/85">
-              Plan:{" "}
-              <span className="font-medium text-white">
-                {grua.plan || (grua.cargando ? "Cargando..." : "—")}
-              </span>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* ===================== Asegurado: fila completa ===================== */}
-      <div className="xl:col-span-12">
-        <Card>
-          <SectionHeader emoji="🧍" title="Asegurado" />
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-lg sm:text-xl font-semibold text-white truncate flex items-center gap-2">
-                <HiUser className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
-                {nombreCompleto || (
-                  <span className="text-rose-300">
-                    Falta nombre y apellido
-                  </span>
-                )}
-              </div>
-              <div className="text-xs sm:text-sm text-white/80 mt-1">
-                DNI/CUIT:{" "}
-                <span className="font-mono text-white/90">{dni}</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
+              <Stat label="Cuotas pagadas" value={`${pagadas}/${total}`} />
+              <Stat
+                label="Progreso"
+                value={`${progresoPct}%`}
+                hint={typeof saldoPendiente === "number" ? `Saldo: ${fmtMoney(saldoPendiente)}` : undefined}
+              />
+              <Stat
+                label="Próximo vencimiento"
+                value={proximoVtoMostrar ? proximoVtoMostrar.format("DD/MM/YYYY") : "—"}
+                hint={ultimaFechaPago ? `Último pago: ${ultimaFechaPagoStr}` : undefined}
+              />
+              <div className="flex items-center justify-start md:justify-center">
+                <EstadoPagosChip estado={estado} diff={diff} />
               </div>
             </div>
 
-            {clienteId ? (
-              <Link
-                to={`/clientes/${clienteId}`}
-                className={`${btnBase} ${btnSecondary} ${linkHover}`}
-                title="Ver perfil del cliente"
-              >
-                👤 Ver cliente
-              </Link>
-            ) : null}
-          </div>
-        </Card>
+            <div className="h-2.5 rounded-full bg-gray-800 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-primary-400 to-amber-400 transition-all duration-500 ease-out"
+                style={{ width: `${progresoPct}%` }}
+              />
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <button type="button" onClick={onOpenCuotas} className={`${btnBase} ${btnPrimary}`}>
+                📄 Ver cuotas
+              </button>
+
+              {documentoPoliza ? (
+                <a href={documentoPoliza} target="_blank" rel="noreferrer noopener" className={`${btnBase} ${btnSecondary} ${linkHover}`} title="Descargar póliza">
+                  <HiDocumentDownload className="w-4 h-4" />
+                  Descargar póliza
+                </a>
+              ) : null}
+            </div>
+            {/* 🗑️ Botón de Renovación eliminado de las acciones */}
+          </Card>
+        </div>
+
+        <div className="xl:col-span-4 grid gap-4 2xl:gap-5 content-start">
+          <Card>
+            <SectionHeader emoji="🛡️" title="Aseguradora" />
+            <div className="space-y-2">
+              <div className="text-base sm:text-lg font-semibold text-white leading-tight">
+                {companiaNombre || "—"}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs sm:text-sm text-white/75">Cobertura:</span>
+                <Chip tone={coberturaTone} title="Tipo de cobertura">{cobertura || "—"}</Chip>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <SectionHeader emoji="🚗" title="Vehículo" />
+            <div className="space-y-4">
+              <div className="text-base sm:text-lg font-semibold text-white flex items-center gap-2 leading-tight">
+                <HiOutlinePhotograph className="w-4 h-4 text-white/80 shrink-0" />
+                <span className="truncate">{marca} {modelo}</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                <div className="bg-gray-800/50 rounded-lg p-2.5 border border-gray-700/50">
+                  <span className="text-white/50 block text-[10px] uppercase tracking-wider mb-0.5">Patente</span>
+                  <span className="font-mono tracking-wide font-medium text-white text-sm">{patente}</span>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-2.5 border border-gray-700/50">
+                  <span className="text-white/50 block text-[10px] uppercase tracking-wider mb-0.5">Año</span>
+                  <span className="font-medium text-white text-sm">{anio}</span>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-2.5 border border-gray-700/50 col-span-2">
+                  <span className="text-white/50 block text-[10px] uppercase tracking-wider mb-0.5">Tipo de Vehículo</span>
+                  <span className="font-medium text-white text-sm">{tipoVehiculo}</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <SectionHeader emoji="🚨" title="Servicio de grúas" />
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Chip tone={grua.activa === true ? "green" : grua.activa === false ? "red" : "gray"} title="Estado">
+                  {grua.cargando ? "⏳ Cargando..." : grua.activa === true ? "✅ Activa" : grua.activa === false ? "❌ Inactiva" : "—"}
+                </Chip>
+              </div>
+              <div className="text-xs sm:text-sm text-white/85">
+                Plan: <span className="font-medium text-white">{grua.plan || (grua.cargando ? "Cargando..." : "—")}</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="xl:col-span-12">
+          <Card>
+            <SectionHeader emoji="🧍" title="Asegurado" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-lg sm:text-xl font-semibold text-white truncate flex items-center gap-2">
+                  <HiUser className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
+                  {nombreCompleto || <span className="text-rose-300">Falta nombre y apellido</span>}
+                </div>
+                <div className="text-xs sm:text-sm text-white/80 mt-1">
+                  DNI/CUIT: <span className="font-mono text-white/90">{dni}</span>
+                </div>
+              </div>
+              {clienteId ? (
+                <Link to={`/clientes/${clienteId}`} className={`${btnBase} ${btnSecondary} ${linkHover}`} title="Ver perfil del cliente">
+                  👤 Ver cliente
+                </Link>
+              ) : null}
+            </div>
+          </Card>
+        </div>
       </div>
     </motion.div>
   );

@@ -3,14 +3,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
+
 import { fetchPolizaPorId } from "../../store/slices/polizasSlice";
-import { PolizasAPI } from "../../api/polizas"; // <- para refreshPack luego de asociación
+import { PolizasAPI } from "../../api/polizas"; 
 import PolizaHeader from "./PolizaHeader";
 import PolizaResumenSection from "./PolizaResumenSection";
 import GruasPanel from "./GruasPanel";
 import CuotasPanel from "./CuotasPanel";
 import PolizaHistoriaPanel from "./PolizaHistoriaPanel";
-import RenovarPolizaModal from "./RenovarPolizaModal";
 
 // ✅ Unificado Vehículo + Documentos
 import VehiculoDocsPanel from "./VehiculoDocsPanel";
@@ -25,13 +27,14 @@ export default function PolizaDetails() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
 
   // ✅ IMPORTANTE: tomar primero byId[polizaId] (cache normalizado)
   const poliza = useSelector(
     (s) => s.polizas?.byId?.[polizaId] || s.polizas?.poliza || null
   );
-  const loadStatus = useSelector((s) => s.polizas?.status || "idle");
-  const loadError = useSelector((s) => s.polizas?.error || null);
+  const loadStatus = useSelector((s) => s.polizas?.detailStatus || s.polizas?.status || "idle");
+  const loadError = useSelector((s) => s.polizas?.detailError || s.polizas?.error || null);
 
   // 🔁 fuerza remount del panel unificado tras importación de medios
   const [refreshTick, setRefreshTick] = useState(0);
@@ -47,8 +50,6 @@ export default function PolizaDetails() {
     return normalizeTabKey(urlTab);
   });
 
-  const [openRenovar, setOpenRenovar] = useState(false);
-
   useEffect(() => {
     if (polizaId && Number.isFinite(polizaId)) {
       console.log("[DBG] PolizaDetails: fetchPolizaPorId", { polizaId });
@@ -57,31 +58,17 @@ export default function PolizaDetails() {
     }
   }, [polizaId, dispatch]);
 
-  // 🔔 Navegar a la nueva póliza cuando se renueva
-  useEffect(() => {
-    const handler = (ev) => {
-      const nueva = ev?.detail?.nuevaPoliza;
-      if (nueva?.id) navigate(`/polizas/${nueva.id}`);
-    };
-    window.addEventListener("poliza:renovada", handler);
-    return () => window.removeEventListener("poliza:renovada", handler);
-  }, [navigate]);
-
-  // 🔔 Refresco automático cuando una solicitud se asocia y el backend copia medios
+  // 🔔 Refresco automático cuando una solicitud se asocia
   useEffect(() => {
     const refreshAll = async (targetId, focusTab) => {
       console.groupCollapsed("[DBG] PolizaDetails.refreshAll");
-      console.log("targetId", targetId, "focusTab", focusTab);
       try {
         await PolizasAPI.refreshPack(targetId); // pack completo (póliza+docs+fotos)
-        console.log("[DBG] refreshPack OK");
       } catch (e) {
         console.warn("[DBG] refreshPack ERROR", e);
       } finally {
-        // ✅ FIX: forzar para evitar TTL/cache
         dispatch(fetchPolizaPorId({ id: targetId, force: true }));
         setRefreshTick((x) => x + 1);
-        console.log("[DBG] fetchPolizaPorId(force) + refreshTick++", { targetId });
         if (focusTab) changeTab(focusTab);
         console.groupEnd();
       }
@@ -89,29 +76,19 @@ export default function PolizaDetails() {
 
     const onAsociada = (ev) => {
       const d = ev?.detail || {};
-      console.groupCollapsed("[DBG] event: solicitud:asociada");
-      console.log(d);
       const target = Number(d.poliza_id || d.polizaId || polizaId);
-      console.log("target", target, "current polizaId", polizaId);
-      console.groupEnd();
       if (!target || target !== polizaId) return;
-      // Si vienen con focusTab="documentos", igual cae al tab unificado vehículo/papeles
       refreshAll(target, d.focusTab || "vehiculo");
     };
 
     const onMediaImportada = (ev) => {
       const d = ev?.detail || {};
-      console.groupCollapsed("[DBG] event: poliza:media_importada");
-      console.log(d);
       const target = Number(d.poliza_id || d.polizaId || polizaId);
-      console.log("target", target, "current polizaId", polizaId);
-      console.groupEnd();
       if (!target || target !== polizaId) return;
       refreshAll(target, d.focusTab || "vehiculo");
     };
 
     const onRefrescar = () => {
-      console.log("[DBG] event: poliza:refrescar -> fetchPolizaPorId(force)");
       dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
       setRefreshTick((x) => x + 1);
     };
@@ -125,7 +102,6 @@ export default function PolizaDetails() {
       window.removeEventListener("poliza:media_importada", onMediaImportada);
       window.removeEventListener("poliza:refrescar", onRefrescar);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polizaId, dispatch]);
 
   const avatar = useMemo(
@@ -143,37 +119,13 @@ export default function PolizaDetails() {
 
   const onBack = () => navigate(-1);
 
-  // ✅ FIX: usar firma correcta + force para refrescar realmente
   const onPerfilActualizado = () =>
     dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
 
-  // 🧪 LOG: cada vez que abrís el tab Vehículo/Papeles o cambia la data en store
-  useEffect(() => {
-    if (tab === "vehiculo") {
-      const count = Array.isArray(poliza?.documentos) ? poliza.documentos.length : 0;
-      console.groupCollapsed("[DBG] PolizaDetails → TAB Vehículo/Papeles (unificado)");
-      console.log("polizaId", polizaId, "documentos en store", count);
-      if (count) {
-        console.table(
-          poliza.documentos.map((d) => ({
-            id: d.id,
-            tipo: d.tipo,
-            url: d.url || d.secure_url,
-            vto: d.vencimiento || null,
-            lado: d.lado || "",
-          }))
-        );
-      } else {
-        console.log(
-          "No hay documentos en store; la UI del tab podría estar filtrando o no los trajo el API pack."
-        );
-      }
-      console.groupEnd();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, polizaId, poliza?.documentos?.length]);
+  // 🛡️ Lógica de roles para la UI
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
 
-  if (loadStatus === "loading" || !poliza) {
+  if (loadStatus === "loading" || (!poliza && loadStatus !== "failed")) {
     return (
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <div className="animate-pulse space-y-4">
@@ -187,36 +139,38 @@ export default function PolizaDetails() {
 
   if (loadStatus === "failed") {
     return (
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 text-red-400">
-        <div className="text-base sm:text-lg font-semibold mb-2">
-          No se pudo cargar la póliza
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-8 text-center">
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 mb-4">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
         </div>
-        <div className="text-xs sm:text-sm opacity-80">
-          {String(loadError || "Error desconocido")}
-        </div>
+        <h2 className="text-xl font-bold text-white">Acceso Denegado / Error</h2>
+        <p className="text-gray-400 mt-2 text-sm max-w-md mx-auto">
+          {String(loadError || "No tienes permisos para ver esta póliza o no pertenece a tu sucursal.")}
+        </p>
         <button
-          onClick={() => dispatch(fetchPolizaPorId({ id: polizaId, force: true }))}
-          className="mt-4 px-3 py-2 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-100 text-sm"
+          onClick={() => navigate('/polizas')}
+          className="mt-6 px-6 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold transition-all"
         >
-          Reintentar
+          Volver al listado
         </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 animate-in fade-in duration-500">
       <PolizaHeader
         poliza={poliza}
         onBack={onBack}
         onPerfilActualizado={onPerfilActualizado}
-        onRenovarClick={() => setOpenRenovar(true)}
       />
 
-      {/* Tabs: scroll horizontal en mobile */}
+      {/* Tabs con scroll horizontal */}
       <div className="mt-5 sm:mt-6 border-b border-gray-800">
-        <div className="overflow-x-auto">
-          <nav className="-mb-px flex min-w-max flex-row gap-2 sm:gap-4 text-xs sm:text-sm px-1 sm:px-0">
+        <div className="overflow-x-auto no-scrollbar">
+          <nav className="-mb-px flex min-w-max flex-row gap-2 sm:gap-4 text-xs sm:text-sm">
             {[
               ["resumen", "Resumen"],
               ["vehiculo", "Vehículo / papeles"],
@@ -229,10 +183,10 @@ export default function PolizaDetails() {
               <button
                 key={key}
                 onClick={() => changeTab(key)}
-                className={`whitespace-nowrap px-2.5 sm:px-3 py-2 border-b-2 text-xs sm:text-sm transition-colors ${
+                className={`whitespace-nowrap px-3 py-2.5 border-b-2 text-xs sm:text-sm font-medium transition-all ${
                   tab === key
-                    ? "border-primary-400 text-primary-400"
-                    : "border-transparent text-gray-400 hover:text-gray-200"
+                    ? "border-emerald-500 text-emerald-400"
+                    : "border-transparent text-gray-500 hover:text-gray-300"
                 }`}
               >
                 {label}
@@ -245,7 +199,7 @@ export default function PolizaDetails() {
       {/* Contenido de tabs */}
       <div className="mt-5 sm:mt-6 space-y-4 sm:space-y-6">
         {tab === "resumen" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
             <PolizaResumenSection
               poliza={poliza}
               polizaId={polizaId}
@@ -253,14 +207,12 @@ export default function PolizaDetails() {
               onOpenVehiculoGaleria={() => changeTab("vehiculo")}
               onEditVehiculo={() => changeTab("vehiculo")}
               onOpenCuotas={() => changeTab("cuotas")}
-              onRenovarPoliza={() => setOpenRenovar(true)}
             />
           </div>
         )}
 
-        {/* ✅ Unificado: Vehículo + Papeles (fotos + documentos) */}
         {tab === "vehiculo" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
             <VehiculoDocsPanel
               key={`veh-${refreshTick}`}
               poliza={poliza}
@@ -276,22 +228,20 @@ export default function PolizaDetails() {
         )}
 
         {tab === "gruas" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
-            <GruasPanel poliza={poliza} />
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
+            <GruasPanel polizaId={polizaId} />
           </div>
         )}
 
         {tab === "cuotas" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
             <CuotasPanel poliza={poliza} polizaId={polizaId} />
           </div>
         )}
 
-        {/* 🆕 Tab Cuponeras robo */}
         {tab === "cuponeras" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
             <CuponesRoboPanel
-              poliza={poliza}
               polizaId={polizaId}
               cupones={poliza?.cupones_robo || []}
             />
@@ -299,23 +249,17 @@ export default function PolizaDetails() {
         )}
 
         {tab === "historial" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
-            <PolizaHistoriaPanel polizaId={poliza.id} />
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
+            <PolizaHistoriaPanel polizaId={polizaId} />
           </div>
         )}
 
         {tab === "notas" && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5 sm:p-6 text-xs sm:text-sm text-gray-300">
-            Próximamente: notas internas por póliza.
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500 italic text-sm">
+            Sección de notas internas próximamente disponible.
           </div>
         )}
       </div>
-
-      <RenovarPolizaModal
-        open={openRenovar}
-        onClose={() => setOpenRenovar(false)}
-        poliza={poliza}
-      />
     </div>
   );
 }

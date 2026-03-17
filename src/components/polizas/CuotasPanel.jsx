@@ -1,19 +1,16 @@
 // src/components/polizas/CuotasPanel.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
-import { HiRefresh, HiX, HiCheck, HiChatAlt2 } from "react-icons/hi"; // ✅ Agregamos el ícono de Chat
-import { PolizasAPI } from "../../api/polizas";
+import { HiRefresh, HiCheck, HiChatAlt2 } from "react-icons/hi"; 
+// 🗑️ PolizasAPI eliminada porque solo se usaba para renovar
 import { pagarCuota } from "../../store/slices/polizasSlice";
-import axios from "axios";
-
-// Configuración base para llamadas directas
-const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
-const BASE = RAW_BASE.endsWith("/") ? RAW_BASE : `${RAW_BASE}/`;
-const http = axios.create({ baseURL: BASE, withCredentials: true });
+// 🚀 INSTANCIA SEGURA: Mantenemos el interceptor de Token
+import api from "../../services/api";
 
 const today = () => dayjs().startOf("day");
+
 const currency = (n) => {
   if (n == null || n === "") return "-";
   try {
@@ -52,76 +49,10 @@ const estadoCuotaBadge = (estado) => {
   );
 };
 
-/* ===================== Modal Renovación (Se mantiene igual) ===================== */
-function RenovarPolizaNumeroModal({ open, onClose, polizaId, numeroActual, onSuccess }) {
-  const [nuevoNumero, setNuevoNumero] = useState("");
-  const [busy, setBusy] = useState(false);
-  const inputRef = useRef(null);
-
-  const sugerido = (() => {
-    const base = numeroActual || "";
-    if (!base) return "";
-    const y = new Date().getFullYear();
-    return `${base}-R${y}`;
-  })();
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
-    else setNuevoNumero("");
-  }, [open]);
-
-  const handleSubmit = async () => {
-    if (!polizaId) return;
-    setBusy(true);
-    try {
-      const payload = {};
-      const trimmed = String(nuevoNumero).trim();
-      if (trimmed !== "") payload.nuevo_numero = trimmed;
-      const nueva = await PolizasAPI.renovarPoliza(polizaId, payload);
-      toast.success("Póliza renovada");
-      onSuccess?.(nueva);
-      onClose?.();
-    } catch (e) {
-      toast.error(e?.message || "No se pudo renovar");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-2xl bg-gradient-to-br from-sky-500/40 via-slate-900 to-black p-[1px] shadow-2xl shadow-black/60">
-        <div className="rounded-2xl bg-slate-950">
-          <div className="border-b border-white/10 px-4 py-3">
-            <h3 className="text-white text-base sm:text-lg font-semibold">Renovar póliza</h3>
-            <p className="text-white/70 text-xs sm:text-sm mt-1">Ingresá el nuevo número de póliza.</p>
-          </div>
-          <div className="p-4 grid gap-3">
-            <div>
-              <input
-                ref={inputRef}
-                value={nuevoNumero}
-                onChange={(e) => setNuevoNumero(e.target.value)}
-                placeholder={sugerido || "Ej: 12-345678-R2025"}
-                className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-sky-400/60"
-              />
-            </div>
-          </div>
-          <div className="border-t border-white/10 px-4 py-3 flex gap-2 justify-end">
-            <button onClick={onClose} className="px-3 py-1.5 rounded-lg bg-white/5 text-white text-sm">Cancelar</button>
-            <button onClick={handleSubmit} disabled={busy} className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm">{busy ? "Creando..." : "Confirmar"}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* 🗑️ Modal de Renovación eliminado por completo de este archivo */
 
 /* ===================== Panel principal ===================== */
-export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
+export default function CuotasPanel({ poliza, polizaId }) {
   const dispatch = useDispatch();
 
   const [rows, setRows] = useState(Array.isArray(poliza?.cuotas) ? poliza.cuotas : []);
@@ -130,7 +61,7 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
   }, [poliza?.cuotas]);
 
   const [busyIds, setBusyIds] = useState({});
-  const [enviandoPostVenta, setEnviandoPostVenta] = useState(false); // ✅ Estado de carga para el mensaje
+  const [enviandoPostVenta, setEnviandoPostVenta] = useState(false); 
 
   const resumen = useMemo(() => {
     const total = rows.length;
@@ -141,7 +72,6 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
   }, [rows]);
 
   const id = Number(polizaId ?? poliza?.id);
-  const numeroActual = poliza?.numero_poliza || poliza?.numero || poliza?.nro_poliza || "";
 
   const handleMarcarPagada = async (cuota) => {
     if (!cuota?.id || cuota.pagado) return;
@@ -168,21 +98,20 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
     }
   };
 
-  // ✅ FUNCIÓN PARA ENVIAR POST-VENTA
   const handleEnviarPostVenta = async () => {
     if (!id) return;
     setEnviandoPostVenta(true);
     try {
-      await http.post(`polizas/${id}/enviar-postventa/`);
-      toast.success("Mensaje de post-venta enviado con UltraMsg ✅");
+      // 🚀 Usamos 'api' centralizada para evitar 401
+      await api.post(`polizas/${id}/enviar-postventa/`);
+      toast.success("Mensaje de post-venta enviado ✅");
     } catch (err) {
-      toast.error("Hubo un error al enviar el mensaje.");
+      console.error("Error Post-Venta:", err);
+      toast.error("Error al enviar mensaje.");
     } finally {
       setEnviandoPostVenta(false);
     }
   };
-
-  const [openRenovar, setOpenRenovar] = useState(false);
 
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-950/90 p-4 sm:p-5 shadow-lg shadow-black/40">
@@ -194,7 +123,7 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
           <h3 className="text-lg sm:text-xl font-semibold text-white">Gestión de Cuotas</h3>
         </div>
         <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
-          {/* ✅ NUEVO BOTÓN POST VENTA */}
+          {/* BOTÓN POST VENTA */}
           <button
             onClick={handleEnviarPostVenta}
             disabled={enviandoPostVenta}
@@ -205,13 +134,7 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
             Enviar Post-Venta
           </button>
 
-          <button
-            onClick={() => setOpenRenovar(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm px-3 py-2 transition-colors"
-          >
-            <HiRefresh className="w-4 h-4" />
-            Renovar póliza
-          </button>
+          {/* 🗑️ Botón de Renovación eliminado de aquí */}
         </div>
       </div>
 
@@ -235,13 +158,12 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
         </div>
       </div>
 
-      {/* Lista de cuotas (CON FECHAS ACLARADAS) */}
+      {/* Lista de cuotas */}
       <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-950/70 divide-y divide-neutral-800">
         {rows.map((cuota) => {
           const estado = estadoCuota(cuota);
           const isBusy = !!busyIds[cuota.id];
 
-          // ✅ LÓGICA VISUAL DE COBERTURA: Calculamos 1 mes extra para mostrarlo clarito
           const vto = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
           const vtoFormat = vto ? vto.format("DD/MM/YYYY") : "-";
           const cubreHasta = vto ? vto.add(1, 'month').format("DD/MM/YYYY") : "-";
@@ -250,7 +172,6 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
             <div key={cuota.id} className="p-4 sm:p-5 bg-neutral-950 hover:bg-neutral-900/90 transition-colors">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 
-                {/* Título de la cuota */}
                 <div className="flex flex-col gap-1.5 md:w-32">
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-bold text-white">#{cuota.cuota_nro}</span>
@@ -261,15 +182,12 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
                   </div>
                 </div>
 
-                {/* ✅ DATOS DE FECHA MEJORADOS */}
                 <div className="grid grid-cols-2 gap-4 flex-1 md:px-6">
-                  {/* Fecha exigible de pago */}
                   <div className="bg-white/5 rounded-lg p-2 border border-white/10">
                     <div className="text-[10px] uppercase tracking-wide text-rose-300/80 mb-0.5">Día de Pago (Vto)</div>
                     <div className="font-bold text-white text-sm">{vtoFormat}</div>
                   </div>
                   
-                  {/* Período de cobertura (Elimina confusión) */}
                   <div className="bg-sky-500/5 rounded-lg p-2 border border-sky-500/10">
                     <div className="text-[10px] uppercase tracking-wide text-sky-300/80 mb-0.5">Cubre Cobertura del:</div>
                     <div className="font-medium text-white text-xs">
@@ -278,7 +196,6 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
                   </div>
                 </div>
 
-                {/* Acción de Pago */}
                 <div className="flex md:justify-end md:w-48">
                   {cuota?.pagado ? (
                     <div className="flex flex-col items-end w-full">
@@ -296,7 +213,7 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
                       type="button"
                       disabled={isBusy}
                       onClick={() => handleMarcarPagada(cuota)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs sm:text-sm border border-emerald-500/60 disabled:opacity-60 font-semibold"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs sm:text-sm border border-emerald-500/60 disabled:opacity-60 font-semibold transition-all active:scale-95"
                     >
                       {isBusy ? <HiRefresh className="h-4 w-4 animate-spin" /> : <HiCheck className="h-4 w-4" />}
                       Marcar Pagada
@@ -309,17 +226,6 @@ export default function CuotasPanel({ poliza, polizaId, onRenovada }) {
           );
         })}
       </div>
-
-      <RenovarPolizaNumeroModal
-        open={openRenovar}
-        onClose={() => setOpenRenovar(false)}
-        polizaId={id}
-        numeroActual={numeroActual}
-        onSuccess={(nuevaPoliza) => {
-          toast.success(`Se creó la póliza #${nuevaPoliza?.numero_poliza || nuevaPoliza?.id}`);
-          onRenovada?.(nuevaPoliza);
-        }}
-      />
     </div>
   );
 }

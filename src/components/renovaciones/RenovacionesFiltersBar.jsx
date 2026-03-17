@@ -15,6 +15,7 @@ export default function RenovacionesFiltersBar({
   oficinasOptions = [],
   resumenBuckets = {},
   onApply, // fuerza recarga
+  isWebAdmin, // 🚀 RECIBIMOS LA VARIABLE DE SEGURIDAD
 }) {
   // Opciones del menú desplegable de "Momento de Vencimiento"
   const timeOptions = useMemo(
@@ -91,25 +92,29 @@ export default function RenovacionesFiltersBar({
         </select>
       </div>
 
-      {/* 3. FILTRO DE OFICINAS */}
-      <div className="lg:col-span-3">
-        <select
-          value={String(oficina || "")}
-          onChange={(e) => handleChange(setOficina, String(e.target.value || ""))}
-          disabled={loading}
-          aria-label="Filtrar por oficina"
-          className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2.5 outline-none focus:border-sky-400/50 focus:bg-white/10 transition-colors appearance-none cursor-pointer disabled:opacity-60"
-        >
-          <option value="" className="bg-slate-900 text-white">
-            Todas las oficinas
-          </option>
-          {(Array.isArray(oficinasOptions) ? oficinasOptions : []).map((o) => (
-            <option key={o.value} value={o.value} className="bg-slate-900 text-white">
-              {o.label}
+      {/* 3. FILTRO DE OFICINAS (🚀 OCULTO SI NO ES ADMIN) */}
+      {isWebAdmin ? (
+        <div className="lg:col-span-3">
+          <select
+            value={String(oficina || "")}
+            onChange={(e) => handleChange(setOficina, String(e.target.value || ""))}
+            disabled={loading}
+            aria-label="Filtrar por oficina"
+            className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2.5 outline-none focus:border-sky-400/50 focus:bg-white/10 transition-colors appearance-none cursor-pointer disabled:opacity-60"
+          >
+            <option value="" className="bg-slate-900 text-white">
+              Todas las oficinas
             </option>
-          ))}
-        </select>
-      </div>
+            {(Array.isArray(oficinasOptions) ? oficinasOptions : []).map((o) => (
+              <option key={o.value} value={o.value} className="bg-slate-900 text-white">
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="lg:col-span-3 hidden lg:block"></div> /* Placeholder para mantener la grilla */
+      )}
 
       {/* 4. TOGGLE SOLO PENDIENTES */}
       <div className="lg:col-span-2">

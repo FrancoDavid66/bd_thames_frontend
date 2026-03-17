@@ -48,10 +48,27 @@ function buildQuery(params) {
   return qs ? `?${qs}` : "";
 }
 
-// ✅ Exportada para uso directo en componentes (evita errores 404 en producción)
+// 🚀 FUNCIÓN DE SEGURIDAD: Atrapa el token desde donde esté guardado
+function getAuthHeaders() {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  if (token && token !== "undefined" && token !== "null") {
+    return { "Authorization": `Bearer ${token.trim()}` };
+  }
+  return {};
+}
+
+// ✅ Exportada para uso directo en componentes
 export async function apiGet(path, params) {
   const url = `${API_ROOT}${path}${buildQuery(params)}`;
-  const res = await fetch(url, { credentials: "include" });
+  
+  const res = await fetch(url, { 
+    headers: {
+      "Accept": "application/json",
+      ...getAuthHeaders()
+    },
+    credentials: "omit" 
+  });
+  
   if (!res.ok) {
     let detail = "";
     try {
@@ -66,12 +83,18 @@ export async function apiGet(path, params) {
 // ✅ Exportada para uso directo en componentes
 export async function apiAction(path, method, body) {
   const url = `${API_ROOT}${path}`;
+  
   const res = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      ...getAuthHeaders()
+    },
     body: body ? JSON.stringify(body) : null,
-    credentials: "include",
+    credentials: "omit", 
   });
+  
   if (!res.ok) {
     let detail = "";
     try {
@@ -119,7 +142,6 @@ export const fetchBajas = createAsyncThunk(
     const merged = { page: "1", page_size: "25", ...params };
     const key = stableKey({ ...merged, _list: 1 });
 
-    // ✅ FIX: respetar force y usar cache SOLO si no es force
     const state = thunkAPI.getState?.();
     const cacheEntry = state?.bajas?.cache?.[key];
     if (!force && isFresh(cacheEntry, TTL_LIST_MS)) {
@@ -131,11 +153,19 @@ export const fetchBajas = createAsyncThunk(
   }
 );
 
-// ✅ NUEVO: Thunk para obtener los KPIs globales de la empresa
+// ✅ Contadores de la sucursal o filtro activo
 export const fetchBajasCounters = createAsyncThunk(
   "bajas/fetchBajasCounters",
-  async ({ dias = 15 } = {}) => {
-    return await apiGet("bajas/operativo/counters/", { dias });
+  async (params = {}) => {
+    return await apiGet("bajas/operativo/counters/", params);
+  }
+);
+
+// 🚀 NUEVO: Contadores globales para el Admin (Toda la empresa)
+export const fetchBajasGlobalCounters = createAsyncThunk(
+  "bajas/fetchBajasGlobalCounters",
+  async (params = {}) => {
+    return await apiGet("bajas/operativo/counters/", params);
   }
 );
 
@@ -144,7 +174,6 @@ export const fetchBajasOficinas = createAsyncThunk(
   async ({ force = false } = {}, thunkAPI) => {
     const key = stableKey({ _oficinas: 1 });
 
-    // (opcional) cache hit aquí también
     const state = thunkAPI.getState?.();
     const cacheEntry = state?.bajas?.cache?.[key];
     if (!force && isFresh(cacheEntry, TTL_OFICINAS_MS)) {
@@ -183,6 +212,9 @@ const bajasSlice = createSlice({
     counters: { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 },
     countersStatus: "idle",
 
+    globalCounters: { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 },
+    globalCountersStatus: "idle",
+
     oficinas: [],
     oficinasStatus: "idle",
     oficinasError: null,
@@ -205,7 +237,7 @@ const bajasSlice = createSlice({
         state.error = null;
 
         const force = !!action?.meta?.arg?.force;
-        if (force) return; // ✅ FIX: si es force, no hidratar desde cache en pending
+        if (force) return;
 
         const params = action?.meta?.arg?.params || {};
         const merged = { page: "1", page_size: "25", ...params };
@@ -242,6 +274,15 @@ const bajasSlice = createSlice({
       .addCase(fetchBajasCounters.fulfilled, (state, action) => {
         state.countersStatus = "succeeded";
         state.counters = action.payload || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
+      })
+
+      // ===== GLOBAL COUNTERS =====
+      .addCase(fetchBajasGlobalCounters.pending, (state) => {
+        state.globalCountersStatus = "loading";
+      })
+      .addCase(fetchBajasGlobalCounters.fulfilled, (state, action) => {
+        state.globalCountersStatus = "succeeded";
+        state.globalCounters = action.payload || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
       })
 
       // ===== OFICINAS =====
@@ -284,8 +325,10 @@ export const selectBajasCount = (s) => Number(s?.bajas?.count) || 0;
 export const selectBajasStatus = (s) => s?.bajas?.status || "idle";
 export const selectBajasError = (s) => s?.bajas?.error || null;
 
-export const selectBajasCounters = (s) => s?.bajas?.counters;
+export const selectBajasCounters = (s) => s?.bajas?.counters || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
 export const selectBajasCountersStatus = (s) => s?.bajas?.countersStatus;
+
+export const selectBajasGlobalCounters = (s) => s?.bajas?.globalCounters || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
 
 export const selectBajasOficinas = (s) => s?.bajas?.oficinas || [];
 export const selectBajasOficinasStatus = (s) => s?.bajas?.oficinasStatus || "idle";

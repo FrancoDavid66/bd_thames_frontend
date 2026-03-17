@@ -49,6 +49,10 @@ export default function OficinasTable({
                   <th className="px-3 py-2 text-right font-semibold text-rose-200">
                     Bajas mes
                   </th>
+                  {/* 🚀 NUEVA COLUMNA: VENCIDAS */}
+                  <th className="px-3 py-2 text-right font-semibold text-orange-200">
+                    Vencidas
+                  </th>
                   <th className="px-3 py-2 text-right font-semibold text-slate-200">
                     Churn %
                   </th>
@@ -57,10 +61,16 @@ export default function OficinasTable({
               <tbody>
                 {oficinasData.map((o, idx) => {
                   const totalOf = Number(o.polizas_total || 0);
+                  const bajasOf = Number(o.bajas_mes || 0);
+                  // 🚀 Capturamos las vencidas 
+                  const vencidasOf = Number(o.vencidas_mes || o.polizas_vencidas || o.vencidas || 0);
+                  
                   const mixCob = o.por_cobertura || {};
                   const mixComp = o.por_compania || {};
                   const antig = o.antiguedad || {};
-                  const churnPct = Number(o.churn_porcentaje || 0);
+                  
+                  // 🚀 Cálculo Real del Churn por oficina
+                  const churnPct = totalOf > 0 ? (bajasOf / totalOf) * 100 : 0;
 
                   // ✅ Preferimos el nombre que manda backend (oficina_nombre)
                   const oficinaNombre =
@@ -146,7 +156,11 @@ export default function OficinasTable({
                         {(o.nuevas_mes || 0).toLocaleString("es-AR")}
                       </td>
                       <td className="px-3 py-2 text-right text-rose-200 align-top">
-                        {(o.bajas_mes || 0).toLocaleString("es-AR")}
+                        {bajasOf.toLocaleString("es-AR")}
+                      </td>
+                      {/* 🚀 NUEVO DATO EN FILA */}
+                      <td className="px-3 py-2 text-right text-orange-200 align-top">
+                        {vencidasOf.toLocaleString("es-AR")}
                       </td>
                       <td className={`px-3 py-2 text-right align-top font-semibold ${churnColor}`}>
                         {churnPct.toFixed(1)}%

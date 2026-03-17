@@ -11,17 +11,21 @@ import {
   HiUpload,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api"; // Central para evitar 401
 import { PolizasAPI } from "../../api/polizas";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 
 /**
  * Props:
- *  - polizaId (number | string) [requerido]
+ * - polizaId (number | string) [requerido]
  *
  * Flujo:
- *  - Lee pack con PolizasAPI.refreshPack() (o fallbacks)
- *  - Normaliza claves/labels
- *  - CRUD de fotos: subir por slot o libre ("OTRA"), eliminar por id
+ * - Lee pack con PolizasAPI.refreshPack() (o fallbacks)
+ * - Normaliza claves/labels
+ * - CRUD de fotos: subir por slot o libre ("OTRA"), eliminar por id
  */
 
 const FOTO_ORDER = [
@@ -289,6 +293,7 @@ function consolidate(rawFotos = [], rawDocs = []) {
 }
 
 export default function VehiculoDocsPanel({ polizaId }) {
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
   const [loading, setLoading] = useState(false);
   const [poliza, setPoliza] = useState(null);
   const [fotos, setFotos] = useState([]);
@@ -299,6 +304,9 @@ export default function VehiculoDocsPanel({ polizaId }) {
   const pendingSlotRef = useRef(null); // "FRENTE", "LATERAL_IZQ", "OTRA", etc.
   const [uploading, setUploading] = useState(false);
   const OTHER_KEY = "OTRA";
+
+  // 🛡️ Lógica de permisos
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
 
   const title = useMemo(() => {
     if (!poliza) return `Póliza #${polizaId}`;
@@ -316,6 +324,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
     setLoading(true);
     try {
       try {
+        // PolizasAPI ya usa la instancia central segura que inyecta el TOKEN JWT
         const { poliza, documentos, fotos } = await PolizasAPI.refreshPack(
           polizaId
         );
@@ -328,25 +337,22 @@ export default function VehiculoDocsPanel({ polizaId }) {
         setDocumentos(d);
         setLoading(false);
         return;
-      } catch {
-        /* sigue con fallbacks */
+      } catch (e) {
+        console.warn("[VehiculoDocsPanel] refreshPack falló, usando fallbacks");
       }
 
-      const [p, docsRaw, fotosRaw] = await Promise.all([
-        PolizasAPI.getById(polizaId).catch(() => null),
-        PolizasAPI.getDocumentos(polizaId).catch(() => ({ results: [] })),
-        PolizasAPI.getFotosVehiculo({ poliza: polizaId }).catch(() => ({
-          results: [],
-        })),
+      // 🚀 FALLBACK: Usamos 'api' de Axios para asegurar que el Token JWT esté presente
+      const [pRes, docsRes, fotosRes] = await Promise.all([
+        api.get(`/polizas/${polizaId}/`).catch(() => ({ data: null })),
+        api.get(`/polizas/documentos/`, { params: { poliza: polizaId } }).catch(() => ({ data: { results: [] } })),
+        api.get(`/polizas/fotos//`, { params: { poliza: polizaId } }).catch(() => ({ data: { results: [] } })),
       ]);
 
-      const docsArr = Array.isArray(docsRaw) ? docsRaw : docsRaw?.results || [];
-      const fotosArr = Array.isArray(fotosRaw)
-        ? fotosRaw
-        : fotosRaw?.results || [];
-
+      const docsArr = Array.isArray(docsRes.data) ? docsRes.data : docsRes.data?.results || [];
+      const fotosArr = Array.isArray(fotosRes.data) ? fotosRes.data : fotosRes.data?.results || [];
       const { fotos: f, documentos: d } = consolidate(fotosArr, docsArr);
-      setPoliza(p || null);
+      
+      setPoliza(pRes.data || null);
       setFotos(f);
       setDocumentos(d);
     } catch (err) {
@@ -418,8 +424,14 @@ export default function VehiculoDocsPanel({ polizaId }) {
     }
   };
 
-  /* ================== CRUD — Eliminar ================== */
+  /* ================== CRUD — Eliminar (PROTEGIDO) ================== */
   const removePhoto = async (item) => {
+    // 🛡️ Solo el Admin puede borrar fotos
+    if (!isWebAdmin) {
+      toast.error("Solo los administradores pueden eliminar archivos.");
+      return;
+    }
+
     if (!item?.id) {
       toast("No puedo eliminar: falta 'id' en la foto.", { icon: "⚠️" });
       return;
@@ -572,13 +584,16 @@ export default function VehiculoDocsPanel({ polizaId }) {
                           >
                             <HiExternalLink /> Ver
                           </a>
-                          <button
-                            onClick={() => removePhoto(item)}
-                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
-                            title="Eliminar"
-                          >
-                            <HiTrash /> Eliminar
-                          </button>
+                          {/* 🛡️ Solo Admin puede borrar */}
+                          {isWebAdmin && (
+                            <button
+                              onClick={() => removePhoto(item)}
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
+                              title="Eliminar"
+                            >
+                              <HiTrash /> Eliminar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </figure>
@@ -624,13 +639,16 @@ export default function VehiculoDocsPanel({ polizaId }) {
                           >
                             <HiExternalLink /> Ver
                           </a>
-                          <button
-                            onClick={() => removePhoto(item)}
-                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
-                            title="Eliminar"
-                          >
-                            <HiTrash /> Eliminar
-                          </button>
+                          {/* 🛡️ Solo Admin puede borrar */}
+                          {isWebAdmin && (
+                            <button
+                              onClick={() => removePhoto(item)}
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
+                              title="Eliminar"
+                            >
+                              <HiTrash /> Eliminar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </figure>
@@ -710,15 +728,27 @@ export default function VehiculoDocsPanel({ polizaId }) {
                             <span className="truncate" title={d.label}>
                               {d.label}
                             </span>
-                            <a
-                              href={d.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-white/10 hover:bg-white/20"
-                              title="Abrir"
-                            >
-                              <HiExternalLink /> Ver
-                            </a>
+                            <div className="flex gap-1">
+                              <a
+                                href={d.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-white/10 hover:bg-white/20"
+                                title="Abrir"
+                              >
+                                <HiExternalLink /> Ver
+                              </a>
+                              {/* 🛡️ Solo Admin puede borrar */}
+                              {isWebAdmin && (
+                                <button
+                                  onClick={() => removePhoto(d)}
+                                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
+                                  title="Eliminar"
+                                >
+                                  <HiTrash />
+                                </button>
+                              )}
+                            </div>
                           </figcaption>
                         </figure>
                       ))}
@@ -739,15 +769,27 @@ export default function VehiculoDocsPanel({ polizaId }) {
                           <span className="truncate" title={d.label}>
                             {d.label}
                           </span>
-                          <a
-                            href={d.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-white/10 hover:bg-white/20"
-                            title="Abrir"
-                          >
-                            <HiExternalLink /> Abrir
-                          </a>
+                          <div className="flex gap-1">
+                            <a
+                              href={d.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-white/10 hover:bg-white/20"
+                              title="Abrir"
+                            >
+                              <HiExternalLink /> Abrir
+                            </a>
+                            {/* 🛡️ Solo Admin puede borrar */}
+                            {isWebAdmin && (
+                              <button
+                                onClick={() => removePhoto(d)}
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
+                                title="Eliminar"
+                              >
+                                <HiTrash />
+                              </button>
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -767,15 +809,27 @@ export default function VehiculoDocsPanel({ polizaId }) {
                           <span className="truncate" title={d.label}>
                             {d.label}
                           </span>
-                          <a
-                            href={d.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-white/10 hover:bg-white/20"
-                            title="Abrir"
-                          >
-                            <HiExternalLink /> Abrir
-                          </a>
+                          <div className="flex gap-1">
+                            <a
+                              href={d.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-white/10 hover:bg-white/20"
+                              title="Abrir"
+                            >
+                              <HiExternalLink /> Abrir
+                            </a>
+                            {/* 🛡️ Solo Admin puede borrar */}
+                            {isWebAdmin && (
+                              <button
+                                onClick={() => removePhoto(d)}
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"
+                                title="Eliminar"
+                              >
+                                <HiTrash />
+                              </button>
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>

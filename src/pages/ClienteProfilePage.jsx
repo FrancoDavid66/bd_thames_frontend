@@ -4,23 +4,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { HiUser, HiShieldCheck, HiExclamationCircle } from 'react-icons/hi';
 
-import {
-  fetchClienteById,
-  fetchClientes,
-  updateCliente,
-  deleteCliente,
-} from '../store/slices/clientesSlice';
+import { useAuth } from '../context/AuthContext';
+import { fetchClienteById, fetchClientes, updateCliente, deleteCliente } from '../store/slices/clientesSlice';
 
 import ClienteEditModal from '../components/clientes/ClienteEditModal';
 import ClienteDatosPersonalesCard from '../components/clientes/ClienteDatosPersonalesCard';
 import ClienteDocumentacionCard from '../components/clientes/ClienteDocumentacionCard';
 import ClientePolizasCard from '../components/clientes/ClientePolizasCard';
-
 import PolizaCreateModal from '../components/polizas/PolizaCreateModal';
 import BotonEditarCliente from '../components/comunes/BotonEditarCliente';
-// ❌ Botón de crear póliza removido del header
-// import BotonCrearPoliza from '../components/comunes/BotonCrearPoliza';
 import BotonBorrarCliente from '../components/comunes/BotonBorrarCliente';
 import ConfirmModal from '../components/comunes/ConfirmModal';
 
@@ -29,25 +23,16 @@ const ClienteProfilePage = () => {
   const idKey = String(id ?? '');
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
-  const {
-    clientes,
-    status,
-    error,
-    byId,
-    byIdStatus,
-    byIdError,
-  } = useSelector((state) => state.clientes);
+  const { clientes, status, error, byId, byIdStatus, byIdError } = useSelector((state) => state.clientes);
 
-  // ✅ Fuente principal: cache por ID (detalle)
-  // 🟡 Fallback: si venís desde la lista y todavía no cargó detalle, puede estar en clientes[]
   const cliente = useMemo(() => {
     const cached = byId?.[idKey];
     if (cached) return cached;
-
-    if (Array.isArray(clientes)) {
-      return clientes.find((c) => String(c?.id) === idKey);
-    }
+    if (Array.isArray(clientes)) return clientes.find((c) => String(c?.id) === idKey);
     return undefined;
   }, [byId, idKey, clientes]);
 
@@ -59,7 +44,6 @@ const ClienteProfilePage = () => {
   const [modalCrearPolizaAbierto, setModalCrearPolizaAbierto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  // ✅ Cargar SIEMPRE el detalle por ID (no depende de la página del listado)
   useEffect(() => {
     if (!id) return;
     dispatch(fetchClienteById(id));
@@ -68,113 +52,116 @@ const ClienteProfilePage = () => {
   const handleSaveCliente = async (updated) => {
     try {
       await dispatch(updateCliente(updated)).unwrap();
-      toast.success('Cliente actualizado');
+      toast.success('Ficha actualizada correctamente');
       setModalEditarAbierto(false);
-      // refrescar detalle por si backend devuelve algo recalculado
       if (id) dispatch(fetchClienteById(id));
-    } catch {
-      toast.error('No se pudo actualizar');
-    }
+    } catch { toast.error('No se pudo actualizar'); }
   };
 
   const handleBorrarCliente = async () => {
+    if (!isWebAdmin) {
+      toast.error('Acceso Denegado: Solo admins pueden borrar clientes.');
+      setModalEliminarAbierto(false);
+      return;
+    }
     if (!cliente || eliminando) return;
     try {
       setEliminando(true);
       await dispatch(deleteCliente(cliente.id)).unwrap();
-      // Dejamos el toast de éxito centralizado en la lista de clientes
+      toast.success('Cliente eliminado definitivamente');
       navigate('/clientes');
-    } catch {
-      toast.error('No se pudo eliminar');
-    } finally {
-      setEliminando(false);
-    }
+    } catch { toast.error('No se pudo eliminar'); } finally { setEliminando(false); }
   };
 
-  // Lógica única para abrir modal de creación de póliza (usada desde la card)
   const abrirCrearPoliza = () => setModalCrearPolizaAbierto(true);
 
   const handlePolizaCreada = () => {
-    // refresca detalle (pólizas)
     if (id) dispatch(fetchClienteById(id));
-    // opcional: refrescar primera página (por si tu lista muestra datos agregados)
     dispatch(fetchClientes({ page: 1 }));
     setModalCrearPolizaAbierto(false);
   };
 
-  // Loading/error del detalle
   if (detailStatus === 'loading' || (status === 'loading' && !cliente)) {
-    return <p className="p-6">Cargando…</p>;
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+        <div className="h-10 w-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mb-4" />
+        <p className="text-[10px] font-black uppercase tracking-widest text-sky-400/80">Cargando Ficha...</p>
+      </div>
+    );
   }
 
-  if (detailStatus === 'failed') {
-    return <p className="p-6">Error: {typeof detailError === 'string' ? detailError : 'No se pudo cargar el cliente'}</p>;
+  if (detailStatus === 'failed' || (status === 'failed' && !cliente)) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
+        <HiExclamationCircle className="text-rose-500/50 text-6xl mb-4" />
+        <p className="text-sm font-bold text-rose-400 uppercase tracking-widest">Error de Conexión</p>
+        <button onClick={() => navigate('/clientes')} className="mt-6 px-6 py-3 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+          Volver al Directorio
+        </button>
+      </div>
+    );
   }
 
-  if (status === 'failed' && !cliente) {
-    return <p className="p-6">Error: {error}</p>;
-  }
-
-  if (!cliente) return <p className="p-6">Cargando cliente…</p>;
+  if (!cliente) return null;
 
   return (
     <motion.div
-      className="max-w-6xl mx-auto p-6 md:p-8 bg-[#0f172a] text-white rounded-2xl shadow-xl space-y-8"
-      initial={{ opacity: 0, y: 10 }}
+      // 📱 Ajuste para celular: padding inferior extra para que se pueda hacer scroll hasta el final
+      className="min-h-[100dvh] bg-[#0b0f19] text-white p-4 sm:p-6 lg:p-8 pb-24"
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center gap-4 border-b border-white/10 pb-4">
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-          <span className="text-white/60">Perfil de</span>{' '}
-          <span className="text-white">
-            {`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()}
-          </span>
-        </h1>
-        <div className="flex gap-3">
-          <BotonEditarCliente onClick={() => setModalEditarAbierto(true)} />
-          {/* Botón “Crear póliza” del header REMOVIDO */}
-          <BotonBorrarCliente onClick={() => setModalEliminarAbierto(true)} />
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        
+        {/* Header Mobile-Friendly */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-6 border-b border-white/10">
+          <div className="flex items-center gap-4 min-w-0">
+             <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 shadow-lg">
+               <HiUser className="text-4xl" />
+             </div>
+             <div className="min-w-0">
+               <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-1">
+                 Ficha #{cliente.id}
+               </h2>
+               <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter truncate text-white">
+                 {`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()}
+               </h1>
+               <div className="flex items-center gap-2 mt-1">
+                 <HiShieldCheck className="text-emerald-400 text-sm shrink-0" />
+                 <span className="text-[9px] sm:text-[10px] text-emerald-400/80 font-black uppercase tracking-widest truncate">
+                    Sucursal: {user?.perfil?.oficina_nombre || 'Local'}
+                 </span>
+               </div>
+             </div>
+          </div>
+          
+          {/* Botones expandidos en celular para fácil acceso táctil */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <div className="w-full sm:w-auto" onClick={() => setModalEditarAbierto(true)}>
+               <BotonEditarCliente className="w-full h-12 sm:h-10 flex justify-center" />
+            </div>
+            {isWebAdmin && (
+              <div className="w-full sm:w-auto" onClick={() => setModalEliminarAbierto(true)}>
+                 <BotonBorrarCliente className="w-full h-12 sm:h-10 flex justify-center" />
+              </div>
+            )}
+          </div>
         </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-1"><ClienteDatosPersonalesCard cliente={cliente} /></div>
+          <div className="xl:col-span-2"><ClienteDocumentacionCard cliente={cliente} /></div>
+        </div>
+
+        <div className="pt-2">
+          <ClientePolizasCard cliente={cliente} onCrearPoliza={abrirCrearPoliza} />
+        </div>
+
+        <ClienteEditModal isOpen={modalEditarAbierto} onClose={() => setModalEditarAbierto(false)} onSave={handleSaveCliente} cliente={cliente} />
+        <PolizaCreateModal isOpen={modalCrearPolizaAbierto} onClose={() => setModalCrearPolizaAbierto(false)} onSuccess={handlePolizaCreada} clienteId={cliente?.id} />
+        <ConfirmModal isOpen={modalEliminarAbierto} onClose={() => setModalEliminarAbierto(false)} nombre={`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()} onConfirm={handleBorrarCliente} confirmDisabled={eliminando} />
       </div>
-
-      {/* Layout de tarjetas */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-1">
-          <ClienteDatosPersonalesCard cliente={cliente} />
-        </div>
-        <div className="xl:col-span-2">
-          <ClienteDocumentacionCard cliente={cliente} />
-        </div>
-      </div>
-
-      {/* Pólizas asociadas del cliente (el “+” está dentro de esta card) */}
-      <ClientePolizasCard cliente={cliente} onCrearPoliza={abrirCrearPoliza} />
-
-      {/* Modales */}
-      <ClienteEditModal
-        isOpen={modalEditarAbierto}
-        onClose={() => setModalEditarAbierto(false)}
-        onSave={handleSaveCliente}
-        cliente={cliente}
-      />
-
-      <PolizaCreateModal
-        isOpen={modalCrearPolizaAbierto}
-        onClose={() => setModalCrearPolizaAbierto(false)}
-        onSuccess={handlePolizaCreada}
-        clienteId={cliente?.id}
-      />
-
-      <ConfirmModal
-        isOpen={modalEliminarAbierto}
-        onClose={() => setModalEliminarAbierto(false)}
-        nombre={`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()}
-        onConfirm={handleBorrarCliente}
-        // opcional: si ConfirmModal lo usa, puede deshabilitar el botón
-        confirmDisabled={eliminando}
-      />
     </motion.div>
   );
 };

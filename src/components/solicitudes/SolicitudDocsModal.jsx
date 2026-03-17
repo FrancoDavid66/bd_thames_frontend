@@ -8,7 +8,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiUpload, HiCalendar, HiLockClosed } from "react-icons/hi";
+import { HiX, HiUpload, HiCalendar, HiLockClosed, HiShieldCheck } from "react-icons/hi";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
 
 // Definimos variants inline para animaciones profesionales
 const modalVariants = {
@@ -78,7 +81,7 @@ function FileSlot({
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm sm:text-base font-medium">{label}</span>
         {required && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-200 border border-amber-400/30">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-200 border border-amber-400/30 uppercase font-bold tracking-tighter">
             Obligatoria
           </span>
         )}
@@ -119,11 +122,13 @@ function FileSlot({
         </button>
 
         {value && (
-          <span className="text-xs sm:text-sm opacity-80 truncate max-w-[200px] sm:max-w-[260px]">{value.name}</span>
+          <span className="text-xs sm:text-sm opacity-80 truncate max-w-[200px] sm:max-w-[260px]">
+            {value.name}
+          </span>
         )}
       </div>
 
-      {help && <p className="mt-2 text-xs sm:text-sm opacity-70">{help}</p>}
+      {help && <p className="mt-2 text-xs sm:text-sm opacity-70 italic">{help}</p>}
     </motion.div>
   );
 }
@@ -134,6 +139,8 @@ export default function SolicitudDocsModal({
   onConfirm,
   initial = {},
 }) {
+  const { user } = useAuth(); // 🚀 Obtenemos usuario
+  
   // ----- Estado de cada slot (un archivo por vez) -----
   const [PATENTE, setPATENTE] = useState(null);
   const [ENTORNO, setENTORNO] = useState(null);
@@ -161,30 +168,25 @@ export default function SolicitudDocsModal({
     setREGISTRO(initial.REGISTRO || null);
     setCEDULA_VERDE(initial.CEDULA_VERDE || null);
 
-    // Acepto tanto ISO como dd/mm/aaaa
     const vtoIso = initial.REGISTRO_vencimiento || "";
     setREGISTRO_VTO_DMY(
       vtoIso && /^\d{4}-\d{2}-\d{2}$/.test(vtoIso) ? fmtDMY(vtoIso) : (initial.REGISTRO_vto_dmy || "")
     );
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, initial]);
 
   const puedeConfirmar = useMemo(() => {
-    // Fotos obligatorias
     if (!PATENTE || !ENTORNO) return false;
-    // Si cargaron REGISTRO, debemos tener vencimiento
     if (REGISTRO && !toISO(REGISTRO_VTO_DMY)) return false;
     return true;
   }, [PATENTE, ENTORNO, REGISTRO, REGISTRO_VTO_DMY]);
 
   const handleConfirm = () => {
-    // Construimos el payload que espera el endpoint crear-completo (serializer)
     const fotos = {};
     const put = (key, file, extras = {}) => {
       if (!file) return;
-      fotos[key] = { file, ...extras }; // el padre se encarga de subir (Cloudinary) y mapear a url/public_id
+      fotos[key] = { file, ...extras };
     };
 
-    // FOTOS vehículo
     put("PATENTE", PATENTE);
     put("ENTORNO", ENTORNO);
     put("FRENTE", FRENTE);
@@ -193,7 +195,6 @@ export default function SolicitudDocsModal({
     put("TRASERA", TRASERA);
     put("VIN", VIN);
 
-    // DOCUMENTOS vigentes
     put("REGISTRO", REGISTRO, { vencimiento: toISO(REGISTRO_VTO_DMY) || null });
     put("CEDULA_VERDE", CEDULA_VERDE);
 
@@ -212,7 +213,7 @@ export default function SolicitudDocsModal({
       >
         {/* Backdrop */}
         <motion.div
-          className="absolute inset-0 bg-black/60"
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           onClick={onClose}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -225,148 +226,140 @@ export default function SolicitudDocsModal({
           initial="initial"
           animate="animate"
           exit="exit"
-          className="relative w-full max-w-md sm:max-w-4xl mx-auto rounded-2xl border border-white/10 bg-[#1b1630] p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
+          className="relative w-full max-w-md sm:max-w-4xl mx-auto rounded-3xl border border-white/10 bg-[#0b0f1e] p-4 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh] scrollbar-hide"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4 sm:mb-5">
-            <div className="flex items-center gap-2">
-              <span className="text-base sm:text-lg font-semibold">Nueva solicitud (wizard)</span>
-              <span className="text-xs sm:text-sm opacity-80">· Imágenes &amp; Docs</span>
+          {/* Header Blindado */}
+          <div className="flex items-center justify-between mb-6 sm:mb-8 border-b border-white/5 pb-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-lg sm:text-xl font-black text-white uppercase tracking-tighter">Wizard de Onboarding</span>
+                <HiShieldCheck className="text-emerald-400 text-xl" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white/40">Imágenes &amp; Documentación</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase border border-emerald-500/20">
+                  Sucursal: {user?.perfil?.oficina_nombre || 'Local'}
+                </span>
+              </div>
             </div>
             <motion.button
               onClick={onClose}
-              className="p-2 rounded-lg border border-white/10 transition-colors hover:bg-white/10"
-              title="Cerrar"
+              className="h-10 w-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 transition-all hover:bg-white/10 text-white/50 hover:text-white"
               variants={buttonVariants}
               whileHover="hover"
               whileTap="tap"
             >
-              <HiX className="w-5 h-5" />
+              <HiX className="w-6 h-6" />
             </motion.button>
           </div>
 
           {/* FOTOS del vehículo */}
-          <motion.section className="mb-5 sm:mb-6" variants={sectionVariants} initial="initial" animate="animate">
-            <div className="flex items-center gap-2 mb-2 sm:mb-3">
-              <HiLockClosed className="text-amber-300" />
-              <h3 className="text-sm sm:text-base font-semibold">Fotos del vehículo (partes)</h3>
+          <motion.section className="mb-8" variants={sectionVariants} initial="initial" animate="animate">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/20">
+                <HiLockClosed className="text-amber-300 text-lg" />
+              </div>
+              <h3 className="text-sm sm:text-lg font-bold text-white uppercase tracking-tight">Inspección Fotográfica (Vehículo)</h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <FileSlot
-                id="slot-patente"
-                label="Patente (obligatoria) *"
-                required
-                value={PATENTE}
-                onChange={setPATENTE}
-              />
-              <FileSlot
-                id="slot-entorno"
-                label="Entorno (obligatoria) *"
-                required
-                value={ENTORNO}
-                onChange={setENTORNO}
-              />
-              <FileSlot id="slot-frente" label="Frente" value={FRENTE} onChange={setFRENTE} />
-              <FileSlot id="slot-lizq" label="Lateral izq." value={LATERAL_IZQ} onChange={setLATERAL_IZQ} />
-              <FileSlot id="slot-lder" label="Lateral der." value={LATERAL_DER} onChange={setLATERAL_DER} />
-              <FileSlot id="slot-trasera" label="Trasera" value={TRASERA} onChange={setTRASERA} />
-              <FileSlot id="slot-vin" label="VIN / chasis" value={VIN} onChange={setVIN} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <FileSlot id="slot-patente" label="Patente" required value={PATENTE} onChange={setPATENTE} />
+              <FileSlot id="slot-entorno" label="Entorno General" required value={ENTORNO} onChange={setENTORNO} />
+              <FileSlot id="slot-frente" label="Vista de Frente" value={FRENTE} onChange={setFRENTE} />
+              <FileSlot id="slot-lizq" label="Lateral Izquierdo" value={LATERAL_IZQ} onChange={setLATERAL_IZQ} />
+              <FileSlot id="slot-lder" label="Lateral Derecho" value={LATERAL_DER} onChange={setLATERAL_DER} />
+              <FileSlot id="slot-trasera" label="Vista Trasera" value={TRASERA} onChange={setTRASERA} />
+              <FileSlot id="slot-vin" label="VIN / Chasis" value={VIN} onChange={setVIN} />
             </div>
 
-            <p className="mt-2 text-xs sm:text-sm opacity-70">
-              Las fotos obligatorias son <b>Patente</b> y <b>Entorno</b>.
+            <p className="mt-3 text-[10px] text-white/30 uppercase tracking-widest font-black ml-1">
+              * Los archivos de patente y entorno son requisitos críticos para la aprobación.
             </p>
           </motion.section>
 
-          {/* DOCUMENTOS del vehículo (vigentes) */}
-          <motion.section className="mb-5 sm:mb-6" variants={sectionVariants} initial="initial" animate="animate">
-            <div className="flex items-center gap-2 mb-2 sm:mb-3">
-              <HiLockClosed className="text-amber-300" />
-              <h3 className="text-sm sm:text-base font-semibold">Documentos del vehículo</h3>
+          {/* DOCUMENTOS del vehículo */}
+          <motion.section className="mb-8" variants={sectionVariants} initial="initial" animate="animate">
+            <div className="flex items-center gap-3 mb-4">
+               <div className="p-2 rounded-xl bg-sky-400/10 border border-sky-400/20">
+                <HiShieldCheck className="text-sky-300 text-lg" />
+              </div>
+              <h3 className="text-sm sm:text-lg font-bold text-white uppercase tracking-tight">Documentación de Respaldo</h3>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
-              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FileSlot
                   id="slot-registro"
-                  label="Registro de conducir"
+                  label="Licencia de Conducir"
                   value={REGISTRO}
                   onChange={setREGISTRO}
                   accept=".jpg,.jpeg,.png,.pdf"
-                  help="Adjuntá una foto o PDF del registro. Si lo cargás, es obligatorio indicar su vencimiento."
+                  help="Obligatorio si se adjunta la licencia."
                 />
                 <FileSlot
                   id="slot-cedula-verde"
-                  label="Cédula verde"
+                  label="Cédula Verde"
                   value={CEDULA_VERDE}
                   onChange={setCEDULA_VERDE}
                   accept=".jpg,.jpeg,.png,.pdf"
                 />
               </div>
 
-              {/* Vencimiento SOLO para REGISTRO */}
+              {/* Vencimiento Registro */}
               <motion.div
-                className="rounded-xl border border-white/10 bg-white/[0.04] p-3 sm:p-4"
+                className="rounded-xl border border-white/10 bg-black/40 p-4 shadow-inner"
                 variants={slotVariants}
-                initial="initial"
-                animate="animate"
-                whileHover="hover"
-                whileTap="tap"
               >
-                <label className="text-sm sm:text-base font-medium flex items-center gap-2 mb-2">
-                  <HiCalendar className="opacity-80" />
-                  Vencimiento Registro de conducir
+                <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2 mb-3">
+                  <HiCalendar className="text-sky-400 text-lg" />
+                  Vencimiento de Licencia
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <input
                     placeholder="dd/mm/aaaa"
                     value={REGISTRO_VTO_DMY}
                     onChange={(e) => {
-                      // máscara simple dd/mm/aaaa solo dígitos
                       const raw = (e.target.value || "").replace(/\D/g, "").slice(0, 8);
                       const dd = raw.slice(0, 2);
                       const mm = raw.slice(2, 4);
                       const yyyy = raw.slice(4, 8);
-                      const out = [dd, mm, yyyy].filter(Boolean).join("/");
-                      setREGISTRO_VTO_DMY(out);
+                      setREGISTRO_VTO_DMY([dd, mm, yyyy].filter(Boolean).join("/"));
                     }}
-                    className="w-full bg-transparent text-sm sm:text-base border border-white/10 rounded-lg px-3 py-2"
+                    className="w-full bg-white/5 text-white font-bold text-sm border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-sky-500/50 transition-all"
                   />
                 </div>
-                <p className="mt-2 text-xs sm:text-sm opacity-70">
-                  Solo requerido si adjuntás el Registro.
+                <p className="mt-3 text-[9px] text-white/30 italic">
+                  Requerido para el cálculo de vigencia.
                 </p>
               </motion.div>
             </div>
           </motion.section>
 
-          {/* Footer */}
-          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Footer de Acciones */}
+          <div className="mt-10 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <motion.button
               onClick={onClose}
-              className="w-full sm:w-auto px-4 py-2 sm:py-3 rounded-xl border border-white/10 transition-colors hover:bg-white/10"
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl border border-white/10 text-white/60 font-bold uppercase text-xs transition-all hover:bg-white/5 hover:text-white"
               variants={buttonVariants}
               whileHover="hover"
               whileTap="tap"
             >
-              Cancelar
+              Cancelar Proceso
             </motion.button>
             <motion.button
               onClick={handleConfirm}
               disabled={!puedeConfirmar}
               className={cn(
-                "w-full sm:w-auto px-4 py-2 sm:py-3 rounded-xl font-semibold transition",
+                "w-full sm:w-auto px-12 py-3 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl",
                 puedeConfirmar
-                  ? "bg-amber-500/90 hover:bg-amber-500 text-neutral-900"
-                  : "bg-white/10 opacity-60 cursor-not-allowed"
+                  ? "bg-emerald-500 text-neutral-900 shadow-emerald-500/20 hover:scale-105 active:scale-95"
+                  : "bg-white/5 text-white/20 border border-white/5 cursor-not-allowed"
               )}
-              title={!puedeConfirmar ? "Completá lo obligatorio" : "Siguiente"}
               variants={buttonVariants}
               whileHover={puedeConfirmar ? "hover" : "initial"}
               whileTap={puedeConfirmar ? "tap" : "initial"}
             >
-              Siguiente
+              Confirmar &amp; Siguiente
             </motion.button>
           </div>
         </motion.div>

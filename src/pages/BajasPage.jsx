@@ -1,4 +1,4 @@
-// src/pages/BajasPage.js
+// src/pages/BajasPage.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +10,10 @@ import {
   HiPaperAirplane,
   HiClipboardList,
   HiCheckCircle,
+  HiFilter,
+  HiLightningBolt,
+  HiSearch,
+  HiCalendar,
 } from "react-icons/hi";
 import ExcelJS from "exceljs";
 
@@ -17,15 +21,18 @@ import {
   fetchBajas,
   fetchBajasOficinas,
   fetchBajasCounters,
+  fetchBajasGlobalCounters,
   selectBajas,
   selectBajasCount,
   selectBajasOficinas,
   selectBajasCounters,
+  selectBajasGlobalCounters,
   apiGet,
   apiAction,
 } from "../store/slices/bajasSlice";
 
 import BajasTable from "../components/bajas/BajasTable";
+import { useAuth } from "../context/AuthContext";
 
 const STATUS = {
   ENVIAR: "PENDIENTE_ENVIO",
@@ -74,48 +81,26 @@ function formatDateTime(isoString) {
   });
 }
 
-function StatusBadge({ status }) {
-  const s = String(status || "");
-  if (s === "REALIZADA")
-    return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-        Realizada
-      </span>
-    );
-  if (s === "ENVIADA")
-    return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
-        Enviada
-      </span>
-    );
-  if (s === "PENDIENTE_ENVIO")
-    return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-500/15 text-red-300 border border-red-500/30">
-        Pendiente
-      </span>
-    );
-  if (!s)
-    return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-700 text-slate-300 border border-slate-600">
-        Nuevo
-      </span>
-    );
-  return (
-    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white border border-white/20">
-      {s}
-    </span>
-  );
-}
-
 export default function BajasPage() {
   const dispatch = useDispatch();
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
   const items = useSelector(selectBajas);
   const totalItemsCount = useSelector(selectBajasCount);
   const oficinas = useSelector(selectBajasOficinas);
-  const globalKpis = useSelector(selectBajasCounters);
+  
+  // 🚀 Obtenemos ambas estadísticas
+  const sucursalKpis = useSelector(selectBajasCounters) || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
+  const adminGlobalKpis = useSelector(selectBajasGlobalCounters) || { total: 0, pendiente_envio: 0, enviada: 0, realizada: 0 };
 
-  const [oficina, setOficina] = useState(() => localStorage.getItem(LS.oficina) || "");
+  const [oficina, setOficina] = useState(() => {
+    if (!isWebAdmin && user?.perfil?.oficina) {
+      return String(user.perfil.oficina.id || user.perfil.oficina);
+    }
+    return localStorage.getItem(LS.oficina) || "";
+  });
+
   const [compania, setCompania] = useState("");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState(STATUS.ENVIAR);
@@ -131,8 +116,6 @@ export default function BajasPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-
-  // ✅ NUEVO: loading para Excel total
   const [excelAllLoading, setExcelAllLoading] = useState(false);
 
   const companiasUnicas = useMemo(() => {
@@ -140,11 +123,21 @@ export default function BajasPage() {
     return Array.from(new Set(names)).sort();
   }, [items]);
 
-  const loadGlobalTotals = useCallback(() => {
-    dispatch(fetchBajasCounters({ dias: umbralDias }));
-  }, [dispatch, umbralDias]);
+  const loadGlobalTotals = useCallback((opts = {}) => {
+    const ofi = opts.oficina !== undefined ? opts.oficina : (!isWebAdmin && user?.perfil?.oficina ? String(user.perfil.oficina.id || user.perfil.oficina) : oficina);
+    const cia = opts.compania !== undefined ? opts.compania : compania;
+    const d = opts.umbralDias !== undefined ? opts.umbralDias : umbralDias;
+    const q = opts.search !== undefined ? opts.search : search;
 
-  // ✅ FIX: acepta overrides para no depender del setState en el mismo click
+    // 1. Cargamos las KPIs con filtro (Sucursal seleccionada)
+    dispatch(fetchBajasCounters({ dias: d, oficina: ofi, compania: cia, search: q, include_canceladas: "1" }));
+    
+    // 2. Si es Admin, cargamos las KPIs Maestras (Sin mandar el filtro de oficina)
+    if (isWebAdmin) {
+      dispatch(fetchBajasGlobalCounters({ dias: d, compania: cia, search: q, include_canceladas: "1" }));
+    }
+  }, [dispatch, umbralDias, oficina, compania, search, isWebAdmin, user]);
+
   const loadTableData = useCallback(
     (opts = {}) => {
       const o = opts?.overrides || {};
@@ -152,7 +145,11 @@ export default function BajasPage() {
       const cia = o.compania ?? compania;
       const dias = o.umbralDias ?? umbralDias;
       const q = o.search ?? search;
-      const ofi = o.oficina ?? oficina;
+      
+      const ofi = !isWebAdmin && user?.perfil?.oficina 
+                  ? String(user.perfil.oficina.id || user.perfil.oficina) 
+                  : (o.oficina ?? oficina);
+      
       const pg = o.page ?? page;
       const ps = o.pageSize ?? pageSize;
 
@@ -165,29 +162,26 @@ export default function BajasPage() {
             search: q,
             dias,
             include_finalizadas: "0",
+            include_canceladas: "1", 
             compania: cia || "",
             baja_estado: tab && tab !== "TODAS" ? tab : "",
           },
           force: !!opts.force,
         })
       );
-
-      loadGlobalTotals();
+      loadGlobalTotals({ oficina: ofi, compania: cia, umbralDias: dias, search: q });
     },
-    [dispatch, page, pageSize, oficina, search, umbralDias, compania, activeTab, loadGlobalTotals]
+    [dispatch, page, pageSize, oficina, search, umbralDias, compania, activeTab, loadGlobalTotals, isWebAdmin, user]
   );
 
-  useEffect(() => {
-    loadTableData();
-  }, [loadTableData]);
-
-  useEffect(() => {
-    dispatch(fetchBajasOficinas());
-  }, [dispatch]);
-
-  useEffect(() => {
-    localStorage.setItem(LS.oficina, oficina);
-  }, [oficina]);
+  useEffect(() => { loadTableData(); }, [loadTableData]);
+  useEffect(() => { dispatch(fetchBajasOficinas()); }, [dispatch]);
+  
+  useEffect(() => { 
+    if (isWebAdmin) {
+      localStorage.setItem(LS.oficina, oficina); 
+    }
+  }, [oficina, isWebAdmin]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -216,21 +210,15 @@ export default function BajasPage() {
       data.sort((a, b) => {
         let valA = a[sortConfig.key];
         let valB = b[sortConfig.key];
-
-        if (typeof valA === "string") {
-          return sortConfig.direction === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        }
+        if (typeof valA === "string") return sortConfig.direction === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
         return sortConfig.direction === "asc" ? valA - valB : valB - valA;
       });
     }
-
     return data;
   }, [items, sortConfig]);
 
   const filtered = enriched.filter(
-    (x) =>
-      (activeTab === "TODAS" || x._bajaStatus === activeTab) &&
-      (compania === "" || x.compania === compania)
+    (x) => (activeTab === "TODAS" || x._bajaStatus === activeTab) && (compania === "" || x.compania === compania)
   );
 
   const totalPages = Math.ceil(totalItemsCount / pageSize) || 1;
@@ -248,122 +236,67 @@ export default function BajasPage() {
     try {
       const data = await apiGet("bajas/historial/");
       if (data) setHistoryData(data.results || data);
-    } catch (e) {
-      console.error("Error cargando historial", e);
-    } finally {
-      setIsHistoryLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsHistoryLoading(false); }
   };
 
   const updateBajaStatus = async (idsArray, nuevoEstado) => {
     try {
-      await Promise.all(
-        idsArray.map((id) => apiAction(`bajas/operativo/${id}/estado/`, "POST", { estado: nuevoEstado }))
-      );
+      await Promise.all(idsArray.map((id) => apiAction(`bajas/operativo/${id}/estado/`, "POST", { estado: nuevoEstado })));
       setSelectedIds(new Set());
       loadTableData({ force: true });
-    } catch (e) {
-      console.error("Error sincronizando estado:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  // ✅ EXCEL: genera archivo
   const generateAndDownloadExcel = async (rows) => {
     if (!rows || rows.length === 0) return;
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Bajas por Mora");
-
-    const headers = ["Nombre y Apellido", "Patente", "Número de Póliza", "Compañía"];
-    const headerRow = sheet.addRow(headers);
-
-    headerRow.eachCell((cell) => {
+    sheet.addRow(["Nombre y Apellido", "Patente", "Número de Póliza", "Compañía"]).eachCell(cell => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF059669" } };
       cell.font = { color: { argb: "FFFFFFFF" }, bold: true };
-      cell.alignment = { horizontal: "center" };
     });
-
-    rows.forEach((p) => {
-      sheet.addRow([
-        p._clienteNombre || `${p?.cliente_apellido || ""} ${p?.cliente_nombre || ""}`.trim() || "Asegurado",
-        p.patente || "S/D",
-        p.numero_poliza || "S/N",
-        p.compania || "S/D",
-      ]);
-    });
-
+    rows.forEach(p => sheet.addRow([p._clienteNombre || "Asegurado", p.patente || "S/D", p.numero_poliza || "S/N", p.compania || "S/D"]));
     sheet.columns = [{ width: 35 }, { width: 15 }, { width: 25 }, { width: 25 }];
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
+    link.href = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
     link.setAttribute("download", `Bajas_${activeTab}_${new Date().toLocaleDateString()}.xlsx`);
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   };
 
-  // ✅ NUEVO: traer TODO lo del tab (sin paginar) para que coincida con la TARJETA
   const fetchAllForActiveTab = useCallback(async () => {
-    // Igual a counters: solo dias + baja_estado (no oficina/compañía/search)
     const tab = activeTab && activeTab !== "TODAS" ? activeTab : "";
-    const baseParams = {
-      dias: umbralDias,
-      include_finalizadas: "0",
-      ...(tab ? { baja_estado: tab } : {}),
-      page: "1",
-      page_size: "500",
-    };
+    
+    const ofi = !isWebAdmin && user?.perfil?.oficina 
+                ? String(user.perfil.oficina.id || user.perfil.oficina) 
+                : oficina;
 
-    let pageN = 1;
-    let all = [];
+    const baseParams = { dias: umbralDias, include_finalizadas: "0", include_canceladas: "1", oficina: ofi, ...(tab ? { baja_estado: tab } : {}), page: "1", page_size: "500" };
+    let pageN = 1, all = [];
     for (;;) {
       const data = await apiGet("bajas/operativo/", { ...baseParams, page: String(pageN) });
       const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
       all = all.concat(results);
-
-      // corte: si DRF paginado trae next
-      if (data && typeof data === "object" && "next" in data) {
-        if (!data.next) break;
-      } else {
-        // fallback por tamaño
-        if (results.length < Number(baseParams.page_size)) break;
-      }
-
+      if (data?.next ? !data.next : results.length < Number(baseParams.page_size)) break;
       pageN += 1;
-      if (pageN > 2000) break; // guard-rail
+      if (pageN > 2000) break;
     }
     return all;
-  }, [activeTab, umbralDias]);
+  }, [activeTab, umbralDias, isWebAdmin, user, oficina]);
 
   const handleExcelTotalTab = async () => {
     try {
       setExcelAllLoading(true);
       const allRows = await fetchAllForActiveTab();
-
-      // enriquecemos nombre para el excel (igual que tu enriched)
-      const hoy = new Date();
-      const rows = allRows.map((p) => {
-        const proximaImpaga = parseDateRobusta(p.min_vto_impaga || p.proxima_vencimiento_impaga);
-        const diasMora = proximaImpaga ? daysBetween(hoy, proximaImpaga) : 0;
-        const { nombre } = getClienteInfo(p);
-        return { ...p, _clienteNombre: nombre, _diasMora: diasMora };
-      });
-
+      const rows = allRows.map(p => ({ ...p, _clienteNombre: getClienteInfo(p).nombre }));
       await generateAndDownloadExcel(rows);
-    } catch (e) {
-      console.error("Error exportando Excel total:", e);
-      alert(`Error exportando Excel total: ${e?.message || e}`);
-    } finally {
-      setExcelAllLoading(false);
-    }
+    } catch (e) { alert(`Error: ${e?.message}`); } finally { setExcelAllLoading(false); }
   };
 
   const executeAction = async () => {
     const { type, ids } = confirmModal;
-    const safeIds = ids.map((id) => String(id));
-    const rowsToExport = enriched.filter((p) => safeIds.includes(String(p.id)));
-
+    const safeIds = ids.map(id => String(id));
+    const rowsToExport = enriched.filter(p => safeIds.includes(String(p.id)));
     if (type === "EXCEL") {
       await generateAndDownloadExcel(rowsToExport);
       setSelectedIds(new Set());
@@ -371,325 +304,296 @@ export default function BajasPage() {
       await updateBajaStatus(safeIds, type);
       if (includeExcel) await generateAndDownloadExcel(rowsToExport);
     }
-    setConfirmModal({ isOpen: false, type: "", ids: [] });
+    closeConfirmModal();
   };
 
-  const openConfirmModal = (type, ids) => {
-    if (!ids || ids.length === 0) return;
-    setIncludeExcel(false);
-    setConfirmModal({ isOpen: true, type, ids });
-  };
-
-  const closeConfirmModal = () => {
-    setConfirmModal({ isOpen: false, type: "", ids: [] });
-    setIncludeExcel(false);
-  };
+  const openConfirmModal = (type, ids) => { setIncludeExcel(false); setConfirmModal({ isOpen: true, type, ids }); };
+  const closeConfirmModal = () => { setConfirmModal({ isOpen: false, type: "", ids: [] }); setIncludeExcel(false); };
 
   const MODAL_CONFIG = {
-    EXCEL: {
-      title: "Confirmar Descarga",
-      desc: "Generar Excel profesional con Nombre, Patente, Póliza y Compañía (solo seleccionadas).",
-      btnText: "Sí, Descargar Excel",
-      btnColor: "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20",
-      icon: <HiDownload className="text-xl" />,
-      iconBg: "bg-emerald-500/20 text-emerald-400",
-    },
-    ENVIADA: {
-      title: "Marcar como Enviadas",
-      desc: "¿Mover estas pólizas a la pestaña de 'Enviadas'?",
-      btnText: "Sí, Marcar Enviadas",
-      btnColor: "bg-amber-600 hover:bg-amber-500 shadow-amber-500/20",
-      icon: <HiPaperAirplane className="text-xl" />,
-      iconBg: "bg-amber-500/20 text-amber-400",
-    },
-    REALIZADA: {
-      title: "Marcar como Realizadas",
-      desc: "¿Confirmas que la compañía ya procesó definitivamente la baja?",
-      btnText: "Sí, Marcar Realizadas",
-      btnColor: "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20",
-      icon: <HiCheckCircle className="text-xl" />,
-      iconBg: "bg-blue-500/20 text-blue-400",
-    },
+    EXCEL: { title: "Confirmar Descarga", desc: "Generar Excel profesional con las pólizas seleccionadas.", btnText: "Descargar Excel", btnColor: "bg-emerald-500 hover:bg-emerald-400", icon: <HiDownload />, iconBg: "bg-emerald-500/20 text-emerald-400" },
+    ENVIADA: { title: "Marcar Enviadas", desc: "¿Mover estas pólizas a la pestaña de 'Enviadas'?", btnText: "Sí, Marcar", btnColor: "bg-amber-500 hover:bg-amber-400", icon: <HiPaperAirplane />, iconBg: "bg-amber-500/20 text-amber-400" },
+    REALIZADA: { title: "Marcar Realizadas", desc: "¿Confirmas que la compañía ya procesó definitivamente la baja?", btnText: "Sí, Realizada", btnColor: "bg-sky-500 hover:bg-sky-400", icon: <HiCheckCircle />, iconBg: "bg-sky-500/20 text-sky-400" },
   };
 
   const activeModalConfig = MODAL_CONFIG[confirmModal.type] || MODAL_CONFIG.EXCEL;
 
+  // 🚀 REUTILIZABLE: Dibujador de Fila de KPIs
+  const renderKpiRow = (kpisData, title) => (
+    <div className="mb-6">
+      {title && <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">{title}</h3>}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { id: STATUS.ENVIAR, label: "Pendientes", val: kpisData?.pendiente_envio || 0, col: "from-rose-500/25 to-rose-900/5", text: "text-rose-400", border: "border-rose-500/30" },
+          { id: STATUS.ENVIADA, label: "Enviadas", val: kpisData?.enviada || 0, col: "from-amber-500/25 to-amber-900/5", text: "text-amber-400", border: "border-amber-500/30" },
+          { id: STATUS.REALIZADA, label: "Realizadas", val: kpisData?.realizada || 0, col: "from-emerald-500/25 to-emerald-900/5", text: "text-emerald-400", border: "border-emerald-500/30" },
+          { id: "TODAS", label: "Universo", val: kpisData?.total || 0, col: "from-slate-500/25 to-slate-900/5", text: "text-slate-100", border: "border-slate-500/30" },
+        ].map((t) => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => { setActiveTab(t.id); setPage(1); setSelectedIds(new Set()); loadTableData({ force: true, overrides: { activeTab: t.id, page: 1 } }); }}
+              className={`relative overflow-hidden p-6 rounded-[2rem] border transition-all duration-300 group ${
+                isActive ? `bg-gradient-to-br ${t.col} ${t.border} scale-[1.03] shadow-2xl ring-2 ring-white/5` : "bg-slate-900/40 border-white/5 opacity-70 hover:opacity-100"
+              }`}
+            >
+              <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 mb-2">{t.label}</div>
+              <div className={`text-4xl font-black ${t.text} drop-shadow-sm`}>{t.val}</div>
+              {isActive && (
+                  <div className="absolute -bottom-2 -right-2 p-4 bg-white/5 rounded-full blur-2xl opacity-50 group-hover:scale-150 transition-transform duration-700" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-5">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 pb-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 py-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white">Bajas por Mora</h1>
-          <p className="text-sm text-slate-400">Total global en la empresa: {globalKpis.total} pólizas detectadas.</p>
+          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <div className="p-2 bg-rose-500/20 rounded-2xl border border-rose-500/30">
+              <HiLightningBolt className="text-rose-500 text-2xl" />
+            </div>
+            Bajas por Mora
+          </h1>
+          <p className="text-slate-400 font-medium mt-1 ml-1">
+            Pólizas candidatas a baja por deuda vencida. 
+            {!isWebAdmin && <span className="text-sky-400 ml-2 font-bold uppercase tracking-widest text-[10px]">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
+          </p>
         </div>
         <button
           onClick={handleOpenHistory}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-200 rounded-lg hover:bg-slate-700 transition font-semibold"
+          className="group flex items-center gap-2 px-6 py-3 bg-slate-900/50 border border-white/10 text-white rounded-2xl hover:bg-sky-500/10 hover:border-sky-500/30 transition-all font-bold shadow-xl backdrop-blur-md"
         >
-          <HiClipboardList className="text-xl text-blue-400" /> Ver Historial
+          <HiClipboardList className="text-xl text-sky-400 group-hover:scale-110 transition-transform" /> Ver Historial
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { id: STATUS.ENVIAR, label: "Pendientes", val: globalKpis.pendiente_envio, col: "text-red-400" },
-          { id: STATUS.ENVIADA, label: "Enviadas", val: globalKpis.enviada, col: "text-amber-400" },
-          { id: STATUS.REALIZADA, label: "Realizadas", val: globalKpis.realizada, col: "text-emerald-400" },
-          { id: "TODAS", label: "Totales", val: globalKpis.total, col: "text-white" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => {
-              setActiveTab(t.id);
-              setPage(1);
-              setSelectedIds(new Set());
-              loadTableData({ force: true, overrides: { activeTab: t.id, page: 1 } });
-            }}
-            className={`p-4 rounded-xl border transition ${
-              activeTab === t.id ? "bg-white/10 border-white/30" : "bg-white/5 border-transparent opacity-60"
-            }`}
-          >
-            <div className="text-xs uppercase text-slate-400">{t.label}</div>
-            <div className={`text-3xl font-bold ${t.col}`}>{t.val}</div>
-          </button>
-        ))}
-      </div>
+      {/* 🚀 DOBLE FILA DE KPIs PARA EL ADMIN, FILA ÚNICA PARA SUCURSAL */}
+      {isWebAdmin ? (
+        <>
+          {renderKpiRow(adminGlobalKpis, "Métricas Globales (Toda la Empresa)")}
+          {renderKpiRow(sucursalKpis, "Métricas por Sucursal (Según filtro actual)")}
+        </>
+      ) : (
+        renderKpiRow(sucursalKpis, null)
+      )}
 
-      {/* ✅ Barra acciones */}
-      <div className="bg-slate-900 p-4 rounded-xl border border-white/10 flex flex-wrap gap-3 items-center">
-        <div className="text-sm font-semibold text-slate-300 mr-auto">{selectedIds.size} pólizas seleccionadas</div>
-
-        {/* ✅ NUEVO: Excel total para que coincida con la tarjeta */}
-        <button
-          disabled={excelAllLoading || (activeTab === "TODAS")}
-          onClick={handleExcelTotalTab}
-          className="px-5 py-2.5 bg-white/10 text-white font-bold rounded-lg hover:bg-white/15 disabled:opacity-30 transition flex items-center gap-2"
-          title={activeTab === "TODAS" ? "Elegí una tarjeta (Pendientes/Enviadas/Realizadas) para exportar el total" : "Exporta TODO el total del tab (sin paginación) igual que la tarjeta"}
-        >
-          <HiDownload className="text-xl" />
-          {excelAllLoading ? "Exportando total..." : "Excel (Total de la Tarjeta)"}
-        </button>
-
-        {/* Excel seleccionadas (igual que antes) */}
-        <button
-          disabled={!selectedIds.size}
-          onClick={() => openConfirmModal("EXCEL", Array.from(selectedIds))}
-          className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500 disabled:opacity-30 transition flex items-center gap-2"
-          title="Exporta solo lo seleccionado (normalmente una página)"
-        >
-          <HiDownload className="text-xl" /> Descargar Excel (Seleccionadas)
-        </button>
-
-        <button
-          disabled={!selectedIds.size}
-          onClick={() => openConfirmModal("ENVIADA", Array.from(selectedIds))}
-          className="px-4 py-2 bg-amber-600/20 text-amber-200 rounded-lg disabled:opacity-30 hover:bg-amber-600/30 transition"
-        >
-          Marcar Enviadas
-        </button>
-        <button
-          disabled={!selectedIds.size}
-          onClick={() => openConfirmModal("REALIZADA", Array.from(selectedIds))}
-          className="px-4 py-2 bg-blue-600/20 text-blue-200 rounded-lg disabled:opacity-30 hover:bg-blue-600/30 transition"
-        >
-          Marcar Realizadas
-        </button>
-        {selectedIds.size > 0 && (
-          <button onClick={() => setSelectedIds(new Set())} className="text-slate-400 hover:text-white text-sm underline">
-            Limpiar
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-900/50 p-4 rounded-xl border border-white/5">
-        <select
-          value={oficina}
-          onChange={(e) => {
-            const v = e.target.value;
-            setOficina(v);
-            setPage(1);
-            loadTableData({ force: true, overrides: { oficina: v, page: 1 } });
-          }}
-          className="md:col-span-3 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-2"
-        >
-          <option value="">Todas las Oficinas</option>
-          {oficinas.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nombre}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={compania}
-          onChange={(e) => {
-            const v = e.target.value;
-            setCompania(v);
-            setPage(1);
-            loadTableData({ force: true, overrides: { compania: v, page: 1 } });
-          }}
-          className="md:col-span-3 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-2"
-        >
-          <option value="">Todas las Compañías</option>
-          {companiasUnicas.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-
-        <input
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Buscar por patente, cliente..."
-          className="md:col-span-4 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-2"
-        />
-
-        <input
-          type="number"
-          value={umbralDias}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setUmbralDias(v);
-            setPage(1);
-            loadTableData({ force: true, overrides: { umbralDias: v, page: 1 } });
-          }}
-          className="md:col-span-2 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-2"
-          title="Mora ≥ N días"
-        />
-      </div>
-
-      <div className="space-y-4">
-        <BajasTable
-          items={filtered}
-          selectedIds={selectedIds}
-          sortConfig={sortConfig}
-          onSort={(key) =>
-            setSortConfig((prev) => ({
-              key,
-              direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
-            }))
-          }
-          onToggleSelect={(id) =>
-            setSelectedIds((prev) => {
-              const n = new Set(prev);
-              n.has(String(id)) ? n.delete(String(id)) : n.add(String(id));
-              return n;
-            })
-          }
-          onSelectAllVisible={(check) => setSelectedIds(check ? new Set(filtered.map((x) => String(x.id))) : new Set())}
-          onComposeEmail={(ids) => openConfirmModal("EXCEL", ids)}
-          onSetStatus={(id, s) => openConfirmModal(s, [id])}
-        />
-
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-4 rounded-xl border border-white/10">
+      <div className="bg-slate-900/40 backdrop-blur-2xl p-6 rounded-[3rem] border border-white/10 shadow-inner space-y-6">
+        
+        <div className="flex flex-col lg:flex-row gap-5 items-center justify-between border-b border-white/5 pb-6">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-400">Filas:</span>
+             <div className="flex -space-x-2">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-8 w-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-sky-400" />
+                    </div>
+                ))}
+             </div>
+             <div className="text-xs font-black text-sky-400 tracking-tighter bg-sky-400/10 px-4 py-2 rounded-full border border-sky-400/20">
+                {selectedIds.size} SELECCIONADAS
+             </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-center">
+            <button
+              disabled={excelAllLoading || activeTab === "TODAS"}
+              onClick={handleExcelTotalTab}
+              className="px-5 py-2.5 bg-white/5 text-white text-xs font-bold rounded-2xl border border-white/10 hover:bg-white/10 hover:border-white/20 disabled:opacity-30 transition-all flex items-center gap-2"
+            >
+              <HiDownload className="text-lg text-emerald-400" /> Excel (Todo {activeTab})
+            </button>
+            <button
+              disabled={!selectedIds.size}
+              onClick={() => openConfirmModal("EXCEL", Array.from(selectedIds))}
+              className="px-5 py-2.5 bg-emerald-500/10 text-emerald-400 text-xs font-black rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/20 disabled:opacity-20 transition flex items-center gap-2"
+            >
+              <HiDownload className="text-lg" /> Exportar Selección
+            </button>
+            <button
+              disabled={!selectedIds.size}
+              onClick={() => openConfirmModal("ENVIADA", Array.from(selectedIds))}
+              className="px-5 py-2.5 bg-amber-500/10 text-amber-400 text-xs font-black rounded-2xl border border-amber-500/20 hover:bg-amber-500/20 disabled:opacity-20 transition"
+            >
+              Marcar Enviadas
+            </button>
+            <button
+              disabled={!selectedIds.size}
+              onClick={() => openConfirmModal("REALIZADA", Array.from(selectedIds))}
+              className="px-5 py-2.5 bg-sky-500/10 text-sky-400 text-xs font-black rounded-2xl border border-sky-500/20 hover:bg-sky-500/20 disabled:opacity-20 transition"
+            >
+              Marcar Realizadas
+            </button>
+            {selectedIds.size > 0 && (
+                <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 text-slate-500 hover:text-white text-xs font-bold uppercase transition-colors">Limpiar</button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          
+          {isWebAdmin ? (
+            <div className="md:col-span-3 group">
+              <div className="relative">
+                  <select
+                  value={oficina}
+                  onChange={(e) => { setOficina(e.target.value); setPage(1); loadTableData({ force: true, overrides: { oficina: e.target.value, page: 1 } }); }}
+                  className="w-full bg-slate-950/40 border border-white/10 text-white rounded-[1.25rem] pl-11 pr-4 py-3.5 text-sm focus:border-sky-500/50 outline-none transition-all appearance-none cursor-pointer"
+                  >
+                      <option value="">Todas las Oficinas</option>
+                      {oficinas.map((o) => <option key={o.id} value={o.id} className="bg-slate-900">{o.nombre}</option>)}
+                  </select>
+                  <HiFilter className="absolute left-4 top-4 text-slate-500 group-focus-within:text-sky-400 transition-colors" />
+              </div>
+            </div>
+          ) : (
+             <div className="md:col-span-3 hidden md:block"></div>
+          )}
+
+          <div className="md:col-span-3 group">
+            <div className="relative">
+                <select
+                value={compania}
+                onChange={(e) => { setCompania(e.target.value); setPage(1); loadTableData({ force: true, overrides: { compania: e.target.value, page: 1 } }); }}
+                className="w-full bg-slate-950/40 border border-white/10 text-white rounded-[1.25rem] pl-11 pr-4 py-3.5 text-sm focus:border-sky-500/50 outline-none transition-all appearance-none cursor-pointer"
+                >
+                    <option value="">Todas las Compañías</option>
+                    {companiasUnicas.map((c) => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
+                </select>
+                <HiFilter className="absolute left-4 top-4 text-slate-500 group-focus-within:text-sky-400 transition-colors" />
+            </div>
+          </div>
+
+          <div className="md:col-span-4 relative group">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar patente, nombre o póliza..."
+              className="w-full bg-slate-950/40 border border-white/10 text-white rounded-[1.25rem] pl-11 pr-4 py-3.5 text-sm focus:border-sky-500/50 focus:bg-slate-950/60 outline-none transition-all placeholder:text-slate-600"
+            />
+            <HiSearch className="absolute left-4 top-4 text-slate-600 group-focus-within:text-sky-400 transition-colors" />
+          </div>
+
+          <div className="md:col-span-2 relative group">
+            <input
+              type="number"
+              value={umbralDias}
+              onChange={(e) => { setUmbralDias(Number(e.target.value)); setPage(1); loadTableData({ force: true, overrides: { umbralDias: Number(e.target.value), page: 1 } }); }}
+              className="w-full bg-slate-950/40 border border-white/10 text-white rounded-[1.25rem] pl-11 pr-4 py-3.5 text-sm focus:border-rose-500/50 outline-none font-bold transition-all"
+            />
+            <HiCalendar className="absolute left-4 top-4 text-slate-600 group-focus-within:text-rose-400 transition-colors" />
+            <span className="absolute right-4 top-4 text-[9px] font-black text-slate-600 group-focus-within:text-rose-400 uppercase tracking-tighter pointer-events-none">DÍAS</span>
+          </div>
+        </div>
+
+        <div className="relative min-h-[400px]">
+          <BajasTable
+            items={filtered}
+            selectedIds={selectedIds}
+            sortConfig={sortConfig}
+            onSort={handleSort}
+            onToggleSelect={(id) => setSelectedIds(prev => { 
+                const n = new Set(prev); 
+                const sid = String(id);
+                n.has(sid) ? n.delete(sid) : n.add(sid); 
+                return n; 
+            })}
+            onSelectAllVisible={(check) => setSelectedIds(check ? new Set(filtered.map(x => String(x.id))) : new Set())}
+            onComposeEmail={(ids) => openConfirmModal("EXCEL", ids)}
+            onSetStatus={(id, s) => openConfirmModal(s, [id])}
+          />
+        </div>
+
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-8 border-t border-white/5">
+          <div className="flex items-center gap-4 bg-slate-950/30 px-6 py-3 rounded-[2rem] border border-white/5 shadow-lg">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Mostrar</span>
             <select
               value={pageSize}
-              onChange={(e) => {
-                const ps = Number(e.target.value);
-                setPageSize(ps);
-                setPage(1);
-                loadTableData({ force: true, overrides: { pageSize: ps, page: 1 } });
-              }}
-              className="bg-slate-800 border border-white/10 text-white text-sm rounded-lg px-2 py-1"
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); loadTableData({ force: true, overrides: { pageSize: Number(e.target.value), page: 1 } }); }}
+              className="bg-transparent text-white text-sm font-black outline-none cursor-pointer hover:text-sky-400 transition-colors"
             >
-              {[15, 30, 50, 100].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
+              {[15, 30, 50, 100].map(n => <option key={n} value={n} className="bg-slate-900">{n} filas</option>)}
             </select>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 group">
             <button
               disabled={page === 1}
-              onClick={() => {
-                const np = page - 1;
-                setPage(np);
-                loadTableData({ force: true, overrides: { page: np } });
-              }}
-              className="p-2 bg-white/5 rounded-lg hover:bg-white/10 disabled:opacity-20 text-white transition-colors"
+              onClick={() => { const np = page - 1; setPage(np); loadTableData({ force: true, overrides: { page: np } }); }}
+              className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl"
             >
-              <HiChevronLeft className="text-xl" />
+              <HiChevronLeft size={22} />
             </button>
-            <span className="text-sm text-white font-medium">
-              Página {page} de {totalPages}
-            </span>
+            <div className="flex flex-col items-center min-w-[100px]">
+                <span className="text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest text-center">Pagina</span>
+                <div className="text-xl font-black text-white bg-white/5 px-6 py-1 rounded-xl border border-white/10">
+                    {page} <span className="text-slate-600 mx-1">/</span> {totalPages}
+                </div>
+            </div>
             <button
               disabled={page >= totalPages}
-              onClick={() => {
-                const np = page + 1;
-                setPage(np);
-                loadTableData({ force: true, overrides: { page: np } });
-              }}
-              className="p-2 bg-white/5 rounded-lg hover:bg-white/10 disabled:opacity-20 text-white transition-colors"
+              onClick={() => { const np = page + 1; setPage(np); loadTableData({ force: true, overrides: { page: np } }); }}
+              className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl"
             >
-              <HiChevronRight className="text-xl" />
+              <HiChevronRight size={22} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Historial Modal */}
       <AnimatePresence>
         {historyModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-slate-900 border border-white/20 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0, y: 40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 40 }}
+              className="bg-slate-900 border border-white/10 rounded-[3rem] w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)]"
             >
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-slate-800">
-                <div className="flex items-center gap-3 text-white">
-                  <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
-                    <HiClipboardList className="text-xl" />
+              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-sky-500/10 via-transparent to-transparent">
+                <div className="flex items-center gap-5">
+                  <div className="p-4 rounded-3xl bg-sky-500/20 text-sky-400 shadow-inner ring-1 ring-sky-500/30">
+                    <HiClipboardList className="text-3xl" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-lg">Historial de Movimientos</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Registro automático de cambios de estado</p>
+                    <h2 className="font-black text-2xl text-white tracking-tight">Registro Maestro</h2>
+                    <p className="text-xs text-slate-500 font-black uppercase tracking-[0.2em] mt-1">Sincronización de Estados de Baja</p>
                   </div>
                 </div>
-                <button onClick={() => setHistoryModalOpen(false)} className="text-slate-400 hover:text-white transition p-1">
-                  <HiX className="text-xl" />
-                </button>
+                <button onClick={() => setHistoryModalOpen(false)} className="text-slate-600 hover:text-white transition-colors p-3 hover:bg-white/5 rounded-full"><HiX size={32} /></button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 bg-slate-950/50">
+              <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar bg-slate-950/20">
                 {isHistoryLoading ? (
-                  <div className="flex justify-center items-center h-40">
-                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex flex-col justify-center items-center h-60 gap-4">
+                    <div className="w-14 h-14 border-[6px] border-sky-500/10 border-t-sky-500 rounded-full animate-spin shadow-lg"></div>
+                    <span className="text-[11px] font-black text-sky-500/70 uppercase tracking-[0.3em] animate-pulse">Obteniendo logs...</span>
                   </div>
                 ) : historyData.length === 0 ? (
-                  <div className="text-center text-slate-500 py-10 italic">Aún no hay movimientos registrados en el historial.</div>
+                  <div className="text-center text-slate-700 py-32 font-bold uppercase tracking-widest text-sm italic">Sin datos registrados.</div>
                 ) : (
-                  <div className="space-y-3">
-                    {historyData.map((mov) => (
-                      <div
-                        key={mov.id}
-                        className="bg-slate-800/50 border border-white/10 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
-                      >
-                        <div className="flex-1">
-                          <div className="text-xs text-slate-400 mb-1">{formatDateTime(mov.fecha)}</div>
-                          <div className="font-semibold text-white text-sm">
-                            {mov.cliente_nombre} <span className="text-slate-400 font-normal">| {mov.compania}</span>
-                          </div>
-                          <div className="text-xs text-blue-400 mt-1">
-                            Póliza: {mov.poliza_numero || "S/N"} • Patente: {mov.patente || "S/D"}
-                          </div>
+                  historyData.map((mov) => (
+                    <div key={mov.id} className="bg-slate-800/20 border border-white/5 rounded-[2rem] p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-slate-800/40 hover:border-white/10 transition-all shadow-sm group">
+                      <div className="flex-1">
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <div className="h-1 w-1 rounded-full bg-sky-500" />
+                            {formatDateTime(mov.fecha)}
                         </div>
-                        <div className="flex items-center gap-3 bg-slate-900 py-2 px-3 rounded-lg border border-white/5">
-                          <StatusBadge status={mov.estado_anterior} />
-                          <HiChevronRight className="text-slate-500" />
-                          <StatusBadge status={mov.estado_nuevo} />
+                        <div className="font-black text-slate-100 text-lg group-hover:text-white transition-colors">{mov.cliente_nombre} <span className="text-slate-500 font-medium text-sm ml-2">| {mov.compania}</span></div>
+                        <div className="text-xs text-sky-400/80 font-black mt-2 bg-sky-500/5 w-fit px-4 py-1 rounded-xl border border-sky-500/10 uppercase tracking-tighter">
+                          Póliza: {mov.poliza_numero || "S/N"} • Patente: {mov.patente || "S/D"}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex items-center gap-4 bg-slate-950/60 p-4 rounded-3xl border border-white/5 shadow-inner">
+                        <StatusBadge status={mov.estado_anterior} />
+                        <HiChevronRight className="text-slate-700 text-xl" />
+                        <StatusBadge status={mov.estado_nuevo} />
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </motion.div>
@@ -697,53 +601,33 @@ export default function BajasPage() {
         )}
       </AnimatePresence>
 
-      {/* Confirmación Modal */}
       <AnimatePresence>
         {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-md">
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-white/20 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-white/10 rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.6)]"
             >
-              <div className="p-5 border-b border-white/10 flex justify-between items-start bg-slate-800">
-                <div className="flex items-center gap-3 text-white">
-                  <div className={`p-2 rounded-lg ${activeModalConfig.iconBg}`}>{activeModalConfig.icon}</div>
-                  <div>
-                    <h2 className="font-bold text-lg">{activeModalConfig.title}</h2>
-                    <p className="text-xs text-slate-400 mt-1">{confirmModal.ids.length} seleccionada/s</p>
-                  </div>
+              <div className="p-8 border-b border-white/5 bg-slate-800/30 flex items-center gap-5">
+                <div className={`p-4 rounded-3xl ${activeModalConfig.iconBg} shadow-2xl ring-1 ring-white/5`}>{activeModalConfig.icon}</div>
+                <div>
+                  <h2 className="font-black text-xl text-white tracking-tight">{activeModalConfig.title}</h2>
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mt-1">{confirmModal.ids.length} SELECCIONADAS</p>
                 </div>
-                <button onClick={closeConfirmModal} className="text-slate-400 hover:text-white transition p-1">
-                  <HiX className="text-xl" />
-                </button>
               </div>
-              <div className="p-6">
-                <p className="text-sm text-slate-300 leading-relaxed">{activeModalConfig.desc}</p>
+              <div className="p-8 space-y-6">
+                <p className="text-base text-slate-400 leading-relaxed font-semibold">{activeModalConfig.desc}</p>
                 {confirmModal.type !== "EXCEL" && (
-                  <label className="mt-4 flex items-center gap-3 cursor-pointer p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition">
-                    <input
-                      type="checkbox"
-                      checked={includeExcel}
-                      onChange={(e) => setIncludeExcel(e.target.checked)}
-                      className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
-                    />
-                    <span className="text-sm text-white font-medium">También descargar Excel (Nombre, Patente, Póliza, Cía)</span>
+                  <label className="flex items-center gap-5 p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-3xl cursor-pointer hover:bg-emerald-500/10 transition-all group">
+                    <input type="checkbox" checked={includeExcel} onChange={(e) => setIncludeExcel(e.target.checked)} className="w-6 h-6 accent-emerald-500 rounded-xl cursor-pointer" />
+                    <span className="text-[13px] text-emerald-100 font-black uppercase tracking-tight group-hover:text-emerald-400 transition-colors">Generar reporte Excel simultáneamente</span>
                   </label>
                 )}
               </div>
-              <div className="p-4 bg-slate-950/50 border-t border-white/5 flex justify-end gap-3">
-                <button onClick={closeConfirmModal} className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-lg transition">
-                  Cancelar
-                </button>
-                <button
-                  onClick={executeAction}
-                  className={`px-5 py-2 text-white text-sm font-bold rounded-lg transition shadow-lg ${
-                    includeExcel ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20" : activeModalConfig.btnColor
-                  }`}
-                >
-                  {includeExcel ? "Marcar y Descargar" : activeModalConfig.btnText}
+              <div className="p-6 bg-slate-950/60 border-t border-white/5 flex gap-4">
+                <button onClick={closeConfirmModal} className="flex-1 px-6 py-4 bg-white/5 hover:bg-white/10 text-white text-xs font-black uppercase rounded-2xl transition tracking-widest border border-white/5">Cerrar</button>
+                <button onClick={executeAction} className={`flex-[2] px-6 py-4 text-white text-xs font-black uppercase rounded-2xl transition shadow-2xl tracking-[0.15em] ${includeExcel ? "bg-emerald-600 hover:bg-emerald-500" : activeModalConfig.btnColor}`}>
+                  {includeExcel ? "PROCESAR Y DESCARGAR" : activeModalConfig.btnText}
                 </button>
               </div>
             </motion.div>

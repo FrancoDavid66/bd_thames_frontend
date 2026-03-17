@@ -92,19 +92,38 @@ function qsFrom(params = {}) {
   return s ? `?${s}` : "";
 }
 
-/** Fetch con fallback: ABS → (si falla) REL */
+/** * 🚀 FIX 401: Fetch con fallback inyectando TOKEN JWT
+ * ABS → (si falla) REL 
+ */
 async function fetchWithFallback(path, opts = {}) {
-  const absUrl = ROOT ? `${ROOT}${REL_BASE}${path}` : null;
-  if (absUrl) {
+  // 🚀 Usamos 'access_token' que es la llave que genera el login
+  const token = localStorage.getItem('access_token');
+  
+  const secureOpts = { 
+    ...opts,
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    }
+  };
+
+  const absUrl = ROOT ? `${ROOT}${path}` : null;
+  
+  // Si el path ya empieza con /api/, lo usamos tal cual
+  const finalPath = path.startsWith('/api/') ? path : `${REL_BASE}${path}`;
+  const finalAbsUrl = ROOT ? `${ROOT}${finalPath}` : null;
+
+  if (finalAbsUrl) {
     try {
-      const r = await fetch(absUrl, opts);
+      const r = await fetch(finalAbsUrl, secureOpts);
       return r;
     } catch (e) {
-      console.warn("[PolizasAPI] ABS falló, uso relativo:", absUrl, e?.name, e?.message);
+      console.warn("[PolizasAPI] ABS falló, uso relativo:", finalAbsUrl, e?.name, e?.message);
     }
   }
-  const relUrl = `${REL_BASE}${path}`;
-  return fetch(relUrl, opts);
+  return fetch(finalPath, secureOpts);
 }
 
 /** JSON con fallback + diagnóstico de red */
@@ -114,11 +133,8 @@ async function fetchJSONWithFallback(path, opts = {}) {
     return await jsonOrThrow(r);
   } catch (e) {
     if (e instanceof TypeError) {
-      const triedAbs = ROOT ? `${ROOT}${REL_BASE}${path}` : null;
-      const triedRel = `${REL_BASE}${path}`;
       console.error("[PolizasAPI] Network/Fetch error:", {
-        triedAbs,
-        triedRel,
+        path,
         location: typeof window !== "undefined" ? window.location.href : "n/a",
       });
     }
@@ -141,20 +157,16 @@ export const PolizasAPI = {
 
   // --------- Crear / actualizar / borrar ---------
   async create(payload) {
-    // ⛏️ Dejá que pase 'fecha_vencimiento'. Solo filtramos 'cantidad_cuotas' (legacy).
+    // 🚀 Permitimos que viaje el campo 'oficina' para el Admin
     const { cantidad_cuotas, ...body } = payload || {};
     return fetchJSONWithFallback(`/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(body),
     });
   },
   async patch(id, payload) {
     return fetchJSONWithFallback(`/${id}/`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(payload),
     });
   },
@@ -162,37 +174,28 @@ export const PolizasAPI = {
     return this.patch(id, payload);
   },
   async remove(id) {
-    try {
-      const r = await fetchWithFallback(`/${id}/`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (r.status === 204) return true;
-      return await jsonOrThrow(r);
-    } catch (e) {
-      if (e instanceof TypeError) {
-        const triedAbs = ROOT ? `${ROOT}${REL_BASE}/${id}/` : null;
-        const triedRel = `${REL_BASE}/${id}/`;
-        console.error("[PolizasAPI] Network/Fetch error (DELETE):", { triedAbs, triedRel });
-      }
-      throw e;
-    }
+    const r = await fetchWithFallback(`/${id}/`, {
+      method: "DELETE",
+    });
+    if (r.status === 204) return true;
+    return await jsonOrThrow(r);
+  },
+
+  // --------- 🚀 LISTADO DE OFICINAS (Para el Admin) ---------
+  async listOficinas(params = {}) {
+    return fetchJSONWithFallback(`/api/usuarios/oficinas/${qsFrom(params)}`);
   },
 
   // --------- Renovación ---------
   async renovarPoliza(id, payload) {
     return fetchJSONWithFallback(`/${id}/renovar/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(payload || {}),
     });
   },
   async duplicarRenovacion(id, payload) {
     return fetchJSONWithFallback(`/${id}/duplicar-renovacion/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(payload || {}),
     });
   },
@@ -202,8 +205,6 @@ export const PolizasAPI = {
     if (!polizaId) throw new Error("Falta 'polizaId'");
     return fetchJSONWithFallback(`/${polizaId}/asociar-grua/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(data || {}),
     });
   },
@@ -213,17 +214,13 @@ export const PolizasAPI = {
     if (!polizaId) throw new Error("Falta 'polizaId'");
     return fetchJSONWithFallback(`/${polizaId}/set-cobertura-grua/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ con_grua: !!con_grua }),
     });
   },
 
   // --------- Compañías ---------
   async getCompanias() {
-    return fetchJSONWithFallback(`/companias/?flat=1`, {
-      credentials: "include",
-    }).then((data) => {
+    return fetchJSONWithFallback(`/companias/?flat=1`).then((data) => {
       if (Array.isArray(data)) return data;
       const arr = Array.isArray(data?.results) ? data.results : Array.isArray(data?.data) ? data.data : [];
       return arr
@@ -250,17 +247,13 @@ export const PolizasAPI = {
 
     return fetchJSONWithFallback(`/${id}/set-foto-perfil/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(body),
     });
   },
 
   // --------- Fotos de vehículo ---------
   async getFotosVehiculo({ poliza, ...params }) {
-    return fetchJSONWithFallback(`/fotos/${qsFrom({ poliza, ...params })}`, {
-      credentials: "include",
-    }).then((data) => {
+    return fetchJSONWithFallback(`/fotos/${qsFrom({ poliza, ...params })}`).then((data) => {
       if (data?.results?.length) {
         data.results = data.results.map((it) => ({
           ...it,
@@ -273,34 +266,20 @@ export const PolizasAPI = {
   async crearFotoVehiculo(foto) {
     return fetchJSONWithFallback(`/fotos/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(foto),
     });
   },
   async borrarFotoVehiculo(id) {
-    try {
-      const r = await fetchWithFallback(`/fotos/${id}/`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (r.status === 204) return true;
-      return await jsonOrThrow(r);
-    } catch (e) {
-      if (e instanceof TypeError) {
-        const triedAbs = ROOT ? `${ROOT}${REL_BASE}/fotos/${id}/` : null;
-        const triedRel = `${REL_BASE}/fotos/${id}/`;
-        console.error("[PolizasAPI] Network/Fetch error (DELETE foto):", { triedAbs, triedRel });
-      }
-      throw e;
-    }
+    const r = await fetchWithFallback(`/fotos/${id}/`, {
+      method: "DELETE",
+    });
+    if (r.status === 204) return true;
+    return await jsonOrThrow(r);
   },
 
   // --------- Documentos ---------
   async getDocumentos(polizaId, params = {}) {
-    return fetchJSONWithFallback(`/documentos/${qsFrom({ poliza: polizaId, ...params })}`, {
-      credentials: "include",
-    }).then((data) => {
+    return fetchJSONWithFallback(`/documentos/${qsFrom({ poliza: polizaId, ...params })}`).then((data) => {
       if (data?.results?.length) {
         data.results = data.results.map((it) => ({
           ...it,
@@ -313,82 +292,37 @@ export const PolizasAPI = {
   async crearDocumento(payload) {
     return fetchJSONWithFallback(`/documentos/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(payload),
     });
   },
   async updateDocumento(id, patch) {
     return fetchJSONWithFallback(`/documentos/${id}/`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(patch),
     });
   },
   async deleteDocumento(id) {
-    try {
-      const r = await fetchWithFallback(`/documentos/${id}/`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (r.status === 204) return true;
-      return await jsonOrThrow(r);
-    } catch (e) {
-      if (e instanceof TypeError) {
-        const triedAbs = ROOT ? `${ROOT}${REL_BASE}/documentos/${id}/` : null;
-        const triedRel = `${REL_BASE}/documentos/${id}/`;
-        console.error("[PolizasAPI] Network/Fetch error (DELETE doc):", { triedAbs, triedRel });
-      }
-      throw e;
-    }
+    const r = await fetchWithFallback(`/documentos/${id}/`, {
+      method: "DELETE",
+    });
+    if (r.status === 204) return true;
+    return await jsonOrThrow(r);
   },
 
   // --------- KPIs y resúmenes ---------
   async kpis(params = {}) {
-    return fetchJSONWithFallback(`/kpis/${qsFrom(params)}`, {
-      credentials: "include",
-    });
+    return fetchJSONWithFallback(`/kpis/${qsFrom(params)}`);
   },
   async resumenEstados() {
-    return fetchJSONWithFallback(`/resumen-estados/`, {
-      credentials: "include",
-    });
+    return fetchJSONWithFallback(`/resumen-estados/`);
   },
 
   // --------- Auxiliares ---------
   async versionesPorPatente(patente) {
-    return fetchJSONWithFallback(`/versiones-por-patente/${qsFrom({ patente })}`, {
-      credentials: "include",
-    });
+    return fetchJSONWithFallback(`/versiones-por-patente/${qsFrom({ patente })}`);
   },
   async cuotasDePoliza(polizaId) {
-    return fetchJSONWithFallback(`/${polizaId}/cuotas/`, {
-      credentials: "include",
-    });
-  },
-
-  // --------- Filtros financieros ---------
-  async listAlDia(extra = {}) {
-    return this.list({ ...extra, estado_financiero: "al_dia", estado: "activa" });
-  },
-  async listMora(bucket = "mora_1_30", extra = {}) {
-    return this.list({ ...extra, estado_financiero: bucket, estado: "activa" });
-  },
-
-  // --------- Filtros por vencimiento ---------
-  async listPorVencimiento({ desde, hasta, ...extra } = {}) {
-    return this.list({
-      ...extra,
-      fecha_vencimiento_desde: desde || undefined,
-      fecha_vencimiento_hasta: hasta || undefined,
-    });
-  },
-  async listVencidasUltimosDias(dias = 7, extra = {}) {
-    return this.list({ ...extra, estado: "vencida", vencidas_ultimos_dias: Number(dias) });
-  },
-  async listVencidasMasDeDias(dias = 30, extra = {}) {
-    return this.list({ ...extra, estado: "vencida", vencidas_mas_de_dias: Number(dias) });
+    return fetchJSONWithFallback(`/${polizaId}/cuotas/`);
   },
 
   // --------- Envío masivo ---------
@@ -396,8 +330,6 @@ export const PolizasAPI = {
     const { page, page_size, ...clean } = filtros || {};
     return fetchJSONWithFallback(`/enviar-mensajes-cuotas/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ filtros: clean }),
     });
   },
@@ -414,13 +346,6 @@ export const PolizasAPI = {
     return { poliza, documentos, fotos };
   },
 
-  /* ====== NUEVOS HELPERS PARA EL PANEL UNIFICADO (vehículo + documentos) ====== */
-
-  /** Alias semántico: igual a refreshPack */
-  async getPack(polizaId) {
-    return this.refreshPack(polizaId);
-  },
-
   /** Lista documentos + fotos en una sola llamada */
   async listarMediaVehiculo(polizaId) {
     const [docsRaw, fotosRaw] = await Promise.all([
@@ -432,12 +357,6 @@ export const PolizasAPI = {
     return { documentos, fotos };
   },
 
-  /**
-   * Sube/Registra una FOTO de vehículo.
-   * Espera que ya tengas la URL (ej. subida a Cloudinary).
-   * data: { url, public_id }  | también acepta {url} solo.
-   * meta: { tipo, lado } opcional.
-   */
   async subirFotoVehiculo(polizaId, data = {}, meta = {}) {
     if (!polizaId) throw new Error("Falta 'polizaId'");
     const { url, public_id = "" } = data || {};
@@ -452,11 +371,6 @@ export const PolizasAPI = {
     return this.crearFotoVehiculo(payload);
   },
 
-  /**
-   * Sube/Registra un DOCUMENTO del vehículo.
-   * data: { url, public_id }
-   * meta: { tipo, vencimiento }  (vencimiento en 'YYYY-MM-DD' si aplica)
-   */
   async subirDocVehiculo(polizaId, data = {}, meta = {}) {
     if (!polizaId) throw new Error("Falta 'polizaId'");
     const { url, public_id = "" } = data || {};
@@ -482,27 +396,22 @@ export const PolizasAPI = {
   },
 
   /** Actualiza un documento (ej. vencimiento/tipo/nombre) */
-  async actualizarDocumento(polizaId, docId, patch = {}) { // polizaId no requerido por el endpoint, se mantiene por consistencia
+  async actualizarDocumento(polizaId, docId, patch = {}) {
     if (!docId) throw new Error("Falta 'docId'");
     return this.updateDocumento(docId, patch);
   },
 
   // --------- Cupones de robo ---------
   async listCuponesRobo(params = {}) {
-    return fetchJSONWithFallback(`/cupones-robo/${qsFrom(params)}`, {
-      credentials: "include",
-    });
+    return fetchJSONWithFallback(`/cupones-robo/${qsFrom(params)}`);
   },
   async listCuponesRoboPorPoliza(polizaId, extra = {}) {
     if (!polizaId) throw new Error("Falta 'polizaId'");
     return this.listCuponesRobo({ ...extra, poliza: polizaId });
   },
   async crearCuponRobo(payload) {
-    // Espera: { poliza, periodo_desde, periodo_hasta, estado? }
     return fetchJSONWithFallback(`/cupones-robo/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(payload || {}),
     });
   },
@@ -510,8 +419,6 @@ export const PolizasAPI = {
     if (!id) throw new Error("Falta 'id' del cupón");
     return fetchJSONWithFallback(`/cupones-robo/${id}/`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(patch || {}),
     });
   },

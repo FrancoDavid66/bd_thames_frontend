@@ -15,6 +15,7 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
+import { HiOutlinePresentationChartBar } from "react-icons/hi";
 
 /* ========= Helpers ========= */
 const toNumber = (v) => {
@@ -35,14 +36,14 @@ function buildDailySeries(ingresos = [], egresos = [], days = 30) {
 
   (ingresos || []).forEach((i) => {
     const f = dayjs(i?.fecha);
-    if (f.isValid()) {
+    if (f.isValid() && f.isAfter(start) && f.isBefore(end)) {
       const key = f.format("YYYY-MM-DD");
       if (base[key]) base[key].ingresos += toNumber(i?.monto);
     }
   });
   (egresos || []).forEach((e) => {
     const f = dayjs(e?.fecha);
-    if (f.isValid()) {
+    if (f.isValid() && f.isAfter(start) && f.isBefore(end)) {
       const key = f.format("YYYY-MM-DD");
       if (base[key]) base[key].egresos += toNumber(e?.monto);
     }
@@ -67,14 +68,14 @@ function buildMonthlySeries(ingresos = [], egresos = [], months = 12) {
 
   (ingresos || []).forEach((i) => {
     const f = dayjs(i?.fecha);
-    if (f.isValid()) {
+    if (f.isValid() && f.isAfter(start.subtract(1, 'day'))) {
       const key = f.format("YYYY-MM");
       if (base[key]) base[key].ingresos += toNumber(i?.monto);
     }
   });
   (egresos || []).forEach((e) => {
     const f = dayjs(e?.fecha);
-    if (f.isValid()) {
+    if (f.isValid() && f.isAfter(start.subtract(1, 'day'))) {
       const key = f.format("YYYY-MM");
       if (base[key]) base[key].egresos += toNumber(e?.monto);
     }
@@ -97,18 +98,21 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const p = Object.fromEntries(payload.map((x) => [x.dataKey, x.value]));
   return (
-    <div className="bg-zinc-950/95 border border-zinc-800 text-zinc-50 rounded-xl shadow-lg px-3 py-2 text-[11px]">
-      <div className="font-semibold mb-1">{label}</div>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-emerald-300">
-          Ingresos: ${currencyAR(p.ingresos)}
-        </span>
-        <span className="text-rose-300">
-          Egresos: ${currencyAR(p.egresos)}
-        </span>
-        <span className="text-sky-300">
-          Balance: ${currencyAR(p.balance)}
-        </span>
+    <div className="bg-zinc-950/95 border border-zinc-800 text-zinc-50 rounded-xl shadow-2xl px-4 py-3 text-[11px] backdrop-blur-sm">
+      <div className="font-bold mb-2 text-zinc-300 uppercase tracking-wide border-b border-zinc-800 pb-1">{label}</div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-emerald-400 font-semibold">Ingresos</span>
+          <span className="text-emerald-300 font-bold">${currencyAR(p.ingresos)}</span>
+        </div>
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-rose-400 font-semibold">Egresos</span>
+          <span className="text-rose-300 font-bold">${currencyAR(p.egresos)}</span>
+        </div>
+        <div className="flex justify-between items-center gap-4 pt-1 mt-1 border-t border-zinc-800/50">
+          <span className="text-sky-400 font-semibold">Balance</span>
+          <span className="text-sky-300 font-extrabold">${currencyAR(p.balance)}</span>
+        </div>
       </div>
     </div>
   );
@@ -131,42 +135,42 @@ const BalanceChart = ({
 
   const yMin = useMemo(() => {
     const minVal = Math.min(0, ...data.map((d) => d.balance, 0));
-    // margen inferior cómodo
-    return Math.floor(minVal * 1.1);
+    // margen inferior cómodo para que la línea no toque el borde del gráfico
+    return Math.floor(minVal * 1.2);
   }, [data]);
 
   return (
     <div
       className={`bg-zinc-950/80 border border-zinc-900 rounded-3xl px-4 py-3 sm:px-5 sm:py-4 shadow-lg shadow-black/25 mb-6 ${className}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-sky-500/80 via-sky-500/40 to-emerald-400/60 flex items-center justify-center text-lg">
-            <span>📊</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500/80 via-sky-500/40 to-emerald-400/60 flex items-center justify-center text-white shadow-inner">
+            <HiOutlinePresentationChartBar className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <h3 className="text-sm sm:text-base font-semibold text-zinc-50">
-              Ingresos vs egresos{" "}
-              <span className="text-[11px] text-zinc-400">
-                {range === "12m" ? "por mes" : "por día"}
+            <h3 className="text-sm sm:text-base font-bold text-zinc-50 tracking-tight">
+              Ingresos vs Egresos{" "}
+              <span className="text-[11px] text-zinc-400 font-normal ml-1 bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-800">
+                {range === "12m" ? "Histórico anual" : "Evolución diaria"}
               </span>
             </h3>
-            <p className="text-[11px] text-zinc-500">
-              Visualizá la evolución en el tiempo
+            <p className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">
+              Análisis de flujo de caja y rentabilidad
             </p>
           </div>
         </div>
 
         {/* Selector de rango tipo pill */}
         <div className="flex w-full sm:w-auto">
-          <div className="flex flex-1 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-1 text-[11px] sm:text-xs">
+          <div className="flex flex-1 bg-zinc-950 border border-zinc-800 rounded-2xl p-1 text-[11px] sm:text-xs shadow-inner">
             <button
               type="button"
               onClick={() => setRange("7d")}
-              className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+              className={`flex-1 px-3 py-1.5 rounded-[14px] transition-all font-medium ${
                 range === "7d"
-                  ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-100"
+                  ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
               }`}
             >
               7 días
@@ -174,10 +178,10 @@ const BalanceChart = ({
             <button
               type="button"
               onClick={() => setRange("30d")}
-              className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+              className={`flex-1 px-3 py-1.5 rounded-[14px] transition-all font-medium ${
                 range === "30d"
-                  ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-100"
+                  ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
               }`}
             >
               30 días
@@ -185,10 +189,10 @@ const BalanceChart = ({
             <button
               type="button"
               onClick={() => setRange("12m")}
-              className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+              className={`flex-1 px-3 py-1.5 rounded-[14px] transition-all font-medium ${
                 range === "12m"
-                  ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-100"
+                  ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
               }`}
             >
               12 meses
@@ -197,51 +201,61 @@ const BalanceChart = ({
         </div>
       </div>
 
-      <div className="h-[220px] sm:h-[280px] w-full">
+      <div className="h-[220px] sm:h-[300px] w-full mt-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272f" />
+          <ComposedChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
             <XAxis
               dataKey="label"
-              stroke="#a1a1aa"
-              tick={{ fontSize: 10, fill: "#a1a1aa" }}
+              stroke="#52525b"
+              tick={{ fontSize: 10, fill: "#a1a1aa", fontWeight: 500 }}
+              tickMargin={10}
               interval="preserveStartEnd"
+              axisLine={false}
+              tickLine={false}
             />
             <YAxis
               tickFormatter={(v) => `$${currencyAR(v)}`}
               domain={[yMin, "auto"]}
-              width={72}
-              tick={{ fontSize: 10, fill: "#a1a1aa" }}
+              width={80}
+              tick={{ fontSize: 10, fill: "#71717a", fontWeight: 500 }}
               stroke="#52525b"
+              axisLine={false}
+              tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#27272a', opacity: 0.4 }} />
             <Legend
+              verticalAlign="top"
+              height={36}
+              iconType="circle"
               wrapperStyle={{
-                fontSize: 10,
+                fontSize: 11,
+                fontWeight: 600,
                 color: "#e5e5e5",
               }}
             />
-            {/* Barras */}
-            <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" />
-            <Bar dataKey="egresos" name="Egresos" fill="#f97373" />
-            {/* Línea de balance */}
+            {/* Barras con bordes redondeados arriba */}
+            <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="egresos" name="Egresos" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            {/* Línea de balance más prominente */}
             <Line
               type="monotone"
               dataKey="balance"
-              name="Balance"
-              stroke="#38bdf8"
-              strokeWidth={2}
-              dot={false}
+              name="Balance Neto"
+              stroke="#0ea5e9"
+              strokeWidth={3}
+              dot={{ r: 3, fill: "#0ea5e9", strokeWidth: 0 }}
+              activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
             />
-            {/* Línea 0 para referencia */}
-            <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" />
+            {/* Línea 0 para referencia clara */}
+            <ReferenceLine y={0} stroke="#52525b" strokeWidth={1} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
       {!data?.length && (
-        <div className="text-center text-xs sm:text-sm text-zinc-500 mt-2">
-          Sin datos para el rango seleccionado.
+        <div className="text-center text-xs sm:text-sm text-zinc-500 mt-4 bg-zinc-900/30 py-4 rounded-xl border border-dashed border-zinc-800">
+          No hay datos suficientes para generar el gráfico en este período.
         </div>
       )}
     </div>

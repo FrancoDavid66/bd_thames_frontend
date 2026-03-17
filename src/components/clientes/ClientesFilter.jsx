@@ -1,6 +1,7 @@
 // src/components/clientes/ClientesFilter.jsx
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { HiSearch, HiFilter } from "react-icons/hi";
 
 const ClientesFilter = ({ onFilterText, onFilterEstado }) => {
   const [busqueda, setBusqueda] = useState("");
@@ -20,66 +21,72 @@ const ClientesFilter = ({ onFilterText, onFilterEstado }) => {
   }, [estado, onFilterEstado]);
 
   const estados = [
-    { value: "todos", label: "Todos" },
-    { value: "activos", label: "Activos" },
-    { value: "inactivos", label: "Inactivos" },
+    { value: "todos", label: "Todos los Clientes" },
+    { value: "activos", label: "Con Pólizas Activas" },
+    { value: "inactivos", label: "Sin Pólizas (Inactivos)" },
   ];
 
   return (
     <motion.section
-      className="rounded-2xl bg-gradient-to-br from-neutral-800/80 via-neutral-950 to-black p-[1px] shadow-lg shadow-black/40"
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      className="rounded-2xl bg-white/[0.02] border border-white/10 p-4 sm:p-5 shadow-2xl backdrop-blur-md"
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
     >
-      <div className="bg-neutral-950/95 rounded-2xl px-4 py-3 sm:px-5 sm:py-4 flex flex-col gap-3">
-        {/* Título + resumen (opcional) */}
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-neutral-100">
-              Filtros de clientes
-            </h3>
-            <p className="text-[11px] text-neutral-400">
-              Buscá por nombre, apellido o DNI y filtrá por estado.
-            </p>
-          </div>
+      <div className="flex flex-col gap-4">
+        
+        {/* Título + Resumen */}
+        <div className="flex items-center gap-2">
+           <div className="h-8 w-8 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center">
+             <HiFilter className="text-sm" />
+           </div>
+           <div>
+             <h3 className="text-xs font-black uppercase tracking-widest text-white">
+               Filtros de Búsqueda
+             </h3>
+             <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mt-0.5">
+               Localizá clientes rápidamente en tu base de datos.
+             </p>
+           </div>
         </div>
 
-        {/* Buscador */}
-        <div className="w-full">
-          <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-neutral-500 text-sm">
-              🔍
-            </span>
+        {/* Buscador + Chips (Grid/Flex layout para que respire) */}
+        <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
+          
+          {/* Buscador Principal */}
+          <div className="w-full lg:flex-1 relative group">
+            <HiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-lg group-focus-within:text-sky-400 transition-colors" />
             <input
               type="text"
-              placeholder="Buscar por nombre, apellido o DNI"
-              className="w-full h-11 pl-9 pr-3 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400"
+              placeholder="Buscar por Nombre, Apellido, DNI o CUIT..."
+              className="w-full h-12 pl-11 pr-4 rounded-xl bg-black/40 border border-white/10 text-sm font-bold text-white placeholder:text-white/20 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/30 transition-all shadow-inner"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
           </div>
-        </div>
 
-        {/* Filtro por estado (chips) */}
-        <div className="flex flex-wrap gap-2">
-          {estados.map((opt) => {
-            const active = estado === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setEstado(opt.value)}
-                className={`px-3 py-1.5 rounded-full text-xs sm:text-sm transition border ${
-                  active
-                    ? "bg-primary-500/15 text-primary-200 border-primary-400/40 ring-1 ring-primary-500/40"
-                    : "bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800"
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+          {/* Filtro por estado (Chips) */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <span className="hidden sm:inline-block text-[10px] font-black uppercase tracking-widest text-white/30 mr-2">Estado:</span>
+            {estados.map((opt) => {
+              const active = estado === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setEstado(opt.value)}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    active
+                      ? "bg-sky-500 text-white shadow-lg shadow-sky-900/40"
+                      : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
         </div>
       </div>
     </motion.section>

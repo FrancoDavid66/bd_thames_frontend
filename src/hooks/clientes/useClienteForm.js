@@ -1,72 +1,82 @@
-// src/utils/clientes/useClienteForm.js
-import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { createCliente } from '../../store/slices/clientesSlice';
-import toast from 'react-hot-toast';
+// src/hooks/clientes/useClienteForm.js
+import { useState } from "react";
+import { useDispatch } from "react-redux";
+import toast from "react-hot-toast";
+import { createCliente } from "../../store/slices/clientesSlice";
 
 export const useClienteForm = ({ onClose, onSuccess }) => {
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(false);
+  
+  // 🚀 Estado inicial con el campo 'oficina' incluido para el blindaje multi-tenant
   const [formData, setFormData] = useState({
-    nombre: '',
-    apellido: '',
-    telefono: '',
-    email: '',
-    dni_cuit_cuil: '',
-    direccion: '',
-    localidad: '', // ✅ nuevo campo
-    fecha_nacimiento: '',
+    nombre: "",
+    apellido: "",
+    dni_cuit_cuil: "",
+    telefono: "",
+    email: "",
+    direccion: "",
+    localidad: "",
+    fecha_nacimiento: "",
+    oficina: "", 
   });
 
+  const [loading, setLoading] = useState(false);
+
   const handleChange = (e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
 
-    const camposObligatorios = ['nombre', 'apellido', 'telefono', 'dni_cuit_cuil'];
-    const faltantes = camposObligatorios.filter((campo) => !formData[campo]?.trim());
-
-    if (faltantes.length > 0) {
-      toast.error(`Faltan completar: ${faltantes.join(', ')}`);
+    // Validaciones básicas de campos obligatorios
+    if (!formData.nombre || !formData.apellido || !formData.dni_cuit_cuil || !formData.telefono) {
+      toast.error("Por favor, completa los campos obligatorios (*)");
       return;
     }
 
-    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
-      toast.error('El email no tiene un formato válido');
-      return;
-    }
-
-    const dataAEnviar = {
-      ...formData,
-      nombre: formData.nombre.trim(),
-      apellido: formData.apellido.trim(),
-      telefono: formData.telefono.trim(),
-      dni_cuit_cuil: formData.dni_cuit_cuil.trim(),
-      direccion: formData.direccion.trim(),
-      localidad: formData.localidad.trim(), // ✅ nuevo campo
-      email: formData.email?.trim() || null,
-      fecha_nacimiento: formData.fecha_nacimiento.trim() === '' ? null : formData.fecha_nacimiento,
-    };
+    setLoading(true);
 
     try {
-      setLoading(true);
-      await dispatch(createCliente(dataAEnviar)).unwrap();
-      toast.success('Cliente creado correctamente');
-      onClose();
-      onSuccess();
-    } catch (err) {
-      toast.error('Error al crear cliente');
+      // 🛡️ Limpiamos campos vacíos antes de enviar.
+      // Si 'oficina' es "", no se envía el campo, permitiendo que el Backend 
+      // asigne la oficina del operador por defecto.
+      const payload = Object.fromEntries(
+        Object.entries(formData).filter(([_, v]) => v !== "" && v !== null)
+      );
+
+      // Despachamos la acción de Redux
+      await dispatch(createCliente(payload)).unwrap();
+      
+      // Único Toast de éxito centralizado para evitar spam de notificaciones
+      toast.success("Cliente registrado con éxito");
+      
+      // Reset del formulario a su estado original
+      setFormData({
+        nombre: "", 
+        apellido: "", 
+        dni_cuit_cuil: "", 
+        telefono: "", 
+        email: "", 
+        direccion: "", 
+        localidad: "", 
+        fecha_nacimiento: "", 
+        oficina: ""
+      });
+
+      // Ejecutamos callbacks de cierre y refresco
+      if (onSuccess) onSuccess();
+      if (onClose) onClose();
+
+    } catch (error) {
+      // Manejo de errores dinámico según lo que devuelva el servidor
+      console.error("❌ Error en useClienteForm:", error);
+      toast.error(typeof error === "string" ? error : "Error al crear el cliente");
     } finally {
       setLoading(false);
     }
   };
 
-  return {
-    formData,
-    handleChange,
-    handleSubmit,
-    loading,
-  };
+  return { formData, handleChange, handleSubmit, loading };
 };

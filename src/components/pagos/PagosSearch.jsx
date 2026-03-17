@@ -20,6 +20,8 @@ import {
   clearBuscarCliente,
 } from "../../store/slices/pagosSlice";
 
+import { useAuth } from "../../context/AuthContext"; // 🚀 Importamos el contexto de autenticación
+
 /* Solo dígitos (para DNI) */
 const onlyDigits = (s) => String(s || "").replace(/\D+/g, "");
 
@@ -38,8 +40,19 @@ const isLikelyDni = (raw) => {
   return d.length >= 6 && d.length <= 11 && d === String(raw || "").replace(/\D+/g, "");
 };
 
+// Función auxiliar para mapear el número de oficina a un nombre más legible
+const getOficinaName = (oficinaNumber) => {
+  const map = {
+    "1": "5 Esquinas",
+    "2": "Axion",
+    "3": "Kilómetro 39"
+  };
+  return map[oficinaNumber] || `Oficina ${oficinaNumber}`;
+};
+
 export default function PagosSearch({ onBuscar }) {
   const dispatch = useDispatch();
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario autenticado
 
   const inputRef = useRef(null);
 
@@ -62,6 +75,9 @@ export default function PagosSearch({ onBuscar }) {
     buscarClienteStatus === "loading" ||
     cuotasPolizaStatus === "loading" ||
     cuotasBuscarStatus === "loading";
+
+  // Verificamos si el usuario actual es administrador
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
   useEffect(() => {
     inputRef.current?.focus?.();
@@ -252,8 +268,8 @@ export default function PagosSearch({ onBuscar }) {
     if (!c) return "";
     const dni = String(c?.dni || "").trim();
     const nom = String(c?.nombre_apellido || "").trim();
-    const ofi = String(c?.oficina || "").trim();
-    return [dni, nom, ofi].filter(Boolean).join(" · ");
+    // No agregamos la oficina aquí directamente al texto base
+    return [dni, nom].filter(Boolean).join(" · ");
   }, [buscarClienteData]);
 
   const polizas = useMemo(() => {
@@ -358,8 +374,14 @@ export default function PagosSearch({ onBuscar }) {
               <div className="text-xs uppercase tracking-wide text-neutral-500">
                 Datos del cliente
               </div>
-              <div className="mt-1 text-sm md:text-base text-neutral-100 font-semibold">
-                {clienteLabel || "Cliente"}
+              <div className="mt-1 text-sm md:text-base text-neutral-100 font-semibold flex items-center flex-wrap gap-2">
+                <span>{clienteLabel || "Cliente"}</span>
+                {/* 🚀 BADGE DE SUCURSAL PARA ADMINS */}
+                {isWebAdmin && buscarClienteData?.cliente?.oficina && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 ml-2">
+                    {getOficinaName(String(buscarClienteData.cliente.oficina))}
+                  </span>
+                )}
               </div>
             </div>
 

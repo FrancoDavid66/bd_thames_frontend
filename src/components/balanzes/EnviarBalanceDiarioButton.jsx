@@ -13,6 +13,7 @@ import {
 const EnviarBalanceDiarioButton = ({
   fecha, // opcional 'YYYY-MM-DD'
   destinatario, // opcional
+  oficina, // 🚀 NUEVO: para enviar el balance de una sucursal específica (Admin)
   className = "",
 }) => {
   const dispatch = useDispatch();
@@ -23,7 +24,9 @@ const EnviarBalanceDiarioButton = ({
   const handleEnviar = () => {
     if (envioStatus === "loading") return; // evita doble click
     const hoyAR = fecha || dayjs().format("YYYY-MM-DD"); // enviamos fecha explícita
-    dispatch(enviarBalanceWhatsapp({ fecha: hoyAR, destinatario }));
+    
+    // 🚀 Despachamos también la oficina al thunk
+    dispatch(enviarBalanceWhatsapp({ fecha: hoyAR, destinatario, oficina }));
   };
 
   useEffect(() => {
@@ -48,28 +51,28 @@ const EnviarBalanceDiarioButton = ({
       aria-live="polite"
       title="Enviar resumen de ingresos/egresos por WhatsApp"
       className={`
-        inline-flex items-center justify-center gap-2
-        h-11 px-4 sm:px-5 rounded-2xl
-        text-xs sm:text-sm font-semibold tracking-wide
-        shadow-md shadow-emerald-500/30
-        border border-emerald-300/60
+        inline-flex items-center justify-center gap-2 w-full sm:w-auto
+        h-10 sm:h-11 px-4 sm:px-5 rounded-2xl
+        text-xs sm:text-sm font-bold tracking-wide
+        shadow-lg shadow-emerald-500/20
+        border border-emerald-400/50
         text-white
-        transition
-        focus:outline-none focus:ring-2 focus:ring-emerald-400/80 focus:ring-offset-2 focus:ring-offset-zinc-900
+        transition-all active:scale-[0.98]
+        focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2 focus:ring-offset-zinc-950
         ${
           isLoading
-            ? "bg-emerald-700 cursor-not-allowed opacity-80"
-            : "bg-emerald-500 hover:bg-emerald-400"
+            ? "bg-emerald-600/80 cursor-not-allowed opacity-80"
+            : "bg-emerald-500 hover:bg-emerald-400 hover:shadow-emerald-500/30"
         }
         ${className}
       `}
     >
       <HiPaperAirplane
-        className={`text-sm sm:text-base ${
-          isLoading ? "animate-pulse opacity-90" : ""
+        className={`text-base transition-transform ${
+          isLoading ? "animate-pulse opacity-90 -translate-y-0.5 translate-x-0.5" : "rotate-90 sm:rotate-0"
         }`}
       />
-      {isLoading ? "Enviando…" : "Enviar balance por WhatsApp"}
+      <span>{isLoading ? "Enviando…" : "Enviar balance por WhatsApp"}</span>
     </button>
   );
 };

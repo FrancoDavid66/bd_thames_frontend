@@ -1,31 +1,20 @@
 // src/hooks/solicitudes/useCatalogos.js
 import { useCallback, useEffect, useRef, useState } from "react";
+import axios from "axios";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
+const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
 
-// ← TU LISTA + NRE
-const FALLBACK_COMPANIAS = [
-  { id: "AGROSALTA", nombre: "Agrosalta" },
-  { id: "ATM", nombre: "ATM" },
-  { id: "DIGNA", nombre: "Digna" },
-  { id: "EQUIDAD", nombre: "Equidad" },
-  { id: "FEDERACION_PATRONAL", nombre: "Federacion Patronal" },
-  { id: "PROVIDENCIA", nombre: "Providencia" },
-  { id: "NRE", nombre: "NRE" },
-];
-
-const FALLBACK_COBERTURAS = [
-  { id: "TERCEROS", nombre: "Responsabilidad Civil" },
-  { id: "TERCEROS_COMPLETO", nombre: "Terceros completo" },
-  { id: "TODO_RIESGO_FRANQ", nombre: "Todo riesgo con franquicia" },
-  { id: "TODO_RIESGO_FULL", nombre: "Todo riesgo (full)" },
-];
+// 🔐 Helper para inyectar el token de seguridad
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("access_token") || localStorage.getItem("token") || localStorage.getItem("jwt");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 /* ===================== cache módulo (no Redux) ===================== */
 const CACHE = {
   ts: 0,
-  companias: FALLBACK_COMPANIAS,
-  coberturas: FALLBACK_COBERTURAS,
+  companias: [],  // 🚀 Cero hardcodeo
+  coberturas: [], // 🚀 Cero hardcodeo
 };
 const TTL_MS = 10 * 60 * 1000; // 10 min
 
@@ -34,8 +23,8 @@ function isFresh() {
 }
 
 function normCompanias(data) {
-  if (!Array.isArray(data)) return FALLBACK_COMPANIAS;
-  return data
+  const arr = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+  return arr
     .map((x) =>
       typeof x === "string"
         ? { id: x.toUpperCase().replace(/\s+/g, "_"), nombre: x }
@@ -43,52 +32,50 @@ function normCompanias(data) {
     )
     .filter((x) => x && (x.id || x.nombre))
     .map((x) => ({
-      id: String(x.id ?? x.nombre).toUpperCase().replace(/\s+/g, "_"),
+      id: String(x.nombre ?? x.id),
       nombre: String(x.nombre ?? x.id),
     }));
 }
 
 function normCoberturas(data) {
-  if (!Array.isArray(data)) return FALLBACK_COBERTURAS;
-  return data
+  const arr = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+  return arr
     .filter((x) => x && (x.id || x.nombre))
     .map((x) =>
       typeof x === "string"
         ? { id: x.toUpperCase().replace(/\s+/g, "_"), nombre: x }
         : {
-            id: String(x.id ?? x.nombre).toUpperCase().replace(/\s+/g, "_"),
+            id: String(x.nombre ?? x.id),
             nombre: String(x.nombre ?? x.id),
           }
     );
 }
 
 async function fetchCatalogos({ signal } = {}) {
-  // 2 requests en paralelo
-  const [rComp, rCob] = await Promise.all([
-    fetch(`${API_BASE}/polizas/companias/`, { signal }),
-    fetch(`${API_BASE}/polizas/coberturas/`, { signal }),
-  ]);
+  try {
+    const [rComp, rCob] = await Promise.all([
+      axios.get(`${API_BASE}/companias/`, { headers: getAuthHeaders(), signal }).catch(() => ({ data: [] })),
+      axios.get(`${API_BASE}/coberturas/`, { headers: getAuthHeaders(), signal }).catch(() => ({ data: [] })),
+    ]);
 
-  const comp = rComp.ok ? normCompanias(await rComp.json()) : FALLBACK_COMPANIAS;
-  const cob = rCob.ok ? normCoberturas(await rCob.json()) : FALLBACK_COBERTURAS;
+    const comp = normCompanias(rComp.data);
+    const cob = normCoberturas(rCob.data);
 
-  CACHE.ts = Date.now();
-  CACHE.companias = comp;
-  CACHE.coberturas = cob;
+    CACHE.ts = Date.now();
+    CACHE.companias = comp;
+    CACHE.coberturas = cob;
 
-  return { companias: comp, coberturas: cob };
+    return { companias: comp, coberturas: cob };
+  } catch (error) {
+    console.error("Error cargando catálogos:", error);
+    return { companias: [], coberturas: [] };
+  }
 }
 
-/**
- * Uso:
- * const { companias, coberturas, ensureLoaded, status } = useCatalogos({ auto:false });
- * // cuando abrís el modal:
- * await ensureLoaded();
- */
 export function useCatalogos({ auto = false } = {}) {
   const [companias, setCompanias] = useState(CACHE.companias);
   const [coberturas, setCoberturas] = useState(CACHE.coberturas);
-  const [status, setStatus] = useState(isFresh() ? "ready" : "idle"); // idle|loading|ready|error
+  const [status, setStatus] = useState(isFresh() ? "ready" : "idle"); 
 
   const abortRef = useRef(null);
   const inFlightRef = useRef(false);
@@ -102,7 +89,6 @@ export function useCatalogos({ auto = false } = {}) {
     }
     if (inFlightRef.current) return { companias, coberturas };
 
-    // abort request anterior si existiera
     if (abortRef.current) abortRef.current.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -116,12 +102,11 @@ export function useCatalogos({ auto = false } = {}) {
       setStatus("ready");
       return data;
     } catch (e) {
-      // AbortError => silencio
-      if (e?.name === "AbortError") return { companias, coberturas };
-      setCompanias(FALLBACK_COMPANIAS);
-      setCoberturas(FALLBACK_COBERTURAS);
+      if (e?.name === "AbortError" || e?.name === "CanceledError") return { companias, coberturas };
+      setCompanias([]);
+      setCoberturas([]);
       setStatus("error");
-      return { companias: FALLBACK_COMPANIAS, coberturas: FALLBACK_COBERTURAS };
+      return { companias: [], coberturas: [] };
     } finally {
       inFlightRef.current = false;
     }

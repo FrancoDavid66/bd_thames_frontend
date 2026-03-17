@@ -1,20 +1,7 @@
 // src/store/slices/polizasSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
-
-/** Base URL robusta:
- * - Usa VITE_API_URL si existe
- * - Si no, cae a '/api/'
- * - Garantiza la barra final
- */
-const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
-const BASE = RAW_BASE.endsWith("/") ? RAW_BASE : `${RAW_BASE}/`;
-
-// Instancia axios consistente para todo el slice
-const http = axios.create({
-  baseURL: BASE,
-  withCredentials: true,
-});
+// 🚀 CAMBIO CLAVE: Usamos la instancia central que tiene los interceptores de Token
+import api from "../../services/api";
 
 /* ---------------- Constantes de performance ---------------- */
 
@@ -78,6 +65,7 @@ function buildPolizasParams(
     solo_activas,
     ordering,
     modo,
+    oficina, // 🚀 Agregado para filtrar por oficina si es Admin
     // Vencimiento
     fecha_vencimiento_desde,
     fecha_vencimiento_hasta,
@@ -103,6 +91,7 @@ function buildPolizasParams(
   if (cliente) params.cliente = cliente;
   if (patente) params.patente = patente;
   if (solo_activas) params.solo_activas = 1;
+  if (oficina) params.oficina = oficina; // 🚀 Filtro de oficina enviado al Backend
 
   if (includeOrdering && ordering) params.ordering = ordering;
 
@@ -121,11 +110,6 @@ function buildPolizasParams(
       params.vencidas_ultimos_dias = Number(vencidas_ultimos_dias);
     if (vencidas_mas_de_dias)
       params.vencidas_mas_de_dias = Number(vencidas_mas_de_dias);
-  }
-
-  // ⚡ Cursor mode (backend: cursor=1 activa cursor; token real viene en next/previous URL)
-  if (includeCursor) {
-    // lo seteamos afuera según heurística
   }
 
   return params;
@@ -155,6 +139,7 @@ function hasAnyFilters(st) {
       (p.cliente || "").trim() ||
       (p.patente || "").trim() ||
       _toBool(p.solo_activas) ||
+      (p.oficina || "").toString().trim() || // 🚀 Detectar filtro de oficina
       (isPolizas && p.estado && p.estado !== "todos") ||
       (isPolizas && p.estado_financiero && p.estado_financiero !== "todos") ||
       (isPolizas && (p.fecha_vencimiento_desde || "").trim()) ||
@@ -168,14 +153,12 @@ function hasAnyFilters(st) {
 function shouldUseCursor(st) {
   const q = (st.polizas.search || "").trim();
   if (q.length >= 1) return true; // al buscar, cursor vuela
-  // si hay filtros (sin search), también conviene cursor para evitar count pesado
   if (hasAnyFilters(st)) return true;
   return false;
 }
 
 // Detecta si estamos “en modo cursor” según la respuesta
 function isCursorResponse(data) {
-  // CursorPagination devuelve next/previous como URL y NO trae count
   return data && typeof data === "object" && "results" in data && !("count" in data);
 }
 
@@ -210,7 +193,6 @@ function estadoPorCuotas(poliza) {
     return Math.abs(diffDays) <= 7 ? "por_vencer" : "al_dia";
   }
 
-  // Fallback (caro)
   const cuotas = poliza?.cuotas || [];
   const impagas = cuotas.filter((c) => !c.pagado);
   if (impagas.length === 0) return "al_dia";
@@ -236,12 +218,11 @@ function estadoPorCuotas(poliza) {
 
 /* ---------------- Thunks ---------------- */
 
-// Resumen compat (si lo usás en algún dashboard)
 export const fetchResumenPolizas = createAsyncThunk(
   "polizas/fetchResumen",
   async (_, { rejectWithValue, signal }) => {
     try {
-      const res = await http.get("polizas/resumen-estados/", { signal });
+      const res = await api.get("polizas/resumen-estados/", { signal });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al obtener resumen");
@@ -249,7 +230,6 @@ export const fetchResumenPolizas = createAsyncThunk(
   }
 );
 
-// KPIs exactos por backend: /polizas/kpis/  (+ cache TTL + abort + dedupe)
 export const fetchPolizasKpis = createAsyncThunk(
   "polizas/fetchKpis",
   async ({ force = false } = {}, { getState, rejectWithValue, signal }) => {
@@ -271,7 +251,7 @@ export const fetchPolizasKpis = createAsyncThunk(
         return { __fromCache: true, queryKey, data: cached.data };
       }
 
-      const res = await http.get("polizas/kpis/", {
+      const res = await api.get("polizas/kpis/", {
         params,
         signal: kpisAbortCtrl.signal,
       });
@@ -303,7 +283,6 @@ export const fetchPolizasKpis = createAsyncThunk(
   }
 );
 
-// Listado paginado server-side + cache/dedupe + abort real
 export const fetchPolizas = createAsyncThunk(
   "polizas/fetchPolizas",
   async ({ force = false, cursorUrl = null } = {}, { getState, rejectWithValue, signal }) => {
@@ -313,11 +292,10 @@ export const fetchPolizas = createAsyncThunk(
       linkSignals(signal, listAbortCtrl);
 
       const state = getState();
-
-      // ✅ si no hay nada (sin search y sin filtros), no pedimos (backend también devuelve none())
       const q = (state.polizas.search || "").trim();
       const filters = hasAnyFilters(state);
-      const allowAll = _toBool(state.polizas.allow_all); // por si luego lo agregás
+      const allowAll = _toBool(state.polizas.allow_all);
+
       if (!force && !allowAll && !q && !filters) {
         return {
           __fromCache: false,
@@ -327,33 +305,25 @@ export const fetchPolizas = createAsyncThunk(
       }
 
       const useCursor = shouldUseCursor(state);
-
-      // params base
       const params = buildPolizasParams(state, {
-        includePaging: !useCursor,       // cursor no usa page
+        includePaging: !useCursor,
         includeOrdering: true,
         includeCursor: false,
       });
 
-      if (useCursor) {
-        // activa modo cursor en backend (si no estamos siguiendo un next/prev real)
-        params.cursor = 1;
-      }
+      if (useCursor) params.cursor = 1;
 
       const queryKey = makeQueryKey("polizas/", params);
-
       const cached = state.polizas.listCache?.[queryKey];
       if (!force && !cursorUrl && cached?.ts && nowMs() - cached.ts < LIST_CACHE_TTL_MS) {
         return { __fromCache: true, queryKey, ...cached };
       }
 
-      // ✅ Si venimos navegando cursor, usamos la URL completa (next/previous)
-      // y NO mandamos params (ya están incluidos en la URL).
       let res;
       if (cursorUrl) {
-        res = await http.get(cursorUrl, { signal: listAbortCtrl.signal });
+        res = await api.get(cursorUrl, { signal: listAbortCtrl.signal });
       } else {
-        res = await http.get("polizas/", {
+        res = await api.get("polizas/", {
           params,
           signal: listAbortCtrl.signal,
         });
@@ -369,18 +339,11 @@ export const fetchPolizas = createAsyncThunk(
   },
   {
     condition: ({ force = false, cursorUrl = null } = {}, { getState }) => {
-      if (cursorUrl) return true; // navegación cursor siempre permite
+      if (cursorUrl) return true;
       if (force) return true;
 
       const state = getState();
-      const q = (state.polizas.search || "").trim();
-      const filters = hasAnyFilters(state);
-      const allowAll = _toBool(state.polizas.allow_all);
-
-      if (!allowAll && !q && !filters) return true; // va a devolver vacío, pero dedupe no aplica
-
       const useCursor = shouldUseCursor(state);
-
       const params = buildPolizasParams(state, {
         includePaging: !useCursor,
         includeOrdering: true,
@@ -389,10 +352,10 @@ export const fetchPolizas = createAsyncThunk(
       if (useCursor) params.cursor = 1;
 
       const queryKey = makeQueryKey("polizas/", params);
-      const inFlightKey = state.polizas.inFlightListKey;
-      if (inFlightKey && inFlightKey === queryKey) return false;
+      const stateSlice = state.polizas;
+      if (stateSlice.inFlightListKey === queryKey) return false;
 
-      const cached = state.polizas.listCache?.[queryKey];
+      const cached = stateSlice.listCache?.[queryKey];
       if (cached?.ts && nowMs() - cached.ts < LIST_CACHE_TTL_MS) return false;
 
       return true;
@@ -418,7 +381,7 @@ export const fetchPolizaPorId = createAsyncThunk(
       detailAbortById.set(id, ctrl);
       linkSignals(signal, ctrl);
 
-      const res = await http.get(`polizas/${id}/`, { signal: ctrl.signal });
+      const res = await api.get(`polizas/${id}/`, { signal: ctrl.signal });
       return { __fromCache: false, id, data: res.data };
     } catch (err) {
       if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
@@ -426,17 +389,6 @@ export const fetchPolizaPorId = createAsyncThunk(
       }
       return rejectWithValue(err.response?.data || "Error al obtener póliza");
     }
-  },
-  {
-    condition: ({ id, force = false } = {}, { getState }) => {
-      if (!id) return false;
-      if (force) return true;
-      const state = getState().polizas;
-      const cached = state.byId?.[id];
-      const cachedAt = state.byIdFetchedAt?.[id];
-      if (cached && cachedAt && nowMs() - cachedAt < DETAIL_CACHE_TTL_MS) return false;
-      return true;
-    },
   }
 );
 
@@ -444,7 +396,7 @@ export const createPoliza = createAsyncThunk(
   "polizas/createPoliza",
   async (payload, { rejectWithValue, signal }) => {
     try {
-      const res = await http.post("polizas/", payload, { signal });
+      const res = await api.post("polizas/", payload, { signal });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al crear póliza");
@@ -456,7 +408,7 @@ export const deletePoliza = createAsyncThunk(
   "polizas/deletePoliza",
   async (id, { rejectWithValue, signal }) => {
     try {
-      await http.delete(`polizas/${id}/`, { signal });
+      await api.delete(`polizas/${id}/`, { signal });
       return id;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al eliminar póliza");
@@ -468,7 +420,8 @@ export const updatePoliza = createAsyncThunk(
   "polizas/updatePoliza",
   async (payload, { rejectWithValue, signal }) => {
     try {
-      const res = await http.patch(`polizas/${payload.id}/`, payload, { signal });
+      // 🚀 Soporta envío de 'oficina' para el Admin
+      const res = await api.patch(`polizas/${payload.id}/`, payload, { signal });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al actualizar póliza");
@@ -480,12 +433,9 @@ export const renovarPoliza = createAsyncThunk(
   "polizas/renovarPoliza",
   async ({ id, nuevoPrecio, nuevoNumero }, { rejectWithValue, signal }) => {
     try {
-      const res = await http.post(
+      const res = await api.post(
         `polizas/${id}/renovar/`,
-        {
-          nuevo_precio: nuevoPrecio,
-          nuevo_numero: nuevoNumero,
-        },
+        { nuevo_precio: nuevoPrecio, nuevo_numero: nuevoNumero },
         { signal }
       );
       return { id, response: res.data };
@@ -499,7 +449,7 @@ export const togglePolizaEstado = createAsyncThunk(
   "polizas/togglePolizaEstado",
   async ({ id, estado }, { rejectWithValue, signal }) => {
     try {
-      await http.patch(`polizas/${id}/`, { estado }, { signal });
+      await api.patch(`polizas/${id}/`, { estado }, { signal });
       return { id, estado };
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al cambiar estado");
@@ -511,7 +461,7 @@ export const pagarCuota = createAsyncThunk(
   "polizas/pagarCuota",
   async ({ cuotaId, data }, { rejectWithValue, signal }) => {
     try {
-      const res = await http.patch(`cuotas/${cuotaId}/pagar/`, data, { signal });
+      const res = await api.patch(`cuotas/${cuotaId}/pagar/`, data, { signal });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al pagar cuota");
@@ -519,7 +469,6 @@ export const pagarCuota = createAsyncThunk(
   }
 );
 
-// 🔔 ENVÍO MASIVO / REPORTE DIAGNÓSTICO
 export const enviarMensajesEstadoCuotas = createAsyncThunk(
   "polizas/enviarMensajesEstadoCuotas",
   async ({ filtros, preview = true }, { rejectWithValue, signal }) => {
@@ -530,15 +479,13 @@ export const enviarMensajesEstadoCuotas = createAsyncThunk(
         incluir_diagnostico: true,
         solo_reporte: !!preview,
       };
-      const res = await http.post("polizas/enviar-mensajes-cuotas/", body, { signal });
+      const res = await api.post("polizas/enviar-mensajes-cuotas/", body, { signal });
       return res.data;
     } catch (err) {
       if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
         return rejectWithValue({ __canceled: true });
       }
-      return rejectWithValue(
-        err.response?.data || "Error al enviar/diagnosticar mensajes"
-      );
+      return rejectWithValue(err.response?.data || "Error al enviar/diagnosticar mensajes");
     }
   }
 );
@@ -550,40 +497,26 @@ const polizasSlice = createSlice({
   initialState: {
     list: [],
     poliza: null,
-
     byId: {},
     byIdFetchedAt: {},
-
     listCache: {},
     listCacheOrder: [],
     lastListKey: null,
     inFlightListKey: null,
-
     kpisCache: {},
     inFlightKpisKey: null,
-
     listStatus: "idle",
     listError: null,
-
     detailStatus: "idle",
     detailError: null,
-
     kpisStatus: "idle",
     kpisError: null,
-
-    // Paginación (ambos modos)
     page: 1,
     pageSize: 25,
     total: 0,
-
-    // page mode
     next: null,
     previous: null,
-
-    // cursor mode (también usa next/previous, pero no hay count)
     cursorEnabled: false,
-
-    // Filtros/orden
     search: "",
     estado: "todos",
     estado_financiero: "todos",
@@ -591,16 +524,13 @@ const polizasSlice = createSlice({
     cliente: "",
     patente: "",
     solo_activas: false,
+    oficina: "", // 🚀 Estado para el filtro multi-tenant del Admin
     ordering: "-id",
     modo: "polizas",
-
-    // Filtros de vencimiento
     fecha_vencimiento_desde: "",
     fecha_vencimiento_hasta: "",
     vencidas_ultimos_dias: "",
     vencidas_mas_de_dias: "",
-
-    // KPIs
     kpis: {
       activas_al_dia: 0,
       activas_mora_1_30: 0,
@@ -617,10 +547,7 @@ const polizasSlice = createSlice({
     kpisPorCobertura: null,
     kpisPorTipo: null,
     kpisTotalGlobal: 0,
-
     resumenPorEstado: {},
-
-    // 🔔 Envío / diagnóstico
     envioMensajesStatus: "idle",
     envioMensajesError: null,
     envioMensajesResumen: null,
@@ -631,104 +558,35 @@ const polizasSlice = createSlice({
     envioMensajesProcesadas: 0,
   },
   reducers: {
-    setPage: (state, action) => {
-      state.page = Number(action.payload) || 1;
-    },
-    setPageSize: (state, action) => {
-      state.pageSize = Number(action.payload) || 25;
-      state.page = 1;
-    },
-    setSearch: (state, action) => {
-      state.search = action.payload || "";
-      state.page = 1;
-    },
-    setEstado: (state, action) => {
-      state.estado = action.payload || "todos";
-      state.page = 1;
-    },
-    setEstadoFinanciero: (state, action) => {
-      state.estado_financiero = action.payload || "todos";
-      state.page = 1;
-    },
-    setCompania: (state, action) => {
-      state.compania = action.payload || "";
-      state.page = 1;
-    },
-    setCliente: (state, action) => {
-      state.cliente = action.payload || "";
-      state.page = 1;
-    },
-    setPatente: (state, action) => {
-      state.patente = action.payload || "";
-      state.page = 1;
-    },
-    setSoloActivas: (state, action) => {
-      state.solo_activas = !!action.payload;
-      state.page = 1;
-    },
-    setOrdering: (state, action) => {
-      state.ordering = action.payload || "-id";
-      state.page = 1;
-    },
-    setModo: (state, action) => {
-      state.modo = action.payload || "polizas";
-      state.page = 1;
-    },
-
-    setFechaVencimientoDesde: (state, action) => {
-      state.fecha_vencimiento_desde = action.payload || "";
-      state.vencidas_ultimos_dias = "";
-      state.vencidas_mas_de_dias = "";
-      state.page = 1;
-    },
-    setFechaVencimientoHasta: (state, action) => {
-      state.fecha_vencimiento_hasta = action.payload || "";
-      state.vencidas_ultimos_dias = "";
-      state.vencidas_mas_de_dias = "";
-      state.page = 1;
-    },
-    setVencidasUltimosDias: (state, action) => {
-      state.vencidas_ultimos_dias = action.payload || "";
-      state.fecha_vencimiento_desde = "";
-      state.fecha_vencimiento_hasta = "";
-      state.vencidas_mas_de_dias = "";
-      state.page = 1;
-    },
-    setVencidasMasDeDias: (state, action) => {
-      state.vencidas_mas_de_dias = action.payload || "";
-      state.fecha_vencimiento_desde = "";
-      state.fecha_vencimiento_hasta = "";
-      state.vencidas_ultimos_dias = "";
-      state.page = 1;
-    },
-    clearVencimientoFilters: (state) => {
-      state.fecha_vencimiento_desde = "";
-      state.fecha_vencimiento_hasta = "";
-      state.vencidas_ultimos_dias = "";
-      state.vencidas_mas_de_dias = "";
-      state.page = 1;
-    },
+    setPage: (state, action) => { state.page = Number(action.payload) || 1; },
+    setPageSize: (state, action) => { state.pageSize = Number(action.payload) || 25; state.page = 1; },
+    setSearch: (state, action) => { state.search = action.payload || ""; state.page = 1; },
+    setEstado: (state, action) => { state.estado = action.payload || "todos"; state.page = 1; },
+    setEstadoFinanciero: (state, action) => { state.estado_financiero = action.payload || "todos"; state.page = 1; },
+    setCompania: (state, action) => { state.compania = action.payload || ""; state.page = 1; },
+    setCliente: (state, action) => { state.cliente = action.payload || ""; state.page = 1; },
+    setPatente: (state, action) => { state.patente = action.payload || ""; state.page = 1; },
+    setSoloActivas: (state, action) => { state.solo_activas = !!action.payload; state.page = 1; },
+    setOficina: (state, action) => { state.oficina = action.payload || ""; state.page = 1; }, // 🚀 Reducer para cambiar oficina
+    setOrdering: (state, action) => { state.ordering = action.payload || "-id"; state.page = 1; },
+    setModo: (state, action) => { state.modo = action.payload || "polizas"; state.page = 1; },
+    setFechaVencimientoDesde: (state, action) => { state.fecha_vencimiento_desde = action.payload || ""; state.vencidas_ultimos_dias = ""; state.vencidas_mas_de_dias = ""; state.page = 1; },
+    setFechaVencimientoHasta: (state, action) => { state.fecha_vencimiento_hasta = action.payload || ""; state.vencidas_ultimos_dias = ""; state.vencidas_mas_de_dias = ""; state.page = 1; },
+    setVencidasUltimosDias: (state, action) => { state.vencidas_ultimos_dias = action.payload || ""; state.fecha_vencimiento_desde = ""; state.fecha_vencimiento_hasta = ""; state.vencidas_mas_de_dias = ""; state.page = 1; },
+    setVencidasMasDeDias: (state, action) => { state.vencidas_mas_de_dias = action.payload || ""; state.fecha_vencimiento_desde = ""; state.fecha_vencimiento_hasta = ""; state.vencidas_ultimos_dias = ""; state.page = 1; },
+    clearVencimientoFilters: (state) => { state.fecha_vencimiento_desde = ""; state.fecha_vencimiento_hasta = ""; state.vencidas_ultimos_dias = ""; state.vencidas_mas_de_dias = ""; state.page = 1; },
   },
   extraReducers: (builder) => {
     builder
-      // Lista
       .addCase(fetchPolizas.pending, (state) => {
         state.listStatus = "loading";
         state.listError = null;
-
-        // key según heurística
         const stWrap = { polizas: state };
         const useCursor = shouldUseCursor(stWrap);
-
-        const params = buildPolizasParams(
-          { polizas: state },
-          { includePaging: !useCursor, includeOrdering: true }
-        );
+        const params = buildPolizasParams({ polizas: state }, { includePaging: !useCursor, includeOrdering: true });
         if (useCursor) params.cursor = 1;
-
         const key = makeQueryKey("polizas/", params);
         state.inFlightListKey = key;
-
         const cached = state.listCache?.[key];
         if (cached?.ids?.length) {
           state.total = cached.total ?? state.total;
@@ -741,19 +599,12 @@ const polizasSlice = createSlice({
         const payload = action.payload || {};
         const queryKey = payload.queryKey || null;
         state.inFlightListKey = null;
-
-        // Caso “vacío intencional”
         if (payload?.data?.__empty) {
           state.listStatus = "succeeded";
           state.cursorEnabled = false;
-          state.list = [];
-          state.total = 0;
-          state.next = null;
-          state.previous = null;
+          state.list = []; state.total = 0; state.next = null; state.previous = null;
           return;
         }
-
-        // Caso cache
         if (payload.__fromCache && queryKey) {
           state.listStatus = "succeeded";
           state.lastListKey = queryKey;
@@ -765,47 +616,25 @@ const polizasSlice = createSlice({
           state.list = ids.map((id) => state.byId[id]).filter(Boolean);
           return;
         }
-
         state.listStatus = "succeeded";
-
         const data = payload.data || {};
         const results = Array.isArray(data) ? data : data.results || [];
-
-        // detecta modo cursor (sin count)
-        const cursorMode = isCursorResponse(data);
-        state.cursorEnabled = cursorMode;
-
+        state.cursorEnabled = isCursorResponse(data);
         for (const p of results) {
           if (p?.id == null) continue;
           state.byId[p.id] = { ...(state.byId[p.id] || {}), ...p };
           state.byIdFetchedAt[p.id] = nowMs();
         }
-
         const ids = results.map((p) => p?.id).filter((id) => id != null);
         state.list = ids.map((id) => state.byId[id]).filter(Boolean);
-
-        // count en page mode; en cursor mode no existe -> usamos length
-        state.total = Array.isArray(data)
-          ? data.length
-          : (data.count ?? (data.results?.length ?? 0));
-
+        state.total = Array.isArray(data) ? data.length : (data.count ?? (data.results?.length ?? 0));
         state.next = data.next || null;
         state.previous = data.previous || null;
-
         if (queryKey) {
           state.lastListKey = queryKey;
-
-          state.listCache[queryKey] = {
-            ids,
-            total: state.total,
-            next: state.next,
-            previous: state.previous,
-            ts: nowMs(),
-          };
-
+          state.listCache[queryKey] = { ids, total: state.total, next: state.next, previous: state.previous, ts: nowMs() };
           state.listCacheOrder = (state.listCacheOrder || []).filter((k) => k !== queryKey);
           state.listCacheOrder.push(queryKey);
-
           while (state.listCacheOrder.length > LIST_CACHE_MAX) {
             const oldest = state.listCacheOrder.shift();
             if (oldest) delete state.listCache[oldest];
@@ -813,8 +642,7 @@ const polizasSlice = createSlice({
         }
       })
       .addCase(fetchPolizas.rejected, (state, action) => {
-        const p = action.payload;
-        if (p?.__canceled) {
+        if (action.payload?.__canceled) {
           state.listStatus = "idle";
           state.inFlightListKey = null;
           return;
@@ -823,12 +651,7 @@ const polizasSlice = createSlice({
         state.listError = action.payload;
         state.inFlightListKey = null;
       })
-
-      // Detalle
-      .addCase(fetchPolizaPorId.pending, (state) => {
-        state.detailStatus = "loading";
-        state.detailError = null;
-      })
+      .addCase(fetchPolizaPorId.pending, (state) => { state.detailStatus = "loading"; state.detailError = null; })
       .addCase(fetchPolizaPorId.fulfilled, (state, action) => {
         state.detailStatus = "succeeded";
         const { id, data } = action.payload || {};
@@ -836,21 +659,12 @@ const polizasSlice = createSlice({
           state.byId[id] = { ...(state.byId[id] || {}), ...data };
           state.byIdFetchedAt[id] = nowMs();
           state.poliza = state.byId[id];
-        } else {
-          state.poliza = data || null;
-        }
+        } else { state.poliza = data || null; }
       })
       .addCase(fetchPolizaPorId.rejected, (state, action) => {
-        const p = action.payload;
-        if (p?.__canceled) {
-          state.detailStatus = "idle";
-          return;
-        }
-        state.detailStatus = "failed";
-        state.detailError = action.payload;
+        if (action.payload?.__canceled) { state.detailStatus = "idle"; return; }
+        state.detailStatus = "failed"; state.detailError = action.payload;
       })
-
-      // CRUD
       .addCase(createPoliza.fulfilled, (state, action) => {
         const p = action.payload;
         if (p?.id != null) {
@@ -863,10 +677,8 @@ const polizasSlice = createSlice({
       .addCase(deletePoliza.fulfilled, (state, action) => {
         const id = action.payload;
         state.list = (state.list || []).filter((p) => p?.id !== id);
-        delete state.byId[id];
-        delete state.byIdFetchedAt[id];
+        delete state.byId[id]; delete state.byIdFetchedAt[id];
         state.total = Math.max(0, state.total - 1);
-
         for (const key of Object.keys(state.listCache || {})) {
           const c = state.listCache[key];
           if (!c?.ids?.includes(id)) continue;
@@ -875,59 +687,37 @@ const polizasSlice = createSlice({
         }
       })
       .addCase(updatePoliza.fulfilled, (state, action) => {
-        const p = action.payload;
-        if (!p?.id) return;
-
+        const p = action.payload; if (!p?.id) return;
         state.byId[p.id] = { ...(state.byId[p.id] || {}), ...p };
         state.byIdFetchedAt[p.id] = nowMs();
-
         const i = (state.list || []).findIndex((x) => x?.id === p.id);
         if (i !== -1) state.list[i] = state.byId[p.id];
-
         if (state.poliza?.id === p.id) state.poliza = state.byId[p.id];
       })
       .addCase(renovarPoliza.fulfilled, (state, action) => {
-        const { id, response } = action.payload || {};
-        if (!id) return;
+        const { id, response } = action.payload || {}; if (!id) return;
         const merged = { ...(state.byId[id] || {}), ...(response || {}) };
-        state.byId[id] = merged;
-        state.byIdFetchedAt[id] = nowMs();
-
+        state.byId[id] = merged; state.byIdFetchedAt[id] = nowMs();
         const i = (state.list || []).findIndex((x) => x?.id === id);
         if (i !== -1) state.list[i] = merged;
         if (state.poliza?.id === id) state.poliza = merged;
       })
       .addCase(togglePolizaEstado.fulfilled, (state, action) => {
-        const { id, estado } = action.payload || {};
-        if (!id) return;
+        const { id, estado } = action.payload || {}; if (!id) return;
         if (state.byId[id]) state.byId[id] = { ...state.byId[id], estado };
         const i = (state.list || []).findIndex((p) => p?.id === id);
         if (i !== -1) state.list[i] = { ...(state.list[i] || {}), estado };
         if (state.poliza?.id === id) state.poliza = { ...(state.poliza || {}), estado };
       })
-
-      // Resumen compat
-      .addCase(fetchResumenPolizas.fulfilled, (state, action) => {
-        state.resumenPorEstado = action.payload || {};
-      })
-
-      // Pago de cuota
+      .addCase(fetchResumenPolizas.fulfilled, (state, action) => { state.resumenPorEstado = action.payload || {}; })
       .addCase(pagarCuota.fulfilled, (state, action) => {
         const cuota = action.payload;
-        const polizaId =
-          cuota?.poliza?.id ??
-          cuota?.poliza_id ??
-          cuota?.poliza ??
-          cuota?.polizaId ??
-          null;
-
+        const polizaId = cuota?.poliza?.id ?? cuota?.poliza_id ?? cuota?.poliza ?? cuota?.polizaId ?? null;
         if (!polizaId) return;
-
         if (state.poliza?.id === polizaId && Array.isArray(state.poliza.cuotas)) {
           const i = state.poliza.cuotas.findIndex((c) => c.id === cuota.id);
           if (i !== -1) state.poliza.cuotas[i] = cuota;
         }
-
         const cached = state.byId?.[polizaId];
         if (cached?.cuotas && Array.isArray(cached.cuotas)) {
           const i = cached.cuotas.findIndex((c) => c.id === cuota.id);
@@ -935,136 +725,68 @@ const polizasSlice = createSlice({
           state.byId[polizaId] = { ...cached };
         }
       })
-
-      // KPIs
       .addCase(fetchPolizasKpis.pending, (state) => {
-        state.kpisStatus = "loading";
-        state.kpisError = null;
-
-        const params = buildPolizasParams(
-          { polizas: state },
-          { includePaging: false, includeOrdering: false }
-        );
-        const key = makeQueryKey("polizas/kpis/", params);
-        state.inFlightKpisKey = key;
-
+        state.kpisStatus = "loading"; state.kpisError = null;
+        const params = buildPolizasParams({ polizas: state }, { includePaging: false, includeOrdering: false });
+        const key = makeQueryKey("polizas/kpis/", params); state.inFlightKpisKey = key;
         const cached = state.kpisCache?.[key];
         if (cached?.data) {
           const p = cached.data || {};
           state.kpis = {
-            activas_al_dia: p.activas_al_dia ?? 0,
-            activas_mora_1_30: p.activas_mora_1_30 ?? 0,
-            activas_mora_31_60: p.activas_mora_31_60 ?? 0,
-            activas_mora_61_90: p.activas_mora_61_90 ?? 0,
-            activas_mora_90_mas: p.activas_mora_90_mas ?? 0,
-            vencidas: p.vencidas ?? 0,
-            canceladas: p.canceladas ?? 0,
-            finalizadas: p.finalizadas ?? 0,
-            total: p.total ?? 0,
+            activas_al_dia: p.activas_al_dia ?? 0, activas_mora_1_30: p.activas_mora_1_30 ?? 0,
+            activas_mora_31_60: p.activas_mora_31_60 ?? 0, activas_mora_61_90: p.activas_mora_61_90 ?? 0,
+            activas_mora_90_mas: p.activas_mora_90_mas ?? 0, vencidas: p.vencidas ?? 0,
+            canceladas: p.canceladas ?? 0, finalizadas: p.finalizadas ?? 0, total: p.total ?? 0,
           };
-          state.kpisPorEstado = p.por_estado || {};
-          state.kpisPorCompania = p.por_compania || {};
-          state.kpisPorCobertura = p.por_cobertura ?? null;
-          state.kpisPorTipo = p.por_tipo ?? null;
+          state.kpisPorEstado = p.por_estado || {}; state.kpisPorCompania = p.por_compania || {};
+          state.kpisPorCobertura = p.por_cobertura ?? null; state.kpisPorTipo = p.por_tipo ?? null;
           state.kpisTotalGlobal = p.total_global ?? 0;
         }
       })
       .addCase(fetchPolizasKpis.fulfilled, (state, action) => {
-        state.kpisStatus = "succeeded";
-        state.inFlightKpisKey = null;
-
-        const payload = action.payload || {};
-        const queryKey = payload.queryKey;
-
-        const data = payload.data || {};
-        const p = data || {};
-
-        if (queryKey) {
-          state.kpisCache[queryKey] = { data: p, ts: nowMs() };
-        }
-
+        state.kpisStatus = "succeeded"; state.inFlightKpisKey = null;
+        const payload = action.payload || {}; const queryKey = payload.queryKey;
+        const p = payload.data || {}; if (queryKey) state.kpisCache[queryKey] = { data: p, ts: nowMs() };
         state.kpis = {
-          activas_al_dia: p.activas_al_dia ?? 0,
-          activas_mora_1_30: p.activas_mora_1_30 ?? 0,
-          activas_mora_31_60: p.activas_mora_31_60 ?? 0,
-          activas_mora_61_90: p.activas_mora_61_90 ?? 0,
-          activas_mora_90_mas: p.activas_mora_90_mas ?? 0,
-          vencidas: p.vencidas ?? 0,
-          canceladas: p.canceladas ?? 0,
-          finalizadas: p.finalizadas ?? 0,
-          total: p.total ?? 0,
+          activas_al_dia: p.activas_al_dia ?? 0, activas_mora_1_30: p.activas_mora_1_30 ?? 0,
+          activas_mora_31_60: p.activas_mora_31_60 ?? 0, activas_mora_61_90: p.activas_mora_61_90 ?? 0,
+          activas_mora_90_mas: p.activas_mora_90_mas ?? 0, vencidas: p.vencidas ?? 0,
+          canceladas: p.canceladas ?? 0, finalizadas: p.finalizadas ?? 0, total: p.total ?? 0,
         };
-        state.kpisPorEstado = p.por_estado || {};
-        state.kpisPorCompania = p.por_compania || {};
-        state.kpisPorCobertura = p.por_cobertura ?? null;
-        state.kpisPorTipo = p.por_tipo ?? null;
+        state.kpisPorEstado = p.por_estado || {}; state.kpisPorCompania = p.por_compania || {};
+        state.kpisPorCobertura = p.por_cobertura ?? null; state.kpisPorTipo = p.por_tipo ?? null;
         state.kpisTotalGlobal = p.total_global ?? 0;
       })
       .addCase(fetchPolizasKpis.rejected, (state, action) => {
-        const p = action.payload;
-        if (p?.__canceled) {
-          state.kpisStatus = "idle";
-          state.inFlightKpisKey = null;
-          return;
-        }
-        state.kpisStatus = "failed";
-        state.kpisError = action.payload;
-        state.inFlightKpisKey = null;
+        if (action.payload?.__canceled) { state.kpisStatus = "idle"; state.inFlightKpisKey = null; return; }
+        state.kpisStatus = "failed"; state.kpisError = action.payload; state.inFlightKpisKey = null;
       })
-
-      // 🔔 Envío masivo / DIAGNÓSTICO
       .addCase(enviarMensajesEstadoCuotas.pending, (state) => {
-        state.envioMensajesStatus = "loading";
-        state.envioMensajesError = null;
-        state.envioMensajesResumen = null;
-        state.envioMensajesPayload = null;
-        state.envioMensajesBuckets = null;
-        state.envioMensajesDiagnostico = null;
-        state.envioMensajesSeleccionadas = 0;
-        state.envioMensajesProcesadas = 0;
+        state.envioMensajesStatus = "loading"; state.envioMensajesError = null;
+        state.envioMensajesResumen = null; state.envioMensajesPayload = null;
+        state.envioMensajesBuckets = null; state.envioMensajesDiagnostico = null;
+        state.envioMensajesSeleccionadas = 0; state.envioMensajesProcesadas = 0;
       })
       .addCase(enviarMensajesEstadoCuotas.fulfilled, (state, action) => {
         state.envioMensajesStatus = "succeeded";
         const r = action.payload || {};
-        state.envioMensajesResumen = {
-          enviados: Number(r.enviados || 0),
-          fallidos: Number(r.fallidos || 0),
-        };
-        state.envioMensajesPayload = r;
-        state.envioMensajesBuckets = r.buckets || null;
+        state.envioMensajesResumen = { enviados: Number(r.enviados || 0), fallidos: Number(r.fallidos || 0) };
+        state.envioMensajesPayload = r; state.envioMensajesBuckets = r.buckets || null;
         state.envioMensajesDiagnostico = r.diagnostico || null;
         state.envioMensajesSeleccionadas = Number(r.seleccionadas || 0);
         state.envioMensajesProcesadas = Number(r.procesadas || 0);
       })
       .addCase(enviarMensajesEstadoCuotas.rejected, (state, action) => {
-        const p = action.payload;
-        if (p?.__canceled) {
-          state.envioMensajesStatus = "idle";
-          return;
-        }
-        state.envioMensajesStatus = "failed";
-        state.envioMensajesError = action.payload;
+        if (action.payload?.__canceled) { state.envioMensajesStatus = "idle"; return; }
+        state.envioMensajesStatus = "failed"; state.envioMensajesError = action.payload;
       });
   },
 });
 
 export const {
-  setPage,
-  setPageSize,
-  setSearch,
-  setEstado,
-  setEstadoFinanciero,
-  setCompania,
-  setCliente,
-  setPatente,
-  setSoloActivas,
-  setOrdering,
-  setModo,
-  setFechaVencimientoDesde,
-  setFechaVencimientoHasta,
-  setVencidasUltimosDias,
-  setVencidasMasDeDias,
-  clearVencimientoFilters,
+  setPage, setPageSize, setSearch, setEstado, setEstadoFinanciero, setCompania, setCliente, setPatente,
+  setSoloActivas, setOficina, setOrdering, setModo, setFechaVencimientoDesde, setFechaVencimientoHasta,
+  setVencidasUltimosDias, setVencidasMasDeDias, clearVencimientoFilters,
 } = polizasSlice.actions;
 
 export default polizasSlice.reducer;
@@ -1078,53 +800,25 @@ export const selectPolizaDetailStatus = (s) => s.polizas.detailStatus || "idle";
 export const selectPolizaDetailError = (s) => s.polizas.detailError || null;
 
 export const selectPolizasFromCache = (s) => {
-  const st = s.polizas;
-  const wrap = { polizas: st };
-  const useCursor = shouldUseCursor(wrap);
-
-  const params = buildPolizasParams(
-    { polizas: st },
-    { includePaging: !useCursor, includeOrdering: true }
-  );
+  const st = s.polizas; const wrap = { polizas: st }; const useCursor = shouldUseCursor(wrap);
+  const params = buildPolizasParams({ polizas: st }, { includePaging: !useCursor, includeOrdering: true });
   if (useCursor) params.cursor = 1;
-
-  const key = makeQueryKey("polizas/", params);
-  const cached = st.listCache?.[key];
+  const key = makeQueryKey("polizas/", params); const cached = st.listCache?.[key];
   if (!cached?.ids) return st.list || [];
   return cached.ids.map((id) => st.byId?.[id]).filter(Boolean);
 };
 
 export const selectPolizasFiltradas = (s) => {
-  const { list, search, estado, modo } = s.polizas;
-  const q = (search || "").trim().toLowerCase();
-  const arr = list || [];
-
-  if (!q && (modo ?? "polizas") !== "cuotas") return arr;
-
+  const { list, search, estado, modo } = s.polizas; const q = (search || "").trim().toLowerCase();
+  const arr = list || []; if (!q && (modo ?? "polizas") !== "cuotas") return arr;
   return arr.filter((p) => {
     if (q) {
-      const texto = [
-        p?.cliente?.nombre,
-        p?.cliente?.apellido,
-        p?.cliente?.dni_cuit_cuil,
-        p?.patente,
-        p?.numero_poliza,
-        p?.marca,
-        p?.modelo,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
+      const texto = [p?.cliente?.nombre, p?.cliente?.apellido, p?.cliente?.dni_cuit_cuil, p?.patente, p?.numero_poliza, p?.marca, p?.modelo]
+        .filter(Boolean).join(" ").toLowerCase();
       if (!texto.includes(q)) return false;
     }
-
     if (estado === "todos") return true;
-
-    if ((modo ?? "polizas") === "cuotas") {
-      return estadoPorCuotas(p) === estado;
-    }
-
+    if ((modo ?? "polizas") === "cuotas") { return estadoPorCuotas(p) === estado; }
     return true;
   });
 };
@@ -1132,7 +826,6 @@ export const selectPolizasFiltradas = (s) => {
 export const selectPolizasKpis = (s) => s.polizas.kpis;
 export const selectKpisStatus = (s) => s.polizas.kpisStatus;
 export const selectClientesAlDia = (s) => s.polizas.kpis.activas_al_dia ?? 0;
-
 export const selectKpisPorEstado = (s) => s.polizas.kpisPorEstado || {};
 export const selectKpisPorCompania = (s) => s.polizas.kpisPorCompania || {};
 export const selectKpisPorCobertura = (s) => s.polizas.kpisPorCobertura || null;
@@ -1141,20 +834,8 @@ export const selectKpisTotalGlobal = (s) => s.polizas.kpisTotalGlobal || 0;
 
 export const selectResumenCuotas = (s) => {
   const list = s.polizas.list || [];
-  const base = {
-    todos: list.length,
-    al_dia: 0,
-    por_vencer: 0,
-    vence_hoy: 0,
-    vencida_7: 0,
-    vencida_30: 0,
-    vencidas: 0,
-    canceladas: 0,
-  };
-  for (const p of list) {
-    const k = estadoPorCuotas(p);
-    base[k] = (base[k] || 0) + 1;
-  }
+  const base = { todos: list.length, al_dia: 0, por_vencer: 0, vence_hoy: 0, vencida_7: 0, vencida_30: 0, vencidas: 0, canceladas: 0 };
+  for (const p of list) { const k = estadoPorCuotas(p); base[k] = (base[k] || 0) + 1; }
   return base;
 };
 

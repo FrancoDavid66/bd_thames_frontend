@@ -1,7 +1,9 @@
 // src/components/solicitudes/modalcreate/ClienteStep.jsx
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { HiIdentification, HiTrash, HiUpload } from "react-icons/hi";
+// 🚀 CORRECCIÓN: Agregado HiUser a la lista de iconos
+import { HiIdentification, HiTrash, HiUpload, HiLocationMarker, HiUser } from "react-icons/hi";
+import { useAuth } from "../../../context/AuthContext";
 
 // Definimos variants inline para animaciones profesionales
 const sectionVariants = {
@@ -31,8 +33,9 @@ const cardVariants = {
 
 /* ===================== UI bits locales ===================== */
 function Note({ children }) {
-  return <p className="mt-1.5 text-xs sm:text-[13px] text-white/70">{children}</p>;
+  return <p className="mt-1.5 text-xs sm:text-[13px] text-white/50 italic font-medium">{children}</p>;
 }
+
 function Input({
   label,
   value,
@@ -45,17 +48,20 @@ function Input({
   autoComplete,
   autoCapitalize,
   pattern,
+  required = false
 }) {
   return (
     <motion.label
-      className={`text-xs sm:text-sm ${className}`}
+      className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
       variants={inputVariants}
       initial="initial"
       animate="animate"
       whileHover="hover"
       whileTap="tap"
     >
-      <span className="block text-white/85 mb-1">{label}</span>
+      <span className="block text-white/80 font-bold uppercase text-[10px] tracking-widest ml-1">
+        {label} {required && <span className="text-rose-400">*</span>}
+      </span>
       <input
         type={type}
         value={value}
@@ -65,41 +71,43 @@ function Input({
         autoCapitalize={autoCapitalize}
         pattern={pattern}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 sm:py-2.5 md:py-3 outline-none focus:ring-4 ring-sky-200/30 text-white placeholder:text-white/40 transition"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 sm:py-3 outline-none focus:ring-2 ring-sky-500/40 text-white placeholder:text-white/20 transition-all shadow-inner"
       />
-      {helper ? <span className="mt-1 block text-xs text-white/65">{helper}</span> : null}
+      {helper ? <span className="mt-1 block text-[10px] text-white/40 font-medium">{helper}</span> : null}
     </motion.label>
   );
 }
+
 function Textarea({ label, value, onChange, className = "" }) {
   return (
     <motion.label
-      className={`text-xs sm:text-sm ${className}`}
+      className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
       variants={inputVariants}
       initial="initial"
       animate="animate"
       whileHover="hover"
       whileTap="tap"
     >
-      <span className="block text-white/85 mb-1">{label}</span>
+      <span className="block text-white/80 font-bold uppercase text-[10px] tracking-widest ml-1">{label}</span>
       <textarea
-        rows={4}
+        rows={3}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 sm:py-2.5 md:py-3 outline-none focus:ring-4 ring-rose-200/30 text-white placeholder:text-white/40 transition resize-none"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:ring-2 ring-rose-500/40 text-white placeholder:text-white/20 transition-all resize-none shadow-inner"
       />
     </motion.label>
   );
 }
+
 function RadioPill({ checked, onChange, label }) {
   return (
     <motion.button
       type="button"
       onClick={onChange}
-      className={`px-3 py-1.5 rounded-xl border text-xs sm:text-sm transition ${
+      className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-tighter transition-all shadow-lg ${
         checked
-          ? "bg-gradient-to-br from-violet-200 to-indigo-200 text-[#0b0f1e] border-white/40"
-          : "bg-white/5 text-white border-white/10 hover:bg-white/10"
+          ? "bg-gradient-to-br from-violet-400 to-indigo-500 text-white border-white/20"
+          : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
       }`}
       variants={buttonVariants}
       initial="initial"
@@ -110,6 +118,7 @@ function RadioPill({ checked, onChange, label }) {
     </motion.button>
   );
 }
+
 function FotoSlot({
   label,
   slot,
@@ -130,45 +139,42 @@ function FotoSlot({
       animate="animate"
       whileHover="hover"
       whileTap="tap"
-      className="rounded-xl border border-white/10 bg-white/5 p-2 shadow-sm"
+      className="rounded-xl border border-white/10 bg-black/20 p-2.5 shadow-xl transition-all hover:border-violet-500/30"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-white/90 text-xs sm:text-sm">
-          {label} {required ? <span className="text-rose-300">*</span> : null}
+        <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest ml-1">
+          {label} {required ? <span className="text-rose-400">*</span> : null}
         </span>
         {has && (
           <motion.button
             type="button"
             onClick={onRemove}
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-rose-200/20 text-rose-100 hover:bg-rose-200/30 transition"
+            className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
             variants={buttonVariants}
-            initial="initial"
-            whileHover="hover"
-            whileTap="tap"
           >
             <HiTrash /> Quitar
           </motion.button>
         )}
       </div>
 
-      <div className="aspect-video rounded-lg overflow-hidden border border-white/10 bg-black/20 flex items-center justify-center">
+      <div className="aspect-video rounded-lg overflow-hidden border border-white/5 bg-gray-900 flex items-center justify-center relative group">
         {has ? (
           isPdf ? (
             <a
               href={slot.url}
               target="_blank"
               rel="noreferrer"
-              className="text-xs underline text-white/90"
+              className="text-xs font-bold text-sky-400 underline decoration-sky-400/30 underline-offset-4"
               title="Abrir PDF"
             >
-              Ver PDF
+              Ver Documento PDF
             </a>
           ) : (
-            <img src={slot.url} alt={label} className="w-full h-full object-cover" />
+            <img src={slot.url} alt={label} className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
           )
         ) : (
-          <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-br from-violet-200 to-indigo-200 text-[#0b0f1e] font-semibold text-xs sm:text-sm border border-white/20 hover:brightness-105">
-            <HiUpload /> Cargar / Sacar
+          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-white/80 font-bold text-xs border border-white/10 hover:bg-white/10 hover:border-violet-400/50 transition-all active:scale-95">
+            <HiUpload className="text-violet-400" /> Adjuntar
             <input
               type="file"
               accept={accept}
@@ -186,7 +192,7 @@ function FotoSlot({
   );
 }
 
-/* ===================== Helpers opcionales ===================== */
+/* ===================== Helpers ===================== */
 export function normalizaTelefonoAR(raw) {
   if (!raw) return "";
   let d = String(raw).replace(/\D/g, "");
@@ -196,21 +202,8 @@ export function normalizaTelefonoAR(raw) {
   if (d.startsWith("15") && d.length >= 10) d = d.slice(2);
   return d;
 }
-const guessMime = (name = "") =>
-  name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg";
 
-/* ===================== Componente ===================== */
-/**
- * Paso 1: Cliente (nuevo | existente) + fotos opcionales de DNI.
- *
- * Props (alineadas con CreateSolicitudModal):
- * - clienteModo, setClienteModo
- * - clienteId, setClienteId
- * - cliente, setCliente
- * - dniSlots, setDniSlots
- * - TIPO_DNI_SLOTS: array de { key, label }
- * - onUploadDNI: fn(file, key)
- */
+/* ===================== Componente Principal ===================== */
 export default function ClienteStep({
   clienteModo,
   setClienteModo,
@@ -226,6 +219,8 @@ export default function ClienteStep({
   ],
   onUploadDNI,
 }) {
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
+  
   const errors = useMemo(() => {
     const e = {};
     if (clienteModo === "existente") {
@@ -238,114 +233,144 @@ export default function ClienteStep({
     return e;
   }, [clienteModo, clienteId, cliente]);
 
-  // 👉 función delegada al padre (CreateSolicitudModal) para subir a Cloudinary
   const handleUploadToSlot = async (file, key) => {
     if (!file) return;
     try {
       await onUploadDNI?.(file, key);
-      // Nada de blobs locales ni toasts acá:
-      // el padre se encarga de setear dniSlots con la URL final.
     } catch (e) {
-      console.error(e);
+      console.error("[ClienteStep] Error uploading:", e);
     }
   };
 
   return (
     <motion.fieldset
-      className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
+      className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6 shadow-2xl backdrop-blur-sm"
       variants={sectionVariants}
       initial="initial"
       animate="animate"
     >
-      <legend className="px-1 text-white/85 text-xs sm:text-sm">Cliente</legend>
-
-      {/* Toggle modo (responsive) */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        <RadioPill
-          checked={clienteModo === "nuevo"}
-          onChange={() => setClienteModo("nuevo")}
-          label="Nuevo"
-        />
-        <RadioPill
-          checked={clienteModo === "existente"}
-          onChange={() => setClienteModo("existente")}
-          label="Existente"
-        />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400">
+               <HiUser className="text-xl" />
+            </div>
+            <div>
+              <legend className="text-white font-bold text-lg leading-none">Perfil del Asegurado</legend>
+              <div className="flex items-center gap-1.5 mt-1">
+                 <HiLocationMarker className="text-emerald-400 text-xs" />
+                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80">
+                    Sucursal: {user?.perfil?.oficina_nombre || 'Local'}
+                 </span>
+              </div>
+            </div>
+        </div>
+        
+        {/* Toggle modo */}
+        <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10 self-start sm:self-center">
+          <RadioPill
+            checked={clienteModo === "nuevo"}
+            onChange={() => setClienteModo("nuevo")}
+            label="Nuevo Registro"
+          />
+          <RadioPill
+            checked={clienteModo === "existente"}
+            onChange={() => setClienteModo("existente")}
+            label="Buscar Existente"
+          />
+        </div>
       </div>
 
       {clienteModo === "existente" ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Input
-            label={`ID de cliente ${errors.clienteId ? "— (requerido)" : ""}`}
-            value={clienteId}
-            onChange={setClienteId}
-            inputMode="numeric"
-            placeholder="Ej: 123"
-          />
-          <div className="md:col-span-2">
-            <Note>Ingresá el ID del cliente existente.</Note>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start animate-in fade-in duration-300">
+          <div className="md:col-span-4">
+             <Input
+                label="ID de Cliente"
+                value={clienteId}
+                onChange={setClienteId}
+                inputMode="numeric"
+                placeholder="ID del sistema..."
+                required
+                helper={errors.clienteId ? "Debes ingresar un ID válido" : ""}
+              />
+          </div>
+          <div className="md:col-span-8 pt-6">
+            <div className="p-4 rounded-xl bg-sky-500/5 border border-sky-500/10 flex items-start gap-3">
+               <div className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400 mt-0.5"><HiIdentification /></div>
+               <div>
+                  <p className="text-xs text-sky-200 font-bold uppercase tracking-tight">Recordatorio Operativo</p>
+                  <Note>Al usar un ID existente, el sistema vinculará esta nueva póliza a los datos de contacto ya registrados en la base de datos central.</Note>
+               </div>
+            </div>
           </div>
         </div>
       ) : (
-        <>
-          {/* Form responsive: 1 col en mobile, 2 col en sm+ */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-400">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label={`Nombre ${errors.nombre ? "— (requerido)" : ""}`}
+              label="Nombres"
               value={cliente.nombre}
               onChange={(v) => setCliente((s) => ({ ...s, nombre: v }))}
               autoCapitalize="words"
               autoComplete="given-name"
+              required
+              placeholder="Ej: Juan Pedro"
             />
             <Input
-              label={`Apellido ${errors.apellido ? "— (requerido)" : ""}`}
+              label="Apellidos"
               value={cliente.apellido}
               onChange={(v) => setCliente((s) => ({ ...s, apellido: v }))}
               autoCapitalize="words"
               autoComplete="family-name"
+              required
+              placeholder="Ej: Pérez"
             />
             <Input
-              label={`Teléfono (WhatsApp) ${errors.telefono ? "— (requerido)" : ""}`}
+              label="Teléfono WhatsApp"
               value={cliente.telefono}
               onChange={(v) => setCliente((s) => ({ ...s, telefono: v }))}
-              helper="Sin +54, sin 0 y sin 15. Ej: 1166709006"
+              helper="Sin prefijos. Ej: 1166709006"
               inputMode="tel"
               autoComplete="tel"
+              required
+              placeholder="1166709006"
             />
             <Input
-              label="Email"
+              label="Correo Electrónico"
               type="email"
               value={cliente.email}
               onChange={(v) => setCliente((s) => ({ ...s, email: v }))}
               autoComplete="email"
+              placeholder="ejemplo@correo.com"
             />
             <Input
               label="DNI / CUIT / CUIL"
               value={cliente.dni_cuit_cuil}
               onChange={(v) => setCliente((s) => ({ ...s, dni_cuit_cuil: v }))}
               inputMode="numeric"
+              placeholder="Sin puntos ni guiones"
             />
             <Input
-              label="Localidad"
+              label="Localidad / Ciudad"
               value={cliente.localidad}
               onChange={(v) => setCliente((s) => ({ ...s, localidad: v }))}
               autoComplete="address-level2"
+              placeholder="Ej: Ramos Mejía"
             />
             <Textarea
               className="sm:col-span-2"
-              label="Dirección"
+              label="Dirección de Domicilio"
               value={cliente.direccion}
               onChange={(v) => setCliente((s) => ({ ...s, direccion: v }))}
+              placeholder="Calle, número, departamento..."
             />
           </div>
 
-          {/* DNI – grid adaptable con targets grandes táctiles */}
-          <div className="mt-3 sm:mt-4 rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-white/80 mb-2">
-              <HiIdentification />
-              <span className="text-xs sm:text-sm">Documentación (DNI)</span>
+          <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.02] shadow-inner">
+            <div className="flex items-center gap-2 text-white/40 mb-4 ml-1">
+              <HiIdentification className="text-lg" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Verificación de Identidad (Opcional)</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {TIPO_DNI_SLOTS.map(({ key, label }) => (
                 <FotoSlot
                   key={key}
@@ -363,15 +388,18 @@ export default function ClienteStep({
                 />
               ))}
             </div>
-            <Note>Las fotos del DNI se guardan en el perfil del cliente (opcional).</Note>
+            <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+               <span className="text-[10px] text-emerald-400 font-medium italic">
+                  * Estas imágenes se almacenarán en la ficha permanente del asegurado para futuras gestiones.
+               </span>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </motion.fieldset>
   );
 }
 
-/* ===================== Validación externa opcional ===================== */
 export function clienteStepHasErrors(modo, clienteId, cliente) {
   const e = {};
   if (modo === "existente") {

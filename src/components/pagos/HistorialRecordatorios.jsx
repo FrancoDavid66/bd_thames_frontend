@@ -12,6 +12,9 @@ import {
   HiSearch,
 } from "react-icons/hi";
 
+// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
+
 function formatDateTime(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -64,6 +67,10 @@ export default function HistorialRecordatorios({
   loading = false,
   onRefresh,
 }) {
+  // 🚀 Obtenemos datos del usuario logueado
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+
   const [search, setSearch] = useState("");
   const [oficinaFilter, setOficinaFilter] = useState("TODAS");
 
@@ -165,35 +172,43 @@ export default function HistorialRecordatorios({
         <div className="flex items-center gap-2 text-[11px] text-gray-300">
           <HiOfficeBuilding className="w-3.5 h-3.5" />
           <span>Oficina:</span>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => setOficinaFilter("TODAS")}
-              className={`px-2 py-0.5 rounded-full border text-[11px] ${
-                oficinaFilter === "TODAS"
-                  ? "border-emerald-400 bg-emerald-500/10 text-emerald-100"
-                  : "border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800"
-              }`}
-            >
-              Todas
-            </button>
-            {oficinas.map((of) => (
+          {/* 🚀 ESCUDO DE SUCURSAL: Mostramos selectores solo si es Admin */}
+          {isWebAdmin ? (
+            <div className="flex gap-1">
               <button
-                key={of}
                 type="button"
-                onClick={() => setOficinaFilter(of)}
+                onClick={() => setOficinaFilter("TODAS")}
                 className={`px-2 py-0.5 rounded-full border text-[11px] ${
-                  oficinaFilter === of
+                  oficinaFilter === "TODAS"
                     ? "border-emerald-400 bg-emerald-500/10 text-emerald-100"
                     : "border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800"
                 }`}
               >
-                {of === "1" && "Oficina 1"}
-                {of === "2" && "Oficina 2"}
-                {of !== "1" && of !== "2" && `Oficina ${of}`}
+                Todas
               </button>
-            ))}
-          </div>
+              {oficinas.map((of) => (
+                <button
+                  key={of}
+                  type="button"
+                  onClick={() => setOficinaFilter(of)}
+                  className={`px-2 py-0.5 rounded-full border text-[11px] ${
+                    oficinaFilter === of
+                      ? "border-emerald-400 bg-emerald-500/10 text-emerald-100"
+                      : "border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800"
+                  }`}
+                >
+                  {of === "1" && "Oficina 1"}
+                  {of === "2" && "Oficina 2"}
+                  {of !== "1" && of !== "2" && `Oficina ${of}`}
+                </button>
+              ))}
+            </div>
+          ) : (
+            // 🚀 BÓVEDA CERRADA: Si NO es Admin, solo ve su oficina (sin botón para cambiar)
+            <div className="px-2 py-0.5 rounded-full border border-emerald-400 bg-emerald-500/10 text-emerald-100 text-[11px]">
+              {user?.perfil?.oficina_nombre || "Tu Sucursal"}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 flex items-center gap-2 sm:justify-end">

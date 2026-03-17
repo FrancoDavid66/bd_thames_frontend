@@ -36,6 +36,12 @@ const DOCS = `${API_BASE}/documentos`;
 const EMP  = `${API_BASE}/empleados`;
 
 async function http(method, url, body, opts = {}) {
+  // 🚀 PARCHE CLAVE: Rescatamos el token de seguridad
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  
+  // 🎤 MICRÓFONO: Verificamos si lo atrapó antes de mandarlo
+  console.log(`🔑 [FRONTEND] Token inyectado en petición a ${url}:`, token ? "✅ SÍ HAY TOKEN" : "❌ NO HAY TOKEN (null)");
+
   const isForm = body instanceof FormData;
   const headers = isForm
     ? { Accept: "application/json" }
@@ -44,13 +50,18 @@ async function http(method, url, body, opts = {}) {
         ...(body ? { "Content-Type": "application/json" } : {}),
       };
 
+  // 🚀 PARCHE CLAVE: Inyectamos el Token en la cabecera si existe
+  if (token && token !== "undefined" && token !== "null") {
+    headers["Authorization"] = `Bearer ${token.trim()}`;
+  }
+
   let res;
   try {
     res = await fetch(url, {
       method,
       headers,
       ...(body ? { body: isForm ? body : JSON.stringify(body) } : {}),
-      ...opts,
+      ...opts, // 🚀 Acá viaja el 'signal' limpiamente por detrás
     });
   } catch (e) {
     const err = new Error("No se pudo conectar con el servidor.");
@@ -103,6 +114,10 @@ function qs(params = {}) {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
+    
+    // 🚀 PARCHE: Evitamos que el signal u objetos se conviertan a texto en la URL
+    if (typeof v === "object" && !Array.isArray(v)) return;
+
     if (Array.isArray(v)) {
       v.forEach((x) => q.append(k, x ?? ""));
     } else {
@@ -116,7 +131,12 @@ function qs(params = {}) {
 export const solicitudesApi = {
   // -------- Solicitudes --------
   async listar(params = {}) {
-    const data = await http("GET", `${API}/` + qs(params));
+    // 🚀 PARCHE: Extraemos el signal de los parámetros visuales
+    const { signal, ...restParams } = params || {};
+    const opts = signal ? { signal } : {};
+    
+    // Mandamos `null` como body, y `opts` con el signal en el 4to parámetro
+    const data = await http("GET", `${API}/` + qs(restParams), null, opts);
     return unwrapList(data);
   },
 
@@ -190,11 +210,11 @@ export const solicitudesApi = {
   /**
    * Tomar una solicitud.
    * Admite:
-   *   tomar(id, { empleado_id })
-   *   tomar(id, { responsable: 'Nombre' })
-   *   tomar(id, empleado_idNumber)
-   *   tomar(id, 'Nombre')
-   *   tomar(id, 'Nombre', empleado_idNumber)
+   * tomar(id, { empleado_id })
+   * tomar(id, { responsable: 'Nombre' })
+   * tomar(id, empleado_idNumber)
+   * tomar(id, 'Nombre')
+   * tomar(id, 'Nombre', empleado_idNumber)
    */
   tomar(id, arg, empleadoId) {
     let body = {};
@@ -342,10 +362,10 @@ export const solicitudesApi = {
    *
    * @param {number|string} id  ID de la solicitud
    * @param {{
-   *   poliza_id:number|string,
-   *   modo?:'copiar'|'mover',
-   *   incluir?:{fotos?:string[], docs?:string[]},
-   *   cliente?:{dni_frente?:boolean,dni_dorso?:boolean,pasaporte_frente?:boolean,pasaporte_dorso?:boolean}
+   * poliza_id:number|string,
+   * modo?:'copiar'|'mover',
+   * incluir?:{fotos?:string[], docs?:string[]},
+   * cliente?:{dni_frente?:boolean,dni_dorso?:boolean,pasaporte_frente?:boolean,pasaporte_dorso?:boolean}
    * }} params
    */
   asociarAPoliza(id, { poliza_id, modo = "copiar", incluir, cliente } = {}) {

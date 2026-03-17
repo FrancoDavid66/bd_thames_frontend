@@ -1,5 +1,13 @@
 // src/components/clientes/ClientePolizasCard.jsx
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { 
+  HiCollection, 
+  HiPlus, 
+  HiArrowRight, 
+  HiShieldCheck,
+  HiOutlineDocumentSearch
+} from "react-icons/hi";
 
 const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
   const navigate = useNavigate();
@@ -12,140 +20,137 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
   const upper = (v) => (v ? String(v).toUpperCase() : "—");
 
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-neutral-800/80 via-neutral-950 to-black p-[1px] shadow-xl shadow-black/40">
-      <div className="rounded-2xl bg-neutral-950/95 border border-neutral-900/80 px-4 py-4 sm:px-6 sm:py-5 text-neutral-100 space-y-4">
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold">
-              Pólizas del cliente
-            </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              Listado de pólizas asociadas al cliente y acceso rápido al detalle.
-            </p>
+    <motion.section 
+      className="rounded-3xl bg-[#0b0f1e] border border-white/10 shadow-2xl overflow-hidden mt-2"
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut", delay: 0.1 }}
+    >
+      <div className="flex flex-col h-full">
+        {/* Header General */}
+        <div className="px-5 py-5 border-b border-white/5 bg-white/[0.02] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-12 w-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
+              <HiCollection className="text-2xl" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-widest truncate leading-none mb-1">
+                Pólizas del Cliente
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider truncate">
+                  Seguros Asociados a este perfil
+                </span>
+                {polizas.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[9px] font-black">
+                    {polizas.length}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {polizas.length > 0 && (
-              <span className="text-[11px] text-neutral-400">
-                {polizas.length} póliza
-                {polizas.length !== 1 ? "s" : ""}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleCrear}
-              className="px-3 sm:px-4 h-9 rounded-full bg-primary-400 text-black text-xs sm:text-sm font-semibold hover:bg-primary-300 transition shadow-sm"
-            >
-              Asociar póliza
-            </button>
-          </div>
-        </header>
+          
+          <button
+            type="button"
+            onClick={handleCrear}
+            className="shrink-0 h-11 px-5 rounded-xl cursor-pointer bg-sky-500 text-black font-black uppercase text-[10px] tracking-widest hover:bg-sky-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-900/30 w-full sm:w-auto"
+          >
+            <HiPlus className="text-sm" /> Asociar Póliza
+          </button>
+        </div>
 
-        {/* Contenido */}
-        {polizas.length === 0 ? (
-          <div className="rounded-xl border border-neutral-800 bg-neutral-900/70 px-4 py-4 text-sm text-neutral-300">
-            Este cliente todavía no tiene pólizas asociadas.
-          </div>
-        ) : (
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {polizas.map((p) => {
-              const titulo = `${fmt(p.compania)} · ${fmt(
-                p.numero_poliza || "Sin número"
-              )}`;
+        {/* Contenido / Listado */}
+        <div className="p-4 sm:p-5 flex-1">
+          {polizas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+              <HiOutlineDocumentSearch className="text-5xl text-white/10 mb-3" />
+              <p className="text-xs font-black text-white/60 uppercase tracking-widest">Sin pólizas vigentes</p>
+              <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1 max-w-xs">
+                Este cliente no tiene ningún seguro registrado en el sistema.
+              </p>
+            </div>
+          ) : (
+            <ul className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {polizas.map((p) => {
+                const titulo = `${fmt(p.compania)} · ${fmt(p.numero_poliza || "S/N")}`;
+                const estado = p.estado && typeof p.estado === "string" ? p.estado.toLowerCase() : p.estado;
 
-              const estado =
-                p.estado && typeof p.estado === "string"
-                  ? p.estado.toLowerCase()
-                  : p.estado;
-
-              const estadoClass =
-                estado === "activa"
-                  ? "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30"
+                const estadoClass = estado === "activa"
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                   : estado === "vencida"
-                  ? "bg-rose-500/10 text-rose-300 ring-1 ring-rose-500/30"
-                  : estado === "finalizada"
-                  ? "bg-neutral-700/40 text-neutral-200 ring-1 ring-neutral-500/40"
-                  : "bg-neutral-700/40 text-neutral-200 ring-1 ring-neutral-500/40";
+                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                  : "bg-white/5 text-white/40 border border-white/10";
 
-              return (
-                <li
-                  key={p.id}
-                  className="rounded-2xl border border-neutral-800 bg-neutral-900/80 px-4 py-3.5 sm:px-4 sm:py-4 flex flex-col gap-3 shadow-sm"
-                >
-                  {/* Header póliza */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm sm:text-base font-semibold text-neutral-50 truncate">
-                        {titulo}
-                      </p>
-                      {p.producto && (
-                        <p className="text-[11px] text-neutral-400 mt-0.5 truncate">
-                          {fmt(p.producto)}
-                        </p>
-                      )}
+                return (
+                  <motion.li
+                    key={p.id}
+                    className="rounded-2xl border border-white/5 bg-black/40 p-4 flex flex-col gap-4 shadow-inner hover:bg-white/[0.02] transition-colors"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    {/* Header de la Póliza */}
+                    <div className="flex items-start justify-between gap-3 border-b border-white/5 pb-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                           <HiShieldCheck className="text-sky-400 text-sm" />
+                           <p className="text-sm font-bold text-white truncate leading-none">
+                             {titulo}
+                           </p>
+                        </div>
+                        {p.producto && (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-white/40 truncate ml-5">
+                            {fmt(p.producto)}
+                          </p>
+                        )}
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${estadoClass}`}>
+                        {fmt(p.estado)}
+                      </span>
                     </div>
-                    <span
-                      className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${estadoClass}`}
-                      title="Estado de la póliza"
-                    >
-                      {fmt(p.estado)}
-                    </span>
-                  </div>
 
-                  {/* Datos del vehículo */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm text-neutral-200">
-                    <div className="space-y-0.5">
-                      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                        Vehículo
+                    {/* Datos del vehículo (Grid responsiva) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                        <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Vehículo</span>
+                        <span className="font-bold text-white/80 truncate">{fmt(p.marca)}</span>
                       </div>
-                      <div>{fmt(p.marca)}</div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                        Modelo
+                      <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                        <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Modelo</span>
+                        <span className="font-bold text-white/80 truncate">{fmt(p.modelo)}</span>
                       </div>
-                      <div>{fmt(p.modelo)}</div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                        Año
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Año</span>
+                        <span className="font-bold text-white/80">{fmt(p.anio)}</span>
                       </div>
-                      <div>{fmt(p.anio)}</div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                        Patente
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Patente</span>
+                        <span className="font-mono font-bold text-sky-400">{upper(p.patente)}</span>
                       </div>
-                      <div className="font-medium">{upper(p.patente)}</div>
-                    </div>
-                    <div className="space-y-0.5 sm:col-span-2">
-                      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                        Cobertura
+                      
+                      <div className="flex flex-col gap-1 col-span-2 sm:col-span-4 pt-1">
+                        <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Cobertura</span>
+                        <span className="font-medium text-white/70 truncate">{fmt(p.cobertura)}</span>
                       </div>
-                      <div>{fmt(p.cobertura)}</div>
                     </div>
-                  </div>
 
-                  {/* Acción */}
-                  <div className="flex flex-col sm:flex-row sm:justify-end pt-1">
-                    <button
-                      type="button"
-                      onClick={() => goDetalle(p.id)}
-                      className="w-full sm:w-auto mt-1 sm:mt-0 px-3 sm:px-4 h-9 rounded-lg bg-neutral-100 text-neutral-900 text-xs sm:text-sm font-semibold hover:bg-white transition"
-                      aria-label={`Ver detalle de póliza ${
-                        p.numero_poliza || p.id
-                      }`}
-                    >
-                      Ver detalle
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    {/* Acción / Footer de la tarjeta */}
+                    <div className="pt-3 border-t border-white/5 mt-auto">
+                      <button
+                        type="button"
+                        onClick={() => goDetalle(p.id)}
+                        className="w-full h-10 rounded-xl cursor-pointer bg-white/5 text-white/80 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all border border-white/10 flex items-center justify-center gap-2"
+                      >
+                        Ver Detalle de Póliza <HiArrowRight />
+                      </button>
+                    </div>
+                  </motion.li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 

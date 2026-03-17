@@ -5,15 +5,30 @@ import { toast } from 'react-hot-toast';
 // 🌐 URL base desde env
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+/**
+ * 🔐 Función auxiliar para obtener el token del almacenamiento local.
+ */
+const getAuthHeaders = () => {
+  // 🚀 ¡CORREGIDO! Ahora busca "access_token" igual que en ingresos
+  const token = localStorage.getItem("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // ──────── THUNKS (EGRESOS) ────────
 
-// Obtener egresos paginados
+// 🚀 Obtener egresos paginados y filtrados por oficina
 export const fetchEgresos = createAsyncThunk(
   'egresos/fetch',
-  // 👇 si se llama sin args, igual funciona y adentro usamos page=1
-  async ({ page = 1 } = {}, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
+    const page = params.page || 1;
+    // Si la oficina es null o undefined, enviamos vacío para que el backend lo maneje
+    const oficina = (params.oficina !== undefined && params.oficina !== null) ? params.oficina : '';
+
     try {
-      const res = await axios.get(`${BASE_URL}egresos/`, { params: { page } });
+      const res = await axios.get(`${BASE_URL}egresos/`, { 
+        params: { page, oficina },
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       return res.data; // { results, count, next, previous }
     } catch (error) {
       console.error('Error al obtener los egresos:', error?.response?.data || error?.message);
@@ -27,7 +42,9 @@ export const createEgreso = createAsyncThunk(
   'egresos/create',
   async (data, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${BASE_URL}egresos/`, data);
+      const res = await axios.post(`${BASE_URL}egresos/`, data, {
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       toast.success('Egreso creado correctamente.');
       return res.data;
     } catch (error) {
@@ -42,7 +59,9 @@ export const updateEgreso = createAsyncThunk(
   'egresos/update',
   async (data, { rejectWithValue }) => {
     try {
-      const res = await axios.put(`${BASE_URL}egresos/${data.id}/`, data);
+      const res = await axios.put(`${BASE_URL}egresos/${data.id}/`, data, {
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       toast.success('Egreso actualizado correctamente.');
       return res.data;
     } catch (error) {
@@ -57,7 +76,9 @@ export const deleteEgreso = createAsyncThunk(
   'egresos/delete',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`${BASE_URL}egresos/${id}/`);
+      await axios.delete(`${BASE_URL}egresos/${id}/`, {
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       toast.success('Egreso eliminado correctamente.');
       return id;
     } catch (error) {
@@ -97,6 +118,7 @@ const egresosSlice = createSlice({
         state.next = payload.next ?? null;
         state.previous = payload.previous ?? null;
         state.count = payload.count ?? 0;
+        
         // ✅ meta.arg puede ser undefined si se llamó sin args → usar optional chaining
         const pageArg = action.meta?.arg?.page ?? 1;
         state.currentPage = pageArg;

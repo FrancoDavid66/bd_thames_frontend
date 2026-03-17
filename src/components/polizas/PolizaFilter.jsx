@@ -1,5 +1,7 @@
 // src/components/polizas/PolizaFilter.jsx
 import React, { useMemo, useState, useEffect } from "react";
+// 🚀 IMPORTAMOS AUTH PARA EL BLINDAJE
+import { useAuth } from "../../context/AuthContext";
 
 /** Estados (chips) para modo "cuotas" */
 const ESTADOS_CUOTAS = [
@@ -58,11 +60,18 @@ const DOT_FINANCIERO = {
   mora_90_mas: "bg-red-600",
 };
 
+// 🚀 OPCIONES DE OFICINAS
+const OFICINAS_OPTS = [
+  { value: "ALL", label: "Todas las sucursales" },
+  { value: "1", label: "5 Esquinas (1)" },
+  { value: "2", label: "Axion (2)" },
+  { value: "3", label: "39 (3)" },
+];
+
 export default function PolizaFilter({
   searchValue = "",
   onSearchChange,
 
-  // 🆕 submit-only
   onSearchSubmit,
   onClearSearchApplied,
   searchApplied = "",
@@ -95,10 +104,15 @@ export default function PolizaFilter({
   onVencidasMasDeDiasChange,
   onClearVencimientoFilters,
 
-  // 🆕 “ver últimas”
+  // 🚀 NUEVOS PROPS PARA MULTI-TENANT
+  oficinaActual = "ALL",
+  onOficinaChange,
+
   onVerUltimas,
   status = "idle",
 }) {
+  const { user } = useAuth(); // 🚀 Extraemos el usuario logueado
+
   const [modoLocal, setModoLocal] = useState(modoProp || "cuotas");
   useEffect(() => {
     if (modoProp) setModoLocal(modoProp);
@@ -110,11 +124,9 @@ export default function PolizaFilter({
     setLocalValue(searchValue || "");
   }, [searchValue]);
 
-  // ✅ ya NO debounce a store: solo informa al padre (draft)
   useEffect(() => {
     onSearchChange?.(localValue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localValue]);
+  }, [localValue, onSearchChange]);
 
   const botones = useMemo(
     () => (modoActual === "polizas" ? ESTADOS_POLIZAS : ESTADOS_CUOTAS),
@@ -177,11 +189,32 @@ export default function PolizaFilter({
 
   const isLoading = status === "loading";
 
+  // 🛡️ LÓGICA DE BLINDAJE: Solo Admin ve el selector de oficina
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
+
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900/90 p-3 md:p-4 text-gray-100 space-y-3">
-      {/* Top bar: búsqueda + acciones */}
+    <div className="rounded-2xl border border-gray-800 bg-gray-900/90 p-3 md:p-4 text-gray-100 space-y-3 shadow-xl">
+      {/* Top bar: búsqueda + oficinas + acciones */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex w-full flex-wrap items-center gap-2">
+          
+          {/* 🚀 SELECTOR DE OFICINA: Solo visible para ADMIN */}
+          {isWebAdmin && onOficinaChange && (
+            <div className="shrink-0">
+              <select
+                value={oficinaActual}
+                onChange={(e) => onOficinaChange(e.target.value)}
+                className="h-9 rounded-xl border border-gray-700 bg-gray-800 px-3 text-xs md:text-sm font-bold text-yellow-400 outline-none focus:border-yellow-500/50"
+              >
+                {OFICINAS_OPTS.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-gray-900 text-white">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <input
             type="search"
             value={localValue}
@@ -284,13 +317,13 @@ export default function PolizaFilter({
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-              className="rounded-full border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs md:text-sm"
+              className="rounded-full border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs md:text-sm outline-none"
               aria-label="Tamaño de página"
               title="Tamaño de página"
               disabled={isLoading}
             >
               {[10, 25, 50, 100].map((n) => (
-                <option key={n} value={n}>
+                <option key={n} value={n} className="bg-gray-900 text-white">
                   {n} / pág.
                 </option>
               ))}
@@ -300,11 +333,10 @@ export default function PolizaFilter({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] md:text-xs text-gray-400">
-        <span>
-          Modo:{" "}
-          <strong className="text-gray-200">
-            {modoActual === "polizas" ? "Pólizas" : "Cuotas"}
-          </strong>
+        <span className="flex items-center gap-2">
+          <span>Modo: <strong className="text-gray-200 uppercase">{modoActual}</strong></span>
+          <span className="opacity-40">|</span>
+          <span>Sucursal: <strong className="text-emerald-400 uppercase">{user?.perfil?.oficina_nombre || 'Local'}</strong></span>
         </span>
         {!!searchApplied && (
           <span className="opacity-80">
@@ -331,7 +363,7 @@ export default function PolizaFilter({
               onClick={() => onEstadoChange?.(key)}
               className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs md:text-sm transition ${
                 active
-                  ? "border-emerald-500/80 bg-emerald-600 text-white"
+                  ? "border-emerald-500/80 bg-emerald-600 text-white shadow-lg shadow-emerald-900/40"
                   : "border-gray-700 bg-gray-800/80 text-gray-100 hover:bg-gray-700"
               }`}
               aria-pressed={active}
@@ -357,25 +389,25 @@ export default function PolizaFilter({
 
       {/* Avanzados solo modo pólizas */}
       {modoActual === "polizas" && (
-        <div className="mt-2 rounded-2xl border border-gray-800 bg-gray-900/80">
+        <div className="mt-2 rounded-2xl border border-gray-800 bg-gray-900/80 overflow-hidden">
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="flex w-full items-center justify-between px-3 py-2 text-xs md:text-sm"
+            className="flex w-full items-center justify-between px-3 py-2.5 text-xs md:text-sm hover:bg-gray-800/50 transition-colors"
           >
             <span className="flex items-center gap-2 text-gray-200">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300 text-xs">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300 text-[10px]">
                 ⚙
               </span>
               Filtros avanzados (mora y vencimiento)
             </span>
-            <span className={`transition-transform ${showAdvanced ? "rotate-90" : "rotate-0"}`}>▶</span>
+            <span className={`transition-transform duration-200 ${showAdvanced ? "rotate-90" : "rotate-0"}`}>▶</span>
           </button>
 
           {showAdvanced && (
-            <div className="border-t border-gray-800 px-3 py-3 space-y-3">
-              <div className="space-y-1">
-                <div className="text-[11px] md:text-xs text-gray-400">Estado financiero (mora)</div>
+            <div className="border-t border-gray-800 px-3 py-3 space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-1.5">
+                <div className="text-[11px] md:text-xs uppercase tracking-wider font-bold text-gray-500">Estado financiero (mora)</div>
                 <div className="flex flex-wrap gap-2">
                   {ESTADOS_FINANCIEROS.map(({ key, label }) => {
                     const active = estadoFinancieroActual === key;
@@ -388,7 +420,7 @@ export default function PolizaFilter({
                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs md:text-sm transition ${
                           active
                             ? "border-indigo-500/80 bg-indigo-600 text-white"
-                            : "border-gray-700 bg-gray-800/80 text-gray-100 hover:bg-gray-700"
+                            : "border-gray-700 bg-gray-800 text-gray-100 hover:bg-gray-700"
                         }`}
                         aria-pressed={active}
                         disabled={isLoading}
@@ -413,32 +445,32 @@ export default function PolizaFilter({
               </div>
 
               <div className="space-y-2">
-                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                  <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 md:max-w-[520px]">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:max-w-[520px]">
                     <label className="flex flex-col text-xs md:text-sm">
-                      <span className="mb-1 text-gray-300">Vencimiento desde</span>
+                      <span className="mb-1.5 text-gray-400 font-medium">Vencimiento desde</span>
                       <input
                         type="date"
                         value={fechaVencimientoDesde || ""}
                         onChange={(e) => onFechaVencimientoDesdeChange?.(e.target.value)}
-                        className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs md:text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30"
+                        className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs md:text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30 transition-all"
                         disabled={isLoading}
                       />
                     </label>
                     <label className="flex flex-col text-xs md:text-sm">
-                      <span className="mb-1 text-gray-300">Vencimiento hasta</span>
+                      <span className="mb-1.5 text-gray-400 font-medium">Vencimiento hasta</span>
                       <input
                         type="date"
                         value={fechaVencimientoHasta || ""}
                         onChange={(e) => onFechaVencimientoHastaChange?.(e.target.value)}
-                        className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs md:text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30"
+                        className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs md:text-sm text-gray-100 outline-none focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/30 transition-all"
                         disabled={isLoading}
                       />
                     </label>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                    <span className="text-[11px] md:text-xs text-gray-300">Atajos:</span>
+                    <span className="text-[11px] md:text-xs font-bold text-gray-500 uppercase tracking-tighter">Atajos:</span>
                     <button
                       type="button"
                       onClick={() => onVencidasUltimosDiasChange?.(3)}
@@ -507,8 +539,8 @@ export default function PolizaFilter({
                   </div>
                 </div>
 
-                <p className="text-[11px] text-gray-400">
-                  Tip: Buscá con Enter/Botón. Así no “pide todo” mientras tipeás.
+                <p className="text-[11px] text-gray-500 italic">
+                  * Tip: Buscá con Enter/Botón. Así no “pide todo” mientras tipeás.
                 </p>
               </div>
             </div>

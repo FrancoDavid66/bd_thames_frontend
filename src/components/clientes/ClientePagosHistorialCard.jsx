@@ -4,14 +4,18 @@ import { motion } from "framer-motion";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 import dayjs from "dayjs";
+import { 
+  HiCreditCard, 
+  HiCheckCircle, 
+  HiClock, 
+  HiCurrencyDollar,
+  HiCalendar
+} from "react-icons/hi";
 import { pagarCuota } from "../../store/slices/clientesSlice";
 
 const fmt = (d) => (d ? dayjs(d).format("DD-MM-YYYY") : "-");
 
-export default function ClientePagosHistorialCard({
-  cuotas = [],
-  onPagoExitoso,
-}) {
+export default function ClientePagosHistorialCard({ cuotas = [], onPagoExitoso }) {
   const dispatch = useDispatch();
   const [filtroPoliza, setFiltroPoliza] = useState(null);
   const [fechaPagoById, setFechaPagoById] = useState({});
@@ -20,9 +24,7 @@ export default function ClientePagosHistorialCard({
   const agrupado = useMemo(() => {
     const acc = {};
     (cuotas || []).forEach((c) => {
-      const key = `${c?.poliza?.marca || ""} ${c?.poliza?.modelo || ""} (${
-        c?.poliza?.patente || "-"
-      })`;
+      const key = `${c?.poliza?.marca || ""} ${c?.poliza?.modelo || ""} (${c?.poliza?.patente || "-"})`;
       acc[key] = acc[key] || [];
       acc[key].push(c);
     });
@@ -30,23 +32,18 @@ export default function ClientePagosHistorialCard({
   }, [cuotas]);
 
   const keys = Object.keys(agrupado);
-  const visible = filtroPoliza
-    ? { [filtroPoliza]: agrupado[filtroPoliza] || [] }
-    : agrupado;
+  const visible = filtroPoliza ? { [filtroPoliza]: agrupado[filtroPoliza] || [] } : agrupado;
 
   const marcar = async (cuota) => {
     try {
       setMarcandoId(cuota.id);
-      const fecha =
-        fechaPagoById[cuota.id] || dayjs().format("YYYY-MM-DD");
-      await dispatch(
-        pagarCuota({ cuotaId: cuota.id, fecha_pago: fecha })
-      ).unwrap();
-      toast.success("Cuota marcada como pagada");
+      const fecha = fechaPagoById[cuota.id] || dayjs().format("YYYY-MM-DD");
+      await dispatch(pagarCuota({ cuotaId: cuota.id, fecha_pago: fecha })).unwrap();
+      toast.success("Pago registrado exitosamente");
       onPagoExitoso && onPagoExitoso();
     } catch (e) {
       console.error(e);
-      toast.error("No se pudo marcar la cuota");
+      toast.error("No se pudo registrar el pago");
     } finally {
       setMarcandoId(null);
     }
@@ -54,53 +51,57 @@ export default function ClientePagosHistorialCard({
 
   return (
     <motion.section
-      className="rounded-2xl bg-gradient-to-br from-neutral-800/80 via-neutral-950 to-black p-[1px] shadow-xl shadow-black/40"
+      className="rounded-3xl bg-[#0b0f1e] border border-white/10 shadow-2xl overflow-hidden flex flex-col h-full"
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <div className="p-4 sm:p-5 lg:p-6 bg-neutral-950/95 text-neutral-100 rounded-2xl space-y-5">
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold">
-              Historial de pagos
+      {/* Header General */}
+      <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+            <HiCreditCard className="text-xl" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-widest truncate">
+              Historial Financiero
             </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              Cuotas agrupadas por póliza, con estado y fecha de pago.
+            <p className="text-[9px] sm:text-[10px] text-white/40 font-bold uppercase tracking-wider mt-0.5 truncate">
+              Gestión de Cuotas y Pagos
             </p>
           </div>
-          {cuotas?.length > 0 && (
-            <div className="text-xs text-neutral-400">
-              Total cuotas:{" "}
-              <span className="font-semibold text-neutral-200">
-                {cuotas.length}
-              </span>
-            </div>
-          )}
-        </header>
+        </div>
+        {cuotas?.length > 0 && (
+          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Total Cuotas:</span>
+            <span className="text-xs font-bold text-white">{cuotas.length}</span>
+          </div>
+        )}
+      </div>
 
-        {/* Filtros por póliza */}
+      <div className="p-4 sm:p-5 flex flex-col gap-5 flex-1">
+        
+        {/* Filtros por póliza (Scroll horizontal en móvil) */}
         {keys.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
             <button
               onClick={() => setFiltroPoliza(null)}
-              className={`px-3 py-1.5 rounded-full text-xs sm:text-sm whitespace-nowrap transition ${
+              className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                 !filtroPoliza
-                  ? "bg-primary-500/15 text-primary-200 ring-1 ring-primary-400/40"
-                  : "bg-neutral-900 text-neutral-200 ring-1 ring-neutral-700/70"
+                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-900/40"
+                  : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
               }`}
             >
-              Todas las pólizas
+              Todas las Pólizas
             </button>
             {keys.map((k) => (
               <button
                 key={k}
                 onClick={() => setFiltroPoliza(k)}
-                className={`px-3 py-1.5 rounded-full text-xs sm:text-sm whitespace-nowrap transition ${
+                className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                   filtroPoliza === k
-                    ? "bg-primary-500/15 text-primary-200 ring-1 ring-primary-400/40"
-                    : "bg-neutral-900 text-neutral-200 ring-1 ring-neutral-700/70"
+                    ? "bg-emerald-500 text-black shadow-lg shadow-emerald-900/40"
+                    : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {k}
@@ -109,124 +110,107 @@ export default function ClientePagosHistorialCard({
           </div>
         )}
 
-        {/* Contenido */}
+        {/* Contenido / Listado de Cuotas */}
         {keys.length === 0 ? (
-          <div className="text-sm text-neutral-400">
-            Este cliente aún no tiene cuotas asociadas.
+          <div className="flex-1 flex flex-col items-center justify-center py-10 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+             <HiCurrencyDollar className="text-4xl text-white/10 mb-2" />
+             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">No hay cuotas registradas.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
             {Object.entries(visible).map(([k, list]) => (
               <motion.article
                 key={k}
-                className="rounded-2xl bg-neutral-900/80 border border-neutral-800 shadow-sm p-4 sm:p-5 flex flex-col gap-3"
+                className="rounded-2xl bg-black/20 border border-white/5 p-4 flex flex-col gap-4"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-sm sm:text-base font-semibold text-primary-200 leading-snug">
+                {/* Título de la Agrupación (Póliza) */}
+                <div className="flex items-start justify-between gap-3 border-b border-white/5 pb-3">
+                  <h3 className="text-xs sm:text-sm font-black text-sky-400 uppercase tracking-wide leading-snug">
                     {k}
                   </h3>
-                  <span className="text-[11px] text-neutral-400">
-                    {list.length} cuota{list.length !== 1 ? "s" : ""}
+                  <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-white/30 bg-white/5 px-2 py-1 rounded-md">
+                    {list.length} Cuota{list.length !== 1 ? "s" : ""}
                   </span>
                 </div>
 
-                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                {/* Lista de Cuotas */}
+                <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-hide pr-1">
                   {list.map((cuota) => {
                     const isPaid = Boolean(cuota.pagado);
                     const estadoBadge = isPaid
-                      ? "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30"
-                      : "bg-rose-500/10 text-rose-300 ring-1 ring-rose-500/30";
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20";
 
                     return (
                       <motion.div
                         key={cuota.id}
-                        className="rounded-xl border border-neutral-800 bg-neutral-950/80 px-3 py-3 sm:px-4 sm:py-3.5 text-sm flex flex-col gap-2"
-                        initial={{ opacity: 0.9, y: 4 }}
+                        className="rounded-2xl border border-white/5 bg-black/60 p-4 flex flex-col gap-3 shadow-inner"
+                        initial={{ opacity: 0.8, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                       >
-                        {/* Primera fila: cuota + estado */}
+                        {/* Cabecera de Cuota */}
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-xs text-neutral-400">
-                            Cuota{" "}
-                            <span className="font-semibold text-neutral-100">
-                              #{cuota.cuota_nro}
-                            </span>
+                          <div className="flex items-center gap-2">
+                             <div className="h-6 w-6 rounded-md bg-white/5 flex items-center justify-center text-[10px] font-black text-white border border-white/10">
+                               #{cuota.cuota_nro}
+                             </div>
+                             <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Cuota</span>
                           </div>
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${estadoBadge}`}
-                          >
-                            {isPaid ? "Pagada" : "Pendiente"}
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${estadoBadge}`}>
+                            {isPaid ? <><HiCheckCircle className="text-sm" /> Pagada</> : <><HiClock className="text-sm" /> Pendiente</>}
                           </span>
                         </div>
 
-                        {/* Datos principales */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-                          <div className="space-y-0.5">
-                            <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                              Monto
-                            </div>
-                            <div className="font-semibold text-neutral-100">
-                              $
-                              {Number(cuota.monto || 0).toLocaleString(
-                                "es-AR"
-                              )}
-                            </div>
+                        {/* Datos de Monto y Fechas */}
+                        <div className="grid grid-cols-2 gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Monto</span>
+                            <span className="text-sm font-mono font-bold text-white">
+                              ${Number(cuota.monto || 0).toLocaleString("es-AR")}
+                            </span>
                           </div>
-                          <div className="space-y-0.5">
-                            <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                              Vencimiento
-                            </div>
-                            <div className="text-neutral-100">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Vencimiento</span>
+                            <span className="text-xs font-bold text-white/80">
                               {fmt(cuota.fecha_vencimiento)}
-                            </div>
+                            </span>
                           </div>
+                          
                           {isPaid && (
-                            <div className="space-y-0.5 sm:col-span-2">
-                              <div className="text-[11px] uppercase tracking-wide text-neutral-500">
-                                Fecha de pago
-                              </div>
-                              <div className="text-neutral-100">
-                                {cuota.fecha_pago
-                                  ? fmt(cuota.fecha_pago)
-                                  : "-"}
-                              </div>
+                            <div className="flex flex-col gap-1 col-span-2 pt-2 border-t border-white/5 mt-1">
+                              <span className="text-[9px] uppercase font-black tracking-widest text-emerald-400/50">Fecha de Pago Registrada</span>
+                              <span className="text-xs font-bold text-emerald-400">
+                                {cuota.fecha_pago ? fmt(cuota.fecha_pago) : "-"}
+                              </span>
                             </div>
                           )}
                         </div>
 
-                        {/* Acción marcar pagada */}
+                        {/* Formulario de Pago (Solo si no está pagada) */}
                         {!isPaid && (
-                          <div className="pt-1 flex flex-col sm:flex-row gap-2 sm:items-center">
-                            <div className="flex-1">
-                              <label className="text-[11px] uppercase tracking-wide text-neutral-500">
-                                Fecha de pago
-                              </label>
+                          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1 relative">
+                              <HiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
                               <input
                                 type="date"
-                                value={
-                                  fechaPagoById[cuota.id] ||
-                                  dayjs().format("YYYY-MM-DD")
-                                }
-                                onChange={(e) =>
-                                  setFechaPagoById((s) => ({
-                                    ...s,
-                                    [cuota.id]: e.target.value,
-                                  }))
-                                }
-                                className="mt-0.5 h-9 w-full rounded-lg bg-neutral-900 border border-neutral-700 px-2 text-xs sm:text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                value={fechaPagoById[cuota.id] || dayjs().format("YYYY-MM-DD")}
+                                onChange={(e) => setFechaPagoById((s) => ({ ...s, [cuota.id]: e.target.value }))}
+                                className="h-11 w-full pl-9 pr-3 rounded-xl bg-black border border-white/10 text-xs sm:text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all [color-scheme:dark]"
                               />
                             </div>
                             <button
                               type="button"
                               onClick={() => marcar(cuota)}
                               disabled={marcandoId === cuota.id}
-                              className="sm:w-auto w-full h-9 mt-1 sm:mt-5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs sm:text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                              className="h-11 px-5 rounded-xl bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition-all w-full sm:w-auto"
                             >
-                              {marcandoId === cuota.id
-                                ? "Marcando..."
-                                : "Marcar pagada"}
+                              {marcandoId === cuota.id ? (
+                                <><div className="h-3 w-3 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Procesando</>
+                              ) : (
+                                "Registrar Pago"
+                              )}
                             </button>
                           </div>
                         )}

@@ -4,13 +4,28 @@ import { toast } from 'react-hot-toast';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
-// Obtener todos los ingresos con paginación
+/**
+ * 🔐 Función auxiliar para obtener el token del almacenamiento local.
+ */
+const getAuthHeaders = () => {
+  // 🚀 ¡CORREGIDO! Ahora busca el nombre exacto que está en tu consola
+  const token = localStorage.getItem("access_token"); 
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// 🚀 PARCHE: Obtener ingresos soportando filtro de oficina y paginación
 export const fetchIngresos = createAsyncThunk(
   'ingresos/fetch',
   async (params = {}, { rejectWithValue }) => {
     const page = params.page || 1;
+    // Si la oficina es null o undefined, enviamos vacío para que el backend lo maneje
+    const oficina = (params.oficina !== undefined && params.oficina !== null) ? params.oficina : '';
+    
     try {
-      const res = await axios.get(`${BASE_URL}ingresos/?page=${page}`);
+      const res = await axios.get(`${BASE_URL}ingresos/`, {
+        params: { page, oficina },
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       return res.data;
     } catch (error) {
       return rejectWithValue(
@@ -25,7 +40,9 @@ export const createIngreso = createAsyncThunk(
   'ingresos/create',
   async (data, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${BASE_URL}ingresos/`, data);
+      const res = await axios.post(`${BASE_URL}ingresos/`, data, {
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       toast.success('Ingreso creado correctamente.');
       return res.data;
     } catch (error) {
@@ -64,7 +81,9 @@ export const updateIngreso = createAsyncThunk(
   'ingresos/update',
   async (data, { rejectWithValue }) => {
     try {
-      const res = await axios.put(`${BASE_URL}ingresos/${data.id}/`, data);
+      const res = await axios.put(`${BASE_URL}ingresos/${data.id}/`, data, {
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       toast.success('Ingreso actualizado correctamente.');
       return res.data;
     } catch (error) {
@@ -80,7 +99,9 @@ export const deleteIngreso = createAsyncThunk(
   'ingresos/delete',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`${BASE_URL}ingresos/${id}/`);
+      await axios.delete(`${BASE_URL}ingresos/${id}/`, {
+        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      });
       toast.success('Ingreso eliminado correctamente.');
       return id;
     } catch (error) {

@@ -19,7 +19,9 @@ import {
   FaBan,
 } from "react-icons/fa";
 
-// ✅ BADGE CORREGIDO: Ya no tiene el límite de 9+
+// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD Y ROLES
+import { useAuth } from "../../context/AuthContext";
+
 const Badge = ({ value = 0 }) => {
   const v = Number(value) || 0;
   if (v <= 0) return null;
@@ -37,13 +39,16 @@ export default function MobileTopBar({
   bajasPendientes = 0,
   cuponVencidas = 0, 
 }) {
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const MOBILE_NAV_H = 68; // px
-  const solTotal =
-    (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
+  const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
+
+  // 🚀 Comprobamos si el usuario logueado es administrador
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
   const primaryTabs = useMemo(
     () => [
@@ -85,14 +90,24 @@ export default function MobileTopBar({
         icon: FaBan,
         badge: bajasPendientes,
       },
-      { to: "/marketing", label: "Campañas", icon: FaBullhorn },
-      { to: "/geo", label: "Geo", icon: FaMapMarkedAlt },
-      { to: "/competencia", label: "Competencia", icon: FaChartBar },
-      { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie },
+      // 🚀 ¡CANDADOS PUESTOS PARA CELULAR!
+      { to: "/marketing", label: "Campañas", icon: FaBullhorn, adminOnly: true },
+      { to: "/geo", label: "Geo", icon: FaMapMarkedAlt, adminOnly: true },
+      { to: "/competencia", label: "Competencia", icon: FaChartBar, adminOnly: true },
+      { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie, adminOnly: true },
+      
+      // Balanzes queda libre para todos
       { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
     ],
     [renovacionesPendientes, bajasPendientes, cuponVencidas]
   );
+
+  // 🚀 Magia: Filtramos los ítems del menú "Más" según el rol
+  const filteredMoreItems = useMemo(() => {
+    if (isWebAdmin) return moreItems;
+    // Si no es admin, le sacamos los que tienen adminOnly
+    return moreItems.filter(item => !item.adminOnly);
+  }, [moreItems, isWebAdmin]);
 
   const isPrimaryActive = (to) =>
     location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
@@ -101,7 +116,6 @@ export default function MobileTopBar({
 
   return (
     <>
-      {/* Menú "Más" con animación pro */}
       <AnimatePresence>
         {moreOpen && (
           <motion.div
@@ -113,28 +127,16 @@ export default function MobileTopBar({
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
             <motion.div
-              className="
-                absolute left-3 right-3
-                rounded-2xl border border-blue-700/40 dark:border-gray-800
-                bg-blue-900/95 dark:bg-gray-900/95 backdrop-blur p-3
-                shadow-2xl
-              "
+              className="absolute left-3 right-3 rounded-2xl border border-blue-700/40 dark:border-gray-800 bg-blue-900/95 dark:bg-gray-900/95 backdrop-blur p-3 shadow-2xl"
               style={{ bottom: sheetBottom }}
               onClick={(e) => e.stopPropagation()}
               initial={{ y: 18, opacity: 0, scale: 0.98 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 14, opacity: 0, scale: 0.985 }}
-              transition={{
-                type: "spring",
-                stiffness: 520,
-                damping: 36,
-                mass: 0.9,
-              }}
+              transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.9 }}
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-extrabold text-white">
-                  Más opciones
-                </div>
+                <div className="text-sm font-extrabold text-white">Más opciones</div>
                 <button
                   className="rounded-xl border border-white/10 px-3 py-2 text-white/90 hover:bg-white/10"
                   onClick={() => setMoreOpen(false)}
@@ -145,8 +147,9 @@ export default function MobileTopBar({
                 </button>
               </div>
 
+              {/* 🚀 Renderizamos SOLO las opciones permitidas */}
               <div className="grid grid-cols-2 gap-2">
-                {moreItems.map(({ to, label, icon: Icon, badge }) => (
+                {filteredMoreItems.map(({ to, label, icon: Icon, badge }) => (
                   <button
                     key={to}
                     onClick={() => {
@@ -168,7 +171,6 @@ export default function MobileTopBar({
         )}
       </AnimatePresence>
 
-      {/* Bottom tabs (entrada suave) */}
       <motion.nav
         className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-blue-800/95 dark:bg-gray-900/95 border-t border-blue-700 dark:border-gray-800 backdrop-blur"
         role="navigation"
@@ -203,7 +205,6 @@ export default function MobileTopBar({
             </li>
           ))}
 
-          {/* Más */}
           <li className="flex-1">
             <button
               onClick={() => setMoreOpen(true)}

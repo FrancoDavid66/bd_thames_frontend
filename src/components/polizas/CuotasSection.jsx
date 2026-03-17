@@ -1,12 +1,16 @@
 // src/components/polizas/CuotasSection.jsx
-import { HiRefresh, HiChevronRight } from "react-icons/hi";
+import { HiChevronRight } from "react-icons/hi";
+// 🚀 IMPORTAMOS AUTH PARA CONSISTENCIA DE INTERFAZ
+import { useAuth } from "../../context/AuthContext";
 
 export default function CuotasSection({
   resumen,
   onOpenDetalle,
-  onOpenRenovar,
+  // 🗑️ onOpenRenovar eliminado de aquí
   onOpen,
 }) {
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
+  
   // Back-compat: si te quedaron llamados con onOpen, lo uso como "ver detalle"
   const openDetalle = onOpenDetalle || onOpen;
 
@@ -29,8 +33,14 @@ export default function CuotasSection({
       {/* Header + acciones */}
       <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div>
-          <div className="text-[11px] text-white/70 uppercase tracking-wide">
-            Sección
+          <div className="flex items-center gap-2">
+            <div className="text-[11px] text-white/70 uppercase tracking-wide">
+              Sección Cobranzas
+            </div>
+            {/* 🚀 ETIQUETA DE SUCURSAL */}
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase border border-emerald-500/20">
+              {user?.perfil?.oficina_nombre || 'Local'}
+            </span>
           </div>
           <h3 className="text-lg sm:text-xl font-semibold text-white">
             Cuotas
@@ -38,16 +48,7 @@ export default function CuotasSection({
         </div>
 
         <div className="flex flex-col sm:flex-row w-full sm:w-auto items-stretch sm:items-center gap-2">
-          {/* Botón primario: Renovar póliza */}
-          <button
-            type="button"
-            onClick={onOpenRenovar}
-            className="inline-flex justify-center items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer w-full sm:w-auto"
-            title="Generar una nueva póliza con sus cuotas"
-          >
-            <HiRefresh className="w-4 h-4" />
-            Renovar póliza
-          </button>
+          {/* 🗑️ Botón de Renovar póliza eliminado de aquí */}
 
           {/* Botón secundario: Ver detalle de cuotas */}
           {openDetalle && (

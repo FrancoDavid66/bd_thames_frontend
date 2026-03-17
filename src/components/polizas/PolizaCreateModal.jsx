@@ -1,7 +1,11 @@
 // src/components/polizas/PolizaCreateModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { HiOfficeBuilding, HiCheck, HiX } from "react-icons/hi"; // 🚀 Iconos para el Admin
 import toast from "react-hot-toast";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
 
 import PolizaStep from "../solicitudes/modalcreate/PolizaStep";
 import ImagenesDocsStep from "../solicitudes/modalcreate/ImagenesDocsStep";
@@ -43,7 +47,7 @@ function addMonthsLocal(ymd, months) {
 const rmDiacritics = (s = "") =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// ✅ Mapeo humano → enum (incluye nuevas etiquetas C+ / C MÁXIMA)
+// ✅ Mapeo humano → enum
 const COBERTURA_MAP = {
   A: "A",
   "A + GRUA": "A_GRUA",
@@ -51,15 +55,12 @@ const COBERTURA_MAP = {
   B1: "B1",
   C: "C",
   C1: "C1",
-  "C1": "C1",
   "C+": "C1",
   "C +": "C1",
   "C TOTAL": "C_TOTAL",
-  "C TOTAL ": "C_TOTAL",
   "C MAXIMA": "C_TOTAL",
   "C MÁXIMA": "C_TOTAL",
   "C FRANQUICIA": "C_FRANQUICIA",
-  "C FRANQUISCIA": "C_FRANQUICIA",
 };
 
 const normalizeCobertura = (v = "") => {
@@ -94,18 +95,12 @@ function firstFieldErrors(payload) {
   return out;
 }
 
-// ==== Slots docs/fotos ====
-
-// Papeles del vehículo
-const DOC_SLOT_RC = [
-  { key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" },
-];
-
+// Slots docs/fotos
+const DOC_SLOT_RC = [{ key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" }];
 const DOC_SLOT_A_GRUA = [
   { key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" },
   { key: "VTV", label: "VTV" },
 ];
-
 const DOC_SLOT_FULL = [
   { key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" },
   { key: "TITULO", label: "Título del vehículo" },
@@ -114,7 +109,6 @@ const DOC_SLOT_FULL = [
   { key: "PERMISO", label: "Permiso" },
 ];
 
-// Fotos del vehículo
 const FOTO_SLOTS_FULL = [
   { key: "FRENTE", label: "Frente" },
   { key: "LATERAL_IZQ", label: "Lateral izq." },
@@ -132,32 +126,21 @@ const FOTO_SLOTS_A_GRUA = [
   { key: "TRASERA", label: "Trasera" },
 ];
 
-// Claves admitidas para “fotos” (solo fotos reales)
 const ALLOWED_FOTO_KEYS_POLIZA = new Set([
-  "PATENTE",
-  "FRENTE",
-  "LATERAL_IZQ",
-  "LATERAL_DER",
-  "TRASERA",
-  "INTERIOR",
-  "RUEDA_AUXILIO",
-  "TUBO_GNC",
+  "PATENTE", "FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA", "INTERIOR", "RUEDA_AUXILIO", "TUBO_GNC",
 ]);
 
-const guessMime = (name = "") =>
-  name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg";
-
-function isHttpUrl(u) {
-  const s = String(u || "");
-  return s.startsWith("http://") || s.startsWith("https://");
-}
+const guessMime = (name = "") => name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg";
+const isHttpUrl = (u) => String(u || "").startsWith("http://") || String(u || "").startsWith("https://");
 
 const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
+  const { user } = useAuth();
   const closeBtnRef = useRef(null);
   const { companias, coberturas } = useCatalogos();
 
-  // Paso actual: 1 = datos póliza / auto, 2 = fotos y docs
   const [step, setStep] = useState(1);
+  const [oficinas, setOficinas] = useState([]);
+  const [loadingOficinas, setLoadingOficinas] = useState(false);
 
   const [poliza, setPoliza] = useState({
     compania: "",
@@ -176,11 +159,30 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     dias_a_vencer: 30,
     generar_cuotas_ahora: true,
   });
+
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+
+  // 🏢 Carga de sucursales y blindaje de oficina
+  useEffect(() => {
+    if (isOpen) {
+      if (isWebAdmin) {
+        setLoadingOficinas(true);
+        PolizasAPI.listOficinas()
+          .then(res => setOficinas(Array.isArray(res) ? res : res.results || []))
+          .catch(() => toast.error("Error al cargar sucursales"))
+          .finally(() => setLoadingOficinas(false));
+      } else if (user?.perfil?.oficina) {
+        // Si no es admin, forzamos su oficina (ID)
+        const ofiId = user.perfil.oficina.id || user.perfil.oficina;
+        setPoliza(prev => ({ ...prev, oficina: String(ofiId) }));
+      }
+    }
+  }, [isOpen, user, isWebAdmin]);
+
   const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ==== Cobertura → slots de docs/fotos ====
   const coberturaNorm = normalizeCobertura(poliza.cobertura || "");
   const isA = coberturaNorm === "A";
   const isAGrua = coberturaNorm === "A_GRUA";
@@ -189,11 +191,8 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
   const DOC_SLOTS = isA ? DOC_SLOT_RC : isAGrua ? DOC_SLOT_A_GRUA : DOC_SLOT_FULL;
 
   const [fotoSlots, setFotoSlots] = useState({});
-  const [docSlots, setDocSlots] = useState(() =>
-    Object.fromEntries(DOC_SLOTS.map(({ key }) => [key, null]))
-  );
+  const [docSlots, setDocSlots] = useState(() => Object.fromEntries(DOC_SLOTS.map(({ key }) => [key, null])));
 
-  // Sincronizar slots cuando cambia la cobertura (sin perder lo cargado)
   useEffect(() => {
     const nextDocKeys = new Set(DOC_SLOTS.map((d) => d.key));
     setDocSlots((prev) => {
@@ -207,16 +206,11 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
       for (const k of nextFotoKeys) out[k] = prev?.[k] || null;
       return out;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coberturaNorm]);
 
-  // ==== Fechas / cuotas ====
   useEffect(() => {
     if (!poliza.fecha_emision) return;
-    setPoliza((s) => ({
-      ...s,
-      primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1),
-    }));
+    setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
   }, [poliza.fecha_emision]);
 
   useEffect(() => {
@@ -224,14 +218,9 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     if (!raw || tocoCantidadCuotas) return;
     const key = rmDiacritics(raw).toLowerCase();
     const cant = COMPANY_CUOTAS_DEFAULT[key];
-    if (cant)
-      setPoliza((s) => ({
-        ...s,
-        cantidad_cuotas_override: String(cant),
-      }));
+    if (cant) setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(cant) }));
   }, [poliza.compania, tocoCantidadCuotas]);
 
-  // ==== Validación solo de datos de póliza (para habilitar paso 2) ====
   const baseErrors = useMemo(() => {
     const e = {};
     if (!poliza.compania.trim()) e.compania = "Requerido";
@@ -246,54 +235,28 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     return e;
   }, [poliza]);
 
-  const canGoToFotos = useMemo(
-    () => Object.keys(baseErrors).length === 0,
-    [baseErrors]
-  );
+  const canGoToFotos = useMemo(() => Object.keys(baseErrors).length === 0, [baseErrors]);
 
-  // ==== Validación de docs/fotos según cobertura (solo aviso visual) ====
   const docsFotosError = useMemo(() => {
-    let requiredDocs = [];
-    let requiredFotos = [];
-
-    if (coberturaNorm === "A") {
-      requiredDocs = ["CEDULA_VERDE_FRENTE"];
-      requiredFotos = [];
-    } else if (coberturaNorm === "A_GRUA") {
-      requiredDocs = ["CEDULA_VERDE_FRENTE", "VTV"];
-      requiredFotos = ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"];
-    } else {
-      // Otras coberturas
-      requiredDocs = ["CEDULA_VERDE_FRENTE"];
-      requiredFotos = ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"];
-    }
+    let requiredDocs = ["CEDULA_VERDE_FRENTE"];
+    let requiredFotos = (coberturaNorm === "A") ? [] : ["FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA"];
+    if (coberturaNorm === "A_GRUA") requiredDocs.push("VTV");
 
     const docKeysAvailable = new Set(DOC_SLOTS.map((d) => d.key));
     const fotoKeysAvailable = new Set(FOTO_SLOTS.map((f) => f.key));
 
-    const missingDocs = requiredDocs.filter(
-      (k) => docKeysAvailable.has(k) && !docSlots?.[k]?.url
-    );
-    const missingFotos = requiredFotos.filter(
-      (k) => fotoKeysAvailable.has(k) && !fotoSlots?.[k]?.url
-    );
+    const missingDocs = requiredDocs.filter(k => docKeysAvailable.has(k) && !docSlots?.[k]?.url);
+    const missingFotos = requiredFotos.filter(k => fotoKeysAvailable.has(k) && !fotoSlots?.[k]?.url);
 
     if (!missingDocs.length && !missingFotos.length) return "";
-
     const parts = [];
     if (missingDocs.length) parts.push(`docs: ${missingDocs.join(", ")}`);
     if (missingFotos.length) parts.push(`fotos: ${missingFotos.join(", ")}`);
-
     return `Faltan cargar ${parts.join(" y ")}`;
   }, [coberturaNorm, DOC_SLOTS, FOTO_SLOTS, docSlots, fotoSlots]);
 
-  // ==== Validación global para SUBMIT (NO bloquea por fotos/docs) ====
-  const canSubmit = useMemo(
-    () => !saving && Object.keys(baseErrors).length === 0,
-    [baseErrors, saving]
-  );
+  const canSubmit = useMemo(() => !saving && Object.keys(baseErrors).length === 0, [baseErrors, saving]);
 
-  // ==== Upload helpers (Cloudinary) ====
   async function handleUploadToSlot(file, folder, setter) {
     if (!file) return;
     const _mime = file.type || guessMime(file.name || "");
@@ -301,32 +264,16 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
       const up = await uploadToCloudinary(file, { folder });
       setter({ file, url: up.secure_url, public_id: up.public_id, mime: _mime });
       toast.success("Subido");
-    } catch {
-      toast.error("No se pudo subir el archivo");
-    }
+    } catch { toast.error("No se pudo subir el archivo"); }
   }
 
-  const onUploadFotoVehiculo = (file, key) =>
-    handleUploadToSlot(file, "de-thames/polizas/fotos", (val) =>
-      setFotoSlots((s) => ({ ...s, [key]: val }))
-    );
+  const onUploadFotoVehiculo = (file, key) => handleUploadToSlot(file, "de-thames/polizas/fotos", (val) => setFotoSlots((s) => ({ ...s, [key]: val })));
+  const onUploadDocVehiculo = (file, key) => handleUploadToSlot(file, "de-thames/polizas/docs", (val) => setDocSlots((s) => ({ ...s, [key]: val })));
 
-  const onUploadDocVehiculo = (file, key) =>
-    handleUploadToSlot(file, "de-thames/polizas/docs", (val) =>
-      setDocSlots((s) => ({ ...s, [key]: val }))
-    );
-
-  // ==== Lógica central de creación ====
   const createPoliza = async () => {
-    if (!clienteId) return toast.error("Falta clienteId para asociar la póliza");
-
+    if (!clienteId) return toast.error("Falta clienteId");
     try {
       setSaving(true);
-
-      const fechaEmision = poliza.fecha_emision || ymdLocal(new Date());
-      const fechaVencimientoFinal =
-        poliza.primer_vencimiento || addMonthsLocal(fechaEmision, 1);
-
       const payload = {
         cliente_id: Number(clienteId),
         compania: poliza.compania.trim(),
@@ -338,244 +285,112 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
         modelo: poliza.modelo.trim(),
         anio: Number(poliza.anio),
         tipo: poliza.tipo || "Auto",
-        precio_cuota:
-          poliza.generar_cuotas_ahora &&
-          String(poliza.precio_cuota).trim()
-            ? Number(poliza.precio_cuota)
-            : undefined,
-        cantidad_cuotas_override: poliza.cantidad_cuotas_override
-          ? Number(poliza.cantidad_cuotas_override)
-          : undefined,
+        precio_cuota: poliza.generar_cuotas_ahora && poliza.precio_cuota ? Number(poliza.precio_cuota) : undefined,
+        cantidad_cuotas_override: poliza.cantidad_cuotas_override ? Number(poliza.cantidad_cuotas_override) : undefined,
         generar_cuotas_ahora: !!poliza.generar_cuotas_ahora,
-        regenerar_cuotas: false,
-        fecha_emision: fechaEmision,
+        fecha_emision: poliza.fecha_emision,
         primer_vencimiento: poliza.primer_vencimiento,
         dias_a_vencer: Number(poliza.dias_a_vencer) || 30,
-        primer_pago: fechaEmision,
-        fecha_vencimiento: fechaVencimientoFinal,
       };
 
-      // ==== FOTOS (vehículo) ====
-      const seenFotoPid = new Set();
-      const seenFotoUrl = new Set();
+      // FOTOS
       const fotosPayload = {};
-
       FOTO_SLOTS.forEach(({ key }) => {
         const s = fotoSlots[key];
-        if (!s?.url || !isHttpUrl(s.url)) return;
-
-        const sendKey = key;
-        if (!ALLOWED_FOTO_KEYS_POLIZA.has(sendKey)) return;
-
-        const pid = s.public_id || "";
-        const url = s.url;
-        if ((pid && seenFotoPid.has(pid)) || seenFotoUrl.has(url)) return;
-
-        fotosPayload[sendKey] = { url, public_id: pid };
-        if (pid) seenFotoPid.add(pid);
-        seenFotoUrl.add(url);
+        if (s?.url && ALLOWED_FOTO_KEYS_POLIZA.has(key)) fotosPayload[key] = { url: s.url, public_id: s.public_id };
       });
+      if (Object.keys(fotosPayload).length) payload.fotos = fotosPayload;
 
-      // ==== DOCUMENTOS (vehículo) ====
-      const seenDocPid = new Set();
-      const seenDocUrl = new Set();
+      // DOCS
       const docsPayload = {};
-
-      Object.entries(docSlots || {}).forEach(([key, s]) => {
-        if (!s?.url || !isHttpUrl(s.url)) return;
-        const pid = s.public_id || "";
-        const url = s.url;
-        if ((pid && seenDocPid.has(pid)) || seenDocUrl.has(url)) return;
-
-        docsPayload[key] = {
-          url,
-          public_id: pid,
-          mime: s.mime || guessMime(s?.file?.name || ""),
-          nombre: key,
-        };
-        if (pid) seenDocPid.add(pid);
-        seenDocUrl.add(url);
+      Object.entries(docSlots).forEach(([key, s]) => {
+        if (s?.url) docsPayload[key] = { url: s.url, public_id: s.public_id, mime: s.mime, nombre: key };
       });
-
-      if (Object.keys(fotosPayload).length) {
-        payload.fotos = fotosPayload;
-      }
-      if (Object.keys(docsPayload).length) {
-        payload.documentos = docsPayload;
-      }
-
-      console.debug("[PolizaCreateModal] POST /api/polizas/ payload:", payload);
+      if (Object.keys(docsPayload).length) payload.documentos = docsPayload;
 
       const raw = await PolizasAPI.create(payload);
-
-      const primeraCuotaId =
-        raw?.primera_cuota_id ??
-        raw?.cuota_id ??
-        raw?.cuota?.id ??
-        raw?.cuotas?.[0]?.id ??
-        raw?.poliza?.cuotas?.[0]?.id ??
-        null;
-
-      const polizaIdResp =
-        raw?.id ?? raw?.poliza_id ?? raw?.poliza?.id ?? null;
-      const clienteIdResp =
-        raw?.cliente_id ?? (clienteId ? Number(clienteId) : null);
-
-      toast.success("Póliza creada y asociada al cliente");
-
-      onSuccess?.({
-        primera_cuota_id: primeraCuotaId,
-        telefono: raw?.cliente?.telefono ?? "",
-        precio_cuota: raw?.precio_cuota ?? poliza?.precio_cuota ?? "",
-        poliza_id: polizaIdResp,
-        cliente_id: clienteIdResp,
-        raw,
-      });
-
+      toast.success("Póliza creada exitosamente");
+      onSuccess?.(raw);
       onClose?.();
     } catch (e) {
-      console.error(
-        "[PolizaCreateModal] Error creando póliza:",
-        e?.message,
-        e?.payload
-      );
-      const msg = e?.message || "No se pudo crear la póliza";
       const lines = firstFieldErrors(e?.payload);
-      if (lines.length) lines.slice(0, 6).forEach((ln) => toast.error(ln));
-      else toast.error(msg);
-    } finally {
-      setSaving(false);
-    }
+      if (lines.length) lines.slice(0, 3).forEach(ln => toast.error(ln));
+      else toast.error(e?.message || "Error al crear póliza");
+    } finally { setSaving(false); }
   };
 
-  // ==== Submit (sin ConfirmModal, solo visual) ====
   const onSubmit = async () => {
-    if (!canSubmit) {
-      if (Object.keys(baseErrors).length) {
-        toast.error("Revisá los datos de la póliza");
-      } else {
-        toast.error("No se puede crear la póliza");
-      }
-      return;
-    }
+    if (!canSubmit) return toast.error("Revisá los datos obligatorios");
     await createPoliza();
   };
 
-  // Bloquear scroll fondo + reset de paso al abrir
   useEffect(() => {
     if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     setStep(1);
-    return () => (document.body.style.overflow = prev);
   }, [isOpen]);
 
   const coberturasOpts = useMemo(() => {
-    const src =
-      Array.isArray(coberturas) && coberturas.length
-        ? coberturas
-        : [
-            "A",
-            "A + GRUA",
-            "B",
-            "B1",
-            "C",
-            "C+",
-            "C MÁXIMA",
-            "C FRANQUICIA",
-          ];
-    const asObjects = src.map((op) =>
-      typeof op === "string" ? { id: op, nombre: op } : op
-    );
-    const seen = new Set();
-    const out = [];
-    for (const op of asObjects) {
-      const key = String(op?.id ?? op?.nombre ?? "").trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push({ id: key, nombre: op?.nombre ?? key });
-    }
-    return out;
+    const src = coberturas?.length ? coberturas : ["A", "A + GRUA", "B", "B1", "C", "C+", "C MÁXIMA", "C FRANQUICIA"];
+    return src.map(op => typeof op === "string" ? { id: op, nombre: op } : op);
   }, [coberturas]);
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/50 px-2 sm:px-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            className="relative bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-xl w-full sm:w-[95%] sm:max-w-5xl max-h-[100vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
-            initial={{ scale: 0.96, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.96, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Crear póliza"
-          >
+        <motion.div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/50 px-2 sm:px-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="relative bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-xl w-full sm:w-[95%] sm:max-w-5xl max-h-[100vh] sm:max-h-[90vh] flex flex-col overflow-hidden" initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}>
+            
             {/* Header */}
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/95 dark:bg-gray-900/95 backdrop-blur">
-              <div className="min-w-0">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                  Nueva póliza
-                </h2>
-                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                  Paso {step} de 2 ·{" "}
-                  {step === 1
-                    ? "Datos de póliza y vehículo"
-                    : "Fotos y documentación"}
-                </p>
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Nueva póliza</h2>
+                <p className="text-[11px] text-gray-500">Paso {step} de 2 · {step === 1 ? "Datos generales" : "Media"}</p>
               </div>
-              <button
-                ref={closeBtnRef}
-                onClick={() => !saving && onClose?.()}
-                disabled={saving}
-                className="h-9 sm:h-10 px-3 rounded-lg bg-black/5 dark:bg-white/10 text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-50 text-xs sm:text-sm"
-              >
-                Cerrar
-              </button>
+              <button onClick={() => !saving && onClose?.()} className="h-9 px-3 rounded-lg bg-black/5 dark:bg-white/10 text-xs sm:text-sm">Cerrar</button>
             </div>
 
-            {/* Cuerpo (scroll interno) */}
-            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4">
+            {/* Cuerpo */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
               {step === 1 && (
-                <PolizaStep
-                  polizaModo={"nueva"}
-                  setPolizaModo={() => {}}
-                  polizaId={""}
-                  setPolizaId={() => {}}
-                  poliza={poliza}
-                  setPoliza={setPoliza}
-                  sinNumero={sinNumero}
-                  setSinNumero={setSinNumero}
-                  companias={companias}
-                  coberturas={coberturasOpts}
-                  setTocoCantidadCuotas={setTocoCantidadCuotas}
-                />
+                <>
+                  {/* 🚀 SELECTOR DE SUCURSAL PARA EL ADMIN */}
+                  {isWebAdmin && (
+                    <div className="p-4 rounded-xl bg-sky-500/5 border border-sky-500/20 mb-4">
+                      <label className="text-[10px] font-black text-sky-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                        <HiOfficeBuilding /> Sucursal de Origen (Solo Admin)
+                      </label>
+                      <select
+                        value={poliza.oficina}
+                        onChange={(e) => setPoliza({ ...poliza, oficina: e.target.value })}
+                        disabled={loadingOficinas}
+                        className="w-full h-11 bg-white dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg px-3 text-sm dark:text-white font-bold outline-none focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="">— Seleccionar Sucursal —</option>
+                        {oficinas.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                      </select>
+                      {loadingOficinas && <p className="text-[9px] text-sky-400 mt-1 animate-pulse">Cargando sucursales...</p>}
+                    </div>
+                  )}
+
+                  <PolizaStep
+                    polizaModo="nueva"
+                    poliza={poliza}
+                    setPoliza={setPoliza}
+                    sinNumero={sinNumero}
+                    setSinNumero={setSinNumero}
+                    companias={companias}
+                    coberturas={coberturasOpts}
+                    setTocoCantidadCuotas={setTocoCantidadCuotas}
+                  />
+                </>
               )}
 
               {step === 2 && (
-                <div className="mt-1 sm:mt-2 rounded-2xl border border-gray-200/10 bg-[#0b0f1e] text-white p-3 sm:p-4">
-                  {/* Mini resumen arriba para contexto */}
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs text-gray-300">
-                    <span className="truncate">
-                      Cobertura:{" "}
-                      <strong className="font-semibold">
-                        {poliza.cobertura || "-"}
-                      </strong>
-                    </span>
-                    <span className="truncate">
-                      Patente:{" "}
-                      <strong className="font-semibold">
-                        {poliza.patente?.toUpperCase() || "-"}
-                      </strong>
-                    </span>
+                <div className="rounded-xl border border-white/5 bg-[#0b0f1e] p-4">
+                  <div className="mb-4 flex gap-4 text-[11px] text-gray-400 uppercase font-black">
+                    <span>Cobertura: <b className="text-white">{poliza.cobertura}</b></span>
+                    <span>Patente: <b className="text-white">{poliza.patente}</b></span>
                   </div>
-
                   <ImagenesDocsStep
                     MAX_FOTOS={MAX_FOTOS}
                     fotoSlotDefs={FOTO_SLOTS}
@@ -588,76 +403,24 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     onUploadDocVehiculo={onUploadDocVehiculo}
                     coverageRuleKey={isA ? "A" : isAGrua ? "A_GRUA" : "OTRAS"}
                   />
-
-                  {docsFotosError && (
-                    <p className="mt-2 text-[11px] sm:text-sm text-amber-300">
-                      {docsFotosError} (se puede crear igual).
-                    </p>
-                  )}
+                  {docsFotosError && <p className="mt-4 text-xs text-amber-400 font-bold italic">⚠️ {docsFotosError}</p>}
                 </div>
               )}
             </div>
 
-            {/* Footer fijo dentro del modal */}
-            <div className="shrink-0 px-3 sm:px-4 py-3 border-t border-white/10 bg-white/95 dark:bg-gray-900/95 backdrop-blur flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
-              <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
-                {step === 1 && !canGoToFotos && (
-                  <span>
-                    Completá los datos básicos de la póliza para continuar con
-                    las fotos.
-                  </span>
-                )}
-                {step === 2 && docsFotosError && <span>{docsFotosError}</span>}
+            {/* Footer */}
+            <div className="shrink-0 px-4 py-3 border-t border-white/10 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
+              <div className="text-[10px] text-gray-500 uppercase font-bold">
+                {step === 1 && !canGoToFotos && "Completa los campos obligatorios (*)"}
               </div>
-
-              <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => !saving && onClose?.()}
-                  disabled={saving}
-                  className="px-3 sm:px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-[12px] sm:text-sm text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
-                >
-                  Cancelar
-                </button>
-
-                {step === 2 && (
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    disabled={saving}
-                    className="px-3 sm:px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-[12px] sm:text-sm text-gray-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-60"
-                  >
-                    Volver a datos
-                  </button>
-                )}
-
-                {step === 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!canGoToFotos) {
-                        toast.error(
-                          "Completá los datos de la póliza antes de seguir"
-                        );
-                        return;
-                      }
-                      setStep(2);
-                    }}
-                    disabled={!canGoToFotos || saving}
-                    className="px-3 sm:px-4 py-2 rounded-xl text-[12px] sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    Continuar a fotos
-                  </button>
-                )}
-
-                {step === 2 && (
-                  <button
-                    type="button"
-                    onClick={onSubmit}
-                    disabled={!canSubmit}
-                    className="px-3 sm:px-4 py-2 rounded-xl text-[12px] sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    {saving ? "Creando…" : "Crear póliza"}
+              <div className="flex gap-3">
+                <button type="button" onClick={() => !saving && onClose?.()} className="h-10 px-4 text-xs uppercase font-black text-gray-400">Cancelar</button>
+                {step === 2 && <button onClick={() => setStep(1)} className="h-10 px-4 rounded-lg bg-white/5 text-xs uppercase font-black text-white">Atrás</button>}
+                {step === 1 ? (
+                  <button onClick={() => canGoToFotos && setStep(2)} disabled={!canGoToFotos} className="h-10 px-6 rounded-lg bg-emerald-600 text-white text-xs uppercase font-black disabled:opacity-30">Continuar</button>
+                ) : (
+                  <button onClick={onSubmit} disabled={saving} className="h-10 px-8 rounded-lg bg-sky-500 text-black text-xs uppercase font-black flex items-center gap-2">
+                    {saving ? "Procesando..." : <><HiCheck /> Finalizar</>}
                   </button>
                 )}
               </div>

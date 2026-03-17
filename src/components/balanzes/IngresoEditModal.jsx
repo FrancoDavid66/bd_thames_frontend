@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
+import "dayjs/locale/es";
+dayjs.locale("es");
+
+// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
 
 import { updateIngreso } from "../../store/slices/ingresosSlice";
 import ModalWrapper from "../comunes/ModalWrapper";
@@ -27,19 +32,33 @@ const readLS = (k, fallback) => {
   }
 };
 
+const writeLS = (k, arr) => {
+  try {
+    localStorage.setItem(k, JSON.stringify(uniqClean(arr)));
+  } catch {
+    // ignore
+  }
+};
+
 export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
   const dispatch = useDispatch();
+
+  // 🚀 ESCUDO DE SUCURSAL
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+
   const ingresos = useSelector((s) => s.ingresos?.list || []);
   const egresos = useSelector((s) => s.egresos?.list || []);
 
   const [form, setForm] = useState({
     monto: "",
     fecha: dayjs().format("YYYY-MM-DD"),
-    forma_pago: "EFECTIVO",
+    forma_pago: "EFECTIVO", // EFECTIVO | TRANSFERENCIA | MERCADOPAGO
     billetera: "",
     categoria: "",
     descripcion: "",
     pagado_por: "",
+    oficina: "", // 🚀 Para el Admin
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -53,17 +72,20 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
     if (!isOpen || !ingreso) return;
     setErrors({});
     setSubmitting(false);
+    
+    // Adaptamos el viejo "VIRTUAL" a "TRANSFERENCIA" por compatibilidad
+    let fp = ingreso.forma_pago || "EFECTIVO";
+    if (fp === "VIRTUAL") fp = "TRANSFERENCIA";
+
     setForm({
-      monto:
-        typeof ingreso.monto === "number"
-          ? ingreso.monto.toString()
-          : ingreso.monto ?? "",
+      monto: typeof ingreso.monto === "number" ? ingreso.monto.toString() : ingreso.monto ?? "",
       fecha: (ingreso.fecha || dayjs().format("YYYY-MM-DD")).slice(0, 10),
-      forma_pago: ingreso.forma_pago || "EFECTIVO",
+      forma_pago: fp,
       billetera: ingreso.billetera || "",
       categoria: ingreso.categoria || "",
       descripcion: ingreso.descripcion || "",
       pagado_por: ingreso.pagado_por || "",
+      oficina: ingreso.oficina || "", // Cargamos la sucursal original
     });
     setTimeout(() => montoRef.current?.focus(), 60);
   }, [isOpen, ingreso]);
@@ -71,6 +93,7 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
   /* Sugerencias (sólo lectura) */
   const [localCats, setLocalCats] = useState([]);
   const [localWallets, setLocalWallets] = useState([]);
+  
   useEffect(() => {
     if (!isOpen) return;
     setLocalCats(readLS(STORAGE_CATS, []));
@@ -103,17 +126,17 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
     setForm((p) => ({
       ...p,
       forma_pago: fp,
-      billetera: fp === "VIRTUAL" ? p.billetera : "",
+      billetera: fp === "EFECTIVO" ? "" : p.billetera,
     }));
 
   const validate = () => {
     const e = {};
-    if (!form.monto || Number(form.monto) <= 0)
-      e.monto = "Ingresá un monto válido.";
+    if (!form.monto || Number(form.monto) <= 0) e.monto = "Ingresá un monto válido.";
     if (!form.fecha) e.fecha = "Seleccioná la fecha.";
     if (!form.categoria?.trim()) e.categoria = "Indicá la categoría.";
-    if (form.forma_pago === "VIRTUAL" && !form.billetera?.trim())
-      e.billetera = "Indicá la billetera/cuenta.";
+    if (form.forma_pago !== "EFECTIVO" && !form.billetera?.trim()) e.billetera = "Indicá la billetera/cuenta.";
+    if (isWebAdmin && !form.oficina) e.oficina = "Seleccioná la sucursal de este ingreso.";
+    
     setErrors(e);
 
     const first = Object.keys(e)[0];
@@ -132,55 +155,85 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate() || !ingreso) return;
+    
+    const montoNum = Number(form.monto || 0);
+    const billeteraDetalle = form.forma_pago !== "EFECTIVO" ? (form.billetera || "Sin especificar") : "";
+
+    const payload = {
+      id: ingreso.id,
+      monto: montoNum,
+      fecha: form.fecha,
+      forma_pago: form.forma_pago,
+      billetera: billeteraDetalle,
+      categoria: form.categoria || "Sin categoría",
+      descripcion: form.descripcion,
+      pagado_por: form.pagado_por,
+      ...(isWebAdmin && form.oficina ? { oficina: form.oficina } : {}), // 🚀 Permitir al admin reasignar la sucursal
+    };
+
     try {
       setSubmitting(true);
-      await dispatch(updateIngreso({ id: ingreso.id, ...form }));
+      await dispatch(updateIngreso(payload)).unwrap();
+      
+      // Guardar billetera en LS para sugerencias futuras
+      if (billeteraDetalle) {
+        const nextW = uniqClean([...localWallets, billeteraDetalle]);
+        writeLS(STORAGE_WALLETS, nextW);
+      }
+
       onClose?.();
+    } catch (err) {
+      console.error("Error al actualizar ingreso:", err);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const isVirtual = form.forma_pago !== "EFECTIVO";
   const disabled =
     submitting ||
     !form.monto ||
     Number(form.monto) <= 0 ||
     !form.fecha ||
     !form.categoria ||
-    (form.forma_pago === "VIRTUAL" && !form.billetera);
+    (isVirtual && !form.billetera) ||
+    (isWebAdmin && !form.oficina);
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose} title="Editar ingreso">
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 text-zinc-800 dark:text-white"
+        className="space-y-5 text-zinc-50"
       >
         {/* Monto / Fecha */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs sm:text-sm mb-1">
-              Monto *
+            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+              Monto <span className="text-emerald-400">*</span>
             </label>
-            <input
-              ref={montoRef}
-              name="monto"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.monto}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-                errors.monto ? "border-red-500" : ""
-              }`}
-              placeholder="0,00"
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-medium">
+                $
+              </span>
+              <input
+                ref={montoRef}
+                name="monto"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.monto}
+                onChange={handleChange}
+                className="w-full pl-7 pr-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                placeholder="0.00"
+              />
+            </div>
             {errors.monto && (
-              <p className="text-xs text-red-500 mt-1">{errors.monto}</p>
+              <p className="text-[11px] text-rose-400 mt-1">{errors.monto}</p>
             )}
           </div>
           <div>
-            <label className="block text-xs sm:text-sm mb-1">
-              Fecha *
+            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+              Fecha <span className="text-emerald-400">*</span>
             </label>
             <input
               ref={fechaRef}
@@ -188,153 +241,179 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
               name="fecha"
               value={form.fecha}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-                errors.fecha ? "border-red-500" : ""
-              }`}
+              className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
             />
             {errors.fecha && (
-              <p className="text-xs text-red-500 mt-1">{errors.fecha}</p>
+              <p className="text-[11px] text-rose-400 mt-1">{errors.fecha}</p>
             )}
           </div>
         </div>
 
-        {/* Forma de pago + Billetera si aplica */}
+        {/* 🚀 SUCURSAL (SOLO ADMIN) */}
+        {isWebAdmin && (
+          <div>
+            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+              Sucursal <span className="text-emerald-400">*</span>
+            </label>
+            <select
+              name="oficina"
+              value={form.oficina}
+              onChange={handleChange}
+              className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+            >
+              <option value="">Seleccione una sucursal...</option>
+              <option value="1">Oficina 1 (5 Esquinas)</option>
+              <option value="2">Oficina 2 (Axion)</option>
+              <option value="3">Oficina 3 (Km 39)</option>
+            </select>
+            {errors.oficina && <p className="text-[11px] text-rose-400 mt-1">{errors.oficina}</p>}
+          </div>
+        )}
+
+        {/* Forma de pago */}
         <div>
-          <label className="block text-xs sm:text-sm font-medium mb-2">
-            Forma de pago
+          <label className="block text-xs font-medium mb-2 text-zinc-400">
+            Forma de pago <span className="text-emerald-400">*</span>
           </label>
-          <div className="inline-flex rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setFormaPago("EFECTIVO")}
-              className={`px-3 py-1.5 text-xs sm:text-sm ${
+              className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-medium transition-colors border ${
                 form.forma_pago === "EFECTIVO"
-                  ? "bg-green-600 text-white"
-                  : "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                  : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800"
               }`}
             >
-              Efectivo
+              Efectivo / Caja
             </button>
             <button
               type="button"
-              onClick={() => setFormaPago("VIRTUAL")}
-              className={`px-3 py-1.5 text-xs sm:text-sm ${
-                form.forma_pago === "VIRTUAL"
-                  ? "bg-blue-600 text-white"
-                  : "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+              onClick={() => setFormaPago("TRANSFERENCIA")}
+              className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-medium transition-colors border ${
+                form.forma_pago === "TRANSFERENCIA"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                  : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800"
               }`}
             >
-              Virtual
+              Transferencia
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormaPago("MERCADOPAGO")}
+              className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-medium transition-colors border ${
+                form.forma_pago === "MERCADOPAGO"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                  : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800"
+              }`}
+            >
+              Mercado Pago
             </button>
           </div>
-
-          {form.forma_pago === "VIRTUAL" && (
-            <div className="mt-3">
-              <label className="block text-xs sm:text-sm mb-1">
-                Billetera / Cuenta destino *
-              </label>
-              <input
-                ref={billeRef}
-                name="billetera"
-                value={form.billetera}
-                onChange={handleChange}
-                list="wallet-suggestions-edit"
-                placeholder="Ej: MP de Manu / Brubank de Candela"
-                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-                  errors.billetera ? "border-red-500" : ""
-                }`}
-              />
-              <datalist id="wallet-suggestions-edit">
-                {walletOpciones.map((opt) => (
-                  <option key={opt} value={opt} />
-                ))}
-              </datalist>
-              {errors.billetera && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.billetera}
-                </p>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Billetera (si es virtual) */}
+        {isVirtual && (
+          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+              Billetera / Cuenta destino <span className="text-emerald-400">*</span>
+            </label>
+            <input
+              ref={billeRef}
+              name="billetera"
+              value={form.billetera}
+              onChange={handleChange}
+              list="wallet-suggestions-edit-ingreso"
+              placeholder="Ej: MP de Manu, Banco Nación…"
+              className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+            />
+            <datalist id="wallet-suggestions-edit-ingreso">
+              {walletOpciones.map((opt) => (
+                <option key={opt} value={opt} />
+              ))}
+            </datalist>
+            {errors.billetera && (
+              <p className="text-[11px] text-rose-400 mt-1">
+                {errors.billetera}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Categoría */}
         <div>
-          <label className="block text-xs sm:text-sm mb-1">
-            Categoría *
+          <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+            Categoría <span className="text-emerald-400">*</span>
           </label>
           <input
             ref={catRef}
             name="categoria"
             value={form.categoria}
             onChange={handleChange}
-            list="cat-suggestions-edit"
+            list="cat-suggestions-edit-ingreso"
             placeholder="Escribí o elegí una categoría"
-            className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm ${
-              errors.categoria ? "border-red-500" : ""
-            }`}
+            className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           />
-          <datalist id="cat-suggestions-edit">
+          <datalist id="cat-suggestions-edit-ingreso">
             {catOpciones.map((opt) => (
               <option key={opt} value={opt} />
             ))}
           </datalist>
           {errors.categoria && (
-            <p className="text-xs text-red-500 mt-1">
+            <p className="text-[11px] text-rose-400 mt-1">
               {errors.categoria}
             </p>
           )}
         </div>
 
         {/* Descripción + Pagado por (opcionales) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs sm:text-sm mb-1">
-              Descripción (opcional)
+            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+              Descripción <span className="text-zinc-500 font-normal">(Opcional)</span>
             </label>
             <input
               name="descripcion"
               value={form.descripcion}
               onChange={handleChange}
               placeholder="Ej: Cobro servicio X"
-              className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
+              className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs sm:text-sm mb-1">
-              Pagado por (opcional)
+            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+              Pagado por <span className="text-zinc-500 font-normal">(Opcional)</span>
             </label>
             <input
               name="pagado_por"
               value={form.pagado_por}
               onChange={handleChange}
               placeholder="Ej: Juan Pérez"
-              className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sm"
+              className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-1">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-zinc-800">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2 rounded-lg text-sm bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-700"
             disabled={submitting}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-sm font-medium border border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition-colors"
           >
             Cancelar
           </button>
           <button
-            id="ingreso-edit-guardar-btn"
             type="submit"
             disabled={disabled}
-            className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold text-white ${
+            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-sm font-bold text-zinc-900 transition-all ${
               disabled
-                ? "bg-blue-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
+                ? "bg-emerald-500/20 text-emerald-500/50 cursor-not-allowed border border-emerald-500/10"
+                : "bg-emerald-400 hover:bg-emerald-500 active:scale-95 shadow-lg shadow-emerald-500/20"
             }`}
           >
-            {submitting ? "Guardando…" : "Guardar cambios"}
+            {submitting ? "Guardando…" : "Actualizar ingreso"}
           </button>
         </div>
       </form>

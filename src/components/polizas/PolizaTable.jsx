@@ -1,14 +1,18 @@
 // src/components/polizas/PolizaTable.jsx
 import React, { useMemo, useState, useCallback, memo } from "react";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaBuilding } from "react-icons/fa"; // 🚀 Icono de sucursal
 import { Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
+
 import PolizaEditModal from "./PolizaEditModal";
 import ConfirmModal from "./ConfirmModal";
 import { deletePoliza } from "../../store/slices/polizasSlice";
 
-/* ---------------- Helpers (sin dayjs) ---------------- */
+/* ---------------- Helpers ---------------- */
 
 function toIntOrNaN(v) {
   const n = Number(v);
@@ -27,69 +31,40 @@ function diffDays(a, b) {
 
 function normalizeEstadoCuotasKey(raw) {
   const v = (raw || "").toString().trim().toLowerCase();
-  if (!v) return "";
-  return v;
+  return v || "";
 }
 
 const CUOTAS_STYLES = {
-  al_dia: {
-    label: "AL DÍA",
-    clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/5",
-  },
-  por_vencer: {
-    label: "POR VENCER",
-    clase: "border-amber-500/60 text-amber-300 bg-amber-500/5",
-  },
-  vence_hoy: {
-    label: "VENCE HOY",
-    clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
-  },
-  vencida_7: {
-    label: "VENCIDA (7 días)",
-    clase: "border-amber-500/70 text-amber-300 bg-amber-500/10",
-  },
-  vencida_30: {
-    label: "VENCIDA (30 días)",
-    clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
-  },
-  vencidas: {
-    label: "VENCIDAS",
-    clase: "border-rose-500/70 text-rose-300 bg-rose-500/10",
-  },
+  al_dia: { label: "AL DÍA", clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/5" },
+  por_vencer: { label: "POR VENCER", clase: "border-amber-500/60 text-amber-300 bg-amber-500/5" },
+  vence_hoy: { label: "VENCE HOY", clase: "border-rose-500/70 text-rose-300 bg-rose-500/10" },
+  vencida_7: { label: "VENCIDA (7 días)", clase: "border-amber-500/70 text-amber-300 bg-amber-500/10" },
+  vencida_30: { label: "VENCIDA (30 días)", clase: "border-rose-500/70 text-rose-300 bg-rose-500/10" },
+  vencidas: { label: "VENCIDAS", clase: "border-rose-500/70 text-rose-300 bg-rose-500/10" },
 };
 
 function computeCuotasBadgeFast(poliza) {
   const keyFromBackend = normalizeEstadoCuotasKey(poliza?.estado_cuotas);
-
   const impagasCount = toIntOrNaN(poliza?.impagas_count ?? poliza?.impagasCount);
   const cuotasArr = Array.isArray(poliza?.cuotas) ? poliza.cuotas : null;
 
   const countImpagas = () => {
     if (!Number.isNaN(impagasCount)) return Math.max(0, impagasCount);
     if (!cuotasArr) return 0;
-    let n = 0;
-    for (const c of cuotasArr) if (!c?.pagado) n += 1;
-    return n;
+    return cuotasArr.filter(c => !c?.pagado).length;
   };
 
   const impagas = countImpagas();
-
   let key = keyFromBackend;
 
   if (!key) {
-    const proxRaw =
-      poliza?.proxima_vencimiento_impaga ||
-      poliza?.proximaVencimientoImpaga ||
-      poliza?.proxima_vencimiento ||
-      null;
-
+    const proxRaw = poliza?.proxima_vencimiento_impaga || poliza?.proximaVencimientoImpaga || poliza?.proxima_vencimiento || null;
     if (impagas <= 0) key = "al_dia";
     else if (proxRaw) {
       const hoy = startOfDay(new Date());
       const prox = startOfDay(new Date(proxRaw));
-      if (Number.isNaN(prox.getTime())) {
-        key = "vencidas";
-      } else {
+      if (Number.isNaN(prox.getTime())) key = "vencidas";
+      else {
         const d = diffDays(hoy, prox);
         if (d === 0) key = "vence_hoy";
         else if (d > 0) {
@@ -97,36 +72,7 @@ function computeCuotasBadgeFast(poliza) {
           else if (d <= 30) key = "vencida_30";
           else key = "vencidas";
         } else {
-          const faltan = Math.abs(d);
-          key = faltan <= 7 ? "por_vencer" : "al_dia";
-        }
-      }
-    } else if (cuotasArr) {
-      if (impagas <= 0) key = "al_dia";
-      else {
-        const hoy = startOfDay(new Date());
-        let proxima = null;
-
-        for (const c of cuotasArr) {
-          if (c?.pagado) continue;
-          if (!c?.fecha_vencimiento) continue;
-          const fv = startOfDay(new Date(c.fecha_vencimiento));
-          if (Number.isNaN(fv.getTime())) continue;
-          if (!proxima || fv.getTime() < proxima.getTime()) proxima = fv;
-        }
-
-        if (!proxima) key = "vencidas";
-        else {
-          const d = diffDays(hoy, proxima);
-          if (d === 0) key = "vence_hoy";
-          else if (d > 0) {
-            if (d <= 7) key = "vencida_7";
-            else if (d <= 30) key = "vencida_30";
-            else key = "vencidas";
-          } else {
-            const faltan = Math.abs(d);
-            key = faltan <= 7 ? "por_vencer" : "al_dia";
-          }
+          key = Math.abs(d) <= 7 ? "por_vencer" : "al_dia";
         }
       }
     } else {
@@ -135,654 +81,198 @@ function computeCuotasBadgeFast(poliza) {
   }
 
   const st = CUOTAS_STYLES[key] || CUOTAS_STYLES.vencidas;
-
-  return {
-    key,
-    label: st.label,
-    clase: st.clase,
-    extra: `${impagas} impagas`,
-  };
+  return { key, label: st.label, clase: st.clase, extra: `${impagas} impagas` };
 }
 
 function useCuotasBadge(poliza) {
-  const id = poliza?.id;
-  const estado_cuotas = poliza?.estado_cuotas || "";
-  const impagas_count = poliza?.impagas_count ?? poliza?.impagasCount ?? "";
-  const prox =
-    poliza?.proxima_vencimiento_impaga ||
-    poliza?.proximaVencimientoImpaga ||
-    poliza?.proxima_vencimiento ||
-    "";
-
-  const cuotasRef = poliza?.cuotas;
-
-  return useMemo(() => computeCuotasBadgeFast(poliza), [
-    id,
-    estado_cuotas,
-    impagas_count,
-    prox,
-    cuotasRef,
-  ]);
+  return useMemo(() => computeCuotasBadgeFast(poliza), [poliza]);
 }
 
-/* ---------------- UI Pieces ---------------- */
+/* ---------------- UI Components ---------------- */
 
-const SortHeader = memo(function SortHeader({
-  label,
-  field,
-  ordering,
-  onOrderingChange,
-  className = "",
-}) {
-  const isActive = ordering && (ordering === field || ordering === `-${field}`);
-  const dir = ordering && ordering.startsWith("-") ? "desc" : "asc";
-
-  const nextOrdering = useCallback(() => {
-    if (!onOrderingChange) return;
-    if (!isActive) return onOrderingChange(field);
-    if (dir === "asc") return onOrderingChange(`-${field}`);
-    return onOrderingChange(field);
-  }, [onOrderingChange, isActive, dir, field]);
+const EstadoPolizaBadge = memo(function EstadoPolizaBadge({ estado }) {
+  const statusStr = (estado || "desconocido").toString().toLowerCase();
+  const configs = {
+    activa: { label: "ACTIVA", clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/10", dot: "bg-emerald-400" },
+    vencida: { label: "VENCIDA", clase: "border-rose-500/60 text-rose-300 bg-rose-500/10", dot: "bg-rose-400 animate-pulse" },
+    cancelada: { label: "CANCELADA", clase: "border-gray-600 text-gray-400 bg-gray-800", dot: "bg-gray-500" },
+    finalizada: { label: "FINALIZADA", clase: "border-blue-500/60 text-blue-300 bg-blue-500/10", dot: "bg-blue-400" }
+  };
+  const config = configs[statusStr] || { label: statusStr.toUpperCase(), clase: "border-white/20 text-white/70 bg-white/5", dot: "bg-white/50" };
 
   return (
-    <th
-      className={`p-3 border-b border-gray-800 bg-gray-900/90 text-xs uppercase tracking-wide text-gray-300 ${
-        onOrderingChange ? "cursor-pointer select-none" : ""
-      } ${className}`}
-      onClick={onOrderingChange ? nextOrdering : undefined}
-      title={onOrderingChange ? "Ordenar" : undefined}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {onOrderingChange && (
-          <span className="text-[10px] text-gray-500">
-            {isActive ? (dir === "asc" ? "▲" : "▼") : "↕"}
-          </span>
-        )}
-      </span>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${config.clase}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+      {config.label}
+    </span>
+  );
+});
+
+const SortHeader = memo(function SortHeader({ label, field, ordering, onOrderingChange, className = "" }) {
+  const isActive = ordering && (ordering === field || ordering === `-${field}`);
+  const dir = ordering?.startsWith("-") ? "desc" : "asc";
+
+  const toggle = () => {
+    if (!onOrderingChange) return;
+    onOrderingChange(isActive && dir === "asc" ? `-${field}` : field);
+  };
+
+  return (
+    <th className={`p-3 border-b border-gray-800 bg-gray-900/90 text-[10px] uppercase font-black tracking-widest text-gray-500 ${onOrderingChange ? "cursor-pointer select-none hover:text-gray-300" : ""} ${className}`} onClick={toggle}>
+      <div className="flex items-center gap-1">
+        {label} {onOrderingChange && <span className="text-[10px]">{isActive ? (dir === "asc" ? "▲" : "▼") : "↕"}</span>}
+      </div>
     </th>
   );
 });
 
-const CuotasBadge = memo(function CuotasBadge({ est }) {
-  if (!est) return null;
+/* ---------------- Rows ---------------- */
+
+const DesktopRow = memo(function DesktopRow({ poliza, zebra, isDeleting, onEditClick, onDeleteClick, isWebAdmin }) {
+  const cuotasEst = useCuotasBadge(poliza);
+  const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
+
   return (
-    <div className="flex flex-col gap-1 text-xs">
-      <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold border ${est.clase}`}
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        {est.label}
-      </span>
-      <span className="text-[11px] text-gray-400">{est.extra}</span>
-    </div>
-  );
-});
+    <tr className={`transition-colors ${zebra} hover:bg-white/[0.02] group`}>
+      <td className="p-3 border-b border-gray-800/50">
+        <Link to={`/polizas/${poliza.id}`} className="text-blue-400 hover:text-blue-300 font-bold text-sm">{poliza.numero_poliza || "-"}</Link>
+        <div className="text-[10px] text-gray-500 font-bold uppercase">{poliza.compania || "S/C"}</div>
+      </td>
 
-/* ---------------- Rows (memo) ---------------- */
+      <td className="p-3 border-b border-gray-800/50">
+        <Link to={`/clientes/${poliza.cliente?.id}`} className="text-gray-200 hover:text-white font-medium text-sm">{clienteNombre || "-"}</Link>
+        <div className="text-[10px] text-gray-500 font-mono">{poliza.cliente?.dni_cuit_cuil}</div>
+      </td>
 
-const DesktopRow = memo(
-  function DesktopRow({ poliza, zebra, isDeleting, onEditClick, onDeleteClick }) {
-    const activa = (poliza?.estado || "").toString().toLowerCase() === "activa";
-    const clienteNombre = `${poliza?.cliente?.nombre || ""} ${
-      poliza?.cliente?.apellido || ""
-    }`.trim();
-
-    const cuotasEst = useCuotasBadge(poliza);
-
-    return (
-      <tr className={`transition-colors ${zebra} hover:bg-gray-850`}>
-        <td className="p-3 border-b border-gray-850 align-top">
-          <Link
-            to={`/polizas/${poliza.id}`}
-            className="text-primary-300 hover:text-primary-200 font-medium text-sm"
-            title="Ver detalle de póliza"
-          >
-            {poliza.numero_poliza || "-"}
-          </Link>
-          {poliza.compania && (
-            <div className="mt-0.5 text-[11px] text-gray-400">{poliza.compania}</div>
-          )}
-        </td>
-
-        <td className="p-3 border-b border-gray-850 align-top">
-          <Link
-            to={`/clientes/${poliza.cliente?.id}`}
-            className="text-sm text-primary-200 hover:text-primary-100"
-            title="Ver perfil de cliente"
-          >
-            {clienteNombre || "-"}
-          </Link>
-          {poliza.cliente?.dni_cuit_cuil && (
-            <div className="mt-0.5 text-[11px] text-gray-400">
-              {poliza.cliente.dni_cuit_cuil}
-            </div>
-          )}
-        </td>
-
-        <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-          {poliza.patente || "-"}
-        </td>
-        <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-          {poliza.marca || "-"}
-        </td>
-        <td className="p-3 border-b border-gray-850 align-top text-sm text-gray-100">
-          {poliza.modelo || "-"}
-        </td>
-
-        <td className="p-3 border-b border-gray-850 align-top">
-          <CuotasBadge est={cuotasEst} />
-        </td>
-
-        <td className="p-3 border-b border-gray-850 align-top text-center">
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-              activa
-                ? "border-emerald-500/60 text-emerald-300 bg-emerald-500/5"
-                : "border-rose-500/60 text-rose-300 bg-rose-500/5"
-            }`}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {activa ? "Activa" : "Inactiva"}
-          </span>
-        </td>
-
-        <td className="p-3 border-b border-gray-850 align-top text-center">
-          <div className="inline-flex items-center gap-2">
-            <button
-              className="p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs transition disabled:opacity-50"
-              onClick={() => onEditClick(poliza)}
-              title="Editar póliza"
-              aria-label="Editar póliza"
-              disabled={isDeleting}
-            >
-              <FaEdit className="w-3.5 h-3.5" />
-            </button>
-            <button
-              className={`p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs transition disabled:opacity-50 ${
-                isDeleting
-                  ? "opacity-60 cursor-wait text-rose-300"
-                  : "text-rose-400 hover:text-rose-300"
-              }`}
-              onClick={() => onDeleteClick(poliza)}
-              title="Eliminar póliza"
-              aria-label="Eliminar póliza"
-              disabled={isDeleting}
-            >
-              <FaTrash className="w-3.5 h-3.5" />
-            </button>
+      {/* 🚀 COLUMNA SUCURSAL (Solo Admin) */}
+      {isWebAdmin && (
+        <td className="p-3 border-b border-gray-800/50">
+          <div className="flex items-center gap-1.5">
+             <div className="h-6 w-6 rounded bg-sky-500/10 flex items-center justify-center text-sky-400 border border-sky-500/20">
+                <FaBuilding className="text-[10px]" />
+             </div>
+             <span className="text-[10px] font-black text-sky-400 uppercase tracking-tighter">
+                {poliza?.oficina_nombre || "LOCAL"}
+             </span>
           </div>
         </td>
-      </tr>
-    );
-  },
-  (prev, next) =>
-    prev.poliza === next.poliza &&
-    prev.isDeleting === next.isDeleting &&
-    prev.zebra === next.zebra
-);
+      )}
 
-const MobileCard = memo(
-  function MobileCard({ poliza, isDeleting, onEditClick, onDeleteClick }) {
-    const clienteNombre = `${poliza?.cliente?.nombre || ""} ${
-      poliza?.cliente?.apellido || ""
-    }`.trim();
+      <td className="p-3 border-b border-gray-800/50 font-mono text-sm text-gray-300">{poliza.patente || "-"}</td>
+      
+      <td className="p-3 border-b border-gray-800/50">
+        <div className="text-xs text-gray-200">{poliza.marca}</div>
+        <div className="text-[10px] text-gray-500 truncate max-w-[120px]">{poliza.modelo}</div>
+      </td>
 
-    const cuotasEst = useCuotasBadge(poliza);
-
-    return (
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[11px] text-gray-400">N° Póliza</div>
-            <Link
-              to={`/polizas/${poliza.id}`}
-              className="font-semibold text-sm text-primary-300 hover:text-primary-200"
-            >
-              {poliza.numero_poliza || "-"}
-            </Link>
-            {poliza.compania && (
-              <div className="mt-0.5 text-[11px] text-gray-500">{poliza.compania}</div>
-            )}
-          </div>
-          <div className={isDeleting ? "opacity-60 shrink-0" : "shrink-0"}>
-            <CuotasBadge est={cuotasEst} />
-          </div>
+      <td className="p-3 border-b border-gray-800/50">
+        <div className={`inline-flex flex-col px-2 py-0.5 rounded border ${cuotasEst.clase}`}>
+          <span className="text-[10px] font-black uppercase tracking-tight">{cuotasEst.label}</span>
+          <span className="text-[9px] opacity-70 font-bold uppercase">{cuotasEst.extra}</span>
         </div>
+      </td>
 
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div className="text-[11px] text-gray-400">Cliente</div>
-            <Link
-              to={`/clientes/${poliza.cliente?.id}`}
-              className="text-sm text-primary-200 hover:text-primary-100"
-            >
-              {clienteNombre || "-"}
-            </Link>
-            {poliza.cliente?.dni_cuit_cuil && (
-              <div className="mt-0.5 text-[11px] text-gray-500">
-                {poliza.cliente.dni_cuit_cuil}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="text-[11px] text-gray-400">Patente</div>
-            <div className="text-sm text-gray-100">{poliza.patente || "-"}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-gray-400">Marca</div>
-            <div className="text-sm text-gray-100">{poliza.marca || "-"}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-gray-400">Modelo</div>
-            <div className="text-sm text-gray-100">{poliza.modelo || "-"}</div>
-          </div>
-        </div>
+      <td className="p-3 border-b border-gray-800/50 text-center">
+        <EstadoPolizaBadge estado={poliza.estado} />
+      </td>
 
-        <div className="mt-4 flex items-center gap-2">
-          <button
-            className="flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-amber-300 hover:text-amber-200 text-xs font-medium transition disabled:opacity-50"
-            onClick={() => onEditClick(poliza)}
-            title="Editar póliza"
-            disabled={isDeleting}
-          >
-            <span className="inline-flex items-center gap-2 justify-center">
-              <FaEdit className="w-3.5 h-3.5" /> Editar
-            </span>
+      <td className="p-3 border-b border-gray-800/50 text-right">
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEditClick(poliza)} className="p-2 rounded-lg bg-gray-800 text-amber-400 hover:bg-amber-400 hover:text-black transition-all" title="Editar">
+            <FaEdit className="text-sm" />
           </button>
-          <button
-            className={`flex-1 px-3 py-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-xs font-medium transition ${
-              isDeleting
-                ? "opacity-60 cursor-wait text-rose-300"
-                : "text-rose-400 hover:text-rose-300"
-            }`}
-            onClick={() => onDeleteClick(poliza)}
-            title="Eliminar póliza"
-            disabled={isDeleting}
-          >
-            <span className="inline-flex items-center gap-2 justify-center">
-              <FaTrash className="w-3.5 h-3.5" /> Eliminar
-            </span>
-          </button>
+          {isWebAdmin && (
+            <button onClick={() => onDeleteClick(poliza)} className="p-2 rounded-lg bg-gray-800 text-rose-400 hover:bg-rose-500 hover:text-white transition-all" title="Eliminar">
+              <FaTrash className="text-sm" />
+            </button>
+          )}
         </div>
-      </div>
-    );
-  },
-  (prev, next) => prev.poliza === next.poliza && prev.isDeleting === next.isDeleting
-);
-
-/* ---------------- Skeleton ---------------- */
-
-const SkeletonRow = memo(function SkeletonRow({ zebra = "bg-gray-900" }) {
-  return (
-    <tr className={`${zebra}`}>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} className="p-3 border-b border-gray-850">
-          <div className="h-4 w-full max-w-[160px] rounded bg-gray-800/80 animate-pulse" />
-        </td>
-      ))}
+      </td>
     </tr>
   );
 });
 
-const SkeletonCard = memo(function SkeletonCard() {
-  return (
-    <div className="p-4">
-      <div className="h-4 w-40 rounded bg-gray-800/80 animate-pulse" />
-      <div className="mt-2 h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
-        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
-        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
-        <div className="h-3 w-28 rounded bg-gray-800/60 animate-pulse" />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="h-8 rounded bg-gray-800/70 animate-pulse" />
-        <div className="h-8 rounded bg-gray-800/70 animate-pulse" />
-      </div>
-    </div>
-  );
-});
-
-/* ---------------- Main ---------------- */
+/* ---------------- Main Component ---------------- */
 
 const PolizaTable = ({
-  polizas = [],
-  status = "idle",
-
-  // page-mode
-  page = 1,
-  pageSize = 10,
-  total = 0,
-
-  ordering,
-  onOrderingChange,
-  onPageChange,
-  onPageSizeChange,
-  onEdit,
-  onDelete,
-
-  // ✅ cursor-mode
-  cursorEnabled = false,
-  hasNext = false,
-  hasPrev = false,
-  onNext,
-  onPrev,
+  polizas = [], status = "idle", page = 1, pageSize = 10, total = 0,
+  ordering, onOrderingChange, onPageChange, onNext, onPrev,
+  cursorEnabled = false, hasNext = false, hasPrev = false
 }) => {
+  const { user } = useAuth();
   const dispatch = useDispatch();
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
   const [editing, setEditing] = useState(null);
   const [openEdit, setOpenEdit] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [openConfirm, setOpenConfirm] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
 
-  const totalPages = useMemo(() => {
-    if (cursorEnabled) return 1; // no aplica
-    const t = Number(total) || 0;
-    const ps = Number(pageSize) || 1;
-    return Math.max(1, Math.ceil(t / ps));
-  }, [total, pageSize, cursorEnabled]);
+  const totalPages = useMemo(() => cursorEnabled ? 1 : Math.ceil(total / pageSize), [total, pageSize, cursorEnabled]);
 
-  const { startIdx, endIdx } = useMemo(() => {
-    // cursor-mode: no conocemos el offset real; mostramos el tamaño actual
-    if (cursorEnabled) {
-      const n = polizas.length || 0;
-      return { startIdx: n ? 1 : 0, endIdx: n };
-    }
+  const handleEditClick = useCallback((p) => { setEditing(p); setOpenEdit(true); }, []);
+  const handleDeleteClick = useCallback((p) => { setDeleting(p); setOpenConfirm(true); }, []);
 
-    const ps = Number(pageSize) || 1;
-    const p = Number(page) || 1;
-    const t = Number(total) || 0;
-
-    if (!polizas.length) return { startIdx: 0, endIdx: 0 };
-    const start = (p - 1) * ps + 1;
-    const end = Math.min(start + polizas.length - 1, t);
-    return { startIdx: start, endIdx: end };
-  }, [polizas.length, page, pageSize, total, cursorEnabled, polizas]);
-
-  const handleEditClick = useCallback(
-    (poliza) => {
-      if (onEdit) return onEdit(poliza);
-      setEditing(poliza);
-      setOpenEdit(true);
-    },
-    [onEdit]
-  );
-
-  const handleDeleteClick = useCallback(
-    (poliza) => {
-      if (onDelete) return onDelete(poliza);
-      setDeleting(poliza);
-      setOpenConfirm(true);
-    },
-    [onDelete]
-  );
-
-  const handleConfirmDelete = useCallback(async () => {
+  const handleConfirmDelete = async () => {
+    if (!deleting) return;
     try {
-      const id = deleting?.id;
-      if (!id) return;
-
-      setDeletingId(id);
-
-      // page-mode: si era la única fila, volvemos una página
-      const shouldGoPrev =
-        !cursorEnabled &&
-        polizas.length === 1 &&
-        page > 1 &&
-        typeof onPageChange === "function";
-
-      await dispatch(deletePoliza(id)).unwrap();
-      toast.success("Póliza eliminada");
-
-      if (shouldGoPrev) onPageChange(page - 1);
+      await dispatch(deletePoliza(deleting.id)).unwrap();
+      toast.success("Póliza eliminada con éxito");
     } catch (e) {
-      const msg = e?.detail || e?.message || "No se pudo eliminar";
-      toast.error(msg);
+      toast.error(e?.message || "Error al eliminar");
     } finally {
-      setOpenConfirm(false);
-      setDeleting(null);
-      setDeletingId(null);
+      setOpenConfirm(false); setDeleting(null);
     }
-  }, [deleting, dispatch, onPageChange, page, polizas.length, cursorEnabled]);
+  };
 
   const isLoading = status === "loading";
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900/95 text-white shadow-sm overflow-hidden">
-      {isLoading && (
-        <div className="px-4 py-2 text-sm text-primary-300 border-b border-gray-800">
-          Cargando pólizas…
-        </div>
-      )}
-
-      <div className="overflow-x-auto hidden md:block">
-        <table className="min-w-full text-left border-collapse">
-          <thead className="sticky top-0 z-10">
+    <div className="rounded-2xl border border-gray-800 bg-[#0b0f1e]/80 backdrop-blur-md text-white shadow-2xl overflow-hidden">
+      {isLoading && <div className="h-1 bg-emerald-500 animate-pulse w-full" />}
+      
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse">
+          <thead>
             <tr>
-              <SortHeader
-                label="N° Póliza"
-                field="numero_poliza"
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-              />
-              <SortHeader
-                label="Cliente"
-                field="cliente__apellido"
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-              />
-              <SortHeader
-                label="Patente"
-                field="patente"
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-              />
-              <SortHeader
-                label="Marca"
-                field="marca"
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-              />
-              <SortHeader
-                label="Modelo"
-                field="modelo"
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-              />
-              <th className="p-3 border-b border-gray-800 bg-gray-900/90 text-xs uppercase tracking-wide text-gray-300">
-                Cuotas
-              </th>
-              <SortHeader
-                label="Estado"
-                field="estado"
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-                className="text-center"
-              />
-              <th className="p-3 border-b border-gray-800 bg-gray-900/90 text-xs uppercase tracking-wide text-gray-300 text-center">
-                Acciones
-              </th>
+              <SortHeader label="Póliza / Cía" field="numero_poliza" ordering={ordering} onOrderingChange={onOrderingChange} />
+              <SortHeader label="Cliente" field="cliente__apellido" ordering={ordering} onOrderingChange={onOrderingChange} />
+              
+              {/* 🚀 HEADER SUCURSAL: Solo Admin */}
+              {isWebAdmin && <SortHeader label="Sucursal" field="oficina__nombre" ordering={ordering} onOrderingChange={onOrderingChange} />}
+              
+              <SortHeader label="Patente" field="patente" ordering={ordering} onOrderingChange={onOrderingChange} />
+              <SortHeader label="Vehículo" field="marca" ordering={ordering} onOrderingChange={onOrderingChange} />
+              <th className="p-3 border-b border-gray-800 bg-gray-900/90 text-[10px] uppercase font-black tracking-widest text-gray-500">Estado Pago</th>
+              <SortHeader label="Estado" field="estado" ordering={ordering} onOrderingChange={onOrderingChange} className="text-center" />
+              <th className="p-3 border-b border-gray-800 bg-gray-900/90 text-right"></th>
             </tr>
           </thead>
-
-          <tbody>
-            {isLoading && polizas.length === 0 ? (
-              <>
-                <SkeletonRow zebra="bg-gray-900" />
-                <SkeletonRow zebra="bg-gray-900/90" />
-                <SkeletonRow zebra="bg-gray-900" />
-                <SkeletonRow zebra="bg-gray-900/90" />
-              </>
-            ) : (
-              polizas.map((poliza, idx) => (
-                <DesktopRow
-                  key={poliza.id}
-                  poliza={poliza}
-                  zebra={idx % 2 === 0 ? "bg-gray-900" : "bg-gray-900/90"}
-                  isDeleting={deletingId === poliza.id}
-                  onEditClick={handleEditClick}
-                  onDeleteClick={handleDeleteClick}
-                />
-              ))
-            )}
+          <tbody className="divide-y divide-gray-800/50">
+            {polizas.map((p, i) => (
+              <DesktopRow key={p.id} poliza={p} zebra={i % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]"} onEditClick={handleEditClick} onDeleteClick={handleDeleteClick} isWebAdmin={isWebAdmin} />
+            ))}
           </tbody>
         </table>
       </div>
 
-      <div className="md:hidden divide-y divide-gray-850">
-        {isLoading && polizas.length === 0 ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
-        ) : (
-          polizas.map((poliza) => (
-            <MobileCard
-              key={poliza.id}
-              poliza={poliza}
-              isDeleting={deletingId === poliza.id}
-              onEditClick={handleEditClick}
-              onDeleteClick={handleDeleteClick}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Footer paginación */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-3 bg-gray-900 border-t border-gray-800">
-        <div className="text-xs sm:text-sm text-gray-300">
-          Mostrando <strong>{startIdx || 0}</strong>–<strong>{endIdx || 0}</strong>{" "}
-          {cursorEnabled ? (
-            <>
-              (en pantalla <strong>{polizas.length || 0}</strong>)
-              {Number(total) > 0 ? (
-                <>
-                  {" "}
-                  · total aprox <strong>{total}</strong>
-                </>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {" "}
-              de <strong>{total || 0}</strong>
-            </>
-          )}
+      {/* Paginación */}
+      <div className="px-6 py-4 flex items-center justify-between bg-black/40 border-t border-gray-800">
+        <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+          {cursorEnabled ? `Registros: ${polizas.length}` : `Página ${page} de ${totalPages} · Total: ${total}`}
         </div>
-
-        {cursorEnabled ? (
-          <div className="flex items-center gap-2 text-sm">
-            <button
-              onClick={() => (onPrev ? onPrev() : onPageChange?.("prev"))}
-              disabled={!hasPrev || isLoading}
-              className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-              title="Anterior"
-            >
-              ‹ Anterior
-            </button>
-            <button
-              onClick={() => (onNext ? onNext() : onPageChange?.("next"))}
-              disabled={!hasNext || isLoading}
-              className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-              title="Siguiente"
-            >
-              Siguiente ›
-            </button>
-
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-              className="ml-2 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1 text-xs sm:text-sm"
-              title="Tamaño de página"
-            >
-              {[10, 25, 50, 100, 200].map((n) => (
-                <option key={n} value={n}>
-                  {n} / pág.
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-sm">
-            <button
-              onClick={() => onPageChange?.(1)}
-              disabled={page <= 1 || isLoading}
-              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-              title="Primera página"
-            >
-              «
-            </button>
-            <button
-              onClick={() => onPageChange?.(page - 1)}
-              disabled={page <= 1 || isLoading}
-              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-              title="Página anterior"
-            >
-              ‹
-            </button>
-            <span className="text-xs sm:text-sm text-gray-300 px-2">
-              Página <strong>{page}</strong> de <strong>{totalPages}</strong>
-            </span>
-            <button
-              onClick={() => onPageChange?.(page + 1)}
-              disabled={page >= totalPages || isLoading}
-              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-              title="Página siguiente"
-            >
-              ›
-            </button>
-            <button
-              onClick={() => onPageChange?.(totalPages)}
-              disabled={page >= totalPages || isLoading}
-              className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:opacity-40"
-              title="Última página"
-            >
-              »
-            </button>
-
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-              className="ml-2 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1 text-xs sm:text-sm"
-              title="Tamaño de página"
-            >
-              {[10, 25, 50, 100].map((n) => (
-                <option key={n} value={n}>
-                  {n} / pág.
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button onClick={() => cursorEnabled ? onPrev?.() : onPageChange?.(page - 1)} disabled={(cursorEnabled ? !hasPrev : page <= 1) || isLoading} className="h-9 px-4 rounded-xl border border-gray-700 bg-gray-800 text-[10px] font-black uppercase tracking-widest hover:bg-gray-700 disabled:opacity-20 transition-all">
+            Anterior
+          </button>
+          <button onClick={() => cursorEnabled ? onNext?.() : onPageChange?.(page + 1)} disabled={(cursorEnabled ? !hasNext : page >= totalPages) || isLoading} className="h-9 px-4 rounded-xl border border-gray-700 bg-gray-800 text-[10px] font-black uppercase tracking-widest hover:bg-gray-700 disabled:opacity-20 transition-all">
+            Siguiente
+          </button>
+        </div>
       </div>
 
-      {/* Modales integrados (fallback interno) */}
-      <PolizaEditModal
-        isOpen={openEdit}
-        poliza={editing}
-        onClose={() => {
-          setOpenEdit(false);
-          setEditing(null);
-        }}
-        onSuccess={() => {
-          setOpenEdit(false);
-          setEditing(null);
-          toast.success("Póliza actualizada");
-        }}
-      />
-
-      <ConfirmModal
-        isOpen={openConfirm}
-        onClose={() => {
-          setOpenConfirm(false);
-          setDeleting(null);
-        }}
-        onConfirm={handleConfirmDelete}
-        message={`¿Eliminar la póliza ${deleting?.numero_poliza || ""}? Esta acción no se puede deshacer.`}
-      />
+      <PolizaEditModal isOpen={openEdit} poliza={editing} onClose={() => { setOpenEdit(false); setEditing(null); }} />
+      <ConfirmModal isOpen={openConfirm} onClose={() => setOpenConfirm(false)} onConfirm={handleConfirmDelete} message={`¿Confirmas la eliminación total de la póliza ${deleting?.numero_poliza}? Esta acción no se puede deshacer.`} />
     </div>
   );
 };

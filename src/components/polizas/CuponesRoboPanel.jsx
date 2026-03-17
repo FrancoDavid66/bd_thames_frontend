@@ -13,6 +13,8 @@ import {
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
 import {
   fetchCuponesRobo,
   actualizarEstadoCuponRobo,
@@ -48,6 +50,7 @@ function formatPeriodo(cupon) {
 }
 
 export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
   const dispatch = useDispatch();
 
   const [uploadingById, setUploadingById] = useState({});
@@ -145,6 +148,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
           monto,
         })
       ).unwrap();
+      toast.success("Pago de cupón registrado correctamente.");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo subir la foto del cupón.");
@@ -168,9 +172,15 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
             <HiShieldCheck className="h-4 w-4" />
           </div>
           <div className="space-y-0.5">
-            <h3 className="text-sm font-semibold text-neutral-50">
-              Cuponeras de robo
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-neutral-50">
+                Cuponeras de robo
+              </h3>
+              {/* 🚀 INDICADOR DE SUCURSAL: Para claridad operativa */}
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase border border-emerald-500/20">
+                {user?.perfil?.oficina_nombre || 'Local'}
+              </span>
+            </div>
             <p className="text-[11px] leading-snug text-neutral-400 max-w-md">
               Cada casillero representa un mes de cobertura de robo. Verde =
               pagado, rosa = vencido, amarillo = al día.
@@ -306,7 +316,7 @@ export default function CuponesRoboPanel({ polizaId, cupones: cuponesProp }) {
                           </span>
                         )}
 
-                        {/* 💥 CHIP DE PAGO MÁS GRANDE */}
+                        {/* CHIP DE PAGO */}
                         {visualEstado === "PAGADA" && tienePagoMeta && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-100">
                             <HiBadgeCheck className="h-4 w-4" />

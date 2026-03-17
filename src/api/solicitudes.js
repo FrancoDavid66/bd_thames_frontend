@@ -1,11 +1,12 @@
-// src/api/solicitudes.js
+// src/services/solicitudes.js
+// Servicio para Solicitudes + Documentos + Empleados (catálogo)
 
 /* ===================== URL helpers ===================== */
 function normalizeBase(raw) {
   if (!raw) return "";
   let base = String(raw).trim();
   base = base.replace(/\s+$/g, "").replace(/\/+$/g, "");
-  base = base.replace(/\/api$/i, "");
+  base = base.replace(/\/api$/i, ""); // saco /api si vino incluido
   try {
     const u = new URL(base);
     const isHttp = u.protocol === "http:";
@@ -15,7 +16,7 @@ function normalizeBase(raw) {
       base = u.toString().replace(/\/+$/g, "");
     }
   } catch {
-    /* ignore */
+    // ignore base rara
   }
   return base;
 }
@@ -27,446 +28,372 @@ const ENV_BASE =
   "";
 
 const ROOT = normalizeBase(ENV_BASE);
+// 👇 Acá unificamos: siempre /api como prefijo
 const API_BASE = ROOT ? `${ROOT}/api` : "/api";
 
-function joinUrl(base, path) {
-  const b = String(base || "").replace(/\/+$/, "");
-  const p = String(path || "").replace(/^\/+/, "");
-  return `${b}/${p}`;
-}
+const API  = `${API_BASE}/solicitudes`;
+const DOCS = `${API_BASE}/documentos`;
+const EMP  = `${API_BASE}/empleados`;
 
-function toHttps(u) {
-  if (!u || typeof u !== "string") return u;
-  try {
-    const url = new URL(u);
-    if (url.protocol === "http:") {
-      url.protocol = "https:";
-      return url.toString();
-    }
-    return u;
-  } catch {
-    return u;
+async function http(method, url, body, opts = {}) {
+  const isForm = body instanceof FormData;
+  const headers = isForm
+    ? { Accept: "application/json" }
+    : {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      };
+
+  // 🚀 PARCHE DE SEGURIDAD: Inyectamos el Token JWT a cada petición
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  
+  console.log(`🔑 [FRONTEND] Evaluando token para ${url}:`, token ? "✅ ENCONTRADO" : "❌ NULO");
+  
+  if (token && token !== "undefined" && token !== "null") {
+    headers["Authorization"] = `Bearer ${token.trim()}`;
   }
-}
 
-/* ===================== Fetch helpers ===================== */
-async function safeJson(res) {
+  let res;
   try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-function firstTruthy(...vals) {
-  for (const v of vals) if (v !== undefined && v !== null && String(v) !== "") return v;
-  return undefined;
-}
-
-async function jsonOrThrow(res, opName = "") {
-  const isNoContent = res.status === 204;
-  const data = isNoContent ? null : await safeJson(res);
-
-  if (!res.ok) {
-    const msg =
-      firstTruthy(
-        data?.detail,
-        data?.message,
-        data?.error,
-        data?.errors && typeof data.errors === "object" ? JSON.stringify(data.errors) : undefined,
-        res.statusText,
-        "Error en la solicitud"
-      ) || "Error en la solicitud";
-
-    const err = new Error(msg);
-    err.payload = data || {};
-    err.status = res.status;
-    err.url = res.url;
-    err.op = opName;
-    try {
-      err.requestId = res.headers?.get?.("X-Request-Id") || res.headers?.get?.("x-request-id") || null;
-    } catch {}
-
-    if (import.meta?.env?.DEV) {
-      console.error(`[API] ${opName || "request"} failed`, {
-        status: res.status,
-        url: res.url,
-        msg,
-        data: err.payload,
-        requestId: err.requestId,
-      });
-    }
+    res = await fetch(url, {
+      method,
+      headers,
+      ...(body ? { body: isForm ? body : JSON.stringify(body) } : {}),
+      ...opts, // Acá es donde viaja el "signal" para abortar peticiones limpiamente
+    });
+  } catch (e) {
+    const err = new Error("No se pudo conectar con el servidor.");
+    err.cause = e;
     throw err;
   }
 
-  if (isNoContent) return true;
-  return data ?? {};
+  // Manejo de error enriquecido
+  if (!res.ok) {
+    const status = res.status;
+    const ctype = res.headers.get("content-type") || "";
+    let msg = `HTTP ${status}`;
+    try {
+      if (ctype.includes("application/json")) {
+        const j = await res.json();
+        const detail =
+          j?.detail ||
+          j?.error ||
+          j?.message ||
+          (Array.isArray(j?.non_field_errors) ? j.non_field_errors.join(", ") : null);
+        if (detail) msg += ` · ${detail}`;
+        else msg += ` · ${JSON.stringify(j).slice(0, 400)}`;
+      } else {
+        const t = await res.text();
+        if (t) msg += ` · ${t.slice(0, 400)}`;
+      }
+    } catch {
+      // Si algo falla al leer el cuerpo, dejamos el msg base
+    }
+    const err = new Error(msg);
+    err.status = status;
+    throw err;
+  }
+
+  // Éxito
+  const ctype = res.headers.get("content-type") || "";
+  if (ctype.includes("application/json")) return res.json();
+  return res; // blobs u otros
 }
 
-function qsFrom(params = {}) {
+function unwrapList(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload?.results && Array.isArray(payload.results)) return payload.results;
+  if (payload?.data && Array.isArray(payload.data)) return payload.data;
+  return [];
+}
+
+/** Construye qs preservando strings vacíos (ej: encargado="") y arrays. */
+function qs(params = {}) {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
-    if (v === undefined || v === null || v === "") return;
-    if (Array.isArray(v)) v.forEach((it) => q.append(k, it));
-    else q.append(k, String(v));
+    if (v === undefined || v === null) return;
+    
+    // 🛡️ PARCHE: Evitamos que el signal u objetos se conviertan a texto en la URL
+    if (typeof v === "object" && !Array.isArray(v)) return;
+
+    if (Array.isArray(v)) {
+      v.forEach((x) => q.append(k, x ?? ""));
+    } else {
+      q.set(k, v === false ? "false" : v === true ? "true" : String(v));
+    }
   });
   const s = q.toString();
   return s ? `?${s}` : "";
 }
 
-function withSignal(opts = {}, signal) {
-  const o = opts && typeof opts === "object" ? opts : {};
-  if (!signal) return o;
-  // no pisar si ya viene uno
-  if (o.signal) return o;
-  return { ...o, signal };
-}
-
-/* ===================== Domain helpers ===================== */
-function assertVencimientoIfRequired({ tipo, vencimiento } = {}) {
-  const t = String(tipo || "").toUpperCase();
-  const isVtv = t === "VTV" || t.includes("DOC_VTV");
-  const isReg = t === "REGISTRO" || t === "REGISTRO_CONDUCIR" || t.includes("DOC_REGISTRO");
-  const isGnc = t === "OBLEA_GNC" || t.includes("GNC");
-  if ((isVtv || isReg || isGnc) && !vencimiento) {
-    const err = new Error("Este documento requiere fecha de vencimiento.");
-    err.code = "REQUIERE_VENCIMIENTO";
-    throw err;
-  }
-}
-
-function normalizeItemsWithHttps(data) {
-  const map = (it) => ({ ...it, url: toHttps(it?.secure_url || it?.url) });
-  if (Array.isArray(data)) return data.map(map);
-  if (data?.results?.length) return { ...data, results: data.results.map(map) };
-  return data;
-}
-
-/* ===================== Endpoints base ===================== */
-const SOL_BASE = joinUrl(API_BASE, "solicitudes");
-const DOCS_BASE = joinUrl(API_BASE, "documentos");
-const EMP_BASE = joinUrl(API_BASE, "empleados");
-
-// Polizas
-const POL_BASE = joinUrl(API_BASE, "polizas");
-const POL_DOCS_BASE = joinUrl(API_BASE, "polizas/documentos");
-const POL_FOTOS_BASE = joinUrl(API_BASE, "polizas/fotos");
-
-const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
-
-/* ===================== Raw API ===================== */
-export const SolicitudesAPI = {
-  async list(params = {}) {
-    const { signal, ...rest } = params || {};
-    const r = await fetch(`${SOL_BASE}/${qsFrom(rest)}`, withSignal({ headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "solicitudes.list");
+export const solicitudesApi = {
+  // -------- Solicitudes --------
+  async listar(params = {}) {
+    // 🛡️ PARCHE: Separamos el signal de los parámetros normales
+    const { signal, ...restParams } = params || {};
+    const opts = signal ? { signal } : {};
+    
+    const data = await http("GET", `${API}/` + qs(restParams), null, opts);
+    return unwrapList(data);
   },
 
-  async getById(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${SOL_BASE}/${id}/`, withSignal({ headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "solicitudes.getById");
+  resumen() {
+    return http("GET", `${API}/resumen/`);
   },
 
-  async create(payload, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${SOL_BASE}/`,
-      withSignal(
-        { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) },
-        signal
-      )
+  crear(body) {
+    // body debe incluir telefono (string) y demás campos
+    return http("POST", `${API}/`, body);
+  },
+
+  eliminar(id) {
+    return http("DELETE", `${API}/${id}/`);
+  },
+
+  // PATCH genérico
+  update(id, body) {
+    return http("PATCH", `${API}/${id}/`, body);
+  },
+
+  // Setear estado
+  setEstado(id, estado) {
+    return http("PATCH", `${API}/${id}/`, { estado });
+  },
+
+  // Comodidad: marcar "en proceso"
+  enProceso(id) {
+    return this.setEstado(id, "EN_REVISION");
+  },
+
+  // NUEVO: crear todo en una transacción (Cliente + DNI + Póliza + Cuotas + Solicitud + Fotos)
+  crearCompleto(payload, opts = {}) {
+    // payload debe seguir el contrato:
+    // { cliente:{...}, cliente_fotos:{...}, poliza:{...}, solicitud:{...}, fotos:{...}, opciones:{...} }
+    return http("POST", `${API}/crear-completo/`, payload, opts);
+  },
+
+  // Terminar con fallback si no existe la acción del backend
+  async terminar(id) {
+    try {
+      return await http("POST", `${API}/${id}/terminar/`, {});
+    } catch {
+      // Fallback: marcar como TERMINADA por PATCH
+      return this.setEstado(id, "TERMINADA");
+    }
+  },
+
+  // Enviar solicitud de seguros
+  enviar(id, payload = {}) {
+    return http("POST", `${API}/${id}/enviar/`, payload);
+  },
+
+  emitirConstancia(id) {
+    return http("POST", `${API}/${id}/emitir_constancia/`, {});
+  },
+
+  convertir(id, poliza_id) {
+    return http(
+      "POST",
+      `${API}/${id}/convertir/`,
+      poliza_id ? { poliza_id } : {}
     );
-    return jsonOrThrow(r, "solicitudes.create");
   },
 
-  async patch(id, patch, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${SOL_BASE}/${id}/`,
-      withSignal(
-        { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(patch) },
-        signal
-      )
-    );
-    return jsonOrThrow(r, "solicitudes.patch");
+  cancelar(id) {
+    return http("POST", `${API}/${id}/cancelar/`, {});
   },
 
-  async update(id, payload, opts = {}) {
-    return this.patch(id, payload, opts);
+  // --- Asignación ---
+  /**
+   * Tomar una solicitud.
+   * Admite:
+   * tomar(id, { empleado_id })
+   * tomar(id, { responsable: 'Nombre' })
+   * tomar(id, empleado_idNumber)
+   * tomar(id, 'Nombre')
+   * tomar(id, 'Nombre', empleado_idNumber)
+   */
+  tomar(id, arg, empleadoId) {
+    let body = {};
+    if (typeof arg === "object" && arg !== null) {
+      body = { ...arg };
+    } else if (typeof arg === "number" && empleadoId === undefined) {
+      body = { empleado_id: arg };
+    } else if (typeof arg === "string" && typeof empleadoId === "number") {
+      body = { responsable: arg, empleado_id: empleadoId };
+    } else if (typeof arg === "string") {
+      body = { responsable: arg };
+    } else if (typeof empleadoId === "number") {
+      body = { empleado_id: empleadoId };
+    }
+    return http("POST", `${API}/${id}/tomar/`, body);
   },
 
-  async remove(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${SOL_BASE}/${id}/`,
-      withSignal({ method: "DELETE", headers: { Accept: "application/json" } }, signal)
-    );
-    if (r.status === 204) return true;
-    return jsonOrThrow(r, "solicitudes.remove");
+  /**
+   * Reasignar una solicitud.
+   * Admite mismas variantes que `tomar`.
+   */
+  reasignar(id, arg, empleadoId) {
+    let body = {};
+    if (typeof arg === "object" && arg !== null) {
+      body = { ...arg };
+    } else if (typeof arg === "number" && empleadoId === undefined) {
+      body = { empleado_id: arg };
+    } else if (typeof arg === "string" && typeof empleadoId === "number") {
+      body = { responsable: arg, empleado_id: empleadoId };
+    } else if (typeof arg === "string") {
+      body = { responsable: arg };
+    } else if (typeof empleadoId === "number") {
+      body = { empleado_id: empleadoId };
+    }
+    return http("POST", `${API}/${id}/reasignar/`, body);
   },
 
-  async crearCompleto(payload, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${SOL_BASE}/crear-completo/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) }, signal)
-    );
-    return jsonOrThrow(r, "solicitudes.crearCompleto");
-  },
+  // NUEVO: marcar tareas operativas de la solicitud (alta_compania / enviar_poliza)
+  /**
+   * @param {number|string} id
+   * @param {"alta"|"alta_compania"|"pendiente_alta"|"envio"|"enviar_poliza"|"pendiente_envio"} key
+   * @param {boolean} done
+   */
+  async marcarTarea(id, key, done) {
+    const map = {
+      alta: "alta_compania",
+      pendiente_alta: "alta_compania",
+      envio: "enviar_poliza",
+      pendiente_envio: "enviar_poliza",
+      enviar_poliza: "enviar_poliza",
+      alta_compania: "alta_compania",
+    };
+    const k = map[key] || key;
+    const payload = { key: k, done: !!done };
 
-  async asociarAPoliza(id, payload, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${SOL_BASE}/${id}/asociar_a_poliza/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload || {}) }, signal)
-    );
-    return jsonOrThrow(r, "solicitudes.asociarAPoliza");
-  },
-
-  /* ---------- Poliza helpers ---------- */
-  async getPolizaById(polizaId, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${POL_BASE}/${polizaId}/`,
-      withSignal({ headers: { Accept: "application/json" } }, signal)
-    );
-    return jsonOrThrow(r, "polizas.getById");
-  },
-
-  async listPolizaDocumentos(polizaId, params = {}) {
-    const { signal, ...rest } = params || {};
-    const r = await fetch(
-      `${POL_DOCS_BASE}/${qsFrom({ poliza: polizaId, ...rest })}`,
-      withSignal({ headers: { Accept: "application/json" } }, signal)
-    );
-    const data = await jsonOrThrow(r, "polizas.listDocumentos");
-    return normalizeItemsWithHttps(data);
-  },
-
-  async listPolizaFotos(polizaId, params = {}) {
-    const { signal, ...rest } = params || {};
-    const r = await fetch(
-      `${POL_FOTOS_BASE}/${qsFrom({ poliza: polizaId, ...rest })}`,
-      withSignal({ headers: { Accept: "application/json" } }, signal)
-    );
-    const data = await jsonOrThrow(r, "polizas.listFotos");
-    return normalizeItemsWithHttps(data);
-  },
-
-  /* ---------- Acciones solicitud ---------- */
-  async tomar(id, { responsable, empleado_id, signal } = {}) {
-    const r = await fetch(
-      `${SOL_BASE}/${id}/tomar/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ responsable, empleado_id }) }, signal)
-    );
-    return jsonOrThrow(r, "solicitudes.tomar");
-  },
-
-  async reasignar(id, { responsable, empleado_id, signal } = {}) {
-    const r = await fetch(
-      `${SOL_BASE}/${id}/reasignar/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ responsable, empleado_id }) }, signal)
-    );
-    return jsonOrThrow(r, "solicitudes.reasignar");
-  },
-
-  async enviar(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${SOL_BASE}/${id}/enviar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "solicitudes.enviar");
-  },
-
-  async emitirConstancia(id, base_verify_url, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${SOL_BASE}/${id}/emitir_constancia/`,
-      withSignal(
-        { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(base_verify_url ? { base_verify_url } : {}) },
-        signal
-      )
-    );
-    return jsonOrThrow(r, "solicitudes.emitirConstancia");
-  },
-
-  async terminar(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${SOL_BASE}/${id}/terminar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "solicitudes.terminar");
-  },
-
-  async cancelar(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${SOL_BASE}/${id}/cancelar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "solicitudes.cancelar");
-  },
-
-  async convertir(id, { poliza_id, signal } = {}) {
-    const r = await fetch(
-      `${SOL_BASE}/${id}/convertir/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(poliza_id ? { poliza_id } : {}) }, signal)
-    );
-    return jsonOrThrow(r, "solicitudes.convertir");
-  },
-
-  async resumen(opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${SOL_BASE}/resumen/`, withSignal({ headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "solicitudes.resumen");
-  },
-
-  comprobantePngUrl(id) {
-    return `${SOL_BASE}/${id}/comprobante_png/`;
-  },
-
-  async descargarComprobantePng(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${SOL_BASE}/${id}/comprobante_png/`, withSignal({ method: "GET" }, signal));
-    if (!r.ok) {
+    // Intentamos acciones dedicadas
+    const candidates = [
+      `${API}/${id}/marcar_tarea/`,
+      `${API}/${id}/tareas/`,
+    ];
+    for (const url of candidates) {
       try {
-        const j = await r.json();
-        const e = new Error(j?.detail || "No se pudo descargar el comprobante");
-        e.payload = j;
-        throw e;
+        return await http("POST", url, payload);
       } catch {
-        throw new Error("No se pudo descargar el comprobante");
+        // probar siguiente
       }
     }
-    return r.blob();
+
+    // Fallback: PATCH directo al campo booleano si existe
+    if (k === "alta_compania" || k === "enviar_poliza") {
+      return http("PATCH", `${API}/${id}/`, { [k]: !!done });
+    }
+
+    // Último recurso: devolver shape mínimo para no romper UI
+    return { id, [k]: !!done };
   },
 
-  /* ---------- Documentos Solicitud (/api/documentos/) ---------- */
-  async listDocumentos(params = {}) {
-    const { signal, ...rest } = params || {};
-    const r = await fetch(`${DOCS_BASE}/${qsFrom(rest)}`, withSignal({ headers: { Accept: "application/json" } }, signal));
-    const data = await jsonOrThrow(r, "documentos.list");
-    return normalizeItemsWithHttps(data);
+  // Si seguís usando el endpoint del backend para el PNG:
+  async descargarComprobante(id, filename = "comprobante.png") {
+    const res = await http("GET", `${API}/${id}/comprobante_png/`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   },
 
-  async crearDocumento(payload, opts = {}) {
-    assertVencimientoIfRequired(payload);
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${DOCS_BASE}/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) }, signal)
+  // -------- Documentos --------
+  async listarDocs(solicitudId) {
+    const data = await http(
+      "GET",
+      `${DOCS}/?solicitud=${encodeURIComponent(solicitudId)}`
     );
-    return jsonOrThrow(r, "documentos.create");
+    return unwrapList(data);
   },
 
-  async updateDocumento(id, patch, opts = {}) {
-    assertVencimientoIfRequired(patch || {});
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${DOCS_BASE}/${id}/`,
-      withSignal({ method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(patch) }, signal)
-    );
-    return jsonOrThrow(r, "documentos.update");
+  crearDoc(payload) {
+    // { solicitud, tipo, url, public_id, nombre, mime }
+    // admite FormData o JSON (http maneja ambos)
+    return http("POST", `${DOCS}/`, payload);
   },
 
-  async deleteDocumento(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${DOCS_BASE}/${id}/`,
-      withSignal({ method: "DELETE", headers: { Accept: "application/json" } }, signal)
-    );
-    if (r.status === 204) return true;
-    return jsonOrThrow(r, "documentos.delete");
+  eliminarDoc(id) {
+    return http("DELETE", `${DOCS}/${id}/`);
   },
 
-  /* ---------- Empleados ---------- */
-  async listEmpleados(params = {}) {
-    const { signal, ...rest } = params || {};
-    const r = await fetch(`${EMP_BASE}/${qsFrom(rest)}`, withSignal({ headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "empleados.list");
+  actualizarDoc(id, data) {
+    return http("PATCH", `${DOCS}/${id}/`, data);
   },
 
-  async empleadosActivos(opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${EMP_BASE}/activos/`, withSignal({ headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "empleados.activos");
+  // -------- Empleados (catálogo) --------
+  async empleadosListar(params = {}) {
+    const { signal, ...restParams } = params || {};
+    const opts = signal ? { signal } : {};
+    const data = await http("GET", `${EMP}/` + qs(restParams), null, opts);
+    return unwrapList(data);
   },
 
-  async crearEmpleado(payload, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${EMP_BASE}/`,
-      withSignal({ method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload || {}) }, signal)
-    );
-    return jsonOrThrow(r, "empleados.create");
+  async empleadosActivos() {
+    const data = await http("GET", `${EMP}/activos/`);
+    return unwrapList(data);
   },
 
-  async activarEmpleado(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(`${EMP_BASE}/${id}/activar/`, withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal));
-    return jsonOrThrow(r, "empleados.activar");
+  // --- ABM Empleados ---
+  crearEmpleado(body) {
+    // body: { nombre: string, activo?: boolean }
+    return http("POST", `${EMP}/`, body);
   },
 
-  async desactivarEmpleado(id, opts = {}) {
-    const { signal } = opts || {};
-    const r = await fetch(
-      `${EMP_BASE}/${id}/desactivar/`,
-      withSignal({ method: "POST", headers: { Accept: "application/json" } }, signal)
-    );
-    return jsonOrThrow(r, "empleados.desactivar");
+  actualizarEmpleado(id, body) {
+    // body: { nombre?: string, activo?: boolean }
+    return http("PATCH", `${EMP}/${id}/`, body);
   },
-};
 
-/* ===================== Facade (nombres actuales) ===================== */
-export const solicitudesApi = {
-  // ✅ ahora soporta: solicitudesApi.listar({ signal })
-  listar: (params = {}) => SolicitudesAPI.list(params),
+  eliminarEmpleado(id) {
+    return http("DELETE", `${EMP}/${id}/`);
+  },
 
-  listarDocs: (solicitudId, extra = {}) =>
-    SolicitudesAPI.listDocumentos({ solicitud: solicitudId, ...extra }).then((data) =>
-      Array.isArray(data) ? data : data?.results || data?.data || []
-    ),
+  // -------- Asociar a póliza (GRANULAR) --------
+  /**
+   * Copia o mueve documentos/fotos seleccionados de la solicitud a la póliza indicada
+   * y opcionalmente actualiza documentación del cliente (DNI/Pasaporte).
+   *
+   * @param {number|string} id  ID de la solicitud
+   * @param {{
+   * poliza_id:number|string,
+   * modo?:'copiar'|'mover',
+   * incluir?:{fotos?:string[], docs?:string[]},
+   * cliente?:{dni_frente?:boolean,dni_dorso?:boolean,pasaporte_frente?:boolean,pasaporte_dorso?:boolean}
+   * }} params
+   */
+  asociarAPoliza(id, { poliza_id, modo = "copiar", incluir, cliente } = {}) {
+    if (!poliza_id) throw new Error("Falta poliza_id");
 
-  listarDocsPoliza: (polizaId, extra = {}) =>
-    SolicitudesAPI.listPolizaDocumentos(polizaId, extra).then((data) =>
-      Array.isArray(data) ? data : data?.results || data?.data || []
-    ),
+    const payload = { poliza_id, modo };
 
-  listarFotosPoliza: (polizaId, extra = {}) =>
-    SolicitudesAPI.listPolizaFotos(polizaId, extra).then((data) =>
-      Array.isArray(data) ? data : data?.results || data?.data || []
-    ),
+    // incluir: solo mando si hay arrays no vacíos
+    if (incluir && (Array.isArray(incluir.fotos) || Array.isArray(incluir.docs))) {
+      const inc = {};
+      if (Array.isArray(incluir.fotos) && incluir.fotos.length)
+        inc.fotos = incluir.fotos;
+      if (Array.isArray(incluir.docs) && incluir.docs.length)
+        inc.docs = incluir.docs;
+      if (Object.keys(inc).length) payload.incluir = inc;
+    }
 
-  crearDoc: (payload, opts) => SolicitudesAPI.crearDocumento(payload, opts),
-  actualizarDoc: (id, patch, opts) => SolicitudesAPI.updateDocumento(id, patch, opts),
-  eliminarDoc: (id, opts) => SolicitudesAPI.deleteDocumento(id, opts),
+    // cliente: mando solo flags presentes (true/false)
+    if (cliente && typeof cliente === "object") {
+      const c = {};
+      ["dni_frente", "dni_dorso", "pasaporte_frente", "pasaporte_dorso"].forEach(
+        (k) => {
+          if (k in cliente) c[k] = !!cliente[k];
+        }
+      );
+      if (Object.keys(c).length) payload.cliente = c;
+    }
 
-  crearCompleto: (payload, opts) => SolicitudesAPI.crearCompleto(payload, opts),
-
-  empleadosActivos: (opts) => SolicitudesAPI.empleadosActivos(opts),
-  crearEmpleado: (payload, opts) => SolicitudesAPI.crearEmpleado(payload, opts),
-
-  tomar: (id, body) => SolicitudesAPI.tomar(id, body),
-  reasignar: (id, body) => SolicitudesAPI.reasignar(id, body),
-  enviar: (id, opts) => SolicitudesAPI.enviar(id, opts),
-  terminar: (id, opts) => SolicitudesAPI.terminar(id, opts),
-  cancelar: (id, opts) => SolicitudesAPI.cancelar(id, opts),
-  convertir: (id, body) => SolicitudesAPI.convertir(id, body),
-
-  resumen: (opts) => SolicitudesAPI.resumen(opts),
-
-  comprobantePngUrl: (id) => SolicitudesAPI.comprobantePngUrl(id),
-  descargarComprobantePng: (id, opts) => SolicitudesAPI.descargarComprobantePng(id, opts),
-
-  asociarAPoliza: (id, body, opts) => SolicitudesAPI.asociarAPoliza(id, body, opts),
-
-  // ✅ NO refresca por defecto (evita 3 requests extra)
-  async asociarAPolizaYRefrescar(id, body = {}, opts = {}) {
-    const { refresh = false, signal } = opts || {};
-    const summary = await SolicitudesAPI.asociarAPoliza(id, body, { signal });
-    const polizaId = summary?.poliza_id;
-    if (!refresh || !polizaId) return { summary };
-
-    const [poliza, documentos, fotos] = await Promise.all([
-      SolicitudesAPI.getPolizaById(polizaId, { signal }),
-      SolicitudesAPI.listPolizaDocumentos(polizaId, { signal }).then((d) => (Array.isArray(d) ? d : d?.results || d || [])),
-      SolicitudesAPI.listPolizaFotos(polizaId, { signal }).then((f) => (Array.isArray(f) ? f : f?.results || f || [])),
-    ]);
-    return { summary, poliza, documentos, fotos };
+    return http("POST", `${API}/${id}/asociar_a_poliza/`, payload);
   },
 };
 

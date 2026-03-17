@@ -3,21 +3,8 @@ import { useEffect, useState } from "react";
 import AnimatedCard from "./AnimatedCard";
 import { HiOfficeBuilding, HiCalendar, HiChartBar } from "react-icons/hi";
 
-const OFICINA_LABELS = {
-  "1": "5 esquinas (1)",
-  "2": "axion (2)",
-  "3": "kilometro 39 (3)",
-  OTRAS: "Otras / sin mapear",
-  SIN_OFICINA: "Sin oficina",
-};
-
-const getOficinaLabel = (value) => {
-  const v = value === null || value === undefined ? "" : String(value).trim();
-  if (!v) return "";
-  return OFICINA_LABELS[v] || v;
-};
-
-const sortOficinas = (arr) => {
+// 🚀 Ordenamiento inteligente
+const sortOficinas = (arr, getOficinaNombre) => {
   const order = ["1", "2", "3", "OTRAS", "SIN_OFICINA"];
   const orderIdx = new Map(order.map((v, i) => [v, i]));
 
@@ -28,11 +15,15 @@ const sortOficinas = (arr) => {
     const ia = orderIdx.has(A) ? orderIdx.get(A) : 999;
     const ib = orderIdx.has(B) ? orderIdx.get(B) : 999;
 
-    if (ia !== ib) return ia - ib;
+    if (ia !== 999 || ib !== 999) {
+      if (ia !== ib) return ia - ib;
+    }
 
-    // resto: alfabético por label (para que sea “lindo” si hay valores legacy)
-    const la = getOficinaLabel(A).toLowerCase();
-    const lb = getOficinaLabel(B).toLowerCase();
+    const nameA = typeof getOficinaNombre === "function" ? getOficinaNombre(A) : A;
+    const nameB = typeof getOficinaNombre === "function" ? getOficinaNombre(B) : B;
+
+    const la = String(nameA || "").toLowerCase();
+    const lb = String(nameB || "").toLowerCase();
     return la.localeCompare(lb, "es");
   });
 };
@@ -49,15 +40,13 @@ export default function EstadisticasFilters({
   setFuenteSnapshot,
   desde,
   hasta,
+  getOficinaNombre, // 🚀 ACÁ RECIBE LA FUNCIÓN
 }) {
-  // dedupe + orden
   const raw = Array.isArray(oficinasOptions) ? oficinasOptions : [];
-  const unique = Array.from(
-    new Set(raw.map((x) => String(x ?? "").trim()).filter(Boolean))
-  );
-  const ordered = sortOficinas(unique);
+  const unique = Array.from(new Set(raw.map((x) => String(x ?? "").trim()).filter(Boolean)));
+  
+  const ordered = sortOficinas(unique, getOficinaNombre);
 
-  // ✅ FIX: input de año "amigable" (permite tipear 2026 sin que rebote / se corrija raro)
   const currentYear = new Date().getFullYear();
   const minYear = 2000;
   const maxYear = currentYear + 1;
@@ -65,53 +54,37 @@ export default function EstadisticasFilters({
   const [anioInput, setAnioInput] = useState(String(anio ?? ""));
 
   useEffect(() => {
-    // sincroniza si cambia desde afuera (refresh / reset / etc.)
     setAnioInput(String(anio ?? ""));
   }, [anio]);
 
   const commitYear = (rawValue) => {
     const t = String(rawValue ?? "").trim();
-
-    // si lo deja vacío, volvemos al valor actual
     if (!t) {
       setAnioInput(String(anio ?? ""));
       return;
     }
-
-    // nos quedamos con solo dígitos y máximo 4
     const onlyDigits = t.replace(/\D+/g, "").slice(0, 4);
     const n = Number(onlyDigits);
-
     if (!Number.isFinite(n)) {
       setAnioInput(String(anio ?? ""));
       return;
     }
-
     const clamped = Math.max(minYear, Math.min(maxYear, n));
     setAnioInput(String(clamped));
     onAnioChange(String(clamped));
   };
 
   const handleYearChange = (e) => {
-    // usamos text + inputMode numeric para evitar "quirks" del type=number (y el bug del 1902)
     const v = e.target.value;
-
-    // dejamos que el usuario tipeé (incluso parcial) sin validar agresivo
     const onlyDigits = String(v ?? "").replace(/\D+/g, "").slice(0, 4);
     setAnioInput(onlyDigits);
-
-    // si ya tiene 4 dígitos, lo validamos y aplicamos
     if (onlyDigits.length === 4) {
       commitYear(onlyDigits);
     }
   };
 
   return (
-    <AnimatedCard
-      index={1}
-      interactive={false}
-      glow="from-emerald-500/40 via-cyan-500/25 to-transparent"
-    >
+    <AnimatedCard index={1} interactive={false} glow="from-emerald-500/40 via-cyan-500/25 to-transparent">
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {/* Oficina */}
         <div className="flex flex-col gap-1">
@@ -127,17 +100,16 @@ export default function EstadisticasFilters({
             <option value="">Todas las oficinas</option>
 
             {ordered.map((of) => {
-              const label = getOficinaLabel(of);
-              const showCode =
-                of === "1" ||
-                of === "2" ||
-                of === "3" ||
-                of === "OTRAS" ||
-                of === "SIN_OFICINA";
+              // 🚀 ACÁ CONVERTIMOS EL ID AL NOMBRE REAL
+              let label = typeof getOficinaNombre === "function" ? getOficinaNombre(of) : of;
+              
+              // Limpiamos los textos legacy por si acaso
+              label = String(label).replace(/\s*\(\d+\)$/, "");
+              const isNumeric = !isNaN(of) && String(of).trim() !== "";
 
               return (
                 <option key={of} value={of}>
-                  {showCode ? `${label}` : label}
+                  {isNumeric ? `${of} (${label})` : label}
                 </option>
               );
             })}
@@ -150,7 +122,6 @@ export default function EstadisticasFilters({
             <HiCalendar className="text-sky-300" />
             Año
           </label>
-
           <input
             type="text"
             inputMode="numeric"
@@ -162,15 +133,10 @@ export default function EstadisticasFilters({
             onChange={handleYearChange}
             onBlur={() => commitYear(anioInput)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.currentTarget.blur();
-              }
+              if (e.key === "Enter") e.currentTarget.blur();
             }}
           />
-
-          <div className="text-[10px] text-slate-400">
-            Rango: {minYear}–{maxYear}
-          </div>
+          <div className="text-[10px] text-slate-400">Rango: {minYear}–{maxYear}</div>
         </div>
 
         {/* Mes */}

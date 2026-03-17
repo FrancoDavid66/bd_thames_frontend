@@ -373,7 +373,6 @@ function CuotaAlertaCard({ cuota, dias }) {
       className={`rounded-2xl border p-4 ${classes}`}
     >
       <div className="space-y-2">
-        {/* ✅ ASEGURADO MÁS GRANDE */}
         <div className="flex items-start justify-between gap-2">
           <p className="text-base sm:text-lg font-extrabold tracking-tight">{asegurado}</p>
           {patente && (
@@ -383,7 +382,6 @@ function CuotaAlertaCard({ cuota, dias }) {
           )}
         </div>
 
-        {/* Etiquetas (oficina/compañía) */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2 py-0.5 text-xs">
             <HiOfficeBuilding className="w-4 h-4" />
@@ -395,7 +393,6 @@ function CuotaAlertaCard({ cuota, dias }) {
           </span>
         </div>
 
-        {/* Estado */}
         <div className="flex items-center gap-2 text-sm">
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-white/10">
             <Icon className="w-4 h-4" />
@@ -403,7 +400,6 @@ function CuotaAlertaCard({ cuota, dias }) {
           <p className="font-medium">{label}</p>
         </div>
 
-        {/* ✅ VEHÍCULO con mejor jerarquía */}
         <p className="opacity-95">
           <span className="font-semibold">{vehiculo || "Vehículo"}</span>
         </p>
@@ -462,8 +458,9 @@ function BucketSection({ bucket, items }) {
  * Props opcionales (modo controlado):
  * - oficina: "ALL" | "1" | "2" | "3"
  * - onOficinaChange(oficinaKey)
+ * - isWebAdmin: boolean 🚀 (NUEVO)
  */
-export default function CuotasAlertas({ oficina, onOficinaChange }) {
+export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) {
   const dispatch = useDispatch();
   const { cuotasAVencer, status, error } = useSelector((s) => s.pagos);
 
@@ -728,7 +725,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
     });
   };
 
-  // ✅ NUEVO: si aún no buscaste, mostramos un panel liviano (no hace fetch)
+  // ✅ si aún no buscaste, mostramos un panel liviano
   if (!hasSearched) {
     return (
       <motion.div
@@ -788,7 +785,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
     );
   }
 
-  // si buscaste y no hay resultados, mostramos estado vacío (en vez de null)
+  // si buscaste y no hay resultados
   if (!cuotasAVencer || cuotasAVencer.length === 0) {
     return (
       <motion.div
@@ -819,7 +816,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
-          Probá cambiar filtros y tocar <span className="font-semibold">Buscar</span> otra vez.
+          Probá cambiar filtros y tocá <span className="font-semibold">Buscar</span> otra vez.
         </div>
       </motion.div>
     );
@@ -955,48 +952,58 @@ export default function CuotasAlertas({ oficina, onOficinaChange }) {
         )}
       </div>
 
-      {/* Chips oficina */}
+      {/* ✅ CHIPS OFICINA CON ESCUDO BLINDADO */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="inline-flex items-center gap-2 text-xs text-slate-300">
           <HiOfficeBuilding className="w-4 h-4" />
           Oficina:
         </span>
 
-        {FILTERS.map((f) => {
-          const active = oficinaSel === f.key;
-          const count = conteosOficina?.[f.key] ?? 0;
-          const disabled = f.key !== "ALL" && count === 0;
+        {isWebAdmin ? (
+          FILTERS.map((f) => {
+            const active = oficinaSel === f.key;
+            const count = conteosOficina?.[f.key] ?? 0;
+            const disabled = f.key !== "ALL" && count === 0;
 
-          return (
-            <motion.button
-              key={f.key}
-              type="button"
-              whileHover={!disabled ? { scale: 1.03 } : undefined}
-              whileTap={!disabled ? { scale: 0.98 } : undefined}
-              onClick={() => {
-                if (disabled) return;
-                setOficinaSel(f.key);
-              }}
-              className={[
-                "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition backdrop-blur-md",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
-                f.ring,
-                active ? f.active : f.inactive,
-                disabled ? "opacity-35 cursor-not-allowed hover:scale-100" : "cursor-pointer",
-              ].join(" ")}
-            >
-              <span className="font-semibold">{f.label}</span>
-              <span
+            return (
+              <motion.button
+                key={f.key}
+                type="button"
+                whileHover={!disabled ? { scale: 1.03 } : undefined}
+                whileTap={!disabled ? { scale: 0.98 } : undefined}
+                onClick={() => {
+                  if (disabled) return;
+                  setOficinaSel(f.key);
+                }}
                 className={[
-                  "ml-1 inline-flex min-w-[28px] justify-center rounded-xl px-2 py-0.5 text-xs font-semibold",
-                  active ? f.badgeActive : f.badgeInactive,
+                  "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition backdrop-blur-md",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
+                  f.ring,
+                  active ? f.active : f.inactive,
+                  disabled ? "opacity-35 cursor-not-allowed hover:scale-100" : "cursor-pointer",
                 ].join(" ")}
               >
-                {count}
-              </span>
-            </motion.button>
-          );
-        })}
+                <span className="font-semibold">{f.label}</span>
+                <span
+                  className={[
+                    "ml-1 inline-flex min-w-[28px] justify-center rounded-xl px-2 py-0.5 text-xs font-semibold",
+                    active ? f.badgeActive : f.badgeInactive,
+                  ].join(" ")}
+                >
+                  {count}
+                </span>
+              </motion.button>
+            );
+          })
+        ) : (
+          // 🚀 Si no es admin, mostramos solo su oficina fija como un badge
+          <div className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition backdrop-blur-md border-emerald-400/50 bg-emerald-500/10 text-emerald-200">
+            <span className="font-semibold">{getFilterMeta(oficinaSel).label}</span>
+            <span className="ml-1 inline-flex min-w-[28px] justify-center rounded-xl px-2 py-0.5 text-xs font-semibold bg-slate-950/30 text-emerald-100">
+              {conteosOficina?.[oficinaSel] ?? 0}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Buckets */}

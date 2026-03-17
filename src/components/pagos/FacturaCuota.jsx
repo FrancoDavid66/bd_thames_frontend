@@ -230,10 +230,6 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
         {/* Footer */}
         <div className="text-center text-xs text-neutral-200/70 print:text-neutral-600">
           Gracias por confiar en nosotros.
-          <br />
-          <span className="opacity-70">
-            STARKE | Sistema de Gestión de Seguros
-          </span>
         </div>
       </div>
     </div>

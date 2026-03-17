@@ -32,6 +32,8 @@ export default function RecordatoriosCuotasModal({
   sending = false,
   // onEnviar(medio_cobro_id | null, oficina: "1" | "2") => {hoy, procesadas, enviados, errores}
   onEnviar,
+  isWebAdmin, // 🚀 ESCUDO: Traemos el flag de si es admin
+  userOficina, // 🚀 ESCUDO: Traemos la oficina del usuario actual
 }) {
   const dispatch = useDispatch();
 
@@ -100,6 +102,7 @@ export default function RecordatoriosCuotasModal({
         const procesadas = result?.procesadas ?? 0;
         toast.success(`Recordatorios enviados: ${enviados} de ${procesadas}.`);
       }
+      onClose(); // 🚀 Cerramos el modal al terminar para mejor UX
     } catch (e) {
       console.error("[PAGOS][RecordatoriosCuotas] Error al enviar:", e);
       toast.error("No se pudieron enviar los recordatorios.");
@@ -464,41 +467,61 @@ export default function RecordatoriosCuotasModal({
                     </>
                   )}
 
-                  {/* Envío por oficina (cada botón envía) */}
+                  {/* 🚀 ESCUDO DE SUCURSAL: Mostrar opciones separadas SOLO si es Admin */}
                   <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 space-y-2">
                     <p className="text-xs text-neutral-200 font-medium">
-                      ¿Desde qué oficina se envían los mensajes?
+                      ¿Hacia qué clientes enviamos los recordatorios?
                     </p>
-                    <p className="text-[11px] text-neutral-400">
-                      Cada botón envía usando el WhatsApp de su oficina.
+                    <p className="text-[11px] text-neutral-400 mb-2">
+                      {isWebAdmin 
+                        ? "Elegí la oficina desde la cual vas a enviar las alertas." 
+                        : "El sistema enviará alertas automáticamente a los clientes de tu sucursal."}
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleEnviarPorOficina("1")}
-                        disabled={!canEnviar || saving}
-                        className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
-                          !canEnviar || saving
-                            ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
-                            : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
-                        }`}
-                      >
-                        <span>Oficina 1 – 5 esquinas</span>
-                      </button>
+                      {isWebAdmin ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleEnviarPorOficina("1")}
+                            disabled={!canEnviar || saving}
+                            className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                              !canEnviar || saving
+                                ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
+                                : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                            }`}
+                          >
+                            <span>Oficina 1 – 5 esquinas</span>
+                          </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleEnviarPorOficina("2")}
-                        disabled={!canEnviar || saving}
-                        className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
-                          !canEnviar || saving
-                            ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
-                            : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
-                        }`}
-                      >
-                        <span>Oficina 2 – Axion</span>
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEnviarPorOficina("2")}
+                            disabled={!canEnviar || saving}
+                            className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                              !canEnviar || saving
+                                ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
+                                : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                            }`}
+                          >
+                            <span>Oficina 2 – Axion</span>
+                          </button>
+                        </>
+                      ) : (
+                         // 🚀 BÓVEDA CERRADA: Si NO es Admin, solo puede enviar a su propia oficina
+                         <button
+                            type="button"
+                            onClick={() => handleEnviarPorOficina(userOficina)}
+                            disabled={!canEnviar || saving}
+                            className={`w-full rounded-xl border px-3 py-2 text-sm font-bold flex items-center justify-center gap-2 ${
+                              !canEnviar || saving
+                                ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
+                                : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                            }`}
+                          >
+                            <span>Enviar a los clientes de mi sucursal</span>
+                          </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -507,7 +530,7 @@ export default function RecordatoriosCuotasModal({
                 <div className="px-6 pb-5 pt-2 flex items-center justify-between gap-3 border-t border-neutral-800">
                   <p className="text-[11px] text-neutral-400 max-w-xs">
                     Se enviará un solo WhatsApp por cliente agrupando sus cuotas.
-                    El alias elegido y la oficina seleccionada se usan en el mensaje.
+                    El alias elegido se usará en el mensaje.
                   </p>
                   <div className="flex items-center gap-2">
                     <button
@@ -516,19 +539,8 @@ export default function RecordatoriosCuotasModal({
                       disabled={sending}
                       className="h-10 px-4 rounded-2xl bg-neutral-900 border border-neutral-700 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
                     >
-                      Cancelar
+                      Cerrar ventana
                     </button>
-
-                    <div className="hidden sm:flex items-center gap-2">
-                      <div className="h-10 px-3 rounded-2xl bg-neutral-900 border border-neutral-800 text-xs text-neutral-300 inline-flex items-center gap-2">
-                        {sending ? (
-                          <span className="inline-block w-3 h-3 border-2 border-neutral-700 border-t-neutral-200 rounded-full animate-spin" />
-                        ) : (
-                          <HiSpeakerphone className="w-4 h-4" />
-                        )}
-                        <span>{sending ? "Enviando..." : "Elegí oficina arriba"}</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </Dialog.Panel>

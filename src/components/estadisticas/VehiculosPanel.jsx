@@ -94,7 +94,13 @@ export default function VehiculosPanel({
     try {
       const params = buildParams(filtros);
       const url = `${apiBase}estadisticas/vehiculos/resumen/?${params.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
+      
+      // 🚀 INYECTAMOS EL TOKEN ACÁ
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const res = await fetch(url, { 
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
       if (!res.ok) {
         let msg = `Error HTTP ${res.status}`;
         try {
@@ -127,7 +133,13 @@ export default function VehiculosPanel({
       params.set("dir", "desc");
 
       const url = `${apiBase}estadisticas/vehiculos/list/?${params.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
+      
+      // 🚀 INYECTAMOS EL TOKEN ACÁ TAMBIÉN
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const res = await fetch(url, { 
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
       if (!res.ok) {
         let msg = `Error HTTP ${res.status}`;
         try {

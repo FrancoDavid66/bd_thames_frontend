@@ -237,8 +237,16 @@ const labelPeriodo = (agrupacion, periodo) => {
   return d.format("DD/MM/YYYY");
 };
 
-async function fetchJsonTry(url, options) {
-  const res = await fetch(url, options);
+// 🚀 ACÁ ESTÁ EL PARCHE: Inyectamos el Token JWT en la cabecera
+async function fetchJsonTry(url, options = {}) {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+  const headers = {
+    ...options.headers,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+
+  const res = await fetch(url, { ...options, headers });
+  
   if (!res.ok) {
     const err = new Error(`HTTP ${res.status}`);
     err.status = res.status;

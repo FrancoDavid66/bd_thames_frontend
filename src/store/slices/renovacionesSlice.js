@@ -5,10 +5,10 @@ import axios from "axios";
 /**
  * ✅ Base URL unificada (MISMA idea que App.jsx)
  * Prioridad:
- *  - VITE_API_BASE
- *  - VITE_API_URL
- *  - window.__API_URL__
- *  - "/api/" (proxy / mismo dominio)
+ * - VITE_API_BASE
+ * - VITE_API_URL
+ * - window.__API_URL__
+ * - "/api/" (proxy / mismo dominio)
  *
  * ✅ En producción: si está seteado a localhost/127.0.0.1, lo ignoramos y usamos "/api/"
  */
@@ -59,7 +59,16 @@ const API_BASE = resolveApiBase();
 // ✅ IMPORTANTE: baseURL termina en "/api/" o es "/api/"
 const api = axios.create({
   baseURL: API_BASE,
-  withCredentials: true,
+  withCredentials: true, // Esto es para cookies (si usas session auth)
+});
+
+// 🚀 BLINDAJE DE AXIOS: Inyectamos el Token JWT automáticamente en cada petición que use `api`
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  if (token && token !== "undefined" && token !== "null") {
+    config.headers.Authorization = `Bearer ${token.trim()}`;
+  }
+  return config;
 });
 
 /** TTL del cache de la bandeja (ms) */
@@ -136,14 +145,14 @@ const normalizeOficinas = (data) => {
 /**
  * Construye querystring estable y limpio.
  * Soporta filtros típicos:
- *  - dias
- *  - solo_pendientes
- *  - bucket (🆕 filtros rápidos: hoy/en_1/en_2/en_3/proximos_3/vencida_1/..)
- *  - search
- *  - ordering
- *  - page / page_size
- *  - estado / fase / compania / oficina / cliente / patente / asegurado / sin_numero / solo_activas (opcionales)
- *  - fecha (opcional) YYYY-MM-DD
+ * - dias
+ * - solo_pendientes
+ * - bucket (🆕 filtros rápidos: hoy/en_1/en_2/en_3/proximos_3/vencida_1/..)
+ * - search
+ * - ordering
+ * - page / page_size
+ * - estado / fase / compania / oficina / cliente / patente / asegurado / sin_numero / solo_activas (opcionales)
+ * - fecha (opcional) YYYY-MM-DD
  *
  * Importante: ignora "force" (solo se usa para bypass de cache)
  */
@@ -202,11 +211,11 @@ export const buildRenovacionesQuery = (params = {}) => {
 /**
  * ✅ Querystring para RESUMEN (sin paginación ni ordering).
  * Soporta:
- *  - dias
- *  - solo_pendientes
- *  - search
- *  - oficina / compania / estado / fase / cliente / patente / asegurado / sin_numero / solo_activas
- *  - fecha (opcional) YYYY-MM-DD
+ * - dias
+ * - solo_pendientes
+ * - search
+ * - oficina / compania / estado / fase / cliente / patente / asegurado / sin_numero / solo_activas
+ * - fecha (opcional) YYYY-MM-DD
  *
  * Nota: a propósito NO incluye "bucket" para que el resumen siga mostrando TODO.
  */
@@ -271,6 +280,7 @@ const normalizeResumen = (data) => {
     solo_pendientes: !!safe?.solo_pendientes,
     pendientes_ventana: Number(safe?.pendientes_ventana || 0),
     buckets: {
+      todas: Number(buckets?.todas || 0), // 🚀 Sumamos `todas` para el fallback si hace falta
       vence_hoy: Number(buckets?.vence_hoy || 0),
       vence_en_1: Number(buckets?.vence_en_1 || 0),
       vence_en_2: Number(buckets?.vence_en_2 || 0),
@@ -280,7 +290,8 @@ const normalizeResumen = (data) => {
       vencida_2: Number(buckets?.vencida_2 || 0),
       vencida_3: Number(buckets?.vencida_3 || 0),
       vencidas_3: Number(buckets?.vencidas_3 || 0),
-      vencidas_4_mas: Number(buckets?.vencidas_4_mas || 0), // 🆕
+      vencidas: Number(buckets?.vencidas || 0), // 🚀 Agregado soporte
+      vencidas_4_mas: Number(buckets?.vencidas_4_mas || 0), 
     },
   };
 };
@@ -316,7 +327,6 @@ export const fetchRenovaciones = createAsyncThunk(
         };
       }
 
-      // ⚠️ NO usar "/polizas..." porque rompe /api/ en axios baseURL
       const { data } = await api.get(`polizas/renovaciones/${query}`);
       const normalized = normalizeRenovacionesResponse(data);
 
@@ -372,6 +382,44 @@ export const fetchRenovacionesResumen = createAsyncThunk(
 );
 
 /**
+ * 🚀 NUEVO THUNK: Traer resumen GLOBAL (para el admin, ignorando filtro de oficina)
+ */
+export const fetchRenovacionesGlobalResumen = createAsyncThunk(
+  "renovaciones/fetchRenovacionesGlobalResumen",
+  async (params = {}, { rejectWithValue, getState }) => {
+    const force = !!params?.force;
+    const cleanParams = stripForce(params);
+    const query = buildRenovacionesResumenQuery(cleanParams);
+
+    try {
+      const state = getState().renovaciones;
+      const cached = state?.globalResumenCache?.[query];
+
+      if (!force && isFresh(cached, RESUMEN_CACHE_TTL)) {
+        return {
+          params: cleanParams,
+          query,
+          fromCache: true,
+          resumen: cached.resumen || null,
+        };
+      }
+
+      const { data } = await api.get(`polizas/renovaciones/resumen/${query}`);
+      const resumen = normalizeResumen(data);
+
+      return { params: cleanParams, query, fromCache: false, resumen };
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al cargar resumen global";
+      return rejectWithValue({ message: msg, raw: err?.response?.data, query });
+    }
+  }
+);
+
+/**
  * Thunk: traer listado de oficinas (para dropdown estable)
  * Endpoint esperado: GET /api/polizas/oficinas/
  */
@@ -409,7 +457,7 @@ export const fetchRenovacionesOficinas = createAsyncThunk(
 /**
  * POST /api/polizas/{id}/refacturar/
  * payload opcional:
- *  { nuevoNumero, nuevaCompania, nuevoPrecio, nuevaFecha }
+ * { nuevoNumero, nuevaCompania, nuevoPrecio, nuevaFecha }
  */
 export const refacturarPoliza = createAsyncThunk(
   "renovaciones/refacturarPoliza",
@@ -431,7 +479,7 @@ export const refacturarPoliza = createAsyncThunk(
 /**
  * POST /api/polizas/{id}/renovar/
  * payload opcional:
- *  { nuevoNumero, nuevaCompania, nuevoPrecio, nuevaFecha }
+ * { nuevoNumero, nuevaCompania, nuevoPrecio, nuevaFecha }
  */
 export const renovarPoliza = createAsyncThunk(
   "renovaciones/renovarPoliza",
@@ -476,6 +524,13 @@ const initialState = {
   },
   lastResumenQuery: "",
 
+  // 🚀 NUEVO: global resumen
+  globalResumen: null,
+  globalResumenStatus: "idle",
+  globalResumenError: null,
+  globalResumenCache: {},
+  lastGlobalResumenQuery: "",
+
   // oficinas (dropdown)
   oficinas: [],
   oficinasStatus: "idle", // idle | loading | succeeded | failed
@@ -509,6 +564,11 @@ const invalidateAllCache = (state) => {
   for (const k of rkeys) {
     if (state.resumenCache[k]) state.resumenCache[k].fetchedAt = 0;
   }
+
+  const gkeys = Object.keys(state.globalResumenCache || {});
+  for (const k of gkeys) {
+    if (state.globalResumenCache[k]) state.globalResumenCache[k].fetchedAt = 0;
+  }
 };
 
 const renovacionesSlice = createSlice({
@@ -539,10 +599,20 @@ const renovacionesSlice = createSlice({
       state.resumen = null;
       state.resumenStatus = "idle";
       state.resumenError = null;
+
+      // también el global
+      state.globalResumenCache = {};
+      state.lastGlobalResumenQuery = "";
+      state.globalResumen = null;
+      state.globalResumenStatus = "idle";
+      state.globalResumenError = null;
     },
     invalidateRenovacionesResumen(state) {
       if (state.lastResumenQuery && state.resumenCache[state.lastResumenQuery]) {
         state.resumenCache[state.lastResumenQuery].fetchedAt = 0;
+      }
+      if (state.lastGlobalResumenQuery && state.globalResumenCache[state.lastGlobalResumenQuery]) {
+        state.globalResumenCache[state.lastGlobalResumenQuery].fetchedAt = 0;
       }
     },
 
@@ -664,6 +734,47 @@ const renovacionesSlice = createSlice({
           action.payload?.message || "Error al cargar resumen de renovaciones";
       })
 
+      // ---------- GLOBAL RESUMEN 🚀 ----------
+      .addCase(fetchRenovacionesGlobalResumen.pending, (state, action) => {
+        state.globalResumenError = null;
+
+        const force = !!action.meta.arg?.force;
+        const query = buildRenovacionesResumenQuery(action.meta.arg || {});
+        state.lastGlobalResumenQuery = query;
+
+        const cached = state.globalResumenCache?.[query];
+
+        if (!force && isFresh(cached, RESUMEN_CACHE_TTL)) {
+          state.globalResumenStatus = "succeeded";
+          state.globalResumen = cached.resumen || null;
+          return;
+        }
+
+        state.globalResumenStatus = "loading";
+      })
+      .addCase(fetchRenovacionesGlobalResumen.fulfilled, (state, action) => {
+        state.globalResumenStatus = "succeeded";
+        state.globalResumenError = null;
+
+        const { query, resumen, fromCache } = action.payload || {};
+        const q = query || buildRenovacionesResumenQuery(action.payload?.params || {});
+        state.lastGlobalResumenQuery = q;
+
+        state.globalResumen = resumen || null;
+
+        if (!fromCache) {
+          state.globalResumenCache[q] = {
+            resumen: resumen || null,
+            fetchedAt: Date.now(),
+          };
+        }
+      })
+      .addCase(fetchRenovacionesGlobalResumen.rejected, (state, action) => {
+        state.globalResumenStatus = "failed";
+        state.globalResumenError =
+          action.payload?.message || "Error al cargar resumen global";
+      })
+
       // ---------- OFICINAS ----------
       .addCase(fetchRenovacionesOficinas.pending, (state) => {
         state.oficinasError = null;
@@ -781,6 +892,9 @@ export const selectRenovacionesResumenStatus = (state) =>
   state.renovaciones.resumenStatus;
 export const selectRenovacionesResumenError = (state) =>
   state.renovaciones.resumenError;
+
+// 🚀 NUEVO: SELECTOR GLOBAL
+export const selectRenovacionesGlobalResumen = (state) => state.renovaciones.globalResumen;
 
 export const selectRenovacionesOficinas = (state) => state.renovaciones.oficinas;
 export const selectRenovacionesOficinasStatus = (state) =>

@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiX, HiSparkles, HiRefresh, HiCog } from "react-icons/hi";
 import toast from "react-hot-toast";
+
+// 🚀 IMPORTACIÓN CORREGIDA: Usamos la API que ya blindamos con el Token JWT
 import { solicitudesApi } from "../../../services/solicitudes";
+import { useAuth } from "../../../context/AuthContext";
 import ResponsablesCrudModal from "./ResponsablesCrudModal";
 
 // Definimos variants inline para animaciones profesionales
@@ -40,9 +43,10 @@ function Select({ label, value, onChange, options = [], className = "", selectRe
           className="w-full rounded-xl border border-white/10 px-3 py-2 sm:py-3 pr-9 outline-none focus:ring-4 ring-violet-200/30 text-white appearance-none transition"
           style={{ backgroundColor: "#141827" }}
         >
-          <option value="">{normalized.length ? "— Seleccionar —" : "Sin datos"}</option>
+          {/* 🚀 Mensaje dinámico si no hay datos en la oficina */}
+          <option value="">{normalized.length ? "— Seleccionar Responsable —" : "No hay personal en esta oficina"}</option>
           {normalized.map((op) => (
-            <option key={op.id} value={op.id} className="bg-[#0f1324] text-white">
+            <option key={op.id} value={op.id} className="bg-[#0f1324] text-white uppercase font-bold">
               {op.nombre || op.id}
             </option>
           ))}
@@ -53,22 +57,20 @@ function Select({ label, value, onChange, options = [], className = "", selectRe
   );
 }
 
-/**
- * Modal minimalista: seleccionar Responsable.
- * ⚙️ abre CRUD avanzado en un modal aparte (ResponsablesCrudModal)
- */
-export default function ResponsableManagerModal({ open, onCancel, onSelected }) {
+// 🚀 PARCHE: Recibimos "oficinaId" desde el CreateSolicitudModal
+export default function ResponsableManagerModal({ open, onCancel, onSelected, oficinaId }) {
+  const { user } = useAuth();
   const [empleados, setEmpleados] = useState([]);
   const [loading, setLoading] = useState(false);
   const [responsableId, setResponsableId] = useState("");
 
-  // ⚙️ CRUD modal
   const [showCrud, setShowCrud] = useState(false);
 
   const backdropRef = useRef(null);
   const selectRef = useRef(null);
 
-  // Bloqueo scroll
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -76,14 +78,21 @@ export default function ResponsableManagerModal({ open, onCancel, onSelected }) 
     return () => (document.body.style.overflow = prev);
   }, [open]);
 
-  // Cargar empleados activos desde servicio
+  // 🚀 CARGA BLINDADA Y FILTRADA
   const loadEmpleados = async () => {
     setLoading(true);
     try {
       const emps = await solicitudesApi.empleadosActivos();
-      setEmpleados(Array.isArray(emps) ? emps : []);
+      let rawList = Array.isArray(emps) ? emps : (emps?.results || []);
+
+      // 🛡️ FILTRO MÁGICO PARA ADMIN: Si somos admin y nos pasaron una oficina, mostramos solo los empleados de ESA oficina
+      if (isWebAdmin && oficinaId) {
+        rawList = rawList.filter(emp => String(emp.oficina) === String(oficinaId) || String(emp.oficina_id) === String(oficinaId));
+      }
+
+      setEmpleados(rawList);
     } catch (e) {
-      console.error(e);
+      console.error("[ResponsableManager] Error:", e);
       toast.error("No se pudieron cargar los responsables");
       setEmpleados([]);
     } finally {
@@ -95,9 +104,8 @@ export default function ResponsableManagerModal({ open, onCancel, onSelected }) 
     if (!open) return;
     setResponsableId("");
     loadEmpleados();
-  }, [open]);
+  }, [open, oficinaId]); // 🔄 Recarga si cambia la oficina
 
-  // Foco inicial
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => selectRef.current?.focus(), 60);
@@ -117,58 +125,48 @@ export default function ResponsableManagerModal({ open, onCancel, onSelected }) 
           ref={backdropRef}
           onClick={handleBackdropClick}
           className="fixed inset-0 z-[95] grid place-items-center bg-black/70 backdrop-blur p-4 sm:p-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         >
           <motion.div
-            variants={modalVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="w-full max-w-md sm:max-w-lg rounded-2xl border border-white/10 bg-[#0f0c28] p-3 sm:p-4 shadow-2xl overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
+            variants={modalVariants} initial="initial" animate="animate" exit="exit"
+            className="relative w-full max-w-md sm:max-w-lg rounded-2xl border border-white/10 bg-[#0f0c28] p-3 sm:p-4 shadow-2xl overflow-hidden"
+            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-rose-200 to-pink-200 text-[#0b0f1e]">
-                  <HiSparkles />
+              <div className="flex flex-col">
+                <h4 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-rose-200 to-pink-200 text-[#0b0f1e]">
+                    <HiSparkles />
+                  </span>
+                  Asignar responsable
+                </h4>
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-8">
+                   Sucursal: {isWebAdmin ? 'SELECCIONADA (ADMIN)' : (user?.perfil?.oficina_nombre || 'Local')}
                 </span>
-                Asignar responsable
-              </h4>
+              </div>
               <div className="flex items-center gap-1">
-                <motion.button
-                  type="button"
-                  onClick={() => setShowCrud(true)}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-                  title="Administrar responsables"
-                  variants={buttonVariants}
-                  initial="initial"
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  <HiCog />
-                </motion.button>
+                {isWebAdmin && (
+                  <motion.button
+                    type="button" onClick={() => setShowCrud(true)}
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+                    title="Administrar responsables" variants={buttonVariants} whileHover="hover" whileTap="tap"
+                  >
+                    <HiCog />
+                  </motion.button>
+                )}
                 <motion.button
                   onClick={onCancel}
                   className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-                  title="Cerrar"
-                  variants={buttonVariants}
-                  initial="initial"
-                  whileHover="hover"
-                  whileTap="tap"
+                  variants={buttonVariants} whileHover="hover" whileTap="tap"
                 >
                   <HiX />
                 </motion.button>
               </div>
             </div>
 
-            {/* Selector + refrescar */}
             <motion.div className="flex items-end gap-2" variants={sectionVariants} initial="initial" animate="animate">
               <Select
-                label={loading ? "Responsable (cargando…)" : "Responsable"}
+                label={loading ? "Personal (sincronizando…)" : "Personal de esta oficina"}
                 value={responsableId}
                 onChange={setResponsableId}
                 options={empleados}
@@ -176,58 +174,33 @@ export default function ResponsableManagerModal({ open, onCancel, onSelected }) 
                 className="flex-1"
               />
               <motion.button
-                type="button"
-                onClick={loadEmpleados}
+                type="button" onClick={loadEmpleados}
                 className="h-[42px] sm:h-[46px] px-2 sm:px-3 rounded-xl bg-white/10 text-white inline-flex items-center gap-2 hover:bg-white/20 border border-white/10"
-                title="Refrescar"
-                variants={buttonVariants}
-                initial="initial"
-                whileHover="hover"
-                whileTap="tap"
+                variants={buttonVariants} whileHover="hover" whileTap="tap"
               >
-                <HiRefresh />
+                <HiRefresh className={loading ? "animate-spin" : ""} />
               </motion.button>
             </motion.div>
 
             <motion.div className="mt-4 flex items-center justify-end gap-2" variants={sectionVariants} initial="initial" animate="animate">
-              <motion.button
-                onClick={onCancel}
-                className="px-3 py-2 rounded-xl bg-white/10 text-sm text-white hover:bg-white/20"
-                variants={buttonVariants}
-                initial="initial"
-                whileHover="hover"
-                whileTap="tap"
-              >
-                Cancelar
-              </motion.button>
+              <button onClick={onCancel} className="px-3 py-2 rounded-xl bg-white/5 text-sm text-white/50 hover:text-white transition-colors uppercase font-bold text-[10px]">Cancelar</button>
               <motion.button
                 onClick={() => {
                   if (!responsableId) return toast.error("Elegí un responsable.");
                   onSelected?.({ responsableId });
                 }}
-                className="px-4 py-2 rounded-2xl bg-gradient-to-br from-sky-200 to-cyan-200 text-[#0b0f1e] font-semibold shadow hover:brightness-105 disabled:opacity-50"
+                className="px-6 py-2 rounded-2xl bg-sky-500 text-black font-black uppercase text-[11px] tracking-widest shadow-lg shadow-sky-900/20 disabled:opacity-30"
                 disabled={!empleados?.length}
-                variants={buttonVariants}
-                initial="initial"
-                whileHover="hover"
-                whileTap="tap"
+                variants={buttonVariants} whileHover="hover" whileTap="tap"
               >
-                Continuar
+                Asignar ahora
               </motion.button>
             </motion.div>
           </motion.div>
         </motion.div>
       </AnimatePresence>
 
-      {/* ⚙️ CRUD modal */}
-      <ResponsablesCrudModal
-        open={showCrud}
-        onClose={() => setShowCrud(false)}
-        onChanged={() => {
-          // Si hubo cambios en el CRUD, refrescamos el select
-          loadEmpleados();
-        }}
-      />
+      <ResponsablesCrudModal open={showCrud} onClose={() => setShowCrud(false)} onChanged={loadEmpleados} />
     </>
   );
 }

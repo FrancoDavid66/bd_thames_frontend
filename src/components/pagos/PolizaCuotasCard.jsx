@@ -3,18 +3,26 @@ import { useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
+import toast from "react-hot-toast";
 import {
   HiCash,
   HiBadgeCheck,
   HiClock,
   HiDocumentText,
   HiX,
+  HiPencil, // 🚀 Importamos el lápiz
 } from "react-icons/hi";
+
+// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
+import { useAuth } from "../../context/AuthContext";
 
 import { registrarPagoYBalance } from "../../utils/pagos/registrarPagoYBalance";
 import DescargarFactura from "./DescargarFactura";
 import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
 import ModalFormaPago from "./ModalFormaPago";
+
+const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
 /* ====== Paleta pastel sólida ====== */
 const P = {
@@ -65,6 +73,12 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 2,
   }).format(Number(n || 0));
 
+const toYmd = (d) => {
+  if (!d) return "";
+  const s = String(d);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+};
+
 /* ====== Badge de estado (pastel) ====== */
 function EstadoBadge({ pagado, fecha_vencimiento }) {
   if (pagado) {
@@ -106,6 +120,11 @@ function EstadoBadge({ pagado, fecha_vencimiento }) {
 
 export default function PolizaCuotasCard({ poliza }) {
   const dispatch = useDispatch();
+  
+  // 🚀 Obtenemos rol de Admin para el botón de cambio de fecha
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+
   const [cuotasLocal, setCuotasLocal] = useState(poliza?.cuotas || []);
   const [cuotaSeleccionada, setCuotaSeleccionada] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -113,9 +132,63 @@ export default function PolizaCuotasCard({ poliza }) {
   // datos para el modal de confirmación visual
   const [confirmData, setConfirmData] = useState(null);
 
+  // 🚀 ESTADOS PARA EL MODAL DE CAMBIO DE FECHA
+  const [modalFechaOpen, setModalFechaOpen] = useState(false);
+  const [cuotaFechaSeleccionada, setCuotaFechaSeleccionada] = useState(null);
+  const [nuevaFecha, setNuevaFecha] = useState("");
+  const [ajustarSiguientes, setAjustarSiguientes] = useState(true);
+  const [isSubmittingFecha, setIsSubmittingFecha] = useState(false);
+
   const abrirModal = (cuota) => {
     setCuotaSeleccionada(cuota);
     setModalOpen(true);
+  };
+
+  // 🚀 Funciones para Cambiar Fecha
+  const abrirModalFecha = (cuota) => {
+    setCuotaFechaSeleccionada(cuota);
+    setNuevaFecha(toYmd(cuota.fecha_vencimiento) || dayjs().format('YYYY-MM-DD'));
+    setAjustarSiguientes(true);
+    setModalFechaOpen(true);
+  };
+
+  const cerrarModalFecha = () => {
+    setModalFechaOpen(false);
+    setCuotaFechaSeleccionada(null);
+  };
+
+  const handleCambiarFecha = async () => {
+    if (!cuotaFechaSeleccionada || !nuevaFecha) return;
+    setIsSubmittingFecha(true);
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+      const res = await axios.patch(
+        `${BASE_URL.replace(/\/+$/, '')}/cuotas/${cuotaFechaSeleccionada.id}/cambiar-fecha/`,
+        {
+          nueva_fecha: nuevaFecha,
+          ajustar_siguientes: ajustarSiguientes
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      const cambiadas = res.data?.cuotas_modificadas || 1;
+      toast.success(`¡Listo! Se actualizaron ${cambiadas} cuotas.`);
+      toast.success("Recargando para ver los cambios...");
+      
+      // Recargamos la vista para que el detalle de la póliza traiga las fechas actualizadas
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+
+      setModalFechaOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.nueva_fecha || error.response?.data?.detail || "Error al cambiar la fecha");
+    } finally {
+      setIsSubmittingFecha(false);
+    }
   };
 
   // 1) Desde ModalFormaPago abrimos nuestro modal de confirmación
@@ -278,7 +351,20 @@ export default function PolizaCuotasCard({ poliza }) {
                   {/* ✅ Lógica de fechas clara: Día de pago y Cobertura mensual */}
                   <div className="grid grid-cols-2 gap-2 mt-1 mb-1 max-w-[280px]">
                     <div className="bg-rose-50/80 rounded-lg p-2 border border-rose-100/50">
-                      <div className="text-[10px] uppercase tracking-wide text-rose-500 font-extrabold mb-0.5">Día de Pago (Vto)</div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <div className="text-[10px] uppercase tracking-wide text-rose-500 font-extrabold">Día de Pago (Vto)</div>
+                        {/* 🚀 BOTÓN DE LÁPIZ PARA CAMBIAR FECHA (SÓLO ADMIN) */}
+                        {isWebAdmin && !cuota.pagado && (
+                          <button
+                            type="button"
+                            onClick={() => abrirModalFecha(cuota)}
+                            className="text-rose-500 hover:text-rose-700 cursor-pointer"
+                            title="Cambiar fecha de vencimiento"
+                          >
+                            <HiPencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                       <div className="font-bold text-neutral-900 text-xs sm:text-sm">
                         {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY") : "—"}
                       </div>
@@ -370,6 +456,83 @@ export default function PolizaCuotasCard({ poliza }) {
         />
       )}
 
+      {/* 🚀 MODAL PARA CAMBIAR FECHA (MÁQUINA DEL TIEMPO PARA ADMINS) */}
+      <AnimatePresence>
+        {modalFechaOpen && cuotaFechaSeleccionada && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center px-3"
+          >
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={isSubmittingFecha ? undefined : cerrarModalFecha} />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 12 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              className="relative z-[71] w-[min(420px,92vw)] rounded-2xl border border-neutral-200 bg-white px-6 py-6 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <h3 className="text-lg font-semibold text-neutral-900">Cambiar Vencimiento</h3>
+                <button
+                  onClick={cerrarModalFecha}
+                  disabled={isSubmittingFecha}
+                  className="h-8 w-8 rounded-lg border flex items-center justify-center text-neutral-500 bg-neutral-100 hover:bg-neutral-200 border-neutral-300 cursor-pointer"
+                >
+                  <HiX className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-sm text-neutral-700">
+                  Cuota <span className="font-semibold text-neutral-900">#{cuotaFechaSeleccionada.cuota_nro}</span>
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Nueva fecha</label>
+                  <input
+                    type="date"
+                    value={nuevaFecha}
+                    onChange={(e) => setNuevaFecha(e.target.value)}
+                    className="w-full h-11 px-3 rounded-xl bg-white border border-neutral-300 text-neutral-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <label className="flex items-start gap-3 cursor-pointer mt-2 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                  <input
+                    type="checkbox"
+                    checked={ajustarSiguientes}
+                    onChange={(e) => setAjustarSiguientes(e.target.checked)}
+                    className="mt-1 accent-indigo-600 w-4 h-4"
+                  />
+                  <span className="text-sm text-indigo-900">
+                    Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).
+                  </span>
+                </label>
+
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    onClick={cerrarModalFecha}
+                    disabled={isSubmittingFecha}
+                    className="h-10 px-4 rounded-xl border border-neutral-300 bg-neutral-100 text-sm text-neutral-700 hover:bg-neutral-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCambiarFecha}
+                    disabled={isSubmittingFecha || !nuevaFecha}
+                    className="h-10 px-4 rounded-xl border border-transparent bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 flex items-center gap-2"
+                  >
+                    {isSubmittingFecha ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Modal de confirmación visual — número grande, centrado */}
       <AnimatePresence>
         {confirmData && (
@@ -450,5 +613,241 @@ export default function PolizaCuotasCard({ poliza }) {
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+// 🚀 FIX APLICADO AQUÍ: Agregamos abrirModalFecha a las props del componente
+const CuotaRow = memo(
+  function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs, abrirModalFecha }) {
+    const {
+      cuota,
+      cuotaPdf,
+      nombreCompleto,
+      patente,
+      modelo,
+      observacion,
+      hasObs,
+      isObsOpen,
+      state,
+      label,
+      dias,
+      venceTxt,
+      pagaTxt,
+      montoTxt,
+      cubreDesdeTxt,
+      cubreHastaTxt,
+      altaTxt,
+      oficinaLabel, 
+      isWebAdmin,   
+    } = model || {};
+
+    const S = PALETTE[state || "pending"];
+    const Icon = state === "paid" ? HiBadgeCheck : HiClock;
+
+    return (
+      <>
+        <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe} hidden sm:block`} aria-hidden />
+
+        <div className={`mx-0 sm:mx-3 my-0 sm:my-3 sm:rounded-2xl border-b sm:border p-3 sm:p-4 shadow-sm ${S.cardBg} ${S.text} ${S.border} relative`}>
+          {/* Raya lateral para celular */}
+          <span className={`absolute left-0 top-0 h-full w-1 ${S.stripe} sm:hidden`} aria-hidden />
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 pl-2 sm:pl-0">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="inline-flex items-center justify-center w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-neutral-800 text-neutral-200 ring-1 ring-white/5">
+                  <HiUser className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                </span>
+                <span className="truncate max-w-[40ch] sm:max-w-[60ch] font-semibold text-sm sm:text-base">
+                  {nombreCompleto}
+                </span>
+
+                {patente && (
+                  <span className="inline-flex items-center rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 bg-neutral-800 border-neutral-700 text-neutral-100 text-[10px] sm:text-xs">
+                    {patente}
+                  </span>
+                )}
+
+                {modelo && (
+                  <span className="inline-flex items-center rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 bg-neutral-800 border-neutral-700 text-neutral-300 text-[10px] sm:text-xs">
+                    {modelo}
+                  </span>
+                )}
+
+                {/* ✅ BADGE DE ALTA DE LA PÓLIZA */}
+                {altaTxt && (
+                  <span className="inline-flex items-center rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 bg-neutral-800 border-neutral-700 text-indigo-300 text-[10px] sm:text-xs font-medium">
+                    Alta: {altaTxt}
+                  </span>
+                )}
+
+                {/* 🚀 BADGE DE OFICINA EN LA FILA DE LA CUOTA (SOLO ADMIN) */}
+                {isWebAdmin && oficinaLabel && (
+                  <span className="inline-flex items-center rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 bg-emerald-500/10 border-emerald-400/30 text-emerald-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                    🏢 {oficinaLabel}
+                  </span>
+                )}
+              </div>
+
+              {/* ✅ CAJONCITOS DE LAS FECHAS */}
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
+                <span className={`inline-flex items-center gap-1 sm:gap-2 rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 ${S.chipBg} ${S.chipText} ${S.chipBorder} text-[10px] sm:text-xs font-medium`}>
+                  <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${S.dot}`} />
+                  <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
+                  {label}
+                </span>
+
+                <span className="text-neutral-500 hidden sm:inline">•</span>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="bg-rose-500/10 rounded-md px-2 py-1 border border-rose-500/20 flex items-center gap-1 w-fit">
+                    <span className="text-[10px] uppercase tracking-wider text-rose-400/80 font-bold">Vence:</span>
+                    <span className="text-xs font-bold text-white">{venceTxt || "—"}</span>
+                    {/* 🚀 BOTÓN DE LÁPIZ PARA CAMBIAR FECHA (SÓLO ADMIN Y SI NO ESTÁ PAGADA) */}
+                    {isWebAdmin && !cuota?.pagado && (
+                      <button
+                        type="button"
+                        onClick={() => abrirModalFecha(cuota)}
+                        className="ml-1 text-rose-400 hover:text-rose-200 transition cursor-pointer"
+                        title="Cambiar fecha de vencimiento"
+                      >
+                        <HiPencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-sky-500/10 rounded-md px-2 py-1 border border-sky-500/20 flex items-center gap-1 w-fit">
+                    <span className="text-[10px] uppercase tracking-wider text-sky-400/80 font-bold">Cubre del:</span>
+                    <span className="text-xs font-medium text-sky-200">{cubreDesdeTxt || "—"}</span>
+                    <span className="text-[10px] text-sky-400/80">al</span>
+                    <span className="text-xs font-medium text-sky-200">{cubreHastaTxt || "—"}</span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] sm:text-sm text-neutral-300 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 w-full sm:w-auto">
+                  {!!pagaTxt && <span>Pagada: {pagaTxt}</span>}
+                  {dias !== null && !cuota?.pagado && (
+                    <span>{dias < 0 ? `Atraso: ${Math.abs(dias)} días` : `Faltan: ${dias} días`}</span>
+                  )}
+                </div>
+              </div>
+
+              {hasObs && isObsOpen && (
+                <div className={`mt-2.5 rounded-xl border px-2.5 py-2 sm:px-3 sm:py-3 ${PALETTE.overdue.noteBg} ${PALETTE.overdue.noteText} border-rose-400`}>
+                  <div className="flex items-start gap-1.5 sm:gap-2">
+                    <HiExclamationCircle className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 shrink-0" />
+                    <div className="text-[11px] sm:text-sm whitespace-pre-wrap break-words">
+                      <span className="font-semibold">Obs: </span>{observacion}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col items-stretch lg:items-end gap-2.5 sm:gap-3 w-full lg:w-auto mt-1 sm:mt-0">
+              <p className="text-xl sm:text-3xl font-extrabold tracking-tight text-neutral-50 text-left lg:text-right w-full">
+                $ {montoTxt}
+              </p>
+
+              {/* Contenedor FLEX que envuelve (wrap) en celular como una grilla fluida */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full">
+                <button
+                  onClick={() => abrirDetalle(cuota)}
+                  className={`flex-1 min-w-[30%] sm:flex-none h-8 sm:h-10 px-2 sm:px-3 rounded-lg sm:rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-[11px] sm:text-sm`}
+                >
+                  <HiQuestionMarkCircle className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                  <span>Info</span>
+                </button>
+
+                {hasObs && (
+                  <button
+                    onClick={() => onToggleObs(cuota?.id)}
+                    className={`flex-1 min-w-[30%] sm:flex-none h-8 sm:h-10 px-2 sm:px-3 rounded-lg sm:rounded-xl border ${PALETTE.overdue.btn} inline-flex items-center justify-center gap-1.5 sm:gap-2 transition cursor-pointer text-[11px] sm:text-sm`}
+                  >
+                    <HiExclamationCircle className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                    <span>Nota</span>
+                  </button>
+                )}
+
+                {!cuota?.pagado && (
+                  <button
+                    onClick={() => abrirPagar(cuota)}
+                    className={`flex-[2] min-w-[45%] sm:flex-none h-8 sm:h-10 px-3 sm:px-4 rounded-lg sm:rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-[11px] sm:text-sm font-semibold`}
+                  >
+                    <HiCash className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                    <span>Pagar</span>
+                  </button>
+                )}
+
+                {cuota?.pagado && (
+                  <>
+                    <div className="flex-1 min-w-[30%] sm:flex-none">
+                      <DescargarFactura
+                        cliente={model?.pol?.cliente}
+                        poliza={model?.pol}
+                        cuota={cuotaPdf || cuota}   // ✅ acá va el próximo vencimiento real
+                        tone="neutral"
+                        label="Bajar"
+                        className="w-full h-8 sm:h-10 text-[11px] sm:text-sm px-1 sm:px-3 rounded-lg sm:rounded-xl"
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-[30%] sm:flex-none">
+                      <ImprimirFacturaTicket
+                        cliente={model?.pol?.cliente}
+                        poliza={model?.pol}
+                        cuota={cuotaPdf || cuota}   // ✅ acá va el próximo vencimiento real
+                        label="Ticket"
+                        className={`w-full h-8 sm:h-10 px-1 sm:px-3 rounded-lg sm:rounded-xl border transition inline-flex items-center justify-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm ${PALETTE.ticketBtn}`}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex-[2] min-w-[45%] sm:flex-none">
+                  <EnviarFacturaWhatsapp cuota={cuota}>
+                    <button className={`w-full h-8 sm:h-10 px-2 sm:px-3 rounded-lg sm:rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-[11px] sm:text-sm`}>
+                      <HiDeviceMobile className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                      <span>WhatsApp</span>
+                    </button>
+                  </EnviarFacturaWhatsapp>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  },
+  (prev, next) => {
+    const a = prev?.model;
+    const b = next?.model;
+    if (a === b) return true;
+    if (a?.isObsOpen !== b?.isObsOpen) return false;
+
+    const ca = a?.cuota;
+    const cb = b?.cuota;
+    if (ca?.id !== cb?.id) return false;
+    if (ca?.pagado !== cb?.pagado) return false;
+    if (ca?.monto !== cb?.monto) return false;
+    if (ca?.fecha_vencimiento !== cb?.fecha_vencimiento) return false;
+    if (ca?.fecha_pago !== cb?.fecha_pago) return false;
+    if (ca?.observaciones_pago !== cb?.observaciones_pago) return false;
+    if (ca?.ultima_observacion_pago !== cb?.ultima_observacion_pago) return false;
+    if (a?.nombreCompleto !== b?.nombreCompleto) return false;
+    if (a?.patente !== b?.patente) return false;
+    if (a?.modelo !== b?.modelo) return false;
+    return true;
+  }
+);
+
+function InfoRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg sm:rounded-xl border border-neutral-800 bg-neutral-900 px-2.5 py-1.5 sm:px-3 sm:py-2">
+      <span className="text-neutral-400 text-[11px] sm:text-sm">{label}</span>
+      <span className="text-neutral-100 truncate max-w-[65%] text-right font-medium text-[11px] sm:text-sm">
+        {value}
+      </span>
+    </div>
   );
 }

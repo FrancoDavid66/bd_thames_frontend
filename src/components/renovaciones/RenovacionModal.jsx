@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
-import { HiX } from "react-icons/hi";
+import { HiX, HiExclamation } from "react-icons/hi";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
@@ -78,7 +78,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
             </div>
 
             <button
-              className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white hover:bg-white/15"
+              className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white hover:bg-white/15 transition-colors"
               onClick={onClose}
               disabled={submitting}
               title="Cerrar"
@@ -94,7 +94,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <input
                 value={nuevoNumero}
                 onChange={(e) => setNuevoNumero(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
+                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                 placeholder="Ej: 12345-ABC"
               />
               <div className="text-xs text-white/60">
@@ -107,7 +107,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <input
                 value={nuevaCompania}
                 onChange={(e) => setNuevaCompania(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
+                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                 placeholder="Ej: RUS / SANCOR / etc."
               />
             </div>
@@ -118,7 +118,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                 <input
                   value={nuevoPrecio}
                   onChange={(e) => setNuevoPrecio(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
+                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                   placeholder="Ej: 12000"
                   inputMode="decimal"
                 />
@@ -130,12 +130,11 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                   type="date"
                   value={nuevaFecha}
                   onChange={(e) => setNuevaFecha(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30"
+                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                 />
               </div>
             </div>
 
-            {/* ✅ NUEVO: Switch “transferir grúa” */}
             <div className="mt-1 rounded-2xl border border-white/10 bg-white/5 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -151,7 +150,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                   disabled={submitting}
                   onClick={() => setTransferirGrua((v) => !v)}
                   className={cx(
-                    "relative inline-flex h-9 w-[74px] items-center rounded-full border transition",
+                    "relative inline-flex h-9 w-[74px] items-center rounded-full border transition shrink-0",
                     transferirGrua
                       ? "bg-emerald-400/25 border-emerald-300/30"
                       : "bg-white/10 border-white/15",
@@ -174,9 +173,19 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               </div>
             </div>
 
-            <div className="mt-2 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+            <div className="mt-1 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5">
+              <HiExclamation className="mt-0.5 shrink-0 text-xl text-amber-400" />
+              <div className="text-[13px] leading-relaxed text-amber-100/90">
+                <strong className="block text-sm font-bold text-amber-400 mb-0.5">Atención</strong>
+                La póliza actual pasará a estado <strong>FINALIZADA</strong> y se creará una nueva versión <strong>ACTIVA</strong>. 
+                <br />
+                <span className="mt-1 block opacity-90">No te olvides de emitir/subir la póliza en la página web de la aseguradora si corresponde.</span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
               <button
-                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-white hover:bg-white/15"
+                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-white hover:bg-white/15 transition-colors"
                 onClick={onClose}
                 disabled={submitting}
                 type="button"
@@ -186,8 +195,8 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
 
               <button
                 className={cx(
-                  "rounded-xl px-4 py-2 font-extrabold text-black",
-                  submitting ? "bg-white/40" : "bg-emerald-300 hover:bg-emerald-200"
+                  "rounded-xl px-5 py-2 font-extrabold text-black transition-colors shadow-md",
+                  submitting ? "bg-white/40 shadow-none" : "bg-emerald-400 hover:bg-emerald-300 shadow-emerald-500/20"
                 )}
                 disabled={submitting}
                 type="button"
@@ -197,12 +206,11 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                     nuevaCompania: (nuevaCompania || "").trim() || undefined,
                     nuevoPrecio: nuevoPrecio === "" ? undefined : Number(nuevoPrecio),
                     nuevaFecha: nuevaFecha || undefined,
-                    // ✅ NUEVO: el backend/handler puede leerlo
                     transferir_grua: transferirGrua ? 1 : 0,
                   })
                 }
               >
-                {submitting ? "Procesando..." : "Renovar"}
+                {submitting ? "Procesando..." : "Renovar póliza"}
               </button>
             </div>
           </div>

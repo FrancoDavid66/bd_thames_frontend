@@ -3,12 +3,16 @@
 
 import { HiLockClosed, HiClipboardList, HiClock } from "react-icons/hi";
 import { motion } from "framer-motion";
+// 🚀 IMPORTAMOS AUTH PARA MANTENER LA CONSISTENCIA DE SUCURSALES
+import { useAuth } from "../../context/AuthContext";
 
 export default function PolizaHistoriaPanel({ polizaId }) {
+  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
+
   return (
-    <section className="relative w-full rounded-2xl border border-gray-800 bg-gray-900 px-4 py-5 sm:px-6 sm:py-6 overflow-hidden">
+    <section className="relative w-full rounded-2xl border border-gray-800 bg-gray-900 px-4 py-5 sm:px-6 sm:py-6 overflow-hidden shadow-2xl">
       {/* Capa de bloqueo suave */}
-      <div className="pointer-events-none absolute inset-0 z-10 bg-black/40" />
+      <div className="pointer-events-none absolute inset-0 z-10 bg-black/40 backdrop-blur-[1px]" />
 
       {/* Contenido de fondo: skeleton muy sutil */}
       <div className="opacity-15 select-none">
@@ -33,9 +37,15 @@ export default function PolizaHistoriaPanel({ polizaId }) {
             <div className="grid place-items-center w-14 h-14 rounded-2xl bg-gray-800 border border-gray-700 shadow-inner">
               <HiLockClosed className="w-7 h-7 text-primary-400" />
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-800/80 border border-gray-700 px-3 py-0.5 text-[11px] font-semibold text-gray-300">
-              HISTORIAL EN CONSTRUCCIÓN
-            </span>
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-800/80 border border-gray-700 px-3 py-0.5 text-[11px] font-semibold text-gray-300">
+                HISTORIAL EN CONSTRUCCIÓN
+              </span>
+              {/* 🚀 INDICADOR DE SUCURSAL: Para que el empleado sepa que el historial será de su oficina */}
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase border border-emerald-500/20">
+                Ámbito: {user?.perfil?.oficina_nombre || 'Local'}
+              </span>
+            </div>
           </div>
 
           <h2 className="text-lg sm:text-xl font-semibold text-white">

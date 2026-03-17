@@ -1,9 +1,12 @@
-/* src/pages/PolizasPage.jsx — Versión COMPLETA (cursor-aware) */
+/* src/pages/PolizasPage.jsx — Versión COMPLETA (cursor-aware) con Blindaje de Sucursal */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { batch, useDispatch, useSelector } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { HiChatAlt2 } from "react-icons/hi";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "../context/AuthContext";
 
 import PolizaTable from "../components/polizas/PolizaTable";
 import PolizaFilter from "../components/polizas/PolizaFilter";
@@ -118,6 +121,7 @@ const estadoPorCuotas = (poliza) => {
 export default function PolizasPage() {
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth(); // 🚀 EXTRAEMOS DATOS DEL USUARIO
 
   const polizasState = useSelector((s) => s.polizas || {});
 
@@ -530,13 +534,19 @@ export default function PolizasPage() {
   const pagingLabel = cursorEnabled ? "cursor" : `página ${page}`;
   const totalLabel = cursorEnabled ? `${listFiltrada.length}` : `${total}`;
 
+  // 🛡️ LÓGICA DE ROLES
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
+
   return (
     <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4 text-gray-100">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Pólizas</h1>
           <p className="text-xs text-gray-400 sm:text-sm">
-            Buscá y filtrá sin cargar todo el universo.
+             {/* 🚀 Mensaje contextual según rol */}
+             {isWebAdmin 
+                ? "Buscá y filtrá sin cargar todo el universo." 
+                : `Gestionando cartera de: ${user?.perfil?.oficina_nombre || 'Sucursal'}`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -556,6 +566,7 @@ export default function PolizasPage() {
       </div>
 
       <PolizaFilter
+        user={user} // 🚀 Pasamos el usuario para que el filtro oculte el selector de oficina internamente
         searchValue={searchDraft}
         onSearchChange={onSearchChange}
         onSearchSubmit={onSearchSubmit}
@@ -672,98 +683,101 @@ export default function PolizasPage() {
         </div>
       )}
 
-      <div className="mt-8 rounded-2xl border border-emerald-700/60 bg-emerald-950/40 p-4 text-sm text-emerald-50">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
-              <HiChatAlt2 />
-            </span>
-            <div>
-              <div className="text-sm font-semibold">Enviar recordatorio de estado de cuotas</div>
-              <div className="text-xs text-emerald-200/80">
-                Usa los filtros de arriba (modo "Cuotas") para definir el universo.
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 rounded border-emerald-500 bg-transparent text-emerald-500"
-                checked={previewOnly}
-                onChange={(e) => setPreviewOnly(e.target.checked)}
-              />
-              <span>Solo preview (no enviar)</span>
-            </label>
-
-            <button
-              type="button"
-              onClick={handleEnviarMensajes}
-              disabled={envioStatus === "loading" || !hayUniverso}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800/70"
-            >
-              {envioStatus === "loading" ? (
-                <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              ) : (
-                <HiChatAlt2 className="h-4 w-4" />
-              )}
-              {envioStatus === "loading"
-                ? previewOnly
-                  ? "Generando reporte..."
-                  : "Enviando..."
-                : previewOnly
-                ? "Generar reporte"
-                : "Enviar de verdad"}
-            </button>
-          </div>
-        </div>
-
-        {envioResumen && (
-          <div className="mt-2 grid gap-2 text-xs text-emerald-100 sm:grid-cols-2">
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
-              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Resumen</div>
-              <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                {JSON.stringify(envioResumen, null, 2)}
-              </pre>
-            </div>
-
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
-              <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Buckets</div>
-              <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                {JSON.stringify(envioBuckets, null, 2)}
-              </pre>
-            </div>
-
-            {envioDiag && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Diagnóstico</div>
-                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                  {JSON.stringify(envioDiag, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            {envioPayload && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Payload enviado</div>
-                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                  {JSON.stringify(envioPayload, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            {(envioSeleccionadas || envioProcesadas) && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Conteo</div>
-                <div className="mt-1 text-[11px]">
-                  Seleccionadas: {envioSeleccionadas} · Procesadas: {envioProcesadas}
+      {/* 🚀 EL ESCUDO: Solo el Admin ve la herramienta de envío masivo de WhatsApp */}
+      {isWebAdmin && (
+        <div className="mt-8 rounded-2xl border border-emerald-700/60 bg-emerald-950/40 p-4 text-sm text-emerald-50">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
+                <HiChatAlt2 />
+                </span>
+                <div>
+                <div className="text-sm font-semibold">Enviar recordatorio de estado de cuotas</div>
+                <div className="text-xs text-emerald-200/80">
+                    Usa los filtros de arriba (modo "Cuotas") para definir el universo.
                 </div>
-              </div>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1 text-xs">
+                <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-emerald-500 bg-transparent text-emerald-500"
+                    checked={previewOnly}
+                    onChange={(e) => setPreviewOnly(e.target.checked)}
+                />
+                <span>Solo preview (no enviar)</span>
+                </label>
+
+                <button
+                type="button"
+                onClick={handleEnviarMensajes}
+                disabled={envioStatus === "loading" || !hayUniverso}
+                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800/70"
+                >
+                {envioStatus === "loading" ? (
+                    <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                ) : (
+                    <HiChatAlt2 className="h-4 w-4" />
+                )}
+                {envioStatus === "loading"
+                    ? previewOnly
+                    ? "Generando reporte..."
+                    : "Enviando..."
+                    : previewOnly
+                    ? "Generar reporte"
+                    : "Enviar de verdad"}
+                </button>
+            </div>
+            </div>
+
+            {envioResumen && (
+            <div className="mt-2 grid gap-2 text-xs text-emerald-100 sm:grid-cols-2">
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
+                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Resumen</div>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                    {JSON.stringify(envioResumen, null, 2)}
+                </pre>
+                </div>
+
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2">
+                <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Buckets</div>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                    {JSON.stringify(envioBuckets, null, 2)}
+                </pre>
+                </div>
+
+                {envioDiag && (
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Diagnóstico</div>
+                    <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                    {JSON.stringify(envioDiag, null, 2)}
+                    </pre>
+                </div>
+                )}
+
+                {envioPayload && (
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Payload enviado</div>
+                    <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                    {JSON.stringify(envioPayload, null, 2)}
+                    </pre>
+                </div>
+                )}
+
+                {(envioSeleccionadas || envioProcesadas) && (
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 sm:col-span-2">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-300/80">Conteo</div>
+                    <div className="mt-1 text-[11px]">
+                    Seleccionadas: {envioSeleccionadas} · Procesadas: {envioProcesadas}
+                    </div>
+                </div>
+                )}
+            </div>
             )}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 /* src/store/slices/pagosSlice.js — Optimizado: cache historial pagos + búsqueda + cancelación + force real
-   + DNI-first: buscar-cliente + cuotas por póliza (Redux)
-   + ✅ Patente/texto: cuotas directo por /api/pagos/buscar/?q=... (nuevo thunk fetchCuotasBuscar)
+    + DNI-first: buscar-cliente + cuotas por póliza (Redux)
+    + ✅ Patente/texto: cuotas directo por /api/pagos/buscar/?q=... (nuevo thunk fetchCuotasBuscar)
+    + 🏢 OFICINA: Soporte para filtrar alias por sucursal
 */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
@@ -9,6 +10,19 @@ import axios from "axios";
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 const API = (path) =>
   `${String(BASE_URL).replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
+
+// ✅ PARCHE: Creamos una instancia segura para inyectar el Token JWT y evitar el 401 Unauthorized
+const apiSegura = axios.create({
+  withCredentials: true,
+});
+
+apiSegura.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  if (token && token !== "undefined" && token !== "null") {
+    config.headers.Authorization = `Bearer ${token.trim()}`;
+  }
+  return config;
+});
 
 /* Normaliza payloads que pueden venir paginados o no */
 const unwrap = (data) =>
@@ -262,7 +276,7 @@ async function enrichBuscarItemsWithPolizaCliente(items, { getState, signal }) {
 
       const results = await Promise.allSettled(
         chunk.map((id) =>
-          axios
+          apiSegura
             .get(API(`polizas/${id}/`), {
               params: compact({ include_cuotas: 0 }),
               signal,
@@ -331,7 +345,7 @@ export const fetchTodasLasCuotas = createAsyncThunk(
   "pagos/fetchTodasLasCuotas",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(API("cuotas/"));
+      const { data } = await apiSegura.get(API("cuotas/"));
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al obtener cuotas");
@@ -369,7 +383,7 @@ export const marcarCuotaComoPagada = createAsyncThunk(
         registrar_en_balance: payload?.registrar_en_balance,
       });
 
-      const { data } = await axios.patch(API(`cuotas/${cuotaId}/pagar/`), body);
+      const { data } = await apiSegura.patch(API(`cuotas/${cuotaId}/pagar/`), body);
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al marcar como pagada");
@@ -381,7 +395,7 @@ export const enviarAlertas = createAsyncThunk(
   "pagos/enviarAlertas",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API("notificaciones/cuotas/alertas/"));
+      const { data } = await apiSegura.post(API("notificaciones/cuotas/alertas/"));
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al enviar alertas");
@@ -406,7 +420,7 @@ export const enviarRecordatoriosCuotas = createAsyncThunk(
         async: asyncFlag,
       });
 
-      const { data } = await axios.post(
+      const { data } = await apiSegura.post(
         API("notificaciones/cuotas/recordatorios/"),
         body,
         { timeout: 60000 }
@@ -429,7 +443,7 @@ export const fetchHistorialRecordatorios = createAsyncThunk(
   "pagos/fetchHistorialRecordatorios",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(API("notificaciones/cuotas/historial/"));
+      const { data } = await apiSegura.get(API("notificaciones/cuotas/historial/"));
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(
@@ -462,7 +476,7 @@ export const fetchHistorialPagos = createAsyncThunk(
       }
       historialAbort = new AbortController();
 
-      const { data } = await axios.get(API("cuotas/pagos/"), {
+      const { data } = await apiSegura.get(API("cuotas/pagos/"), {
         params: built,
         signal: historialAbort.signal,
       });
@@ -493,7 +507,7 @@ export const downloadHistorialPagosCSV = createAsyncThunk(
     try {
       const p = params && typeof params === "object" ? params : {};
 
-      const res = await axios.get(API("cuotas/pagos/"), {
+      const res = await apiSegura.get(API("cuotas/pagos/"), {
         params: compact({
           mes: p?.mes,
           dia: p?.dia,
@@ -535,7 +549,7 @@ export const downloadHistorialPagosPDF = createAsyncThunk(
     try {
       const p = params && typeof params === "object" ? params : {};
 
-      const res = await axios.get(API("cuotas/pagos/"), {
+      const res = await apiSegura.get(API("cuotas/pagos/"), {
         params: compact({
           mes: p?.mes,
           dia: p?.dia,
@@ -576,7 +590,7 @@ export const downloadHistorialPagosPDF = createAsyncThunk(
 );
 
 /** ✅ Búsqueda PRO (rápida): GET /pagos/buscar/ => devuelve CUOTAS APLANADAS (flat)
- *  ✅ enriquece con cliente desde /polizas/{id}/ si falta nombre
+ * ✅ enriquece con cliente desde /polizas/{id}/ si falta nombre
  */
 export const fetchPagosBuscar = createAsyncThunk(
   "pagos/fetchPagosBuscar",
@@ -622,7 +636,7 @@ export const fetchPagosBuscar = createAsyncThunk(
       }
       buscarAbort = new AbortController();
 
-      const { data } = await axios.get(API("pagos/buscar/"), {
+      const { data } = await apiSegura.get(API("pagos/buscar/"), {
         params: built,
         signal: buscarAbort.signal,
       });
@@ -713,7 +727,7 @@ export const fetchCuotasBuscar = createAsyncThunk(
       }
       cuotasBuscarAbort = new AbortController();
 
-      const { data } = await axios.get(API("pagos/buscar/"), {
+      const { data } = await apiSegura.get(API("pagos/buscar/"), {
         params: built,
         signal: cuotasBuscarAbort.signal,
       });
@@ -783,7 +797,7 @@ export const fetchBuscarClientePorDni = createAsyncThunk(
       }
       clienteDniAbort = new AbortController();
 
-      const resp = await axios.get(API("pagos/buscar-cliente/"), {
+      const resp = await apiSegura.get(API("pagos/buscar-cliente/"), {
         params: { dni: dniDigits },
         signal: clienteDniAbort.signal,
         timeout: 30000,
@@ -829,7 +843,7 @@ export const fetchCuotasPorPoliza = createAsyncThunk(
       }
       cuotasPolizaAbort = new AbortController();
 
-      const resp = await axios.get(API("pagos/buscar/"), {
+      const resp = await apiSegura.get(API("pagos/buscar/"), {
         params: compact({
           poliza_id: pid,
           solo_pendientes: solo_pendientes ? 1 : 0,
@@ -890,7 +904,7 @@ export const fetchPolizas = createAsyncThunk(
       }
       polizasAbort = new AbortController();
 
-      const { data } = await axios.get(API("polizas/"), {
+      const { data } = await apiSegura.get(API("polizas/"), {
         params: compact({
           search: q,
           page_size: limit,
@@ -917,7 +931,7 @@ export const fetchPolizas = createAsyncThunk(
 
           const results = await Promise.allSettled(
             chunk.map((id) =>
-              axios
+              apiSegura
                 .get(API(`polizas/${id}/`), {
                   params: compact({ include_cuotas: 1 }),
                   signal: polizasAbort?.signal,
@@ -951,7 +965,7 @@ export const registrarIngreso = createAsyncThunk(
   "pagos/registrarIngreso",
   async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API("ingresos/"), payload);
+      const { data } = await apiSegura.post(API("ingresos/"), payload);
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al registrar ingreso");
@@ -972,7 +986,7 @@ export const fetchCuotasAVencer = createAsyncThunk(
         modo: p?.modo,
       });
 
-      const { data } = await axios.get(API("cuotas/a-vencer/"), { params: built });
+      const { data } = await apiSegura.get(API("cuotas/a-vencer/"), { params: built });
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al obtener cuotas a vencer");
@@ -980,11 +994,14 @@ export const fetchCuotasAVencer = createAsyncThunk(
   }
 );
 
+/* 🏢 ACTUALIZADO: Ahora permite pasar filtros como oficina */
 export const fetchMediosCobro = createAsyncThunk(
   "pagos/fetchMediosCobro",
-  async (_, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(API("medios-cobro/"));
+      const { data } = await apiSegura.get(API("medios-cobro/"), {
+        params: compact(params || {}),
+      });
       return unwrap(data);
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al obtener medios de cobro");
@@ -996,7 +1013,7 @@ export const crearMedioCobro = createAsyncThunk(
   "pagos/crearMedioCobro",
   async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(API("medios-cobro/"), payload);
+      const { data } = await apiSegura.post(API("medios-cobro/"), payload);
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al crear medio de cobro");
@@ -1008,7 +1025,7 @@ export const actualizarMedioCobro = createAsyncThunk(
   "pagos/actualizarMedioCobro",
   async ({ id, ...payload }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.patch(API(`medios-cobro/${id}/`), payload);
+      const { data } = await apiSegura.patch(API(`medios-cobro/${id}/`), payload);
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al actualizar medio de cobro");
@@ -1020,7 +1037,7 @@ export const eliminarMedioCobro = createAsyncThunk(
   "pagos/eliminarMedioCobro",
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(API(`medios-cobro/${id}/`));
+      await apiSegura.delete(API(`medios-cobro/${id}/`));
       return id;
     } catch (error) {
       return rejectWithValue(error?.response?.data || "Error al eliminar medio de cobro");
@@ -1452,7 +1469,7 @@ const pagosSlice = createSlice({
         const ck = buildBuscarCacheKey(built);
 
         if (!force && ck) {
-          const hit = state.buscarCache?.[ck];
+          const hit = state.buscarCache?.[built];
           if (hit && isFresh(hit.ts, BUSCAR_CACHE_TTL_MS) && Array.isArray(hit.items)) {
             state.buscarItems = hit.items;
             state.buscarMeta = hit.meta || { count: hit.items.length, next: null, previous: null };

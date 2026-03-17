@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import { HiOutlineCalendar } from "react-icons/hi";
 dayjs.locale("es");
 
 /**
@@ -89,9 +90,9 @@ const BalanceDateFilter = ({
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-2xl bg-gradient-to-br from-sky-500/80 via-sky-500/40 to-emerald-400/60 flex items-center justify-center text-sm">
-            <span>📅</span>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-sky-500/80 via-sky-500/40 to-emerald-400/60 flex items-center justify-center text-white shadow-inner">
+            <HiOutlineCalendar className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
             <h3 className="text-xs sm:text-sm font-semibold text-zinc-50">
@@ -109,10 +110,10 @@ const BalanceDateFilter = ({
               <button
                 type="button"
                 onClick={() => setTab("dia")}
-                className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+                className={`flex-1 px-3 py-1.5 rounded-xl transition-all ${
                   tab === "dia"
                     ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-100"
+                    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
                 }`}
               >
                 Día
@@ -120,10 +121,10 @@ const BalanceDateFilter = ({
               <button
                 type="button"
                 onClick={() => setTab("rango")}
-                className={`flex-1 px-2.5 py-1.5 rounded-2xl transition ${
+                className={`flex-1 px-3 py-1.5 rounded-xl transition-all ${
                   tab === "rango"
                     ? "bg-zinc-100 text-zinc-900 font-semibold shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-100"
+                    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
                 }`}
               >
                 Rango
@@ -137,14 +138,14 @@ const BalanceDateFilter = ({
       {hasDia && tab === "dia" && (
         <div className="flex flex-col sm:flex-row sm:items-end gap-3">
           <div className="flex-1 min-w-[180px]">
-            <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400">
+            <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400 font-medium">
               Fecha
             </label>
             <input
               type="date"
               value={value || hoy}
               onChange={(e) => onChange && onChange(e.target.value)}
-              className="w-full px-2.5 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-50 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-50 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-sky-400 transition-shadow"
             />
           </div>
 
@@ -152,14 +153,14 @@ const BalanceDateFilter = ({
             <button
               type="button"
               onClick={setHoy}
-              className="px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-100 text-[11px] sm:text-xs hover:bg-zinc-800"
+              className="px-4 py-2 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-100 text-[11px] sm:text-xs font-medium hover:bg-zinc-800 active:scale-[0.98] transition-transform"
             >
               Hoy
             </button>
             <button
               type="button"
               onClick={setAyer}
-              className="px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-100 text-[11px] sm:text-xs hover:bg-zinc-800"
+              className="px-4 py-2 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-100 text-[11px] sm:text-xs font-medium hover:bg-zinc-800 active:scale-[0.98] transition-transform"
             >
               Ayer
             </button>
@@ -171,25 +172,25 @@ const BalanceDateFilter = ({
       {hasRango && tab === "rango" && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400">
+            <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400 font-medium">
               Desde
             </label>
             <input
               type="date"
               value={fechaInicio}
               onChange={(e) => setFechaInicio(e.target.value)}
-              className="w-full px-2.5 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-50 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-50 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-sky-400 transition-shadow"
             />
           </div>
           <div>
-            <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400">
+            <label className="block text-[11px] sm:text-xs mb-1 text-zinc-400 font-medium">
               Hasta
             </label>
             <input
               type="date"
               value={fechaFin}
               onChange={(e) => setFechaFin(e.target.value)}
-              className="w-full px-2.5 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-50 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full px-3 py-2 rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-50 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-sky-400 transition-shadow"
             />
           </div>
           <div className="flex items-end">
@@ -197,10 +198,10 @@ const BalanceDateFilter = ({
               type="button"
               onClick={filtrarPorFecha}
               disabled={!fechaInicio || !fechaFin}
-              className={`w-full px-4 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition ${
+              className={`w-full px-4 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
                 !fechaInicio || !fechaFin
-                  ? "bg-sky-500/30 text-sky-100/70 cursor-not-allowed"
-                  : "bg-sky-500 text-white hover:bg-sky-600"
+                  ? "bg-sky-500/20 text-sky-100/50 cursor-not-allowed border border-sky-500/10"
+                  : "bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-sky-500/20 border border-sky-400"
               }`}
             >
               Aplicar filtro

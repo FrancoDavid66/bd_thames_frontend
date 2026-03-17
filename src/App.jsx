@@ -4,8 +4,15 @@ import { useSelector } from "react-redux";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
+// 🚀 IMPORTAMOS EL LOGO OFICIAL
+import logoThames from "./assets/logos/logo_thames.svg";
+
+// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useAuth } from "./context/AuthContext";
+import { LoginPage } from "./pages/LoginPage";
+
 import Sidebar from "./components/layout/Sidebar";
-import Navbar from "./components/layout/Navbar";
+import Header from "./components/layout/Header";
 import MobileTopBar from "./components/layout/MobileTopBar";
 
 import HomePage from "./pages/HomePage";
@@ -20,33 +27,27 @@ import PropiedadesPage from "./pages/PropiedadesPage";
 import AlquileresPage from "./pages/AlquileresPage";
 import AlquilerDetails from "./components/alquileres/AlquilerDetails";
 import BalanzesPage from "./pages/BalanzesPage";
-// NUEVOS
 import SolicitudesPage from "./pages/SolicitudesPage";
 import GruasPage from "./pages/GruasPage";
-// CUPONERAS
 import CuponerasPage from "./pages/CuponerasPage";
-// COMPETENCIA
 import CompetenciaPage from "./pages/CompetenciaPage";
-// ESTADÍSTICAS
 import EstadisticasPage from "./pages/EstadisticasPage";
-// MARKETING / CAMPAÑAS
 import MarketingPage from "./pages/MarketingPage";
-
-// ✅ Renovaciones
 import RenovacionesPage from "./pages/RenovacionesPage";
-
-// ✅🆕 Vencimientos
 import VencimientosPage from "./pages/VencimientosPage";
-
-// ✅🆕 Bajas
 import BajasPage from "./pages/BajasPage";
 
-// 🔔 Realtime counters (front-only BroadcastChannel)
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
 function App() {
   const { mode } = useSelector((state) => state.theme);
   const location = useLocation();
+  
+  // 🚀 EXTRAEMOS DATOS DE AUTENTICACIÓN
+  const { user, loading } = useAuth();
+
+  // 🚀 ESTADO PARA LA PANTALLA DE BIENVENIDA
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const isMobile = useMemo(
     () =>
@@ -58,10 +59,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
       const stored = localStorage.getItem("sidebarOpen");
-      if (
-        typeof window !== "undefined" &&
-        window.matchMedia("(max-width: 1023.5px)").matches
-      ) {
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023.5px)").matches) {
         return false;
       }
       return stored === null ? true : stored === "true";
@@ -70,22 +68,22 @@ function App() {
     }
   });
 
-  // --- Contadores de Solicitudes (pendientes) para el Sidebar ---
+  // --- Contadores de Solicitudes ---
   const [solPendienteAlta, setSolPendienteAlta] = useState(0);
   const [solPendienteEnvio, setSolPendienteEnvio] = useState(0);
 
-  // --- Contadores de Cuponeras (para badge en sidebar) ---
+  // --- Contadores de Cuponeras ---
   const [cuponPendientes, setCuponPendientes] = useState(0);
   const [cuponPorVencer7, setCuponPorVencer7] = useState(0);
   const [cuponVencidas, setCuponVencidas] = useState(0);
 
-  // ✅ Contador Renovaciones (para badge en sidebar)
+  // --- Contador Renovaciones ---
   const [renovacionesPendientes, setRenovacionesPendientes] = useState(0);
 
-  // ✅🆕 Contador Bajas (NUEVO)
+  // --- Contador Bajas ---
   const [bajasPendientes, setBajasPendientes] = useState(0);
 
-  // ====== Helper: API ROOT (siempre /api/) ======
+  // ====== Helper: API ROOT ======
   const getApiRoot = () => {
     const raw = (
       (typeof window !== "undefined" &&
@@ -93,18 +91,15 @@ function App() {
       import.meta?.env?.VITE_API_BASE ||
       import.meta?.env?.VITE_API_URL ||
       ""
-    )
-      .toString()
-      .trim();
+    ).toString().trim();
 
     if (!raw) return "/api/";
-
     let base = raw.endsWith("/") ? raw : `${raw}/`;
     if (/\/api\/?$/i.test(base)) return base.replace(/\/api\/?$/i, "/api/");
     return `${base}api/`;
   };
 
-  // ====== 🆕 Helper: oficina scope por URL (?oficina=) + fallback localStorage ======
+  // ====== Helper: oficina scope ======
   const getScopedOficina = (key) => {
     try {
       const sp = new URLSearchParams(location.search || "");
@@ -124,23 +119,13 @@ function App() {
     }
   };
 
-  // ====== Flags / configuración de polling (Solicitudes) ======
-  const DISABLE_POLL =
-    String(import.meta?.env?.VITE_DISABLE_COUNTERS_POLL || "").toLowerCase() ===
-    "true";
-
-  const PROBE_COUNTERS =
-    String(import.meta?.env?.VITE_PROBE_COUNTERS || "true").toLowerCase() ===
-    "true";
+  // ====== Polling Config ======
+  const DISABLE_POLL = String(import.meta?.env?.VITE_DISABLE_COUNTERS_POLL || "").toLowerCase() === "true";
 
   const API_BASE = useMemo(() => {
-    const raw =
-      (import.meta?.env?.VITE_API_BASE &&
-        String(import.meta.env.VITE_API_BASE).trim()) ||
-      (import.meta?.env?.VITE_API_URL &&
-        String(import.meta.env.VITE_API_URL).trim()) ||
-      (window.__API_URL__ || "");
-
+    const raw = (import.meta?.env?.VITE_API_BASE && String(import.meta.env.VITE_API_BASE).trim()) ||
+                (import.meta?.env?.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) ||
+                (window.__API_URL__ || "");
     const base = raw.toString().trim();
     if (!base) return ""; 
     return base.endsWith("/") ? base : `${base}/`;
@@ -151,9 +136,13 @@ function App() {
     return url || null;
   }, []);
 
+  // Fetch genérico con credenciales
   const fetchJSON = async (url) => {
     try {
-      const res = await fetch(url, { credentials: "include" });
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(url, { 
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!res.ok) return null;
       return await res.json();
     } catch {
@@ -163,125 +152,104 @@ function App() {
 
   // ====== Solicitudes: fetch ======
   const tryFetchCounters = async () => {
-    if (DISABLE_POLL) return;
+    if (DISABLE_POLL || !user) return;
     if (EXPLICIT_COUNTERS_URL) {
       const data = await fetchJSON(EXPLICIT_COUNTERS_URL);
       if (data) {
         const root = data?.solicitudes ?? data ?? {};
-        const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? root.toRegister ?? 0;
-        const envio = root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? root.toSend ?? 0;
-        setSolPendienteAlta(Number(alta) || 0);
-        setSolPendienteEnvio(Number(envio) || 0);
+        setSolPendienteAlta(Number(root.pendiente_alta || 0));
+        setSolPendienteEnvio(Number(root.pendiente_envio || 0));
       }
       return;
     }
-    if (!PROBE_COUNTERS) return;
-    const candidates = [
-      API_BASE ? `${API_BASE}solicitudes/counters` : null,
-      "/api/solicitudes/counters",
-      "/solicitudes/counters",
-    ].filter(Boolean);
-    for (const url of candidates) {
-      const data = await fetchJSON(url);
-      if (!data) continue;
-      const root = data?.solicitudes ?? data ?? {};
-      const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? root.toRegister ?? 0;
-      const envio = root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? root.toSend ?? 0;
-      setSolPendienteAlta(Number(alta) || 0);
-      setSolPendienteEnvio(Number(envio) || 0);
-      return;
+    // 🚀 CORRECCIÓN ACÁ: Le sacamos el "api/" duplicado
+    const url = API_BASE ? `${API_BASE}solicitudes/counters` : "/api/solicitudes/counters";
+    const data = await fetchJSON(url);
+    if (data) {
+        const root = data?.solicitudes ?? data ?? {};
+        setSolPendienteAlta(Number(root.pendiente_alta || 0));
+        setSolPendienteEnvio(Number(root.pendiente_envio || 0));
     }
   };
 
   // ====== Cuponeras: fetch ======
   const fetchCuponerasCounters = async () => {
+    if (!user) return;
     try {
       const apiRoot = getApiRoot();
-      const key = "scope.cuponeras.oficina";
-      const shouldScope = location.pathname === "/cuponeras" || location.pathname.startsWith("/cuponeras/");
-      const oficina = shouldScope ? getScopedOficina(key) : "";
-      
-      // ✅ Agregamos solo_ultimo=1 para que los counters coincidan con el dashboard
+      const oficina = getScopedOficina("scope.cuponeras.oficina");
       const qs = new URLSearchParams();
       qs.set("solo_ultimo", "1");
       if (oficina) qs.set("oficina", oficina);
 
-      const url = `${apiRoot}polizas/cupones-robo/counters/?${qs.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) return;
-      const data = await res.json();
-      setCuponPendientes(Number(data.pendientes || data.totalPendientes || 0));
-      setCuponPorVencer7(Number(data.por_vencer_7 || data.porVencer7 || 0));
-      setCuponVencidas(Number(data.vencidas || 0));
+      const data = await fetchJSON(`${apiRoot}polizas/cupones-robo/counters/?${qs.toString()}`);
+      if (data) {
+        setCuponPendientes(Number(data.pendientes || 0));
+        setCuponPorVencer7(Number(data.por_vencer_7 || 0));
+        setCuponVencidas(Number(data.vencidas || 0));
+      }
     } catch {}
   };
 
-  // ✅ Renovaciones: fetch
+  // ====== Renovaciones: fetch ======
   const fetchRenovacionesCounters = async () => {
+    if (!user) return;
     try {
       const apiRoot = getApiRoot();
-      const key = "scope.renovaciones.oficina";
-      const shouldScope = location.pathname === "/polizas/renovaciones" || location.pathname.startsWith("/polizas/renovaciones/");
-      const oficina = shouldScope ? getScopedOficina(key) : "";
+      const oficina = getScopedOficina("scope.renovaciones.oficina");
       const qs = new URLSearchParams();
       qs.set("dias", "30");
       qs.set("solo_pendientes", "1");
-      qs.set("page", "1");
-      qs.set("page_size", "1");
       if (oficina) qs.set("oficina", oficina);
-      const url = `${apiRoot}polizas/renovaciones/?${qs.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) return;
-      const data = await res.json();
-      setRenovacionesPendientes(Number(data?.count ?? 0));
+
+      const data = await fetchJSON(`${apiRoot}polizas/renovaciones/?${qs.toString()}`);
+      if (data) setRenovacionesPendientes(Number(data?.count ?? 0));
     } catch {}
   };
 
-  // ✅🆕 Bajas: fetch (NUEVO)
+  // ====== Bajas: fetch ======
   const fetchBajasCountersApp = async () => {
+    if (!user) return;
     try {
       const apiRoot = getApiRoot();
-      const url = `${apiRoot}bajas/operativo/counters/?dias=15`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) return;
-      const data = await res.json();
-      // Usamos el campo 'pendiente_envio' para la notificación naranja
-      setBajasPendientes(Number(data.pendiente_envio) || 0);
+      const data = await fetchJSON(`${apiRoot}bajas/operativo/counters/?dias=15`);
+      if (data) setBajasPendientes(Number(data.pendiente_envio) || 0);
     } catch {}
   };
 
-  // Suscripción realtime (BroadcastChannel) para Solicitudes
+  // ========================================================
+  // 🚀 USE-EFFECTS
+  // ========================================================
+
   useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        setShowWelcome(false);
+      }, 2200);
+      return () => clearTimeout(timer);
+    } else {
+      setShowWelcome(true); 
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return; 
+
     const unsub = solicitudesRealtime.subscribe((evt) => {
-      if (!evt) return;
-      if ((evt.type === "solicitudes.counters" || evt.type === "solicitudes.counters.backend") && evt.data) {
+      if (evt && evt.data) {
         const root = evt.data?.solicitudes ?? evt.data ?? {};
-        const alta = root.pendiente_alta ?? root.pendienteAlta ?? root.alta ?? 0;
-        const envio = root.pendiente_envio ?? root.pendienteEnvio ?? root.envio ?? 0;
-        setSolPendienteAlta(Number(alta) || 0);
-        setSolPendienteEnvio(Number(envio) || 0);
+        setSolPendienteAlta(Number(root.pendiente_alta || 0));
+        setSolPendienteEnvio(Number(root.pendiente_envio || 0));
       }
     });
 
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
-    fetchBajasCountersApp(); // ✅🆕 Primer intento de bajas
+    fetchBajasCountersApp();
 
     return () => { try { unsub && unsub(); } catch {} };
-  }, []); 
-
-  const toggleSidebar = () => {
-    setSidebarOpen((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
-        localStorage.setItem("sidebarOpen", String(next));
-      }
-      return next;
-    });
-  };
-
-  const closeSidebar = () => setSidebarOpen(false);
+  }, [user]); 
 
   useEffect(() => {
     if (mode === "dark") document.documentElement.classList.add("dark");
@@ -289,97 +257,176 @@ function App() {
   }, [mode]);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") closeSidebar(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    if (isMobile) setSidebarOpen(false);
+  }, [location.pathname, isMobile]);
 
-  useEffect(() => { if (isMobile) closeSidebar(); }, [location.pathname]); 
-
-  // Refrescar contadores al navegar
   useEffect(() => {
+    if (!user) return;
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
-    fetchBajasCountersApp(); // ✅🆕 Refrescar bajas al navegar
-  }, [location.pathname, location.search]);
+    fetchBajasCountersApp();
+  }, [location.pathname, location.search, user]);
 
-  // Refresco periódico
   useEffect(() => {
-    if (DISABLE_POLL) return;
+    if (DISABLE_POLL || !user) return;
     const id = setInterval(() => {
       tryFetchCounters();
       fetchCuponerasCounters();
       fetchRenovacionesCounters();
-      fetchBajasCountersApp(); // ✅🆕 Refrescar bajas periódicamente
+      fetchBajasCountersApp();
     }, 60_000);
     return () => clearInterval(id);
-  }, [DISABLE_POLL]);
+  }, [DISABLE_POLL, user]);
 
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  const closeSidebar = () => setSidebarOpen(false);
+
+  // ========================================================
+  // EARLY RETURNS
+  // ========================================================
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-brand-200">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // ====== RENDER DASHBOARD (USUARIO AUTENTICADO) ======
   return (
-    <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        solPendienteAlta={solPendienteAlta}
-        solPendienteEnvio={solPendienteEnvio}
-        cuponPendientes={cuponPendientes}
-        cuponPorVencer7={cuponPorVencer7}
-        cuponVencidas={cuponVencidas}
-        renovacionesPendientes={renovacionesPendientes}
-        bajasPendientes={bajasPendientes} // ✅🆕 Pasado al Sidebar
-      />
+    <>
+      {/* 🚀 PANTALLA DE BIENVENIDA CON LOGO */}
+      <AnimatePresence>
+        {showWelcome && (
+          <motion.div
+            key="welcome-overlay"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#030712] text-white"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
+            transition={{ duration: 0.6, ease: "easeInOut" }}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+              className="flex flex-col items-center text-center px-4"
+            >
+              {/* 🚀 LOGO EN LUGAR DE LA ESTRELLA */}
+              <motion.div 
+                animate={{ y: [-5, 5, -5] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="mb-8"
+              >
+                <img 
+                  src={logoThames} 
+                  alt="Logo Thames" 
+                  className="h-28 w-auto drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]" 
+                />
+              </motion.div>
 
-      <motion.div
-        className={`flex-1 min-h-[100dvh] min-h-0 min-w-0 flex flex-col transition-all duration-300 ${
-          sidebarOpen ? "lg:ml-64" : ""
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <Navbar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+              <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                Bienvenido, {user?.username}
+              </h1>
+              <p className="mt-4 text-xs sm:text-sm font-medium tracking-widest text-zinc-500 uppercase">
+                Preparando tu entorno de trabajo...
+              </p>
+              
+              {/* Barra de carga futurista */}
+              <div className="mt-8 h-1 w-64 overflow-hidden rounded-full bg-white/10 relative">
+                <motion.div 
+                  className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-emerald-400"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 1.8, ease: "easeInOut" }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <motion.main
-          className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -30, opacity: 0 }}
-          transition={{ duration: 0.25 }}
-        >
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/clientes" element={<ClientesPage />} />
-              <Route path="/clientes/:id" element={<ClienteProfilePage />} />
-              <Route path="/polizas" element={<PolizasPage />} />
-              <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
-              <Route path="/polizas/vencimientos" element={<VencimientosPage />} />
-              <Route path="/polizas/bajas" element={<BajasPage />} />
-              <Route path="/polizas/:id" element={<PolizaDetails />} />
-              <Route path="/pagos" element={<PagosPage />} />
-              <Route path="/balanzes" element={<BalanzesPage />} />
-              <Route path="/siniestros" element={<SiniestrosPage />} />
-              <Route path="/cuponeras" element={<CuponerasPage />} />
-              <Route path="/geo" element={<GeoPage />} />
-              <Route path="/competencia" element={<CompetenciaPage />} />
-              <Route path="/estadisticas" element={<EstadisticasPage />} />
-              <Route path="/marketing" element={<MarketingPage />} />
-              <Route path="/solicitudes" element={<SolicitudesPage />} />
-              <Route path="/gruas" element={<GruasPage />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </AnimatePresence>
-        </motion.main>
-
-        <MobileTopBar
+      {/* 🚀 LA APLICACIÓN REAL */}
+      <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           solPendienteAlta={solPendienteAlta}
           solPendienteEnvio={solPendienteEnvio}
+          cuponPendientes={cuponPendientes}
+          cuponPorVencer7={cuponPorVencer7}
+          cuponVencidas={cuponVencidas}
           renovacionesPendientes={renovacionesPendientes}
-          bajasPendientes={bajasPendientes} // ✅🆕 Pasado al MobileTopBar
+          bajasPendientes={bajasPendientes}
+          user={user} 
         />
-      </motion.div>
-    </div>
+
+        <motion.div
+          className={`flex-1 min-h-[100dvh] min-h-0 min-w-0 flex flex-col transition-all duration-300 ${
+            sidebarOpen ? "lg:ml-64" : ""
+          }`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+
+          <motion.main
+            className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -30, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <AnimatePresence mode="wait">
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/clientes" element={<ClientesPage />} />
+                <Route path="/clientes/:id" element={<ClienteProfilePage />} />
+                <Route path="/polizas" element={<PolizasPage />} />
+                <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
+                <Route path="/polizas/vencimientos" element={<VencimientosPage />} />
+                <Route path="/polizas/bajas" element={<BajasPage />} />
+                <Route path="/polizas/:id" element={<PolizaDetails />} />
+                <Route path="/pagos" element={<PagosPage />} />
+                <Route path="/balanzes" element={<BalanzesPage />} />
+                <Route path="/siniestros" element={<SiniestrosPage />} />
+                <Route path="/cuponeras" element={<CuponerasPage />} />
+                <Route path="/geo" element={<GeoPage />} />
+                <Route path="/competencia" element={<CompetenciaPage />} />
+                <Route path="/estadisticas" element={<EstadisticasPage />} />
+                
+                <Route 
+                  path="/marketing" 
+                  element={user.perfil?.rol === 'ADMIN' ? <MarketingPage /> : <Navigate to="/" replace />} 
+                />
+                
+                <Route path="/solicitudes" element={<SolicitudesPage />} />
+                <Route path="/gruas" element={<GruasPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </AnimatePresence>
+          </motion.main>
+
+          <MobileTopBar
+            solPendienteAlta={solPendienteAlta}
+            solPendienteEnvio={solPendienteEnvio}
+            renovacionesPendientes={renovacionesPendientes}
+            bajasPendientes={bajasPendientes}
+          />
+        </motion.div>
+      </div>
+    </>
   );
 }
 
