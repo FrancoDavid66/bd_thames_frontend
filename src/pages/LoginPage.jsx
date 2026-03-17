@@ -17,11 +17,21 @@ export const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    const res = await login(username, password);
-    if (!res.success) {
-        toast.error(res.message || "Acceso denegado. Intenta nuevamente.");
+    
+    // 🛡️ Agregamos un bloque try/catch súper robusto por si el AuthContext explota
+    try {
+      const res = await login(username, password);
+      // Validamos si 'res' existe y si fue exitoso
+      if (!res || !res.success) {
+          toast.error(res?.message || "Acceso denegado. Verificá tus datos.");
+      }
+    } catch (error) {
+      console.error("Error capturado en el login:", error);
+      toast.error("Error de conexión. Revisa tus credenciales.");
+    } finally {
+      // Nos aseguramos de apagar el loading pase lo que pase
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   // Variantes de animación para hacer que los elementos entren escalonados
