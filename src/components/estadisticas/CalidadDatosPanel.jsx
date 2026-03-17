@@ -1,14 +1,19 @@
 // src/components/estadisticas/CalidadDatosPanel.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AnimatedCard from "./AnimatedCard";
+import { HiExclamationCircle, HiUserGroup, HiShieldExclamation } from "react-icons/hi";
 
-export default function CalidadDatosPanel({ apiBase, oficina, setOficina, oficinasList, getOficinaNombre }) {
+export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, anio, mes }) {
   const navigate = useNavigate();
 
   const [resumen, setResumen] = useState(null);
   const [loadingResumen, setLoadingResumen] = useState(false);
   const [errorResumen, setErrorResumen] = useState("");
+
+  // 🚀 ESTADO PARA LAS MÉTRICAS DE PÓLIZAS
+  const [calidadPolizas, setCalidadPolizas] = useState(null);
+  const [loadingPolizas, setLoadingPolizas] = useState(false);
 
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
@@ -21,8 +26,6 @@ export default function CalidadDatosPanel({ apiBase, oficina, setOficina, oficin
   const [ordering, setOrdering] = useState("-id");
 
   const totalPages = Math.max(1, Math.ceil(Number(count || 0) / Number(pageSize || 25)));
-
-  const oficinasValidas = Array.isArray(oficinasList) ? oficinasList : [];
 
   useEffect(() => { setPage(1); }, [oficina, pageSize, ordering]);
 
@@ -38,7 +41,7 @@ export default function CalidadDatosPanel({ apiBase, oficina, setOficina, oficin
     try {
       const qs = new URLSearchParams();
       if (oficina) qs.set("oficina", oficina);
-      const url = `${apiBase}clientes/sin-telefono/resumen/${qs.toString() ? `?${qs.toString()}` : ""}`;
+      const url = `${apiBase}clientes/calidad/resumen/${qs.toString() ? `?${qs.toString()}` : ""}`;
       const token = localStorage.getItem('access_token');
       const res = await fetch(url, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -49,6 +52,37 @@ export default function CalidadDatosPanel({ apiBase, oficina, setOficina, oficin
       setErrorResumen("No se pudo cargar el resumen.");
     } finally {
       setLoadingResumen(false);
+    }
+  };
+
+  // 🚀 BÚSQUEDA DE CALIDAD DE PÓLIZAS EN EL BACKEND
+  const fetchCalidadPolizas = async () => {
+    setLoadingPolizas(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("anio", anio);
+      params.set("mes", mes);
+      if (oficina) params.set("oficina", oficina);
+
+      const url = `${apiBase}estadisticas/polizas/por-oficina/?${params.toString()}`;
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(url, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
+      const data = await res.json();
+
+      if (data && Array.isArray(data.oficinas)) {
+        const totales = data.oficinas.reduce((acc, o) => {
+          const c = o.calidad_datos || {};
+          acc.sin_patente += c.sin_patente || 0;
+          acc.sin_vehiculo += c.sin_vehiculo || 0;
+          acc.sin_compania += c.sin_compania || 0;
+          return acc;
+        }, { sin_patente: 0, sin_vehiculo: 0, sin_compania: 0 });
+        setCalidadPolizas(totales);
+      }
+    } catch (e) {
+      console.error("Error al cargar calidad de pólizas:", e);
+    } finally {
+      setLoadingPolizas(false);
     }
   };
 
@@ -82,7 +116,11 @@ export default function CalidadDatosPanel({ apiBase, oficina, setOficina, oficin
     }
   };
 
-  useEffect(() => { fetchResumen(); }, [oficina]);
+  useEffect(() => { 
+    fetchResumen(); 
+    fetchCalidadPolizas(); 
+  }, [oficina, anio, mes]);
+  
   useEffect(() => { fetchListado(); }, [oficina, page, pageSize, ordering]);
 
   useEffect(() => {
@@ -132,48 +170,69 @@ export default function CalidadDatosPanel({ apiBase, oficina, setOficina, oficin
     <div className="grid gap-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Calidad de datos — Asegurados sin teléfono</div>
-          <div className="text-[11px] text-slate-400">Detecta clientes con teléfono vacío y te permite contactarlos.</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Auditoría de Calidad de Datos</div>
+          <div className="text-[11px] text-slate-400">Detecta perfiles incompletos que pueden dificultar el contacto o la gestión.</div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* BOTONES DE ACCIÓN RÁPIDA */}
-          <button type="button" onClick={() => { fetchResumen(); fetchListado(); }} className="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-slate-200 transition hover:bg-white/10">Refrescar</button>
-          <button type="button" onClick={downloadCsv} disabled={!items.length} className="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-60">CSV (página)</button>
-          <button type="button" onClick={downloadExcel} disabled={!items.length} className="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-60">Excel (página)</button>
+          <button type="button" onClick={() => { fetchResumen(); fetchListado(); fetchCalidadPolizas(); }} className="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-slate-200 transition hover:bg-white/10">Refrescar</button>
         </div>
       </div>
 
-      <AnimatedCard index={2} glow="from-sky-500/40 via-fuchsia-500/20 to-transparent">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Sin teléfono</div>
-            <div className="mt-1 text-3xl font-semibold text-slate-50">{loadingResumen ? "…" : Number(resumen?.sin_telefono || 0).toLocaleString("es-AR")}</div>
-            <div className="mt-1 text-[11px] text-slate-400">{oficina ? `Oficina: ${getOficinaNombre(oficina)}` : "Todas las oficinas"}</div>
+      {/* 🚀 TARJETAS DE KPI DE PÓLIZAS Y CLIENTES INCOMPLETOS */}
+      <AnimatedCard index={1} glow="from-rose-500/30 via-orange-500/10 to-transparent">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HiUserGroup className="text-rose-400" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-rose-300">Clientes sin Teléfono</div>
+            </div>
+            <div className="mt-1 text-3xl font-bold text-slate-50">{loadingResumen ? "…" : Number(resumen?.sin_telefono || 0).toLocaleString("es-AR")}</div>
+            <div className="mt-1 text-[11px] text-slate-400">{oficina ? getOficinaNombre(oficina) : "Todas las oficinas"}</div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Total (scope)</div>
-            <div className="mt-1 text-3xl font-semibold text-slate-50">{loadingResumen ? "…" : Number(resumen?.total || 0).toLocaleString("es-AR")}</div>
+
+          <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HiShieldExclamation className="text-orange-400" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-orange-300">Pólizas sin Patente</div>
+            </div>
+            <div className="mt-1 text-3xl font-bold text-slate-50">{loadingPolizas ? "…" : Number(calidadPolizas?.sin_patente || 0).toLocaleString("es-AR")}</div>
+            <div className="mt-1 text-[11px] text-slate-400">Patente vacía o con guiones</div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">% sin teléfono</div>
-            <div className="mt-1 text-3xl font-semibold text-slate-50">{loadingResumen ? "…" : `${pct}%`}</div>
+
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HiExclamationCircle className="text-amber-400" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">Pólizas sin Vehículo</div>
+            </div>
+            <div className="mt-1 text-3xl font-bold text-slate-50">{loadingPolizas ? "…" : Number(calidadPolizas?.sin_vehiculo || 0).toLocaleString("es-AR")}</div>
+            <div className="mt-1 text-[11px] text-slate-400">Marca o Modelo vacío</div>
           </div>
+
+          <div className="rounded-2xl border border-slate-500/20 bg-slate-500/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HiExclamationCircle className="text-slate-400" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Pólizas sin Compañía</div>
+            </div>
+            <div className="mt-1 text-3xl font-bold text-slate-50">{loadingPolizas ? "…" : Number(calidadPolizas?.sin_compania || 0).toLocaleString("es-AR")}</div>
+            <div className="mt-1 text-[11px] text-slate-400">Revisar registros antiguos</div>
+          </div>
+
         </div>
       </AnimatedCard>
 
+      {/* LISTADO DE CLIENTES SIN TELÉFONO (Mantenido intacto) */}
       <AnimatedCard index={3} glow="from-emerald-500/35 via-cyan-500/15 to-transparent">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Listado (paginado)</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Listado de Clientes Incompletos</div>
               <div className="text-[11px] text-slate-400">Total encontrados: <span className="font-semibold text-slate-200">{Number(count || 0).toLocaleString("es-AR")}</span></div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={downloadCsv} disabled={!items.length} className="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-60">Exportar CSV</button>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="h-9 w-[260px] max-w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 text-sm text-slate-100 outline-none" />
-              <select value={ordering} onChange={(e) => setOrdering(e.target.value)} className="h-9 rounded-xl border border-white/10 bg-slate-950/40 px-3 text-sm text-slate-100 outline-none">
-                <option value="-id">Más nuevos</option><option value="id">Más viejos</option><option value="apellido">Apellido A→Z</option><option value="-apellido">Apellido Z→A</option>
-              </select>
             </div>
           </div>
 

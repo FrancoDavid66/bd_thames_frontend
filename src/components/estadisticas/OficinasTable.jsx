@@ -47,11 +47,11 @@ export default function OficinasTable({
                     Altas mes
                   </th>
                   <th className="px-3 py-2 text-right font-semibold text-rose-200">
-                    Bajas mes
+                    Bajas (Canceladas)
                   </th>
-                  {/* 🚀 NUEVA COLUMNA: VENCIDAS */}
+                  {/* 🚀 NUEVA COLUMNA: MOROSIDAD EXACTA */}
                   <th className="px-3 py-2 text-right font-semibold text-orange-200">
-                    Vencidas
+                    En Mora (Vencidas)
                   </th>
                   <th className="px-3 py-2 text-right font-semibold text-slate-200">
                     Churn %
@@ -62,17 +62,17 @@ export default function OficinasTable({
                 {oficinasData.map((o, idx) => {
                   const totalOf = Number(o.polizas_total || 0);
                   const bajasOf = Number(o.bajas_mes || 0);
-                  // 🚀 Capturamos las vencidas 
-                  const vencidasOf = Number(o.vencidas_mes || o.polizas_vencidas || o.vencidas || 0);
+                  
+                  // 🚀 Mapeamos la nueva variable "en_mora" que nos manda el backend
+                  const vencidasOf = Number(o.en_mora || o.vencidas_mes || 0);
                   
                   const mixCob = o.por_cobertura || {};
                   const mixComp = o.por_compania || {};
                   const antig = o.antiguedad || {};
                   
-                  // 🚀 Cálculo Real del Churn por oficina
+                  // 🚀 Churn exacto usando bajas operativas
                   const churnPct = totalOf > 0 ? (bajasOf / totalOf) * 100 : 0;
 
-                  // ✅ Preferimos el nombre que manda backend (oficina_nombre)
                   const oficinaNombre =
                     (o.oficina_nombre && String(o.oficina_nombre).trim()) ||
                     getOficinaNombre?.(o.oficina) ||
@@ -101,21 +101,6 @@ export default function OficinasTable({
                   if (antig["5_plus"]) antigResumenParts.push(`5+: ${antig["5_plus"]}`);
                   const antigResumen = antigResumenParts.join(" · ");
 
-                  const anioVeh = o.anio_vehiculo || {};
-                  let anioLabel = "";
-                  if (anioVeh.min && anioVeh.max) {
-                    const prom =
-                      anioVeh.promedio !== undefined && anioVeh.promedio !== null
-                        ? Math.round(Number(anioVeh.promedio))
-                        : null;
-                    anioLabel = prom
-                      ? `${anioVeh.min}–${anioVeh.max} (prom: ${prom})`
-                      : `${anioVeh.min}–${anioVeh.max}`;
-                  } else if (anioVeh.promedio !== undefined && anioVeh.promedio !== null) {
-                    const prom = Math.round(Number(anioVeh.promedio));
-                    anioLabel = `prom: ${prom}`;
-                  }
-
                   let churnColor = "text-slate-100";
                   if (churnPct >= 5 && churnPct < 10) churnColor = "text-amber-300";
                   else if (churnPct >= 10) churnColor = "text-rose-300";
@@ -130,8 +115,6 @@ export default function OficinasTable({
                     >
                       <td className="px-3 py-2 whitespace-nowrap text-slate-100 align-top">
                         <div className="font-semibold">{oficinaNombre}</div>
-
-                        {/* ✅ mostramos código si existe (útil para buckets/diagnóstico) */}
                         {o.oficina ? (
                           <div className="mt-0.5 text-[10px] text-slate-500">
                             Código: {String(o.oficina)}
@@ -142,11 +125,10 @@ export default function OficinasTable({
                           {cobResumen && <div>Coberturas: {cobResumen}</div>}
                           {compResumen && <div>Compañías: {compResumen}</div>}
                           {antigResumen && <div>Antigüedad (años): {antigResumen}</div>}
-                          {anioLabel && <div>Años vehículo: {anioLabel}</div>}
                         </div>
                       </td>
 
-                      <td className="px-3 py-2 text-right text-slate-100 align-top">
+                      <td className="px-3 py-2 text-right text-slate-100 align-top font-bold">
                         {totalOf.toLocaleString("es-AR")}
                       </td>
                       <td className="px-3 py-2 text-right text-slate-200 align-top">
@@ -158,11 +140,10 @@ export default function OficinasTable({
                       <td className="px-3 py-2 text-right text-rose-200 align-top">
                         {bajasOf.toLocaleString("es-AR")}
                       </td>
-                      {/* 🚀 NUEVO DATO EN FILA */}
-                      <td className="px-3 py-2 text-right text-orange-200 align-top">
+                      <td className="px-3 py-2 text-right text-orange-300 align-top font-bold">
                         {vencidasOf.toLocaleString("es-AR")}
                       </td>
-                      <td className={`px-3 py-2 text-right align-top font-semibold ${churnColor}`}>
+                      <td className={`px-3 py-2 text-right align-top font-black tracking-widest ${churnColor}`}>
                         {churnPct.toFixed(1)}%
                       </td>
                     </motion.tr>

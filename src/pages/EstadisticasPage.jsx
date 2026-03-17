@@ -16,7 +16,6 @@ import AltasPolizasPanel from "../components/estadisticas/AltasPolizasPanel";
 
 import CalidadDatosPanel from "../components/estadisticas/CalidadDatosPanel";
 import DuplicadosPolizasPanel from "../components/estadisticas/DuplicadosPolizasPanel";
-// 🚀 IMPORTAMOS NUESTRO PANEL CONTABLE RECIÉN CREADO
 import ContabilidadPanel from "../components/estadisticas/ContabilidadPanel";
 
 const getApiBase = () => {
@@ -212,7 +211,8 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
         acc.activas += o.polizas_activas || 0;
         acc.nuevas += o.nuevas_mes || 0;
         acc.bajas += o.bajas_mes || 0;
-        acc.vencidas += o.vencidas_mes || o.polizas_vencidas || o.vencidas || 0;
+        // 🚀 SUMAMOS LA VARIABLE REAL DE MOROSIDAD
+        acc.vencidas += o.en_mora || o.vencidas_mes || o.polizas_vencidas || 0;
         return acc;
       }, { total: 0, activas: 0, nuevas: 0, bajas: 0, vencidas: 0 }
     );
@@ -220,6 +220,17 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
 
   const churnGlobal = totales.total > 0 ? (totales.bajas / totales.total) * 100 : 0;
   const periodoLabel = periodo || `${String(mes).padStart(2, "0")}/${String(anio).padStart(4, "0")}`;
+
+  // 🚀 Extraemos los totales de calidad de datos si el backend los manda
+  const calidadGlobal = useMemo(() => {
+    return oficinasData.reduce((acc, o) => {
+        const c = o.calidad_datos || {};
+        acc.sin_patente += c.sin_patente || 0;
+        acc.sin_vehiculo += c.sin_vehiculo || 0;
+        acc.sin_compania += c.sin_compania || 0;
+        return acc;
+    }, { sin_patente: 0, sin_vehiculo: 0, sin_compania: 0 });
+  }, [oficinasData]);
 
   return (
     <>
@@ -253,6 +264,9 @@ export default function EstadisticasPage() {
   const [fuenteSnapshot, setFuenteSnapshot] = useState("live");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+
+  // 🚀 Estado compartido de Calidad de Datos (Se lo pasamos al panel de Calidad)
+  const [calidadGeneralData, setCalidadGeneralData] = useState({ sin_patente: 0, sin_vehiculo: 0, sin_compania: 0 });
 
   useEffect(() => {
     const fetchOficinasDb = async () => {
@@ -343,7 +357,7 @@ export default function EstadisticasPage() {
 
           {tab === "calidad" && (
             <motion.div key="calidad" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
-              <CalidadDatosPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
+              <CalidadDatosPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} anio={anio} mes={mes} />
             </motion.div>
           )}
 
@@ -361,7 +375,6 @@ export default function EstadisticasPage() {
 
           {tab === "contabilidad" && (
             <motion.div key="contabilidad" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
-              {/* 🚀 ACÁ PONEMOS EL PANEL REAL DE CONTABILIDAD */}
               <ContabilidadPanel 
                 apiBase={apiBase} 
                 oficina={oficina} 
