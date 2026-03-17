@@ -258,10 +258,10 @@ const BalancesPage = () => {
                   onChange={(e) => setOficinaSeleccionada(e.target.value)}
                   className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-zinc-50 border-none focus:ring-0 p-0 cursor-pointer outline-none truncate"
                 >
-                  <option value="ALL">Todas las cajas</option>
-                  <option value="1">Oficina 1 (5 Esquinas)</option>
-                  <option value="2">Oficina 2 (Axion)</option>
-                  <option value="3">Oficina 3 (Km 39)</option>
+                  <option value="ALL" className="bg-zinc-900 text-zinc-100">Todas las cajas</option>
+                  <option value="1" className="bg-zinc-900 text-zinc-100">Oficina 1 (5 Esquinas)</option>
+                  <option value="2" className="bg-zinc-900 text-zinc-100">Oficina 2 (Axion)</option>
+                  <option value="3" className="bg-zinc-900 text-zinc-100">Oficina 3 (Km 39)</option>
                 </select>
               </div>
             )}
@@ -343,10 +343,10 @@ const BalancesPage = () => {
         <section className="space-y-6">
           {/* 🚀 GRILLA RESPONSIVA: 2 columnas en mobile/tablet, 4 columnas en PC */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <KpiCard title="Ingresos (Día)" value={tIn} variant="green" />
-            <KpiCard title="Egresos (Día)" value={tEg} variant="red" />
-            <KpiCard title="Neto (Día)" value={tBal} variant="blue" />
-            <KpiCard title="Caja Chica (Físico)" value={tCajaChica} variant="amber" />
+            <KpiCard title="Ingresos (Mes)" value={totalIngresosMensuales} variant="green" />
+            <KpiCard title="Egresos (Mes)" value={totalEgresosMensuales} variant="red" />
+            <KpiCard title="Neto (Mes)" value={totalIngresosMensuales - totalEgresosMensuales} variant="blue" />
+            <KpiCard title="Caja Chica (Mes - Efectivo)" value={tCajaChica} variant="amber" />
           </div>
 
           {/* Acciones rápidas */}

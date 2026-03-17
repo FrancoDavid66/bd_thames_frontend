@@ -116,7 +116,9 @@ export default function BajasPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [excelAllLoading, setExcelAllLoading] = useState(false);
+  
+  // 🚀 Estado para mostrar feedback visual al descargar desde la tarjeta
+  const [downloadingTab, setDownloadingTab] = useState(null); 
 
   const companiasUnicas = useMemo(() => {
     const names = (items || []).map((p) => p.compania).filter(Boolean);
@@ -264,33 +266,61 @@ export default function BajasPage() {
     link.click();
   };
 
-  const fetchAllForActiveTab = useCallback(async () => {
-    const tab = activeTab && activeTab !== "TODAS" ? activeTab : "";
+  // 🚀 NUEVA FUNCIÓN: Descarga el Excel directo desde el Backend
+  const handleDownloadExcelFromBackend = async (e, tabId, isGlobal) => {
+    e.stopPropagation(); // Evita que se active el click de la tarjeta (setActiveTab)
+    if (downloadingTab) return;
     
-    const ofi = !isWebAdmin && user?.perfil?.oficina 
-                ? String(user.perfil.oficina.id || user.perfil.oficina) 
-                : oficina;
-
-    const baseParams = { dias: umbralDias, include_finalizadas: "0", include_canceladas: "1", oficina: ofi, ...(tab ? { baja_estado: tab } : {}), page: "1", page_size: "500" };
-    let pageN = 1, all = [];
-    for (;;) {
-      const data = await apiGet("bajas/operativo/", { ...baseParams, page: String(pageN) });
-      const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      all = all.concat(results);
-      if (data?.next ? !data.next : results.length < Number(baseParams.page_size)) break;
-      pageN += 1;
-      if (pageN > 2000) break;
-    }
-    return all;
-  }, [activeTab, umbralDias, isWebAdmin, user, oficina]);
-
-  const handleExcelTotalTab = async () => {
+    setDownloadingTab(tabId);
     try {
-      setExcelAllLoading(true);
-      const allRows = await fetchAllForActiveTab();
-      const rows = allRows.map(p => ({ ...p, _clienteNombre: getClienteInfo(p).nombre }));
-      await generateAndDownloadExcel(rows);
-    } catch (e) { alert(`Error: ${e?.message}`); } finally { setExcelAllLoading(false); }
+      const token = localStorage.getItem("access_token");
+      const ofiFiltro = isGlobal ? "ALL" : (!isWebAdmin && user?.perfil?.oficina ? String(user.perfil.oficina.id || user.perfil.oficina) : oficina);
+      
+      // Mapeamos el nombre de la tarjeta para enviarlo a Django
+      let estadoBackend = "UNIVERSO";
+      if (tabId === STATUS.ENVIAR) estadoBackend = "PENDIENTES";
+      if (tabId === STATUS.ENVIADA) estadoBackend = "ENVIADAS";
+      if (tabId === STATUS.REALIZADA) estadoBackend = "REALIZADAS";
+
+      const url = new URL(`${import.meta.env.VITE_API_URL}bajas/operativo/exportar-excel/`);
+      url.searchParams.append("estado_tarjeta", estadoBackend);
+      url.searchParams.append("dias", umbralDias);
+      url.searchParams.append("include_canceladas", "1");
+      
+      if (ofiFiltro) url.searchParams.append("oficina", ofiFiltro);
+      if (compania) url.searchParams.append("compania", compania);
+      if (search) url.searchParams.append("search", search);
+
+      const response = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error("Error al descargar el Excel");
+
+      const blob = await response.blob();
+      
+      // Capturamos el nombre de archivo desde el header si es posible
+      let filename = `Bajas_${estadoBackend}_${new Date().toLocaleDateString()}.xlsx`;
+      const disposition = response.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+          filename = disposition.split('filename=')[1].replace(/"/g, '');
+      }
+
+      const objectUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(objectUrl);
+
+    } catch (error) {
+      console.error(error);
+      alert("Hubo un error al generar el archivo Excel.");
+    } finally {
+      setDownloadingTab(null);
+    }
   };
 
   const executeAction = async () => {
@@ -319,7 +349,7 @@ export default function BajasPage() {
   const activeModalConfig = MODAL_CONFIG[confirmModal.type] || MODAL_CONFIG.EXCEL;
 
   // 🚀 REUTILIZABLE: Dibujador de Fila de KPIs
-  const renderKpiRow = (kpisData, title) => (
+  const renderKpiRow = (kpisData, title, isGlobal = false) => (
     <div className="mb-6">
       {title && <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">{title}</h3>}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -329,15 +359,36 @@ export default function BajasPage() {
           { id: STATUS.REALIZADA, label: "Realizadas", val: kpisData?.realizada || 0, col: "from-emerald-500/25 to-emerald-900/5", text: "text-emerald-400", border: "border-emerald-500/30" },
           { id: "TODAS", label: "Universo", val: kpisData?.total || 0, col: "from-slate-500/25 to-slate-900/5", text: "text-slate-100", border: "border-slate-500/30" },
         ].map((t) => {
-          const isActive = activeTab === t.id;
+          // Si estamos dibujando la fila global, no mostramos el estado Activo visual porque la tabla de abajo responde a la sucursal
+          const isActive = !isGlobal && activeTab === t.id; 
+          const isDownloadingThis = downloadingTab === t.id;
+
           return (
             <button
               key={t.id}
-              onClick={() => { setActiveTab(t.id); setPage(1); setSelectedIds(new Set()); loadTableData({ force: true, overrides: { activeTab: t.id, page: 1 } }); }}
-              className={`relative overflow-hidden p-6 rounded-[2rem] border transition-all duration-300 group ${
+              onClick={() => { 
+                if(!isGlobal) {
+                  setActiveTab(t.id); setPage(1); setSelectedIds(new Set()); loadTableData({ force: true, overrides: { activeTab: t.id, page: 1 } }); 
+                }
+              }}
+              className={`relative overflow-hidden p-6 rounded-[2rem] border transition-all duration-300 group text-left ${
                 isActive ? `bg-gradient-to-br ${t.col} ${t.border} scale-[1.03] shadow-2xl ring-2 ring-white/5` : "bg-slate-900/40 border-white/5 opacity-70 hover:opacity-100"
-              }`}
+              } ${isGlobal ? "cursor-default hover:scale-100" : ""}`}
             >
+              {/* 🚀 BOTÓN DE DESCARGA INCORPORADO EN LA TARJETA */}
+              <div 
+                onClick={(e) => handleDownloadExcelFromBackend(e, t.id, isGlobal)}
+                className={`absolute top-4 right-4 p-2 rounded-xl border bg-white/5 backdrop-blur-md transition-all cursor-pointer z-20 
+                  ${isDownloadingThis ? "border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/40 hover:text-white hover:bg-white/10 hover:border-white/30 hover:scale-110"}`}
+                title={`Descargar Excel: ${t.label}`}
+              >
+                 {isDownloadingThis ? (
+                    <div className="w-5 h-5 border-2 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin" />
+                 ) : (
+                    <HiDownload className="text-xl" />
+                 )}
+              </div>
+
               <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 mb-2">{t.label}</div>
               <div className={`text-4xl font-black ${t.text} drop-shadow-sm`}>{t.val}</div>
               {isActive && (
@@ -376,11 +427,11 @@ export default function BajasPage() {
       {/* 🚀 DOBLE FILA DE KPIs PARA EL ADMIN, FILA ÚNICA PARA SUCURSAL */}
       {isWebAdmin ? (
         <>
-          {renderKpiRow(adminGlobalKpis, "Métricas Globales (Toda la Empresa)")}
-          {renderKpiRow(sucursalKpis, "Métricas por Sucursal (Según filtro actual)")}
+          {renderKpiRow(adminGlobalKpis, "Métricas Globales (Toda la Empresa)", true)}
+          {renderKpiRow(sucursalKpis, "Métricas por Sucursal (Según filtro actual)", false)}
         </>
       ) : (
-        renderKpiRow(sucursalKpis, null)
+        renderKpiRow(sucursalKpis, null, false)
       )}
 
       <div className="bg-slate-900/40 backdrop-blur-2xl p-6 rounded-[3rem] border border-white/10 shadow-inner space-y-6">
@@ -400,13 +451,7 @@ export default function BajasPage() {
           </div>
           
           <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-center">
-            <button
-              disabled={excelAllLoading || activeTab === "TODAS"}
-              onClick={handleExcelTotalTab}
-              className="px-5 py-2.5 bg-white/5 text-white text-xs font-bold rounded-2xl border border-white/10 hover:bg-white/10 hover:border-white/20 disabled:opacity-30 transition-all flex items-center gap-2"
-            >
-              <HiDownload className="text-lg text-emerald-400" /> Excel (Todo {activeTab})
-            </button>
+            {/* Este botón viejo lo podemos dejar o sacar, pero ya no hace falta porque están los íconos arriba */}
             <button
               disabled={!selectedIds.size}
               onClick={() => openConfirmModal("EXCEL", Array.from(selectedIds))}
