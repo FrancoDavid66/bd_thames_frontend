@@ -218,7 +218,9 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
     );
   }, [oficinasData]);
 
-  const churnGlobal = totales.total > 0 ? (totales.bajas / totales.total) * 100 : 0;
+  // 🚀 AHORA EL CHURN GLOBAL SUMA BAJAS + VENCIDAS
+  const churnGlobal = totales.total > 0 ? ((totales.bajas + totales.vencidas) / totales.total) * 100 : 0;
+  
   const periodoLabel = periodo || `${String(mes).padStart(2, "0")}/${String(anio).padStart(4, "0")}`;
 
   // 🚀 Extraemos los totales de calidad de datos si el backend los manda

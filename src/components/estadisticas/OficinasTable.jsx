@@ -70,8 +70,8 @@ export default function OficinasTable({
                   const mixComp = o.por_compania || {};
                   const antig = o.antiguedad || {};
                   
-                  // 🚀 Churn exacto usando bajas operativas
-                  const churnPct = totalOf > 0 ? (bajasOf / totalOf) * 100 : 0;
+                  // 🚀 AHORA EL CHURN SUMA BAJAS + VENCIDAS
+                  const churnPct = totalOf > 0 ? ((bajasOf + vencidasOf) / totalOf) * 100 : 0;
 
                   const oficinaNombre =
                     (o.oficina_nombre && String(o.oficina_nombre).trim()) ||
