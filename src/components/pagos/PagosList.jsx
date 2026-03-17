@@ -6,6 +6,7 @@
    🧹 UPDATE: Filtro automático para ocultar cuotas de pólizas canceladas/vencidas
    🎨 UPDATE: Pendientes APAGADAS, Pagadas MUY VIVAS.
    👀 UPDATE: Vencimiento y Período SIEMPRE VISIBLES.
+   📄 UPDATE: Botón de Descargar PDF agregado a la vista principal
 */
 import { useDispatch } from "react-redux";
 import { useMemo, useState, useCallback, useEffect, memo } from "react";
@@ -1026,7 +1027,7 @@ const CuotaRow = memo(
               </div>
             </div>
 
-            {/* 3. BOTONES DE ACCIÓN (PAGAR / TICKET) */}
+            {/* 3. BOTONES DE ACCIÓN (PAGAR / PDF / TICKET / WPP) */}
             <div className="flex items-center gap-2 w-full mt-2 pt-2 border-t border-slate-700/50">
                 {!cuota?.pagado ? (
                   <button
@@ -1038,20 +1039,36 @@ const CuotaRow = memo(
                   </button>
                 ) : (
                   <div className="flex gap-2 w-full">
+                    {/* 📄 NUEVO: Botón para Descargar PDF */}
+                    <div className="flex-1">
+                      <DescargarFactura
+                        cliente={model?.pol?.cliente}
+                        poliza={model?.pol}
+                        cuota={cuotaPdf || cuota}
+                        label="Bajar PDF"
+                        tone="neutral"
+                        className="w-full h-11 px-1 sm:px-4 rounded-xl border transition inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
+                      />
+                    </div>
+                    
+                    {/* 🖨️ Botón para Ticket térmico */}
                     <div className="flex-1">
                        <ImprimirFacturaTicket
                           cliente={model?.pol?.cliente}
                           poliza={model?.pol}
                           cuota={cuotaPdf || cuota}
-                          label="Imprimir Ticket"
-                          className={`w-full h-11 px-4 rounded-xl border transition inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold cursor-pointer ${PALETTE.ticketBtn}`}
+                          label="Ticket"
+                          className={`w-full h-11 px-1 sm:px-4 rounded-xl border transition inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold cursor-pointer ${PALETTE.ticketBtn}`}
                         />
                     </div>
+
+                    {/* 📱 Botón para WhatsApp */}
                     <div className="flex-1">
                       <EnviarFacturaWhatsapp cuota={cuota}>
-                        <button className={`w-full h-11 px-4 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold cursor-pointer`}>
+                        <button className={`w-full h-11 px-1 sm:px-4 rounded-xl border ${PALETTE.neutralBtn} transition inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold cursor-pointer`}>
                           <HiDeviceMobile className="w-4 h-4 sm:w-5 sm:h-5" />
-                          <span>WhatsApp</span>
+                          <span className="hidden sm:inline">WhatsApp</span>
+                          <span className="sm:hidden">WPP</span>
                         </button>
                       </EnviarFacturaWhatsapp>
                     </div>

@@ -10,7 +10,7 @@ import {
   HiSearch, 
   HiBan, 
   HiOfficeBuilding,
-  HiUserGroup // 🚀 Corregido: Importado correctamente ahora
+  HiUserGroup 
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
@@ -172,8 +172,9 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
                         <div className="space-y-1">
                             <label className="text-[9px] font-black text-sky-400/50 uppercase ml-1">Sucursal</label>
                             <select value={nuevoOficina} onChange={(e) => setNuevoOficina(e.target.value)} className="w-full h-12 px-4 rounded-xl bg-black/40 border border-sky-500/20 text-sky-400 font-bold text-sm outline-none cursor-pointer">
-                                <option value="">— Elegir Oficina —</option>
-                                {oficinasReal.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                                {/* 🚀 FIX DE COLORES AQUÍ: Le damos fondo oscuro y texto claro a las opciones */}
+                                <option value="" className="bg-[#0b0f1e] text-slate-400">— Elegir Oficina —</option>
+                                {oficinasReal.map(o => <option key={o.id} value={o.id} className="bg-[#0b0f1e] text-white">{o.nombre}</option>)}
                             </select>
                         </div>
                     )}
