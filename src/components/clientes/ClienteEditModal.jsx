@@ -4,7 +4,7 @@ import { HiPencilAlt, HiX } from "react-icons/hi";
 import { useClienteEditForm } from "../../hooks/clientes/useClienteEditForm";
 
 const ClienteEditModal = ({ isOpen, onClose, onSave, cliente }) => {
-  const { formData, handleChange, handleSubmit } = useClienteEditForm({
+  const { formData, handleChange, handleSubmit, loading } = useClienteEditForm({
     cliente,
     onClose,
     onSave,
@@ -75,8 +75,9 @@ const ClienteEditModal = ({ isOpen, onClose, onSave, cliente }) => {
               </button>
             </div>
 
-            {/* Formulario scrolleable */}
+            {/* 🚀 FIX: Le agregamos el ID al formulario para conectarlo con el botón de afuera */}
             <form
+              id="form-editar-cliente"
               onSubmit={handleSubmit}
               className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide"
             >
@@ -115,15 +116,19 @@ const ClienteEditModal = ({ isOpen, onClose, onSave, cliente }) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2.5 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all"
+                disabled={loading}
+                className="px-6 py-2.5 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
               >
                 Cancelar
               </button>
+              {/* 🚀 FIX: Conectamos el botón al formulario usando form="form-editar-cliente" */}
               <button
                 type="submit"
-                className="px-8 py-2.5 rounded-xl bg-sky-500 text-black font-black uppercase text-[10px] tracking-widest shadow-lg shadow-sky-900/40 hover:bg-sky-400 transition-all flex items-center gap-2"
+                form="form-editar-cliente"
+                disabled={loading}
+                className="px-8 py-2.5 rounded-xl bg-sky-500 text-black font-black uppercase text-[10px] tracking-widest shadow-lg shadow-sky-900/40 hover:bg-sky-400 transition-all flex items-center gap-2 disabled:opacity-50"
               >
-                Guardar Cambios
+                {loading ? "Guardando..." : "Guardar Cambios"}
               </button>
             </div>
           </motion.div>
