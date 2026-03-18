@@ -6,7 +6,7 @@ import {
   FaHome, FaUsers, FaFileAlt, FaMoneyCheckAlt, FaDatabase,
   FaChartBar, FaMapMarkedAlt, FaClipboardList, FaBullhorn,
   FaChevronDown, FaChevronRight, FaChevronLeft, FaSyncAlt,
-  FaClock, FaBan, FaTruckMoving, 
+  FaClock, FaBan, FaTruckMoving, FaCashRegister // 💸 Agregamos icono de caja
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
@@ -39,6 +39,9 @@ export default function Sidebar({
       { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt },
       { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
       { to: "/balanzes", label: "Balanzes", icon: FaDatabase }, 
+      
+      // 💸 NUEVO ACCESO: Recaudación / Caja para TODOS
+      { to: "/recaudacion", label: "Caja", icon: FaCashRegister },
       
       // Solo Admin
       { to: "/marketing", label: "Campañas", icon: FaBullhorn, adminOnly: true },
@@ -87,7 +90,7 @@ export default function Sidebar({
                 {user?.perfil?.oficina_nombre || 'Sucursal'}
             </p>
           </div>
-          <button onClick={onClose} className="text-white bg-blue-800 dark:bg-gray-800 px-2 py-2 rounded-md">
+          <button onClick={onClose} className="text-white bg-blue-800 dark:bg-gray-800 px-2 py-2 rounded-md cursor-pointer">
             <FaChevronLeft />
           </button>
         </div>
@@ -102,20 +105,20 @@ export default function Sidebar({
                       <item.icon className="text-lg shrink-0" />
                       <span className="font-medium truncate">Pólizas</span>
                     </NavLink>
-                    <button onClick={() => setPolizasOpen(!polizasOpen)} className="px-3 py-2 text-white/80">
+                    <button onClick={() => setPolizasOpen(!polizasOpen)} className="px-3 py-2 text-white/80 cursor-pointer">
                       {polizasOpen ? <FaChevronDown /> : <FaChevronRight />}
                     </button>
                   </div>
                   {polizasOpen && (
                     <div className="ml-3 border-l border-white/10 pl-3 space-y-1">
-                      <NavLink to="/polizas" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition hover:bg-blue-800/50">
+                      <NavLink to="/polizas" className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
                         <FaFileAlt className="text-base" /> Listado
                       </NavLink>
-                      <NavLink to="/polizas/bajas" className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition hover:bg-blue-800/50">
+                      <NavLink to="/polizas/bajas" className={({ isActive }) => `flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
                         <div className="flex items-center gap-3"><FaBan /> Bajas</div>
                         <Badge value={bajasPendientes} />
                       </NavLink>
-                      <NavLink to="/polizas/renovaciones" className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition hover:bg-blue-800/50">
+                      <NavLink to="/polizas/renovaciones" className={({ isActive }) => `flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
                         <div className="flex items-center gap-3"><FaSyncAlt /> Renovaciones</div>
                         <Badge value={renovacionesPendientes} tone="amber" />
                       </NavLink>
@@ -130,7 +133,7 @@ export default function Sidebar({
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 rounded-lg transition ${isActive ? "bg-blue-800 dark:bg-gray-800" : "hover:bg-blue-800/60"}`
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition ${isActive ? "bg-blue-800 dark:bg-gray-800 text-emerald-400" : "hover:bg-blue-800/60"}`
                 }
               >
                 <item.icon className="text-lg shrink-0" />

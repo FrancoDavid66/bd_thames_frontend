@@ -37,6 +37,9 @@ import RenovacionesPage from "./pages/RenovacionesPage";
 import VencimientosPage from "./pages/VencimientosPage";
 import BajasPage from "./pages/BajasPage";
 
+// ✅ NUEVA APP
+import RecaudacionPage from "./pages/RecaudacionPage";
+
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
 function App() {
@@ -405,6 +408,7 @@ function App() {
                 <Route path="/geo" element={<GeoPage />} />
                 <Route path="/competencia" element={<CompetenciaPage />} />
                 <Route path="/estadisticas" element={<EstadisticasPage />} />
+                <Route path="/recaudacion" element={<RecaudacionPage />} />
                 
                 <Route 
                   path="/marketing" 

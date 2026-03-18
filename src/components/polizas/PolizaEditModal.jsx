@@ -45,13 +45,12 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
 
   useEffect(() => {
     if (isOpen) {
-      // 🚀 FIX: Peticiones a las rutas correctas del catálogo
-      api.get("polizas/companias/").then(res => {
+      api.get("companias/").then(res => {
         const arr = Array.isArray(res.data) ? res.data : (res.data?.results || []);
         setCompanias(arr.filter(c => c.activa).map(c => c.nombre));
       }).catch(console.warn);
       
-      api.get("polizas/coberturas/").then(res => {
+      api.get("coberturas/").then(res => {
         const arr = Array.isArray(res.data) ? res.data : (res.data?.results || []);
         setCoberturas(arr.filter(c => c.activa).map(c => c.nombre));
       }).catch(console.warn);

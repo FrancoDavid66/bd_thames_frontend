@@ -30,6 +30,9 @@ import bajasReducer from "./slices/bajasSlice";
 // ✅🆕 Marketing / Campañas
 import marketingReducer from "./slices/marketingSlice";
 
+// ✅🆕 Recaudación / Cierres de caja
+import recaudacionReducer from "./slices/recaudacionSlice";
+
 export const store = configureStore({
   reducer: {
     clientes: clientesReducer,
@@ -58,6 +61,9 @@ export const store = configureStore({
 
     // ✅🆕
     marketing: marketingReducer,
+
+    // ✅🆕
+    recaudacion: recaudacionReducer,
   },
 });
 

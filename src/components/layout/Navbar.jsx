@@ -1,6 +1,7 @@
 // src/components/layout/Navbar.jsx
 import { useState } from "react";
-import { HiMenu, HiX, HiLogout, HiUserCircle } from "react-icons/hi";
+import { HiMenu, HiX, HiLogout, HiUserCircle, HiCurrencyDollar } from "react-icons/hi";
+import { Link } from "react-router-dom"; // 🚀 Importamos Link para la navegación
 import { useAuth } from "../../context/AuthContext"; // 🚀 Importamos Auth
 
 export default function Navbar({
@@ -29,7 +30,7 @@ export default function Navbar({
       <div className="w-full min-w-0 flex items-center justify-between gap-3 px-3 sm:px-4 h-14">
         <button
           onClick={toggleSidebar}
-          className="inline-flex items-center justify-center h-10 w-10 shrink-0 rounded-md hover:bg-blue-700/60 focus:outline-none"
+          className="inline-flex items-center justify-center h-10 w-10 shrink-0 rounded-md hover:bg-blue-700/60 focus:outline-none cursor-pointer"
         >
           {sidebarOpen ? <HiX className="text-xl" /> : <HiMenu className="text-xl" />}
         </button>
@@ -41,8 +42,19 @@ export default function Navbar({
         </div>
 
         {/* 🚀 LADO DERECHO: USUARIO Y LOGOUT */}
-        <div className="relative flex items-center gap-2 shrink-0">
-          <div className="hidden sm:flex flex-col items-end mr-2">
+        <div className="relative flex items-center gap-3 shrink-0">
+          
+          {/* 💸 ACCESO RÁPIDO A CAJA / RECAUDACIÓN */}
+          <Link
+            to="/recaudacion"
+            title="Ir a Caja y Recaudación"
+            className="flex items-center justify-center cursor-pointer h-9 px-3 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors border border-emerald-500/30 gap-1.5"
+          >
+            <HiCurrencyDollar className="text-lg" />
+            <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest mt-0.5">Caja</span>
+          </Link>
+
+          <div className="hidden sm:flex flex-col items-end mr-1 border-l border-white/10 pl-3">
             <span className="text-[11px] font-bold uppercase tracking-tighter text-yellow-400">
               {user?.perfil?.rol === 'ADMIN' ? 'Administrador' : user?.perfil?.oficina_nombre || 'Oficina'}
             </span>
@@ -54,7 +66,7 @@ export default function Navbar({
           <button
             onClick={logout}
             title="Cerrar Sesión"
-            className="flex items-center justify-center cursor-pointer h-9 w-9 rounded-full bg-white/10 hover:bg-red-500/80 transition-colors border border-white/10"
+            className="flex items-center justify-center cursor-pointer h-9 w-9 rounded-full bg-white/10 hover:bg-red-500/80 transition-colors border border-white/10 ml-1"
           >
             <HiLogout className="text-lg" />
           </button>

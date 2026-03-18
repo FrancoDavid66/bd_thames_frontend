@@ -17,6 +17,7 @@ import {
   FaSyncAlt,
   FaTimes,
   FaBan,
+  FaCashRegister // 💸 Agregamos icono de caja
 } from "react-icons/fa";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD Y ROLES
@@ -72,6 +73,12 @@ export default function MobileTopBar({
 
   const moreItems = useMemo(
     () => [
+      // 💸 NUEVO ACCESO: Recaudación / Caja para TODOS
+      {
+        to: "/recaudacion",
+        label: "Caja",
+        icon: FaCashRegister,
+      },
       {
         to: "/cuponeras",
         label: "Cuponeras",
@@ -138,7 +145,7 @@ export default function MobileTopBar({
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm font-extrabold text-white">Más opciones</div>
                 <button
-                  className="rounded-xl border border-white/10 px-3 py-2 text-white/90 hover:bg-white/10"
+                  className="rounded-xl border border-white/10 px-3 py-2 text-white/90 hover:bg-white/10 cursor-pointer"
                   onClick={() => setMoreOpen(false)}
                   aria-label="Cerrar"
                   title="Cerrar"
@@ -156,10 +163,10 @@ export default function MobileTopBar({
                       setMoreOpen(false);
                       navigate(to);
                     }}
-                    className="relative flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 active:scale-[0.99] transition"
+                    className="cursor-pointer relative flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 active:scale-[0.99] transition"
                   >
                     <span className="relative inline-flex items-center justify-center h-7 w-7 rounded-lg bg-white/10">
-                      <Icon />
+                      <Icon className={to === '/recaudacion' ? 'text-emerald-400' : ''} />
                       <Badge value={badge} />
                     </span>
                     <span className="min-w-0 truncate">{label}</span>
@@ -208,7 +215,7 @@ export default function MobileTopBar({
           <li className="flex-1">
             <button
               onClick={() => setMoreOpen(true)}
-              className="group relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-gray-300 hover:text-white"
+              className="cursor-pointer group relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-gray-300 hover:text-white"
             >
               <span className="inline-flex items-center justify-center h-6 w-6 rounded-md">
                 <FaEllipsisH />
