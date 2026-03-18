@@ -23,6 +23,15 @@ const http = axios.create({
   withCredentials: true,
 });
 
+// 🚀 FIX: INTERCEPTOR PARA INYECTAR EL TOKEN JWT EN CADA PETICIÓN
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  if (token && token !== "undefined" && token !== "null") {
+    config.headers.Authorization = `Bearer ${token.trim()}`;
+  }
+  return config;
+});
+
 /* ============ THUNKS ============ */
 
 // GET /polizas/cupones-robo/?poliza=<id>
