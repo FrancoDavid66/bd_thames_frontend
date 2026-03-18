@@ -26,7 +26,6 @@ const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"].map(
   (x) => ({ id: x, nombre: x })
 );
 
-/* ===== Cobertura -> Banner Rule ===== */
 function toRuleKey(human) {
   const k = String(human || "").trim().toUpperCase();
   if (k === "A") return "A";
@@ -76,8 +75,6 @@ export default function PolizaStep({
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
-  // 🚀 LISTA INTELIGENTE DE OFICINAS
-  // Si sos Admin usa la DB completa. Si sos Operador, usa tus propios datos.
   const opcionesOficina = useMemo(() => {
     if (isWebAdmin && oficinas.length > 0) return oficinas;
 
@@ -178,21 +175,20 @@ export default function PolizaStep({
             label="Compañía"
             value={poliza?.compania || ""}
             onChange={(v) => setPoliza((prev = {}) => ({ ...prev, compania: v }))}
-            options={companias}
+            options={companias} 
             isWebAdmin={isWebAdmin}
-            endpoint="/companias/"
+            endpoint="/companias/"  // 🚀 CAMBIADO: Ruta global sincronizada
           />
 
           <SelectCreatable
             label="Cobertura"
             value={poliza?.cobertura || ""}
             onChange={(v) => setPoliza((prev = {}) => ({ ...prev, cobertura: v }))}
-            options={coberturas}
+            options={coberturas} 
             isWebAdmin={isWebAdmin}
-            endpoint="/coberturas/"
+            endpoint="/coberturas/" // 🚀 CAMBIADO: Ruta global sincronizada
           />
 
-          {/* 🚀 AHORA USA LA LISTA INTELIGENTE QUE NUNCA QUEDA VACÍA */}
           <Select
             label="Oficina"
             value={poliza?.oficina || ""}
@@ -305,8 +301,8 @@ function Select({ label, value, onChange, options = [], className = "", disabled
         <select
           value={value || ""} disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full rounded-xl border border-white/10 px-4 py-2.5 pr-9 outline-none transition-all font-medium appearance-none ${
-            disabled ? 'bg-black/40 text-white/30 cursor-not-allowed opacity-70' : 'bg-white/5 text-white focus:ring-2 ring-violet-500/40 cursor-pointer'
+          className={`cursor-pointer w-full rounded-xl border border-white/10 px-4 py-2.5 pr-9 outline-none transition-all font-medium appearance-none ${
+            disabled ? 'bg-black/40 text-white/30 cursor-not-allowed opacity-70' : 'bg-white/5 text-white focus:ring-2 ring-violet-500/40'
           }`}
         >
           <option value="">— Seleccionar —</option>
@@ -380,7 +376,7 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
           <button 
             type="button" 
             onClick={() => setIsCreating(true)}
-            className="text-[9px] font-black uppercase text-sky-400 bg-sky-400/10 hover:bg-sky-400/20 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1"
+            className="cursor-pointer text-[9px] font-black uppercase text-sky-400 bg-sky-400/10 hover:bg-sky-400/20 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1"
           >
             <HiPlus /> Nuevo
           </button>
@@ -408,7 +404,7 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
             type="button" 
             onClick={handleSaveNew} 
             disabled={saving}
-            className="h-10 w-10 shrink-0 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl transition-colors shadow-lg disabled:opacity-50"
+            className="cursor-pointer h-10 w-10 shrink-0 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl transition-colors shadow-lg disabled:opacity-50"
           >
             {saving ? <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" /> : <HiCheck className="text-lg" />}
           </button>
@@ -416,7 +412,7 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
             type="button" 
             onClick={() => setIsCreating(false)} 
             disabled={saving}
-            className="h-10 w-10 shrink-0 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 rounded-xl transition-colors"
+            className="cursor-pointer h-10 w-10 shrink-0 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 rounded-xl transition-colors"
           >
             <HiX className="text-lg" />
           </button>
@@ -426,7 +422,7 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
           <select
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 pr-9 outline-none focus:ring-2 ring-violet-500/40 text-white font-medium appearance-none transition-all cursor-pointer"
+            className="cursor-pointer w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 pr-9 outline-none focus:ring-2 ring-violet-500/40 text-white font-medium appearance-none transition-all"
           >
             <option value="">— Seleccionar —</option>
             {mergedOptions.map((op) => (

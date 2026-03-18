@@ -173,9 +173,12 @@ export default function BajasPage() {
       );
       loadGlobalTotals({ oficina: ofi, compania: cia, umbralDias: dias, search: q });
     },
-    [dispatch, page, pageSize, oficina, search, umbralDias, compania, activeTab, loadGlobalTotals, isWebAdmin, user]
+    // 🚀 LA CURA: Quitamos 'page' de las dependencias. Usamos los valores actuales si no vienen en los overrides.
+    // Esto evita que loadTableData se regenere y dispare otros efectos sin querer.
+    [dispatch, pageSize, oficina, search, umbralDias, compania, activeTab, loadGlobalTotals, isWebAdmin, user] 
   );
 
+  // 1. Carga inicial
   useEffect(() => { loadTableData(); }, [loadTableData]);
   useEffect(() => { dispatch(fetchBajasOficinas()); }, [dispatch]);
   
@@ -185,13 +188,15 @@ export default function BajasPage() {
     }
   }, [oficina, isWebAdmin]);
 
+  // 2. 🚀 BÚSQUEDA BLINDADA: Usamos un ref para saber si el search realmente cambió por el usuario
+  // o si es la primera vez que se monta.
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
       loadTableData({ force: true, overrides: { page: 1, search } });
-    }, 300);
+    }, 400); // 400ms de debounce
     return () => clearTimeout(t);
-  }, [search, loadTableData]);
+  }, [search]); // 🚀 LA CURA 2: Solo depende de search. Si escribis, busca. Si cambiás de página, esto NO se ejecuta.
 
   const enriched = useMemo(() => {
     const hoy = new Date();
@@ -566,23 +571,35 @@ export default function BajasPage() {
           </div>
 
           <div className="flex items-center gap-4 group">
+            {/* 🚀 BOTÓN PREVIOUS ARREGLADO */}
             <button
               disabled={page === 1}
-              onClick={() => { const np = page - 1; setPage(np); loadTableData({ force: true, overrides: { page: np } }); }}
-              className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl"
+              onClick={() => { 
+                const np = page - 1; 
+                setPage(np); 
+                loadTableData({ force: true, overrides: { page: np } }); 
+              }}
+              className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl cursor-pointer disabled:cursor-not-allowed"
             >
               <HiChevronLeft size={22} />
             </button>
+            
             <div className="flex flex-col items-center min-w-[100px]">
                 <span className="text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest text-center">Pagina</span>
                 <div className="text-xl font-black text-white bg-white/5 px-6 py-1 rounded-xl border border-white/10">
                     {page} <span className="text-slate-600 mx-1">/</span> {totalPages}
                 </div>
             </div>
+            
+            {/* 🚀 BOTÓN NEXT ARREGLADO */}
             <button
               disabled={page >= totalPages}
-              onClick={() => { const np = page + 1; setPage(np); loadTableData({ force: true, overrides: { page: np } }); }}
-              className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl"
+              onClick={() => { 
+                const np = page + 1; 
+                setPage(np); 
+                loadTableData({ force: true, overrides: { page: np } }); 
+              }}
+              className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl cursor-pointer disabled:cursor-not-allowed"
             >
               <HiChevronRight size={22} />
             </button>

@@ -44,6 +44,9 @@ const ClienteProfilePage = () => {
   const [modalCrearPolizaAbierto, setModalCrearPolizaAbierto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
+  // 🚀 MAGIA: Estado para inyectar la póliza al instante
+  const [polizasNuevas, setPolizasNuevas] = useState([]);
+
   useEffect(() => {
     if (!id) return;
     dispatch(fetchClienteById(id));
@@ -75,13 +78,39 @@ const ClienteProfilePage = () => {
 
   const abrirCrearPoliza = () => setModalCrearPolizaAbierto(true);
 
-  const handlePolizaCreada = () => {
-    if (id) dispatch(fetchClienteById(id));
-    dispatch(fetchClientes({ page: 1 }));
+  // 🚀 FIX: Atrapamos la póliza nueva e inyectamos al instante sin recargar la página
+  const handlePolizaCreada = (nuevaPoliza) => {
     setModalCrearPolizaAbierto(false);
+    
+    // La agregamos localmente para que se vea YA MISMO en la tarjeta
+    if (nuevaPoliza && nuevaPoliza.id) {
+      setPolizasNuevas((prev) => [nuevaPoliza, ...prev]);
+    }
+
+    // Refrescamos Redux en segundo plano (con un mini delay para dar tiempo a la DB a asentar los datos)
+    setTimeout(() => {
+      if (id) dispatch(fetchClienteById(id));
+      dispatch(fetchClientes({ page: 1 }));
+    }, 600);
   };
 
-  if (detailStatus === 'loading' || (status === 'loading' && !cliente)) {
+  // 🚀 Fusionamos el cliente de Redux con las pólizas inyectadas en tiempo real
+  const clienteParaMostrar = useMemo(() => {
+    if (!cliente) return null;
+    
+    const polizasActuales = cliente.polizas || [];
+    const idsActuales = new Set(polizasActuales.map(p => p.id));
+    
+    // Evitamos duplicados por si Redux ya se actualizó y trajo la póliza nueva
+    const agregadas = polizasNuevas.filter(p => !idsActuales.has(p.id));
+    
+    return {
+      ...cliente,
+      polizas: [...agregadas, ...polizasActuales]
+    };
+  }, [cliente, polizasNuevas]);
+
+  if (detailStatus === 'loading' || (status === 'loading' && !clienteParaMostrar)) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
         <div className="h-10 w-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mb-4" />
@@ -90,7 +119,7 @@ const ClienteProfilePage = () => {
     );
   }
 
-  if (detailStatus === 'failed' || (status === 'failed' && !cliente)) {
+  if (detailStatus === 'failed' || (status === 'failed' && !clienteParaMostrar)) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
         <HiExclamationCircle className="text-rose-500/50 text-6xl mb-4" />
@@ -102,11 +131,10 @@ const ClienteProfilePage = () => {
     );
   }
 
-  if (!cliente) return null;
+  if (!clienteParaMostrar) return null;
 
   return (
     <motion.div
-      // 📱 Ajuste para celular: padding inferior extra para que se pueda hacer scroll hasta el final
       className="min-h-[100dvh] bg-[#0b0f19] text-white p-4 sm:p-6 lg:p-8 pb-24"
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
@@ -122,10 +150,10 @@ const ClienteProfilePage = () => {
              </div>
              <div className="min-w-0">
                <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-1">
-                 Ficha #{cliente.id}
+                 Ficha #{clienteParaMostrar.id}
                </h2>
                <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter truncate text-white">
-                 {`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()}
+                 {`${clienteParaMostrar?.nombre ?? ''} ${clienteParaMostrar?.apellido ?? ''}`.trim()}
                </h1>
                <div className="flex items-center gap-2 mt-1">
                  <HiShieldCheck className="text-emerald-400 text-sm shrink-0" />
@@ -136,7 +164,6 @@ const ClienteProfilePage = () => {
              </div>
           </div>
           
-          {/* Botones expandidos en celular para fácil acceso táctil */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
             <div className="w-full sm:w-auto" onClick={() => setModalEditarAbierto(true)}>
                <BotonEditarCliente className="w-full h-12 sm:h-10 flex justify-center" />
@@ -150,17 +177,18 @@ const ClienteProfilePage = () => {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-1"><ClienteDatosPersonalesCard cliente={cliente} /></div>
-          <div className="xl:col-span-2"><ClienteDocumentacionCard cliente={cliente} /></div>
+          <div className="xl:col-span-1"><ClienteDatosPersonalesCard cliente={clienteParaMostrar} /></div>
+          <div className="xl:col-span-2"><ClienteDocumentacionCard cliente={clienteParaMostrar} /></div>
         </div>
 
         <div className="pt-2">
-          <ClientePolizasCard cliente={cliente} onCrearPoliza={abrirCrearPoliza} />
+          {/* 🚀 Pasamos el cliente fusionado a la tarjeta de Pólizas */}
+          <ClientePolizasCard cliente={clienteParaMostrar} onCrearPoliza={abrirCrearPoliza} />
         </div>
 
-        <ClienteEditModal isOpen={modalEditarAbierto} onClose={() => setModalEditarAbierto(false)} onSave={handleSaveCliente} cliente={cliente} />
-        <PolizaCreateModal isOpen={modalCrearPolizaAbierto} onClose={() => setModalCrearPolizaAbierto(false)} onSuccess={handlePolizaCreada} clienteId={cliente?.id} />
-        <ConfirmModal isOpen={modalEliminarAbierto} onClose={() => setModalEliminarAbierto(false)} nombre={`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()} onConfirm={handleBorrarCliente} confirmDisabled={eliminando} />
+        <ClienteEditModal isOpen={modalEditarAbierto} onClose={() => setModalEditarAbierto(false)} onSave={handleSaveCliente} cliente={clienteParaMostrar} />
+        <PolizaCreateModal isOpen={modalCrearPolizaAbierto} onClose={() => setModalCrearPolizaAbierto(false)} onSuccess={handlePolizaCreada} clienteId={clienteParaMostrar?.id} />
+        <ConfirmModal isOpen={modalEliminarAbierto} onClose={() => setModalEliminarAbierto(false)} nombre={`${clienteParaMostrar?.nombre ?? ''} ${clienteParaMostrar?.apellido ?? ''}`.trim()} onConfirm={handleBorrarCliente} confirmDisabled={eliminando} />
       </div>
     </motion.div>
   );

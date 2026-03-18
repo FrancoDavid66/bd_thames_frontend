@@ -1,16 +1,10 @@
 // src/components/polizas/PolizaTable.jsx
-import React, { useMemo, useState, useCallback, memo } from "react";
-import { FaEdit, FaTrash, FaBuilding } from "react-icons/fa"; // 🚀 Icono de sucursal
+import React, { useMemo, memo } from "react";
+import { FaBuilding } from "react-icons/fa"; // 🚀 Icono de sucursal
 import { Link } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import toast from "react-hot-toast";
 
 // 🚀 IMPORTACIONES DE SEGURIDAD
 import { useAuth } from "../../context/AuthContext";
-
-import PolizaEditModal from "./PolizaEditModal";
-import ConfirmModal from "./ConfirmModal";
-import { deletePoliza } from "../../store/slices/polizasSlice";
 
 /* ---------------- Helpers ---------------- */
 
@@ -128,19 +122,20 @@ const SortHeader = memo(function SortHeader({ label, field, ordering, onOrdering
 
 /* ---------------- Rows ---------------- */
 
-const DesktopRow = memo(function DesktopRow({ poliza, zebra, isDeleting, onEditClick, onDeleteClick, isWebAdmin }) {
+const DesktopRow = memo(function DesktopRow({ poliza, zebra, isWebAdmin }) {
   const cuotasEst = useCuotasBadge(poliza);
   const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
 
   return (
-    <tr className={`transition-colors ${zebra} hover:bg-white/[0.02] group`}>
+    <tr className={`transition-colors ${zebra} hover:bg-white/[0.02] group relative`}>
       <td className="p-3 border-b border-gray-800/50">
-        <Link to={`/polizas/${poliza.id}`} className="text-blue-400 hover:text-blue-300 font-bold text-sm">{poliza.numero_poliza || "-"}</Link>
+        {/* Hacemos que todo este td sea clickeable o mantenemos el Link */}
+        <Link to={`/polizas/${poliza.id}`} className="text-blue-400 hover:text-blue-300 font-bold text-sm block">{poliza.numero_poliza || "-"}</Link>
         <div className="text-[10px] text-gray-500 font-bold uppercase">{poliza.compania || "S/C"}</div>
       </td>
 
       <td className="p-3 border-b border-gray-800/50">
-        <Link to={`/clientes/${poliza.cliente?.id}`} className="text-gray-200 hover:text-white font-medium text-sm">{clienteNombre || "-"}</Link>
+        <Link to={`/clientes/${poliza.cliente?.id}`} className="text-gray-200 hover:text-white font-medium text-sm block">{clienteNombre || "-"}</Link>
         <div className="text-[10px] text-gray-500 font-mono">{poliza.cliente?.dni_cuit_cuil}</div>
       </td>
 
@@ -175,19 +170,6 @@ const DesktopRow = memo(function DesktopRow({ poliza, zebra, isDeleting, onEditC
       <td className="p-3 border-b border-gray-800/50 text-center">
         <EstadoPolizaBadge estado={poliza.estado} />
       </td>
-
-      <td className="p-3 border-b border-gray-800/50 text-right">
-        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEditClick(poliza)} className="p-2 rounded-lg bg-gray-800 text-amber-400 hover:bg-amber-400 hover:text-black transition-all" title="Editar">
-            <FaEdit className="text-sm" />
-          </button>
-          {isWebAdmin && (
-            <button onClick={() => onDeleteClick(poliza)} className="p-2 rounded-lg bg-gray-800 text-rose-400 hover:bg-rose-500 hover:text-white transition-all" title="Eliminar">
-              <FaTrash className="text-sm" />
-            </button>
-          )}
-        </div>
-      </td>
     </tr>
   );
 });
@@ -200,30 +182,9 @@ const PolizaTable = ({
   cursorEnabled = false, hasNext = false, hasPrev = false
 }) => {
   const { user } = useAuth();
-  const dispatch = useDispatch();
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
-  const [editing, setEditing] = useState(null);
-  const [openEdit, setOpenEdit] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [openConfirm, setOpenConfirm] = useState(false);
-
   const totalPages = useMemo(() => cursorEnabled ? 1 : Math.ceil(total / pageSize), [total, pageSize, cursorEnabled]);
-
-  const handleEditClick = useCallback((p) => { setEditing(p); setOpenEdit(true); }, []);
-  const handleDeleteClick = useCallback((p) => { setDeleting(p); setOpenConfirm(true); }, []);
-
-  const handleConfirmDelete = async () => {
-    if (!deleting) return;
-    try {
-      await dispatch(deletePoliza(deleting.id)).unwrap();
-      toast.success("Póliza eliminada con éxito");
-    } catch (e) {
-      toast.error(e?.message || "Error al eliminar");
-    } finally {
-      setOpenConfirm(false); setDeleting(null);
-    }
-  };
 
   const isLoading = status === "loading";
 
@@ -232,7 +193,7 @@ const PolizaTable = ({
       {isLoading && <div className="h-1 bg-emerald-500 animate-pulse w-full" />}
       
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse">
+        <table className="min-w-full border-collapse relative">
           <thead>
             <tr>
               <SortHeader label="Póliza / Cía" field="numero_poliza" ordering={ordering} onOrderingChange={onOrderingChange} />
@@ -245,12 +206,11 @@ const PolizaTable = ({
               <SortHeader label="Vehículo" field="marca" ordering={ordering} onOrderingChange={onOrderingChange} />
               <th className="p-3 border-b border-gray-800 bg-gray-900/90 text-[10px] uppercase font-black tracking-widest text-gray-500">Estado Pago</th>
               <SortHeader label="Estado" field="estado" ordering={ordering} onOrderingChange={onOrderingChange} className="text-center" />
-              <th className="p-3 border-b border-gray-800 bg-gray-900/90 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800/50">
             {polizas.map((p, i) => (
-              <DesktopRow key={p.id} poliza={p} zebra={i % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]"} onEditClick={handleEditClick} onDeleteClick={handleDeleteClick} isWebAdmin={isWebAdmin} />
+              <DesktopRow key={p.id} poliza={p} zebra={i % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]"} isWebAdmin={isWebAdmin} />
             ))}
           </tbody>
         </table>
@@ -270,9 +230,6 @@ const PolizaTable = ({
           </button>
         </div>
       </div>
-
-      <PolizaEditModal isOpen={openEdit} poliza={editing} onClose={() => { setOpenEdit(false); setEditing(null); }} />
-      <ConfirmModal isOpen={openConfirm} onClose={() => setOpenConfirm(false)} onConfirm={handleConfirmDelete} message={`¿Confirmas la eliminación total de la póliza ${deleting?.numero_poliza}? Esta acción no se puede deshacer.`} />
     </div>
   );
 };

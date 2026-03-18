@@ -287,7 +287,10 @@ export default function CuponerasPage() {
       const c = cmp.trim();
       if (c) params.compania = c;
 
-      const res = await http.get("polizas/cupones-robo/dashboard/", { params });
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const res = await http.get("polizas/cupones-robo/dashboard/", { params, headers });
       const data = res.data || {};
 
       setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
@@ -298,7 +301,15 @@ export default function CuponerasPage() {
       setLastLoadedAt(new Date().toISOString());
     } catch (e) {
       console.error(e);
-      setError("No se pudieron cargar las cuponeras de robo.");
+      // 🚀 FIX: Extraemos el error de forma segura para evitar [object Object]
+      let msg = "No se pudieron cargar las cuponeras de robo.";
+      if (e?.response?.data) {
+        if (typeof e.response.data === "string") msg = e.response.data;
+        else if (e.response.data.detail) msg = e.response.data.detail;
+        else if (e.response.data.error) msg = e.response.data.error;
+      }
+      setError(msg);
+      
       setCounters({ total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
       setCountersFiltrados({ total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
       setCount(0);
@@ -312,7 +323,7 @@ export default function CuponerasPage() {
     const id = setTimeout(() => {
       setPage(1);
       loadDashboard(search, compania, { page: 1, pageSize, scope });
-    }, 350);
+    }, 400); // 🚀 Un poco más de debounce
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, compania]);
