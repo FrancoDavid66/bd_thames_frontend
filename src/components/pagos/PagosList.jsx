@@ -328,19 +328,14 @@ export default function PagosList({
   const [ajustarSiguientes, setAjustarSiguientes] = useState(true);
   const [isSubmittingFecha, setIsSubmittingFecha] = useState(false);
 
-  // 🚀 FILTRO INTELIGENTE: Ocultamos las pólizas muertas para limpiar la lista
+  // 🚀 FILTRO INTELIGENTE: Eliminamos el filtro de ocultar canceladas/vencidas
   const items = useMemo(() => {
     const base = Array.isArray(cuotas) ? cuotas : [];
     return base.filter((c) => {
       // 1. Filtrar pagadas si está activado el botón
       if (ocultarPagadas && c.pagado) return false;
 
-      // 2. 🧹 LIMPIEZA: Ocultar pólizas canceladas o vencidas
-      const estadoPoliza = String(c?.poliza?.estado || "").trim().toLowerCase();
-      if (["cancelada", "anulada", "baja", "vencida"].includes(estadoPoliza)) {
-        return false; // ¡Desaparecen de la lista!
-      }
-
+      // Dejamos pasar todas las pólizas, incluidas las canceladas, para poder cobrar deuda.
       return true;
     });
   }, [cuotas, ocultarPagadas]);
@@ -476,6 +471,7 @@ export default function PagosList({
         monto,
         numeroPoliza,
         cuotaNro: cuota.cuota_nro,
+        polizaEstado: String(pol.estado || "").toUpperCase(),
         oficinaLabel,
       });
 
@@ -486,7 +482,13 @@ export default function PagosList({
 
   const ejecutarPagoConfirmado = useCallback(async () => {
     if (!confirmData || confirmandoPago) return;
-    const { datos, cuota, monto } = confirmData;
+    const { datos, cuota, monto, polizaEstado } = confirmData;
+
+    // 🚀 LÓGICA INTELIGENTE DE REACTIVACIÓN (Calculamos ANTES de pagar)
+    const polId = getPolizaId(cuota.poliza, cuota);
+    const cuotasMismaPoliza = items.filter(c => getPolizaId(c.poliza, c) === polId);
+    const overdueCount = cuotasMismaPoliza.filter(c => !c.pagado && dayjs(c.fecha_vencimiento).isBefore(dayjs().startOf("day"))).length;
+    const remainingOverdue = Math.max(0, overdueCount - 1); // Descontamos la que se está pagando ahora
 
     const payload = {
       id: cuota.id,
@@ -511,7 +513,18 @@ export default function PagosList({
         return;
       }
 
-      toast.success("Cuota marcada como pagada");
+      // 🚀 FEEDBACK INTELIGENTE AL USUARIO SEGÚN ESTADO DE PÓLIZA
+      if (polizaEstado === "CANCELADA" || polizaEstado === "ANULADA") {
+        toast.success("Deuda cobrada exitosamente (Póliza CANCELADA).", { icon: "💀", duration: 5000 });
+      } else if (polizaEstado === "VENCIDA") {
+        if (remainingOverdue === 0) {
+          toast.success("Pago registrado. ¡La póliza vuelve a estar ACTIVA! 🟢", { duration: 6000 });
+        } else {
+          toast.success(`Pago registrado. Aún debe ${remainingOverdue} cuotas (La póliza sigue VENCIDA). 🔴`, { duration: 6000 });
+        }
+      } else {
+        toast.success("Cuota marcada como pagada");
+      }
 
       const conObs = {
         ...cuotaActualizada,
@@ -530,7 +543,7 @@ export default function PagosList({
     } finally {
       setConfirmandoPago(false);
     }
-  }, [confirmData, confirmandoPago, dispatch, actualizarCuotas]);
+  }, [confirmData, confirmandoPago, dispatch, actualizarCuotas, items]);
 
   const handleCancelarConfirm = useCallback(() => {
     if (!confirmData) {
@@ -573,6 +586,7 @@ export default function PagosList({
       const dias = fv ? fv.diff(hoy, "day") : null;
       const state = cuota?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
       const label = state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
+      const polizaEstado = String(pol?.estado || "").toUpperCase();
 
       const cubreDesdeTxt = fv ? fv.subtract(1, "month").format("DD/MM/YYYY") : null;
       const cubreHastaTxt = fv ? fv.format("DD/MM/YYYY") : null;
@@ -603,6 +617,7 @@ export default function PagosList({
         state,
         label,
         dias,
+        polizaEstado,
         venceTxt: fmtDate(cuota?.fecha_vencimiento),
         pagaTxt: cuota?.fecha_pago ? fmtDate(cuota?.fecha_pago) : null,
         montoTxt: fmtMoney(cuota?.monto),
@@ -621,7 +636,7 @@ export default function PagosList({
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-6 sm:p-10 text-center text-sm sm:text-base text-slate-400">
-        No hay cuotas para mostrar. Las pólizas canceladas o dadas de baja se ocultan automáticamente.
+        No hay cuotas para mostrar en este filtro.
       </div>
     );
   }
@@ -630,7 +645,7 @@ export default function PagosList({
     <div className={`w-full ${PALETTE.basePanel} rounded-none sm:rounded-3xl border-t border-b sm:border overflow-hidden flex flex-col`}>
       <div className={`px-3 sm:px-6 py-3 sm:py-4 text-[11px] sm:text-sm uppercase tracking-wide ${PALETTE.header}`}>
         <div className="flex items-center justify-between gap-2">
-          <span className="font-bold text-slate-200">Resultados</span>
+          <span className="font-bold text-slate-200">Resultados ({items.length})</span>
           {showFastControls && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] sm:text-[11px] normal-case text-slate-400">
@@ -811,6 +826,13 @@ export default function PagosList({
                 </button>
               </div>
 
+              {/* 🚀 ADVERTENCIA ROJA EN EL MODAL DE PAGO SI ESTÁ CANCELADA */}
+              {(confirmData.polizaEstado === "CANCELADA" || confirmData.polizaEstado === "ANULADA") && (
+                <div className="mb-4 p-3 bg-rose-900/50 border border-rose-500/50 rounded-xl text-rose-200 text-sm shadow-sm">
+                  ⚠️ <strong className="text-white">PÓLIZA DADA DE BAJA:</strong> Estás a punto de cobrar una cuota de una póliza cancelada. Esto se registrará como <b>recupero de deuda</b>.
+                </div>
+              )}
+
               <div className="space-y-3 bg-slate-900 p-4 rounded-xl border border-slate-700/50">
                 <p className="text-xs sm:text-sm text-slate-300">
                   Vas a pagar la cuota <span className="font-bold text-emerald-400">#{confirmData.cuotaNro ?? "?"}</span> de la póliza <span className="font-bold text-white">{confirmData.numeroPoliza}</span>.
@@ -933,7 +955,7 @@ export default function PagosList({
   );
 }
 
-// 🚀 ACORDEÓN MÓVIL Y COLORES POR ESTADO (FECHAS SIEMPRE VISIBLES)
+// 🚀 ACORDEÓN MÓVIL Y COLORES POR ESTADO DE PÓLIZA
 const CuotaRow = memo(
   function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs, abrirModalFecha }) {
     const [expanded, setExpanded] = useState(false);
@@ -950,6 +972,7 @@ const CuotaRow = memo(
       state,
       label,
       dias,
+      polizaEstado,
       venceTxt,
       pagaTxt,
       montoTxt,
@@ -962,11 +985,22 @@ const CuotaRow = memo(
 
     const S = PALETTE[state || "pending"];
 
+    // 🚀 LÓGICA DE ESTILOS DE ALARMA DE PÓLIZA
+    const isPolicyVencida = polizaEstado === "VENCIDA";
+    const isPolicyCancelada = polizaEstado === "CANCELADA" || polizaEstado === "ANULADA";
+
+    let extraClasses = "";
+    if (isPolicyCancelada && !cuota.pagado) {
+       extraClasses = "opacity-80 grayscale-[30%] bg-slate-900/80 border-slate-700"; 
+    } else if (isPolicyVencida && !cuota.pagado) {
+       extraClasses = "ring-2 ring-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.3)] bg-gradient-to-r from-orange-950/40 to-slate-900 border-orange-500/40"; 
+    }
+
     return (
       <>
         <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe} hidden sm:block`} aria-hidden />
 
-        <div className={`mx-0 sm:mx-3 my-0 sm:my-2 sm:rounded-2xl border-b sm:border p-3 sm:p-4 shadow-md ${S.cardBg} ${S.border} relative transition-all duration-300`}>
+        <div className={`mx-0 sm:mx-3 my-0 sm:my-2 sm:rounded-2xl border-b sm:border p-3 sm:p-4 shadow-md ${S.cardBg} ${S.border} ${extraClasses} relative transition-all duration-300`}>
           <span className={`absolute left-0 top-0 h-full w-1 ${S.stripe} sm:hidden`} aria-hidden />
 
           <div className="pl-2 sm:pl-0 flex flex-col gap-2">
@@ -974,7 +1008,7 @@ const CuotaRow = memo(
             {/* 1. ENCABEZADO: Cliente, Cuota, Badge y Monto */}
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className={`truncate max-w-[200px] sm:max-w-md font-bold text-sm sm:text-base ${state === 'paid' ? 'text-white' : state === 'overdue' ? 'text-rose-50' : 'text-slate-300'}`}>
                     {nombreCompleto}
                   </span>
@@ -982,6 +1016,12 @@ const CuotaRow = memo(
                     <span className="hidden sm:inline-flex items-center rounded border px-1.5 py-0.5 bg-emerald-500/20 border-emerald-400/40 text-emerald-300 text-[9px] font-black uppercase tracking-wider shadow-sm">
                       {oficinaLabel}
                     </span>
+                  )}
+                  {isPolicyCancelada && !cuota.pagado && (
+                    <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-black uppercase border border-rose-500/40 shadow-sm">💀 De Baja</span>
+                  )}
+                  {isPolicyVencida && !cuota.pagado && (
+                    <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 text-[10px] font-black uppercase border border-orange-500/40 shadow-sm animate-pulse">⚠️ Reactivar</span>
                   )}
                 </div>
                 <div className="text-xs text-slate-400 mt-1 flex items-center gap-2 font-medium">
@@ -991,7 +1031,7 @@ const CuotaRow = memo(
               </div>
 
               <div className="text-right shrink-0 flex flex-col items-end">
-                <span className={`text-xl sm:text-2xl font-black tracking-tight ${S.amountText}`}>
+                <span className={`text-xl sm:text-2xl font-black tracking-tight ${isPolicyVencida && !cuota.pagado ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' : S.amountText}`}>
                   $ {montoTxt}
                 </span>
                 <span className={`mt-1.5 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest border ${S.chipBg} ${S.chipText} ${S.chipBorder}`}>
@@ -1032,14 +1072,14 @@ const CuotaRow = memo(
                 {!cuota?.pagado ? (
                   <button
                     onClick={() => abrirPagar(cuota)}
-                    className={`w-full h-11 px-6 rounded-xl ${PALETTE.actionBtn} transition inline-flex items-center justify-center gap-2 font-bold cursor-pointer text-sm tracking-wide`}
+                    className={`w-full h-11 px-6 rounded-xl transition inline-flex items-center justify-center gap-2 font-bold cursor-pointer text-sm tracking-wide ${isPolicyVencida ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/30' : PALETTE.actionBtn}`}
                   >
                     <HiCash className="w-5 h-5" />
-                    <span>PAGAR CUOTA</span>
+                    <span>{isPolicyVencida ? "PAGAR Y REACTIVAR" : "PAGAR CUOTA"}</span>
                   </button>
                 ) : (
                   <div className="flex gap-2 w-full">
-                    {/* 📄 NUEVO: Botón para Descargar PDF */}
+                    {/* 📄 Botón para Descargar PDF */}
                     <div className="flex-1">
                       <DescargarFactura
                         cliente={model?.pol?.cliente}
