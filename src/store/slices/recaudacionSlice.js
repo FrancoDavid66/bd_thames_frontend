@@ -28,6 +28,20 @@ export const uploadRecaudacion = createAsyncThunk(
   }
 );
 
+// 🚀 NUEVO THUNK: Traer Empleados Activos para el Cierre de Caja
+export const fetchEmpleadosActivos = createAsyncThunk(
+  "recaudacion/fetchEmpleados",
+  async (_, { rejectWithValue }) => {
+    try {
+      // Usamos la ruta correcta (sin 'solicitudes/')
+      const res = await api.get("empleados/activos/");
+      return res.data || [];
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || "Error al cargar los empleados");
+    }
+  }
+);
+
 const recaudacionSlice = createSlice({
   name: "recaudacion",
   initialState: {
@@ -35,11 +49,14 @@ const recaudacionSlice = createSlice({
     loading: false,
     error: null,
     uploading: false,
+    // 🚀 ESTADOS PARA EMPLEADOS
+    empleados: [],
+    loadingEmpleados: false,
   },
   reducers: {},
   extraReducers: (builder) => {
     builder
-      // Fetch
+      // Fetch Recaudaciones
       .addCase(fetchRecaudaciones.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -52,7 +69,8 @@ const recaudacionSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // Upload
+      
+      // Upload Recaudacion
       .addCase(uploadRecaudacion.pending, (state) => {
         state.uploading = true;
       })
@@ -63,6 +81,18 @@ const recaudacionSlice = createSlice({
       })
       .addCase(uploadRecaudacion.rejected, (state) => {
         state.uploading = false;
+      })
+      
+      // 🚀 Fetch Empleados
+      .addCase(fetchEmpleadosActivos.pending, (state) => {
+        state.loadingEmpleados = true;
+      })
+      .addCase(fetchEmpleadosActivos.fulfilled, (state, action) => {
+        state.loadingEmpleados = false;
+        state.empleados = action.payload;
+      })
+      .addCase(fetchEmpleadosActivos.rejected, (state) => {
+        state.loadingEmpleados = false;
       });
   },
 });
