@@ -2,14 +2,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { FaEdit, FaTrash } from "react-icons/fa"; // 🚀 Iconos para los botones
+import { FaEdit, FaTrash } from "react-icons/fa";
+import { HiClipboardCheck } from "react-icons/hi"; // 🚀 Icono para Renovar
 import toast from "react-hot-toast";
 
-// 🚀 IMPORTACIONES DE SEGURIDAD
+// 🚀 IMPORTACIONES DE SEGURIDAD Y ACCIONES
 import { useAuth } from "../../context/AuthContext";
-
 import { fetchPolizaPorId, deletePoliza } from "../../store/slices/polizasSlice";
+import { renovarPoliza } from "../../store/slices/renovacionesSlice"; // 🚀 Thunk para renovar
 import { PolizasAPI } from "../../api/polizas"; 
+
 import PolizaHeader from "./PolizaHeader";
 import PolizaResumenSection from "./PolizaResumenSection";
 import GruasPanel from "./GruasPanel";
@@ -18,9 +20,9 @@ import PolizaHistoriaPanel from "./PolizaHistoriaPanel";
 import VehiculoDocsPanel from "./VehiculoDocsPanel";
 import CuponesRoboPanel from "./CuponesRoboPanel";
 
-// 🚀 Modales que traemos de PolizaTable
 import PolizaEditModal from "./PolizaEditModal";
 import ConfirmModal from "./ConfirmModal";
+import RenovacionModal from "../renovaciones/RenovacionModal"; // 🚀 Importamos el Modal de Renovación
 
 export default function PolizaDetails() {
   const { id } = useParams();
@@ -29,23 +31,22 @@ export default function PolizaDetails() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
+  const { user } = useAuth();
 
-  // ✅ IMPORTANTE: tomar primero byId[polizaId] (cache normalizado)
   const poliza = useSelector(
     (s) => s.polizas?.byId?.[polizaId] || s.polizas?.poliza || null
   );
   const loadStatus = useSelector((s) => s.polizas?.detailStatus || s.polizas?.status || "idle");
   const loadError = useSelector((s) => s.polizas?.detailError || s.polizas?.error || null);
 
-  // 🔁 fuerza remount del panel unificado tras importación de medios
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // 🚀 Estados para los modales de Edición y Eliminación
+  // 🚀 Estados para los modales
   const [openEdit, setOpenEdit] = useState(false);
   const [openConfirm, setOpenConfirm] = useState(false);
+  const [openRenovar, setOpenRenovar] = useState(false); // 🚀 Estado para el modal de renovar
+  const [submittingRenovacion, setSubmittingRenovacion] = useState(false); // 🚀 Estado de carga para renovación
 
-  // Normaliza claves de tabs
   const normalizeTabKey = (t) => {
     if (t === "documentos" || t === "vehiculo_docs") return "vehiculo";
     return t || "resumen";
@@ -62,11 +63,10 @@ export default function PolizaDetails() {
     }
   }, [polizaId, dispatch]);
 
-  // 🔔 Refresco automático cuando una solicitud se asocia
   useEffect(() => {
     const refreshAll = async (targetId, focusTab) => {
       try {
-        await PolizasAPI.refreshPack(targetId); // pack completo
+        await PolizasAPI.refreshPack(targetId);
       } catch (e) {
         console.warn("[DBG] refreshPack ERROR", e);
       } finally {
@@ -124,12 +124,11 @@ export default function PolizaDetails() {
   const onPerfilActualizado = () =>
     dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
 
-  // 🚀 Manejador de Eliminación
   const handleConfirmDelete = async () => {
     try {
       await dispatch(deletePoliza(polizaId)).unwrap();
       toast.success("Póliza eliminada con éxito");
-      navigate("/polizas", { replace: true }); // Redirigir al listado después de borrar
+      navigate("/polizas", { replace: true });
     } catch (e) {
       toast.error(e?.message || "Error al eliminar");
     } finally {
@@ -137,8 +136,38 @@ export default function PolizaDetails() {
     }
   };
 
-  // 🛡️ Lógica de roles
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
+  // 🚀 Manejador de Renovación
+  const handleRenovar = async (payload) => {
+    if (!poliza?.id) return;
+    setSubmittingRenovacion(true);
+
+    const finalPayload = {
+      ...(payload || {}),
+      transferir_grua: payload?.transferir_grua ?? payload?.transferirGrua ?? payload?.grua ?? 1,
+    };
+
+    try {
+      const res = await dispatch(renovarPoliza({ id: poliza.id, payload: finalPayload })).unwrap();
+      const nuevaId = res?.data?.id;
+
+      toast.success("Póliza renovada correctamente");
+      setOpenRenovar(false);
+
+      // Si nos devuelve el ID de la nueva póliza, navegamos a ella
+      if (nuevaId) {
+        navigate(`/polizas/${nuevaId}`);
+      } else {
+        // Si no, recargamos la actual (que ahora debería estar como 'Finalizada')
+        dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
+      }
+    } catch (e) {
+      toast.error(e?.message || "No se pudo renovar la póliza");
+    } finally {
+      setSubmittingRenovacion(false);
+    }
+  };
+
+  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
   if (loadStatus === "loading" || (!poliza && loadStatus !== "failed")) {
     return (
@@ -182,7 +211,6 @@ export default function PolizaDetails() {
         onPerfilActualizado={onPerfilActualizado}
       />
 
-      {/* Tabs y Acciones */}
       <div className="mt-5 sm:mt-6 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 sm:pb-0">
         <div className="overflow-x-auto no-scrollbar w-full sm:w-auto">
           <nav className="-mb-px flex min-w-max flex-row gap-2 sm:gap-4 text-xs sm:text-sm">
@@ -210,11 +238,20 @@ export default function PolizaDetails() {
           </nav>
         </div>
 
-        {/* 🚀 BOTONES DE ACCIÓN (EDITAR / ELIMINAR) CON CURSOR-POINTER */}
-        <div className="flex items-center gap-2 mb-2 sm:mb-0">
+        <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-0">
+          {/* 🚀 BOTÓN DE RENOVAR (Solo para Admin) */}
+          {isWebAdmin && (
+            <button 
+              onClick={() => setOpenRenovar(true)} 
+              className="cursor-pointer flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-bold uppercase tracking-wider border border-emerald-500/20"
+            >
+              <HiClipboardCheck className="text-sm" /> Renovar
+            </button>
+          )}
+
           <button 
             onClick={() => setOpenEdit(true)} 
-            className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/80 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold uppercase tracking-wider border border-amber-500/20"
+            className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/80 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold uppercase tracking-wider border border-amber-500/20"
           >
             <FaEdit className="text-sm" /> Editar
           </button>
@@ -222,7 +259,7 @@ export default function PolizaDetails() {
           {isWebAdmin && (
             <button 
               onClick={() => setOpenConfirm(true)} 
-              className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/80 text-rose-400 hover:bg-rose-500 hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-rose-500/20"
+              className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/80 text-rose-400 hover:bg-rose-500 hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-rose-500/20"
             >
               <FaTrash className="text-sm" /> Eliminar
             </button>
@@ -230,7 +267,6 @@ export default function PolizaDetails() {
         </div>
       </div>
 
-      {/* Contenido de tabs */}
       <div className="mt-5 sm:mt-6 space-y-4 sm:space-y-6">
         {tab === "resumen" && (
           <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-3 sm:p-4 shadow-xl">
@@ -295,7 +331,6 @@ export default function PolizaDetails() {
         )}
       </div>
 
-      {/* 🚀 MODALES INTEGRADOS */}
       <PolizaEditModal 
         isOpen={openEdit} 
         poliza={poliza} 
@@ -311,6 +346,17 @@ export default function PolizaDetails() {
         onClose={() => setOpenConfirm(false)} 
         onConfirm={handleConfirmDelete} 
         message={`¿Confirmas la eliminación total de la póliza ${poliza?.numero_poliza || "S/N"}? Esta acción no se puede deshacer.`} 
+      />
+
+      {/* 🚀 MODAL DE RENOVACIÓN INTEGRADO */}
+      <RenovacionModal
+        open={openRenovar}
+        item={poliza}
+        onClose={() => {
+          if (!submittingRenovacion) setOpenRenovar(false);
+        }}
+        onSubmit={handleRenovar}
+        submitting={submittingRenovacion}
       />
     </div>
   );

@@ -21,6 +21,7 @@ const DEFAULT_FILTER_OPTIONS = {
   anios: [],
   modelos: [],
   companias: [],
+  oficinas: [], // 🚀 NUEVO: Agregamos oficinas al estado inicial
 };
 
 const initialState = {
@@ -71,6 +72,7 @@ export const fetchMarketingFilterOptions = createAsyncThunk(
         anios: Array.isArray(data?.anios) ? data.anios : [],
         modelos: Array.isArray(data?.modelos) ? data.modelos : [],
         companias: Array.isArray(data?.companias) ? data.companias : [],
+        oficinas: Array.isArray(data?.oficinas) ? data.oficinas : [], // 🚀 NUEVO: Capturamos las oficinas que manda el backend
       };
     } catch (err) { return rejectWithValue(toError(err)); }
   }

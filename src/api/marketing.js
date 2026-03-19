@@ -1,12 +1,6 @@
-const getBase = () => {
-  const raw =
-    (import.meta?.env?.VITE_API_BASE && String(import.meta.env.VITE_API_BASE).trim()) ||
-    (import.meta?.env?.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) ||
-    "/api/";
-  const base = raw || "/api/";
-  return base.endsWith("/") ? base : `${base}/`;
-};
+import api from '../services/api';
 
+// Mantenemos tu función para armar la URL con los filtros
 const buildQS = (params = {}) => {
   const qs = new URLSearchParams();
 
@@ -34,91 +28,42 @@ const buildQS = (params = {}) => {
   return out ? `?${out}` : "";
 };
 
-const jsonOrThrow = async (res) => {
-  const text = await res.text();
-  let data = null;
-
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = null;
-  }
-
-  if (!res.ok) {
-    const msg = data?.detail || data?.error || data?.message || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return data;
-};
-
 export const MarketingAPI = {
   async audienciaResumen(params) {
-    const base = getBase();
-    const url = `${base}marketing/audiencia/resumen/${buildQS(params)}`;
-    const res = await fetch(url, { credentials: "include" });
-    return jsonOrThrow(res);
+    const res = await api.get(`marketing/audiencia/resumen/${buildQS(params)}`);
+    return res.data;
   },
 
   async audienciaExport(params, formato = "csv") {
-    const base = getBase();
-    const url = `${base}marketing/audiencia/export/${buildQS({ ...params, formato })}`;
-    const res = await fetch(url, { credentials: "include" });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(text || `HTTP ${res.status}`);
-    }
-    return res.blob();
+    const res = await api.get(`marketing/audiencia/export/${buildQS({ ...params, formato })}`, {
+      responseType: 'blob' // Fundamental para descargar el Excel/CSV
+    });
+    return res.data;
   },
 
   async filtrosOpciones(params = {}) {
-    const base = getBase();
-    const url = `${base}marketing/filtros/opciones/${buildQS(params)}`;
-    const res = await fetch(url, { credentials: "include" });
-    return jsonOrThrow(res);
+    const res = await api.get(`marketing/filtros/opciones/${buildQS(params)}`);
+    return res.data;
   },
 
   async enviarMensaje(payload = {}) {
-    const base = getBase();
-    const url = `${base}marketing/enviar/`;
-    
-    // Detectamos si el payload es un FormData (contiene archivos)
-    const isFormData = payload instanceof FormData;
-    
-    // Si es FormData, NO debemos poner el Content-Type (el navegador lo hace solo)
-    const headers = {};
-    if (!isFormData) {
-      headers["Content-Type"] = "application/json";
-    }
-
-    const res = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-      headers: headers,
-      // Si es FormData, lo pasamos directo. Si no, lo convertimos a JSON.
-      body: isFormData ? payload : JSON.stringify(payload || {}),
-    });
-    return jsonOrThrow(res);
+    // Axios detecta si es FormData o JSON y pone los headers correctos automáticamente
+    const res = await api.post(`marketing/enviar/`, payload);
+    return res.data;
   },
 
   async listarHistorial(params = {}) {
-    const base = getBase();
-    const url = `${base}marketing/historial/${buildQS(params)}`;
-    const res = await fetch(url, { credentials: "include" });
-    return jsonOrThrow(res);
+    const res = await api.get(`marketing/historial/${buildQS(params)}`);
+    return res.data;
   },
 
   async obtenerHistorial(id) {
-    const base = getBase();
-    const url = `${base}marketing/historial/${id}/`;
-    const res = await fetch(url, { credentials: "include" });
-    return jsonOrThrow(res);
+    const res = await api.get(`marketing/historial/${id}/`);
+    return res.data;
   },
 
   async logsHistorial(id, params = {}) {
-    const base = getBase();
-    const url = `${base}marketing/historial/${id}/logs/${buildQS(params)}`;
-    const res = await fetch(url, { credentials: "include" });
-    return jsonOrThrow(res);
+    const res = await api.get(`marketing/historial/${id}/logs/${buildQS(params)}`);
+    return res.data;
   },
 };

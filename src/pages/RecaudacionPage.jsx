@@ -8,7 +8,7 @@ import {
   HiCamera, HiUpload, HiOutlineOfficeBuilding, 
   HiClock, HiCalendar, HiFilter, HiX, HiZoomIn, 
   HiCurrencyDollar, HiPrinter, HiReceiptTax, HiCheckCircle, HiExclamationCircle, HiChevronDoubleUp, HiChevronDoubleDown,
-  HiUser // 🚀 Nuevo icono
+  HiUser 
 } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO, REDUX Y UTILIDADES
@@ -16,6 +16,9 @@ import { useAuth } from "../context/AuthContext";
 import { fetchRecaudaciones, uploadRecaudacion, fetchEmpleadosActivos } from "../store/slices/recaudacionSlice";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import api from "../services/api";
+
+// 🚀 IMPORTAMOS LA IMAGEN DE EJEMPLO
+import EjemploDineroImg from "../assets/ejemplo_dinero.jpg";
 
 const RecaudacionPage = () => {
   const { user } = useAuth();
@@ -57,7 +60,9 @@ function UserUploadView({ user }) {
   
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [montoDeclarado, setMontoDeclarado] = useState("");
+  
+  // El estado guarda el número crudo (ej: "100000")
+  const [montoDeclarado, setMontoDeclarado] = useState(""); 
   const fileInputRef = useRef(null);
 
   // ESTADOS TICKET
@@ -67,17 +72,15 @@ function UserUploadView({ user }) {
   const [horaImpresion, setHoraImpresion] = useState("");
 
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState("");
+  const [zoomExample, setZoomExample] = useState(false);
 
   useEffect(() => {
-    // 1. Traer Balance
+    // 1. Traer Balance (SOLO para el ticket, NO auto-llena el input)
     const fetchBalance = async () => {
       setLoadingBalance(true);
       try {
         const res = await api.get("balance-diario/");
         setBalanceDia(res.data);
-        if (res.data?.totales?.saldo_caja_chica) {
-          setMontoDeclarado(res.data.totales.saldo_caja_chica.replace("$", "").replace(/\./g, "").replace(",", ".").trim());
-        }
       } catch (error) {
         console.error("Error trayendo balance", error);
       } finally {
@@ -90,6 +93,20 @@ function UserUploadView({ user }) {
     dispatch(fetchEmpleadosActivos());
   }, [dispatch]);
 
+  // Formatear número con puntos de miles para mostrarlo
+  const formatNumber = (value) => {
+    if (!value) return "";
+    const cleanValue = value.toString().replace(/\D/g, ""); // Borra todo lo que no sea número
+    if (cleanValue === "") return "";
+    return new Intl.NumberFormat("es-AR").format(cleanValue);
+  };
+
+  // Guardar en el estado el número limpio
+  const handleMontoChange = (e) => {
+    const rawValue = e.target.value.replace(/\D/g, "");
+    setMontoDeclarado(rawValue);
+  };
+
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (selected) {
@@ -101,6 +118,7 @@ function UserUploadView({ user }) {
 
   const handleUpload = async () => {
     if (!empleadoSeleccionado) return toast.error("Por favor, seleccioná quién está rindiendo la caja en el Paso 1.");
+    if (!montoDeclarado) return toast.error("Por favor, ingresá la cantidad de plata que contaste.");
     if (!file) return toast.error("Tenés que sacar una foto primero en el Paso 3.");
     
     try {
@@ -119,6 +137,7 @@ function UserUploadView({ user }) {
       setFile(null);
       setPreview(null);
       setEmpleadoSeleccionado("");
+      setMontoDeclarado(""); // Reseteamos el campo a vacío
       if (fileInputRef.current) fileInputRef.current.value = "";
       
     } catch (error) {
@@ -127,7 +146,7 @@ function UserUploadView({ user }) {
     }
   };
 
-  // 🚀 FUNCIÓN DE IMPRESIÓN (TICKET 80MM)
+  // FUNCIÓN DE IMPRESIÓN (TICKET 80MM)
   const handlePrint = () => {
     if (!empleadoSeleccionado) return toast.error("Seleccioná tu nombre (Paso 1) antes de imprimir el ticket.");
     
@@ -141,7 +160,7 @@ function UserUploadView({ user }) {
     const cantOp = balanceDia.totales.ingresos_cantidad + balanceDia.totales.egresos_cantidad;
     const sucursal = balanceDia.scope?.oficina_nombre || "Sucursal";
 
-    const printWindow = window.open("", "_blank", "width=300,height=500");
+    const printWindow = window.open("", "_blank", "width=400,height=600");
     
     printWindow.document.write(`
       <html>
@@ -154,56 +173,56 @@ function UserUploadView({ user }) {
               width: 80mm;
               margin: 0;
               padding: 15px 10px;
-              color: #000;
-              font-size: 12px;
+              color: #000; 
+              font-size: 16px; 
             }
             .center { text-align: center; }
             .bold { font-weight: bold; }
-            .line { border-bottom: 1px dashed #000; margin: 10px 0; }
-            .flex { display: flex; justify-content: space-between; margin-bottom: 4px; }
-            .title { font-size: 18px; margin-bottom: 5px; }
-            .total-box { margin: 15px 0; }
-            .total-monto { font-size: 28px; font-weight: bold; margin: 5px 0; letter-spacing: -1px; }
+            .line { border-bottom: 2px dashed #000; margin: 15px 0; } 
+            .flex { display: flex; justify-content: space-between; margin-bottom: 6px; }
+            .title { font-size: 24px; margin-bottom: 6px; } 
+            .total-box { margin: 20px 0; }
+            .total-monto { font-size: 38px; font-weight: bold; margin: 10px 0; letter-spacing: -1px; } 
           </style>
         </head>
         <body>
           <div class="center">
             <div class="title bold">THAMES SEGUROS</div>
-            <div class="bold">${sucursal.toUpperCase()}</div>
-            <div style="margin-top: 5px;">FECHA: ${balanceDia.fecha_hum}</div>
-            <div>TICKET CIERRE DE CAJA</div>
+            <div class="bold" style="font-size: 18px;">${sucursal.toUpperCase()}</div>
+            <div style="margin-top: 8px;">FECHA: ${balanceDia.fecha_hum}</div>
+            <div class="bold" style="margin-top: 6px; font-size: 18px;">TICKET CIERRE DE CAJA</div>
           </div>
 
           <div class="line"></div>
 
           <div class="center total-box">
-            <div style="font-size: 10px; text-transform: uppercase;">Total a rendir (Físico)</div>
+            <div class="bold" style="font-size: 14px; text-transform: uppercase;">Total a rendir (Físico)</div>
             <div class="total-monto">$${totalFisico}</div>
-            <div style="font-size: 11px; margin-top: 8px;">RESPONSABLE CAJA:</div>
-            <div class="bold" style="font-size: 15px;">${empleadoNombre}</div>
+            <div style="font-size: 14px; margin-top: 15px;">RESPONSABLE CAJA:</div>
+            <div class="bold" style="font-size: 22px; margin-top: 5px;">${empleadoNombre}</div>
           </div>
 
           <div class="line"></div>
 
-          <div class="flex">
+          <div class="flex" style="font-size: 18px; font-weight: bold;">
             <span>Ingresos (Evo):</span>
             <span>$${ingresosEfe}</span>
           </div>
-          <div class="flex">
+          <div class="flex" style="font-size: 18px; font-weight: bold;">
             <span>Egresos (Evo):</span>
             <span>-$${egresosEfe}</span>
           </div>
-          <div class="flex" style="color: #444; font-size: 10px; margin-top: 8px;">
+          <div class="flex bold" style="font-size: 14px; margin-top: 12px;">
             <span>Cant. Operaciones:</span>
             <span>${cantOp}</span>
           </div>
 
           <div class="line"></div>
 
-          <div class="center" style="font-size: 11px;">
-            <div style="color: #555;">CTA: ${user?.username.toUpperCase()}</div>
+          <div class="center" style="font-size: 14px;">
+            <div style="margin-bottom: 5px;">CTA: ${user?.username.toUpperCase()}</div>
             <div>${horaActual}</div>
-            <div class="bold" style="margin-top: 15px;">--- CIERRE VÁLIDO ---</div>
+            <div class="bold" style="margin-top: 20px; font-size: 18px;">--- CIERRE VÁLIDO ---</div>
           </div>
         </body>
       </html>
@@ -266,23 +285,18 @@ function UserUploadView({ user }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 mb-6 bg-slate-950/50 py-3 px-4 rounded-2xl border border-slate-800">
-            <div className="relative w-20 h-16 flex items-center justify-center shrink-0">
-              <div className="absolute w-16 h-8 bg-emerald-600/80 rounded border border-emerald-400/50 -rotate-6 shadow-lg flex items-center justify-center">
-                <div className="w-6 h-3 border border-emerald-300/30 rounded-full"></div>
-              </div>
-              <div className="absolute w-16 h-8 bg-emerald-500 rounded border border-emerald-400 shadow-lg flex items-center justify-center">
-                <div className="w-6 h-3 border border-emerald-200/50 rounded-full"></div>
-              </div>
-              <div className="absolute w-7 h-11 bg-slate-50 border border-slate-300 shadow-md rotate-12 flex flex-col gap-[3px] p-1 top-1 right-2">
-                <div className="w-full h-[2px] bg-slate-300 rounded-full"></div>
-                <div className="w-3/4 h-[2px] bg-slate-300 rounded-full"></div>
-                <div className="w-full h-[2px] bg-slate-300 rounded-full"></div>
-                <div className="w-1/2 h-[2px] bg-slate-800 mt-auto rounded-full"></div>
-              </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 bg-slate-950/50 py-3 px-4 rounded-2xl border border-slate-800">
+            <div className="relative w-full sm:w-48 h-32 flex items-center justify-center shrink-0 rounded-lg overflow-hidden border border-slate-700 shadow-md group">
+              <img src={EjemploDineroImg} alt="Ejemplo de foto" className="w-full h-full object-contain" />
+              <button 
+                onClick={() => setZoomExample(true)}
+                className="absolute top-2 right-2 h-8 w-8 bg-black/60 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center backdrop-blur-sm transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+              >
+                <HiZoomIn className="text-xl"/>
+              </button>
             </div>
-            <p className="text-xs text-slate-400 font-medium leading-tight max-w-[130px]">
-              El ticket impreso tiene que verse <span className="text-white font-bold">claramente</span> en la foto.
+            <p className="text-xs text-slate-400 font-medium leading-relaxed text-center sm:text-left">
+              Como se ve en la imagen, el ticket impreso tiene que colocarse <span className="text-white font-bold">arriba</span> de los billetes y verse <span className="text-white font-bold">claramente</span> en la foto.
             </p>
           </div>
 
@@ -348,20 +362,25 @@ function UserUploadView({ user }) {
         />
 
         <div className="mt-auto">
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Monto Físico (Se llena solo)</label>
-          <div className="relative mb-4">
+          <label className="block text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Monto Físico (Efectivo en mano)</label>
+          <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold"><HiCurrencyDollar className="text-lg"/></span>
             <input 
-              type="number" 
-              value={montoDeclarado}
-              onChange={(e) => setMontoDeclarado(e.target.value)}
+              type="text" 
+              inputMode="numeric"
+              placeholder="Ej: 100.000"
+              value={formatNumber(montoDeclarado)}
+              onChange={handleMontoChange}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white font-bold outline-none focus:border-emerald-500 focus:ring-1 ring-emerald-500/50 transition-all"
             />
           </div>
-
+          {/* 🚀 NUEVA INFO AGREGADA AQUÍ ABAJO DEL INPUT */}
+    <p className="text-sm text-slate-400 mt-3 mb-5 leading-relaxed">
+            ⚠️ <strong className="text-white">Importante:</strong> Ingresá exactamente la cantidad de billetes que contaste a mano.
+          </p>
           <button 
             onClick={handleUpload}
-            disabled={!file || !empleadoSeleccionado || uploading}
+            disabled={!file || !empleadoSeleccionado || !montoDeclarado || uploading}
             className="cursor-pointer w-full h-14 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
           >
             {uploading ? (
@@ -443,6 +462,29 @@ function UserUploadView({ user }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ================= MODAL DE ZOOM DE LA IMAGEN DE EJEMPLO ================= */}
+      <AnimatePresence>
+        {zoomExample && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[101] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm cursor-pointer" 
+            onClick={() => setZoomExample(false)} 
+          >
+            <button className="absolute top-6 right-6 text-white/50 hover:text-white bg-black/50 p-2 rounded-full backdrop-blur-md cursor-pointer">
+              <HiX className="text-3xl" />
+            </button>
+            <motion.img 
+              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              src={EjemploDineroImg} 
+              alt="Ejemplo de foto ampliada" 
+              className="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

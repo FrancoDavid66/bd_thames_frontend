@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  FaBullhorn, FaPaperPlane, FaSyncAlt, FaTimes, FaHistory, 
+  FaBullhorn, FaSyncAlt, FaTimes, FaHistory, 
   FaChevronDown, FaSpinner, FaWhatsapp, FaImage, 
   FaUpload, FaTrash, FaEye, FaEyeSlash, FaCheckCircle
 } from "react-icons/fa";
@@ -36,13 +36,16 @@ export default function MarketingPage() {
   const historialStatus = useSelector(selectMarketingHistorialStatus);
   const sendStatus = useSelector(selectMarketingSendStatus);
 
-  // ✅ FIX: Ahora los filtros inicializan como arrays vacíos para soportar múltiple selección
+  // 🚀 FIX: Agregamos dias_condicion y dias_cantidad al estado inicial
   const [form, setForm] = useState({ 
-    oficina: "1", 
+    oficina: "", // Ahora por defecto arranca en "Todas las oficinas"
     anio: [], 
     marca: [], 
     modelo: [], 
-    compania: [] 
+    compania: [],
+    estado: "activa", // 🚀 Agregado para que arranque en activas por defecto
+    dias_condicion: "", // 🚀 Agregado para el filtro de días
+    dias_cantidad: ""   // 🚀 Agregado para el filtro de días
   });
   
   const [mensaje, setMensaje] = useState("Hola {nombre} 😊, te escribimos de Thames por tu {marca} {modelo}...");
@@ -55,7 +58,6 @@ export default function MarketingPage() {
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [visibleItemsCount, setVisibleItemsCount] = useState(5);
 
-  // ✅ NUEVO ESTADO PARA EL CARTEL DE ÉXITO
   const [showSuccess, setShowSuccess] = useState(false);
 
   const loadingAud = audienciaStatus === "loading";
@@ -112,7 +114,7 @@ export default function MarketingPage() {
       setVisibleItemsCount(5);
       setIsHistoryVisible(true);
 
-      // ✅ MOSTRAMOS EL CARTEL DE ÉXITO POR 3 SEGUNDOS
+      // MOSTRAMOS EL CARTEL DE ÉXITO POR 3 SEGUNDOS
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
@@ -151,7 +153,7 @@ export default function MarketingPage() {
         )}
       </AnimatePresence>
 
-      {/* ✅ NUEVO: OVERLAY DE ÉXITO (Misión Cumplida) */}
+      {/* OVERLAY DE ÉXITO (Misión Cumplida) */}
       <AnimatePresence>
         {showSuccess && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center">

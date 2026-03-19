@@ -6,23 +6,12 @@ import { HiX, HiExclamation } from "react-icons/hi";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
-function pickVtoRef(item) {
-  return (
-    item?.vto_referencia ||
-    item?.ultima_cuota_vencimiento ||
-    item?.fecha_vencimiento ||
-    item?.proxima_vencimiento_impaga ||
-    null
-  );
-}
-
 export default function RenovacionModal({ open, item, onClose, onSubmit, submitting }) {
   const [nuevoNumero, setNuevoNumero] = useState("");
   const [nuevaCompania, setNuevaCompania] = useState("");
   const [nuevoPrecio, setNuevoPrecio] = useState("");
   const [nuevaFecha, setNuevaFecha] = useState("");
 
-  // ✅ NUEVO: transferir servicio de grúa a la póliza renovada
   const [transferirGrua, setTransferirGrua] = useState(true);
 
   useEffect(() => {
@@ -34,10 +23,28 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
       item?.precio_cuota != null && item?.precio_cuota !== "" ? String(item?.precio_cuota) : ""
     );
 
-    const base = pickVtoRef(item) || item?.primer_pago || null;
-    setNuevaFecha(base ? dayjs(base).format("YYYY-MM-DD") : "");
+    // 🚀 LÓGICA INTELIGENTE DE FECHAS
+    let fechaCalculada = null;
 
-    // ✅ por defecto: sí (para que no se “pierda” la grúa al renovar)
+    if (item?.cuotas && item.cuotas.length > 0) {
+      // 1. Agarramos todas las cuotas y buscamos la que tenga el número más alto
+      const ultimaCuota = [...item.cuotas].sort((a, b) => b.cuota_nro - a.cuota_nro)[0];
+      
+      if (ultimaCuota?.fecha_vencimiento) {
+        // 2. Le sumamos exactamente 1 mes a la fecha de esa última cuota
+        fechaCalculada = dayjs(ultimaCuota.fecha_vencimiento).add(1, 'month');
+      }
+    }
+
+    // 3. Fallback: Si no tiene cuotas, busca otras referencias de la póliza
+    if (!fechaCalculada) {
+      const fallbackStr = item?.vto_referencia || item?.ultima_cuota_vencimiento || item?.fecha_vencimiento || item?.primer_pago;
+      if (fallbackStr) {
+        fechaCalculada = dayjs(fallbackStr);
+      }
+    }
+
+    setNuevaFecha(fechaCalculada ? fechaCalculada.format("YYYY-MM-DD") : "");
     setTransferirGrua(true);
   }, [open, item]);
 
@@ -55,7 +62,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
         }}
       >
         <motion.div
-          className="w-full max-w-xl rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl shadow-2xl"
+          className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900 backdrop-blur-xl shadow-2xl"
           initial={{ y: 18, opacity: 0, scale: 0.98 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 18, opacity: 0, scale: 0.98 }}
@@ -94,7 +101,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <input
                 value={nuevoNumero}
                 onChange={(e) => setNuevoNumero(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                 placeholder="Ej: 12345-ABC"
               />
               <div className="text-xs text-white/60">
@@ -107,7 +114,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <input
                 value={nuevaCompania}
                 onChange={(e) => setNuevaCompania(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                 placeholder="Ej: RUS / SANCOR / etc."
               />
             </div>
@@ -118,7 +125,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                 <input
                   value={nuevoPrecio}
                   onChange={(e) => setNuevoPrecio(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
                   placeholder="Ej: 12000"
                   inputMode="decimal"
                 />
@@ -130,7 +137,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                   type="date"
                   value={nuevaFecha}
                   onChange={(e) => setNuevaFecha(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
                 />
               </div>
             </div>
@@ -166,7 +173,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
                     )}
                   />
                   <span className="sr-only">Transferir grúa</span>
-                  <span className="w-full text-[11px] font-extrabold text-white/80">
+                  <span className="w-full text-[11px] font-extrabold text-white/80 text-center">
                     {transferirGrua ? "SI" : "NO"}
                   </span>
                 </button>
