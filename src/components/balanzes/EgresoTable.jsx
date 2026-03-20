@@ -1,26 +1,17 @@
+// src/components/balanzes/EgresoTable.jsx
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 dayjs.locale("es");
+import { HiClock, HiPencil, HiTrash, HiUser, HiOfficeBuilding } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
 import { useAuth } from "../../context/AuthContext";
 
 import { deleteEgreso, fetchEgresos } from "../../store/slices/egresosSlice";
 import EgresoEditModal from "./EgresoEditModal";
-import { HiPencil, HiTrash, HiUser, HiOfficeBuilding, HiClock } from "react-icons/hi";
 
-/**
- * EgresoTable
- *
- * Modos:
- * 1) Con prop: <EgresoTable egresos={arrayFiltrada} /> → sin paginación, usa la data provista.
- * 2) Sin prop: <EgresoTable /> → usa Redux (fetchEgresos) con paginación.
- *
- * Estilo: encabezado sticky rojo, skeleton al cargar, vacío elegante y total al pie.
- * Mobile-first: en celular se muestra como lista de cards compactas.
- */
 const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
   const dispatch = useDispatch();
 
@@ -38,50 +29,92 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
     currentPage = 1,
   } = useSelector((s) => s.egresos || {});
 
-  // ---- Página (solo modo store) ----
   const [page, setPage] = useState(currentPage || 1);
-
   useEffect(() => {
     if (!Array.isArray(egresosProp)) {
       dispatch(fetchEgresos({ page }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, page, egresosProp]);
 
   // ---- Modal edición ----
   const [egresoAEditar, setEgresoAEditar] = useState(null);
 
-  // ---- Fuente de datos visible ----
+  // 🚀 NUEVO ESTADO: Filtro por Forma de Pago
+  const [filtroForma, setFiltroForma] = useState("TODAS");
+
   const data = Array.isArray(egresosProp) ? egresosProp : egresosStore;
 
-  // ---- Helpers ----
+  // 🚀 FILTRAMOS LOS DATOS SEGÚN EL BOTÓN SELECCIONADO
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    if (filtroForma === "TODAS") return data;
+    return data.filter(it => {
+      const forma = (it?.forma_pago || "EFECTIVO").toUpperCase();
+      return forma === filtroForma;
+    });
+  }, [data, filtroForma]);
+
   const fmtMoney = (n) => {
-    // Forzamos a que reemplace comas por puntos para que JavaScript lo entienda
     const numeroLimpio = Number(String(n || "0").replace(",", "."));
     return (Number.isFinite(numeroLimpio) ? numeroLimpio : 0).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   };
-  const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "—");
 
-  // 🚀 FIX: El totalizador de egresos también estaba expuesto a las comas
+  const renderFechaConHora = (item) => {
+    if (!item?.fecha) return "—";
+    const fechaCorta = dayjs(item.fecha).format("DD/MM/YYYY");
+    const hora = item.created_at ? dayjs(item.created_at).format("HH:mm") : null;
+    
+    return (
+      <div className="flex flex-col">
+        <span className="text-zinc-300 font-medium">{fechaCorta}</span>
+        {hora && <span className="text-[10px] text-zinc-500 mt-0.5">{hora} hs</span>}
+      </div>
+    );
+  };
+
+  // 🚀 INSIGNIAS DE FORMA DE PAGO GIGANTES
+  const renderFormaPago = (formaRaw) => {
+    const forma = (formaRaw || "EFECTIVO").toUpperCase();
+    
+    if (forma === "EFECTIVO") {
+      return (
+        <span className="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-sm">
+          💵 EFECTIVO
+        </span>
+      );
+    }
+    if (forma === "TRANSFERENCIA") {
+      return (
+        <span className="inline-flex items-center gap-1.5 bg-sky-500/20 text-sky-400 border border-sky-500/30 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-sm">
+          🏦 TRANSF.
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 bg-zinc-700/50 text-zinc-300 border border-zinc-600 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-sm">
+        💳 {forma}
+      </span>
+    );
+  };
+
   const totalVisible = useMemo(
-    () => (data || []).reduce((acc, it) => {
+    () => (filteredData || []).reduce((acc, it) => {
       const val = Number(String(it?.monto || "0").replace(",", "."));
       return acc + (Number.isFinite(val) ? val : 0);
     }, 0),
-    [data]
+    [filteredData]
   );
 
-  // ---- Acciones ----
   const handleDelete = async (egreso) => {
-    // 🚀 Doble check de seguridad en el front
+    // 🚀 REGLA ESTRICTA: Solo Admin borra
     if (!isWebAdmin) {
       alert("No tienes permisos para eliminar egresos. Contacta al administrador.");
       return;
     }
-    const ok = window.confirm("¿Seguro que querés eliminar este egreso? Esto sumará dinero a tu caja chica nuevamente.");
+    const ok = window.confirm("¿Seguro que querés eliminar este egreso? Esta acción afectará el balance.");
     if (!ok) return;
 
     try {
@@ -99,20 +132,39 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
 
   return (
     <div className={`w-full ${className}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
+      
+      {/* 🚀 ENCABEZADO Y FILTROS */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <h2 className="text-sm sm:text-lg font-semibold flex items-center gap-2">
-          Egresos
+          Listado de Egresos
           {isWebAdmin && !Array.isArray(egresosProp) && (
             <span className="text-[10px] bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-400 font-normal">
               Vista Global
             </span>
           )}
         </h2>
-        {!Array.isArray(egresosProp) && (
-          <span className="text-[11px] sm:text-xs opacity-70">
-            Página {page}
-          </span>
-        )}
+
+        {/* 🚀 BOTONES DE FILTRO */}
+        <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-zinc-800">
+          <button
+            onClick={() => setFiltroForma("TODAS")}
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filtroForma === "TODAS" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"}`}
+          >
+            Todas
+          </button>
+          <button
+            onClick={() => setFiltroForma("EFECTIVO")}
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filtroForma === "EFECTIVO" ? "bg-emerald-500/20 text-emerald-400 shadow-sm" : "text-zinc-400 hover:text-emerald-400/70"}`}
+          >
+            Efectivo
+          </button>
+          <button
+            onClick={() => setFiltroForma("TRANSFERENCIA")}
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filtroForma === "TRANSFERENCIA" ? "bg-sky-500/20 text-sky-400 shadow-sm" : "text-zinc-400 hover:text-sky-400/70"}`}
+          >
+            Transf.
+          </button>
+        </div>
       </div>
 
       {hasError && (
@@ -121,19 +173,18 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
         </div>
       )}
 
-      {/* ===== Vista DESKTOP/TABLET: tabla clásica ===== */}
+      {/* ===== Vista DESKTOP/TABLET ===== */}
       <div className="hidden md:block">
         <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm">
           <table className="min-w-full text-xs sm:text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-rose-600/95 text-white">
-                <th className="px-3 sm:px-4 py-2 text-left">Categoría</th>
-                <th className="px-3 sm:px-4 py-2 text-left">Descripción</th>
-                <th className="px-3 sm:px-4 py-2 text-left">Forma de pago</th>
-                <th className="px-3 sm:px-4 py-2 text-right">Monto</th>
-                <th className="px-3 sm:px-4 py-2 text-left">Fecha</th>
-                <th className="px-3 sm:px-4 py-2 text-left">Cargado por</th>
-                <th className="px-3 sm:px-4 py-2 text-center">Acciones</th>
+                <th className="px-3 sm:px-4 py-3 text-left">Descripción</th>
+                <th className="px-3 sm:px-4 py-3 text-right">Monto</th>
+                <th className="px-3 sm:px-4 py-3 text-left">Fecha y Hora</th>
+                <th className="px-3 sm:px-4 py-3 text-center">Categoría / Forma</th>
+                <th className="px-3 sm:px-4 py-3 text-left">Cargado por</th>
+                <th className="px-3 sm:px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
 
@@ -141,74 +192,73 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={`sk-${i}`} className="border-b border-zinc-800/70">
-                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-24 sm:w-28 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-40 sm:w-48 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-24 sm:w-28 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-3 text-right"><div className="h-3 w-16 sm:w-20 bg-zinc-800 rounded ml-auto" /></td>
-                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-20 sm:w-24 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-24 sm:w-28 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-3 text-center"><div className="h-3 w-14 sm:w-16 bg-zinc-800 rounded mx-auto" /></td>
+                    <td className="px-3 sm:px-4 py-4"><div className="h-3 w-32 sm:w-40 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-4 text-right"><div className="h-3 w-16 sm:w-24 bg-zinc-800 rounded ml-auto" /></td>
+                    <td className="px-3 sm:px-4 py-4"><div className="h-3 w-20 sm:w-24 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-4"><div className="h-6 w-24 sm:w-28 bg-zinc-800 rounded mx-auto" /></td>
+                    <td className="px-3 sm:px-4 py-4"><div className="h-3 w-24 sm:w-28 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-4 text-center"><div className="h-3 w-12 sm:w-16 bg-zinc-800 rounded mx-auto" /></td>
                   </tr>
                 ))
-              ) : data?.length ? (
-                data.map((egreso) => (
-                  <tr
-                    key={egreso.id}
-                    className="border-b border-zinc-800/70 hover:bg-zinc-900/70"
-                  >
-                    <td className="px-3 sm:px-4 py-2 align-top">
-                      <span className="text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded w-fit inline-block">
-                        {egreso.categoria || "S/C"}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-4 py-2 align-top">
+              ) : filteredData?.length ? (
+                filteredData.map((egreso) => (
+                  <tr key={egreso.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/70">
+                    <td className="px-3 sm:px-4 py-3 align-middle">
                       <div className="max-w-xs sm:max-w-md truncate font-semibold text-zinc-200">
                         {egreso.descripcion || "—"}
                       </div>
-                      {/* 🚀 Si es admin, mostramos la oficina de donde viene este egreso */}
                       {isWebAdmin && egreso.oficina_nombre && (
-                        <div className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-1">
+                        <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1 font-semibold uppercase tracking-wider">
                           <HiOfficeBuilding /> {egreso.oficina_nombre}
                         </div>
                       )}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 align-top text-zinc-400">
-                      {egreso.forma_pago || "Efectivo"}
+                    
+                    {/* Monto en ROJO por ser egreso */}
+                    <td className="px-3 sm:px-4 py-3 text-right align-middle font-extrabold text-rose-400 text-base tracking-tight">
+                      -${fmtMoney(egreso.monto)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 text-right align-top font-bold text-rose-400">
-                      ${fmtMoney(egreso.monto)}
+                    
+                    <td className="px-3 sm:px-4 py-3 align-middle">
+                      {renderFechaConHora(egreso)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 align-top text-zinc-300">
-                      {fmtDate(egreso.fecha)}
+                    
+                    <td className="px-3 sm:px-4 py-3 align-middle text-center">
+                      <div className="flex flex-col items-center gap-1.5">
+                        {renderFormaPago(egreso.forma_pago)}
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 truncate max-w-[100px]">
+                          {egreso.categoria || "S/C"}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-4 py-2 align-top">
-                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs">
+
+                    <td className="px-3 sm:px-4 py-3 align-middle">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
                         <HiUser className="text-zinc-500" />
                         {egreso.usuario_nombre || "Sistema"}
                       </div>
                     </td>
-                    <td className="px-3 sm:px-4 py-2 align-top">
-                      <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-                        {/* 🚀 Editar y Borrar solo visibles para el Admin */}
+                    
+                    {/* 🚀 COLUMNA DE ACCIONES: RESTRINGIDA */}
+                    <td className="px-3 sm:px-4 py-3 align-middle text-center">
+                      <div className="flex items-center justify-center gap-1.5 sm:gap-2 relative z-20">
                         {isWebAdmin ? (
                           <>
                             <button
                               type="button"
                               onClick={() => setEgresoAEditar(egreso)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-white bg-sky-600/80 hover:bg-sky-600 text-xs transition-colors"
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-zinc-800 hover:bg-rose-600 transition-colors"
                               title="Editar egreso"
                             >
                               <HiPencil className="text-sm" />
-                              <span className="hidden xl:inline">Editar</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(egreso)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-white bg-rose-600/80 hover:bg-rose-600 text-xs transition-colors"
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-zinc-800 hover:bg-rose-600 transition-colors"
                               title="Eliminar egreso"
                             >
                               <HiTrash className="text-sm" />
-                              <span className="hidden xl:inline">Eliminar</span>
                             </button>
                           </>
                         ) : (
@@ -220,26 +270,23 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                 ))
               ) : (
                 <tr>
-                  <td
-                    className="px-4 py-8 text-center text-zinc-500"
-                    colSpan={7}
-                  >
-                    No hay egresos para mostrar.
+                  <td className="px-4 py-12 text-center text-zinc-500" colSpan={6}>
+                    No se encontraron egresos para este filtro.
                   </td>
                 </tr>
               )}
             </tbody>
 
-            {data?.length ? (
+            {filteredData?.length ? (
               <tfoot>
-                <tr className="bg-rose-900/30 border-t border-rose-800/50">
-                  <td className="px-3 sm:px-4 py-3 font-semibold text-zinc-300" colSpan={3}>
-                    Total Acumulado
+                <tr className="bg-rose-900/20 border-t border-rose-800/30">
+                  <td className="px-3 sm:px-4 py-4 font-semibold text-zinc-300 uppercase tracking-widest text-xs">
+                    Total Filtrado
                   </td>
-                  <td className="px-3 sm:px-4 py-3 text-right font-extrabold text-rose-300 text-base">
+                  <td className="px-3 sm:px-4 py-4 text-right font-extrabold text-rose-400 text-lg tracking-tight">
                     ${fmtMoney(totalVisible)}
                   </td>
-                  <td className="px-3 sm:px-4 py-3" colSpan={3} />
+                  <td className="px-3 sm:px-4 py-4" colSpan={4} />
                 </tr>
               </tfoot>
             ) : null}
@@ -247,87 +294,79 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
         </div>
       </div>
 
-      {/* ===== Vista MOBILE: lista tipo cards ===== */}
+      {/* ===== Vista MOBILE ===== */}
       <div className="md:hidden">
         {isLoading ? (
           <ul className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <li
-                key={`sk-m-${i}`}
-                className="bg-zinc-950/70 border border-zinc-900 rounded-2xl px-3 py-2.5 flex gap-3"
-              >
+              <li key={`sk-m-${i}`} className="bg-zinc-950/70 border border-zinc-900 rounded-2xl px-3 py-2.5 flex gap-3">
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 w-24 bg-zinc-800 rounded" />
-                  <div className="h-3 w-40 bg-zinc-800 rounded" />
+                  <div className="h-3 w-32 bg-zinc-800 rounded" />
                   <div className="h-3 w-20 bg-zinc-800 rounded" />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="h-6 w-6 bg-zinc-800 rounded-full" />
-                  <div className="h-6 w-6 bg-zinc-800 rounded-full" />
                 </div>
               </li>
             ))}
           </ul>
-        ) : data?.length ? (
+        ) : filteredData?.length ? (
           <>
-            <ul className="space-y-2">
-              {data.map((egreso) => (
+            <ul className="space-y-3">
+              {filteredData.map((egreso) => (
                 <li
                   key={egreso.id}
-                  className="bg-zinc-950/70 border border-zinc-900 rounded-2xl px-3 py-3 flex flex-col gap-2"
+                  className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-medium text-zinc-400">
-                          {egreso.categoria || "S/C"}
-                        </span>
-                        <p className="text-sm font-semibold text-zinc-50 leading-tight mt-0.5">
-                          {egreso.descripcion || "Sin descripción"}
-                        </p>
-                      </div>
-                      {isWebAdmin && egreso.oficina_nombre && (
-                        <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
-                          <HiOfficeBuilding /> {egreso.oficina_nombre}
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-base font-extrabold text-rose-400 whitespace-nowrap">
+                    <span className="text-xl font-black text-rose-400 tracking-tight">
                       -${fmtMoney(egreso.monto)}
                     </span>
+                    <div className="flex flex-col items-end gap-1.5">
+                      {renderFormaPago(egreso.forma_pago)}
+                      <span className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
+                        {egreso.categoria || "S/C"}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-400 border-t border-zinc-800/50 pt-2">
-                    <span className="flex items-center gap-1"><HiClock className="text-zinc-600"/> {fmtDate(egreso.fecha)}</span>
-                    {egreso.forma_pago && (
-                      <span className="text-zinc-500">{egreso.forma_pago}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-100 leading-snug">
+                      {egreso.descripcion || "—"}
+                    </p>
+                    {isWebAdmin && egreso.oficina_nombre && (
+                      <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1 font-semibold uppercase tracking-wider">
+                        <HiOfficeBuilding /> {egreso.oficina_nombre}
+                      </p>
                     )}
                   </div>
 
-                  {/* 🚀 Fila extra para autoría y botones mobile */}
-                  <div className="flex items-center justify-between mt-1 pt-1">
-                    <span className="text-[10px] text-zinc-500 flex items-center gap-1">
-                      <HiUser /> {egreso.usuario_nombre || "Sistema"}
-                    </span>
+                  <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
+                    <div className="flex flex-col">
+                      <span className="flex items-center gap-1 text-[11px] text-zinc-400 font-medium">
+                        <HiClock className="text-zinc-600"/> 
+                        {egreso.fecha ? dayjs(egreso.fecha).format("DD/MM/YY") : "—"}
+                        {egreso.created_at && ` - ${dayjs(egreso.created_at).format("HH:mm")} hs`}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5 font-medium">
+                        <HiUser className="text-zinc-600" /> Por: {egreso.usuario_nombre || "Sistema"}
+                      </span>
+                    </div>
                     
-                    <div className="flex gap-2">
+                    {/* 🚀 RESTRINGIDO EN MOBILE TAMBIÉN */}
+                    <div className="flex gap-2 relative z-20">
                       {isWebAdmin ? (
                         <>
                           <button
                             type="button"
                             onClick={() => setEgresoAEditar(egreso)}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sky-600/80 text-white hover:bg-sky-600 transition"
-                            title="Editar egreso"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 text-zinc-300 hover:bg-rose-600 hover:text-white transition"
                           >
-                            <HiPencil className="text-[10px]" />
+                            <HiPencil className="text-[12px]" />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDelete(egreso)}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-600/80 text-white hover:bg-rose-600 transition"
-                            title="Eliminar egreso"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 text-zinc-300 hover:bg-rose-600 hover:text-white transition"
                           >
-                            <HiTrash className="text-[10px]" />
+                            <HiTrash className="text-[12px]" />
                           </button>
                         </>
                       ) : null}
@@ -337,24 +376,23 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
               ))}
             </ul>
 
-            {/* Total resumido en mobile */}
-            <div className="mt-3 bg-rose-900/30 border border-rose-800/50 rounded-2xl px-4 py-3 flex items-center justify-between text-sm">
-              <span className="font-semibold text-zinc-300">
-                Total acumulado
+            <div className="mt-4 bg-rose-900/20 border border-rose-800/30 rounded-2xl px-4 py-4 flex items-center justify-between shadow-sm">
+              <span className="font-bold text-zinc-300 uppercase text-xs tracking-widest">
+                Total Filtrado
               </span>
-              <span className="font-extrabold text-rose-300">
+              <span className="font-black text-rose-400 text-xl tracking-tight">
                 ${fmtMoney(totalVisible)}
               </span>
             </div>
           </>
         ) : (
-          <div className="mt-3 text-xs text-zinc-500 text-center py-6 bg-zinc-950/50 rounded-2xl border border-dashed border-zinc-800">
-            No hay egresos para mostrar.
+          <div className="mt-3 text-sm text-zinc-500 text-center py-10 bg-zinc-950/50 rounded-2xl border border-dashed border-zinc-800">
+            No se encontraron egresos.
           </div>
         )}
       </div>
 
-      {/* Paginación (solo modo store) */}
+      {/* Paginación */}
       {!Array.isArray(egresosProp) && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 text-xs sm:text-sm bg-zinc-950 p-2 rounded-xl border border-zinc-900">
           <button
@@ -362,9 +400,7 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
             onClick={() => previous && setPage(Math.max(1, page - 1))}
             disabled={!previous}
             className={`px-4 py-2 rounded-lg font-medium transition ${
-              previous
-                ? "bg-zinc-800 text-zinc-100 hover:bg-zinc-700"
-                : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+              previous ? "bg-zinc-800 text-zinc-100 hover:bg-zinc-700" : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
             }`}
           >
             Anterior
@@ -375,9 +411,7 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
             onClick={() => next && setPage(page + 1)}
             disabled={!next}
             className={`px-4 py-2 rounded-lg font-medium transition ${
-              next
-                ? "bg-zinc-800 text-zinc-100 hover:bg-zinc-700"
-                : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+              next ? "bg-zinc-800 text-zinc-100 hover:bg-zinc-700" : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
             }`}
           >
             Siguiente

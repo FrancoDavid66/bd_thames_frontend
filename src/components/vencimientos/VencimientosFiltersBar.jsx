@@ -28,11 +28,15 @@ export default function VencimientosFiltersBar({
   onApplyCustomRange,
 
   status,
+
+  // 🚀 NUEVO: Recibimos si el usuario es administrador
+  esAdmin = true,
 }) {
   return (
     <div className="space-y-3 mb-3">
       {/* Orden + filtros básicos */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+      {/* 🚀 Ajustamos las columnas de Tailwind dinámicamente si no hay selector de oficina */}
+      <div className={`grid grid-cols-1 gap-2 ${esAdmin ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
         <input
           className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
           placeholder="Buscar (cliente, patente, póliza...)"
@@ -40,23 +44,26 @@ export default function VencimientosFiltersBar({
           onChange={(e) => onChangeSearch(e.target.value)}
         />
 
-        <select
-          className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
-          value={oficina}
-          disabled={oficinasStatus === "loading" || (Array.isArray(oficinas) && oficinas.length === 0)}
-          onChange={(e) => onChangeOficina(e.target.value)}
-          title="Filtrar por oficina"
-        >
-          <option value="">
-            {oficinasStatus === "loading" ? "Cargando oficinas…" : oficinas?.length ? "Todas las oficinas" : "Sin oficinas"}
-          </option>
-          {Array.isArray(oficinas) &&
-            oficinas.map((o) => (
-              <option key={String(o.id)} value={String(o.id)}>
-                {o.nombre}
-              </option>
-            ))}
-        </select>
+        {/* 🚀 SOLO SE MUESTRA SI ES ADMIN */}
+        {esAdmin && (
+          <select
+            className="px-3 py-2 rounded bg-slate-900 border border-slate-700"
+            value={oficina}
+            disabled={oficinasStatus === "loading" || (Array.isArray(oficinas) && oficinas.length === 0)}
+            onChange={(e) => onChangeOficina(e.target.value)}
+            title="Filtrar por oficina"
+          >
+            <option value="">
+              {oficinasStatus === "loading" ? "Cargando oficinas…" : oficinas?.length ? "Todas las oficinas" : "Sin oficinas"}
+            </option>
+            {Array.isArray(oficinas) &&
+              oficinas.map((o) => (
+                <option key={String(o.id)} value={String(o.id)}>
+                  {o.nombre}
+                </option>
+              ))}
+          </select>
+        )}
 
         <select
           className="px-3 py-2 rounded bg-slate-900 border border-slate-700"

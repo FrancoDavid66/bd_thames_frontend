@@ -1,72 +1,104 @@
 // src/components/vencimientos/VencimientosSummary.jsx
 import React from "react";
+import { FaExclamationCircle, FaRegClock, FaCalendarCheck } from "react-icons/fa";
 
+// 🚀 Helper para estilos Light/Dark según el tono (Le sacamos la lógica de active)
 function pillCls(tone) {
-  if (tone === "red") return "bg-red-500/15 text-red-200 border-red-500/30";
-  if (tone === "amber") return "bg-amber-500/15 text-amber-200 border-amber-500/30";
-  if (tone === "emerald") return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
-  return "bg-slate-500/15 text-slate-200 border-slate-500/30";
+  const base = "relative overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:shadow-sm";
+
+  if (tone === "red") {
+    return `${base} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-500/30`;
+  }
+  if (tone === "amber") {
+    return `${base} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-amber-200 dark:hover:border-amber-500/30`;
+  }
+  if (tone === "emerald") {
+    return `${base} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-500/30`;
+  }
+  return `${base} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700`;
 }
 
-function KpiButton({ label, value, active, onClick, tone = "slate" }) {
+// 🚀 Helper para el color del texto y los iconos
+function textCls(tone) {
+  if (tone === "red") return "text-slate-600 dark:text-slate-300 group-hover:text-red-600 dark:group-hover:text-red-400";
+  if (tone === "amber") return "text-slate-600 dark:text-slate-300 group-hover:text-amber-600 dark:group-hover:text-amber-400";
+  if (tone === "emerald") return "text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400";
+  return "text-slate-600 dark:text-slate-300";
+}
+
+function KpiButton({ label, value, onClick, tone = "slate", icon: Icon }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded border p-3 text-left transition ${
-        active ? "ring-2 ring-white/30" : "hover:bg-white/5"
-      } ${pillCls(tone)}`}
+      className={`group rounded-xl border p-3.5 text-left cursor-pointer focus:outline-none ${pillCls(tone)}`}
       title={label}
     >
-      <div className="text-xs opacity-80">{label}</div>
-      <div className="text-lg font-semibold">{value ?? "—"}</div>
+      <div className={`absolute -right-2 -bottom-2 text-5xl opacity-[0.04] dark:opacity-10 pointer-events-none ${textCls(tone)}`}>
+        {Icon && <Icon />}
+      </div>
+
+      <div className="flex items-start justify-between">
+        <div className={`text-xs font-bold uppercase tracking-wide opacity-80 mb-1 ${textCls(tone)}`}>
+          {label}
+        </div>
+        {Icon && (
+          <div className={`text-sm opacity-60 ${textCls(tone)}`}>
+            <Icon />
+          </div>
+        )}
+      </div>
+      
+      <div className={`text-2xl sm:text-3xl font-black tracking-tight ${textCls(tone)}`}>
+        {value ?? "—"}
+      </div>
     </button>
   );
 }
 
-export default function VencimientosSummary({ resumen, tab, useCustomRange, onSelectTab }) {
+export default function VencimientosSummary({ resumen, onSelectTab }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
       <KpiButton
-        label="Vencidas 30"
+        label="Venc. 30 días"
         value={resumen?.vencidas_30}
         tone="red"
-        active={!useCustomRange && tab === "vencidas"}
+        icon={FaExclamationCircle}
         onClick={() => onSelectTab("vencidas")}
       />
       <KpiButton
-        label="Vencidas 14"
+        label="Venc. 14 días"
         value={resumen?.vencidas_14}
         tone="red"
-        active={!useCustomRange && tab === "vencidas"}
+        icon={FaExclamationCircle}
         onClick={() => onSelectTab("vencidas")}
       />
       <KpiButton
-        label="Vencidas 7"
+        label="Venc. 7 días"
         value={resumen?.vencidas_7}
         tone="red"
-        active={!useCustomRange && tab === "vencidas"}
+        icon={FaExclamationCircle}
         onClick={() => onSelectTab("vencidas")}
       />
       <KpiButton
-        label="Vencidas 3"
+        label="Venc. 3 días"
         value={resumen?.vencidas_3}
         tone="red"
-        active={!useCustomRange && tab === "vencidas"}
+        icon={FaExclamationCircle}
         onClick={() => onSelectTab("vencidas")}
       />
       <KpiButton
-        label="Vence hoy"
+        label="Vence Hoy"
         value={resumen?.vence_hoy}
         tone="amber"
-        active={!useCustomRange && tab === "hoy"}
+        icon={FaRegClock}
         onClick={() => onSelectTab("hoy")}
       />
       <KpiButton
-        label="Por vencer (3)"
+        label="Por Vencer (3)"
         value={resumen?.por_vencer_3}
         tone="emerald"
-        active={!useCustomRange && tab === "por_vencer"}
+        icon={FaCalendarCheck}
         onClick={() => onSelectTab("por_vencer")}
       />
     </div>

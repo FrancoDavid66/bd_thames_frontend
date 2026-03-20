@@ -1,5 +1,6 @@
 // src/components/vencimientos/VencimientosExportModal.jsx
 import React, { useMemo, useState } from "react";
+import { FaFileExport, FaTimes, FaSpinner, FaFileExcel, FaFilePdf, FaFilter, FaEye } from "react-icons/fa";
 
 // ====== helpers API (mismos que usabas) ======
 const RAW_BASE = (import.meta.env.VITE_API_URL || "").toString().trim();
@@ -143,14 +144,11 @@ function htmlPrintable(title, subtitle, headers, rows) {
 }
 
 function buildScopeParams(scope, context, currentParams) {
-  // base: todo lo del usuario (oficina/search/include_finalizadas/fecha)
-  // y según scope forzamos modo / rango
   const base = {
     oficina: context.oficina || undefined,
     search: context.search || undefined,
     include_finalizadas: context.includeFinalizadas ? 1 : undefined,
     fecha: context.baseDate || undefined,
-    // ordering seguro:
     ordering: currentParams.ordering,
     page: 1,
     page_size: 200,
@@ -169,7 +167,6 @@ function buildScopeParams(scope, context, currentParams) {
   if (scope === "hoy") return { ...base, modo: "hoy", past_days: 0, future_days: 0 };
   if (scope === "por_vencer") return { ...base, modo: "por_vencer", past_days: 0, future_days: 3 };
 
-  // rango personalizado
   if (scope === "custom") {
     return {
       ...base,
@@ -199,7 +196,6 @@ async function fetchAllPolizas(params) {
 }
 
 function computeDiasFallbackLocal(p) {
-  // usa backend dias_para_vencer si viene, si no calcula con vto_referencia/fecha_vencimiento
   const raw = p?.dias_para_vencer;
   const d = typeof raw === "number" ? raw : Number(raw);
   if (Number.isFinite(d)) return d;
@@ -300,12 +296,12 @@ function buildAseguradosFromPolizas(polizas) {
 }
 
 export default function VencimientosExportModal({ onClose, currentParams, context, pageData }) {
-  const [scope, setScope] = useState("actual"); // actual | vencidas | hoy | por_vencer | custom
-  const [view, setView] = useState("polizas"); // polizas | asegurados
-  const [format, setFormat] = useState("excel"); // excel | pdf
+  const [scope, setScope] = useState("actual"); 
+  const [view, setView] = useState("polizas"); 
+  const [format, setFormat] = useState("excel"); 
   const [onlyThisPage, setOnlyThisPage] = useState(false);
-
   const [busy, setBusy] = useState(false);
+
   const subtitle = useMemo(() => {
     const parts = [];
     parts.push(`Filtro: ${scope === "actual" ? "Actual" : scope}`);
@@ -327,7 +323,6 @@ export default function VencimientosExportModal({ onClose, currentParams, contex
         polizas = await fetchAllPolizas(p);
       }
 
-      // construir filas
       let title = `Vencimientos_${scope}_${todayStamp()}`;
 
       if (view === "polizas") {
@@ -355,11 +350,10 @@ export default function VencimientosExportModal({ onClose, currentParams, contex
           w.focus();
           w.print();
         }
-
         return;
       }
 
-      // asegurados
+      // Asegurados
       const asegurados = onlyThisPage ? (pageData.asegurados || []) : buildAseguradosFromPolizas(polizas);
       const headers = ["Nombre", "DNI", "Teléfono", "Oficina", "Pólizas", "Vencidas", "Hoy", "Por vencer", "Vto más próximo", "Días más próximo"];
       const rows = asegurados.map((a) => [
@@ -396,79 +390,142 @@ export default function VencimientosExportModal({ onClose, currentParams, contex
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-3 z-50">
-      <div className="w-full max-w-lg rounded-xl border border-white/10 bg-slate-950 p-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div>
-            <div className="text-lg font-semibold">Exportar</div>
-            <div className="text-xs opacity-70">{subtitle}</div>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div 
+        className="w-full max-w-xl rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl">
+              <FaFileExport className="text-xl" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Exportar Datos</h2>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-xs">{subtitle}</div>
+            </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-sm"
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors focus:outline-none"
+            disabled={busy}
           >
-            Cerrar
+            <FaTimes className="text-xl" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-          <div className="rounded border border-white/10 p-3">
-            <div className="text-xs opacity-70 mb-1">Qué exportar</div>
-            <select
-              className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm"
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-            >
-              <option value="actual">Filtro actual</option>
-              <option value="vencidas">Solo vencidas</option>
-              <option value="hoy">Solo hoy</option>
-              <option value="por_vencer">Solo por vencer</option>
-              <option value="custom">Rango personalizado</option>
-            </select>
+        {/* BODY */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Columna Izquierda */}
+          <div className="space-y-4">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50 h-full">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+                <FaFilter /> Selección
+              </label>
+              
+              <div className="space-y-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Rango a exportar</span>
+                  <select
+                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none cursor-pointer shadow-sm"
+                    value={scope}
+                    onChange={(e) => setScope(e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="actual">Filtro actual (lo que veo)</option>
+                    <option value="vencidas">Solo vencidas completas</option>
+                    <option value="hoy">Solo vencen hoy</option>
+                    <option value="por_vencer">Solo por vencer</option>
+                    <option value="custom">Rango personalizado</option>
+                  </select>
+                </div>
 
-            <label className="flex items-center gap-2 text-sm mt-3">
-              <input
-                type="checkbox"
-                checked={onlyThisPage}
-                onChange={(e) => setOnlyThisPage(e.target.checked)}
-              />
-              Exportar solo esta página (rápido)
-            </label>
-            {!onlyThisPage ? (
-              <div className="text-xs opacity-60 mt-1">Trae todas las páginas (usa next del backend).</div>
-            ) : null}
+                <label className="flex items-start gap-2.5 text-sm group cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 dark:bg-slate-700 cursor-pointer"
+                    checked={onlyThisPage}
+                    onChange={(e) => setOnlyThisPage(e.target.checked)}
+                    disabled={busy}
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-medium text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                      Solo esta página (Rápido)
+                    </span>
+                    {!onlyThisPage && (
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                        Descarga todo el historial trayendo página por página.
+                      </span>
+                    )}
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
 
-          <div className="rounded border border-white/10 p-3">
-            <div className="text-xs opacity-70 mb-1">Vista</div>
-            <select
-              className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm"
-              value={view}
-              onChange={(e) => setView(e.target.value)}
-            >
-              <option value="polizas">Pólizas</option>
-              <option value="asegurados">Asegurados</option>
-            </select>
+          {/* Columna Derecha */}
+          <div className="space-y-4">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50 h-full">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+                <FaEye /> Formato de salida
+              </label>
 
-            <div className="text-xs opacity-70 mb-1 mt-3">Formato</div>
-            <select
-              className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm"
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-            >
-              <option value="excel">Excel (.xls)</option>
-              <option value="pdf">PDF (Imprimir/Guardar)</option>
-            </select>
+              <div className="space-y-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Vista de datos</span>
+                  <select
+                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none cursor-pointer shadow-sm"
+                    value={view}
+                    onChange={(e) => setView(e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="polizas">Listado de Pólizas</option>
+                    <option value="asegurados">Listado de Asegurados</option>
+                  </select>
+                </div>
+
+                <div>
+                  <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Tipo de archivo</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormat("excel")}
+                      disabled={busy}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                        format === "excel" 
+                          ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400" 
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      <FaFileExcel className={format === "excel" ? "text-emerald-600 dark:text-emerald-400" : ""} /> Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormat("pdf")}
+                      disabled={busy}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                        format === "pdf" 
+                          ? "bg-rose-50 dark:bg-rose-500/10 border-rose-500 text-rose-700 dark:text-rose-400" 
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      <FaFilePdf className={format === "pdf" ? "text-rose-600 dark:text-rose-400" : ""} /> Imprimir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 mt-4">
+        {/* FOOTER */}
+        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-sm"
+            className="px-4 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600"
             disabled={busy}
           >
             Cancelar
@@ -477,12 +534,24 @@ export default function VencimientosExportModal({ onClose, currentParams, contex
           <button
             type="button"
             onClick={handleDownload}
-            className={`px-4 py-2 rounded bg-emerald-700 hover:bg-emerald-600 text-sm ${
-              busy ? "opacity-60 cursor-not-allowed" : ""
-            }`}
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 ${
+              format === "excel" 
+                ? "bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500 shadow-emerald-500/30" 
+                : "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 shadow-blue-500/30"
+            } ${busy ? "opacity-75 cursor-not-allowed" : "hover:-translate-y-0.5"}`}
             disabled={busy}
           >
-            {busy ? "Exportando…" : "Descargar"}
+            {busy ? (
+              <>
+                <FaSpinner className="animate-spin text-lg" />
+                <span>Generando...</span>
+              </>
+            ) : (
+              <>
+                <FaFileExport className="text-lg" />
+                <span>Descargar {format === 'excel' ? 'Excel' : 'Reporte'}</span>
+              </>
+            )}
           </button>
         </div>
       </div>

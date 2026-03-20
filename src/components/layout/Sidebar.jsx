@@ -6,7 +6,7 @@ import {
   FaHome, FaUsers, FaFileAlt, FaMoneyCheckAlt, FaDatabase,
   FaChartBar, FaMapMarkedAlt, FaClipboardList, FaBullhorn,
   FaChevronDown, FaChevronRight, FaChevronLeft, FaSyncAlt,
-  FaClock, FaBan, FaTruckMoving, FaCashRegister // 💸 Agregamos icono de caja
+  FaClock, FaBan, FaTruckMoving, FaCashRegister, FaFileInvoiceDollar
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
@@ -31,6 +31,8 @@ export default function Sidebar({
       { to: "/", label: "Inicio", icon: FaHome },
       { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList },
       { to: "/clientes", label: "Clientes", icon: FaUsers },
+      
+      // La pestaña principal de Pólizas (el acordeón)
       { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
       
       // 🚀 ¡CANDADO PUESTO! Solo Admin ve Grúas
@@ -40,11 +42,15 @@ export default function Sidebar({
       { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
       { to: "/balanzes", label: "Balanzes", icon: FaDatabase }, 
       
-      // 💸 NUEVO ACCESO: Recaudación / Caja para TODOS
+      // 💸 Recaudación / Caja para TODOS
       { to: "/recaudacion", label: "Caja", icon: FaCashRegister },
       
       // Solo Admin
       { to: "/marketing", label: "Campañas", icon: FaBullhorn, adminOnly: true },
+      
+      // 🚀 NUEVO: Cotizador (Solo Admin)
+      { to: "/cotizaciones", label: "Cotizador", icon: FaFileInvoiceDollar, adminOnly: true },
+      
       { to: "/estadisticas", label: "Estadísticas", icon: FaChartBar, adminOnly: true },
       { to: "/competencia", label: "Competencia", icon: FaChartBar, adminOnly: true },
       
@@ -59,8 +65,13 @@ export default function Sidebar({
 
   const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
+  // 🚀 MAGIA: Mantiene el acordeón de Pólizas abierto si estás en Vencimientos
   const polizasActive = useMemo(() => {
-    return location.pathname === "/polizas" || location.pathname.startsWith("/polizas/");
+    return (
+      location.pathname === "/polizas" || 
+      location.pathname.startsWith("/polizas/") || 
+      location.pathname === "/vencimientos"
+    );
   }, [location.pathname]);
 
   const [polizasOpen, setPolizasOpen] = useState(polizasActive);
@@ -97,11 +108,13 @@ export default function Sidebar({
 
         <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100%-110px)]">
           {filteredNavItems.map((item) => {
+            
+            // 🚀 RENDERIZADO DEL ACORDEÓN DE PÓLIZAS
             if (item.to === "/polizas") {
               return (
                 <div key="polizas-group" className="space-y-1">
                   <div className={`flex items-center gap-2 rounded-lg transition ${polizasActive ? "bg-blue-800 dark:bg-gray-800" : "hover:bg-blue-800/60"}`}>
-                    <NavLink to="/polizas" className="flex-1 min-w-0 flex items-center gap-3 px-4 py-2">
+                    <NavLink to="/polizas" className="flex-1 min-w-0 flex items-center gap-3 px-4 py-2" end>
                       <item.icon className="text-lg shrink-0" />
                       <span className="font-medium truncate">Pólizas</span>
                     </NavLink>
@@ -109,18 +122,26 @@ export default function Sidebar({
                       {polizasOpen ? <FaChevronDown /> : <FaChevronRight />}
                     </button>
                   </div>
+                  
+                  {/* 🚀 SUB-MENÚ DE PÓLIZAS */}
                   {polizasOpen && (
-                    <div className="ml-3 border-l border-white/10 pl-3 space-y-1">
-                      <NavLink to="/polizas" className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
+                    <div className="ml-3 border-l border-white/10 pl-3 mt-1 space-y-1">
+                      <NavLink to="/polizas" end className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
                         <FaFileAlt className="text-base" /> Listado
                       </NavLink>
-                      <NavLink to="/polizas/bajas" className={({ isActive }) => `flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
-                        <div className="flex items-center gap-3"><FaBan /> Bajas</div>
-                        <Badge value={bajasPendientes} />
+                      
+                      <NavLink to="/vencimientos" className={({ isActive }) => `flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
+                        <div className="flex items-center gap-3"><FaClock /> Vencimientos</div>
                       </NavLink>
+
                       <NavLink to="/polizas/renovaciones" className={({ isActive }) => `flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
                         <div className="flex items-center gap-3"><FaSyncAlt /> Renovaciones</div>
                         <Badge value={renovacionesPendientes} tone="amber" />
+                      </NavLink>
+                      
+                      <NavLink to="/polizas/bajas" className={({ isActive }) => `flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive ? "bg-blue-800/80 text-emerald-400" : "hover:bg-blue-800/50"}`}>
+                        <div className="flex items-center gap-3"><FaBan /> Bajas</div>
+                        <Badge value={bajasPendientes} />
                       </NavLink>
                     </div>
                   )}
@@ -128,6 +149,7 @@ export default function Sidebar({
               );
             }
 
+            // RENDERIZADO DEL RESTO DE LOS BOTONES
             return (
               <NavLink
                 key={item.to}

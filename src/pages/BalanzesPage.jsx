@@ -1,5 +1,5 @@
 // src/pages/BalancesPage.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlus } from "react-icons/fa";
 import { HiCog, HiOfficeBuilding } from "react-icons/hi";
@@ -19,7 +19,6 @@ import EgresoCreateModal from "../components/balanzes/EgresoCreateModal";
 import IngresoTable from "../components/balanzes/IngresoTable";
 import EgresoTable from "../components/balanzes/EgresoTable";
 
-// 🚀 BOTÓN DE DESCARGA
 import DescargarBalanceDiarioButton from "../components/balanzes/DescargarBalanceDiarioButton";
 import BalanceChart from "../components/balanzes/BalanceChart";
 import BalanceExportPanel from "../components/balanzes/BalanceExportPanel";
@@ -37,31 +36,42 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 2,
   });
 
-/* 🚀 KPI card OPTIMIZADO PARA MÓVILES Y TABLETS */
+/* 🚀 KPI card OPTIMIZADO */
 function KpiCard({ title, value, variant = "blue" }) {
   const variants = {
-    green:
-      "bg-gradient-to-br from-emerald-600/70 via-emerald-600/40 to-emerald-500/60 border border-emerald-400/40 text-white",
+    green: "bg-gradient-to-br from-emerald-600/70 via-emerald-600/40 to-emerald-500/60 border border-emerald-400/40 text-white",
     red: "bg-gradient-to-br from-rose-600/70 via-rose-600/40 to-rose-500/60 border border-rose-400/40 text-white",
     blue: "bg-gradient-to-br from-sky-600/70 via-sky-600/40 to-sky-500/60 border border-sky-400/40 text-white",
     amber: "bg-gradient-to-br from-amber-600/70 via-amber-600/40 to-amber-500/60 border border-amber-400/40 text-white", 
   };
   return (
-    <div
-      className={`${variants[variant]} px-3 py-3 sm:px-4 sm:py-4 rounded-2xl shadow-sm transition-all duration-300 min-w-0 flex flex-col justify-center`}
-    >
-      <h3 className="text-[10px] sm:text-xs uppercase tracking-wide opacity-80 truncate" title={title}>
+    <div className={`${variants[variant]} px-3 py-3 sm:px-4 sm:py-4 rounded-2xl shadow-sm transition-all duration-300 min-w-0 flex flex-col justify-center`}>
+      <h3 className="text-[10px] sm:text-xs uppercase tracking-wide opacity-90 truncate" title={title}>
         {title}
       </h3>
-      <p 
-        className="text-base sm:text-lg lg:text-2xl xl:text-3xl font-extrabold mt-1 truncate" 
-        title={`$${fmtMoney(value)}`}
-      >
+      <p className="text-lg sm:text-xl lg:text-2xl font-black mt-1 tracking-tight">
         ${fmtMoney(value)}
       </p>
     </div>
   );
 }
+
+/* 🚀 COMPONENTE FILA DE KPIs (Para el Admin) */
+const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
+  <div className={`p-4 rounded-2xl border space-y-3 shadow-sm ${highlight ? "bg-zinc-900/50 border-zinc-700" : "bg-zinc-950/40 border-zinc-800/60"}`}>
+    <h2 className={`text-sm font-bold tracking-wider uppercase flex items-center gap-2 ${highlight ? "text-sky-400" : "text-emerald-400"}`}>
+      {highlight ? "🌍 " : "🏢 "} {title}
+    </h2>
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <KpiCard title={`Ingresos Tot. ${suffix}`} value={metrics.tIn} variant="green" />
+      <KpiCard title={`Efectivo ${suffix}`} value={metrics.tInEfe} variant="green" />
+      <KpiCard title={`Transferencia ${suffix}`} value={metrics.tInTransf} variant="green" />
+      <KpiCard title={`Egresos Tot. ${suffix}`} value={metrics.tEg} variant="red" />
+      <KpiCard title={`Neto ${suffix}`} value={metrics.tBal} variant="blue" />
+      <KpiCard title={`Caja Chica ${suffix}`} value={metrics.tCajaChica} variant="amber" />
+    </div>
+  </div>
+);
 
 const TABS = [
   { id: "resumen", label: "Resumen" },
@@ -77,37 +87,23 @@ const BalancesPage = () => {
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
   const userOficina = user?.perfil?.oficina?.codigo || user?.perfil?.oficina?.id || user?.perfil?.oficina || "";
 
-  // Estado de la oficina seleccionada
   const [oficinaSeleccionada, setOficinaSeleccionada] = useState("ALL");
+  const [adminTimeView, setAdminTimeView] = useState("dia"); 
 
-  // listas crudas
-  const { list: ingresos = [], status: ingresosStatus } = useSelector(
-    (s) => s.ingresos || {}
-  );
-  const { list: egresos = [], status: egresosStatus } = useSelector(
-    (s) => s.egresos || {}
-  );
-
-  // datos del balance diario
+  const { list: ingresos = [], status: ingresosStatus } = useSelector((s) => s.ingresos || {});
+  const { list: egresos = [], status: egresosStatus } = useSelector((s) => s.egresos || {});
   const balanceState = useSelector((s) => s.balance || {});
   const balanceData = balanceState?.data;
   const balanceStatus = balanceState?.status;
 
-  // fecha seleccionada
   const [fecha, setFecha] = useState(() => dayjs().format("YYYY-MM-DD"));
-
-  // tab actual principal
   const [activeTab, setActiveTab] = useState("resumen");
-
-  // sub-tab dentro de Resumen
   const [resumenMovTab, setResumenMovTab] = useState("ingresos");
-
-  // modales
+  
   const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
   const [modalEgresoAbierto, setModalEgresoAbierto] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // filtros para el gráfico
   const [chartYear, setChartYear] = useState(() => dayjs().year());
   const [chartMonth, setChartMonth] = useState("all"); 
 
@@ -123,59 +119,66 @@ const BalancesPage = () => {
   const mesActual = hoy.month();
   const anioActual = hoy.year();
 
-  const ingresosMensuales = useMemo(
-    () =>
-      ingresos.filter((i) => {
-        const f = dayjs(i.fecha);
-        // 🚀 FIX DEL FRONTEND: Si no es admin, no filtramos por oficina en la UI porque el backend ya envió solo los suyos.
-        const ofiOk = isWebAdmin 
-          ? (oficinaSeleccionada === "ALL" || String(i.oficina) === String(oficinaSeleccionada))
-          : true;
-        return f.month() === mesActual && f.year() === anioActual && ofiOk;
-      }),
+  const ingresosMensuales = useMemo(() =>
+    ingresos.filter((i) => {
+      const f = dayjs(i.fecha);
+      const ofiOk = isWebAdmin ? (oficinaSeleccionada === "ALL" || String(i.oficina) === String(oficinaSeleccionada)) : true;
+      return f.month() === mesActual && f.year() === anioActual && ofiOk;
+    }),
     [ingresos, mesActual, anioActual, isWebAdmin, oficinaSeleccionada]
   );
 
-  const egresosMensuales = useMemo(
-    () =>
-      egresos.filter((e) => {
-        const f = dayjs(e.fecha);
-        // 🚀 FIX DEL FRONTEND
-        const ofiOk = isWebAdmin 
-          ? (oficinaSeleccionada === "ALL" || String(e.oficina) === String(oficinaSeleccionada))
-          : true;
-        return f.month() === mesActual && f.year() === anioActual && ofiOk;
-      }),
+  const egresosMensuales = useMemo(() =>
+    egresos.filter((e) => {
+      const f = dayjs(e.fecha);
+      const ofiOk = isWebAdmin ? (oficinaSeleccionada === "ALL" || String(e.oficina) === String(oficinaSeleccionada)) : true;
+      return f.month() === mesActual && f.year() === anioActual && ofiOk;
+    }),
     [egresos, mesActual, anioActual, isWebAdmin, oficinaSeleccionada]
   );
 
-  const totalIngresosMensuales = useMemo(
-    () => ingresosMensuales.reduce((acc, i) => acc + toNumber(i.monto), 0),
-    [ingresosMensuales]
-  );
-  const totalEgresosMensuales = useMemo(
-    () => egresosMensuales.reduce((acc, e) => acc + toNumber(e.monto), 0),
-    [egresosMensuales]
-  );
+  // ==========================================
+  // 🚀 FUNCIÓN MÁGICA: Extrae métricas Día/Mes por Oficina
+  // ==========================================
+  const getMetrics = useCallback((ofiCode, timeView) => {
+    if (timeView === "dia") {
+      let source = balanceData;
+      if (ofiCode !== "ALL" && ofiCode !== null) {
+        source = balanceData?.por_oficina?.find(o => String(o.scope.oficina) === String(ofiCode)) || null;
+      } else if (ofiCode === null) {
+        source = balanceData?.sin_oficina || null;
+      }
 
-  const ingresosPreview = useMemo(
-    () => ingresosMensuales.slice(0, 20),
-    [ingresosMensuales]
-  );
-  const egresosPreview = useMemo(
-    () => egresosMensuales.slice(0, 20),
-    [egresosMensuales]
-  );
+      const tIn = toNumber(source?.totales?.ingresos);
+      const tEg = toNumber(source?.totales?.egresos);
+      const tBal = toNumber(source?.totales?.balance);
+      const tCajaChica = toNumber(source?.totales?.saldo_caja_chica);
+      const inForma = source?.ingresos?.por_forma_pago || [];
+      const tInEfe = toNumber(inForma.find(f => f.forma_pago === "EFECTIVO")?.total);
+      const tInTransf = toNumber(inForma.find(f => f.forma_pago === "TRANSFERENCIA")?.total);
 
-  const tIn = toNumber(balanceData?.totales?.ingresos);
-  const tEg = toNumber(balanceData?.totales?.egresos);
-  const tBal = toNumber(balanceData?.totales?.balance);
-  const tCajaChica = toNumber(balanceData?.totales?.saldo_caja_chica);
+      return { tIn, tEg, tBal, tCajaChica, tInEfe, tInTransf };
+    } else {
+      const ingFiltrados = ofiCode === "ALL" ? ingresosMensuales : ofiCode === null ? ingresosMensuales.filter(i => !i.oficina) : ingresosMensuales.filter(i => String(i.oficina) === String(ofiCode));
+      const egFiltrados = ofiCode === "ALL" ? egresosMensuales : ofiCode === null ? egresosMensuales.filter(e => !e.oficina) : egresosMensuales.filter(e => String(e.oficina) === String(ofiCode));
 
-  const cargando =
-    ingresosStatus === "loading" ||
-    egresosStatus === "loading" ||
-    balanceStatus === "loading";
+      const tIn = ingFiltrados.reduce((acc, i) => acc + toNumber(i.monto), 0);
+      const tEg = egFiltrados.reduce((acc, e) => acc + toNumber(e.monto), 0);
+      const tBal = tIn - tEg;
+      const tInEfe = ingFiltrados.filter(i => (i.forma_pago || '').toUpperCase() === 'EFECTIVO').reduce((acc, i) => acc + toNumber(i.monto), 0);
+      const tInTransf = ingFiltrados.filter(i => (i.forma_pago || '').toUpperCase() === 'TRANSFERENCIA').reduce((acc, i) => acc + toNumber(i.monto), 0);
+      const tEgEfe = egFiltrados.filter(e => (e.forma_pago || 'EFECTIVO').toUpperCase() === 'EFECTIVO').reduce((acc, e) => acc + toNumber(e.monto), 0);
+      const tCajaChica = tInEfe - tEgEfe;
+
+      return { tIn, tEg, tBal, tCajaChica, tInEfe, tInTransf };
+    }
+  }, [balanceData, ingresosMensuales, egresosMensuales]);
+
+  const suffix = adminTimeView === "dia" ? "(Día)" : "(Mes)";
+  const cargando = ingresosStatus === "loading" || egresosStatus === "loading" || balanceStatus === "loading";
+
+  // 🚀 MÉTRICAS PARA EL EMPLEADO (Solo del Día)
+  const empMetricsDia = getMetrics("ALL", "dia");
 
   const yearsOptions = useMemo(() => {
     const yearsSet = new Set();
@@ -184,37 +187,28 @@ const BalancesPage = () => {
       const y = dayjs(item.fecha).year();
       if (Number.isFinite(y)) yearsSet.add(y);
     });
-    if (yearsSet.size === 0) {
-      yearsSet.add(anioActual);
-    }
+    if (yearsSet.size === 0) yearsSet.add(anioActual);
     return Array.from(yearsSet).sort();
   }, [ingresos, egresos, anioActual]);
 
-  const ingresosChart = useMemo(
-    () =>
-      ingresosMensuales.filter((i) => {
-        if (!i.fecha) return false;
-        const d = dayjs(i.fecha);
-        if (chartYear && d.year() !== chartYear) return false;
-        if (chartMonth !== "all" && d.month() + 1 !== Number(chartMonth))
-          return false;
-        return true;
-      }),
-    [ingresosMensuales, chartYear, chartMonth]
-  );
+  const ingresosPreview = useMemo(() => ingresosMensuales.slice(0, 20), [ingresosMensuales]);
+  const egresosPreview = useMemo(() => egresosMensuales.slice(0, 20), [egresosMensuales]);
 
-  const egresosChart = useMemo(
-    () =>
-      egresosMensuales.filter((e) => {
-        if (!e.fecha) return false;
-        const d = dayjs(e.fecha);
-        if (chartYear && d.year() !== chartYear) return false;
-        if (chartMonth !== "all" && d.month() + 1 !== Number(chartMonth))
-          return false;
-        return true;
-      }),
-    [egresosMensuales, chartYear, chartMonth]
-  );
+  const ingresosChart = useMemo(() => ingresosMensuales.filter((i) => {
+      if (!i.fecha) return false;
+      const d = dayjs(i.fecha);
+      if (chartYear && d.year() !== chartYear) return false;
+      if (chartMonth !== "all" && d.month() + 1 !== Number(chartMonth)) return false;
+      return true;
+  }), [ingresosMensuales, chartYear, chartMonth]);
+
+  const egresosChart = useMemo(() => egresosMensuales.filter((e) => {
+      if (!e.fecha) return false;
+      const d = dayjs(e.fecha);
+      if (chartYear && d.year() !== chartYear) return false;
+      if (chartMonth !== "all" && d.month() + 1 !== Number(chartMonth)) return false;
+      return true;
+  }), [egresosMensuales, chartYear, chartMonth]);
 
   return (
     <div className="p-3 sm:p-4 md:p-6 pb-10 text-zinc-50 max-w-7xl mx-auto w-full overflow-x-hidden">
@@ -233,9 +227,9 @@ const BalancesPage = () => {
             Resumen de balances
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1 truncate">
-            Mes actual:{" "}
+            Visualizando datos del:{" "}
             <strong className="text-zinc-100">
-              {dayjs().format("MMMM YYYY")}
+              {dayjs(fecha).format("DD [de] MMMM YYYY")}
             </strong>
           </p>
           {cargando ? (
@@ -245,11 +239,10 @@ const BalancesPage = () => {
           ) : null}
         </div>
 
-        {/* Filtro + acciones, mobile-first */}
+        {/* Filtro + acciones */}
         <div className="w-full xl:w-auto flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
             
-            {/* SELECTOR DE OFICINA (SOLO ADMIN) */}
             {isWebAdmin && (
               <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-2xl px-3 py-2 w-full sm:w-auto min-w-0">
                 <HiOfficeBuilding className="text-zinc-400 shrink-0" />
@@ -266,11 +259,8 @@ const BalancesPage = () => {
               </div>
             )}
 
-            {/* Fecha */}
             <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-2xl px-3 py-2 w-full sm:w-auto min-w-0">
-              <span className="text-[11px] sm:text-xs text-zinc-400 shrink-0">
-                Fecha
-              </span>
+              <span className="text-[11px] sm:text-xs text-zinc-400 shrink-0">Fecha</span>
               <input
                 type="date"
                 value={fecha}
@@ -287,7 +277,6 @@ const BalancesPage = () => {
             </div>
           </div>
 
-          {/* 🚀 BOTONES EXCLUSIVOS PARA EL ADMIN */}
           {isWebAdmin && (
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="flex-1 sm:flex-none">
@@ -296,12 +285,10 @@ const BalancesPage = () => {
                   oficina={oficinaSeleccionada === "ALL" ? "" : oficinaSeleccionada} 
                 />
               </div>
-              
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 title="Configuración de Categorías"
-                aria-label="Abrir configuración"
                 className="inline-flex items-center justify-center w-10 h-10 shrink-0 rounded-2xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 transition"
               >
                 <HiCog className="text-xl" />
@@ -312,7 +299,7 @@ const BalancesPage = () => {
       </div>
 
       {/* Tabs principales */}
-      <div className="mt-2 mb-5 border-b border-zinc-800">
+      <div className="mt-2 mb-5 border-b border-zinc-800 flex justify-between items-end">
         <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -321,36 +308,102 @@ const BalancesPage = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`
-                  whitespace-nowrap px-3 sm:px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-semibold
-                  transition border
-                  ${
-                    active
-                      ? "bg-zinc-950 border-zinc-700 text-white"
-                      : "bg-zinc-900 border-transparent text-zinc-400 hover:bg-zinc-900/80 hover:text-white"
-                  }
-                `}
+                className={`whitespace-nowrap px-3 sm:px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-semibold transition border ${active ? "bg-zinc-950 border-zinc-700 text-white" : "bg-zinc-900 border-transparent text-zinc-400 hover:bg-zinc-900/80 hover:text-white"}`}
               >
                 {tab.label}
               </button>
             );
           })}
         </div>
+
+        {/* 🚀 TOGGLE DE DÍA/MES (Solo Admin) */}
+        {isWebAdmin && activeTab === "resumen" && (
+          <div className="hidden sm:flex bg-zinc-950 border border-zinc-800 rounded-xl p-1 mb-1 shadow-sm">
+            <button
+              onClick={() => setAdminTimeView("dia")}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "dia" ? "bg-sky-500/20 text-sky-400" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              Diario
+            </button>
+            <button
+              onClick={() => setAdminTimeView("mes")}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "mes" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              Mensual
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TAB: Resumen */}
       {activeTab === "resumen" && (
         <section className="space-y-6">
-          {/* 🚀 GRILLA RESPONSIVA: 2 columnas en mobile/tablet, 4 columnas en PC */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <KpiCard title="Ingresos (Mes)" value={totalIngresosMensuales} variant="green" />
-            <KpiCard title="Egresos (Mes)" value={totalEgresosMensuales} variant="red" />
-            <KpiCard title="Neto (Mes)" value={totalIngresosMensuales - totalEgresosMensuales} variant="blue" />
-            <KpiCard title="Caja Chica (Mes - Efectivo)" value={tCajaChica} variant="amber" />
-          </div>
+          
+          {/* Toggle Día/Mes para mobile (Admin) */}
+          {isWebAdmin && (
+            <div className="sm:hidden flex bg-zinc-950 border border-zinc-800 rounded-xl p-1 shadow-sm">
+              <button
+                onClick={() => setAdminTimeView("dia")}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "dia" ? "bg-sky-500/20 text-sky-400" : "text-zinc-400 hover:text-zinc-200"}`}
+              >
+                Vista Diaria
+              </button>
+              <button
+                onClick={() => setAdminTimeView("mes")}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "mes" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-400 hover:text-zinc-200"}`}
+              >
+                Vista Mensual
+              </button>
+            </div>
+          )}
+
+          {/* 🚀 TARJETAS KPI (Diferenciadas por ROL) */}
+          {isWebAdmin ? (
+            <div className="space-y-4">
+              {oficinaSeleccionada === "ALL" ? (
+                <>
+                  <KpiRowGroup 
+                    title="Caja General (Todas las Sucursales)" 
+                    metrics={getMetrics("ALL", adminTimeView)} 
+                    suffix={suffix} 
+                    highlight={true} 
+                  />
+                  {balanceData?.por_oficina?.map(ofi => (
+                    <KpiRowGroup 
+                      key={ofi.scope.oficina}
+                      title={`Sucursal: ${ofi.scope.oficina_nombre}`} 
+                      metrics={getMetrics(ofi.scope.oficina, adminTimeView)} 
+                      suffix={suffix} 
+                    />
+                  ))}
+                  {balanceData?.sin_oficina && (
+                    <KpiRowGroup 
+                      title="Sin Sucursal Asignada" 
+                      metrics={getMetrics(null, adminTimeView)} 
+                      suffix={suffix} 
+                    />
+                  )}
+                </>
+              ) : (
+                <KpiRowGroup 
+                  title="Sucursal Seleccionada" 
+                  metrics={getMetrics("ALL", adminTimeView)} 
+                  suffix={suffix} 
+                  highlight={true}
+                />
+              )}
+            </div>
+          ) : (
+            // 🚀 VISTA EMPLEADO COMÚN (Sin Caja Chica)
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <KpiCard title="Neto Total (Día)" value={empMetricsDia.tBal} variant="blue" />
+              <KpiCard title="Ingreso Efectivo (Día)" value={empMetricsDia.tInEfe} variant="green" />
+              <KpiCard title="Ingreso Transf. (Día)" value={empMetricsDia.tInTransf} variant="green" />
+            </div>
+          )}
 
           {/* Acciones rápidas */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4">
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setModalIngresoAbierto(true)}
@@ -368,7 +421,7 @@ const BalancesPage = () => {
           </div>
 
           {/* Sub-tabs de movimientos */}
-          <section className="space-y-3">
+          <section className="space-y-3 pt-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex flex-col gap-1 min-w-0">
                 <h2 className="text-sm md:text-base font-semibold truncate">
@@ -480,27 +533,27 @@ const BalancesPage = () => {
           <div className="md:hidden space-y-4">
             <div className="grid grid-cols-1 gap-3">
               <div className="bg-emerald-600 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Ingresos del mes</h3>
+                <h3 className="text-xs opacity-90 truncate">Ingresos del Día</h3>
                 <p className="text-2xl font-extrabold mt-1 truncate">
-                  ${fmtMoney(totalIngresosMensuales)}
+                  ${fmtMoney(empMetricsDia.tIn)}
                 </p>
               </div>
               <div className="bg-rose-600 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Egresos del mes</h3>
+                <h3 className="text-xs opacity-90 truncate">Egresos del Día</h3>
                 <p className="text-2xl font-extrabold mt-1 truncate">
-                  ${fmtMoney(totalEgresosMensuales)}
+                  ${fmtMoney(empMetricsDia.tEg)}
                 </p>
               </div>
               <div className="bg-sky-600/40 border border-sky-400/50 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Resultado del mes</h3>
+                <h3 className="text-xs opacity-90 truncate">Resultado del Día</h3>
                 <p
                   className={`text-2xl font-extrabold mt-1 truncate ${
-                    totalIngresosMensuales - totalEgresosMensuales >= 0
+                    empMetricsDia.tBal >= 0
                       ? "text-sky-50"
                       : "text-rose-100"
                   }`}
                 >
-                  ${fmtMoney(totalIngresosMensuales - totalEgresosMensuales)}
+                  ${fmtMoney(empMetricsDia.tBal)}
                 </p>
               </div>
             </div>
@@ -575,18 +628,9 @@ const BalancesPage = () => {
       )}
 
       {/* Modales */}
-      <IngresoCreateModal
-        isOpen={modalIngresoAbierto}
-        onClose={() => setModalIngresoAbierto(false)}
-      />
-      <EgresoCreateModal
-        isOpen={modalEgresoAbierto}
-        onClose={() => setModalEgresoAbierto(false)}
-      />
-      <BalanzesSettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={() => setModalIngresoAbierto(false)} />
+      <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={() => setModalEgresoAbierto(false)} />
+      <BalanzesSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 };

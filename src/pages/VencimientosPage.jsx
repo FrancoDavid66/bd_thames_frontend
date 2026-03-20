@@ -13,6 +13,8 @@ import {
   selectVencimientosOficinasStatus,
 } from "../store/slices/vencimientosSlice";
 
+import { FaSyncAlt, FaFileExport, FaFileAlt, FaUsers, FaSpinner } from "react-icons/fa";
+
 import VencimientosTabs from "../components/vencimientos/VencimientosTabs";
 import VencimientosSummary from "../components/vencimientos/VencimientosSummary";
 import VencimientosFiltersBar from "../components/vencimientos/VencimientosFiltersBar";
@@ -39,18 +41,20 @@ function toneByDias(d) {
   return "slate";
 }
 
+// 🚀 Helper de estilos actualizado para los pills (píldoras) de días restantes en las tablas
 function pillCls(tone) {
-  if (tone === "red") return "bg-red-500/15 text-red-200 border-red-500/30";
-  if (tone === "amber") return "bg-amber-500/15 text-amber-200 border-amber-500/30";
-  if (tone === "emerald") return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
-  return "bg-slate-500/15 text-slate-200 border-slate-500/30";
+  const base = "font-bold shadow-sm transition-colors";
+  if (tone === "red") return `${base} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 border border-red-200 dark:border-red-500/30`;
+  if (tone === "amber") return `${base} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30`;
+  if (tone === "emerald") return `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30`;
+  return `${base} bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600`;
 }
 
 function badgeCls(kind) {
-  if (kind === "finalizada") return "bg-slate-600/20 text-slate-200 border-slate-500/30";
-  if (kind === "vencida") return "bg-red-600/20 text-red-200 border-red-500/30";
-  if (kind === "activa") return "bg-emerald-600/20 text-emerald-200 border-emerald-500/30";
-  return "bg-slate-600/15 text-slate-200 border-slate-500/30";
+  if (kind === "finalizada") return "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 border-none";
+  if (kind === "vencida") return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-none";
+  if (kind === "activa") return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-none";
+  return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-none";
 }
 
 // ✅ dd/mm/aaaa (soporta "YYYY-MM-DD" o ISO "YYYY-MM-DDTHH:mm...")
@@ -164,6 +168,10 @@ export default function VencimientosPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // 🚀 BUSCAMOS AL USUARIO EN EL ESTADO GLOBAL DE REDUX
+  const authUser = useSelector((state) => state.auth?.user || state.user?.user || state.usuarios?.me || null);
+  const esAdmin = authUser ? (authUser.is_superuser || authUser?.perfil?.rol === 'ADMIN') : true;
+
   const items = useSelector(selectVencimientos);
   const resumen = useSelector(selectVencimientosResumen);
   const status = useSelector(selectVencimientosStatus);
@@ -198,10 +206,7 @@ export default function VencimientosPage() {
 
   const [baseDate, setBaseDate] = useState("");
 
-  // ✅ Orden mejorado
-  // backend seguro: vto_referencia / -vto_referencia
-  // si el usuario elige "días", lo hacemos local SOLO en la página (sin depender del backend)
-  const [sortMode, setSortMode] = useState("urgente"); // urgente | lejos | dias_asc | dias_desc
+  const [sortMode, setSortMode] = useState("urgente");
 
   const bumpReload = useCallback(() => setReloadToken((t) => t + 1), []);
 
@@ -232,7 +237,6 @@ export default function VencimientosPage() {
 
   const ordering = useMemo(() => {
     if (sortMode === "lejos") return "-vto_referencia";
-    // default: urgente primero
     return "vto_referencia";
   }, [sortMode]);
 
@@ -240,7 +244,7 @@ export default function VencimientosPage() {
     dispatch(fetchVencimientosOficinas());
   }, [dispatch]);
 
-  // mantener oficina en querystring (como ya tenías)
+  // mantener oficina en querystring
   useEffect(() => {
     try {
       const sp = new URLSearchParams(location.search || "");
@@ -310,7 +314,6 @@ export default function VencimientosPage() {
     [oficinaNameById]
   );
 
-  // ✅ polizas: agregar _dias y aplicar orden local si se eligió dias_asc/dias_desc
   const polizas = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
     const withDias = arr.map((p) => ({ ...p, _dias: Number.isFinite(computeDiasFallback(p)) ? computeDiasFallback(p) : null }));
@@ -334,7 +337,6 @@ export default function VencimientosPage() {
     return withDias;
   }, [items, sortMode]);
 
-  // ✅ asegurados dedup (igual a tu lógica, pero basado en polizas ya normalizadas)
   const asegurados = useMemo(() => {
     const arr = Array.isArray(polizas) ? polizas : [];
     const map = new Map();
@@ -440,35 +442,46 @@ export default function VencimientosPage() {
     ? "Vence hoy"
     : "Por vencer (1-3 días)";
 
-  // export modal
   const [exportOpen, setExportOpen] = useState(false);
 
   return (
-    <div className="p-4 text-slate-100">
-      <div className="flex items-center justify-between gap-2 mb-3">
+    <div className="p-4 sm:p-6 text-slate-800 dark:text-slate-100 min-h-full">
+      
+      {/* 🚀 HEADER SUPERIOR */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold">Vencimientos</h1>
-          <div className="text-sm opacity-75">Mostrando: {title}</div>
-          <div className="text-xs opacity-60 mt-1">
-            Pólizas en esta página: {polizas.length} • Total backend: {totalCount}
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-800 dark:text-white">
+            Vencimientos
+          </h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-1">
+            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              Mostrando: <span className="text-blue-600 dark:text-blue-400 font-bold">{title}</span>
+            </span>
+            <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
+            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-medium">
+              Pólizas en vista: {polizas.length} de {totalCount}
+            </span>
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 focus:outline-none"
             onClick={() => load({ force: true })}
+            disabled={status === "loading"}
           >
-            Recargar
+            <FaSyncAlt className={status === "loading" ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">Recargar</span>
           </button>
 
           <button
             type="button"
-            className="px-3 py-2 rounded bg-emerald-700 hover:bg-emerald-600"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 border border-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 hover:shadow-blue-500/40 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 focus:outline-none"
             onClick={() => setExportOpen(true)}
           >
-            Exportar (Excel/PDF)
+            <FaFileExport />
+            <span className="hidden sm:inline">Exportar</span>
           </button>
         </div>
       </div>
@@ -483,7 +496,6 @@ export default function VencimientosPage() {
       />
 
       <VencimientosFiltersBar
-        // search/oficina/pageSize
         search={search}
         onChangeSearch={(v) => {
           setSearch(v);
@@ -510,21 +522,18 @@ export default function VencimientosPage() {
           setPage(1);
           bumpReload();
         }}
-        // sorting
         sortMode={sortMode}
         onChangeSortMode={(v) => {
           setSortMode(v);
           setPage(1);
           bumpReload();
         }}
-        // base date
         baseDate={baseDate}
         onChangeBaseDate={(v) => {
           setBaseDate(v);
           setPage(1);
           bumpReload();
         }}
-        // custom range
         useCustomRange={useCustomRange}
         onToggleCustomRange={(v) => {
           setUseCustomRange(v);
@@ -538,29 +547,36 @@ export default function VencimientosPage() {
         setDraftFutureDays={setDraftFutureDays}
         onApplyCustomRange={applyCustomRange}
         status={status}
+        esAdmin={esAdmin}
       />
 
-      {/* Switch vista */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => setViewMode("polizas")}
-          className={`px-3 py-2 rounded border text-sm transition ${
-            viewMode === "polizas" ? "bg-white/10" : "hover:bg-white/5"
-          }`}
-        >
-          Vista: Pólizas (página: {polizas.length})
-        </button>
+      {/* 🚀 SWITCH DE VISTA (Pólizas / Asegurados) TIPO SEGMENTED CONTROL */}
+      <div className="flex justify-center md:justify-start mt-6 mb-2">
+        <div className="inline-flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={() => setViewMode("polizas")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              viewMode === "polizas" 
+                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50" 
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <FaFileAlt /> Pólizas ({polizas.length})
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setViewMode("asegurados")}
-          className={`px-3 py-2 rounded border text-sm transition ${
-            viewMode === "asegurados" ? "bg-white/10" : "hover:bg-white/5"
-          }`}
-        >
-          Vista: Asegurados (página: {asegurados.length})
-        </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("asegurados")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              viewMode === "asegurados" 
+                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50" 
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <FaUsers /> Asegurados ({asegurados.length})
+          </button>
+        </div>
       </div>
 
       <VencimientosPagination
@@ -575,8 +591,12 @@ export default function VencimientosPage() {
         prevUrl={prevUrl}
       />
 
+      {/* 🚀 ESTADO DE CARGA MODERNIZADO */}
       {status === "loading" ? (
-        <div className="opacity-80 mt-3">Cargando…</div>
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
+          <FaSpinner className="text-4xl animate-spin mb-4 text-blue-500" />
+          <p className="text-sm font-semibold tracking-wide uppercase">Cargando vencimientos...</p>
+        </div>
       ) : viewMode === "polizas" ? (
         <VencimientosPolizasTable
           polizas={polizas}
@@ -600,36 +620,34 @@ export default function VencimientosPage() {
         />
       )}
 
-      <VencimientosPagination
-        page={page}
-        setPage={setPage}
-        pageSize={pageSize}
-        totalCount={totalCount}
-        totalPages={totalPages}
-        showingFrom={showingFrom}
-        showingTo={showingTo}
-        nextUrl={nextUrl}
-        prevUrl={prevUrl}
-      />
+      <div className="mt-4">
+        <VencimientosPagination
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          showingFrom={showingFrom}
+          showingTo={showingTo}
+          nextUrl={nextUrl}
+          prevUrl={prevUrl}
+        />
+      </div>
 
       {exportOpen ? (
         <VencimientosExportModal
           onClose={() => setExportOpen(false)}
-          // params base actuales
           currentParams={params}
-          // para construir params por filtro elegido (hoy/vencidas/etc)
           context={{
             oficina,
             search: debouncedSearch,
             includeFinalizadas,
             baseDate,
             sortMode,
-            // rango actual
             useCustomRange,
             customPastDays,
             customFutureDays,
           }}
-          // data de la página (por si elige "solo página")
           pageData={{
             polizas,
             asegurados,

@@ -100,7 +100,7 @@ export default function Header({ sidebarOpen, toggleSidebar }) {
             
             <div className="hidden sm:flex items-center">
               <span className="text-xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
-                THAMES APP 2.0
+                THAMES APP 3.0
               </span>
             </div>
           </div>

@@ -17,7 +17,9 @@ import {
   FaSyncAlt,
   FaTimes,
   FaBan,
-  FaCashRegister // 💸 Agregamos icono de caja
+  FaCashRegister,
+  FaClock,
+  FaFileInvoiceDollar // 🚀 NUEVO: Icono para Cotizador
 } from "react-icons/fa";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD Y ROLES
@@ -73,7 +75,11 @@ export default function MobileTopBar({
 
   const moreItems = useMemo(
     () => [
-      // 💸 NUEVO ACCESO: Recaudación / Caja para TODOS
+      {
+        to: "/vencimientos",
+        label: "Vencimientos",
+        icon: FaClock,
+      },
       {
         to: "/recaudacion",
         label: "Caja",
@@ -99,11 +105,14 @@ export default function MobileTopBar({
       },
       // 🚀 ¡CANDADOS PUESTOS PARA CELULAR!
       { to: "/marketing", label: "Campañas", icon: FaBullhorn, adminOnly: true },
+      
+      // 🚀 NUEVO: Cotizador en Celular (Solo Admin)
+      { to: "/cotizaciones", label: "Cotizador", icon: FaFileInvoiceDollar, adminOnly: true },
+      
       { to: "/geo", label: "Geo", icon: FaMapMarkedAlt, adminOnly: true },
       { to: "/competencia", label: "Competencia", icon: FaChartBar, adminOnly: true },
       { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie, adminOnly: true },
       
-      // Balanzes queda libre para todos
       { to: "/balanzes", label: "Balanzes", icon: FaDatabase },
     ],
     [renovacionesPendientes, bajasPendientes, cuponVencidas]
@@ -112,7 +121,6 @@ export default function MobileTopBar({
   // 🚀 Magia: Filtramos los ítems del menú "Más" según el rol
   const filteredMoreItems = useMemo(() => {
     if (isWebAdmin) return moreItems;
-    // Si no es admin, le sacamos los que tienen adminOnly
     return moreItems.filter(item => !item.adminOnly);
   }, [moreItems, isWebAdmin]);
 
@@ -155,7 +163,7 @@ export default function MobileTopBar({
               </div>
 
               {/* 🚀 Renderizamos SOLO las opciones permitidas */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
                 {filteredMoreItems.map(({ to, label, icon: Icon, badge }) => (
                   <button
                     key={to}

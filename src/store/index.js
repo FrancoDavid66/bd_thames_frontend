@@ -33,6 +33,9 @@ import marketingReducer from "./slices/marketingSlice";
 // ✅🆕 Recaudación / Cierres de caja
 import recaudacionReducer from "./slices/recaudacionSlice";
 
+// 🚀 NUEVO: Cotizaciones
+import cotizacionesReducer from "./slices/cotizacionesSlice";
+
 export const store = configureStore({
   reducer: {
     clientes: clientesReducer,
@@ -64,6 +67,9 @@ export const store = configureStore({
 
     // ✅🆕
     recaudacion: recaudacionReducer,
+
+    // 🚀 NUEVO
+    cotizaciones: cotizacionesReducer,
   },
 });
 

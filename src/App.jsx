@@ -36,9 +36,10 @@ import MarketingPage from "./pages/MarketingPage";
 import RenovacionesPage from "./pages/RenovacionesPage";
 import VencimientosPage from "./pages/VencimientosPage";
 import BajasPage from "./pages/BajasPage";
-
-// ✅ NUEVA APP
 import RecaudacionPage from "./pages/RecaudacionPage";
+
+// 🚀 NUEVA APP: COTIZACIONES
+import CotizacionesPage from "./pages/CotizacionesPage";
 
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
@@ -165,7 +166,6 @@ function App() {
       }
       return;
     }
-    // 🚀 CORRECCIÓN ACÁ: Le sacamos el "api/" duplicado
     const url = API_BASE ? `${API_BASE}solicitudes/counters` : "/api/solicitudes/counters";
     const data = await fetchJSON(url);
     if (data) {
@@ -309,7 +309,6 @@ function App() {
   // ====== RENDER DASHBOARD (USUARIO AUTENTICADO) ======
   return (
     <>
-      {/* 🚀 PANTALLA DE BIENVENIDA CON LOGO */}
       <AnimatePresence>
         {showWelcome && (
           <motion.div
@@ -325,7 +324,6 @@ function App() {
               transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
               className="flex flex-col items-center text-center px-4"
             >
-              {/* 🚀 LOGO EN LUGAR DE LA ESTRELLA */}
               <motion.div 
                 animate={{ y: [-5, 5, -5] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -345,7 +343,6 @@ function App() {
                 Preparando tu entorno de trabajo...
               </p>
               
-              {/* Barra de carga futurista */}
               <div className="mt-8 h-1 w-64 overflow-hidden rounded-full bg-white/10 relative">
                 <motion.div 
                   className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-emerald-400"
@@ -359,7 +356,6 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* 🚀 LA APLICACIÓN REAL */}
       <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
         <Sidebar
           isOpen={sidebarOpen}
@@ -398,9 +394,9 @@ function App() {
                 <Route path="/clientes/:id" element={<ClienteProfilePage />} />
                 <Route path="/polizas" element={<PolizasPage />} />
                 <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
-                <Route path="/polizas/vencimientos" element={<VencimientosPage />} />
                 <Route path="/polizas/bajas" element={<BajasPage />} />
                 <Route path="/polizas/:id" element={<PolizaDetails />} />
+                <Route path="/vencimientos" element={<VencimientosPage />} />
                 <Route path="/pagos" element={<PagosPage />} />
                 <Route path="/balanzes" element={<BalanzesPage />} />
                 <Route path="/siniestros" element={<SiniestrosPage />} />
@@ -409,6 +405,9 @@ function App() {
                 <Route path="/competencia" element={<CompetenciaPage />} />
                 <Route path="/estadisticas" element={<EstadisticasPage />} />
                 <Route path="/recaudacion" element={<RecaudacionPage />} />
+                
+                {/* 🚀 NUEVA RUTA DE COTIZACIONES */}
+                <Route path="/cotizaciones" element={<CotizacionesPage />} />
                 
                 <Route 
                   path="/marketing" 
