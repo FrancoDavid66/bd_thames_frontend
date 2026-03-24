@@ -84,9 +84,19 @@ function joinUrl(root, path) {
 
 async function apiGet(path, params = {}) {
   const url = `${joinUrl(API_ROOT, path)}${buildQuery(params)}`;
+  
+  // 🚀 OBTENEMOS EL TOKEN Y ARMAMOS LOS HEADERS
+  const token = localStorage.getItem("access_token");
+  const headers = { 
+    "Content-Type": "application/json" 
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: headers, // 🚀 INYECTAMOS LOS HEADERS ACÁ
     credentials: "include",
   });
 

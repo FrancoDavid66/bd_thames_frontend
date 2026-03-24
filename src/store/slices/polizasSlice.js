@@ -75,7 +75,9 @@ function buildPolizasParams(
 
   const isPolizas = (modo ?? "polizas") === "polizas";
 
-  const params = {};
+  // 🚀 MAGIA ACÁ: Le agregamos allow_all: 1 para que el backend siempre nos devuelva 
+  // las últimas pólizas incluso si no hay filtros.
+  const params = { allow_all: 1 };
 
   // paging normal (page/page_size) solo si includePaging
   if (includePaging) {
@@ -292,17 +294,9 @@ export const fetchPolizas = createAsyncThunk(
       linkSignals(signal, listAbortCtrl);
 
       const state = getState();
-      const q = (state.polizas.search || "").trim();
-      const filters = hasAnyFilters(state);
-      const allowAll = _toBool(state.polizas.allow_all);
-
-      if (!force && !allowAll && !q && !filters) {
-        return {
-          __fromCache: false,
-          queryKey: "polizas/__empty__",
-          data: { results: [], count: 0, next: null, previous: null, __empty: true },
-        };
-      }
+      
+      // 🚀 ELIMINADO EL CORTE ANTICIPADO: Antes Redux bloqueaba la llamada si no había filtros.
+      // Ahora dejamos que pase libremente para que nos traiga las últimas pólizas al iniciar.
 
       const useCursor = shouldUseCursor(state);
       const params = buildPolizasParams(state, {

@@ -3,8 +3,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchCotizaciones, deleteCotizacion } from "../store/slices/cotizacionesSlice";
 import { useAuth } from "../context/AuthContext";
 import dayjs from "dayjs";
-import { HiPlus, HiPencil, HiTrash, HiDocumentText, HiShieldCheck } from "react-icons/hi";
+import { HiPlus, HiPencil, HiTrash, HiDocumentText, HiShieldCheck, HiCog } from "react-icons/hi";
 import CotizacionModal from "../components/cotizaciones/CotizacionModal";
+import CompaniasSettingsModal from "../components/cotizaciones/CompaniasSettingsModal"; // 🚀 IMPORTAMOS EL MODAL
 
 const CotizacionesPage = () => {
   const dispatch = useDispatch();
@@ -13,6 +14,7 @@ const CotizacionesPage = () => {
 
   const { list: cotizaciones, status } = useSelector(state => state.cotizaciones);
   const [modalOpen, setModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false); // 🚀 ESTADO PARA EL ENGRANAJE
   const [cotizacionEdit, setCotizacionEdit] = useState(null);
 
   useEffect(() => {
@@ -59,9 +61,21 @@ const CotizacionesPage = () => {
           <h1 className="text-2xl md:text-3xl font-black tracking-tight">Gestor de Cotizaciones</h1>
           <p className="text-sm text-zinc-400 mt-1">Armá propuestas y calculá tu rentabilidad neta.</p>
         </div>
-        <button onClick={handleCreate} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition shadow-lg shadow-emerald-900/20">
-          <HiPlus /> Nueva Cotización
-        </button>
+        
+        <div className="flex items-center gap-3">
+          {/* 🚀 BOTÓN DEL ENGRANAJE */}
+          <button 
+            onClick={() => setSettingsOpen(true)} 
+            className="flex items-center justify-center h-10 w-10 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-sky-400 rounded-xl transition"
+            title="Configurar Compañías y Comisiones"
+          >
+            <HiCog size={20} />
+          </button>
+          
+          <button onClick={handleCreate} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white h-10 px-5 rounded-xl font-bold transition shadow-lg shadow-emerald-900/20">
+            <HiPlus /> Nueva Cotización
+          </button>
+        </div>
       </div>
 
       <div className="bg-zinc-950/60 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
@@ -124,6 +138,9 @@ const CotizacionesPage = () => {
       </div>
 
       <CotizacionModal isOpen={modalOpen} onClose={() => setModalOpen(false)} cotizacionEdit={cotizacionEdit} />
+      
+      {/* 🚀 EL MODAL PARA CONFIGURAR COMPAÑÍAS */}
+      <CompaniasSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 };

@@ -30,6 +30,7 @@ import {
   setSoloActivas,
   setOrdering,
   setModo,
+  setOficina, // 🚀 Filtro Sucursal
   setFechaVencimientoDesde,
   setFechaVencimientoHasta,
   setVencidasUltimosDias,
@@ -153,6 +154,7 @@ export default function PolizasPage() {
     cliente = "",
     patente = "",
     solo_activas = false,
+    oficina = "", // 🚀 EXTRAEMOS EL ESTADO OFICINA DEL SLICE
     ordering = "-id",
     modo = "polizas",
     // filtros vencimiento
@@ -224,6 +226,7 @@ export default function PolizasPage() {
       cliente,
       patente,
       solo_activas,
+      oficina, // 🚀 AÑADIMOS OFICINA PARA RECARGAR SI CAMBIA
       ordering,
       modo,
       fecha_vencimiento_desde,
@@ -242,6 +245,7 @@ export default function PolizasPage() {
     cliente,
     patente,
     solo_activas,
+    oficina,
     ordering,
     modo,
     fecha_vencimiento_desde,
@@ -260,6 +264,7 @@ export default function PolizasPage() {
       solo_activas,
       estado,
       estado_financiero,
+      oficina, // 🚀 TAMBIÉN ACÁ
       modo,
       fecha_vencimiento_desde,
       fecha_vencimiento_hasta,
@@ -274,6 +279,7 @@ export default function PolizasPage() {
     solo_activas,
     estado,
     estado_financiero,
+    oficina,
     modo,
     fecha_vencimiento_desde,
     fecha_vencimiento_hasta,
@@ -284,57 +290,28 @@ export default function PolizasPage() {
   const lastListKeyRef = useRef("");
   const lastKpisKeyRef = useRef("");
 
-  // ✅ NO dispares búsqueda por tipear. Solo se fetch-ea cuando cambia SEARCH aplicada.
+  // 🚀 Siempre retorna true para que recargue al inicio
   const hasAnyFilter = useMemo(() => {
-    const hasSearch = (search || "").trim().length >= 2; // mínimo 2 chars
-    const hasOther =
-      !!compania ||
-      !!cliente ||
-      !!patente ||
-      !!solo_activas ||
-      (modo === "polizas" && estado !== "todos") ||
-      (modo === "polizas" && estado_financiero !== "todos") ||
-      !!fecha_vencimiento_desde ||
-      !!fecha_vencimiento_hasta ||
-      !!vencidas_ultimos_dias ||
-      !!vencidas_mas_de_dias;
-    return hasSearch || hasOther;
-  }, [
-    search,
-    compania,
-    cliente,
-    patente,
-    solo_activas,
-    modo,
-    estado,
-    estado_financiero,
-    fecha_vencimiento_desde,
-    fecha_vencimiento_hasta,
-    vencidas_ultimos_dias,
-    vencidas_mas_de_dias,
-  ]);
+    return true; 
+  }, []);
 
   useEffect(() => {
     if (!ready || !didInitRef.current) return;
-
-    if (!hasAnyFilter) return;
 
     if (lastListKeyRef.current === listQueryKey) return;
     lastListKeyRef.current = listQueryKey;
 
-    dispatch(fetchPolizas());
-  }, [dispatch, listQueryKey, ready, hasAnyFilter]);
+    dispatch(fetchPolizas({ force: true }));
+  }, [dispatch, listQueryKey, ready]);
 
   useEffect(() => {
     if (!ready || !didInitRef.current) return;
 
-    if (!hasAnyFilter) return;
-
     if (lastKpisKeyRef.current === kpisQueryKey) return;
     lastKpisKeyRef.current = kpisQueryKey;
 
-    dispatch(fetchPolizasKpis());
-  }, [dispatch, kpisQueryKey, ready, hasAnyFilter]);
+    dispatch(fetchPolizasKpis({ force: true }));
+  }, [dispatch, kpisQueryKey, ready]);
 
   // --------- 3) Resúmenes ----------
   const resumenCuotas = useMemo(() => {
@@ -440,7 +417,7 @@ export default function PolizasPage() {
     setSearchDraft("");
     dispatch(setSearch(""));
     dispatch(fetchPolizas({ force: true }));
-    dispatch(fetchPolizasKpis());
+    dispatch(fetchPolizasKpis({ force: true }));
   }, [dispatch]);
 
   // --------- 6) Paneles laterales ----------
@@ -468,6 +445,7 @@ export default function PolizasPage() {
       cliente: cliente || "",
       patente: patente || "",
       solo_activas: solo_activas ? 1 : undefined,
+      oficina: oficina || undefined, // 🚀 ENVIAMOS TAMBIÉN EL FILTRO AL BACK
 
       estado: modo === "polizas" && estado !== "todos" ? estado : undefined,
       estado_financiero:
@@ -498,6 +476,7 @@ export default function PolizasPage() {
     cliente,
     patente,
     solo_activas,
+    oficina,
     estado,
     estado_financiero,
     modo,
@@ -595,14 +574,9 @@ export default function PolizasPage() {
         onClearVencimientoFilters={onClearVencimiento}
         onVerUltimas={handleVerUltimas}
         status={status}
+        oficinaActual={oficina} // 🚀 AGREGADO: Pasamos la oficina seleccionada
+        onOficinaChange={(val) => dispatch(setOficina(val === "ALL" ? "" : val))} // 🚀 AGREGADO: Disparamos la acción
       />
-
-      {!hasAnyFilter && (
-        <div className="mt-3 rounded-xl border border-amber-700/40 bg-amber-950/20 p-3 text-xs text-amber-100">
-          Escribí al menos <b>2 letras</b> y tocá <b>Buscar</b> (o usá filtros).{" "}
-          Si querés listar igual, tocá <b>Ver últimas</b>.
-        </div>
-      )}
 
       {error && status === "failed" && (
         <div className="mt-2 rounded-xl border border-rose-700/50 bg-rose-950/30 p-3 text-xs text-rose-100">
