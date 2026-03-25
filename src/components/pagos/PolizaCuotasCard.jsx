@@ -545,7 +545,8 @@ const CuotaRow = memo(function CuotaRow({ model, abrirDetalle, abrirPagar, onTog
               <div className="bg-rose-50/80 rounded-md px-2 py-1 border border-rose-200 flex items-center gap-1 w-fit">
                 <span className="text-[10px] uppercase tracking-wider text-rose-500 font-bold">Vence:</span>
                 <span className="text-xs font-bold text-neutral-900">{venceTxt || "—"}</span>
-                {isWebAdmin && !cuota.pagado && (
+                {/* 🚀 TEMPORAL: Quitamos isWebAdmin para que todos lo vean */}
+                {!cuota.pagado && (
                   <button type="button" onClick={() => model.abrirModalFecha(cuota)} className="ml-1 text-rose-500 hover:text-rose-700 transition cursor-pointer">
                     <HiPencil className="w-3.5 h-3.5" />
                   </button>
