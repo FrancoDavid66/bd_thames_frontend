@@ -1,213 +1,361 @@
 // src/components/cotizaciones/CompaniasSettingsModal.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { HiX, HiPlus, HiTrash, HiPencil, HiCheck } from "react-icons/hi";
+import { HiX, HiTrash, HiCog, HiArrowLeft } from "react-icons/hi";
+import { FaBuilding, FaShieldAlt } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
-
 const getAuthHeaders = () => {
   const token = localStorage.getItem("access_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-// 🚀 LISTA DE BOTONES RÁPIDOS PARA AGREGAR BENEFICIOS
 const QUICK_BENEFITS = [
   "Granizo", "Cristales", "Cerraduras", "Grúa 100km", "Grúa Ilimitada", 
-  "Robo Neumáticos", "Inundación", "Reposición 0KM"
+  "Robo Neumáticos", "Daños por Inundación", "Reposición 0KM", "Destrucción Total"
 ];
 
 const CompaniasSettingsModal = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState("companias"); 
-  const [data, setData] = useState([]);
+  const [companias, setCompanias] = useState([]);
+  const [coberturas, setCoberturas] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  const [editingId, setEditingId] = useState(null);
-  // 🚀 AÑADIMOS beneficios_default AL ESTADO INICIAL
-  const [formData, setFormData] = useState({ nombre: "", comision_default: "", beneficios_default: [] });
+
+  const [selectedCia, setSelectedCia] = useState(null);
+
+  // Estados de los Formularios
+  const [ciaForm, setCiaForm] = useState({ nombre: "", comision_default: "", antiguedad_maxima: 25 });
+  const [cobForm, setCobForm] = useState({ nombre: "", beneficios_default: [] });
+  const [tagInput, setTagInput] = useState("");
+
+  const currentYear = new Date().getFullYear(); // 🚀 Obtenemos el año actual para la calculadora
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchData();
+      setSelectedCia(null);
+      setCiaForm({ nombre: "", comision_default: "", antiguedad_maxima: 25 });
+    }
+  }, [isOpen]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === "companias" ? "companias" : "coberturas";
-      const res = await axios.get(`${BASE_URL}cotizaciones/${endpoint}/`, { headers: getAuthHeaders() });
-      setData(res.data.results || res.data);
+      const [resCia, resCob] = await Promise.all([
+        axios.get(`${BASE_URL}cotizaciones/companias/`, { headers: getAuthHeaders() }),
+        axios.get(`${BASE_URL}cotizaciones/coberturas/`, { headers: getAuthHeaders() })
+      ]);
+      setCompanias(resCia.data.results || resCia.data);
+      setCoberturas(resCob.data.results || resCob.data);
     } catch (error) {
-      toast.error("Error al cargar datos.");
+      toast.error("Error al cargar configuraciones");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchData();
-      setEditingId(null);
-      setFormData({ nombre: "", comision_default: "", beneficios_default: [] });
-    }
-  }, [isOpen, activeTab]);
-
-  const handleSubmit = async (e) => {
+  // --- CRUD COMPAÑÍAS ---
+  const handleCreateCia = async (e) => {
     e.preventDefault();
-    if (!formData.nombre) return toast.error("El nombre es obligatorio");
-
-    const endpoint = activeTab === "companias" ? "companias" : "coberturas";
-    
-    // 🚀 SI ES COBERTURA, MANDAMOS LA LISTA DE BURBUJAS AL BACKEND
-    const payload = activeTab === "companias" 
-        ? { nombre: formData.nombre, comision_default: formData.comision_default || 0 } 
-        : { nombre: formData.nombre, beneficios_default: formData.beneficios_default };
-
+    if (!ciaForm.nombre) return toast.error("El nombre es obligatorio");
     try {
-      if (editingId) {
-        await axios.put(`${BASE_URL}cotizaciones/${endpoint}/${editingId}/`, payload, { headers: getAuthHeaders() });
-        toast.success("Registro actualizado.");
-      } else {
-        await axios.post(`${BASE_URL}cotizaciones/${endpoint}/`, payload, { headers: getAuthHeaders() });
-        toast.success("Registro agregado.");
-      }
-      setFormData({ nombre: "", comision_default: "", beneficios_default: [] });
-      setEditingId(null);
+      await axios.post(`${BASE_URL}cotizaciones/companias/`, {
+        nombre: ciaForm.nombre,
+        comision_default: 0,
+        antiguedad_maxima: 25 
+      }, { headers: getAuthHeaders() });
+      toast.success("Compañía creada");
+      setCiaForm({ nombre: "", comision_default: "", antiguedad_maxima: 25 });
       fetchData();
     } catch (error) {
-      toast.error("Hubo un error al guardar.");
+      toast.error("Error al crear compañía");
     }
   };
 
-  const handleEdit = (item) => {
-    setEditingId(item.id);
-    setFormData({ 
-      nombre: item.nombre, 
-      comision_default: item.comision_default || "",
-      beneficios_default: item.beneficios_default || [] // 🚀 AL EDITAR, CARGAMOS LAS BURBUJAS EXISTENTES
+  const handleUpdateCia = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.put(`${BASE_URL}cotizaciones/companias/${selectedCia.id}/`, {
+        ...ciaForm,
+        comision_default: Number(ciaForm.comision_default) || 0,
+        antiguedad_maxima: Number(ciaForm.antiguedad_maxima) || 25
+      }, { headers: getAuthHeaders() });
+      toast.success("Datos actualizados");
+      
+      const updatedCia = { ...selectedCia, ...ciaForm };
+      setSelectedCia(updatedCia);
+      
+      fetchData();
+    } catch (error) {
+      toast.error("Error al actualizar compañía");
+    }
+  };
+
+  const handleDeleteCia = async (id) => {
+    if (!window.confirm("¿Seguro que querés eliminar/desactivar esta compañía?")) return;
+    try {
+      await axios.delete(`${BASE_URL}cotizaciones/companias/${id}/`, { headers: getAuthHeaders() });
+      toast.success("Compañía eliminada");
+      if (selectedCia?.id === id) setSelectedCia(null);
+      fetchData();
+    } catch (error) {
+      toast.error("Error al eliminar. Probablemente tenga cotizaciones asociadas.");
+    }
+  };
+
+  // --- NAVEGACIÓN ---
+  const openCiaSettings = (cia) => {
+    setSelectedCia(cia);
+    setCiaForm({ 
+      nombre: cia.nombre, 
+      comision_default: cia.comision_default, 
+      antiguedad_maxima: cia.antiguedad_maxima 
     });
+    setCobForm({ nombre: "", beneficios_default: [] });
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("¿Seguro que querés borrar este registro?")) return;
-    const endpoint = activeTab === "companias" ? "companias" : "coberturas";
-    try {
-      await axios.delete(`${BASE_URL}cotizaciones/${endpoint}/${id}/`, { headers: getAuthHeaders() });
-      toast.success("Eliminado correctamente.");
-      fetchData();
-    } catch (error) {
-      toast.error("No se puede borrar porque ya está en uso en alguna cotización.");
-    }
+  const closeCiaSettings = () => {
+    setSelectedCia(null);
+    setCiaForm({ nombre: "", comision_default: "", antiguedad_maxima: 25 });
   };
 
-  // 🚀 MANEJO DE BURBUJAS PARA EL FORMULARIO DE COBERTURAS
+  // --- CRUD COBERTURAS ---
   const handleAddTag = (tag) => {
-    if (!formData.beneficios_default.includes(tag)) {
-      setFormData({ ...formData, beneficios_default: [...formData.beneficios_default, tag] });
+    const t = tag.trim();
+    if (t && !cobForm.beneficios_default.includes(t)) {
+      setCobForm({ ...cobForm, beneficios_default: [...cobForm.beneficios_default, t] });
     }
+    setTagInput("");
   };
 
   const handleRemoveTag = (tagToRemove) => {
-    setFormData({ ...formData, beneficios_default: formData.beneficios_default.filter(t => t !== tagToRemove) });
+    setCobForm({
+      ...cobForm,
+      beneficios_default: cobForm.beneficios_default.filter(t => t !== tagToRemove)
+    });
+  };
+
+  const handleCreateCob = async (e) => {
+    e.preventDefault();
+    if (!cobForm.nombre) return toast.error("El nombre de la cobertura es obligatorio");
+    try {
+      await axios.post(`${BASE_URL}cotizaciones/coberturas/`, {
+        ...cobForm,
+        compania: selectedCia.id
+      }, { headers: getAuthHeaders() });
+      toast.success("Cobertura creada");
+      setCobForm({ nombre: "", beneficios_default: [] });
+      fetchData();
+    } catch (error) {
+      toast.error("Error al crear cobertura");
+    }
+  };
+
+  const handleDeleteCob = async (id) => {
+    if (!window.confirm("¿Seguro que querés eliminar esta cobertura?")) return;
+    try {
+      await axios.delete(`${BASE_URL}cotizaciones/coberturas/${id}/`, { headers: getAuthHeaders() });
+      toast.success("Cobertura eliminada");
+      fetchData();
+    } catch (error) {
+      toast.error("Error al eliminar. Probablemente tenga cotizaciones asociadas.");
+    }
   };
 
   if (!isOpen) return null;
 
+  const coberturasDeCia = selectedCia 
+    ? coberturas.filter(c => String(c.compania) === String(selectedCia.id)) 
+    : [];
+
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-        <div className="flex justify-between items-center p-5 border-b border-zinc-800 bg-zinc-900/50">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">⚙️ Configuración Global</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white bg-zinc-800 rounded-full p-1.5 transition"><HiX size={20} /></button>
-        </div>
-
-        <div className="flex border-b border-zinc-800">
-          <button onClick={() => setActiveTab("companias")} className={`flex-1 py-3 text-sm font-bold transition ${activeTab === "companias" ? "text-sky-400 border-b-2 border-sky-400 bg-zinc-900/50" : "text-zinc-500 hover:text-zinc-300"}`}>🏢 Compañías</button>
-          <button onClick={() => setActiveTab("coberturas")} className={`flex-1 py-3 text-sm font-bold transition ${activeTab === "coberturas" ? "text-sky-400 border-b-2 border-sky-400 bg-zinc-900/50" : "text-zinc-500 hover:text-zinc-300"}`}>🛡️ Coberturas</button>
-        </div>
-
-        <div className="p-5 overflow-y-auto flex-1">
-          <form onSubmit={handleSubmit} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl mb-6">
-            <h3 className="text-xs font-bold text-sky-400 uppercase tracking-wider mb-3">{editingId ? "Editar Registro" : "Agregar Nuevo"}</h3>
-            <div className="flex flex-col sm:flex-row gap-3 items-end mb-3">
-              <div className="flex-1 w-full">
-                <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-semibold">Nombre</label>
-                <input required type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none" />
-              </div>
-              {activeTab === "companias" && (
-                <div className="w-full sm:w-24">
-                  <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-semibold">Comisión (%)</label>
-                  <input required type="number" step="0.01" value={formData.comision_default} onChange={e => setFormData({...formData, comision_default: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none" />
-                </div>
-              )}
-              <button type="submit" className="w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-bold bg-sky-600 hover:bg-sky-500 text-white transition flex items-center justify-center gap-1">
-                {editingId ? <HiCheck size={16} /> : <HiPlus size={16} />} {editingId ? "Guardar" : "Agregar"}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+        
+        {/* HEADER DINÁMICO */}
+        <div className="flex justify-between items-center p-5 border-b border-zinc-800 bg-zinc-900/40 rounded-t-3xl">
+          <div className="flex items-center gap-3">
+            {selectedCia && (
+              <button onClick={closeCiaSettings} className="text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 p-2 rounded-xl transition-colors">
+                <HiArrowLeft size={20} />
               </button>
+            )}
+            <div>
+              <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                {selectedCia ? `⚙️ Configurando: ${selectedCia.nombre}` : "⚙️ Configurador de Seguros"}
+              </h2>
+              <p className="text-zinc-500 text-xs mt-1">
+                {selectedCia ? "Ajustá comisiones, límites y coberturas de esta aseguradora." : "Administrá tus aseguradoras y reglas de negocio."}
+              </p>
             </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white bg-zinc-900 hover:bg-rose-600 rounded-full p-2 transition-colors">
+            <HiX size={20} />
+          </button>
+        </div>
 
-            {/* 🚀 ESTA ES LA SECCIÓN NUEVA: BURBUJAS SOLO PARA COBERTURAS */}
-            {activeTab === "coberturas" && (
-              <div className="pt-3 border-t border-zinc-800">
-                <label className="block text-[10px] text-zinc-400 mb-2 uppercase font-semibold">Beneficios por defecto (Se auto-completarán en la cotización)</label>
-                
-                {/* DIBUJAMOS LAS BURBUJAS YA CARGADAS */}
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.beneficios_default.map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1 bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-1 rounded-lg text-xs font-semibold">
-                      {tag} <button type="button" onClick={() => handleRemoveTag(tag)} className="hover:text-rose-400 ml-1 transition"><HiX size={12} /></button>
-                    </span>
-                  ))}
-                </div>
+        {/* BODY */}
+        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+          {loading ? (
+            <div className="flex justify-center py-10 text-zinc-500">Cargando datos...</div>
+          ) : !selectedCia ? (
+            /* =========================================
+               VISTA 1: LISTADO DE COMPAÑÍAS
+               ========================================= */
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+              
+              {/* FORMULARIO SIMPLIFICADO */}
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
+                <h3 className="text-sm font-black text-sky-400 mb-4 uppercase tracking-widest">Crear Nueva Compañía</h3>
+                <form onSubmit={handleCreateCia} className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-bold tracking-widest">Nombre de la Aseguradora *</label>
+                    <input type="text" required value={ciaForm.nombre} onChange={e => setCiaForm({...ciaForm, nombre: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none transition-colors" placeholder="Ej: Equidad Seguros" />
+                  </div>
+                  <div className="shrink-0 w-full sm:w-auto">
+                    <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-black uppercase tracking-widest px-8 py-3 rounded-xl transition-all shadow-lg shadow-sky-600/20">Guardar Compañía</button>
+                  </div>
+                </form>
+              </div>
 
-                {/* INPUT PARA AGREGAR BURBUJAS A MANO CON ENTER */}
-                <input 
-                  type="text" 
-                  placeholder="Escribí un beneficio y presioná Enter..." 
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (e.target.value.trim()) { handleAddTag(e.target.value.trim()); e.target.value = ''; }
-                    }
-                  }}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-sky-500" 
-                />
-
-                {/* BOTONCITOS RÁPIDOS */}
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {QUICK_BENEFITS.map(b => (
-                    <button key={b} type="button" onClick={() => handleAddTag(b)} className="text-[10px] font-bold uppercase tracking-wider bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-2 py-1 rounded-md transition">
-                      + {b}
-                    </button>
-                  ))}
+              <div>
+                <h3 className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-widest">Compañías Cargadas ({companias.length})</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {companias.map(cia => {
+                    const limiteAnio = currentYear - (cia.antiguedad_maxima || 25);
+                    return (
+                      <div key={cia.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col relative group hover:border-zinc-700 transition-colors">
+                        <div className="absolute top-3 right-3 flex gap-2">
+                          <button onClick={() => openCiaSettings(cia)} className="text-zinc-500 hover:text-sky-400 bg-zinc-950 hover:bg-sky-500/10 p-1.5 rounded-lg transition" title="Configurar coberturas y límites">
+                            <HiCog size={18}/>
+                          </button>
+                          <button onClick={() => handleDeleteCia(cia.id)} className="text-zinc-500 hover:text-rose-500 bg-zinc-950 hover:bg-rose-500/10 p-1.5 rounded-lg transition" title="Eliminar">
+                            <HiTrash size={18}/>
+                          </button>
+                        </div>
+                        
+                        <FaBuilding className="text-sky-500 text-2xl mb-2" />
+                        <h4 className="text-white font-black text-lg leading-tight pr-16">{cia.nombre}</h4>
+                        
+                        <div className="mt-4 pt-3 border-t border-zinc-800 flex flex-wrap gap-2 text-xs">
+                          <span className="bg-sky-500/10 text-sky-400 px-2 py-1 rounded-md font-bold">Comis: {cia.comision_default}%</span>
+                          {/* 🚀 ACÁ LE AGREGUÉ EL CÁLCULO A LA TARJETA */}
+                          <span className="bg-amber-500/10 text-amber-500 px-2 py-1 rounded-md font-bold">Desde el {limiteAnio}</span>
+                          <span className="bg-zinc-950 text-zinc-400 border border-zinc-800 px-2 py-1 rounded-md font-bold w-full mt-1 text-center cursor-pointer hover:bg-sky-500/10 hover:text-sky-400 transition" onClick={() => openCiaSettings(cia)}>
+                            ⚙️ Configurar ➔
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
-            )}
-            
-            {editingId && (
-              <button type="button" onClick={() => { setEditingId(null); setFormData({nombre: "", comision_default: "", beneficios_default: []}); }} className="mt-3 text-xs text-zinc-500 underline">
-                Cancelar edición
-              </button>
-            )}
-          </form>
 
-          {loading ? ( <p className="text-center py-4 text-zinc-500 animate-pulse">Cargando...</p> ) : (
-            <ul className="space-y-2">
-              {data.map(item => (
-                <li key={item.id} className="flex flex-col bg-zinc-950 border border-zinc-800/80 p-3 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-zinc-200">{item.nombre}</span>
-                    <div className="flex items-center gap-3">
-                      {activeTab === "companias" && <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black text-xs">{item.comision_default}%</span>}
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleEdit(item)} className="p-1.5 text-zinc-500 hover:text-sky-400 bg-zinc-900 rounded-md transition"><HiPencil size={14}/></button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-zinc-500 hover:text-rose-400 bg-zinc-900 rounded-md transition"><HiTrash size={14}/></button>
-                      </div>
-                    </div>
+            </div>
+          ) : (
+            /* =========================================
+               VISTA 2: CONFIGURACIÓN DE UNA COMPAÑÍA
+               ========================================= */
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+              
+              {/* EDITAR DATOS DE LA COMPAÑÍA */}
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
+                <h3 className="text-sm font-black text-sky-400 mb-4 uppercase tracking-widest flex items-center gap-2"><FaBuilding/> Ajustes Generales</h3>
+                <form onSubmit={handleUpdateCia} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-start">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-bold tracking-widest">Nombre</label>
+                    <input type="text" required value={ciaForm.nombre} onChange={e => setCiaForm({...ciaForm, nombre: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none" />
                   </div>
-                  {/* 🚀 MUESTRA UN RESUMEN DE LOS TAGS EN LA LISTA DE ABAJO */}
-                  {activeTab === "coberturas" && item.beneficios_default?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {item.beneficios_default.map(b => <span key={b} className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">{b}</span>)}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  <div>
+                    <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-bold tracking-widest">Comis. Blanca (%)</label>
+                    <input type="number" value={ciaForm.comision_default} onChange={e => setCiaForm({...ciaForm, comision_default: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-bold tracking-widest">Antigüedad Max.</label>
+                    <input type="number" value={ciaForm.antiguedad_maxima} onChange={e => setCiaForm({...ciaForm, antiguedad_maxima: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none" />
+                    {/* 🚀 ACÁ ESTÁ LA CALCULADORA EN EL MODO EDICIÓN */}
+                    {ciaForm.antiguedad_maxima && (
+                      <p className="text-[10px] text-amber-500 font-bold mt-1.5 flex items-center gap-1">
+                        ↳ Cubre desde el año {currentYear - Number(ciaForm.antiguedad_maxima)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-4 flex justify-end mt-2 border-t border-zinc-800 pt-3">
+                    <button type="submit" className="bg-zinc-800 hover:bg-sky-600 text-white text-xs font-black uppercase tracking-widest px-6 py-2 rounded-xl transition-all">Actualizar Datos</button>
+                  </div>
+                </form>
+              </div>
+
+              {/* CREAR NUEVA COBERTURA PARA ESTA COMPAÑÍA */}
+              <div className="bg-emerald-900/10 border border-emerald-900/30 rounded-2xl p-5">
+                <h3 className="text-sm font-black text-emerald-400 mb-4 uppercase tracking-widest flex items-center gap-2"><FaShieldAlt/> Agregar Cobertura</h3>
+                <form onSubmit={handleCreateCob} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] text-zinc-400 mb-1 uppercase font-bold tracking-widest">Nombre de Cobertura *</label>
+                    <input type="text" required value={cobForm.nombre} onChange={e => setCobForm({...cobForm, nombre: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none" placeholder="Ej: Terceros Completo Premium" />
+                  </div>
+
+                  {/* BURBUJAS DE BENEFICIOS */}
+                  <div className="pt-2">
+                     <label className="block text-[10px] text-zinc-400 mb-2 uppercase font-bold tracking-widest">Beneficios / Cosas que cubre</label>
+                     
+                     <div className="flex flex-col sm:flex-row gap-3 mb-3">
+                        <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Tipeá un beneficio y presioná Enter..." onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); }}} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-emerald-500" />
+                        <button type="button" onClick={() => handleAddTag(tagInput)} className="bg-zinc-800 text-zinc-300 hover:bg-zinc-700 px-4 py-2 rounded-xl text-xs font-bold uppercase transition">Agregar</button>
+                     </div>
+
+                     <div className="flex flex-wrap gap-1.5 mb-4">
+                       <span className="text-[10px] text-zinc-500 font-semibold mr-2 mt-1">Sugerencias:</span>
+                       {QUICK_BENEFITS.map(b => (
+                         <button key={b} type="button" onClick={() => handleAddTag(b)} className="text-[9px] font-black uppercase tracking-wider bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-2.5 py-1 rounded-md transition">+ {b}</button>
+                       ))}
+                     </div>
+
+                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 min-h-[60px] flex flex-wrap gap-2 items-start">
+                       {cobForm.beneficios_default.length === 0 && <span className="text-xs text-zinc-600 italic mt-1">Aún no hay beneficios agregados...</span>}
+                       {cobForm.beneficios_default.map(tag => (
+                         <span key={tag} className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg text-xs font-bold">
+                           {tag}
+                           <button type="button" onClick={() => handleRemoveTag(tag)} className="hover:text-rose-400 hover:bg-rose-500/20 rounded-full p-0.5 transition"><HiX size={14} /></button>
+                         </span>
+                       ))}
+                     </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest px-6 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-600/20">Guardar Cobertura</button>
+                  </div>
+                </form>
+              </div>
+
+              {/* LISTA DE COBERTURAS DE ESTA COMPAÑÍA */}
+              <div>
+                <h3 className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-widest border-b border-zinc-800 pb-2">Coberturas de {selectedCia.nombre} ({coberturasDeCia.length})</h3>
+                {coberturasDeCia.length === 0 ? (
+                  <p className="text-zinc-500 text-sm italic">Esta compañía aún no tiene coberturas configuradas.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {coberturasDeCia.map(cob => (
+                      <div key={cob.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col relative">
+                        <button onClick={() => handleDeleteCob(cob.id)} className="absolute top-3 right-3 text-zinc-500 hover:text-rose-500 bg-zinc-950 hover:bg-rose-500/10 p-1.5 rounded-lg transition"><HiTrash size={16}/></button>
+                        <h4 className="text-emerald-400 font-black text-lg pr-8 mb-3">{cob.nombre}</h4>
+                        
+                        <div className="flex flex-wrap gap-1.5 mt-auto pt-2 border-t border-zinc-800">
+                          {cob.beneficios_default.length > 0 ? (
+                            cob.beneficios_default.map((b, i) => (
+                              <span key={i} className="text-[9px] font-bold bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded uppercase tracking-wider">{b}</span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-zinc-600 italic">Sin beneficios cargados.</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
           )}
         </div>
       </div>

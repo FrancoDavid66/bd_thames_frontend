@@ -295,9 +295,6 @@ export const fetchPolizas = createAsyncThunk(
 
       const state = getState();
       
-      // 🚀 ELIMINADO EL CORTE ANTICIPADO: Antes Redux bloqueaba la llamada si no había filtros.
-      // Ahora dejamos que pase libremente para que nos traiga las últimas pólizas al iniciar.
-
       const useCursor = shouldUseCursor(state);
       const params = buildPolizasParams(state, {
         includePaging: !useCursor,
@@ -414,7 +411,6 @@ export const updatePoliza = createAsyncThunk(
   "polizas/updatePoliza",
   async (payload, { rejectWithValue, signal }) => {
     try {
-      // 🚀 Soporta envío de 'oficina' para el Admin
       const res = await api.patch(`polizas/${payload.id}/`, payload, { signal });
       return res.data;
     } catch (err) {
@@ -480,6 +476,35 @@ export const enviarMensajesEstadoCuotas = createAsyncThunk(
         return rejectWithValue({ __canceled: true });
       }
       return rejectWithValue(err.response?.data || "Error al enviar/diagnosticar mensajes");
+    }
+  }
+);
+
+// 🚀 NUEVA ACCIÓN PARA DESCARGAR LA PLANILLA DE AUDITORÍA (Serializable)
+export const exportarPolizas = createAsyncThunk(
+  "polizas/exportar",
+  async ({ formato } = {}, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const params = buildPolizasParams(state, {
+        includePaging: false, 
+        includeOrdering: true,
+        includeCursor: false,
+      });
+
+      params.formato = formato || "pdf";
+
+      const res = await api.get("polizas/asegurados-export/", {
+        params,
+        responseType: "blob",
+      });
+
+      const fileUrl = window.URL.createObjectURL(new Blob([res.data]));
+      
+      // Devolvemos la URL y el formato para guardarlo con la extensión correcta
+      return { fileUrl, formato: params.formato }; 
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Error al exportar pólizas");
     }
   }
 );

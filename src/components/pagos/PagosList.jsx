@@ -1047,7 +1047,8 @@ const CuotaRow = memo(
                 <span className={`text-sm font-black ${state === 'overdue' ? 'text-rose-400' : state === 'paid' ? 'text-emerald-300' : 'text-white'}`}>
                   {venceTxt || "—"}
                 </span>
-                {isWebAdmin && !cuota?.pagado && (
+                {/* 🚀 TEMPORAL: Quitamos isWebAdmin para que todos lo vean */}
+                {!cuota?.pagado && (
                   <button
                     type="button"
                     onClick={() => abrirModalFecha(cuota)}
@@ -1225,9 +1226,9 @@ const CuotaRow = memo(
 
 function InfoRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 shadow-sm">
-      <span className="text-slate-400 text-[11px] sm:text-sm font-medium">{label}</span>
-      <span className="text-white truncate max-w-[65%] text-right font-bold text-[11px] sm:text-sm">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm">
+      <span className="text-slate-400 text-xs sm:text-sm font-medium">{label}</span>
+      <span className="text-white truncate max-w-[65%] text-right font-bold text-xs sm:text-sm">
         {value}
       </span>
     </div>
