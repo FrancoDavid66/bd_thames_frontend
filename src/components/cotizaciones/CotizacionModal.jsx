@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import axios from "axios";
 import { createCotizacion, updateCotizacion } from "../../store/slices/cotizacionesSlice";
-import { HiX, HiPlus, HiTrash, HiStar, HiChevronRight, HiChevronLeft, HiCheckCircle, HiDocumentDownload, HiPrinter, HiPhotograph, HiTag } from "react-icons/hi";
+import { HiX, HiPlus, HiTrash, HiStar, HiChevronRight, HiChevronLeft, HiCheckCircle, HiDocumentDownload, HiPrinter, HiPhotograph } from "react-icons/hi";
 import { FaUserAlt, FaCar, FaCalculator, FaBuilding } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import { toPng } from 'html-to-image';
@@ -95,12 +95,11 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
   const [companiasBackend, setCompaniasBackend] = useState([]);
   const [coberturasBackend, setCoberturasBackend] = useState([]);
 
+  // 🚀 AÑADIMOS imagen_auto AL ESTADO
   const [formData, setFormData] = useState({
     cliente_nombre: "", telefono: "", marca_auto: "", modelo_auto: "",
     anio_auto: new Date().getFullYear(), tiene_gnc: false, estado: "PENDIENTE",
-    imagen_auto: null,
-    incluir_oferta: false, // 🚀 NUEVO
-    texto_oferta: "¡15% DE DESCUENTO EN LA PRIMERA CUOTA POR ADHESIÓN AL DÉBITO!" // 🚀 VALOR POR DEFECTO
+    imagen_auto: null // 🚀 ACÁ GUARDAMOS EL BASE64
   });
 
   const [opciones, setOpciones] = useState([]);
@@ -130,9 +129,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         cliente_nombre: cotizacionEdit.cliente_nombre, telefono: cotizacionEdit.telefono || "",
         marca_auto: cotizacionEdit.marca_auto, modelo_auto: cotizacionEdit.modelo_auto,
         anio_auto: cotizacionEdit.anio_auto, tiene_gnc: cotizacionEdit.tiene_gnc, estado: cotizacionEdit.estado,
-        imagen_auto: cotizacionEdit.imagen_auto || null,
-        incluir_oferta: cotizacionEdit.incluir_oferta || false,
-        texto_oferta: cotizacionEdit.texto_oferta || "¡15% DE DESCUENTO EN LA PRIMERA CUOTA POR ADHESIÓN AL DÉBITO!"
+        imagen_auto: cotizacionEdit.imagen_auto || null // 🚀 SI VIENE DEL BACKEND, LA CARGAMOS
       });
       const opsAcomodadas = (cotizacionEdit.opciones || []).map(op => ({
         ...op, 
@@ -154,7 +151,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
     setFormData({
       cliente_nombre: "", telefono: "", marca_auto: "", modelo_auto: "", 
       anio_auto: new Date().getFullYear(), tiene_gnc: false, estado: "PENDIENTE",
-      imagen_auto: null, incluir_oferta: false, texto_oferta: "¡15% DE DESCUENTO EN LA PRIMERA CUOTA POR ADHESIÓN AL DÉBITO!"
+      imagen_auto: null
     });
     setOpciones([]);
   };
@@ -219,10 +216,11 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
     }
   };
 
+  // 🚀 MANEJADOR PARA CARGAR LA IMAGEN Y CONVERTIRLA A BASE64
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { 
+      if (file.size > 2 * 1024 * 1024) { // Limite de 2MB para no trabar todo
         toast.error("La imagen es muy pesada. Elegí una que pese menos de 2MB.");
         return;
       }
@@ -550,6 +548,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                                 <input type="number" value={formData.anio_auto} onChange={e => setFormData({...formData, anio_auto: e.target.value})} className="w-full bg-zinc-900/50 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none transition-all font-mono text-lg" />
                               </motion.div>
 
+                              {/* 🚀 BOTÓN PARA SUBIR LA FOTO DEL AUTO */}
                               <motion.div variants={listItemVariants} className="col-span-full mt-2">
                                 <label className="block text-[11px] text-zinc-400 mb-1.5 uppercase font-bold tracking-widest">Foto del Vehículo (Opcional)</label>
                                 <div className="relative flex items-center justify-center w-full h-32 bg-zinc-900/30 border-2 border-dashed border-zinc-700 hover:border-indigo-500 hover:bg-zinc-900/50 transition-colors rounded-2xl cursor-pointer overflow-hidden">
@@ -583,30 +582,6 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
 
                   {step === 3 && (
                       <div className="space-y-6">
-                          {/* 🚀 NUEVA SECCIÓN DE OFERTA ESPECIAL */}
-                          <div className="bg-emerald-900/10 border border-emerald-500/30 rounded-2xl p-5 max-w-4xl mx-auto shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                <HiTag className="text-emerald-400" size={24}/>
-                                <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">¿Querés incluir una Oferta Especial?</h3>
-                              </div>
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={formData.incluir_oferta} onChange={e => setFormData({...formData, incluir_oferta: e.target.checked})} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                              </label>
-                            </div>
-                            
-                            <AnimatePresence>
-                              {formData.incluir_oferta && (
-                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                                  <label className="block text-[10px] text-zinc-400 mb-1.5 uppercase font-bold tracking-widest">Texto de la Oferta / Gancho de Venta</label>
-                                  <textarea value={formData.texto_oferta} onChange={e => setFormData({...formData, texto_oferta: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all text-sm font-bold h-20" placeholder="Ej: ¡10% de descuento abonando con CBU!" />
-                                  <p className="text-[10px] text-emerald-500/70 mt-2 italic font-medium">* Este mensaje aparecerá resaltado en el PDF antes del cierre.</p>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-
                           <div>
                             <h4 className="text-[11px] text-zinc-400 mb-3 uppercase font-bold tracking-widest text-center">Seleccioná las compañías base para comparar</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto">
@@ -646,10 +621,10 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                                 const recargoPct = parseToNumber(opcion.objetivo_ganancia || "0");
                                 
                                 const recargoPlata = (costo * recargoPct) / 100;
-                                const precioFinal = redondearPrecio(costo + recargoPlata);
+                                const precioClienteCalculado = opcion.precio_cliente ? Number(opcion.precio_cliente) : redondearPrecio(costo + recargoPlata);
                                 
                                 const gananciaComision = (costo * comisionPct) / 100;
-                                const gananciaExtraRedondeada = precioFinal - costo;
+                                const gananciaExtraRedondeada = precioClienteCalculado - costo;
                                 const gananciaTotalBroker = gananciaComision + gananciaExtraRedondeada;
 
                                 const coberturasFiltradas = coberturasBackend.filter(cob => String(cob.compania) === String(opcion.compania_id));
@@ -759,13 +734,13 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                                         <motion.div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-lg p-2.5 flex flex-col justify-center items-end flex-1 shadow-inner relative" layout>
                                           <span className="text-[9px] text-emerald-500 uppercase font-black tracking-widest">Precio Final</span>
                                           <motion.span 
-                                            key={redondearPrecio(parseToNumber(opcion.costo_compania) + (parseToNumber(opcion.costo_compania) * parseToNumber(opcion.objetivo_ganancia || "0") / 100))} 
+                                            key={precioClienteCalculado} 
                                             initial={{ scale: 1.1, color: "#a7f3d0" }} 
                                             animate={{ scale: 1, color: "#34d399" }} 
                                             transition={{ type: "spring", stiffness: 300, damping: 20 }}
                                             className="text-2xl font-black leading-none drop-shadow-sm"
                                           >
-                                            ${redondearPrecio(parseToNumber(opcion.costo_compania) + (parseToNumber(opcion.costo_compania) * parseToNumber(opcion.objetivo_ganancia || "0") / 100)).toLocaleString("es-AR")}
+                                            ${precioClienteCalculado.toLocaleString("es-AR")}
                                           </motion.span>
                                           
                                           {gananciaTotalBroker > 0 && (
