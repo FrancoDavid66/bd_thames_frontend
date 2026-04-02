@@ -32,7 +32,7 @@ const CotizacionPDFTemplate = ({
   const getBadgeInfo = (op, index, total) => {
       if (op.es_recomendada) {
           return { 
-              label: "★ NUESTRA RECOMENDACIÓN (EQUILIBRADA)", 
+              label: "★ NUESTRA RECOMENDACIÓN ", 
               bg: "bg-amber-500",
               text: "text-amber-700",
               border: "border-amber-400 shadow-md", 
