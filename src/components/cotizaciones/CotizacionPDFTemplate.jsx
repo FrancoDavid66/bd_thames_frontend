@@ -1,7 +1,7 @@
 // src/components/cotizaciones/CotizacionPDFTemplate.jsx
 import React from "react";
-import { FaCar, FaPhoneAlt } from "react-icons/fa"; 
-import { HiCheckCircle, HiTag } from "react-icons/hi";
+import { FaCar, FaPhoneAlt } from "react-icons/fa"; // Sacamos FaEnvelope
+import { HiCheckCircle } from "react-icons/hi";
 import logoThames from "../../assets/logos/logo_thames_horizontal.png";
 
 const parseToNumber = (val) => {
@@ -20,6 +20,7 @@ const CotizacionPDFTemplate = ({
 
   const opcionesCalculadas = [...opciones].map(op => {
       const costo = parseToNumber(op.costo_compania);
+      const pct = Number(op.porcentaje_comision) || 0;
       const objetivo = parseToNumber(op.objetivo_ganancia || objetivoGanancia || "35");
       const precioFinal = op.precio_cliente ? Number(op.precio_cliente) : costo + Math.max(0, (costo * objetivo) / 100);
       const sumaAseguradaNum = parseToNumber(op.suma_asegurada);
@@ -70,19 +71,9 @@ const CotizacionPDFTemplate = ({
     >
         <div className="h-4 w-full bg-red-600 absolute top-0 left-0 z-20"></div>
 
-        <div className="relative px-10 pt-12 pb-20 rounded-b-[40px] shadow-lg z-10 shrink-0 overflow-hidden bg-zinc-900">
-            {formData.imagen_auto && (
-                <>
-                    <img 
-                      src={formData.imagen_auto} 
-                      alt="Fondo Vehículo" 
-                      className="absolute inset-0 w-full h-full object-cover z-0" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-900/90 via-zinc-900/80 to-zinc-900/90 z-0"></div>
-                </>
-            )}
-
-            <div className="flex justify-between items-start relative z-10">
+        {/* 🚀 HEADER NEGRO RESTAURADO */}
+        <div className="px-10 pt-12 pb-24 rounded-b-[40px] shadow-lg relative z-10 shrink-0 bg-zinc-900">
+            <div className="flex justify-between items-start">
                 <div className="flex items-center">
                     <img src={logoThames} alt="Thames Seguros" className="h-16 object-contain" />
                 </div>
@@ -95,12 +86,14 @@ const CotizacionPDFTemplate = ({
                 </div>
             </div>
 
+            {/* 🚀 NUEVA DISTRIBUCIÓN: TEXTO A LA IZQUIERDA, FOTO EN CAJA A LA DERECHA */}
             <div className="mt-8 flex justify-between items-center gap-6 relative z-10">
                 <div className="flex-1">
-                    <p className="text-red-500 text-xs font-black uppercase tracking-widest mb-1 drop-shadow-md">Propuesta de Seguro Exclusiva Para:</p>
-                    <h2 className="text-5xl font-black text-white uppercase leading-tight drop-shadow-lg">{formData.cliente_nombre}</h2>
+                    <p className="text-red-500 text-xs font-black uppercase tracking-widest mb-1">Propuesta de Seguro Exclusiva Para:</p>
+                    <h2 className="text-5xl font-black text-white uppercase leading-tight">{formData.cliente_nombre}</h2>
                 </div>
                 
+                {/* BOX PARA LA IMAGEN DEL AUTO */}
                 {formData.imagen_auto && (
                     <div className="w-56 h-36 shrink-0 rounded-2xl border-4 border-zinc-800 overflow-hidden shadow-2xl bg-zinc-950 flex items-center justify-center">
                         <img 
@@ -112,6 +105,7 @@ const CotizacionPDFTemplate = ({
                 )}
             </div>
 
+            {/* TARJETAS FLOTANTES ROJA Y NEGRA */}
             <div className="flex gap-4 absolute -bottom-16 left-10 right-10 z-20">
                 <div className="flex-1 bg-red-600 rounded-2xl p-5 shadow-2xl border-4 border-zinc-900 flex flex-col justify-center">
                     <p className="text-red-200 text-[10px] font-black uppercase tracking-widest mb-1">Contacto del Titular</p>
@@ -197,21 +191,6 @@ const CotizacionPDFTemplate = ({
             </div>
             </div>
 
-            {/* 🚀 BLOQUE DE OFERTA ESPECIAL CONDICIONAL */}
-            {formData.incluir_oferta && formData.texto_oferta && (
-                <div className="mb-6 mx-auto w-full">
-                    <div className="bg-emerald-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-lg border-2 border-emerald-400">
-                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                            <HiTag size={28}/>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5">Beneficio Exclusivo del Mes</p>
-                            <p className="text-lg font-black leading-tight italic uppercase">{formData.texto_oferta}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {(() => {
             if (!opRecomendada) return null;
             const compNameRec = companiasBackend.find(c => String(c.id) === String(opRecomendada.compania_id))?.nombre || "Compañía";
@@ -258,6 +237,7 @@ const CotizacionPDFTemplate = ({
                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-3 mt-2">Tu Productor Asesor</p>
                 <div className="flex flex-col gap-1.5 text-xs font-bold text-zinc-600">
                     <span className="flex items-center gap-2 justify-end"><FaPhoneAlt className="text-red-500"/> +54 9 11 2424-8190</span>
+                    {/* 🚀 REMOVIDO EL CORREO ELECTRÓNICO */}
                 </div>
             </div>
         </div>
