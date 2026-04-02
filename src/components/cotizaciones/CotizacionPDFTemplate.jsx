@@ -18,52 +18,47 @@ const CotizacionPDFTemplate = ({
   cotizacionEdit 
 }) => {
 
-  // 1. CALCULAMOS PRECIOS Y ORDENAMOS DE MENOR A MAYOR (Psicología de ventas)
   const opcionesCalculadas = [...opciones].map(op => {
       const costo = parseToNumber(op.costo_compania);
       const pct = Number(op.porcentaje_comision) || 0;
-      const objetivo = parseToNumber(op.objetivo_ganancia || objetivoGanancia || "35"); // 🚀 Usamos el margen por defecto
+      const objetivo = parseToNumber(op.objetivo_ganancia || objetivoGanancia || "35");
       const precioFinal = op.precio_cliente ? Number(op.precio_cliente) : costo + Math.max(0, (costo * objetivo) / 100);
       const sumaAseguradaNum = parseToNumber(op.suma_asegurada);
       
       return { ...op, precioCalculado: Math.ceil(precioFinal / 1000) * 1000, sumaCalculada: sumaAseguradaNum };
-  }).sort((a, b) => a.precioCalculado - b.precioCalculado); // Ordena por precio ascendente
+  }).sort((a, b) => a.precioCalculado - b.precioCalculado);
 
   const opRecomendada = opcionesCalculadas.find(o => o.es_recomendada) || opcionesCalculadas[0];
 
-  // 2. NUEVA LÓGICA DE ETIQUETAS Y COLORES (AZUL, VERDE, DORADO)
   const getBadgeInfo = (op, index, total) => {
-      // 🥇 1. PRIORIDAD: NUESTRA RECOMENDACIÓN (DORADO/AMBER)
       if (op.es_recomendada) {
           return { 
               label: "★ NUESTRA RECOMENDACIÓN (EQUILIBRADA)", 
-              bg: "bg-amber-500", // Gold (Tailwind amber es más dorado)
-              text: "text-amber-700", // Texto descriptivo en dorado oscuro para legibilidad
+              bg: "bg-amber-500",
+              text: "text-amber-700",
               border: "border-amber-400 shadow-md", 
               priceText: "text-amber-600",
               sumaColors: "text-amber-600 bg-amber-50 border-amber-100",
               desc: "La mejor relación costo-beneficio del mercado. Estás cubierto contra lo importante sin pagar de más." 
           };
       }
-      // 🥉 2. SEGUNDO: OPCIÓN BÁSICA (AZUL/BLUE)
       if (index === 0) {
           return { 
               label: "OPCIÓN BÁSICA (ESENCIAL)", 
-              bg: "bg-blue-600", // Azul
-              text: "text-blue-700", // Texto descriptivo en azul oscuro
+              bg: "bg-blue-600",
+              text: "text-blue-700",
               border: "border-blue-500", 
-              priceText: "text-zinc-800", // Precio en negro estándar
+              priceText: "text-zinc-800",
               sumaColors: "text-blue-600 bg-blue-50 border-blue-100",
               desc: "Cobertura inicial indispensable para cumplir con la ley y poder circular por la calle tranquilo." 
           };
       }
-      // 🥈 3. RESTO: OPCIONES INTERMEDIAS/VALOR AGREGADO (VERDE/EMERALD)
       return { 
           label: "OPCIÓN INTERMEDIA (VALOR ADICIONAL)", 
-          bg: "bg-emerald-600", // Verde
-          text: "text-emerald-700", // Texto descriptivo en verde oscuro
+          bg: "bg-emerald-600",
+          text: "text-emerald-700",
           border: "border-emerald-500", 
-          priceText: "text-zinc-800", // Precio en negro estándar
+          priceText: "text-zinc-800",
           sumaColors: "text-emerald-600 bg-emerald-50 border-emerald-100",
           desc: "Una excelente alternativa para sumar a tu consideración con protecciones adicionales." 
       };
@@ -72,14 +67,12 @@ const CotizacionPDFTemplate = ({
   return (
     <div 
       id="pdf-quote-content" 
-      // 🚀 FORZAMOS LAS MEDIDAS EXACTAS DE A4 PARA HTML2CANVAS (A 96 DPI APROX)
-      style={{ width: "210mm", height: "297mm", position: "relative" }}
-      className="bg-[#faf9f6] mx-auto text-zinc-900 flex flex-col font-sans overflow-hidden shadow-2xl"
+      // 🚀 FIJAMOS EL ANCHO A 794 PÍXELES EXACTOS (Medida A4 Web)
+      className="bg-[#faf9f6] w-[794px] min-h-[1123px] mx-auto text-zinc-900 flex flex-col font-sans overflow-hidden shadow-2xl relative"
     >
-        {/* Thames Red Top Line */}
         <div className="h-4 w-full bg-red-600 absolute top-0 left-0 z-20"></div>
 
-        <div className="bg-zinc-900 text-white px-10 pt-12 pb-20 rounded-b-[40px] shadow-lg relative z-10">
+        <div className="bg-zinc-900 text-white px-10 pt-12 pb-20 rounded-b-[40px] shadow-lg relative z-10 shrink-0">
             <div className="flex justify-between items-start">
             <div className="flex items-center">
                 <img src={logoThames} alt="Thames Seguros" className="h-16 object-contain" />
@@ -118,14 +111,13 @@ const CotizacionPDFTemplate = ({
             </div>
         </div>
 
-        <div className="px-10 pt-24 flex-1 flex flex-col z-0">
+        <div className="px-10 pt-24 pb-10 flex-1 flex flex-col z-0 shrink-0">
             <div className="mb-6">
             
             <div className="grid grid-cols-12 gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-300 pb-2 mb-4 px-2">
                 <div className="col-span-3 pl-2">Aseguradora</div>
                 <div className="col-span-2 text-center">Suma Asegurada</div>
                 <div className="col-span-4">Plan de Cobertura</div>
-                {/* 🚀 OCULTAMOS EL COSTO CIA. MOSTRAMOS SOLO PRECIO FINAL */}
                 <div className="col-span-3 text-right pr-2">Precio Mensual</div>
             </div>
 
@@ -143,8 +135,8 @@ const CotizacionPDFTemplate = ({
                             </div>
                             
                             <div className="grid grid-cols-12 gap-2 items-center px-4 pt-5 pb-3">
-                                <div className="col-span-3 font-black text-zinc-900 text-base truncate pr-2 flex items-center">
-                                    <span>{compName.toUpperCase()}</span>
+                                <div className="col-span-3 font-black text-zinc-900 text-base pr-2 flex items-center">
+                                    <span className="break-words">{compName.toUpperCase()}</span>
                                 </div>
                                 
                                 <div className="col-span-2 flex items-center justify-center">
@@ -189,7 +181,7 @@ const CotizacionPDFTemplate = ({
             const compNameRec = companiasBackend.find(c => String(c.id) === String(opRecomendada.compania_id))?.nombre || "Compañía";
 
             return (
-                <div className="mb-auto mt-4">
+                <div className="mt-4">
                     <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest border-b border-zinc-300 pb-2 mb-4">
                         Por qué elegimos a <span className="text-zinc-800">{compNameRec.toUpperCase()}</span> para la opción Ideal:
                     </h3>
@@ -214,8 +206,8 @@ const CotizacionPDFTemplate = ({
             })()}
         </div>
 
-        {/* 🚀 FOOTER ABSOLUTO AL FONDO DE LA PÁGINA */}
-        <div className="absolute bottom-0 w-full px-10 pb-8 pt-6 bg-white border-t-2 border-zinc-100 flex justify-between items-end z-10">
+        {/* 🚀 FOOTER POSICIONADO AL FINAL DEL CONTENEDOR FLEX (mt-auto) */}
+        <div className="w-full px-10 pb-8 pt-6 bg-white border-t-2 border-zinc-100 flex justify-between items-end mt-auto relative z-10 shrink-0">
             <div className="flex gap-3">
                 <div className="bg-red-600 text-white py-3 px-4 rounded-xl max-w-[150px] shadow-md">
                     <p className="text-[9px] font-black uppercase tracking-widest mb-1 text-red-200">Validez</p>

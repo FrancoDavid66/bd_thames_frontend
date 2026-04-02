@@ -90,7 +90,6 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
   const [direction, setDirection] = useState(0); 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   
-  // 🚀 GUARDAMOS EL MARGEN GLOBAL PARA USARLO
   const [globalMargin, setGlobalMargin] = useState("35");
 
   const [companiasBackend, setCompaniasBackend] = useState([]);
@@ -116,7 +115,6 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         .then(res => setCoberturasBackend(res.data.results || res.data))
         .catch(err => console.error("Error coberturas:", err));
 
-      // 🚀 BUSCAMOS EL MARGEN AL ABRIR Y LO REDONDEAMOS
       axios.get(`${BASE_URL}cotizaciones/configuracion/`, { headers: getAuthHeaders() })
         .then(res => setGlobalMargin(String(Math.round(Number(res.data.margen_ganancia_default) || 35))))
         .catch(err => console.error("Error cargando configuración global:", err));
@@ -137,7 +135,6 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         detalles_cobertura: Array.isArray(op.detalles_cobertura) ? op.detalles_cobertura : [],
         suma_asegurada: formatFromBackend(op.suma_asegurada),
         costo_compania: formatFromBackend(op.costo_compania),
-        // 🚀 LIMPIEZA DE DECIMALES EN LA GANANCIA
         objetivo_ganancia: op.objetivo_ganancia ? String(Math.round(Number(op.objetivo_ganancia))) : globalMargin
       }));
       setOpciones(opsAcomodadas);
@@ -168,7 +165,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         suma_asegurada: "", 
         detalles_cobertura: [], 
         es_recomendada: opciones.length === 0, 
-        objetivo_ganancia: globalMargin, // 🚀 USA EL GLOBAL
+        objetivo_ganancia: globalMargin, 
         tempId: Date.now() 
       }]);
     }
@@ -198,7 +195,6 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         newOptions.forEach(o => o.es_recomendada = false); 
     }
     
-    // 🚀 ASEGURAR NÚMERO ENTERO EN EL INPUT DE RECARGO
     if (field === "objetivo_ganancia") {
       newOptions[index][field] = value ? String(Math.round(Number(value))) : "";
     } else {
@@ -313,7 +309,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
     }
   };
 
-  // 🚀 MEJORA EN LA GENERACIÓN DEL PDF (ESCALA Y RESOLUCIÓN)
+  // 🚀 MEJORA EN LA GENERACIÓN DEL PDF (EVITAMOS EL CORTE O DESCENTRADO)
   const generatePDFDocument = async () => {
     const input = document.getElementById("pdf-quote-content");
     if (!input) {
@@ -322,35 +318,31 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
     }
 
     try {
-      // Configuramos toPng para que respete el tamaño exacto del contenedor
+      // 🚀 Forzamos que html2canvas capture el ancho y alto exactos sin importar el scroll
       const dataUrl = await toPng(input, {
         quality: 1,
-        backgroundColor: '#faf9f6', // Fondo del PDF
+        backgroundColor: '#faf9f6', 
         pixelRatio: 2, 
-        skipFonts: false,
+        width: 794, // 🚀 Ancho exacto A4 en píxeles a 96DPI
+        height: input.scrollHeight, // Toma todo el contenido
         style: {
-          transform: 'none', // Evita que se distorsione si hay animaciones
+          transform: 'none', 
+          margin: '0',
+          position: 'static'
         }
       });
       
-      // Creamos el PDF en formato A4 vertical ("p")
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4"
       });
       
-      const pdfWidth = pdf.internal.pageSize.getWidth(); // A4 = 210mm
-      const pdfHeight = pdf.internal.pageSize.getHeight(); // A4 = 297mm
-      
-      // Calculamos el ratio para que la imagen entre perfectamente
+      const pdfWidth = pdf.internal.pageSize.getWidth();
       const imgProps = pdf.getImageProperties(dataUrl);
       const ratio = imgProps.height / imgProps.width;
-      
-      // Forzamos a que el ancho de la imagen ocupe todo el ancho de la página A4
       let finalHeight = pdfWidth * ratio;
       
-      // Dibujamos la imagen desde la coordenada 0,0
       pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, finalHeight);
       
       return pdf;
@@ -615,7 +607,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                                                       type="button" 
                                                       disabled={isDisabled} 
                                                       onClick={() => handleCompaniaChange(index, c.id)} 
-                                                      className={`p-3 rounded-xl border-2 text-left transition-all duration-200 flex flex-col gap-1 relative overflow-hidden ${isDisabled ? 'border-zinc-800 bg-zinc-900/20 opacity-50 cursor-not-allowed' : isSelected ? 'border-indigo-500 bg-indigo-500/10 shadow-md shadow-indigo-500/10 cursor-pointer' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-600 hover:bg-zinc-900 cursor-pointer'}`}
+                                                      className={`p-3 rounded-xl border-2 text-left transition-all duration-200 flex flex-col gap-1 relative overflow-hidden ${isDisabled ? 'border-zinc-800 bg-zinc-900/20 opacity-50 cursor-not-allowed' : isSelected ? 'border-indigo-500 bg-indigo-500/10 shadow-md shadow-indigo-500/10 cursor-pointer' : 'border-zinc-800 bg-zinc-95 hover:border-zinc-600 hover:bg-zinc-900 cursor-pointer'}`}
                                                       whileHover={isDisabled ? {} : { translateY: -3, scale: 1.02 }}
                                                       whileTap={isDisabled ? {} : { scale: 0.98 }}
                                                     >
@@ -745,7 +737,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                   )}
 
                   {step === 4 && (
-                      <div className="space-y-6 w-full mx-auto pb-4 overflow-x-auto custom-scrollbar">
+                      <div className="space-y-6 max-w-4xl mx-auto pb-4">
                           {!isPdfMode && (
                           <div className="text-center mb-6 mt-2">
                               <h3 className="text-2xl font-black text-emerald-500 flex justify-center items-center gap-2"><HiCheckCircle/> ¡Propuesta Épica Lista!</h3>
@@ -753,15 +745,15 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                           </div>
                           )}
 
-                          {/* 🚀 CONTENEDOR PARA EL PDF: FORZAMOS EL TAMAÑO A4 EXACTO PARA QUE NO SALGA CORRIDO */}
-                          <div className="flex justify-center w-full min-w-[210mm] bg-black/20 p-4 rounded-3xl">
+                          {/* 🚀 EVITAMOS RECORTES CON OVERFLOW Y DIMENSIONES MÁS CONSERVADORAS */}
+                          <div className="flex justify-center w-full bg-black/20 p-4 rounded-3xl overflow-x-auto custom-scrollbar">
                             <CotizacionPDFTemplate 
                               formData={formData}
                               opciones={opciones}
                               companiasBackend={companiasBackend}
                               coberturasBackend={coberturasBackend}
                               cotizacionEdit={cotizacionEdit}
-                              objetivoGanancia={globalMargin} // 🚀 PASAMOS EL MARGEN GLOBAL
+                              objetivoGanancia={globalMargin}
                             />
                           </div>
                       </div>
