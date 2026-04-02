@@ -116,9 +116,9 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         .then(res => setCoberturasBackend(res.data.results || res.data))
         .catch(err => console.error("Error coberturas:", err));
 
-      // 🚀 BUSCAMOS EL MARGEN AL ABRIR
+      // 🚀 BUSCAMOS EL MARGEN AL ABRIR Y LO REDONDEAMOS
       axios.get(`${BASE_URL}cotizaciones/configuracion/`, { headers: getAuthHeaders() })
-        .then(res => setGlobalMargin(res.data.margen_ganancia_default))
+        .then(res => setGlobalMargin(String(Math.round(Number(res.data.margen_ganancia_default) || 35))))
         .catch(err => console.error("Error cargando configuración global:", err));
     }
   }, [isOpen, isPdfMode]);
@@ -137,8 +137,8 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         detalles_cobertura: Array.isArray(op.detalles_cobertura) ? op.detalles_cobertura : [],
         suma_asegurada: formatFromBackend(op.suma_asegurada),
         costo_compania: formatFromBackend(op.costo_compania),
-        // 🚀 USA EL MARGEN QUE SE CARGÓ DE LA BDD, SINO EL GLOBAL
-        objetivo_ganancia: op.objetivo_ganancia ? op.objetivo_ganancia : globalMargin
+        // 🚀 LIMPIEZA DE DECIMALES EN LA GANANCIA
+        objetivo_ganancia: op.objetivo_ganancia ? String(Math.round(Number(op.objetivo_ganancia))) : globalMargin
       }));
       setOpciones(opsAcomodadas);
     } else {
@@ -197,7 +197,14 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
     if (field === "es_recomendada" && value === true) {
         newOptions.forEach(o => o.es_recomendada = false); 
     }
-    newOptions[index][field] = value;
+    
+    // 🚀 ASEGURAR NÚMERO ENTERO EN EL INPUT DE RECARGO
+    if (field === "objetivo_ganancia") {
+      newOptions[index][field] = value ? String(Math.round(Number(value))) : "";
+    } else {
+      newOptions[index][field] = value;
+    }
+    
     setOpciones(newOptions);
   };
 
@@ -306,6 +313,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
     }
   };
 
+  // 🚀 MEJORA EN LA GENERACIÓN DEL PDF (ESCALA Y RESOLUCIÓN)
   const generatePDFDocument = async () => {
     const input = document.getElementById("pdf-quote-content");
     if (!input) {
@@ -313,20 +321,43 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         return null;
     }
 
-    const dataUrl = await toPng(input, {
-      quality: 1,
-      backgroundColor: '#ffffff',
-      pixelRatio: 2, 
-      skipFonts: false
-    });
-    
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const ratio = input.offsetHeight / input.offsetWidth;
-    const pdfHeight = pdfWidth * ratio;
-    
-    pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-    return pdf;
+    try {
+      // Configuramos toPng para que respete el tamaño exacto del contenedor
+      const dataUrl = await toPng(input, {
+        quality: 1,
+        backgroundColor: '#faf9f6', // Fondo del PDF
+        pixelRatio: 2, 
+        skipFonts: false,
+        style: {
+          transform: 'none', // Evita que se distorsione si hay animaciones
+        }
+      });
+      
+      // Creamos el PDF en formato A4 vertical ("p")
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth(); // A4 = 210mm
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // A4 = 297mm
+      
+      // Calculamos el ratio para que la imagen entre perfectamente
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const ratio = imgProps.height / imgProps.width;
+      
+      // Forzamos a que el ancho de la imagen ocupe todo el ancho de la página A4
+      let finalHeight = pdfWidth * ratio;
+      
+      // Dibujamos la imagen desde la coordenada 0,0
+      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, finalHeight);
+      
+      return pdf;
+    } catch (error) {
+      console.error("Error generando imagen para PDF:", error);
+      return null;
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -340,6 +371,8 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         const fileName = `Propuesta_${safeName}_ThamesSeguros.pdf`;
         pdf.save(fileName);
         toast.success("¡PDF descargado con éxito!", { id: loadingToastId });
+      } else {
+        toast.error("Ocurrió un error al crear el archivo.", { id: loadingToastId });
       }
     } catch (error) {
       toast.error("Ocurrió un error al crear el archivo.", { id: loadingToastId });
@@ -358,6 +391,8 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         pdf.autoPrint();
         window.open(pdf.output('bloburl'), '_blank');
         toast.success("¡Documento listo para imprimir!", { id: loadingToastId });
+      } else {
+        toast.error("Ocurrió un error al preparar la impresión.", { id: loadingToastId });
       }
     } catch (error) {
       toast.error("Ocurrió un error al preparar la impresión.", { id: loadingToastId });
@@ -649,7 +684,8 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                                         <div>
                                           <label className="block text-[10px] text-emerald-500 mb-1 uppercase font-black tracking-widest">Recargo / Ganancia</label>
                                           <div className="relative">
-                                            <input type="number" value={opcion.objetivo_ganancia || ''} onChange={e => handleOptionChange(index, "objetivo_ganancia", e.target.value)} className="w-full bg-zinc-900 border border-emerald-900/50 rounded-lg pl-3 pr-7 py-2 text-sm text-emerald-400 font-black outline-none focus:border-emerald-500 focus:bg-emerald-950/30 transition-colors" placeholder="0" />
+                                            {/* 🚀 EL INPUT AHORA SOLO CARGA NÚMEROS ENTEROS */}
+                                            <input type="number" step="1" value={opcion.objetivo_ganancia || ''} onChange={e => handleOptionChange(index, "objetivo_ganancia", e.target.value)} className="w-full bg-zinc-900 border border-emerald-900/50 rounded-lg pl-3 pr-7 py-2 text-sm text-emerald-400 font-black outline-none focus:border-emerald-500 focus:bg-emerald-950/30 transition-colors" placeholder="0" />
                                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">%</span>
                                           </div>
                                         </div>
@@ -709,7 +745,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                   )}
 
                   {step === 4 && (
-                      <div className="space-y-6 max-w-4xl mx-auto pb-4">
+                      <div className="space-y-6 w-full mx-auto pb-4 overflow-x-auto custom-scrollbar">
                           {!isPdfMode && (
                           <div className="text-center mb-6 mt-2">
                               <h3 className="text-2xl font-black text-emerald-500 flex justify-center items-center gap-2"><HiCheckCircle/> ¡Propuesta Épica Lista!</h3>
@@ -717,15 +753,17 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                           </div>
                           )}
 
-                          <CotizacionPDFTemplate 
-                            formData={formData}
-                            opciones={opciones}
-                            companiasBackend={companiasBackend}
-                            coberturasBackend={coberturasBackend}
-                            cotizacionEdit={cotizacionEdit}
-                            objetivoGanancia={globalMargin} // 🚀 PASAMOS EL MARGEN GLOBAL
-                          />
-
+                          {/* 🚀 CONTENEDOR PARA EL PDF: FORZAMOS EL TAMAÑO A4 EXACTO PARA QUE NO SALGA CORRIDO */}
+                          <div className="flex justify-center w-full min-w-[210mm] bg-black/20 p-4 rounded-3xl">
+                            <CotizacionPDFTemplate 
+                              formData={formData}
+                              opciones={opciones}
+                              companiasBackend={companiasBackend}
+                              coberturasBackend={coberturasBackend}
+                              cotizacionEdit={cotizacionEdit}
+                              objetivoGanancia={globalMargin} // 🚀 PASAMOS EL MARGEN GLOBAL
+                            />
+                          </div>
                       </div>
                   )}
 
