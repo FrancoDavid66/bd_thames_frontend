@@ -52,14 +52,15 @@ const CotizacionPDFTemplate = ({
               desc: "Cobertura inicial indispensable para cumplir con la ley y poder circular por la calle tranquilo." 
           };
       }
+      // 🚀 CAMBIO DE COPY PARA QUE SUENE A BENEFICIO, NO A GASTO
       return { 
-          label: "OPCIÓN INTERMEDIA (VALOR ADICIONAL)", 
+          label: "OPCIÓN ALTERNATIVA (COBERTURA AMPLIADA)", 
           bg: "bg-emerald-600",
           text: "text-emerald-700",
           border: "border-emerald-500", 
           priceText: "text-zinc-800",
           sumaColors: "text-emerald-600 bg-emerald-50 border-emerald-100",
-          desc: "Una excelente alternativa para sumar a tu consideración con protecciones adicionales." 
+          desc: "Una excelente alternativa que eleva tu nivel de protección ante cualquier imprevisto." 
       };
   };
 
@@ -70,8 +71,19 @@ const CotizacionPDFTemplate = ({
     >
         <div className="h-4 w-full bg-red-600 absolute top-0 left-0 z-20"></div>
 
-        <div className="px-10 pt-12 pb-24 rounded-b-[40px] shadow-lg relative z-10 shrink-0 bg-zinc-900">
-            <div className="flex justify-between items-start">
+        <div className="relative px-10 pt-12 pb-20 rounded-b-[40px] shadow-lg z-10 shrink-0 overflow-hidden bg-zinc-900">
+            {formData.imagen_auto && (
+                <>
+                    <img 
+                      src={formData.imagen_auto} 
+                      alt="Fondo Vehículo" 
+                      className="absolute inset-0 w-full h-full object-cover z-0" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-900/90 via-zinc-900/80 to-zinc-900/90 z-0"></div>
+                </>
+            )}
+
+            <div className="flex justify-between items-start relative z-10">
                 <div className="flex items-center">
                     <img src={logoThames} alt="Thames Seguros" className="h-16 object-contain" />
                 </div>
@@ -85,22 +97,19 @@ const CotizacionPDFTemplate = ({
             </div>
 
             <div className="mt-8 flex justify-between items-center gap-6 relative z-10">
-                <div className="flex-1 max-w-[65%]">
+                <div className="flex-1">
                     <p className="text-red-500 text-xs font-black uppercase tracking-widest mb-1 drop-shadow-md">Propuesta de Seguro Exclusiva Para:</p>
                     <h2 className="text-5xl font-black text-white uppercase leading-tight drop-shadow-lg">{formData.cliente_nombre}</h2>
                 </div>
                 
-                {/* 🚀 BOX FIXEADO CON BACKGROUND-IMAGE */}
                 {formData.imagen_auto && (
-                    <div 
-                        className="w-56 h-36 shrink-0 rounded-2xl border-4 border-zinc-800 shadow-2xl bg-zinc-950 relative z-10"
-                        style={{
-                            backgroundImage: `url(${formData.imagen_auto})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat'
-                        }}
-                    />
+                    <div className="w-56 h-36 shrink-0 rounded-2xl border-4 border-zinc-800 overflow-hidden shadow-2xl bg-zinc-950 flex items-center justify-center">
+                        <img 
+                            src={formData.imagen_auto} 
+                            alt="Vehículo" 
+                            className="w-full h-full object-cover" 
+                        />
+                    </div>
                 )}
             </div>
 
