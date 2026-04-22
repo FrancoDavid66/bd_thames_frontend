@@ -1,4 +1,4 @@
-// src/components/pagos/FacturaCuota.jsx — Reemplaza TODO el archivo con esta versión
+// src/components/pagos/FacturaCuota.jsx
 import React from "react";
 import dayjs from "dayjs";
 import {
@@ -57,10 +57,28 @@ const isPagoAtrasado = (cuota) => {
   return p.isAfter(v);
 };
 
+// 🚀 NUEVA FUNCIÓN: Suma 48hs hábiles (salta fines de semana)
+const calcularRehabilitacionStr = (fechaPago) => {
+    if (!fechaPago) return "—";
+    const d = new Date(fechaPago);
+    if (isNaN(d.getTime())) return "—";
+    let added = 0;
+    while (added < 2) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) added++; 
+    }
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
 export default function FacturaCuota({ cliente, poliza, cuota }) {
   if (!cliente || !poliza || !cuota) return null;
 
   const pagoAtrasado = isPagoAtrasado(cuota);
+  
+  // Calculamos la fecha estimada de reactivación si está pagado
+  const fechaRehabilitacion = cuota.pagado 
+    ? calcularRehabilitacionStr(cuota.pago_registrado_en || cuota.fecha_pago) 
+    : "—";
 
   return (
     <div className="max-w-3xl mx-auto rounded-2xl border border-neutral-300/20 bg-neutral-500 text-neutral-100 shadow print:bg-white print:text-black print:border-none print:shadow-none">
@@ -221,9 +239,14 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
 
         {/* Aviso por pago atrasado */}
         {pagoAtrasado && (
-          <div className="rounded-lg border border-amber-400/60 bg-amber-500/10 text-amber-100 text-xs px-4 py-3 text-center print:border-amber-500/80 print:text-amber-900 print:bg-transparent">
-            Por haber abonado el seguro en forma atrasada, la cobertura se
-            restablecerá en 2 días hábiles.
+          <div className="rounded-lg border border-rose-400/60 bg-rose-500/10 text-rose-100 text-sm px-5 py-4 text-justify print:border-red-500/80 print:text-red-900 print:bg-transparent">
+            <p className="font-bold uppercase mb-2 text-center">Aviso Legal: Pago fuera de término</p>
+            <p>
+              El cliente acepta y confirma bajo juramento que <strong className="font-bold">NO ha tenido ningún siniestro ni reclamo</strong> en los días previos a este pago, durante los cuales la póliza se encontraba vencida.
+            </p>
+            <p className="mt-2">
+              Asimismo, toma conocimiento de que la cobertura retomará su vigencia recién a las <strong className="font-bold">48 horas hábiles</strong> de este pago (Fecha estimada: <strong className="font-bold">{fechaRehabilitacion}</strong>), período en el cual <strong className="font-bold">TAMPOCO TENDRÁ COBERTURA</strong>.
+            </p>
           </div>
         )}
 

@@ -4,7 +4,7 @@ import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 const mmToPt = (mm) => (mm * 72) / 25.4;
 
 const TICKET_WIDTH = mmToPt(80);
-const TICKET_HEIGHT = mmToPt(460);
+const TICKET_HEIGHT = mmToPt(480); // Un poco más largo para que quepa la nueva leyenda
 const PAD_X = mmToPt(5);
 const PAD_Y = mmToPt(8);
 
@@ -21,33 +21,6 @@ const ymd = (d) => {
 };
 
 const pad2 = (n) => String(n).padStart(2, "0");
-
-/** Suma meses de forma segura en YYYY-MM-DD (mantiene día si se puede, clamp si no) */
-const addMonthsYmd = (ymdStr, deltaMonths) => {
-  const s = ymd(ymdStr);
-  if (!s || s.length < 10) return "";
-  const base = new Date(`${s}T12:00:00`);
-  if (Number.isNaN(base.getTime())) return "";
-
-  const target = new Date(base.getTime());
-  target.setMonth(target.getMonth() + Number(deltaMonths || 0));
-
-  const intendedMonth = (base.getMonth() + Number(deltaMonths || 0) + 1200) % 12;
-  const actualMonth = target.getMonth();
-  if (actualMonth !== intendedMonth) {
-    const y2 = target.getFullYear();
-    const m2 = intendedMonth;
-    const lastDay = new Date(y2, m2 + 1, 0, 12, 0, 0);
-    target.setFullYear(lastDay.getFullYear());
-    target.setMonth(lastDay.getMonth());
-    target.setDate(lastDay.getDate());
-  }
-
-  const yy = target.getFullYear();
-  const mm = pad2(target.getMonth() + 1);
-  const dd = pad2(target.getDate());
-  return `${yy}-${mm}-${dd}`;
-};
 
 const fmtDateTimeHM = (d) => {
   if (!d) return "—";
@@ -118,6 +91,18 @@ const isPagoAtrasado = (cuota) => {
   return p.getTime() > v.getTime();
 };
 
+// 🚀 NUEVA FUNCIÓN: Suma 48hs hábiles (salta fines de semana)
+const calcularRehabilitacion = (refDate) => {
+  const d = refDate ? new Date(refDate) : new Date();
+  if (Number.isNaN(d.getTime())) return "—";
+  let added = 0;
+  while (added < 2) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) added++; // Salta Domingo(0) y Sábado(6)
+  }
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
 const styles = StyleSheet.create({
   page: {
     width: TICKET_WIDTH,
@@ -153,7 +138,6 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
 
-  // ✅ más aire
   block: { marginBottom: 10 },
   sectionTitle: {
     fontSize: 11,
@@ -162,7 +146,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  // ✅ líneas con altura y alineación prolija
   line: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -172,10 +155,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 10, fontWeight: "bold", width: "58%" },
   value: { fontSize: 10, width: "42%", textAlign: "right", lineHeight: 1.25 },
 
-  // ✅ texto normal con mejor lineHeight
   text: { fontSize: 10, lineHeight: 1.3 },
 
-  // ✅ tabla con padding mejor y separación
   table: { marginTop: 6, borderWidth: 1, borderColor: "#000" },
   tableHeader: {
     flexDirection: "row",
@@ -205,11 +186,11 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 12, fontWeight: "bold" },
   totalAmount: { fontSize: 12, fontWeight: "bold" },
 
-  // ✅ aviso con más aire y lectura
+  // ✅ aviso legal modificado
   legalAlert: {
     marginTop: 14,
     paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderWidth: 2,
     borderColor: "#000",
     borderRadius: 6,
@@ -221,8 +202,8 @@ const styles = StyleSheet.create({
     textDecoration: "underline",
     marginBottom: 8,
   },
-  legalText: { fontSize: 10, textAlign: "center", lineHeight: 1.35 },
-  alertBoldUnderline: { fontWeight: "bold", textDecoration: "underline" },
+  legalText: { fontSize: 9, textAlign: "justify", lineHeight: 1.35 },
+  alertBold: { fontWeight: "bold" },
 });
 
 const FacturaCuotaTicketPDF = ({
@@ -232,7 +213,6 @@ const FacturaCuotaTicketPDF = ({
   pago_hm_full,
   pago_dt_iso,
 }) => {
-  // === Igual que PDF: fallbacks robustos desde poliza.cliente_* ===
   const titularFinal =
     `${safe(cliente.nombre || poliza.cliente_nombre, "")} ${safe(
       cliente.apellido || poliza.cliente_apellido,
@@ -250,23 +230,17 @@ const FacturaCuotaTicketPDF = ({
   const cuotaNro = safe(cuota.cuota_nro);
   const monto = cuota.monto ?? cuota.total ?? 0;
 
+  const fechaReferenciaPago = pago_dt_iso || cuota.pago_registrado_en || cuota.fecha_pago || new Date();
+  
   const fechaHoraOperacion =
     (pago_hm_full && String(pago_hm_full).trim()) ||
     (cuota.pago_hm_full && String(cuota.pago_hm_full).trim()) ||
-    fmtDateTimeHM(
-      pago_dt_iso || cuota.pago_registrado_en || cuota.fecha_pago || new Date()
-    );
+    fmtDateTimeHM(fechaReferenciaPago);
 
-  // ✅ Vencimiento ACTUAL (no próximo)
   const vencimientoActualTxt = fmtDateOnly(cuota.fecha_vencimiento);
 
-  // ✅ Cobertura (vencimiento - 1 mes) al vencimiento
-  const vtoBase = ymd(cuota?.fecha_vencimiento || "");
-  const cubreDesde = vtoBase ? fmtDateOnly(addMonthsYmd(vtoBase, -1)) : "—";
-  const cubreHasta = vtoBase ? fmtDateOnly(vtoBase) : "—";
-  const coberturaTxt = vtoBase ? `${cubreDesde} al ${cubreHasta}` : "—";
-
   const pagoFueraDeTermino = isPagoAtrasado(cuota);
+  const fechaRehabilitacion = calcularRehabilitacion(fechaReferenciaPago);
 
   return (
     <Document>
@@ -277,7 +251,7 @@ const FacturaCuotaTicketPDF = ({
         <View style={styles.header}>
           <Text style={styles.title}>COMPROBANTE DE PAGO</Text>
           <Text style={styles.subtitle}>
-            Factura por servicios jurídicos y seguros
+            Servicios Jurídicos y Seguros
           </Text>
         </View>
 
@@ -291,13 +265,15 @@ const FacturaCuotaTicketPDF = ({
 
         <View style={styles.block}>
           <View style={styles.line}>
-            <Text style={styles.label}>Fecha y Hora de Operación</Text>
+            <Text style={styles.label}>Fecha y Hora de Pago</Text>
             <Text style={styles.value}>{fechaHoraOperacion}</Text>
           </View>
 
+          {/* Ocultamos el bloque de Cobertura */}
+          
           <View style={styles.line}>
-            <Text style={styles.label}>Cobertura</Text>
-            <Text style={styles.value}>{coberturaTxt}</Text>
+            <Text style={styles.label}>Vencimiento Cuota</Text>
+            <Text style={styles.value}>{vencimientoActualTxt}</Text>
           </View>
         </View>
 
@@ -319,11 +295,10 @@ const FacturaCuotaTicketPDF = ({
           <Text style={[styles.text, { marginTop: 4 }]}>Patente: {patente}</Text>
         </View>
 
-        {/* === Igual que PDF: tabla Concepto / Valor a Pagar + TOTAL ABONADO === */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <Text style={styles.tableHeaderText}>Concepto</Text>
-            <Text style={styles.tableHeaderText}>Valor a Pagar</Text>
+            <Text style={styles.tableHeaderText}>Monto</Text>
           </View>
 
           <View style={styles.tableRow}>
@@ -332,22 +307,8 @@ const FacturaCuotaTicketPDF = ({
           </View>
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>TOTAL ABONADO</Text>
+            <Text style={styles.totalLabel}>TOTAL</Text>
             <Text style={styles.totalAmount}>{fmtMoney(monto)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.hr} />
-
-        <View style={styles.block}>
-          <View style={styles.line}>
-            <Text style={styles.label}>Vencimiento</Text>
-            <Text style={styles.value}>{vencimientoActualTxt}</Text>
-          </View>
-
-          <View style={styles.line}>
-            <Text style={styles.label}>Cuota</Text>
-            <Text style={styles.value}>#{safe(cuota.cuota_nro)}</Text>
           </View>
         </View>
 
@@ -355,17 +316,8 @@ const FacturaCuotaTicketPDF = ({
           <View style={styles.legalAlert}>
             <Text style={styles.legalTitle}>PAGO FUERA DE TÉRMINO</Text>
             <Text style={styles.legalText}>
-              Por haber abonado el seguro en forma{" "}
-              <Text style={styles.alertBoldUnderline}>atrasada</Text>, la cobertura
-              se restablecerá dentro de las{" "}
-              <Text style={styles.alertBoldUnderline}>48 horas hábiles</Text>. El
-              asegurado deja constancia y declara{" "}
-              <Text style={styles.alertBoldUnderline}>bajo juramento</Text> que{" "}
-              <Text style={styles.alertBoldUnderline}>NO</Text> ha tenido ningún
-              tipo de{" "}
-              <Text style={styles.alertBoldUnderline}>siniestro ni reclamo</Text>{" "}
-              durante el período en el cual la cuota se encontraba{" "}
-              <Text style={styles.alertBoldUnderline}>impaga</Text>.
+              El cliente acepta y confirma bajo juramento que <Text style={styles.alertBold}>NO ha tenido ningún siniestro ni reclamo</Text> en los días previos a este pago, durante los cuales la póliza se encontraba vencida.{"\n\n"}
+              Asimismo, toma conocimiento de que la cobertura retomará su vigencia recién a las <Text style={styles.alertBold}>48 horas hábiles</Text> de este pago (Fecha estimada: <Text style={styles.alertBold}>{fechaRehabilitacion}</Text>), período en el cual <Text style={styles.alertBold}>TAMPOCO TENDRÁ COBERTURA</Text>.
             </Text>
           </View>
         )}
