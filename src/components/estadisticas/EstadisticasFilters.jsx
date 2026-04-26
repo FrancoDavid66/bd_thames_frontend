@@ -3,28 +3,20 @@ import { useEffect, useState } from "react";
 import AnimatedCard from "./AnimatedCard";
 import { HiOfficeBuilding, HiCalendar, HiChartBar } from "react-icons/hi";
 
-// 🚀 Ordenamiento inteligente
+// 🚀 Ordenamiento 100% dinámico y alfabético
 const sortOficinas = (arr, getOficinaNombre) => {
-  const order = ["1", "2", "3", "OTRAS", "SIN_OFICINA"];
-  const orderIdx = new Map(order.map((v, i) => [v, i]));
-
   return [...arr].sort((a, b) => {
     const A = String(a ?? "").trim();
     const B = String(b ?? "").trim();
 
-    const ia = orderIdx.has(A) ? orderIdx.get(A) : 999;
-    const ib = orderIdx.has(B) ? orderIdx.get(B) : 999;
-
-    if (ia !== 999 || ib !== 999) {
-      if (ia !== ib) return ia - ib;
-    }
+    // Mandamos "OTRAS" y "SIN_OFICINA" al final de la lista siempre
+    if (A === "SIN_OFICINA" || A === "OTRAS") return 1;
+    if (B === "SIN_OFICINA" || B === "OTRAS") return -1;
 
     const nameA = typeof getOficinaNombre === "function" ? getOficinaNombre(A) : A;
     const nameB = typeof getOficinaNombre === "function" ? getOficinaNombre(B) : B;
 
-    const la = String(nameA || "").toLowerCase();
-    const lb = String(nameB || "").toLowerCase();
-    return la.localeCompare(lb, "es");
+    return nameA.localeCompare(nameB, "es");
   });
 };
 
@@ -40,7 +32,7 @@ export default function EstadisticasFilters({
   setFuenteSnapshot,
   desde,
   hasta,
-  getOficinaNombre, // 🚀 ACÁ RECIBE LA FUNCIÓN
+  getOficinaNombre,
 }) {
   const raw = Array.isArray(oficinasOptions) ? oficinasOptions : [];
   const unique = Array.from(new Set(raw.map((x) => String(x ?? "").trim()).filter(Boolean)));
@@ -100,16 +92,12 @@ export default function EstadisticasFilters({
             <option value="">Todas las oficinas</option>
 
             {ordered.map((of) => {
-              // 🚀 ACÁ CONVERTIMOS EL ID AL NOMBRE REAL
-              let label = typeof getOficinaNombre === "function" ? getOficinaNombre(of) : of;
+              // 🚀 ACÁ CONVERTIMOS EL ID AL NOMBRE REAL DE LA DB
+              const label = typeof getOficinaNombre === "function" ? getOficinaNombre(of) : of;
               
-              // Limpiamos los textos legacy por si acaso
-              label = String(label).replace(/\s*\(\d+\)$/, "");
-              const isNumeric = !isNaN(of) && String(of).trim() !== "";
-
               return (
                 <option key={of} value={of}>
-                  {isNumeric ? `${of} (${label})` : label}
+                  {label}
                 </option>
               );
             })}

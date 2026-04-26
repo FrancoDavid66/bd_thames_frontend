@@ -1,32 +1,28 @@
 // src/pages/SolicitudesPage.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux"; // 🚀 IMPORTAMOS REDUX
 import { 
   HiPlus, 
   HiRefresh, 
   HiShieldCheck, 
   HiBadgeCheck, 
-  HiUserGroup, 
   HiChevronDown,
   HiCollection
 } from "react-icons/hi";
 import toast from "react-hot-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 
-// 🚀 IMPORTACIONES DE SEGURIDAD
+// 🚀 IMPORTACIONES DE SEGURIDAD Y REDUX
 import { useAuth } from "../context/AuthContext";
+import { fetchAdminCompanias, fetchAdminCoberturas } from "../store/slices/adminSlice";
 
 import SolicitudesList from "../components/solicitudes/SolicitudesList";
 import CreateSolicitudModal from "../components/solicitudes/CreateSolicitudModal";
-import ResponsablesCrudModal from "../components/solicitudes/modalcreate/ResponsablesCrudModal";
-import CatalogosCrudModal from "../components/solicitudes/modalcreate/CatalogosCrudModal"; 
-
 import { solicitudesApi } from "../services/solicitudes.js";
-import { useCatalogos } from "../hooks/solicitudes/useCatalogos";
 
 import PageTransition from "../ux/motion/PageTransition.jsx";
 import { pressable } from "../ux/motion/variants";
-
 import { solicitudesRealtime } from "../services/notifications/solicitudes.js";
 
 /* Helpers */
@@ -55,30 +51,26 @@ function matchOficinaFilter(value, filter, oficinasList) {
 
 function normalizeList(list) {
   let arr = [];
-  if (Array.isArray(list)) {
-    arr = list;
-  } else if (list && Array.isArray(list.results)) {
-    arr = list.results;
-  } else if (list && Array.isArray(list.data)) {
-    arr = list.data;
-  }
+  if (Array.isArray(list)) arr = list;
+  else if (list && Array.isArray(list.results)) arr = list.results;
+  else if (list && Array.isArray(list.data)) arr = list.data;
   return arr.map((s) => ({ ...s, tareas: getTareas(s) }));
 }
 
 export default function SolicitudesPage() {
   const { user } = useAuth(); 
-  const [items, setItems] = useState([]);
+  const dispatch = useDispatch();
   
-  // 🚀 ESTADO DINÁMICO DE OFICINAS
+  // 🚀 LEEMOS LOS CATÁLOGOS DIRECTO DE LA "TORRE DE CONTROL" (REDUX)
+  const { companias, coberturas } = useSelector((state) => state.admin);
+
+  const [items, setItems] = useState([]);
   const [oficinasConfig, setOficinasConfig] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   
-  const [showEquipo, setShowEquipo] = useState(false);
-  const [showCatalogos, setShowCatalogos] = useState(false);
-
   const [hasLoaded, setHasLoaded] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -101,21 +93,23 @@ export default function SolicitudesPage() {
     return "TODAS";
   });
 
-  const { companias, coberturas, ensureLoaded: ensureCatalogosLoaded } = useCatalogos({ auto: false });
-
   const inFlightRef = useRef(false);
   const latestReqIdRef = useRef(0);
   const abortRef = useRef(null);
-
   const knownIdsRef = useRef(new Set());
   const isFirstLoadRef = useRef(true);
 
-  // 🚀 CARGAR OFICINAS DESDE EL BACKEND (Ajustado a la ruta real de tu Django)
+  // 🚀 AL MONTAR, ASEGURAMOS QUE LOS CATÁLOGOS ESTÉN CARGADOS
+  useEffect(() => {
+    dispatch(fetchAdminCompanias());
+    dispatch(fetchAdminCoberturas());
+  }, [dispatch]);
+
+  // Cargar Oficinas desde el Backend
   useEffect(() => {
     const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
     const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
     
-    // 👇 Ruta corregida para que apunte a /usuarios/oficinas/
     fetch(`${API_BASE}/usuarios/oficinas/`, {
       headers: token ? { "Authorization": `Bearer ${token}` } : {}
     })
@@ -265,10 +259,9 @@ export default function SolicitudesPage() {
     }
   }, [terminar]);
 
-  const openCreate = useCallback(async () => {
-    try { await ensureCatalogosLoaded?.(); } catch {}
+  const openCreate = useCallback(() => {
     setCreating(true);
-  }, [ensureCatalogosLoaded]);
+  }, []);
 
   return (
     <PageTransition>
@@ -290,26 +283,6 @@ export default function SolicitudesPage() {
                 </motion.div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {isWebAdmin && (
-                    <>
-                      <motion.button
-                        onClick={() => setShowCatalogos(true)}
-                        className="hidden md:inline-flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all font-bold text-[11px] uppercase tracking-widest"
-                        variants={pressable} initial="initial" whileHover="hover" whileTap="tap"
-                      >
-                        <HiCollection className="text-lg" /> Catálogos
-                      </motion.button>
-                      
-                      <motion.button
-                        onClick={() => setShowEquipo(true)}
-                        className="hidden md:inline-flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all font-bold text-[11px] uppercase tracking-widest"
-                        variants={pressable} initial="initial" whileHover="hover" whileTap="tap"
-                      >
-                        <HiUserGroup className="text-lg" /> Gestión Equipo
-                      </motion.button>
-                    </>
-                  )}
-
                   <motion.button
                     onClick={() => cargar({ silent: false, force: true })}
                     disabled={loading || refreshing}
@@ -401,34 +374,15 @@ export default function SolicitudesPage() {
           </div>
         </div>
 
-        {/* FAB para Mobile */}
-        {!creating && (
-          <motion.button
-            onClick={openCreate}
-            className="lg:hidden fixed right-6 z-[80] w-14 h-14 rounded-2xl flex items-center justify-center text-black bg-amber-400 border border-amber-300 shadow-2xl shadow-amber-900/40"
-            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 90px)" }}
-            variants={pressable} initial="initial" whileHover="hover" whileTap="tap"
-          >
-            <HiPlus className="w-8 h-8" />
-          </motion.button>
-        )}
-
         {/* MODALES */}
         {creating && (
           <CreateSolicitudModal
             onClose={() => setCreating(false)}
             onCreated={() => { setCreating(false); if (hasLoaded) cargar({ silent: true, force: true }); }}
-            companias={companias} coberturas={coberturas}
+            companias={companias}     // 🚀 VIAJAN DESDE REDUX AL WIZARD
+            coberturas={coberturas}   // 🚀 VIAJAN DESDE REDUX AL WIZARD
             oficinas={oficinasConfig}
           />
-        )}
-
-        {isWebAdmin && showEquipo && (
-          <ResponsablesCrudModal open={showEquipo} onClose={() => setShowEquipo(false)} onChanged={() => cargar({ silent: true })} />
-        )}
-
-        {isWebAdmin && showCatalogos && (
-          <CatalogosCrudModal open={showCatalogos} onClose={() => setShowCatalogos(false)} onChanged={() => ensureCatalogosLoaded({ force: true })} />
         )}
       </section>
     </PageTransition>

@@ -6,7 +6,8 @@ import {
   FaHome, FaUsers, FaFileAlt, FaMoneyCheckAlt, FaDatabase,
   FaChartBar, FaMapMarkedAlt, FaClipboardList, FaBullhorn,
   FaChevronDown, FaChevronRight, FaChevronLeft, FaSyncAlt,
-  FaClock, FaBan, FaTruckMoving, FaCashRegister, FaFileInvoiceDollar
+  FaClock, FaBan, FaTruckMoving, FaCashRegister, FaFileInvoiceDollar,
+  FaShieldAlt // 🚀 Ícono nuevo para la pestaña Admin
 } from "react-icons/fa";
 
 import ThemeToggle from "./ThemeToggle";
@@ -35,26 +36,29 @@ export default function Sidebar({
       // La pestaña principal de Pólizas (el acordeón)
       { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
       
-      // 🚀 ¡CANDADO PUESTO! Solo Admin ve Grúas
+      // Solo Admin ve Grúas
       { to: "/gruas", label: "Grúas", icon: FaTruckMoving, adminOnly: true }, 
       
       { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt },
       { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
       { to: "/balanzes", label: "Balanzes", icon: FaDatabase }, 
       
-      // 💸 Recaudación / Caja para TODOS
+      // Recaudación / Caja para TODOS
       { to: "/recaudacion", label: "Caja", icon: FaCashRegister },
+      
+      // 🚀 NUEVO: Panel de Administración (Solo Admin)
+      { to: "/admin", label: "Administración", icon: FaShieldAlt, adminOnly: true },
       
       // Solo Admin
       { to: "/marketing", label: "Campañas", icon: FaBullhorn, adminOnly: true },
       
-      // 🚀 NUEVO: Cotizador (Solo Admin)
+      // Cotizador (Solo Admin)
       { to: "/cotizaciones", label: "Cotizador", icon: FaFileInvoiceDollar, adminOnly: true },
       
       { to: "/estadisticas", label: "Estadísticas", icon: FaChartBar, adminOnly: true },
       { to: "/competencia", label: "Competencia", icon: FaChartBar, adminOnly: true },
       
-      // 🚀 ¡CANDADO PUESTO! Solo Admin ve Geo
+      // Solo Admin ve Geo
       { to: "/geo", label: "Geo", icon: FaMapMarkedAlt, adminOnly: true },
     ];
 

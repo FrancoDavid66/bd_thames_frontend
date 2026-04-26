@@ -294,17 +294,40 @@ export default function PolizasPage() {
       </div>
 
       <PolizaFilter
-        user={user} searchValue={searchDraft} onSearchChange={onSearchChange} onSearchSubmit={onSearchSubmit}
-        onClearSearchApplied={onClearSearchApplied} searchApplied={search} estadoActual={estado}
-        onEstadoChange={onEstadoChange} estadoFinancieroActual={estado_financiero} onEstadoFinancieroChange={onEstadoFinancieroChange}
-        pageSize={pageSize} onPageSizeChange={onPageSizeChange} totalFiltradas={cursorEnabled ? listFiltrada.length : total}
-        modoActual={modo} onModoChange={onModoChange} resumenCuotas={resumenCuotas} resumenPolizas={resumenPolizas}
-        kpis={kpis} fechaVencimientoDesde={fecha_vencimiento_desde} fechaVencimientoHasta={fecha_vencimiento_hasta}
-        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange} onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
-        vencidasUltimosDias={vencidas_ultimos_dias} vencidasMasDeDias={vencidas_mas_de_dias}
-        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange} onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
-        onClearVencimientoFilters={onClearVencimiento} onVerUltimas={handleVerUltimas} status={status}
-        oficinaActual={oficina} onOficinaChange={(val) => dispatch(setOficina(val === "ALL" ? "" : val))}
+        user={user} 
+        searchValue={searchDraft} 
+        onSearchChange={onSearchChange} 
+        onSearchSubmit={onSearchSubmit}
+        onClearSearchApplied={onClearSearchApplied} 
+        searchApplied={search} 
+        estadoActual={estado}
+        onEstadoChange={onEstadoChange} 
+        estadoFinancieroActual={estado_financiero} 
+        onEstadoFinancieroChange={onEstadoFinancieroChange}
+        pageSize={pageSize} 
+        onPageSizeChange={onPageSizeChange} 
+        totalFiltradas={cursorEnabled ? listFiltrada.length : total}
+        modoActual={modo} 
+        onModoChange={onModoChange} 
+        resumenCuotas={resumenCuotas} 
+        resumenPolizas={resumenPolizas}
+        kpis={kpis} 
+        fechaVencimientoDesde={fecha_vencimiento_desde} 
+        fechaVencimientoHasta={fecha_vencimiento_hasta}
+        onFechaVencimientoDesdeChange={onFechaVencimientoDesdeChange} 
+        onFechaVencimientoHastaChange={onFechaVencimientoHastaChange}
+        vencidasUltimosDias={vencidas_ultimos_dias} 
+        vencidasMasDeDias={vencidas_mas_de_dias}
+        onVencidasUltimosDiasChange={onVencidasUltimosDiasChange} 
+        onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
+        onClearVencimientoFilters={onClearVencimiento} 
+        onVerUltimas={handleVerUltimas} 
+        status={status}
+        oficinaActual={oficina} 
+        onOficinaChange={(val) => dispatch(setOficina(val === "ALL" ? "" : val))}
+        // CONEXIÓN DINÁMICA DE COMPAÑÍAS (Reemplazando el comentario problemático)
+        companiaActual={compania}
+        onCompaniaChange={onCompaniaChange}
       />
 
       {error && status === "failed" && (

@@ -3,9 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { HiPlus, HiCheck, HiX } from "react-icons/hi";
+import { HiPlus, HiCheck, HiX, HiShieldCheck } from "react-icons/hi";
 
-// 🚀 IMPORTAMOS AUTH PARA EL BLINDAJE DE SUCURSALES
 import { useAuth } from "../../../context/AuthContext";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
@@ -25,13 +24,6 @@ const inputVariants = {
 const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"].map(
   (x) => ({ id: x, nombre: x })
 );
-
-function toRuleKey(human) {
-  const k = String(human || "").trim().toUpperCase();
-  if (k === "A") return "A";
-  if (k.includes("A") && k.includes("GRUA")) return "A_GRUA";
-  return "OTRAS";
-}
 
 function ymdLocal(d) {
   const y = d.getFullYear();
@@ -115,40 +107,72 @@ export default function PolizaStep({
     setPoliza((prev = {}) => ({ ...prev, primer_vencimiento: next }));
   }, [poliza?.fecha_emision, setPoliza]);
 
-  const coverageRuleKey = toRuleKey(poliza?.cobertura);
+  // 🚀 FIX: Filtramos las coberturas para que SOLO muestre las de la compañía elegida
+  const coberturasFiltradas = useMemo(() => {
+    if (!poliza?.compania) return [];
+    const ciaId = String(poliza.compania).trim().toLowerCase();
+    return coberturas.filter(c => 
+      String(c.compania).trim().toLowerCase() === ciaId || 
+      String(c.compania_nombre).trim().toLowerCase() === ciaId
+    );
+  }, [coberturas, poliza?.compania]);
+
+  const coberturaObj = useMemo(() => {
+    if (!poliza?.cobertura) return null;
+    const selectedKey = String(poliza.cobertura).trim().toLowerCase();
+    
+    // Busca solo dentro de las filtradas
+    const found = coberturasFiltradas.find(c => 
+      String(c.id).trim().toLowerCase() === selectedKey || 
+      String(c.nombre).trim().toLowerCase() === selectedKey
+    );
+
+    if (found) {
+       let fotos = found.fotos_requeridas;
+       if (typeof fotos === 'string') { try { fotos = JSON.parse(fotos); } catch(e) { fotos = fotos.split(',').map(s=>s.trim()).filter(Boolean); } }
+       if (!Array.isArray(fotos)) fotos = [];
+
+       let docs = found.documentos_requeridos || found.documentos_requeridas;
+       if (typeof docs === 'string') { try { docs = JSON.parse(docs); } catch(e) { docs = docs.split(',').map(s=>s.trim()).filter(Boolean); } }
+       if (!Array.isArray(docs)) docs = [];
+
+       return { ...found, fotos_requeridas: fotos, documentos_requeridos: docs };
+    }
+    return null;
+  }, [poliza?.cobertura, coberturasFiltradas]);
+
   const requisitos = useMemo(() => {
-    if (coverageRuleKey === "A") {
+    if (!coberturaObj) {
       return {
-        title: "Requisitos para cobertura A",
-        items: ["Cédula verde (frente)"],
-        note: "No se solicitan fotos del vehículo en esta cobertura.",
-        color: "from-emerald-200/80 to-teal-200/80",
+        title: "Seleccione una cobertura",
+        items: ["Elija la compañía y cobertura para ver los requisitos."],
+        note: "",
+        color: "from-slate-500/20 to-slate-400/20 text-slate-400",
       };
     }
-    if (coverageRuleKey === "A_GRUA") {
-      return {
-        title: "Requisitos para A + GRÚA",
-        items: [
-          "Cédula verde (frente)",
-          "VTV",
-          "Fotos del vehículo: Frente, Lateral Izq., Lateral Der., Trasera",
-        ],
-        note: "Estas imágenes se cargarán en el paso siguiente.",
-        color: "from-sky-200/80 to-cyan-200/80",
-      };
-    }
+
+    const fotos = coberturaObj.fotos_requeridas || [];
+    const docs = coberturaObj.documentos_requeridos || [];
+    const hasRequisitos = fotos.length > 0 || docs.length > 0;
+
+    const items = [];
+    if (docs.length > 0) items.push(`Papeles: ${docs.join(', ')}`);
+    else items.push("Papeles: Sin requerimientos legales");
+
+    if (fotos.length > 0) items.push(`Inspección: ${fotos.length} fotos (${fotos.join(', ')})`);
+    else items.push("Inspección: Sin requerimiento fotográfico");
+
     return {
-      title: "Requisitos para otras coberturas",
-      items: [
-        "Cédula verde (frente)",
-        "VTV (si aplica)",
-        "Oblea GNC / Título (si aplica)",
-        "Fotos completas del vehículo (incluye interiores/auxilio si corresponde)",
-      ],
-      note: "En el próximo paso podrás adjuntar documentos y galería de fotos.",
-      color: "from-amber-200/80 to-yellow-200/80",
+      title: `Requisitos para: ${coberturaObj.nombre}`,
+      items,
+      note: hasRequisitos 
+        ? "El sistema bloqueará la solicitud si no cargás esto en el próximo paso." 
+        : "Podrás avanzar de forma rápida en el paso de imágenes.",
+      color: hasRequisitos 
+        ? "from-sky-500/20 to-cyan-500/20 text-sky-400" 
+        : "from-emerald-500/20 to-teal-500/20 text-emerald-400",
     };
-  }, [coverageRuleKey]);
+  }, [coberturaObj]);
 
   return (
     <motion.div
@@ -174,19 +198,19 @@ export default function PolizaStep({
           <SelectCreatable
             label="Compañía"
             value={poliza?.compania || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, compania: v }))}
+            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, compania: v, cobertura: "" }))} // 🚀 Resetea cobertura si cambia cia
             options={companias} 
             isWebAdmin={isWebAdmin}
-            endpoint="/companias/"  // 🚀 CAMBIADO: Ruta global sincronizada
+            endpoint="/cotizaciones/companias/" 
           />
 
           <SelectCreatable
             label="Cobertura"
             value={poliza?.cobertura || ""}
             onChange={(v) => setPoliza((prev = {}) => ({ ...prev, cobertura: v }))}
-            options={coberturas} 
+            options={coberturasFiltradas} // 🚀 Pasa la lista filtrada
             isWebAdmin={isWebAdmin}
-            endpoint="/coberturas/" // 🚀 CAMBIADO: Ruta global sincronizada
+            endpoint="/cotizaciones/coberturas/" 
           />
 
           <Select
@@ -203,8 +227,8 @@ export default function PolizaStep({
           className="mt-4 rounded-xl border border-white/5 p-3 sm:p-4 bg-black/20"
           variants={inputVariants}
         >
-          <div className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter text-[#0b0f1e] bg-gradient-to-br ${requisitos.color} mb-2 shadow-sm`}>
-            {requisitos.title}
+          <div className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter bg-gradient-to-br ${requisitos.color} mb-2 shadow-sm`}>
+            <HiShieldCheck className="text-sm" /> {requisitos.title}
           </div>
           <ul className="list-disc pl-5 text-white/80 text-xs sm:text-sm space-y-1">
             {requisitos.items.map((it) => (

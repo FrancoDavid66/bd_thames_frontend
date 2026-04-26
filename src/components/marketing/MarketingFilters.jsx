@@ -1,3 +1,5 @@
+// src/components/marketing/MarketingFilters.jsx
+import { useState, useEffect } from "react";
 import { FaDownload, FaEye, FaFilter, FaTimes } from "react-icons/fa";
 
 const toOptions = (arr) =>
@@ -35,7 +37,6 @@ function Field({ label, children }) {
   );
 }
 
-// MultiSelect con UI/UX mejorado
 function MultiSelect({ values = [], options = [], onChange, placeholder = "Todos", addLabel = "+ Agregar" }) {
   const currentValues = Array.isArray(values) ? values : (values ? [values] : []);
 
@@ -57,7 +58,6 @@ function MultiSelect({ values = [], options = [], onChange, placeholder = "Todos
 
   return (
     <div className="space-y-3">
-      {/* Etiquetas seleccionadas */}
       {currentValues.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {currentValues.map(val => (
@@ -70,8 +70,6 @@ function MultiSelect({ values = [], options = [], onChange, placeholder = "Todos
           ))}
         </div>
       )}
-
-      {/* Selector para agregar */}
       <select
         onChange={handleSelect}
         value="" 
@@ -104,8 +102,24 @@ export default function MarketingFilters({
   const modelos = toOptions(options.modelos);
   const companias = toOptions(options.companias);
   
-  // 🚀 NUEVO: Leemos la lista de oficinas que nos mandó el backend
-  const oficinasDb = Array.isArray(options.oficinas) ? options.oficinas : [];
+  // 🚀 FIX: Traemos las oficinas directo del backend para asegurarnos de tener el ID y el estado 'activa'
+  const [oficinasReal, setOficinasReal] = useState([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+    const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
+    
+    fetch(`${API_BASE}/usuarios/oficinas/`, {
+      headers: token ? { "Authorization": `Bearer ${token}` } : {}
+    })
+    .then(res => res.ok ? res.json() : [])
+    .then(data => {
+      const arr = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      // Solo mostramos las activas
+      setOficinasReal(arr.filter(ofi => ofi.activa === true));
+    })
+    .catch(err => console.error("Error cargando oficinas en marketing:", err));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -116,7 +130,6 @@ export default function MarketingFilters({
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 items-start">
           
-          {/* 🚀 NUEVO: Desplegable de Oficinas 100% Dinámico */}
           <Field label="Oficina (Emisor)">
             <select
               value={values.oficina || ""}
@@ -124,9 +137,9 @@ export default function MarketingFilters({
               className="w-full h-12 rounded-xl bg-slate-950/50 border border-white/10 px-4 outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50 text-white cursor-pointer text-sm transition-all hover:bg-white/5"
             >
               <option value="" className="text-black bg-white">Todas las oficinas</option>
-              {oficinasDb.map((ofi) => (
-                <option key={ofi.codigo} value={ofi.codigo} className="text-black bg-white">
-                  {ofi.nombre} ({ofi.codigo})
+              {oficinasReal.map((ofi) => (
+                <option key={ofi.id} value={ofi.id} className="text-black bg-white">
+                  {ofi.nombre} ({ofi.id})
                 </option>
               ))}
             </select>
@@ -138,6 +151,8 @@ export default function MarketingFilters({
               onChange={(e) => onChange("estado", e.target.value)}
               className="w-full h-12 rounded-xl bg-yellow-400/5 border border-yellow-400/20 px-4 outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50 text-yellow-400 font-bold cursor-pointer text-sm transition-all hover:bg-yellow-400/10"
             >
+              {/* 🚀 EL HACK DEFINITIVO: Le pasamos TODOS los estados literalmente escritos */}
+              <option value="activa,vencida,pendiente,nueva,cotizar,renovacion" className="text-black bg-white">🌐 Sin filtro (Absolutamente todas)</option>
               <option value="activa" className="text-black bg-white">✅ Activas (Al día)</option>
               <option value="vencida" className="text-black bg-white">⚠️ Vencidas (Con deuda)</option>
               <option value="activa,vencida" className="text-black bg-white">Todas (Act. y Venc.)</option>
@@ -172,43 +187,19 @@ export default function MarketingFilters({
           </Field>
 
           <Field label="Marcas">
-            <MultiSelect 
-              values={values.marca} 
-              options={marcas} 
-              onChange={(newArr) => onChange("marca", newArr)} 
-              placeholder="Todas las marcas" 
-              addLabel="+ Agregar Marca"
-            />
+            <MultiSelect values={values.marca} options={marcas} onChange={(newArr) => onChange("marca", newArr)} placeholder="Todas las marcas" addLabel="+ Agregar Marca" />
           </Field>
 
           <Field label="Años">
-            <MultiSelect 
-              values={values.anio} 
-              options={anios} 
-              onChange={(newArr) => onChange("anio", newArr)} 
-              placeholder="Todos los años" 
-              addLabel="+ Agregar Año"
-            />
+            <MultiSelect values={values.anio} options={anios} onChange={(newArr) => onChange("anio", newArr)} placeholder="Todos los años" addLabel="+ Agregar Año" />
           </Field>
 
           <Field label="Modelos">
-            <MultiSelect 
-              values={values.modelo} 
-              options={modelos} 
-              onChange={(newArr) => onChange("modelo", newArr)} 
-              placeholder="Todos los modelos" 
-              addLabel="+ Agregar Modelo"
-            />
+            <MultiSelect values={values.modelo} options={modelos} onChange={(newArr) => onChange("modelo", newArr)} placeholder="Todos los modelos" addLabel="+ Agregar Modelo" />
           </Field>
 
           <Field label="Compañías">
-            <MultiSelect 
-              values={values.compania} 
-              options={companias} 
-              onChange={(newArr) => onChange("compania", newArr)} 
-              placeholder="Todas las compañías" 
-              addLabel="+ Agregar Cía"
-            />
+            <MultiSelect values={values.compania} options={companias} onChange={(newArr) => onChange("compania", newArr)} placeholder="Todas las compañías" addLabel="+ Agregar Cía" />
           </Field>
         </div>
 
@@ -226,19 +217,8 @@ export default function MarketingFilters({
             {onExport && (
               <div className="flex items-center gap-3 ml-auto">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Exportar:</span>
-                <button
-                  onClick={() => onExport("csv")}
-                  className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold text-slate-300 hover:text-white transition-all"
-                >
-                  <FaDownload /> CSV
-                </button>
-
-                <button
-                  onClick={() => onExport("xlsx")}
-                  className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold text-slate-300 hover:text-white transition-all"
-                >
-                  <FaDownload /> EXCEL
-                </button>
+                <button onClick={() => onExport("csv")} className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold text-slate-300 hover:text-white transition-all"><FaDownload /> CSV</button>
+                <button onClick={() => onExport("xlsx")} className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold text-slate-300 hover:text-white transition-all"><FaDownload /> EXCEL</button>
               </div>
             )}
           </div>
@@ -247,12 +227,8 @@ export default function MarketingFilters({
 
       {!!errorText && (
         <div className="rounded-2xl bg-rose-500/10 border border-rose-500/30 p-5 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
-            <FaTimes />
-          </div>
-          <p className="text-sm font-medium text-rose-200">
-            {errorText}
-          </p>
+          <div className="h-8 w-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 shrink-0"><FaTimes /></div>
+          <p className="text-sm font-medium text-rose-200">{errorText}</p>
         </div>
       )}
     </div>

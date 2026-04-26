@@ -1,14 +1,12 @@
 // src/components/solicitudes/modalcreate/ResponsablesCrudModal.jsx
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   HiX, 
-  HiCog, 
   HiPlus, 
   HiTrash, 
   HiCheck, 
   HiSearch, 
-  HiBan, 
   HiOfficeBuilding,
   HiUserGroup 
 } from "react-icons/hi";
@@ -29,18 +27,10 @@ const itemVariants = {
   animate: { opacity: 1, x: 0 },
 };
 
-// 🏢 LISTA DE RESPALDO (Por si el backend no responde)
-const OFICINAS_FALLBACK = [
-  { id: 1, nombre: "5 Esquinas" },
-  { id: 2, nombre: "Axion" },
-  { id: 3, nombre: "Kilómetro 39" },
-  { id: 4, nombre: "San Justo" },
-];
-
 export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
   const { user } = useAuth(); 
   const [items, setItems] = useState([]);
-  const [oficinasReal, setOficinasReal] = useState(OFICINAS_FALLBACK); 
+  const [oficinasReal, setOficinasReal] = useState([]); 
   const [loading, setLoading] = useState(false);
 
   // 🛡️ Lógica de Permisos Multi-tenant
@@ -59,18 +49,27 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Cargamos Empleados (Filtrado automático por oficina en el Backend vía MultiTenantMixin)
+      // 1. Cargamos Empleados 
       const empleados = await solicitudesApi.empleadosListar({}).catch(() => []);
       setItems(Array.isArray(empleados) ? empleados : (empleados?.results || []));
 
-      // 2. Cargamos Oficinas (Solo si es admin para el selector de creación)
+      // 🚀 2. FIX CLAVE: Forzamos la consulta a la fuente real de oficinas
       if (isWebAdmin) {
         try {
-          const ofis = await solicitudesApi.oficinasListar({});
-          const dataOfis = Array.isArray(ofis) ? ofis : (ofis?.results || []);
-          if (dataOfis.length > 0) setOficinasReal(dataOfis);
+          const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+          const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
+          
+          const res = await fetch(`${API_BASE}/usuarios/oficinas/`, {
+            headers: token ? { "Authorization": `Bearer ${token}` } : {}
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            const dataOfis = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+            setOficinasReal(dataOfis);
+          }
         } catch (err) {
-          console.warn("Usando catálogo de respaldo para oficinas.");
+          console.error("Error al cargar las oficinas reales", err);
         }
       }
     } catch (e) {
@@ -88,7 +87,7 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
     const nombre = (nuevoNombre || "").trim();
     if (!nombre) return toast.error("El nombre es obligatorio.");
     
-    // 🏢 Determinamos la oficina: La elegida por el admin o la del usuario de sucursal logueado
+    // 🏢 Determinamos la oficina
     const targetOficina = isWebAdmin ? nuevoOficina : userOficinaId;
 
     if (!targetOficina) {
@@ -100,7 +99,7 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
       await solicitudesApi.crearEmpleado({ 
         nombre, 
         activo: nuevoActivo, 
-        oficina: targetOficina // 🚀 Enviamos ID numérico para el Backend
+        oficina: targetOficina 
       });
       
       toast.success("Personal registrado correctamente");
@@ -154,7 +153,7 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
             
-            {/* Registro de Personal (Nuevo) */}
+            {/* Registro de Personal */}
             <motion.section className="p-5 rounded-2xl border border-white/10 bg-white/[0.03] shadow-inner">
               {!creating ? (
                 <button onClick={() => setCreating(true)} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/40 font-black uppercase text-[10px] tracking-widest hover:border-sky-500/50 hover:text-sky-400 transition-all flex items-center justify-center gap-2">
@@ -172,7 +171,6 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
                         <div className="space-y-1">
                             <label className="text-[9px] font-black text-sky-400/50 uppercase ml-1">Sucursal</label>
                             <select value={nuevoOficina} onChange={(e) => setNuevoOficina(e.target.value)} className="w-full h-12 px-4 rounded-xl bg-black/40 border border-sky-500/20 text-sky-400 font-bold text-sm outline-none cursor-pointer">
-                                {/* 🚀 FIX DE COLORES AQUÍ: Le damos fondo oscuro y texto claro a las opciones */}
                                 <option value="" className="bg-[#0b0f1e] text-slate-400">— Elegir Oficina —</option>
                                 {oficinasReal.map(o => <option key={o.id} value={o.id} className="bg-[#0b0f1e] text-white">{o.nombre}</option>)}
                             </select>
@@ -207,7 +205,7 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
                   {loading ? (
                     <div className="p-12 text-center text-sky-400 text-[10px] font-black uppercase tracking-widest animate-pulse">Sincronizando...</div>
                   ) : filtered.length === 0 ? (
-                    <div className="p-12 text-center text-white/10 text-[10px] font-black uppercase tracking-widest italic">No hay responsables en esta unidad</div>
+                    <div className="p-12 text-center text-white/10 text-[10px] font-black uppercase tracking-widest italic">No hay responsables registrados</div>
                   ) : (
                     filtered.map((it) => (
                         <motion.div key={it.id} className="p-4 flex items-center justify-between group hover:bg-white/[0.02] transition-colors" variants={itemVariants}>
@@ -238,7 +236,7 @@ export default function ResponsablesCrudModal({ open, onClose, onChanged }) {
           </div>
 
           <div className="p-4 border-t border-white/5 bg-black/40 text-center">
-             <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">Thames Security Multi-tenant System v2.1</p>
+             <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">Thames Security Multi-tenant System</p>
           </div>
         </motion.div>
       </motion.div>

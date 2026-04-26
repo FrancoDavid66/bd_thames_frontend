@@ -14,10 +14,11 @@ import {
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
-// 🚀 IMPORTACIONES DE SEGURIDAD
+// 🚀 IMPORTACIONES DE SEGURIDAD Y SERVICIOS
 import { useAuth } from "../../context/AuthContext";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 import { solicitudesApi } from "../../services/solicitudes.js";
+import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
 
 import ResponsableManagerModal from "./modalcreate/ResponsableManagerModal";
 import ClienteStep from "./modalcreate/ClienteStep";
@@ -25,9 +26,6 @@ import PolizaStep from "./modalcreate/PolizaStep";
 import ImagenesDocsStep from "./modalcreate/ImagenesDocsStep";
 import SolicitudStep from "./modalcreate/SolicitudStep";
 
-import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
-
-// Variants para animaciones
 const modalVariants = {
   initial: { opacity: 0, scale: 0.95 },
   animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
@@ -40,9 +38,9 @@ const stepVariants = {
   exit: { opacity: 0, x: -50, transition: { duration: 0.3 } },
 };
 
-/* =====================   Constantes   ===================== */
 const MAX_FOTOS_RAW = import.meta.env.VITE_MAX_FOTOS;
 const MAX_FOTOS = MAX_FOTOS_RAW === "0" || MAX_FOTOS_RAW === 0 ? 0 : Number(MAX_FOTOS_RAW || 12);
+const TIPO_DNI_SLOTS = [ { key: "DNI_FRENTE", label: "DNI frente" }, { key: "DNI_DORSO", label: "DNI dorso" } ];
 
 function ymdLocal(d) {
   const y = d.getFullYear();
@@ -70,17 +68,9 @@ function addMonthsLocal(ymd, months) {
   return ymdLocal(new Date(y2, m2, day2, 12, 0, 0, 0));
 }
 
-const DOC_SLOT_RC = [ { key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" }, { key: "CEDULA_VERDE_DORSO", label: "Cédula verde (dorso)" } ];
-const DOC_SLOT_A_GRUA = [ { key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" }, { key: "CEDULA_VERDE_DORSO", label: "Cédula verde (dorso)" } ];
-const DOC_SLOT_FULL = [ { key: "CEDULA_VERDE_FRENTE", label: "Cédula verde (frente)" }, { key: "CEDULA_VERDE_DORSO", label: "Cédula verde (dorso)" }, { key: "TITULO", label: "Título del vehículo" }, { key: "OBLEA_GNC", label: "Oblea GNC" } ];
-const FOTO_SLOTS_FULL = [ { key: "FRENTE", label: "Frente" }, { key: "LATERAL_IZQ", label: "Lateral izq." }, { key: "LATERAL_DER", label: "Lateral der." }, { key: "TRASERA", label: "Trasera" }, { key: "PATENTE", label: "Patente" }, { key: "TUBO_GNC", label: "Equipo GNC" } ];
-const FOTO_SLOTS_A_GRUA = [ { key: "FRENTE", label: "Frente" }, { key: "LATERAL_IZQ", label: "Lateral izq." }, { key: "LATERAL_DER", label: "Lateral der." }, { key: "TRASERA", label: "Trasera" }, { key: "PATENTE", label: "Patente" } ];
-const TIPO_DNI_SLOTS = [ { key: "DNI_FRENTE", label: "DNI frente" }, { key: "DNI_DORSO", label: "DNI dorso" } ];
-
-const ALLOWED_FOTO_KEYS_SOLICITUD = new Set(["PATENTE", "FRENTE", "LATERAL_IZQ", "LATERAL_DER", "TRASERA", "EQUIPO_GNC", "OBLEA_GNC"]);
-
 const rmDiacritics = (s = "") => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const guessMime = (name = "") => (name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+
 function normalizaTelefonoAR(raw) {
   if (!raw) return "";
   let d = String(raw).replace(/\D/g, "");
@@ -91,12 +81,11 @@ function normalizaTelefonoAR(raw) {
   return d;
 }
 
-/* =====================   Componente   ===================== */
 export default function CreateSolicitudModal({
   onClose,
   companias = [],
   coberturas = [],
-  oficinas = [], // 🚀 AHORA RECIBE LAS OFICINAS DEL PADRE
+  oficinas = [], 
   onCreated,
   skipResponsableGate = false,
   initialResponsableId = "",
@@ -141,14 +130,20 @@ export default function CreateSolicitudModal({
     setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
   }, [poliza.fecha_emision]);
 
+  // Seteo de cantidad de cuotas automático
   useEffect(() => {
     const COMPANY_CUOTAS = { agrosalta: 6, "federacion patronal": 6, "federación patronal": 6, atm: 4, equidad: 3, nre: 3, providencia: 3 };
-    const raw = (poliza.compania || "").trim();
+    
+    // 🚀 TRADUCTOR INTERNO: Buscamos el nombre real para calcular las cuotas
+    const ciaObj = companias.find(c => String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania));
+    const finalCompania = ciaObj ? ciaObj.nombre : poliza.compania;
+
+    const raw = (finalCompania || "").trim();
     if (!raw || tocoCantidadCuotas) return;
     const key = rmDiacritics(raw).toLowerCase();
     const cant = COMPANY_CUOTAS[key];
     if (cant) setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(cant) }));
-  }, [poliza.compania, tocoCantidadCuotas]);
+  }, [poliza.compania, companias, tocoCantidadCuotas]);
 
   const cuotasPreview = useMemo(() => {
     const count = Number(poliza.cantidad_cuotas_override || 12);
@@ -159,23 +154,65 @@ export default function CreateSolicitudModal({
 
   const [solicitud, setSolicitud] = useState({ prioridad: "NORMAL", observaciones: "", tipoSeguro: initialTipoSeguro });
 
-  const coberturaNorm = String(poliza.cobertura || "").trim().toUpperCase();
-  const isA = coberturaNorm === "A";
-  const isAGrua = coberturaNorm.includes("A") && coberturaNorm.includes("GRUA");
+  const coberturaObj = useMemo(() => {
+    if (!poliza.cobertura || !poliza.compania) return null;
+    
+    const ciaId = String(poliza.compania).trim().toLowerCase();
+    const selectedKey = String(poliza.cobertura).trim().toLowerCase();
+    
+    const found = coberturas.find(c => {
+      const matchCia = String(c.compania).trim().toLowerCase() === ciaId || String(c.compania_nombre).trim().toLowerCase() === ciaId;
+      const matchCob = String(c.id).trim().toLowerCase() === selectedKey || String(c.nombre).trim().toLowerCase() === selectedKey;
+      return matchCia && matchCob;
+    });
 
-  const FOTO_SLOTS = isA ? [] : isAGrua ? FOTO_SLOTS_A_GRUA : FOTO_SLOTS_FULL;
-  const DOC_SLOTS = isA ? DOC_SLOT_RC : isAGrua ? DOC_SLOT_A_GRUA : DOC_SLOT_FULL;
+    if (found) {
+       let fotos = found.fotos_requeridas;
+       if (typeof fotos === 'string') {
+           try { fotos = JSON.parse(fotos); } 
+           catch(e) { fotos = fotos.split(',').map(s => s.trim()).filter(Boolean); }
+       }
+       if (!Array.isArray(fotos)) fotos = [];
+       
+       let docs = found.documentos_requeridos || found.documentos_requeridas;
+       if (typeof docs === 'string') {
+           try { docs = JSON.parse(docs); } 
+           catch(e) { docs = docs.split(',').map(s => s.trim()).filter(Boolean); }
+       }
+       if (!Array.isArray(docs)) docs = [];
+       
+       return { ...found, fotos_requeridas: fotos, documentos_requeridos: docs };
+    }
+    return null;
+  }, [poliza.cobertura, poliza.compania, coberturas]);
 
   const [fotoSlots, setFotoSlots] = useState({});
-  const [docSlots, setDocSlots] = useState(Object.fromEntries(DOC_SLOTS.map(({ key }) => [key, null])));
+  const [docSlots, setDocSlots] = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const nextDocKeys = new Set(DOC_SLOTS.map((d) => d.key));
-    setDocSlots((prev) => { const out = {}; for (const k of nextDocKeys) out[k] = prev?.[k] || null; return out; });
-    const nextFotoKeys = new Set(FOTO_SLOTS.map((f) => f.key));
-    setFotoSlots((prev) => { const out = {}; for (const k of nextFotoKeys) out[k] = prev?.[k] || null; return out; });
-  }, [coberturaNorm]);
+    if (!coberturaObj || !Array.isArray(coberturaObj.fotos_requeridas) || coberturaObj.fotos_requeridas.length === 0) {
+      setFotoSlots({});
+    } else {
+      const nextFotoKeys = new Set(coberturaObj.fotos_requeridas);
+      setFotoSlots((prev) => { 
+        const out = {}; 
+        for (const k of nextFotoKeys) out[k] = prev?.[k] || null; 
+        return out; 
+      });
+    }
+    
+    if (!coberturaObj || !Array.isArray(coberturaObj.documentos_requeridos) || coberturaObj.documentos_requeridos.length === 0) {
+      setDocSlots({});
+    } else {
+      const nextDocKeys = new Set(coberturaObj.documentos_requeridos);
+      setDocSlots((prev) => { 
+        const out = {}; 
+        for (const k of nextDocKeys) out[k] = prev?.[k] || null; 
+        return out; 
+      });
+    }
+  }, [coberturaObj]);
 
   const paso1Errors = useMemo(() => {
     const e = {};
@@ -222,6 +259,7 @@ export default function CreateSolicitudModal({
       toast.success("Subido");
     } catch { toast.error("No se pudo subir el archivo"); }
   }
+  
   const onUploadDNI = (file, key) => handleUploadToSlot(file, "de-thames/clientes/dni", (val) => setDniSlots((s) => ({ ...s, [key]: val })));
   const onUploadFotoVehiculo = (file, key) => handleUploadToSlot(file, "de-thames/solicitudes/fotos", (val) => setFotoSlots((s) => ({ ...s, [key]: val })));
   const onUploadDocVehiculo = (file, key) => handleUploadToSlot(file, "de-thames/solicitudes/docs", (val) => setDocSlots((s) => ({ ...s, [key]: val })));
@@ -230,6 +268,13 @@ export default function CreateSolicitudModal({
     if (!canSubmit) return;
     setSaving(true);
     try {
+      // 🚀 TRADUCTOR FINAL: Convertimos IDs a Nombres para que el backend no explote
+      const ciaObj = companias.find(c => String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania));
+      const finalCompania = ciaObj ? ciaObj.nombre : poliza.compania;
+
+      const cobObj = coberturas.find(c => String(c.id) === String(poliza.cobertura) || String(c.nombre) === String(poliza.cobertura));
+      const finalCobertura = cobObj ? cobObj.nombre : poliza.cobertura;
+
       const payload = { 
         cliente: {}, poliza: {}, solicitud: {}, fotos: {}, documentos: {}, cliente_fotos: {},
         oficina: poliza.oficina ? Number(poliza.oficina) : null
@@ -244,7 +289,14 @@ export default function CreateSolicitudModal({
         payload.cliente = { modo: "existente", id: Number(clienteId) };
       } else {
         payload.cliente = {
-          modo: "nuevo", nombre: cliente.nombre.trim(), apellido: cliente.apellido.trim(), telefono: normalizaTelefonoAR(cliente.telefono), email: cliente.email || null, dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(), direccion: (cliente.direccion || "").trim(), localidad: (cliente.localidad || "").trim(),
+          modo: "nuevo", 
+          nombre: cliente.nombre.trim(), 
+          apellido: cliente.apellido.trim(), 
+          telefono: normalizaTelefonoAR(cliente.telefono), 
+          email: cliente.email || null, 
+          dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(), 
+          direccion: (cliente.direccion || "").trim(), 
+          localidad: (cliente.localidad || "").trim(),
         };
       }
 
@@ -255,28 +307,45 @@ export default function CreateSolicitudModal({
         payload.poliza = { modo: "existente", id: Number(polizaId) };
       } else {
         payload.poliza = {
-          modo: "nueva", compania: poliza.compania.trim(), cobertura: poliza.cobertura.trim(), 
+          modo: "nueva", 
+          compania: finalCompania.trim(), 
+          cobertura: finalCobertura.trim(), 
           oficina: poliza.oficina ? Number(poliza.oficina) : null,
-          patente: poliza.patente.trim().toUpperCase(), marca: poliza.marca.trim(), modelo: poliza.modelo.trim(), 
-          anio: Number(poliza.anio), tipo: poliza.tipo || "Auto", precio_cuota: 0, 
+          patente: poliza.patente.trim().toUpperCase(), 
+          marca: poliza.marca.trim(), 
+          modelo: poliza.modelo.trim(), 
+          anio: Number(poliza.anio), 
+          tipo: poliza.tipo || "Auto", 
+          precio_cuota: 0, 
           cantidad_cuotas_override: poliza.cantidad_cuotas_override ? Number(poliza.cantidad_cuotas_override) : undefined, 
-          primer_vencimiento: poliza.primer_vencimiento, fecha_emision: poliza.fecha_emision || ymdLocal(new Date()), 
-          dias_a_vencer: Number(poliza.dias_a_vencer) || 30, generar_cuotas_ahora: !!poliza.generar_cuotas_ahora, regenerar_cuotas: false,
+          primer_vencimiento: poliza.primer_vencimiento, 
+          fecha_emision: poliza.fecha_emision || ymdLocal(new Date()), 
+          dias_a_vencer: Number(poliza.dias_a_vencer) || 30, 
+          generar_cuotas_ahora: !!poliza.generar_cuotas_ahora, 
+          regenerar_cuotas: false,
         };
       }
 
-      payload.solicitud = { responsable_empleado: Number(responsableId), responsable: "", prioridad: solicitud.prioridad || "NORMAL", observaciones: (solicitud.observaciones || "").trim(), motivo: "ALTA_POLIZA", tipoSeguro: solicitud.tipoSeguro || "ROBO" };
-
-      FOTO_SLOTS.forEach(({ key }) => {
-        const s = fotoSlots[key];
-        if (!s?.url) return;
-        const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
-        if (ALLOWED_FOTO_KEYS_SOLICITUD.has(sendKey)) payload.fotos[sendKey] = { url: s.url, public_id: s.public_id };
-      });
+      payload.solicitud = { 
+        responsable_empleado: Number(responsableId), 
+        responsable: "", 
+        prioridad: solicitud.prioridad || "NORMAL", 
+        observaciones: (solicitud.observaciones || "").trim(), 
+        motivo: "ALTA_POLIZA", 
+        tipoSeguro: solicitud.tipoSeguro || "ROBO",
+        cobertura_solicitada: finalCobertura.trim(),
+        compania_preferida: finalCompania.trim(),
+      };
 
       Object.entries(docSlots || {}).forEach(([key, s]) => {
         if (!s?.url) return;
         payload.documentos[key] = { url: s.url, public_id: s.public_id, mime: s.mime || guessMime(s?.file?.name || ""), nombre: key };
+      });
+
+      Object.entries(fotoSlots || {}).forEach(([key, s]) => {
+        if (!s?.url) return;
+        const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
+        payload.documentos[sendKey] = { url: s.url, public_id: s.public_id, mime: guessMime(), nombre: sendKey };
       });
 
       const raw = await solicitudesApi.crearCompleto(payload);
@@ -291,8 +360,8 @@ export default function CreateSolicitudModal({
           auto_marca: poliza.marca,
           auto_modelo: poliza.modelo,
           auto_anio: poliza.anio,
-          poliza_cobertura: poliza.cobertura,
-          poliza_compania: poliza.compania,
+          poliza_cobertura: finalCobertura.trim(),
+          poliza_compania: finalCompania.trim(),
         });
       } catch (err) { console.warn("Email alert falló", err); }
 
@@ -309,7 +378,6 @@ export default function CreateSolicitudModal({
     return () => (document.body.style.overflow = prev);
   }, []);
 
-  // 🚀 AHORA EL HEADER BUSCA EL NOMBRE DE LA LISTA DINÁMICA DE OFICINAS
   const selectedOficinaObj = oficinas.find((o) => String(o.id) === String(poliza.oficina));
   const headerOficinaName = isWebAdmin 
     ? (selectedOficinaObj ? selectedOficinaObj.nombre : "SELECCIONANDO SUCURSAL...") 
@@ -398,7 +466,22 @@ export default function CreateSolicitudModal({
           <AnimatePresence mode="wait">
             {step === 1 && <motion.div key="s1" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><ClienteStep clienteModo={clienteModo} setClienteModo={setClienteModo} clienteId={clienteId} setClienteId={setClienteId} cliente={cliente} setCliente={setCliente} dniSlots={dniSlots} setDniSlots={setDniSlots} TIPO_DNI_SLOTS={TIPO_DNI_SLOTS} onUploadDNI={onUploadDNI} /></motion.div>}
             {step === 2 && <motion.div key="s2" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><PolizaStep polizaModo={polizaModo} setPolizaModo={setPolizaModo} polizaId={polizaId} setPolizaId={setPolizaId} poliza={poliza} setPoliza={setPoliza} sinNumero={sinNumero} setSinNumero={setSinNumero} companias={companias} coberturas={coberturas} oficinas={oficinas} setTocoCantidadCuotas={setTocoCantidadCuotas} cuotasPreview={cuotasPreview} isWebAdmin={isWebAdmin} /></motion.div>}
-            {step === 3 && <motion.div key="s3" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><ImagenesDocsStep MAX_FOTOS={MAX_FOTOS} fotoSlotDefs={FOTO_SLOTS} fotoSlots={fotoSlots} setFotoSlots={setFotoSlots} docSlots={docSlots} setDocSlots={setDocSlots} docSlotDefs={DOC_SLOTS} onUploadFotoVehiculo={onUploadFotoVehiculo} onUploadDocVehiculo={onUploadDocVehiculo} /></motion.div>}
+            
+            {step === 3 && (
+              <motion.div key="s3" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
+                <ImagenesDocsStep 
+                  MAX_FOTOS={MAX_FOTOS} 
+                  coberturaSeleccionada={coberturaObj} 
+                  fotoSlots={fotoSlots} 
+                  setFotoSlots={setFotoSlots} 
+                  docSlots={docSlots} 
+                  setDocSlots={setDocSlots} 
+                  onUploadFotoVehiculo={onUploadFotoVehiculo} 
+                  onUploadDocVehiculo={onUploadDocVehiculo} 
+                />
+              </motion.div>
+            )}
+
             {step === 4 && <motion.div key="s4" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><SolicitudStep responsableNombre={responsableId ? `#${responsableId}` : ""} onCambiarResponsable={() => setAskResponsable(true)} solicitud={solicitud} setSolicitud={setSolicitud} /></motion.div>}
           </AnimatePresence>
         </div>

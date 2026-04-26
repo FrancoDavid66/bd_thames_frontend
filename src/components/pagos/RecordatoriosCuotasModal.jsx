@@ -32,7 +32,6 @@ function proveedorLabel(proveedor) {
 }
 
 const LS_KEY = "pagos_recordatorios_oficina";
-const isValidOfi = (v) => v === "1" || v === "2" || v === "3";
 
 function safeNum(v, fallback = 0) {
   const n = Number(v);
@@ -46,13 +45,6 @@ function pickFirst(obj, keys, fallback) {
   return fallback;
 }
 
-const getOficinaFullName = (num) => {
-  if (num === "1") return "Oficina 1 – 5 Esquinas";
-  if (num === "2") return "Oficina 2 – Axion";
-  if (num === "3") return "Oficina 3 – Km 39";
-  return `Oficina ${num}`;
-};
-
 export default function RecordatoriosCuotasModal({
   isOpen,
   onClose,
@@ -64,8 +56,11 @@ export default function RecordatoriosCuotasModal({
 }) {
   const dispatch = useDispatch();
   
+  // 🚀 ESTADO DINÁMICO DE OFICINAS
+  const [oficinasReal, setOficinasReal] = useState([]);
+
   // 🚀 Aseguramos que la oficina predeterminada para el empleado sea la suya
-  const defaultOfi = !isWebAdmin && userOficina ? String(userOficina) : "2";
+  const defaultOfi = !isWebAdmin && userOficina ? String(userOficina) : "1";
   const [oficinaSeleccionada, setOficinaSeleccionada] = useState(defaultOfi);
   
   const [selectedId, setSelectedId] = useState(null);
@@ -75,7 +70,37 @@ export default function RecordatoriosCuotasModal({
   const [deletingId, setDeletingId] = useState(null);
   const [lastResult, setLastResult] = useState(null);
 
-  // 🚀 Filtramos los medios de cobro. El empleado solo ve los de SU oficina.
+  // 🚀 FUNCIÓN DINÁMICA PARA NOMBRES CON ID
+  const getOficinaNombreDinamico = (num) => {
+    const found = oficinasReal.find(o => String(o.id) === String(num));
+    if (found) return `${found.nombre} (${found.id})`;
+    
+    // Fallbacks por si tarda en cargar la DB
+    if (num === "1") return "5 Esquinas (1)";
+    if (num === "2") return "Axion (2)";
+    if (num === "3") return "Km 39 (3)";
+    return `Oficina ${num}`;
+  };
+
+  // 🚀 CARGAR OFICINAS DESDE EL BACKEND
+  useEffect(() => {
+    if (!isOpen || !isWebAdmin) return;
+
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+    const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
+    
+    fetch(`${API_BASE}/usuarios/oficinas/`, {
+      headers: token ? { "Authorization": `Bearer ${token}` } : {}
+    })
+    .then(res => res.ok ? res.json() : [])
+    .then(data => {
+      const arr = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      setOficinasReal(arr);
+    })
+    .catch(err => console.error("Error cargando oficinas:", err));
+  }, [isOpen, isWebAdmin]);
+
+  // 🚀 Filtramos los medios de cobro
   const mediosAptos = useMemo(() => {
     const targetOfi = isWebAdmin ? oficinaSeleccionada : userOficina;
     return (mediosCobro || []).filter((m) => {
@@ -97,11 +122,10 @@ export default function RecordatoriosCuotasModal({
     if (isWebAdmin) {
       let saved = "";
       try { saved = String(window?.localStorage?.getItem(LS_KEY) || "").trim(); } catch { saved = ""; }
-      const ofi = isValidOfi(saved) ? saved : "2";
+      const ofi = saved ? saved : "1";
       setOficinaSeleccionada(ofi);
       setForm(f => ({ ...f, oficina: ofi }));
     } else {
-      // Forzamos la oficina del usuario para que no se le rompa la vista
       const ofiUsuario = String(userOficina || "2");
       setOficinaSeleccionada(ofiUsuario);
       setForm(f => ({ ...f, oficina: ofiUsuario }));
@@ -109,7 +133,6 @@ export default function RecordatoriosCuotasModal({
     
     setLastResult(null);
     resetForm();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isWebAdmin, userOficina]);
 
   useEffect(() => {
@@ -118,13 +141,12 @@ export default function RecordatoriosCuotasModal({
     } else if (mediosAptos.length === 0) {
       setSelectedId(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediosAptos]);
 
   const setOfi = (v) => {
     if (!isWebAdmin || sending) return;
     const next = String(v || "").trim();
-    if (!isValidOfi(next)) return;
+    if (!next) return;
     setOficinaSeleccionada(next);
     setSelectedId(null);
     if (!editingId) setForm(f => ({ ...f, oficina: next }));
@@ -172,7 +194,7 @@ export default function RecordatoriosCuotasModal({
         toast.success("Billetera actualizada");
       } else {
         await dispatch(crearMedioCobro(payload)).unwrap();
-        toast.success(`Billetera guardada para ${getOficinaFullName(payload.oficina)}`);
+        toast.success(`Billetera guardada para ${getOficinaNombreDinamico(payload.oficina)}`);
       }
       dispatch(fetchMediosCobro({ activo: true }));
       resetForm();
@@ -201,7 +223,7 @@ export default function RecordatoriosCuotasModal({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Reporte_${getOficinaFullName(oficinaSeleccionada)}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `Reporte_${getOficinaNombreDinamico(oficinaSeleccionada).replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
@@ -217,7 +239,6 @@ export default function RecordatoriosCuotasModal({
             <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 translate-y-2 scale-95" enterTo="opacity-100 translate-y-0 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0 scale-100" leaveTo="opacity-0 translate-y-2 scale-95">
               <Dialog.Panel className="w-full max-w-lg rounded-3xl bg-neutral-950 border border-neutral-800 text-white shadow-2xl overflow-hidden relative">
                 
-                {/* 🚀 PANTALLA DE CARGA (OVERLAY) - SOLO ADMIN */}
                 <AnimatePresence>
                   {sending && isWebAdmin && (
                     <motion.div 
@@ -233,14 +254,13 @@ export default function RecordatoriosCuotasModal({
                       </div>
                       <h3 className="text-xl font-bold text-white mb-2">Enviando recordatorios...</h3>
                       <p className="text-sm text-neutral-400 max-w-[280px]">
-                        Estamos notificando a los clientes de <strong>{getOficinaFullName(oficinaSeleccionada)}</strong>. 
+                        Estamos notificando a los clientes de <strong>{getOficinaNombreDinamico(oficinaSeleccionada)}</strong>. 
                         Por favor, no cierres esta ventana.
                       </p>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* HEADER */}
                 <div className="relative px-6 pt-6 pb-4 border-b border-neutral-800">
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isWebAdmin ? 'bg-emerald-500/15 border border-emerald-400/40 text-emerald-300' : 'bg-sky-500/15 border border-sky-400/40 text-sky-300'}`}>
@@ -251,7 +271,7 @@ export default function RecordatoriosCuotasModal({
                         {isWebAdmin ? "Panel de Recordatorios" : "Billeteras Autorizadas"}
                       </Dialog.Title>
                       <p className="mt-1 text-xs text-neutral-400">
-                        {isWebAdmin ? "Gestión centralizada de envíos masivos." : `Medios de pago para ${getOficinaFullName(userOficina)}.`}
+                        {isWebAdmin ? "Gestión centralizada de envíos masivos." : `Medios de pago para ${getOficinaNombreDinamico(userOficina)}.`}
                       </p>
                     </div>
                   </div>
@@ -264,12 +284,11 @@ export default function RecordatoriosCuotasModal({
 
                 <div className="px-6 py-5 space-y-5">
                   
-                  {/* RESULTADOS (SOLO ADMIN) */}
                   {lastResult && isWebAdmin && (
                     <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center justify-between">
                       <div>
                         <div className="text-sm font-bold text-emerald-300">Envío finalizado</div>
-                        <div className="text-xs text-neutral-300">{getOficinaFullName(oficinaSeleccionada)} • {safeNum(lastResult.enviados)} mensajes enviados.</div>
+                        <div className="text-xs text-neutral-300">{getOficinaNombreDinamico(oficinaSeleccionada)} • {safeNum(lastResult.enviados)} mensajes enviados.</div>
                       </div>
                       <button onClick={handleDownloadReport} className="flex items-center gap-1.5 text-xs font-bold text-sky-300 hover:text-white border border-sky-500/30 bg-sky-500/10 px-3 py-2 rounded-xl transition-all">
                         <HiDownload className="w-4 h-4" /> Excel
@@ -277,7 +296,6 @@ export default function RecordatoriosCuotasModal({
                     </div>
                   )}
 
-                  {/* FORMULARIO CRUD (SOLO ADMIN) */}
                   {isWebAdmin && (
                     <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
                       <div className="flex items-center justify-between">
@@ -293,11 +311,18 @@ export default function RecordatoriosCuotasModal({
                           <option value="mercado_pago">Mercado Pago</option>
                           <option value="billetera_virtual">Billetera Virtual</option>
                         </select>
+                        
+                        {/* 🚀 SELECT DINÁMICO DE OFICINAS CON ID */}
                         <select className="h-9 rounded-xl bg-neutral-950 border border-neutral-700 px-2 text-xs text-white" value={form.oficina} onChange={(e) => setForm({ ...form, oficina: e.target.value })}>
-                          <option value="1">Ofi 1 (5 Esquinas)</option>
-                          <option value="2">Ofi 2 (Axion)</option>
-                          <option value="3">Ofi 3 (Km 39)</option>
+                          {oficinasReal.length > 0 ? (
+                            oficinasReal.map(o => (
+                              <option key={o.id} value={o.id}>{o.nombre} ({o.id})</option>
+                            ))
+                          ) : (
+                            <option value={oficinaSeleccionada}>Cargando oficinas...</option>
+                          )}
                         </select>
+
                         <input type="text" className="h-9 rounded-xl bg-neutral-950 border border-neutral-700 px-3 text-xs text-white" placeholder="Alias o CBU" value={form.aliasCbu} onChange={(e) => setForm({ ...form, aliasCbu: e.target.value })} />
                         <input type="text" className="h-9 rounded-xl bg-neutral-950 border border-neutral-700 px-3 text-xs text-white" placeholder="Titular de la cuenta" value={form.titular} onChange={(e) => setForm({ ...form, titular: e.target.value })} />
                       </div>
@@ -309,7 +334,6 @@ export default function RecordatoriosCuotasModal({
                     </div>
                   )}
 
-                  {/* MENSAJE INFORMATIVO PARA EMPLEADOS */}
                   {!isWebAdmin && (
                     <div className="p-3 bg-neutral-900/50 border border-neutral-800 rounded-2xl flex items-center gap-3 text-neutral-400 shadow-inner">
                       <div className="p-2 bg-neutral-800 rounded-lg shrink-0">
@@ -322,7 +346,6 @@ export default function RecordatoriosCuotasModal({
                     </div>
                   )}
 
-                  {/* LISTADO DE BILLETERAS */}
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold text-neutral-500 uppercase px-1">
                       {isWebAdmin ? "Seleccioná la billetera para el mensaje:" : "Cuentas habilitadas:"}
@@ -330,7 +353,7 @@ export default function RecordatoriosCuotasModal({
                     
                     {mediosAptos.length === 0 ? (
                       <div className="py-10 text-center text-xs text-neutral-500 border border-dashed border-neutral-800 rounded-2xl bg-neutral-900/20">
-                        No hay billeteras registradas para {getOficinaFullName(isWebAdmin ? oficinaSeleccionada : userOficina)}.
+                        No hay billeteras registradas para {getOficinaNombreDinamico(isWebAdmin ? oficinaSeleccionada : userOficina)}.
                       </div>
                     ) : (
                       mediosAptos.map((m) => {
@@ -354,7 +377,6 @@ export default function RecordatoriosCuotasModal({
                               </div>
                             </div>
                             
-                            {/* Acciones de Edición (Solo Admin) */}
                             {isWebAdmin && (
                               <div className="flex gap-2">
                                 <button onClick={(e) => { e.stopPropagation(); handleEditClick(m); }} className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors" title="Editar">
@@ -371,30 +393,32 @@ export default function RecordatoriosCuotasModal({
                     )}
                   </div>
 
-                  {/* SELECTOR DE OFICINAS A NOTIFICAR (SOLO ADMIN) */}
+                  {/* 🚀 SELECTOR DE OFICINAS DINÁMICO CON ID ENTRE PARÉNTESIS */}
                   {isWebAdmin && (
                     <div className="mt-6 space-y-3 pt-4 border-t border-neutral-800">
                       <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest">¿Qué oficina vas a notificar ahora?</p>
                       <div className="flex flex-col gap-2">
-                        {["1", "2", "3"].map(num => (
+                        {oficinasReal.map(ofi => (
                           <button 
-                            key={num} 
-                            onClick={() => setOfi(num)} 
+                            key={ofi.id} 
+                            onClick={() => setOfi(ofi.id)} 
                             disabled={sending} 
                             className={`w-full py-3 px-4 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between 
-                              ${oficinaSeleccionada === num ? "border-emerald-400 bg-emerald-500 text-neutral-950 shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-600"} 
+                              ${String(oficinaSeleccionada) === String(ofi.id) ? "border-emerald-400 bg-emerald-500 text-neutral-950 shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-600"} 
                               ${sending ? "opacity-50" : ""}`}
                           >
-                            <span>{getOficinaFullName(num)}</span>
-                            {oficinaSeleccionada === num && <HiCheckCircle className="w-5 h-5" />}
+                            <span>{ofi.nombre} ({ofi.id})</span>
+                            {String(oficinaSeleccionada) === String(ofi.id) && <HiCheckCircle className="w-5 h-5" />}
                           </button>
                         ))}
+                        {oficinasReal.length === 0 && (
+                           <div className="py-2 text-center text-xs text-neutral-500 italic">Cargando sucursales...</div>
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* FOOTER ACCIONES */}
                 <div className="px-6 py-5 bg-neutral-900/80 border-t border-neutral-800 flex items-center justify-between">
                   <div className="text-[10px] text-neutral-500 leading-tight max-w-[150px]">
                     {isWebAdmin ? "Central operativa de cobranzas." : "Información de cuentas de cobro."}

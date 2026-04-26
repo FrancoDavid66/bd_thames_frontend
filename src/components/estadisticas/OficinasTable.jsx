@@ -49,7 +49,6 @@ export default function OficinasTable({
                   <th className="px-3 py-2 text-right font-semibold text-rose-200">
                     Bajas (Canceladas)
                   </th>
-                  {/* 🚀 NUEVA COLUMNA: MOROSIDAD EXACTA */}
                   <th className="px-3 py-2 text-right font-semibold text-orange-200">
                     En Mora (Vencidas)
                   </th>
@@ -62,21 +61,16 @@ export default function OficinasTable({
                 {oficinasData.map((o, idx) => {
                   const totalOf = Number(o.polizas_total || 0);
                   const bajasOf = Number(o.bajas_mes || 0);
-                  
-                  // 🚀 Mapeamos la nueva variable "en_mora" que nos manda el backend
                   const vencidasOf = Number(o.en_mora || o.vencidas_mes || 0);
                   
                   const mixCob = o.por_cobertura || {};
                   const mixComp = o.por_compania || {};
                   const antig = o.antiguedad || {};
                   
-                  // 🚀 AHORA EL CHURN SUMA BAJAS + VENCIDAS
                   const churnPct = totalOf > 0 ? ((bajasOf + vencidasOf) / totalOf) * 100 : 0;
 
-                  const oficinaNombre =
-                    (o.oficina_nombre && String(o.oficina_nombre).trim()) ||
-                    getOficinaNombre?.(o.oficina) ||
-                    String(o.oficina || "—");
+                  // 🚀 FIX: OBLIGAMOS AL SISTEMA A USAR EL NOMBRE REAL DE LA BASE DE DATOS
+                  const oficinaNombre = getOficinaNombre ? getOficinaNombre(o.oficina) : (o.oficina_nombre || o.oficina || "—");
 
                   const cobKeys = Object.keys(mixCob);
                   const cobResumen = cobKeys
@@ -114,14 +108,17 @@ export default function OficinasTable({
                       transition={{ duration: 0.15 }}
                     >
                       <td className="px-3 py-2 whitespace-nowrap text-slate-100 align-top">
-                        <div className="font-semibold">{oficinaNombre}</div>
-                        {o.oficina ? (
+                        {/* El Nombre Principal */}
+                        <div className="font-semibold text-sky-400">{oficinaNombre}</div>
+                        
+                        {/* El Código/ID chiquito abajo */}
+                        {o.oficina && String(o.oficina) !== "SIN_OFICINA" && String(o.oficina) !== "OTRAS" ? (
                           <div className="mt-0.5 text-[10px] text-slate-500">
-                            Código: {String(o.oficina)}
+                            Código / ID: {String(o.oficina)}
                           </div>
                         ) : null}
 
-                        <div className="mt-0.5 text-[10px] text-slate-400 space-y-0.5">
+                        <div className="mt-1.5 text-[10px] text-slate-400 space-y-0.5">
                           {cobResumen && <div>Coberturas: {cobResumen}</div>}
                           {compResumen && <div>Compañías: {compResumen}</div>}
                           {antigResumen && <div>Antigüedad (años): {antigResumen}</div>}

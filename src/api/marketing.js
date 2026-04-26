@@ -1,6 +1,5 @@
 import api from '../services/api';
 
-// Mantenemos tu función para armar la URL con los filtros
 const buildQS = (params = {}) => {
   const qs = new URLSearchParams();
 
@@ -20,7 +19,10 @@ const buildQS = (params = {}) => {
     }
 
     const s = String(v).trim();
-    if (!s) return;
+    
+    // 🚀 FIX: Si el campo es 'estado', permitimos que viaje vacío para que Django NO aplique su default 'activa'
+    if (!s && k !== "estado") return;
+
     qs.set(k, s);
   });
 
@@ -36,7 +38,7 @@ export const MarketingAPI = {
 
   async audienciaExport(params, formato = "csv") {
     const res = await api.get(`marketing/audiencia/export/${buildQS({ ...params, formato })}`, {
-      responseType: 'blob' // Fundamental para descargar el Excel/CSV
+      responseType: 'blob'
     });
     return res.data;
   },
@@ -47,7 +49,6 @@ export const MarketingAPI = {
   },
 
   async enviarMensaje(payload = {}) {
-    // Axios detecta si es FormData o JSON y pone los headers correctos automáticamente
     const res = await api.post(`marketing/enviar/`, payload);
     return res.data;
   },

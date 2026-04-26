@@ -1,13 +1,12 @@
 // src/components/solicitudes/modalcreate/ResponsableManagerModal.jsx
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiSparkles, HiRefresh, HiCog } from "react-icons/hi";
+import { HiX, HiSparkles, HiRefresh } from "react-icons/hi";
 import toast from "react-hot-toast";
 
 // 🚀 IMPORTACIÓN CORREGIDA: Usamos la API que ya blindamos con el Token JWT
 import { solicitudesApi } from "../../../services/solicitudes";
 import { useAuth } from "../../../context/AuthContext";
-import ResponsablesCrudModal from "./ResponsablesCrudModal";
 
 // Definimos variants inline para animaciones profesionales
 const modalVariants = {
@@ -64,8 +63,6 @@ export default function ResponsableManagerModal({ open, onCancel, onSelected, of
   const [loading, setLoading] = useState(false);
   const [responsableId, setResponsableId] = useState("");
 
-  const [showCrud, setShowCrud] = useState(false);
-
   const backdropRef = useRef(null);
   const selectRef = useRef(null);
 
@@ -119,88 +116,75 @@ export default function ResponsableManagerModal({ open, onCancel, onSelected, of
   };
 
   return (
-    <>
-      <AnimatePresence>
+    <AnimatePresence>
+      <motion.div
+        ref={backdropRef}
+        onClick={handleBackdropClick}
+        className="fixed inset-0 z-[95] grid place-items-center bg-black/70 backdrop-blur p-4 sm:p-0"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      >
         <motion.div
-          ref={backdropRef}
-          onClick={handleBackdropClick}
-          className="fixed inset-0 z-[95] grid place-items-center bg-black/70 backdrop-blur p-4 sm:p-0"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          variants={modalVariants} initial="initial" animate="animate" exit="exit"
+          className="relative w-full max-w-md sm:max-w-lg rounded-2xl border border-white/10 bg-[#0f0c28] p-3 sm:p-4 shadow-2xl overflow-hidden"
+          role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
         >
-          <motion.div
-            variants={modalVariants} initial="initial" animate="animate" exit="exit"
-            className="relative w-full max-w-md sm:max-w-lg rounded-2xl border border-white/10 bg-[#0f0c28] p-3 sm:p-4 shadow-2xl overflow-hidden"
-            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex flex-col">
-                <h4 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-rose-200 to-pink-200 text-[#0b0f1e]">
-                    <HiSparkles />
-                  </span>
-                  Asignar responsable
-                </h4>
-                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-8">
-                   Sucursal: {isWebAdmin ? 'SELECCIONADA (ADMIN)' : (user?.perfil?.oficina_nombre || 'Local')}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col">
+              <h4 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-rose-200 to-pink-200 text-[#0b0f1e]">
+                  <HiSparkles />
                 </span>
-              </div>
-              <div className="flex items-center gap-1">
-                {isWebAdmin && (
-                  <motion.button
-                    type="button" onClick={() => setShowCrud(true)}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-                    title="Administrar responsables" variants={buttonVariants} whileHover="hover" whileTap="tap"
-                  >
-                    <HiCog />
-                  </motion.button>
-                )}
-                <motion.button
-                  onClick={onCancel}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-                  variants={buttonVariants} whileHover="hover" whileTap="tap"
-                >
-                  <HiX />
-                </motion.button>
-              </div>
+                Asignar responsable
+              </h4>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-8">
+                 Sucursal: {isWebAdmin ? 'SELECCIONADA (ADMIN)' : (user?.perfil?.oficina_nombre || 'Local')}
+              </span>
             </div>
-
-            <motion.div className="flex items-end gap-2" variants={sectionVariants} initial="initial" animate="animate">
-              <Select
-                label={loading ? "Personal (sincronizando…)" : "Personal de esta oficina"}
-                value={responsableId}
-                onChange={setResponsableId}
-                options={empleados}
-                selectRef={selectRef}
-                className="flex-1"
-              />
+            <div className="flex items-center gap-1">
               <motion.button
-                type="button" onClick={loadEmpleados}
-                className="h-[42px] sm:h-[46px] px-2 sm:px-3 rounded-xl bg-white/10 text-white inline-flex items-center gap-2 hover:bg-white/20 border border-white/10"
+                onClick={onCancel}
+                className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-white transition hover:bg-white/20"
                 variants={buttonVariants} whileHover="hover" whileTap="tap"
               >
-                <HiRefresh className={loading ? "animate-spin" : ""} />
+                <HiX />
               </motion.button>
-            </motion.div>
+            </div>
+          </div>
 
-            <motion.div className="mt-4 flex items-center justify-end gap-2" variants={sectionVariants} initial="initial" animate="animate">
-              <button onClick={onCancel} className="px-3 py-2 rounded-xl bg-white/5 text-sm text-white/50 hover:text-white transition-colors uppercase font-bold text-[10px]">Cancelar</button>
-              <motion.button
-                onClick={() => {
-                  if (!responsableId) return toast.error("Elegí un responsable.");
-                  onSelected?.({ responsableId });
-                }}
-                className="px-6 py-2 rounded-2xl bg-sky-500 text-black font-black uppercase text-[11px] tracking-widest shadow-lg shadow-sky-900/20 disabled:opacity-30"
-                disabled={!empleados?.length}
-                variants={buttonVariants} whileHover="hover" whileTap="tap"
-              >
-                Asignar ahora
-              </motion.button>
-            </motion.div>
+          <motion.div className="flex items-end gap-2" variants={sectionVariants} initial="initial" animate="animate">
+            <Select
+              label={loading ? "Personal (sincronizando…)" : "Personal de esta oficina"}
+              value={responsableId}
+              onChange={setResponsableId}
+              options={empleados}
+              selectRef={selectRef}
+              className="flex-1"
+            />
+            <motion.button
+              type="button" onClick={loadEmpleados}
+              className="h-[42px] sm:h-[46px] px-2 sm:px-3 rounded-xl bg-white/10 text-white inline-flex items-center gap-2 hover:bg-white/20 border border-white/10"
+              variants={buttonVariants} whileHover="hover" whileTap="tap"
+            >
+              <HiRefresh className={loading ? "animate-spin" : ""} />
+            </motion.button>
+          </motion.div>
+
+          <motion.div className="mt-4 flex items-center justify-end gap-2" variants={sectionVariants} initial="initial" animate="animate">
+            <button onClick={onCancel} className="px-3 py-2 rounded-xl bg-white/5 text-sm text-white/50 hover:text-white transition-colors uppercase font-bold text-[10px]">Cancelar</button>
+            <motion.button
+              onClick={() => {
+                if (!responsableId) return toast.error("Elegí un responsable.");
+                onSelected?.({ responsableId });
+              }}
+              className="px-6 py-2 rounded-2xl bg-sky-500 text-black font-black uppercase text-[11px] tracking-widest shadow-lg shadow-sky-900/20 disabled:opacity-30"
+              disabled={!empleados?.length}
+              variants={buttonVariants} whileHover="hover" whileTap="tap"
+            >
+              Asignar ahora
+            </motion.button>
           </motion.div>
         </motion.div>
-      </AnimatePresence>
-
-      <ResponsablesCrudModal open={showCrud} onClose={() => setShowCrud(false)} onChanged={loadEmpleados} />
-    </>
+      </motion.div>
+    </AnimatePresence>
   );
 }

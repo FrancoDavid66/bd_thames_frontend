@@ -41,6 +41,9 @@ import RecaudacionPage from "./pages/RecaudacionPage";
 // 🚀 NUEVA APP: COTIZACIONES
 import CotizacionesPage from "./pages/CotizacionesPage";
 
+// 🚀 NUEVA APP: PANEL DE ADMINISTRADOR
+import AdminPage from "./pages/AdminPage";
+
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
 function App() {
@@ -409,6 +412,12 @@ function App() {
                 {/* 🚀 NUEVA RUTA DE COTIZACIONES */}
                 <Route path="/cotizaciones" element={<CotizacionesPage />} />
                 
+                {/* 🚀 RUTA PROTEGIDA PARA ADMIN PANEL */}
+                <Route 
+                  path="/admin" 
+                  element={user.perfil?.rol === 'ADMIN' ? <AdminPage /> : <Navigate to="/" replace />} 
+                />
+
                 <Route 
                   path="/marketing" 
                   element={user.perfil?.rol === 'ADMIN' ? <MarketingPage /> : <Navigate to="/" replace />} 

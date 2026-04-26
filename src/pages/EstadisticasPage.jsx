@@ -211,19 +211,16 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
         acc.activas += o.polizas_activas || 0;
         acc.nuevas += o.nuevas_mes || 0;
         acc.bajas += o.bajas_mes || 0;
-        // 🚀 SUMAMOS LA VARIABLE REAL DE MOROSIDAD
         acc.vencidas += o.en_mora || o.vencidas_mes || o.polizas_vencidas || 0;
         return acc;
       }, { total: 0, activas: 0, nuevas: 0, bajas: 0, vencidas: 0 }
     );
   }, [oficinasData]);
 
-  // 🚀 AHORA EL CHURN GLOBAL SUMA BAJAS + VENCIDAS
   const churnGlobal = totales.total > 0 ? ((totales.bajas + totales.vencidas) / totales.total) * 100 : 0;
   
   const periodoLabel = periodo || `${String(mes).padStart(2, "0")}/${String(anio).padStart(4, "0")}`;
 
-  // 🚀 Extraemos los totales de calidad de datos si el backend los manda
   const calidadGlobal = useMemo(() => {
     return oficinasData.reduce((acc, o) => {
         const c = o.calidad_datos || {};
@@ -267,7 +264,6 @@ export default function EstadisticasPage() {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
 
-  // 🚀 Estado compartido de Calidad de Datos (Se lo pasamos al panel de Calidad)
   const [calidadGeneralData, setCalidadGeneralData] = useState({ sin_patente: 0, sin_vehiculo: 0, sin_compania: 0 });
 
   useEffect(() => {
@@ -289,6 +285,7 @@ export default function EstadisticasPage() {
     fetchOficinasDb();
   }, [apiBase]);
 
+  // 🚀 LIMPIEZA TOTAL DE HARDCODEO. Ahora 100% dinámico leyendo el array de oficinasList
   const getOficinaNombre = useCallback((id) => {
     if (!id) return "Sin oficina";
     const strId = String(id).trim();
@@ -297,12 +294,12 @@ export default function EstadisticasPage() {
 
     const arr = Array.isArray(oficinasList) ? oficinasList : [];
     const match = arr.find(o => String(o.id) === strId || String(o.codigo) === strId);
+    
+    // Si la encuentra en la DB, devuelve el nombre real (Ej: "HOME OFFICE BARRACAS")
     if (match) return match.nombre;
 
-    if (strId === "1") return "5 esquinas (1)";
-    if (strId === "2") return "Axion (2)";
-    if (strId === "3") return "Kilometro 39 (3)";
-    return strId;
+    // Si aún no cargó la API o la oficina fue borrada, devuelve "Oficina X"
+    return `Oficina ${strId}`;
   }, [oficinasList]);
 
   return (
