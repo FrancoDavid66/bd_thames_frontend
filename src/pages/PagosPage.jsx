@@ -22,6 +22,7 @@ import {
   HiUserGroup,
   HiIdentification,
   HiChevronRight as HiChevronRightMini,
+  HiChartBar, // 🚀 NUEVO ICONO PARA MÉTRICAS
 } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
@@ -33,6 +34,7 @@ import CuotasAlertas from "../components/pagos/CuotasAlertas";
 import CuentasCobroModal from "../components/pagos/CuentasCobroModal";
 import RecordatoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
 import HistorialRecordatorios from "../components/pagos/HistorialRecordatorios";
+import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal"; // 🚀 NUEVO COMPONENTE
 
 import {
   fetchMediosCobro,
@@ -371,6 +373,7 @@ const PagosPage = () => {
   const [tab, setTab] = useState("pagos");
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
+  const [showReporteModal, setShowReporteModal] = useState(false); // 🚀 NUEVO ESTADO
 
   const [cuotas, setCuotas] = useState([]);
   const [ocultarPagadas, setOcultarPagadas] = useState(false);
@@ -737,6 +740,18 @@ const PagosPage = () => {
                   <HiSpeakerphone className="text-base sm:text-lg" />
                   <span>{sendingRecordatorios ? "Enviando..." : "Recordatorios"}</span>
                 </motion.button>
+
+                {/* 🚀 BOTÓN NUEVO DE MÉTRICAS */}
+                <motion.button
+                  type="button"
+                  onClick={() => setShowReporteModal(true)}
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] cursor-pointer border border-sky-500/50 bg-sky-600 hover:bg-sky-500 transition-colors"
+                >
+                  <HiChartBar className="text-base sm:text-lg" />
+                  <span className="hidden sm:inline">Efectividad</span>
+                </motion.button>
               </>
             )}
           </div>
@@ -1100,6 +1115,9 @@ const PagosPage = () => {
 
       <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
       <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} isWebAdmin={isWebAdmin} userOficina={userOficina} />
+      
+      {/* 🚀 MODAL NUEVO */}
+      <ReporteEfectividadModal isOpen={showReporteModal} onClose={() => setShowReporteModal(false)} />
     </div>
   );
 };

@@ -349,7 +349,7 @@ export default function SolicitudesPage() {
           </div>
 
           {/* Listado */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 lg:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+120px)] scrollbar-hide">
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 lg:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+120px)] scrollbar-hide relative">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                <Kpi label="Activas" value={counts.activas} color="text-sky-400" />
                <Kpi label="Terminadas" value={counts.terminadas} color="text-emerald-400" icon={<HiBadgeCheck />} />
@@ -371,6 +371,18 @@ export default function SolicitudesPage() {
                 onTerminar={terminar} onToggleTarea={toggleTarea}
               />
             )}
+
+            {/* 🚀 BOTÓN FLOTANTE (FAB) SÓLO PARA MÓVILES */}
+            <motion.button
+              onClick={openCreate}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.9 }}
+              className="md:hidden fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400 text-slate-900 shadow-[0_4px_20px_rgba(251,191,36,0.6)] border border-amber-300"
+            >
+              <HiPlus className="h-7 w-7" />
+            </motion.button>
           </div>
         </div>
 

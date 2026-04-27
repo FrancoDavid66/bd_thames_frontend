@@ -18,6 +18,9 @@ import CalidadDatosPanel from "../components/estadisticas/CalidadDatosPanel";
 import DuplicadosPolizasPanel from "../components/estadisticas/DuplicadosPolizasPanel";
 import ContabilidadPanel from "../components/estadisticas/ContabilidadPanel";
 
+// 🚀 IMPORTAMOS EL NUEVO PANEL DE EFECTIVIDAD DE MENSAJES
+import EfectividadMensajesPanel from "../components/estadisticas/EfectividadMensajesPanel";
+
 const getApiBase = () => {
   const raw =
     (import.meta?.env?.VITE_API_BASE && String(import.meta.env.VITE_API_BASE).trim()) ||
@@ -335,6 +338,9 @@ export default function EstadisticasPage() {
           <TabButton active={tab === "duplicados"} onClick={() => setTab("duplicados")}>Duplicados</TabButton>
           <TabButton active={tab === "asegurados"} onClick={() => setTab("asegurados")}>Asegurados</TabButton>
           <TabButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")}>Contabilidad</TabButton>
+          
+          {/* 🚀 NUEVA PESTAÑA COBRANZAS */}
+          <TabButton active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>Cobranzas</TabButton>
         </div>
 
         <AnimatePresence mode="wait">
@@ -379,6 +385,21 @@ export default function EstadisticasPage() {
                 oficina={oficina} 
                 anio={anio} 
                 mes={mes} 
+                getOficinaNombre={getOficinaNombre} 
+              />
+            </motion.div>
+          )}
+
+          {/* 🚀 RENDERIZADO DEL NUEVO PANEL */}
+          {tab === "cobranzas" && (
+            <motion.div key="cobranzas" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+              <EfectividadMensajesPanel 
+                apiBase={apiBase} 
+                oficina={oficina} 
+                anio={anio} 
+                mes={mes} 
+                desde={desde} 
+                hasta={hasta} 
                 getOficinaNombre={getOficinaNombre} 
               />
             </motion.div>
