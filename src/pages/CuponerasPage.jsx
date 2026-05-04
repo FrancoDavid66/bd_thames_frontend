@@ -21,8 +21,6 @@ import axios from "axios";
 
 import { useDispatch } from "react-redux";
 import { actualizarEstadoCuponRobo } from "../store/slices/cuponesRoboSlice";
-
-// ✅ IMPORTAMOS TU FUNCIÓN PARA SUBIR A CLOUDINARY
 import { uploadToCloudinary } from "../utils/cloudinary";
 
 const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
@@ -31,6 +29,14 @@ const BASE = RAW_BASE.endsWith("/") ? RAW_BASE : `${RAW_BASE}/`;
 const http = axios.create({
   baseURL: BASE,
   withCredentials: true,
+});
+
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
+  if (token && token !== "undefined" && token !== "null") {
+    config.headers.Authorization = `Bearer ${token.trim()}`;
+  }
+  return config;
 });
 
 const badgeByEstado = {
@@ -234,10 +240,11 @@ export default function CuponerasPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // ✅ ESTADOS PARA EL MODAL DE PAGO
   const [pagoModal, setPagoModal] = useState(null);
   const [montoPago, setMontoPago] = useState("");
-  const [fotoComprobante, setFotoComprobante] = useState(null); // Nuevo estado para la foto
+  // 🚀 NUEVO ESTADO: Costo de la Compañía
+  const [montoCompania, setMontoCompania] = useState(""); 
+  const [fotoComprobante, setFotoComprobante] = useState(null); 
   const [procesandoPago, setProcesandoPago] = useState(false);
 
   useEffect(() => {
@@ -287,10 +294,7 @@ export default function CuponerasPage() {
       const c = cmp.trim();
       if (c) params.compania = c;
 
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      const res = await http.get("polizas/cupones-robo/dashboard/", { params, headers });
+      const res = await http.get("polizas/cupones-robo/dashboard/", { params });
       const data = res.data || {};
 
       setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
@@ -301,7 +305,6 @@ export default function CuponerasPage() {
       setLastLoadedAt(new Date().toISOString());
     } catch (e) {
       console.error(e);
-      // 🚀 FIX: Extraemos el error de forma segura para evitar [object Object]
       let msg = "No se pudieron cargar las cuponeras de robo.";
       if (e?.response?.data) {
         if (typeof e.response.data === "string") msg = e.response.data;
@@ -323,7 +326,7 @@ export default function CuponerasPage() {
     const id = setTimeout(() => {
       setPage(1);
       loadDashboard(search, compania, { page: 1, pageSize, scope });
-    }, 400); // 🚀 Un poco más de debounce
+    }, 400); 
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, compania]);
@@ -354,75 +357,81 @@ export default function CuponerasPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  // ✅ Función para formatear el input en tiempo real
   const handleMontoChange = (e) => {
     let val = e.target.value;
     val = val.replace(/[^0-9,]/g, "");
-    
     const parts = val.split(",");
     let integerPart = parts[0];
     let decimalPart = parts.length > 1 ? "," + parts[1].slice(0, 2) : ""; 
-
-    if (integerPart) {
-      integerPart = new Intl.NumberFormat("es-AR").format(Number(integerPart));
-    }
-
+    if (integerPart) integerPart = new Intl.NumberFormat("es-AR").format(Number(integerPart));
     setMontoPago(integerPart + decimalPart);
   };
 
-  // ✅ Manejar selección de foto
+  // 🚀 NUEVO: Formateador para el Costo de Compañía
+  const handleMontoCompaniaChange = (e) => {
+    let val = e.target.value;
+    val = val.replace(/[^0-9,]/g, "");
+    const parts = val.split(",");
+    let integerPart = parts[0];
+    let decimalPart = parts.length > 1 ? "," + parts[1].slice(0, 2) : ""; 
+    if (integerPart) integerPart = new Intl.NumberFormat("es-AR").format(Number(integerPart));
+    setMontoCompania(integerPart + decimalPart);
+  };
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFotoComprobante(e.target.files[0]);
     }
   };
 
-  // ✅ FUNCION PARA CONFIRMAR EL PAGO AL BACKEND (CON FOTO)
+  // 🚀 FUNCIÓN ACTUALIZADA: Conexión con Redux y Motor Financiero
   const confirmarPago = async () => {
     if (!pagoModal || !fotoComprobante) return;
     
     setProcesandoPago(true);
     try {
-      // 1. Subir la foto a Cloudinary primero
+      // 1. Subir a Cloudinary
       const { secure_url, public_id } = await uploadToCloudinary(
         fotoComprobante,
         "rc-admin/cupones-robo"
       );
 
-      // 2. Limpiar el texto "66.000,50" -> "66000.50"
-      const montoLimpio = montoPago 
-        ? parseFloat(montoPago.replace(/\./g, "").replace(",", ".")) 
-        : 0;
+      const montoLimpio = montoPago ? parseFloat(montoPago.replace(/\./g, "").replace(",", ".")) : 0;
+      const costoCompaniaLimpio = montoCompania ? parseFloat(montoCompania.replace(/\./g, "").replace(",", ".")) : 0;
         
-      // 3. Mandar todo a Redux
+      // 2. Despachar a Redux enviando ambos montos
       await dispatch(
         actualizarEstadoCuponRobo({
           id: pagoModal.id,
           polizaId: pagoModal.poliza,
           estado: "PAGADA",
           monto: montoLimpio,
+          costo_compania: costoCompaniaLimpio, // 🚀 ENVIAMOS EL COSTO PARA CALCULAR LA COMISIÓN
           foto_url: secure_url,
           foto_public_id: public_id,
         })
       ).unwrap();
 
-      // Reset y refresh
+      // 🛑 NOTA: Hemos eliminado el http.post("balances/egresos/...") manual de aquí. 
+      // El backend ahora gestiona la creación del Egreso automáticamente.
+
       setPagoModal(null);
       setMontoPago("");
+      setMontoCompania("");
       setFotoComprobante(null);
       refreshAll(); 
     } catch (err) {
       console.error("Error al procesar pago:", err);
-      // Aquí el error se muestra en pantalla gracias a los Toasts de Redux
     } finally {
       setProcesandoPago(false);
     }
   };
 
-  // ✅ Función para abrir el modal y formatear data
   const openModalPago = (c) => {
-    setPagoModal(c);
-    setFotoComprobante(null); // Limpiamos si quedó alguna foto de antes
+    setPagoModal({ ...c, isConfirming: false });
+    setFotoComprobante(null);
+    setMontoCompania(""); // Limpiar el campo de costo
+    
     if (c.monto) {
       const m = String(c.monto).replace(".", ",");
       const parts = m.split(",");
@@ -432,6 +441,11 @@ export default function CuponerasPage() {
     } else {
       setMontoPago("");
     }
+  };
+
+  const handleInitiateConfirm = () => {
+    if (!montoPago) return;
+    setPagoModal(prev => ({ ...prev, isConfirming: true }));
   };
 
   return (
@@ -745,7 +759,6 @@ export default function CuponerasPage() {
 
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {/* ✅ BOTÓN DE PAGAR */}
                         {visual !== "PAGADA" && (
                           <button
                             type="button"
@@ -758,7 +771,6 @@ export default function CuponerasPage() {
                           </button>
                         )}
 
-                        {/* BOTÓN WHATSAPP */}
                         <button
                           type="button"
                           onClick={() => onWhatsApp(c)}
@@ -834,7 +846,7 @@ export default function CuponerasPage() {
         </div>
       </div>
 
-      {/* ✅ MODAL DE PAGO CON FOTO OBLIGATORIA */}
+      {/* ✅ MODAL DE PAGO ACTUALIZADO CON DOBLE INPUT */}
       <AnimatePresence>
         {pagoModal && (
           <motion.div
@@ -862,75 +874,107 @@ export default function CuponerasPage() {
                 </button>
               </div>
 
-              <div className="p-5 space-y-5 text-sm text-slate-600 dark:text-slate-300">
-                <p>
-                  Vas a marcar como <strong>PAGADA</strong> la cuota del asegurado{" "}
-                  <span className="font-semibold">{pagoModal.asegurado_nombre || "—"}</span>{" "}
-                  (Póliza: {pagoModal.poliza_numero || pagoModal.poliza}).
-                </p>
-                
-                {/* Monto */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                    Monto abonado ($)
-                  </label>
-                  <div className="relative">
-                    <HiCurrencyDollar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              {!pagoModal.isConfirming ? (
+                <div className="p-5 space-y-5 text-sm text-slate-600 dark:text-slate-300">
+                  <p>
+                    Registrando transacción para el asegurado{" "}
+                    <span className="font-semibold">{pagoModal.asegurado_nombre || "—"}</span>.
+                  </p>
+                  
+                  {/* Monto que paga el cliente */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Monto abonado por cliente ($)
+                    </label>
+                    <div className="relative">
+                      <HiCurrencyDollar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={montoPago}
+                        onChange={handleMontoChange}
+                        placeholder="Ej: 80.000"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white transition"
+                        disabled={procesandoPago}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 🚀 NUEVO: Monto que cobra la compañía */}
+                  <div>
+                    <label className="block text-xs font-bold text-amber-500 uppercase tracking-wider mb-2">
+                      Costo de la Compañía ($) <span className="text-[9px] text-slate-400 font-normal normal-case ml-1">(Opcional)</span>
+                    </label>
+                    <div className="relative">
+                      <HiCurrencyDollar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-amber-500/50" />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={montoCompania}
+                        onChange={handleMontoCompaniaChange}
+                        placeholder="Ej: 60.000"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:text-white transition"
+                        disabled={procesandoPago}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Foto */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>Comprobante de Pago</span>
+                      <span className="text-[10px] text-rose-500 font-bold bg-rose-500/10 px-2 py-0.5 rounded-md">Obligatorio</span>
+                    </label>
+                    
+                    <div
+                      onClick={() => !procesandoPago && fileInputRef.current?.click()}
+                      className={`relative overflow-hidden w-full h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer
+                        ${fotoComprobante 
+                          ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' 
+                          : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400'
+                        }`}
+                    >
+                      <HiPhotograph className="h-6 w-6" />
+                      <span className="text-xs font-medium px-2 text-center">
+                        {fotoComprobante ? fotoComprobante.name : "Hacé clic para subir la foto del comprobante"}
+                      </span>
+                    </div>
+
                     <input
-                      type="text"
-                      inputMode="decimal"
-                      value={montoPago}
-                      onChange={handleMontoChange}
-                      placeholder="Ej: 66.000"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white transition"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileChange}
                       disabled={procesandoPago}
                     />
                   </div>
                 </div>
-
-                {/* ✅ Comprobante de pago OBLIGATORIO */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                    <span>Comprobante de Pago</span>
-                    <span className="text-[10px] text-rose-500 font-bold bg-rose-500/10 px-2 py-0.5 rounded-md">Obligatorio</span>
-                  </label>
-                  
-                  <div
-                    onClick={() => !procesandoPago && fileInputRef.current?.click()}
-                    className={`relative overflow-hidden w-full h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer
-                      ${fotoComprobante 
-                        ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' 
-                        : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400'
-                      }`}
-                  >
-                    <HiPhotograph className="h-6 w-6" />
-                    <span className="text-xs font-medium px-2 text-center">
-                      {fotoComprobante ? fotoComprobante.name : "Hacé clic para subir la foto del comprobante"}
-                    </span>
+              ) : (
+                <div className="p-5 space-y-4">
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-center">
+                    <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                      Se descontará de la caja un total de <strong className="text-rose-500 font-black text-base">${montoCompania || montoPago}</strong> para pagar a la compañía.
+                    </p>
+                    {montoCompania && montoPago && (
+                      <p className="text-xs text-emerald-500 font-bold mt-2">
+                        Ganancia de Agencia/Vendedor: ${(parseFloat(montoPago.replace(/\./g, "").replace(",", ".")) - parseFloat(montoCompania.replace(/\./g, "").replace(",", "."))).toLocaleString("es-AR")}
+                      </p>
+                    )}
                   </div>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                    disabled={procesandoPago}
-                  />
                 </div>
-
-              </div>
+              )}
 
               <div className="bg-slate-50 dark:bg-slate-900/50 px-5 py-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
                 <button
-                  onClick={() => setPagoModal(null)}
+                  onClick={() => pagoModal.isConfirming ? setPagoModal(prev => ({ ...prev, isConfirming: false })) : setPagoModal(null)}
                   className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition"
                   disabled={procesandoPago}
                 >
-                  Cancelar
+                  {pagoModal.isConfirming ? "Volver" : "Cancelar"}
                 </button>
                 <button
-                  onClick={confirmarPago}
+                  onClick={pagoModal.isConfirming ? confirmarPago : handleInitiateConfirm}
                   disabled={procesandoPago || !montoPago || !fotoComprobante}
                   className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition shadow-sm shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
@@ -939,7 +983,7 @@ export default function CuponerasPage() {
                   ) : (
                     <HiCheckCircle className="h-4 w-4" /> 
                   )}
-                  {procesandoPago ? "Subiendo foto y guardando..." : "Confirmar Pago"}
+                  {procesandoPago ? "Guardando..." : (pagoModal.isConfirming ? "Sí, confirmar pago" : "Siguiente")}
                 </button>
               </div>
             </motion.div>

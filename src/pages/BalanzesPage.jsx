@@ -5,6 +5,7 @@ import { FaPlus } from "react-icons/fa";
 import { HiCog, HiOfficeBuilding } from "react-icons/hi";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import axios from "axios"; // 🚀 IMPORTAMOS AXIOS
 dayjs.locale("es");
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
@@ -92,9 +93,31 @@ const BalancesPage = () => {
 
   const { list: ingresos = [], status: ingresosStatus } = useSelector((s) => s.ingresos || {});
   const { list: egresos = [], status: egresosStatus } = useSelector((s) => s.egresos || {});
+  
   const balanceState = useSelector((s) => s.balance || {});
   const balanceData = balanceState?.data;
   const balanceStatus = balanceState?.status;
+
+  // 🚀 ESTADO LOCAL PARA GARANTIZAR QUE CARGUEN LAS OFICINAS
+  const [oficinasAdmin, setOficinasAdmin] = useState([]);
+
+  useEffect(() => {
+    // 🚀 PEDIMOS LA LISTA OFICIAL A LA BASE DE DATOS SI ES ADMIN
+    if (isWebAdmin) {
+      const token = localStorage.getItem("access_token");
+      const baseURL = import.meta.env.VITE_API_URL;
+      
+      axios.get(`${baseURL}usuarios/oficinas/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        // Axios puede devolver { results: [...] } si hay paginación, o el array directo
+        const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
+        setOficinasAdmin(data);
+      })
+      .catch(err => console.error("Error al cargar lista de sucursales:", err));
+    }
+  }, [isWebAdmin]);
 
   const [fecha, setFecha] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [activeTab, setActiveTab] = useState("resumen");
@@ -252,9 +275,12 @@ const BalancesPage = () => {
                   className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-zinc-50 border-none focus:ring-0 p-0 cursor-pointer outline-none truncate"
                 >
                   <option value="ALL" className="bg-zinc-900 text-zinc-100">Todas las cajas</option>
-                  <option value="1" className="bg-zinc-900 text-zinc-100">Oficina 1 (5 Esquinas)</option>
-                  <option value="2" className="bg-zinc-900 text-zinc-100">Oficina 2 (Axion)</option>
-                  <option value="3" className="bg-zinc-900 text-zinc-100">Oficina 3 (Km 39)</option>
+                  {/* 🚀 Opciones dinámicas cargadas con Axios directamente */}
+                  {oficinasAdmin.map(ofi => (
+                    <option key={ofi.id} value={ofi.id} className="bg-zinc-900 text-zinc-100">
+                      {ofi.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -368,6 +394,7 @@ const BalancesPage = () => {
                     suffix={suffix} 
                     highlight={true} 
                   />
+                  {/* Se mapea balanceData para dibujar las KPI cards dinámicas */}
                   {balanceData?.por_oficina?.map(ofi => (
                     <KpiRowGroup 
                       key={ofi.scope.oficina}

@@ -1,55 +1,115 @@
+// src/components/siniestros/SiniestrosList.jsx
 import React from 'react';
 import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 
-const SiniestrosList = ({ siniestros, onView, onEdit, onDelete }) => {
-  const navigate = useNavigate();
+const SiniestrosList = ({ siniestros, isWebAdmin, onView, onEdit, onDelete }) => {
+
+  // Función para darle color a los estados del siniestro
+  const getEstadoBadge = (estado, label) => {
+    const colors = {
+      PENDIENTE: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      DENUNCIADO: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      INSPECCION: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      LIQUIDACION: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+      CERRADO: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    };
+    const style = colors[estado] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    return (
+      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${style}`}>
+        {label || estado}
+      </span>
+    );
+  };
 
   return (
-    <div className="overflow-x-auto rounded shadow border dark:border-gray-700">
-      <table className="w-full text-left border-collapse bg-white dark:bg-gray-900 text-black dark:text-white">
-        <thead className="bg-gray-100 dark:bg-gray-800">
+    <div className="overflow-x-auto rounded-2xl shadow-xl border border-slate-700 bg-slate-900">
+      <table className="w-full text-left border-collapse text-sm text-slate-300">
+        <thead className="bg-slate-800 text-slate-200 text-xs uppercase tracking-wider">
           <tr>
-            <th className="p-3 border-b">ID</th>
-            <th className="p-3 border-b">Cliente</th>
-            <th className="p-3 border-b">Póliza</th>
-            <th className="p-3 border-b">Marca</th>
-            <th className="p-3 border-b">Modelo</th>
-            <th className="p-3 border-b">Año</th>
-            <th className="p-3 border-b">Responsabilidad</th>
-            <th className="p-3 border-b">Acciones</th>
+            <th className="p-4 border-b border-slate-700 font-bold">Estado / Fecha</th>
+            <th className="p-4 border-b border-slate-700 font-bold">Asegurado</th>
+            <th className="p-4 border-b border-slate-700 font-bold">Vehículo</th>
+            <th className="p-4 border-b border-slate-700 font-bold">Responsabilidad</th>
+            <th className="p-4 border-b border-slate-700 font-bold text-center">Acciones</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-slate-800">
           {siniestros.length === 0 ? (
             <tr>
-              <td colSpan="8" className="p-4 text-center text-gray-500">
-                No hay siniestros registrados.
+              <td colSpan="5" className="p-8 text-center text-slate-500 font-medium">
+                No hay siniestros registrados. ¡Todo en orden! 🚀
               </td>
             </tr>
           ) : (
             siniestros.map((siniestro) => (
-              <tr key={siniestro.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
-                <td className="p-3 border-b">{siniestro.id}</td>
-                <td className="p-3 border-b">{siniestro.cliente}</td>
-                <td className="p-3 border-b">{siniestro.poliza}</td>
-                <td className="p-3 border-b">{siniestro.marca_auto}</td>
-                <td className="p-3 border-b">{siniestro.modelo_auto}</td>
-                <td className="p-3 border-b">{siniestro.ano_auto}</td>
-                <td className="p-3 border-b">{siniestro.responsabilidad}</td>
-                <td className="p-3 border-b text-center">
-                  <div className="flex items-center justify-center gap-3">
-                    <button onClick={() => onView(siniestro)} className="text-blue-500 hover:text-blue-700">
-                      <FaEye />
-                    </button>
-                    <button onClick={() => onEdit(siniestro)} className="text-yellow-500 hover:text-yellow-700">
-                      <FaEdit />
-                    </button>
-                    <button onClick={() => onDelete(siniestro)} className="text-red-500 hover:text-red-700">
-                      <FaTrash />
-                    </button>
+              <tr key={siniestro.id} className="hover:bg-slate-800/50 transition-colors">
+                
+                {/* ESTADO Y FECHA */}
+                <td className="p-4">
+                  <div className="flex flex-col items-start gap-1.5">
+                    {getEstadoBadge(siniestro.estado, siniestro.estado_label)}
+                    <span className="text-xs text-slate-500">
+                      {siniestro.fecha_siniestro ? dayjs(siniestro.fecha_siniestro).format('DD/MM/YYYY') : 'Sin fecha'}
+                    </span>
                   </div>
                 </td>
+
+                {/* CLIENTE */}
+                <td className="p-4">
+                  <div className="font-bold text-white mb-0.5">{siniestro.cliente_label || 'Sin Cliente'}</div>
+                  {siniestro.nro_reclamo_cia ? (
+                    <div className="text-xs text-indigo-400 font-medium">Reclamo: #{siniestro.nro_reclamo_cia}</div>
+                  ) : (
+                    <div className="text-xs text-rose-400 font-medium opacity-80">Sin Nro Cía</div>
+                  )}
+                </td>
+
+                {/* VEHÍCULO */}
+                <td className="p-4">
+                  <div className="font-semibold">{siniestro.marca_auto} {siniestro.modelo_auto}</div>
+                  {siniestro.patente && (
+                    <div className="inline-block mt-1 px-1.5 py-0.5 bg-slate-950 border border-slate-700 rounded text-xs font-mono text-slate-300">
+                      {siniestro.patente}
+                    </div>
+                  )}
+                </td>
+
+                {/* RESPONSABILIDAD */}
+                <td className="p-4">
+                  <span className="text-slate-300 font-medium">{siniestro.responsabilidad_label || siniestro.responsabilidad}</span>
+                </td>
+
+                {/* ACCIONES */}
+                <td className="p-4 text-center align-middle">
+                  <div className="flex items-center justify-center gap-2">
+                    <button 
+                      onClick={() => onView(siniestro)} 
+                      className="p-2 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-colors"
+                      title="Ver Detalles Completos"
+                    >
+                      <FaEye />
+                    </button>
+                    <button 
+                      onClick={() => onEdit(siniestro)} 
+                      className="p-2 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                      title="Editar Siniestro"
+                    >
+                      <FaEdit />
+                    </button>
+                    {/* Solo el Admin puede borrar siniestros (por seguridad) */}
+                    {isWebAdmin && (
+                      <button 
+                        onClick={() => onDelete(siniestro)} 
+                        className="p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors"
+                        title="Eliminar Registro"
+                      >
+                        <FaTrash />
+                      </button>
+                    )}
+                  </div>
+                </td>
+
               </tr>
             ))
           )}

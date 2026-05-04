@@ -1,8 +1,8 @@
 // src/components/layout/Navbar.jsx
 import { useState } from "react";
 import { HiMenu, HiX, HiLogout, HiUserCircle, HiCurrencyDollar } from "react-icons/hi";
-import { Link } from "react-router-dom"; // 🚀 Importamos Link para la navegación
-import { useAuth } from "../../context/AuthContext"; // 🚀 Importamos Auth
+import { Link } from "react-router-dom"; 
+import { useAuth } from "../../context/AuthContext"; 
 
 export default function Navbar({
   sidebarOpen,
@@ -10,7 +10,8 @@ export default function Navbar({
   solPendienteAlta = 0,
   solPendienteEnvio = 0,
 }) {
-  const { user, logout } = useAuth(); // 🚀 Extraemos usuario y logout
+  const { user, logout } = useAuth(); 
+  const isVendedor = user?.perfil?.rol === 'VENDEDOR'; // 🚀 NUEVO
 
   return (
     <header
@@ -41,22 +42,25 @@ export default function Navbar({
           </h1>
         </div>
 
-        {/* 🚀 LADO DERECHO: USUARIO Y LOGOUT */}
         <div className="relative flex items-center gap-3 shrink-0">
           
-          {/* 💸 ACCESO RÁPIDO A CAJA / RECAUDACIÓN */}
-          <Link
-            to="/recaudacion"
-            title="Ir a Caja y Recaudación"
-            className="flex items-center justify-center cursor-pointer h-9 px-3 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors border border-emerald-500/30 gap-1.5"
-          >
-            <HiCurrencyDollar className="text-lg" />
-            <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest mt-0.5">Caja</span>
-          </Link>
+          {/* 💸 ACCESO RÁPIDO A CAJA / RECAUDACIÓN (Solo si NO es vendedor) */}
+          {!isVendedor && (
+            <Link
+              to="/recaudacion"
+              title="Ir a Caja y Recaudación"
+              className="flex items-center justify-center cursor-pointer h-9 px-3 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors border border-emerald-500/30 gap-1.5"
+            >
+              <HiCurrencyDollar className="text-lg" />
+              <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest mt-0.5">Caja</span>
+            </Link>
+          )}
 
           <div className="hidden sm:flex flex-col items-end mr-1 border-l border-white/10 pl-3">
             <span className="text-[11px] font-bold uppercase tracking-tighter text-yellow-400">
-              {user?.perfil?.rol === 'ADMIN' ? 'Administrador' : user?.perfil?.oficina_nombre || 'Oficina'}
+              {user?.perfil?.rol === 'ADMIN' ? 'Administrador' : 
+               user?.perfil?.rol === 'VENDEDOR' ? 'Vendedor Externo' : 
+               (user?.perfil?.oficina_nombre || 'Oficina')}
             </span>
             <span className="text-[10px] opacity-80 truncate max-w-[100px]">
               {user?.username}

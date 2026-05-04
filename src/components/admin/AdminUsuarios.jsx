@@ -1,7 +1,8 @@
 // src/components/admin/AdminUsuarios.jsx
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchAdminUsuarios, fetchAdminOficinas } from "../../store/slices/adminSlice";import { HiPlus, HiPencil, HiTrash, HiX, HiSave, HiUserCircle } from "react-icons/hi";
+import { fetchAdminUsuarios, fetchAdminOficinas } from "../../store/slices/adminSlice";
+import { HiPlus, HiPencil, HiTrash, HiX, HiSave, HiUserCircle } from "react-icons/hi";
 
 const getApiUrl = () => (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
 
@@ -101,7 +102,11 @@ export default function AdminUsuarios() {
                 <td className="px-4 py-3 font-semibold text-white flex items-center gap-2"><HiUserCircle className="text-slate-400 text-lg"/> {u.username}</td>
                 <td className="px-4 py-3">{u.first_name} {u.last_name}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${u.perfil?.rol === 'ADMIN' ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'}`}>
+                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                    u.perfil?.rol === 'ADMIN' ? 'bg-amber-500/20 text-amber-300' : 
+                    u.perfil?.rol === 'VENDEDOR' ? 'bg-purple-500/20 text-purple-300' : 
+                    'bg-sky-500/20 text-sky-300'
+                  }`}>
                     {u.perfil?.rol}
                   </span>
                 </td>
@@ -148,14 +153,22 @@ export default function AdminUsuarios() {
                 <div>
                   <label className="text-xs text-amber-400 mb-1 block font-semibold">Rol del Sistema</label>
                   <select value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
-                    <option value="OFICINA">Vendedor (Oficina)</option>
+                    <option value="OFICINA">Personal de Oficina / Cajero</option>
+                    <option value="VENDEDOR">Vendedor Externo</option>
                     <option value="ADMIN">Administrador Global</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-sky-400 mb-1 block font-semibold">Asignar a Oficina</label>
                   <select value={formData.oficina} onChange={e => setFormData({...formData, oficina: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none">
-                    <option value="">-- Sin Oficina (Todas) --</option>
+                    
+                    {/* 🚀 TEXTO DINÁMICO SEGÚN EL ROL SELECCIONADO */}
+                    <option value="">
+                      {formData.rol === 'ADMIN' ? '-- Acceso Global (Todas) --' : 
+                       formData.rol === 'VENDEDOR' ? '-- Independiente (Sin Sucursal) --' : 
+                       '-- Seleccionar Oficina --'}
+                    </option>
+                    
                     {oficinas.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
                   </select>
                 </div>

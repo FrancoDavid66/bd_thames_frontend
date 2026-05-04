@@ -2,8 +2,7 @@
 import { HiChartBar, HiShieldCheck, HiExclamation, HiTrendingDown } from "react-icons/hi";
 import AnimatedCard from "./AnimatedCard";
 
-export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPromedio }) {
-  // Usamos churnGlobal, pero dejamos churnPromedio como respaldo por compatibilidad
+export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPromedio, onCardClick }) {
   const churnValue = churnGlobal !== undefined ? churnGlobal : churnPromedio;
 
   return (
@@ -11,7 +10,7 @@ export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPr
       
       {/* 1. Pólizas Totales */}
       <AnimatedCard index={3} glow="from-sky-500/60 via-cyan-500/35 to-transparent">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 cursor-pointer hover:bg-slate-900/50 p-1 rounded-xl transition-colors" onClick={() => onCardClick("TOTALES")}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
               Pólizas totales
@@ -22,14 +21,14 @@ export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPr
             {Number(totales?.total || 0).toLocaleString("es-AR")}
           </p>
           <p className="text-[11px] sm:text-xs font-medium text-slate-400">
-            Stock total de pólizas en las oficinas seleccionadas.
+            Stock total de pólizas en las oficinas. <span className="text-sky-400 font-bold block mt-0.5">Ver lista ➔</span>
           </p>
         </div>
       </AnimatedCard>
 
       {/* 2. Pólizas Activas */}
       <AnimatedCard index={4} glow="from-emerald-500/60 via-sky-500/30 to-transparent">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 cursor-pointer hover:bg-slate-900/50 p-1 rounded-xl transition-colors" onClick={() => onCardClick("ACTIVAS")}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
               Pólizas activas
@@ -40,14 +39,14 @@ export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPr
             {Number(totales?.activas || 0).toLocaleString("es-AR")}
           </p>
           <p className="text-[11px] sm:text-xs font-medium text-slate-400">
-            Pólizas en estado <strong>activa</strong> al cierre del período.
+            Pólizas en estado <strong>activa</strong>. <span className="text-emerald-400 font-bold block mt-0.5">Ver lista ➔</span>
           </p>
         </div>
       </AnimatedCard>
 
       {/* 3. Altas del Mes */}
       <AnimatedCard index={5} glow="from-emerald-400/60 via-lime-400/30 to-transparent">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 cursor-pointer hover:bg-slate-900/50 p-1 rounded-xl transition-colors" onClick={() => onCardClick("ALTAS")}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
               Altas del mes
@@ -58,17 +57,17 @@ export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPr
             {Number(totales?.nuevas || 0).toLocaleString("es-AR")}
           </p>
           <p className="text-[11px] sm:text-xs font-medium text-slate-400">
-            Pólizas con <strong>fecha_emision</strong> dentro del período.
+            Emitidas en el período. <span className="text-emerald-300 font-bold block mt-0.5">Ver lista ➔</span>
           </p>
         </div>
       </AnimatedCard>
 
       {/* 4. Pólizas Vencidas */}
       <AnimatedCard index={6} glow="from-orange-500/60 via-amber-500/30 to-transparent">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 cursor-pointer hover:bg-slate-900/50 p-1 rounded-xl transition-colors" onClick={() => onCardClick("VENCIDAS")}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Vencidas
+              Vencidas (Mora)
             </span>
             <HiExclamation className="h-5 w-5 text-orange-400" />
           </div>
@@ -76,14 +75,14 @@ export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPr
             {Number(totales?.vencidas || 0).toLocaleString("es-AR")}
           </p>
           <p className="text-[11px] sm:text-xs font-medium text-slate-400">
-            Pólizas fuera de término o sin cobertura vigente.
+            Fuera de término o sin cobertura. <span className="text-orange-400 font-bold block mt-0.5">Ver morosos ➔</span>
           </p>
         </div>
       </AnimatedCard>
 
-      {/* 5. Bajas Exactas y Churn (MODIFICADA) */}
+      {/* 5. Bajas Exactas y Churn */}
       <AnimatedCard index={7} glow="from-rose-500/60 via-red-500/30 to-transparent">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 cursor-pointer hover:bg-slate-900/50 p-1 rounded-xl transition-colors" onClick={() => onCardClick("BAJAS")}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
               Bajas del Mes
@@ -91,17 +90,15 @@ export default function EstadisticasSummaryCards({ totales, churnGlobal, churnPr
             <HiTrendingDown className="h-5 w-5 text-rose-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            {/* Número exacto de bajas, gigante y claro */}
             <p className="text-2xl font-bold text-slate-50">
               {Number(totales?.bajas || 0).toLocaleString("es-AR")}
             </p>
-            {/* Porcentaje de Churn, más chiquito al lado */}
             <p className="text-sm font-semibold text-rose-400">
               ({Number(churnValue || 0).toFixed(1)}% Churn)
             </p>
           </div>
           <p className="text-[11px] sm:text-xs font-medium text-slate-400">
-            Cancelaciones exactas y su impacto en la cartera.
+            Cancelaciones exactas. <span className="text-rose-400 font-bold block mt-0.5">Ver lista ➔</span>
           </p>
         </div>
       </AnimatedCard>

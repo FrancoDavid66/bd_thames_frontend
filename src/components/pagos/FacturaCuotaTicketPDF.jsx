@@ -4,7 +4,7 @@ import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 const mmToPt = (mm) => (mm * 72) / 25.4;
 
 const TICKET_WIDTH = mmToPt(80);
-const TICKET_HEIGHT = mmToPt(480); // Un poco más largo para que quepa la nueva leyenda
+const TICKET_HEIGHT = mmToPt(480); 
 const PAD_X = mmToPt(5);
 const PAD_Y = mmToPt(8);
 
@@ -19,8 +19,6 @@ const ymd = (d) => {
   if (!s) return "";
   return s.length >= 10 ? s.slice(0, 10) : s;
 };
-
-const pad2 = (n) => String(n).padStart(2, "0");
 
 const fmtDateTimeHM = (d) => {
   if (!d) return "—";
@@ -91,14 +89,22 @@ const isPagoAtrasado = (cuota) => {
   return p.getTime() > v.getTime();
 };
 
-// 🚀 NUEVA FUNCIÓN: Suma 48hs hábiles (salta fines de semana)
+// 🚀 NUEVA FUNCIÓN: Suma 1 día (24hs)
+const calcularDiaSiguiente = (refDate) => {
+  const d = refDate ? new Date(refDate) : new Date();
+  if (Number.isNaN(d.getTime())) return "—";
+  d.setDate(d.getDate() + 1);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+// Suma 48hs hábiles (salta fines de semana)
 const calcularRehabilitacion = (refDate) => {
   const d = refDate ? new Date(refDate) : new Date();
   if (Number.isNaN(d.getTime())) return "—";
   let added = 0;
   while (added < 2) {
     d.setDate(d.getDate() + 1);
-    if (d.getDay() !== 0 && d.getDay() !== 6) added++; // Salta Domingo(0) y Sábado(6)
+    if (d.getDay() !== 0 && d.getDay() !== 6) added++; 
   }
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
@@ -115,11 +121,9 @@ const styles = StyleSheet.create({
     color: "#000",
     backgroundColor: "#fff",
   },
-
   header: { marginBottom: 10 },
   title: { fontSize: 16, fontWeight: "bold", textAlign: "center" },
   subtitle: { fontSize: 9, textAlign: "center", marginTop: 3 },
-
   statusPill: {
     alignSelf: "center",
     paddingVertical: 3,
@@ -130,14 +134,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statusText: { fontSize: 12, fontWeight: "bold" },
-
   hr: {
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     marginVertical: 10,
     borderStyle: "dashed",
   },
-
   block: { marginBottom: 10 },
   sectionTitle: {
     fontSize: 11,
@@ -145,7 +147,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 6,
   },
-
   line: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -154,9 +155,7 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 10, fontWeight: "bold", width: "58%" },
   value: { fontSize: 10, width: "42%", textAlign: "right", lineHeight: 1.25 },
-
   text: { fontSize: 10, lineHeight: 1.3 },
-
   table: { marginTop: 6, borderWidth: 1, borderColor: "#000" },
   tableHeader: {
     flexDirection: "row",
@@ -185,8 +184,6 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 12, fontWeight: "bold" },
   totalAmount: { fontSize: 12, fontWeight: "bold" },
-
-  // ✅ aviso legal modificado
   legalAlert: {
     marginTop: 14,
     paddingVertical: 10,
@@ -239,7 +236,11 @@ const FacturaCuotaTicketPDF = ({
 
   const vencimientoActualTxt = fmtDateOnly(cuota.fecha_vencimiento);
 
-  const pagoFueraDeTermino = isPagoAtrasado(cuota);
+  // 🚀 LÓGICA DE ALERTAS (Primera cuota vs Atrasado)
+  const esPrimeraCuota = String(cuotaNro) === "1";
+  const pagoFueraDeTermino = !esPrimeraCuota && isPagoAtrasado(cuota);
+  
+  const fechaDiaSiguiente = calcularDiaSiguiente(fechaReferenciaPago);
   const fechaRehabilitacion = calcularRehabilitacion(fechaReferenciaPago);
 
   return (
@@ -268,9 +269,6 @@ const FacturaCuotaTicketPDF = ({
             <Text style={styles.label}>Fecha y Hora de Pago</Text>
             <Text style={styles.value}>{fechaHoraOperacion}</Text>
           </View>
-
-          {/* Ocultamos el bloque de Cobertura */}
-          
           <View style={styles.line}>
             <Text style={styles.label}>Vencimiento Cuota</Text>
             <Text style={styles.value}>{vencimientoActualTxt}</Text>
@@ -312,12 +310,23 @@ const FacturaCuotaTicketPDF = ({
           </View>
         </View>
 
+        {/* 🚀 ALERTA PRIMERA CUOTA */}
+        {esPrimeraCuota && (
+          <View style={styles.legalAlert}>
+            <Text style={styles.legalTitle}>INICIO DE COBERTURA</Text>
+            <Text style={styles.legalText}>
+              El cliente toma conocimiento de que su vehículo comenzará a tener cobertura a partir del <Text style={styles.alertBold}>día siguiente</Text> a la realización de este pago (Fecha estimada: <Text style={styles.alertBold}>{fechaDiaSiguiente}</Text>).
+            </Text>
+          </View>
+        )}
+
+        {/* 🚀 ALERTA PAGO ATRASADO (Cuota 2+) */}
         {pagoFueraDeTermino && (
           <View style={styles.legalAlert}>
             <Text style={styles.legalTitle}>PAGO FUERA DE TÉRMINO</Text>
             <Text style={styles.legalText}>
               El cliente acepta y confirma bajo juramento que <Text style={styles.alertBold}>NO ha tenido ningún siniestro ni reclamo</Text> en los días previos a este pago, durante los cuales la póliza se encontraba vencida.{"\n\n"}
-              Asimismo, toma conocimiento de que la cobertura retomará su vigencia recién a las <Text style={styles.alertBold}>48 horas hábiles</Text> de este pago (Fecha estimada: <Text style={styles.alertBold}>{fechaRehabilitacion}</Text>), período en el cual <Text style={styles.alertBold}>TAMPOCO TENDRÁ COBERTURA</Text>.
+              Asimismo, toma conocimiento de que la cobertura retomará su vigencia a partir del <Text style={styles.alertBold}>día siguiente o a las 48 horas hábiles</Text> de este pago (Fecha máxima estimada: <Text style={styles.alertBold}>{fechaRehabilitacion}</Text>), período en el cual <Text style={styles.alertBold}>TAMPOCO TENDRÁ COBERTURA</Text>.
             </Text>
           </View>
         )}

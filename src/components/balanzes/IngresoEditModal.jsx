@@ -1,3 +1,4 @@
+// src/components/balanzes/IngresoEditModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
@@ -49,6 +50,9 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
 
   const ingresos = useSelector((s) => s.ingresos?.list || []);
   const egresos = useSelector((s) => s.egresos?.list || []);
+  
+  // 🚀 AHORA TRAEMOS LAS OFICINAS DESDE EL ESTADO GLOBAL
+  const { oficinas } = useSelector((s) => s.balance || {});
 
   const [form, setForm] = useState({
     monto: "",
@@ -262,9 +266,10 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
               className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
             >
               <option value="">Seleccione una sucursal...</option>
-              <option value="1">Oficina 1 (5 Esquinas)</option>
-              <option value="2">Oficina 2 (Axion)</option>
-              <option value="3">Oficina 3 (Km 39)</option>
+              {/* 🚀 MAPEO DINÁMICO DE SUCURSALES DESDE REDUX */}
+              {oficinas && oficinas.map(ofi => (
+                <option key={ofi.id} value={ofi.id}>{ofi.nombre}</option>
+              ))}
             </select>
             {errors.oficina && <p className="text-[11px] text-rose-400 mt-1">{errors.oficina}</p>}
           </div>

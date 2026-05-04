@@ -138,7 +138,7 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
       ...wallets,
       ...ingresos
         .filter((i) => i?.forma_pago === "TRANSFERENCIA" || i?.forma_pago === "MERCADOPAGO" || i?.forma_pago === "VIRTUAL")
-        .map((i) => i?.billetera), // Nota: si renombraste billetera a forma_pago, revisá esto
+        .map((i) => i?.billetera), 
       ...egresos
         .filter((e) => e?.forma_pago === "TRANSFERENCIA" || e?.forma_pago === "MERCADOPAGO" || e?.forma_pago === "VIRTUAL")
         .map((e) => e?.billetera),

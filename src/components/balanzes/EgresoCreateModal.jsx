@@ -9,7 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { createEgreso } from "../../store/slices/egresosSlice";
 import { fetchBalanceDiario, createCategoria } from "../../store/slices/balanceSlice";
 import ModalWrapper from "../comunes/ModalWrapper";
-import CategoriaSelect from "./CategoriaSelect"; // 🚀 IMPORTAMOS NUESTRO SELECTOR
+import CategoriaSelect from "./CategoriaSelect";
 
 const normalizarStr = (raw) => (raw ?? "").toString().trim();
 const today = () => dayjs().format("YYYY-MM-DD");
@@ -21,7 +21,8 @@ export default function EgresoCreateModal({ isOpen, onClose }) {
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
   const userOficina = user?.perfil?.oficina?.id || user?.perfil?.oficina?.codigo || user?.perfil?.oficina || "";
 
-  const { categorias } = useSelector((s) => s.balance || {});
+  // 🚀 AHORA TRAEMOS LAS OFICINAS DESDE EL ESTADO GLOBAL
+  const { categorias, oficinas } = useSelector((s) => s.balance || {});
 
   const [form, setForm] = useState({
     descripcion: "",
@@ -105,14 +106,11 @@ export default function EgresoCreateModal({ isOpen, onClose }) {
     try {
       setSubmitting(true);
       
-      // 1. Crear el Egreso
       await dispatch(createEgreso(payload)).unwrap();
 
-      // 2. Refrescar tablero KPI
       const ofiParaBalance = isWebAdmin ? form.oficina : userOficina;
       dispatch(fetchBalanceDiario({ fecha: payload.fecha, oficina: ofiParaBalance }));
 
-      // 3. Registrar categoría en DB oficial si no existe
       const existeCat = (categorias || []).some(c => c.nombre.toLowerCase() === catNorm.toLowerCase());
       if (catNorm && !existeCat) {
         dispatch(createCategoria({ nombre: catNorm, tipo: "EGRESO" }));
@@ -152,9 +150,10 @@ export default function EgresoCreateModal({ isOpen, onClose }) {
             <label className="block text-xs font-medium mb-1.5 text-zinc-400">Sucursal <span className="text-rose-400">*</span></label>
             <select name="oficina" value={form.oficina} onChange={handleChange} className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
               <option value="">Seleccione una sucursal...</option>
-              <option value="1">Oficina 1 (5 Esquinas)</option>
-              <option value="2">Oficina 2 (Axion)</option>
-              <option value="3">Oficina 3 (Km 39)</option>
+              {/* 🚀 MAPEO DINÁMICO DE SUCURSALES DESDE REDUX */}
+              {oficinas?.map(ofi => (
+                <option key={ofi.id} value={ofi.id}>{ofi.nombre}</option>
+              ))}
             </select>
             {errors.oficina && <p className="text-[11px] text-rose-400 mt-1">{errors.oficina}</p>}
           </div>
@@ -167,7 +166,6 @@ export default function EgresoCreateModal({ isOpen, onClose }) {
             {errors.descripcion && <p className="text-[11px] text-rose-400 mt-1">{errors.descripcion}</p>}
           </div>
           <div>
-            {/* 🚀 USAMOS EL SELECTOR INTELIGENTE */}
             <CategoriaSelect 
               tipo="EGRESO" 
               value={form.categoria} 

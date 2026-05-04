@@ -34,7 +34,7 @@ export const fetchAdminResponsables = createAsyncThunk('admin/fetchResponsables'
   } catch (error) { return rejectWithValue(error.message); }
 });
 
-// 🚀 NUEVAS RUTAS DE CATÁLOGOS CORREGIDAS (Con prefijo /cotizaciones/)
+// 🚀 RUTAS DE CATÁLOGOS
 export const fetchAdminCompanias = createAsyncThunk('admin/fetchCompanias', async (_, { rejectWithValue }) => {
   try {
     const token = localStorage.getItem('access_token') || localStorage.getItem('token');
@@ -58,10 +58,16 @@ export const fetchAdminCoberturas = createAsyncThunk('admin/fetchCoberturas', as
 const adminSlice = createSlice({
   name: 'admin',
   initialState: {
-    oficinas: [], usuarios: [], responsables: [],
-    companias: [], coberturas: [], 
-    loadingOficinas: false, loadingUsuarios: false, loadingResponsables: false,
-    loadingCompanias: false, loadingCoberturas: false,
+    oficinas: [], 
+    usuarios: [], 
+    responsables: [],
+    companias: [], 
+    coberturas: [],
+    loadingOficinas: false, 
+    loadingUsuarios: false, 
+    loadingResponsables: false,
+    loadingCompanias: false, 
+    loadingCoberturas: false,
   },
   reducers: {},
   extraReducers: (builder) => {

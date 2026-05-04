@@ -140,6 +140,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
   // 🚀 ESTADOS NUEVOS PARA LOS CATÁLOGOS DINÁMICOS
   const [companiasList, setCompaniasList] = useState([]);
   const [coberturasList, setCoberturasList] = useState([]);
+  const [planesPagoList, setPlanesPagoList] = useState([]); // 🚀 NUEVO ESTADO PARA PLANES
 
   const [step, setStep] = useState(1);
   const [oficinas, setOficinas] = useState([]);
@@ -157,6 +158,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     tipo: "Auto",
     precio_cuota: "",
     cantidad_cuotas_override: "",
+    plan_pago: "", // 🚀 NUEVO: Plan de pago seleccionado
     primer_vencimiento: "",
     fecha_emision: ymdLocal(new Date()),
     dias_a_vencer: 30,
@@ -186,7 +188,15 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
         })
         .catch((e) => console.warn("No se pudieron cargar las coberturas dinámicas.", e));
 
-      // 3. Cargar Oficinas (Si es Admin)
+      // 🚀 3. NUEVO: Cargar Planes de Pago
+      api.get("planes-pago/")
+        .then(res => {
+          const arr = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+          setPlanesPagoList(arr.filter(p => p.activa));
+        })
+        .catch((e) => console.warn("No se pudieron cargar los planes de pago dinámicos.", e));
+
+      // 4. Cargar Oficinas (Si es Admin)
       if (isWebAdmin) {
         setLoadingOficinas(true);
         PolizasAPI.listOficinas()
@@ -245,8 +255,10 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
   }, [poliza.fecha_emision]);
 
+  // Si cambia la compañía, limpiamos el plan de pago por defecto para obligarlo a elegir uno válido
   useEffect(() => {
     const raw = (poliza.compania || "").trim();
+    setPoliza(s => ({ ...s, plan_pago: "" })); // 🚀 NUEVO: Reset de plan
     if (!raw || tocoCantidadCuotas) return;
     const key = rmDiacritics(raw).toLowerCase();
     const cant = COMPANY_CUOTAS_DEFAULT[key];
@@ -318,7 +330,11 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
         anio: Number(poliza.anio),
         tipo: poliza.tipo || "Auto",
         precio_cuota: poliza.generar_cuotas_ahora && poliza.precio_cuota ? Number(poliza.precio_cuota) : undefined,
+        
+        // 🚀 NUEVO: Enviamos el ID del Plan de Pago. Si hay plan, Backend ignora cantidad_cuotas_override
+        plan_pago: poliza.plan_pago ? Number(poliza.plan_pago) : undefined, 
         cantidad_cuotas_override: poliza.cantidad_cuotas_override ? Number(poliza.cantidad_cuotas_override) : undefined,
+        
         generar_cuotas_ahora: !!poliza.generar_cuotas_ahora,
         fecha_emision: poliza.fecha_emision,
         primer_vencimiento: poliza.primer_vencimiento,
@@ -364,7 +380,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
     setStep(1);
   }, [isOpen]);
 
-  // 🚀 LECTURA DIRECTA DE BD (Sin hardcodeo)
+  // 🚀 LECTURA DIRECTA DE BD
   const coberturasOpts = coberturasList;
   const companiasOpts = companiasList;
 
@@ -414,6 +430,7 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
                     setSinNumero={setSinNumero}
                     companias={companiasOpts} 
                     coberturas={coberturasOpts} 
+                    planesPago={planesPagoList} // 🚀 NUEVO: Le pasamos la lista completa de planes a PolizaStep
                     setTocoCantidadCuotas={setTocoCantidadCuotas}
                   />
                 </>

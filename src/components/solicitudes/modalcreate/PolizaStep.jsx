@@ -62,6 +62,7 @@ export default function PolizaStep({
   companias = [],
   coberturas = [],
   oficinas = [],
+  setTocoCantidadCuotas,
   variants,
 }) {
   const { user } = useAuth();
@@ -107,21 +108,21 @@ export default function PolizaStep({
     setPoliza((prev = {}) => ({ ...prev, primer_vencimiento: next }));
   }, [poliza?.fecha_emision, setPoliza]);
 
-  // 🚀 FIX: Filtramos las coberturas para que SOLO muestre las de la compañía elegida
+  // 🚀 FILTRO APLICADO AQUÍ
   const coberturasFiltradas = useMemo(() => {
     if (!poliza?.compania) return [];
-    const ciaId = String(poliza.compania).trim().toLowerCase();
+    const ciaSelected = String(poliza.compania).trim().toLowerCase();
+    
     return coberturas.filter(c => 
-      String(c.compania).trim().toLowerCase() === ciaId || 
-      String(c.compania_nombre).trim().toLowerCase() === ciaId
+      String(c.compania).trim().toLowerCase() === ciaSelected || 
+      String(c.compania_nombre).trim().toLowerCase() === ciaSelected
     );
-  }, [coberturas, poliza?.compania]);
+  }, [poliza?.compania, coberturas]);
 
   const coberturaObj = useMemo(() => {
     if (!poliza?.cobertura) return null;
     const selectedKey = String(poliza.cobertura).trim().toLowerCase();
     
-    // Busca solo dentro de las filtradas
     const found = coberturasFiltradas.find(c => 
       String(c.id).trim().toLowerCase() === selectedKey || 
       String(c.nombre).trim().toLowerCase() === selectedKey
@@ -198,7 +199,7 @@ export default function PolizaStep({
           <SelectCreatable
             label="Compañía"
             value={poliza?.compania || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, compania: v, cobertura: "" }))} // 🚀 Resetea cobertura si cambia cia
+            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, compania: v, cobertura: "" }))} 
             options={companias} 
             isWebAdmin={isWebAdmin}
             endpoint="/cotizaciones/companias/" 
@@ -208,7 +209,7 @@ export default function PolizaStep({
             label="Cobertura"
             value={poliza?.cobertura || ""}
             onChange={(v) => setPoliza((prev = {}) => ({ ...prev, cobertura: v }))}
-            options={coberturasFiltradas} // 🚀 Pasa la lista filtrada
+            options={coberturasFiltradas} 
             isWebAdmin={isWebAdmin}
             endpoint="/cotizaciones/coberturas/" 
           />
@@ -450,7 +451,7 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
           >
             <option value="">— Seleccionar —</option>
             {mergedOptions.map((op) => (
-              <option key={op.id} value={op.id} className="bg-[#0f1324] text-white">
+              <option key={op.id} value={op.nombre || op.id} className="bg-[#0f1324] text-white">
                 {op.nombre || op.id}
               </option>
             ))}

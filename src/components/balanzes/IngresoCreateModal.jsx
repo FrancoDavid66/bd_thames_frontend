@@ -18,7 +18,8 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
   const userOficina = user?.perfil?.oficina?.id || user?.perfil?.oficina?.codigo || user?.perfil?.oficina || "";
 
-  const { categorias } = useSelector((s) => s.balance || {});
+  // 🚀 AHORA TRAEMOS LAS OFICINAS DESDE EL ESTADO GLOBAL
+  const { categorias, oficinas } = useSelector((s) => s.balance || {});
 
   const [form, setForm] = useState({
     monto: "",
@@ -159,9 +160,10 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
             <label className="block text-xs font-medium mb-1.5 text-zinc-400">Sucursal <span className="text-emerald-400">*</span></label>
             <select name="oficina" value={form.oficina} onChange={handleChange} className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
               <option value="">Seleccione una sucursal...</option>
-              <option value="1">Oficina 1 (5 Esquinas)</option>
-              <option value="2">Oficina 2 (Axion)</option>
-              <option value="3">Oficina 3 (Km 39)</option>
+              {/* 🚀 MAPEO DINÁMICO DE SUCURSALES DESDE REDUX */}
+              {oficinas && oficinas.map(ofi => (
+                <option key={ofi.id} value={ofi.id}>{ofi.nombre}</option>
+              ))}
             </select>
             {errors.oficina && <p className="text-[11px] text-rose-400 mt-1">{errors.oficina}</p>}
           </div>

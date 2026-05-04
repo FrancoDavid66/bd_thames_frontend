@@ -116,54 +116,28 @@ export default function CreateSolicitudModal({
   const [polizaId, setPolizaId] = useState("");
   const [poliza, setPoliza] = useState({ compania: "", numero_poliza: "", cobertura: "", oficina: "", patente: "", marca: "", modelo: "", anio: "", tipo: "Auto", precio_cuota: "", cantidad_cuotas_override: "", primer_vencimiento: "", fecha_emision: ymdLocal(new Date()), dias_a_vencer: 30, generar_cuotas_ahora: true });
 
+  const [sinNumero, setSinNumero] = useState(false);
+  const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
+
   useEffect(() => {
     if (!isWebAdmin && user?.perfil?.oficina) {
       setPoliza(prev => ({ ...prev, oficina: String(user.perfil.oficina) }));
     }
   }, [isWebAdmin, user]);
 
-  const [sinNumero, setSinNumero] = useState(false);
-  const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
-
   useEffect(() => {
     if (!poliza.fecha_emision) return;
     setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
   }, [poliza.fecha_emision]);
 
-  // Seteo de cantidad de cuotas automático
-  useEffect(() => {
-    const COMPANY_CUOTAS = { agrosalta: 6, "federacion patronal": 6, "federación patronal": 6, atm: 4, equidad: 3, nre: 3, providencia: 3 };
-    
-    // 🚀 TRADUCTOR INTERNO: Buscamos el nombre real para calcular las cuotas
-    const ciaObj = companias.find(c => String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania));
-    const finalCompania = ciaObj ? ciaObj.nombre : poliza.compania;
-
-    const raw = (finalCompania || "").trim();
-    if (!raw || tocoCantidadCuotas) return;
-    const key = rmDiacritics(raw).toLowerCase();
-    const cant = COMPANY_CUOTAS[key];
-    if (cant) setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(cant) }));
-  }, [poliza.compania, companias, tocoCantidadCuotas]);
-
-  const cuotasPreview = useMemo(() => {
-    const count = Number(poliza.cantidad_cuotas_override || 12);
-    const first = poliza.primer_vencimiento;
-    if (!first || !count || count < 1) return [];
-    return Array.from({ length: count }, (_, i) => ({ nro: i + 1, fecha: addMonthsLocal(first, i), monto: 0 }));
-  }, [poliza.cantidad_cuotas_override, poliza.primer_vencimiento]);
-
-  const [solicitud, setSolicitud] = useState({ prioridad: "NORMAL", observaciones: "", tipoSeguro: initialTipoSeguro });
-
+  // 🚀 REFACTOR: CALCULAMOS COBERTURA SIN FILTRAR POR COMPAÑÍA (PORQUE ES GLOBAL)
   const coberturaObj = useMemo(() => {
-    if (!poliza.cobertura || !poliza.compania) return null;
+    if (!poliza.cobertura) return null;
     
-    const ciaId = String(poliza.compania).trim().toLowerCase();
     const selectedKey = String(poliza.cobertura).trim().toLowerCase();
     
     const found = coberturas.find(c => {
-      const matchCia = String(c.compania).trim().toLowerCase() === ciaId || String(c.compania_nombre).trim().toLowerCase() === ciaId;
-      const matchCob = String(c.id).trim().toLowerCase() === selectedKey || String(c.nombre).trim().toLowerCase() === selectedKey;
-      return matchCia && matchCob;
+      return String(c.id).trim().toLowerCase() === selectedKey || String(c.nombre).trim().toLowerCase() === selectedKey;
     });
 
     if (found) {
@@ -184,7 +158,25 @@ export default function CreateSolicitudModal({
        return { ...found, fotos_requeridas: fotos, documentos_requeridos: docs };
     }
     return null;
-  }, [poliza.cobertura, poliza.compania, coberturas]);
+  }, [poliza.cobertura, coberturas]);
+
+  useEffect(() => {
+    if (tocoCantidadCuotas) return;
+    if (coberturaObj && coberturaObj.cuotas_a_generar) {
+      setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(coberturaObj.cuotas_a_generar) }));
+    } else {
+      setPoliza((s) => ({ ...s, cantidad_cuotas_override: "6" }));
+    }
+  }, [coberturaObj, tocoCantidadCuotas]);
+
+  const cuotasPreview = useMemo(() => {
+    const count = Number(poliza.cantidad_cuotas_override || 6);
+    const first = poliza.primer_vencimiento;
+    if (!first || !count || count < 1) return [];
+    return Array.from({ length: count }, (_, i) => ({ nro: i + 1, fecha: addMonthsLocal(first, i), monto: 0 }));
+  }, [poliza.cantidad_cuotas_override, poliza.primer_vencimiento]);
+
+  const [solicitud, setSolicitud] = useState({ prioridad: "NORMAL", observaciones: "", tipoSeguro: initialTipoSeguro });
 
   const [fotoSlots, setFotoSlots] = useState({});
   const [docSlots, setDocSlots] = useState({});
@@ -268,7 +260,6 @@ export default function CreateSolicitudModal({
     if (!canSubmit) return;
     setSaving(true);
     try {
-      // 🚀 TRADUCTOR FINAL: Convertimos IDs a Nombres para que el backend no explote
       const ciaObj = companias.find(c => String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania));
       const finalCompania = ciaObj ? ciaObj.nombre : poliza.compania;
 

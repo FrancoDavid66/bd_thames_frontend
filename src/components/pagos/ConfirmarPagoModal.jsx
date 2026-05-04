@@ -1,7 +1,7 @@
 // src/components/pagos/ConfirmarPagoModal.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiCash, HiSparkles } from "react-icons/hi";
+import { HiX, HiCash, HiSparkles, HiCamera, HiOutlineSwitchHorizontal } from "react-icons/hi";
 
 const MONEY_FMT = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
@@ -15,21 +15,48 @@ export default function ConfirmarPagoModal({
   confirmandoPago, 
   onClose, 
   onConfirm, 
-  isWebAdmin 
+  isWebAdmin,
+  onOpenTraspaso // 🚀 NUEVA FUNCIÓN PARA ABRIR EL MODAL DE VENTAS
 }) {
+  const [cuponeraSubida, setCuponeraSubida] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setCuponeraSubida(false);
+  }, [isOpen]);
+
   if (!isOpen || !confirmData) return null;
 
   const da = confirmData.diasAtraso || 0;
   const isCancelada = confirmData.polizaEstado === "CANCELADA" || confirmData.polizaEstado === "ANULADA";
 
-  // 💡 Lógica de Cross-Selling (Oportunidad de Venta)
   const cobNormalizada = String(confirmData.polizaCobertura || "").trim().toUpperCase();
-  const isCoberturaA = cobNormalizada === "A" || cobNormalizada === "COBERTURA A" || cobNormalizada.includes("RC") || cobNormalizada.includes("RESPONSABILIDAD CIVIL");
+  const compania = String(confirmData.polizaCompania || "").trim().toUpperCase();
+  
+  const isCoberturaA = 
+    cobNormalizada === "A" || 
+    cobNormalizada === "COBERTURA A" || 
+    cobNormalizada === "RC" || 
+    cobNormalizada.includes("RESPONSABILIDAD CIVIL");
+
+  // 💡 Lógica de Detección de Misión
+  const isNRE = compania.includes("NRE") || compania.includes("NUEVA RUTA");
+
+  const tieneRobo = !isCancelada && !isCoberturaA && (
+    cobNormalizada.includes("ROBO") ||
+    cobNormalizada.includes("TERCEROS") ||
+    cobNormalizada.includes("TODO RIESGO") ||
+    cobNormalizada.includes("TR") ||
+    cobNormalizada.includes("TC") ||
+    cobNormalizada === "B" ||
+    cobNormalizada === "C" ||
+    cobNormalizada.includes("C1") ||
+    cobNormalizada.includes("C+") ||
+    cobNormalizada === "D"
+  );
 
   let modalBgConfirm = "bg-slate-800 border-slate-700";
   let backdropBg = "bg-black/60 backdrop-blur-sm";
 
-  // 🚨 Lógica de Semáforo de Riesgo (Teñimos toda la pantalla)
   if (isCancelada || da >= 15) {
     modalBgConfirm = "bg-rose-950 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.4)]";
     backdropBg = "bg-rose-950/90 backdrop-blur-md";
@@ -40,6 +67,8 @@ export default function ConfirmarPagoModal({
     modalBgConfirm = "bg-slate-800 border-yellow-600/50 shadow-[0_0_30px_rgba(234,179,8,0.15)]";
     backdropBg = "bg-yellow-950/80 backdrop-blur-sm";
   }
+
+  const botonBloqueado = confirmandoPago || (tieneRobo && !cuponeraSubida);
 
   return (
     <AnimatePresence>
@@ -60,7 +89,7 @@ export default function ConfirmarPagoModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 12 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className={`relative z-[66] w-full max-w-[420px] rounded-2xl border px-5 py-5 sm:px-6 sm:py-6 shadow-2xl transition-colors duration-300 ${modalBgConfirm}`}
+            className={`relative z-[66] w-full max-w-[420px] rounded-2xl border px-5 py-5 sm:px-6 sm:py-6 shadow-2xl transition-colors duration-300 ${modalBgConfirm} max-h-[95vh] overflow-y-auto custom-scrollbar`}
           >
             <div className="flex items-start justify-between gap-3 mb-3">
               <h3 className={`text-base sm:text-lg font-bold text-white`}>Confirmar pago</h3>
@@ -76,7 +105,7 @@ export default function ConfirmarPagoModal({
               </button>
             </div>
 
-            {/* 🚨 ADVERTENCIAS DE RIESGO INTELIGENTES */}
+            {/* 🚨 ADVERTENCIAS DE RIESGO */}
             {isCancelada && (
               <div className="mb-4 p-3 bg-black/40 border border-black/40 rounded-xl text-rose-100 text-sm shadow-sm">
                 ⚠️ <strong className="text-white">PÓLIZA DADA DE BAJA:</strong> Estás a punto de cobrar una cuota de una póliza cancelada. Esto se registrará como <b>recupero de deuda</b>.
@@ -112,16 +141,79 @@ export default function ConfirmarPagoModal({
               </div>
             )}
 
-            {/* 💡 CROSS-SELLING: Oportunidad de Venta */}
-            {!isCancelada && isCoberturaA && (
+            {/* 🚀 MISIÓN NRE (SÚPER DESTACADA CON BOTÓN) */}
+            {!isCancelada && isNRE && isCoberturaA && (
+              <div className="mb-4 p-4 bg-indigo-900/60 border-2 border-indigo-500 rounded-xl text-indigo-100 text-sm shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                <div className="flex items-center gap-2 font-black text-white text-base mb-2">
+                  <HiSparkles className="w-5 h-5 text-indigo-400" />
+                  🚀 ¡MISIÓN NRE! GANA COMISIÓN
+                </div>
+                <p className="mb-3 text-[12px] leading-tight text-indigo-200">
+                  Este cliente tiene NRE (RC). ¡Convencelo de migrar y sumá a tu sueldo ahora mismo!
+                </p>
+                <ul className="space-y-1.5 mb-4">
+                  <li className="flex justify-between items-center bg-indigo-950/50 p-2 rounded border border-indigo-500/30">
+                    <span className="font-semibold text-xs text-indigo-100">A PROF (Sin grúa)</span>
+                    <span className="font-black text-emerald-400">+$10.000</span>
+                  </li>
+                  <li className="flex justify-between items-center bg-indigo-950/50 p-2 rounded border border-indigo-500/30">
+                    <span className="font-semibold text-xs text-indigo-100">A PROF (+ Grúa)</span>
+                    <span className="font-black text-emerald-400">+$15.000</span>
+                  </li>
+                  <li className="flex justify-between items-center bg-indigo-950/50 p-2 rounded border border-indigo-500/30">
+                    <span className="font-semibold text-xs text-indigo-100">A AMCA / ROBO</span>
+                    <span className="font-black text-emerald-400">+$10.000 + EXTRAS</span>
+                  </li>
+                </ul>
+                
+                {/* BOTÓN MÁGICO */}
+                <button 
+                  onClick={() => onOpenTraspaso(confirmData)}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-400 hover:-translate-y-0.5 cursor-pointer"
+                >
+                  <HiOutlineSwitchHorizontal className="text-lg" /> Registrar Traspaso y Ganar
+                </button>
+              </div>
+            )}
+
+            {/* 💡 CROSS-SELLING: OPORTUNIDAD PERSONALIZADA CON BOTÓN */}
+            {!isCancelada && !isNRE && isCoberturaA && (
               <div className="mb-4 p-3 bg-indigo-600/20 border border-indigo-500/50 rounded-xl text-indigo-100 text-sm shadow-sm">
                 <div className="flex items-center gap-1.5 font-bold mb-1 text-indigo-300">
                   <HiSparkles className="w-4 h-4 text-indigo-400" />
                   OPORTUNIDAD DE VENTA
                 </div>
-                <p className="text-indigo-200/90 text-[13px] leading-tight">
-                  El vehículo tiene <strong>Cobertura A (RC)</strong>. ¡Aprovechá que el cliente está acá para <strong>ofrecerle cotizar ROBO</strong> por una pequeña diferencia!
+                <p className="text-indigo-200/90 text-[13px] leading-tight font-semibold">
+                  Asegurado con R.C.: Ofrecele un seguro con ROBO o un servicio con GRÚA a $55.000.
                 </p>
+                <button 
+                  onClick={() => onOpenTraspaso(confirmData)}
+                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-500/20 border border-indigo-500/50 px-4 py-2 text-xs font-bold text-indigo-300 transition-all hover:bg-indigo-500/40 cursor-pointer"
+                >
+                  Registrar Venta Extra
+                </button>
+              </div>
+            )}
+
+            {/* 📸 VALIDACIÓN DE CUPONERA */}
+            {tieneRobo && (
+              <div className="mb-4 p-4 bg-sky-900/60 border-2 border-sky-500/80 rounded-xl text-sky-100 text-sm shadow-[0_0_15px_rgba(14,165,233,0.3)]">
+                <div className="flex items-center gap-2 font-bold text-white text-base mb-2">
+                  <HiCamera className="w-5 h-5 text-sky-400" />
+                  SEGURO CON ROBO
+                </div>
+                <p className="mb-3 text-[13px] leading-relaxed text-sky-200">
+                  Estás por cobrar un seguro que incluye Robo. <strong className="text-white">Tenés que pagar la cuponera y subir el comprobante</strong> para poder continuar.
+                </p>
+                <label className="flex items-center gap-3 cursor-pointer bg-sky-950/50 hover:bg-sky-900/80 transition-colors p-3 rounded-lg border border-sky-500/40">
+                  <input 
+                    type="checkbox" 
+                    checked={cuponeraSubida} 
+                    onChange={(e) => setCuponeraSubida(e.target.checked)} 
+                    className="w-5 h-5 accent-sky-500 cursor-pointer rounded bg-slate-900 border-slate-700" 
+                  />
+                  <span className="text-white font-semibold text-[13px]">Ya pagué y subí la cuponera.</span>
+                </label>
               </div>
             )}
 
@@ -157,9 +249,14 @@ export default function ConfirmarPagoModal({
               </button>
               <button
                 onClick={onConfirm}
-                disabled={confirmandoPago}
-                className={`h-11 px-5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg transition-all border ${
-                  confirmandoPago ? "bg-emerald-900/50 text-emerald-200/40 border-emerald-800" : da >= 15 || isCancelada ? "bg-white text-rose-700 hover:bg-slate-100 shadow-white/30 border-slate-200" : da >= 4 ? "bg-white text-amber-700 hover:bg-slate-100 shadow-white/30 border-slate-200" : da >= 1 ? "bg-white text-yellow-700 hover:bg-slate-100 shadow-white/30 border-slate-200" : "bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/30 border-emerald-400"
+                disabled={botonBloqueado}
+                className={`h-11 px-5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all border ${
+                  botonBloqueado 
+                    ? "bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed" 
+                    : da >= 15 || isCancelada ? "bg-white text-rose-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer" 
+                    : da >= 4 ? "bg-white text-amber-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer" 
+                    : da >= 1 ? "bg-white text-yellow-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer" 
+                    : "bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] border-emerald-400 cursor-pointer"
                 }`}
               >
                 {confirmandoPago ? (

@@ -4,22 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 dayjs.locale("es");
-import { HiClock, HiPencil, HiTrash, HiUser, HiOfficeBuilding } from "react-icons/hi";
+import { HiClock, HiPencil, HiTrash, HiUser, HiOfficeBuilding, HiOutlineExternalLink } from "react-icons/hi";
+import { Link } from "react-router-dom"; // 🚀 Importación para enlaces
 
-// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
 import { useAuth } from "../../context/AuthContext";
-
 import { deleteEgreso, fetchEgresos } from "../../store/slices/egresosSlice";
 import EgresoEditModal from "./EgresoEditModal";
 
 const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
   const dispatch = useDispatch();
 
-  // 🚀 ESCUDO DE SUCURSAL: Identificamos si es admin
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
-  // ---- STORE (modo paginado) ----
   const {
     list: egresosStore = [],
     status = "idle",
@@ -36,15 +33,11 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
     }
   }, [dispatch, page, egresosProp]);
 
-  // ---- Modal edición ----
   const [egresoAEditar, setEgresoAEditar] = useState(null);
-
-  // 🚀 NUEVO ESTADO: Filtro por Forma de Pago
   const [filtroForma, setFiltroForma] = useState("TODAS");
 
   const data = Array.isArray(egresosProp) ? egresosProp : egresosStore;
 
-  // 🚀 FILTRAMOS LOS DATOS SEGÚN EL BOTÓN SELECCIONADO
   const filteredData = useMemo(() => {
     if (!data) return [];
     if (filtroForma === "TODAS") return data;
@@ -75,7 +68,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
     );
   };
 
-  // 🚀 INSIGNIAS DE FORMA DE PAGO GIGANTES
   const renderFormaPago = (formaRaw) => {
     const forma = (formaRaw || "EFECTIVO").toUpperCase();
     
@@ -100,6 +92,46 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
     );
   };
 
+  // 🚀 NUEVA FUNCIÓN: Limpia la descripción, quita la patente y detecta pólizas
+  const renderDescripcion = (descripcionOriginal) => {
+    if (!descripcionOriginal) return "—";
+
+    // Regex para buscar "Póliza " seguido de cualquier cosa hasta un paréntesis (la patente) o el final
+    const matchPoliza = descripcionOriginal.match(/(.*?)(Póliza\s+[\w-]+)(?:\s*\([^)]+\))?(.*)/i);
+
+    if (matchPoliza) {
+      const [, preTexto, polizaParte, postTexto] = matchPoliza;
+      
+      // Extraemos solo el número de póliza para la URL (asumiendo que empieza después de "Póliza ")
+      const polizaNumero = polizaParte.replace(/Póliza\s+/i, "").trim();
+      
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-semibold text-zinc-200">
+            {preTexto.trim() || "Pago de Egreso"}
+          </span>
+          <div className="flex items-center">
+            {/* OJO: Aquí asumo que la ruta para ver pólizas por número/busqueda es /polizas. 
+                Si tu ruta requiere ID interno, dejaremos el link para que filtre por número de póliza en la grilla */}
+            <Link 
+              to={`/polizas?search=${polizaNumero}`} 
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 hover:text-sky-300 transition-colors uppercase tracking-wider bg-sky-400/10 px-1.5 py-0.5 rounded border border-sky-400/20"
+            >
+              {polizaParte} <HiOutlineExternalLink className="text-[10px]" />
+            </Link>
+            {postTexto && <span className="text-zinc-500 ml-1 text-[11px]">{postTexto}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-xs sm:max-w-md font-semibold text-zinc-200">
+        {descripcionOriginal}
+      </div>
+    );
+  };
+
   const totalVisible = useMemo(
     () => (filteredData || []).reduce((acc, it) => {
       const val = Number(String(it?.monto || "0").replace(",", "."));
@@ -109,7 +141,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
   );
 
   const handleDelete = async (egreso) => {
-    // 🚀 REGLA ESTRICTA: Solo Admin borra
     if (!isWebAdmin) {
       alert("No tienes permisos para eliminar egresos. Contacta al administrador.");
       return;
@@ -133,7 +164,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
   return (
     <div className={`w-full ${className}`}>
       
-      {/* 🚀 ENCABEZADO Y FILTROS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <h2 className="text-sm sm:text-lg font-semibold flex items-center gap-2">
           Listado de Egresos
@@ -144,7 +174,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
           )}
         </h2>
 
-        {/* 🚀 BOTONES DE FILTRO */}
         <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-zinc-800">
           <button
             onClick={() => setFiltroForma("TODAS")}
@@ -204,9 +233,9 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                 filteredData.map((egreso) => (
                   <tr key={egreso.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/70">
                     <td className="px-3 sm:px-4 py-3 align-middle">
-                      <div className="max-w-xs sm:max-w-md truncate font-semibold text-zinc-200">
-                        {egreso.descripcion || "—"}
-                      </div>
+                      {/* 🚀 APLICAMOS EL NUEVO FORMATO DE DESCRIPCIÓN CON ENLACE */}
+                      {renderDescripcion(egreso.descripcion)}
+
                       {isWebAdmin && egreso.oficina_nombre && (
                         <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1 font-semibold uppercase tracking-wider">
                           <HiOfficeBuilding /> {egreso.oficina_nombre}
@@ -214,7 +243,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                       )}
                     </td>
                     
-                    {/* Monto en ROJO por ser egreso */}
                     <td className="px-3 sm:px-4 py-3 text-right align-middle font-extrabold text-rose-400 text-base tracking-tight">
                       -${fmtMoney(egreso.monto)}
                     </td>
@@ -233,13 +261,13 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                     </td>
 
                     <td className="px-3 sm:px-4 py-3 align-middle">
-                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-                        <HiUser className="text-zinc-500" />
+                      {/* 🚀 APLICAMOS EL AUMENTO DE TAMAÑO AL USUARIO */}
+                      <div className="flex items-center gap-1.5 text-zinc-200 text-sm font-semibold">
+                        <HiUser className="text-zinc-400" />
                         {egreso.usuario_nombre || "Sistema"}
                       </div>
                     </td>
                     
-                    {/* 🚀 COLUMNA DE ACCIONES: RESTRINGIDA */}
                     <td className="px-3 sm:px-4 py-3 align-middle text-center">
                       <div className="flex items-center justify-center gap-1.5 sm:gap-2 relative z-20">
                         {isWebAdmin ? (
@@ -328,9 +356,9 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                   </div>
 
                   <div>
-                    <p className="text-sm font-semibold text-zinc-100 leading-snug">
-                      {egreso.descripcion || "—"}
-                    </p>
+                    {/* 🚀 APLICAMOS EL NUEVO FORMATO DE DESCRIPCIÓN CON ENLACE EN MÓVILES */}
+                    {renderDescripcion(egreso.descripcion)}
+
                     {isWebAdmin && egreso.oficina_nombre && (
                       <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1 font-semibold uppercase tracking-wider">
                         <HiOfficeBuilding /> {egreso.oficina_nombre}
@@ -345,12 +373,12 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                         {egreso.fecha ? dayjs(egreso.fecha).format("DD/MM/YY") : "—"}
                         {egreso.created_at && ` - ${dayjs(egreso.created_at).format("HH:mm")} hs`}
                       </span>
-                      <span className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5 font-medium">
-                        <HiUser className="text-zinc-600" /> Por: {egreso.usuario_nombre || "Sistema"}
+                      {/* 🚀 AUMENTO DE TAMAÑO AL USUARIO EN MOBILE */}
+                      <span className="text-[12px] text-zinc-200 flex items-center gap-1 mt-0.5 font-semibold">
+                        <HiUser className="text-zinc-400" /> Por: {egreso.usuario_nombre || "Sistema"}
                       </span>
                     </div>
                     
-                    {/* 🚀 RESTRINGIDO EN MOBILE TAMBIÉN */}
                     <div className="flex gap-2 relative z-20">
                       {isWebAdmin ? (
                         <>
@@ -392,7 +420,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
         )}
       </div>
 
-      {/* Paginación */}
       {!Array.isArray(egresosProp) && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 text-xs sm:text-sm bg-zinc-950 p-2 rounded-xl border border-zinc-900">
           <button
@@ -419,7 +446,6 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
         </div>
       )}
 
-      {/* Modal edición */}
       {egresoAEditar && isWebAdmin ? (
         <EgresoEditModal
           isOpen={!!egresoAEditar}

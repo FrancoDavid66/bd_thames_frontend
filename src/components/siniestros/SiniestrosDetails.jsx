@@ -1,6 +1,8 @@
+// src/components/siniestros/SiniestrosDetails.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
+import dayjs from 'dayjs';
 import SiniestroEventoForm from './SiniestroEventoForm';
 import { getEventosBySiniestro, addEvento } from '../../store/slices/siniestrosSlice';
 import { toast } from 'react-hot-toast';
@@ -19,16 +21,11 @@ const SiniestrosDetails = ({ isOpen, onClose, siniestro }) => {
   const handleAddEvento = async (eventoData) => {
     try {
       await dispatch(addEvento({ ...eventoData, siniestro_id: siniestro.id })).unwrap();
-      toast.success('Evento creado exitosamente');
+      toast.success('Evento agregado a la bitácora');
       setIsEventoFormOpen(false);
     } catch (err) {
-      toast.error('Error al crear el evento');
+      toast.error('Error al guardar el evento');
     }
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
   };
 
   if (!isOpen || !siniestro) return null;
@@ -36,42 +33,106 @@ const SiniestrosDetails = ({ isOpen, onClose, siniestro }) => {
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
-        <motion.div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-lg w-[95%] max-w-3xl" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.25 }}>
-          <h2 className="text-xl font-bold mb-4">Detalles del Siniestro</h2>
-          <div className="space-y-2">
-            <p><strong>Cliente:</strong> {siniestro.cliente}</p>
-            <p><strong>Póliza:</strong> {siniestro.poliza}</p>
-            <p><strong>Marca:</strong> {siniestro.marca_auto}</p>
-            <p><strong>Modelo:</strong> {siniestro.modelo_auto}</p>
-            <p><strong>Año:</strong> {siniestro.ano_auto}</p>
-            <p><strong>Descripción:</strong> {siniestro.descripcion}</p>
-            <p><strong>Responsabilidad:</strong> {siniestro.responsabilidad === 'CHOCO' ? 'Nuestro asegurado chocó' : 'Nuestro asegurado fue chocado'}</p>
-            <p><strong>Fecha de creación:</strong> {formatDate(siniestro.fecha_creacion)}</p>
-            <p><strong>Última modificación:</strong> {formatDate(siniestro.fecha_modificacion)}</p>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-lg font-semibold">Eventos del Siniestro</h3>
-            {eventos.length > 0 ? (
-              <ul className="mt-2 space-y-1">
-                {eventos.map((evento) => (
-                  <li key={evento.id} className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
-                    {formatDate(evento.fecha_evento)} - {evento.descripcion_evento}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500">No hay eventos registrados.</p>
+        <motion.div 
+          className="bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col md:flex-row gap-6" 
+          initial={{ scale: 0.95, opacity: 0, y: 10 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        >
+          {/* COLUMNA IZQUIERDA: DATOS DEL SINIESTRO */}
+          <div className="flex-1 space-y-6">
+            <div className="border-b border-slate-800 pb-4 flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-black text-white">Siniestro #{siniestro.id}</h2>
+                <p className="text-sm font-medium text-slate-400 mt-1">Nro Cía: <span className="text-indigo-400">{siniestro.nro_reclamo_cia || 'No cargado'}</span></p>
+              </div>
+              <span className="px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                {siniestro.estado_label || siniestro.estado}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
+                <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Cliente</span>
+                <span className="font-bold text-white">{siniestro.cliente_label}</span>
+              </div>
+              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
+                <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Fecha Accidente</span>
+                <span className="font-bold text-white">{siniestro.fecha_siniestro ? dayjs(siniestro.fecha_siniestro).format('DD/MM/YYYY') : '—'}</span>
+              </div>
+              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
+                <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Vehículo</span>
+                <span className="font-bold text-white">{siniestro.marca_auto} {siniestro.modelo_auto} ({siniestro.ano_auto})</span>
+                {siniestro.patente && <span className="block text-xs font-mono text-sky-400 mt-1">{siniestro.patente}</span>}
+              </div>
+              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
+                <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Responsabilidad</span>
+                <span className="font-bold text-white">{siniestro.responsabilidad_label || siniestro.responsabilidad}</span>
+              </div>
+            </div>
+
+            <div>
+              <span className="block text-xs text-slate-400 font-bold mb-2 uppercase">Relato de los Hechos</span>
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-sm whitespace-pre-wrap">
+                {siniestro.descripcion}
+              </div>
+            </div>
+
+            {/* Datos del Tercero (Solo si existen) */}
+            {(siniestro.tercero_nombre || siniestro.tercero_patente) && (
+              <div className="p-4 bg-rose-900/10 border border-rose-500/20 rounded-xl">
+                <span className="block text-xs text-rose-400 font-bold mb-3 uppercase">Datos del Tercero</span>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-slate-500">Nombre:</span> <span className="text-slate-200">{siniestro.tercero_nombre || '—'}</span></div>
+                  <div><span className="text-slate-500">Teléfono:</span> <span className="text-slate-200">{siniestro.tercero_telefono || '—'}</span></div>
+                  <div><span className="text-slate-500">Patente:</span> <span className="text-slate-200 uppercase">{siniestro.tercero_patente || '—'}</span></div>
+                  <div><span className="text-slate-500">Seguro:</span> <span className="text-slate-200">{siniestro.tercero_compania || '—'} ({siniestro.tercero_poliza || 'S/P'})</span></div>
+                </div>
+              </div>
             )}
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <button onClick={() => setIsEventoFormOpen(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Agregar Evento</button>
-            <button onClick={onClose} className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white rounded">Cerrar</button>
+
+          {/* COLUMNA DERECHA: BITÁCORA DE EVENTOS */}
+          <div className="w-full md:w-80 flex flex-col border-t md:border-t-0 md:border-l border-slate-800 pt-6 md:pt-0 md:pl-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">⏱️ Bitácora</h3>
+              <button onClick={() => setIsEventoFormOpen(true)} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg shadow-md transition-colors">
+                + Nota
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+              {eventos.length > 0 ? (
+                eventos.map((evento) => (
+                  <div key={evento.id} className="p-3 bg-slate-800/80 border border-slate-700/50 rounded-xl relative">
+                    <div className="absolute top-3 -left-[5px] w-2 h-2 rounded-full bg-sky-500"></div>
+                    <p className="text-[10px] font-bold text-sky-400 mb-1">
+                      {dayjs(evento.fecha_evento).format('DD MMM YYYY')}
+                    </p>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      {evento.descripcion_evento}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 border border-dashed border-slate-700 rounded-xl text-center">
+                  <p className="text-sm text-slate-500">No hay movimientos registrados en este siniestro.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <button onClick={onClose} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors">
+                Cerrar Panel
+              </button>
+            </div>
           </div>
+
           <SiniestroEventoForm
             isOpen={isEventoFormOpen}
             onClose={() => setIsEventoFormOpen(false)}

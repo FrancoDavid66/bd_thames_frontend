@@ -17,9 +17,10 @@ import AltasPolizasPanel from "../components/estadisticas/AltasPolizasPanel";
 import CalidadDatosPanel from "../components/estadisticas/CalidadDatosPanel";
 import DuplicadosPolizasPanel from "../components/estadisticas/DuplicadosPolizasPanel";
 import ContabilidadPanel from "../components/estadisticas/ContabilidadPanel";
-
-// 🚀 IMPORTAMOS EL NUEVO PANEL DE EFECTIVIDAD DE MENSAJES
 import EfectividadMensajesPanel from "../components/estadisticas/EfectividadMensajesPanel";
+
+// 🚀 IMPORTAMOS EL NUEVO MODAL DE LISTADOS
+import ListadoClientesModal from "../components/estadisticas/ListadoClientesModal";
 
 const getApiBase = () => {
   const raw =
@@ -175,6 +176,10 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
   const [showExport, setShowExport] = useState(false);
   const [showVehiculosExport, setShowVehiculosExport] = useState(false);
 
+  // 🚀 ESTADOS PARA EL MODAL DE LISTADOS
+  const [showListado, setShowListado] = useState(false);
+  const [tipoListado, setTipoListado] = useState(null);
+
   const oficinasValidas = Array.isArray(oficinasList) ? oficinasList : [];
 
   const fetchEstadisticas = async () => {
@@ -220,19 +225,16 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
     );
   }, [oficinasData]);
 
-  const churnGlobal = totales.total > 0 ? ((totales.bajas + totales.vencidas) / totales.total) * 100 : 0;
+  // FÓRMULA DE CHURN CORREGIDA: Solo Bajas Reales / Totales * 100
+  const churnGlobal = totales.total > 0 ? (totales.bajas / totales.total) * 100 : 0;
   
   const periodoLabel = periodo || `${String(mes).padStart(2, "0")}/${String(anio).padStart(4, "0")}`;
 
-  const calidadGlobal = useMemo(() => {
-    return oficinasData.reduce((acc, o) => {
-        const c = o.calidad_datos || {};
-        acc.sin_patente += c.sin_patente || 0;
-        acc.sin_vehiculo += c.sin_vehiculo || 0;
-        acc.sin_compania += c.sin_compania || 0;
-        return acc;
-    }, { sin_patente: 0, sin_vehiculo: 0, sin_compania: 0 });
-  }, [oficinasData]);
+  // 🚀 MANEJADOR DE CLICS EN LAS TARJETAS DE RESUMEN
+  const handleCardClick = (tipo) => {
+    setTipoListado(tipo);
+    setShowListado(true);
+  };
 
   return (
     <>
@@ -240,7 +242,9 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
       
       {error && <AnimatedCard index={2}><div className="rounded-xl border border-rose-500/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-100">{error}</div></AnimatedCard>}
       
-      <EstadisticasSummaryCards totales={totales} churnGlobal={churnGlobal} />
+      {/* 🚀 PASAMOS EL HANDLER A LAS TARJETAS */}
+      <EstadisticasSummaryCards totales={totales} churnGlobal={churnGlobal} onCardClick={handleCardClick} />
+      
       <OficinasTable oficinasData={oficinasData} getOficinaNombre={getOficinaNombre} formatMixPercent={formatMixPercent} />
       <AltasPolizasPanel apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} defaultOficina={oficina} />
       <VehiculosPanel apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} defaultOficina={oficina} onOpenExport={() => setShowVehiculosExport(true)} />
@@ -248,6 +252,16 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
 
       <AseguradosExportModal open={showExport} onClose={() => setShowExport(false)} apiBase={apiBase} oficinas={oficinasValidas} defaultOficina={oficina} getOficinaNombre={getOficinaNombre} />
       <VehiculosExportModal open={showVehiculosExport} onClose={() => setShowVehiculosExport(false)} apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} />
+      
+      {/* 🚀 INYECTAMOS EL NUEVO MODAL ACÁ */}
+      <ListadoClientesModal 
+        isOpen={showListado} 
+        onClose={() => setShowListado(false)} 
+        tipo={tipoListado} 
+        apiBase={apiBase}
+        getOficinaNombre={getOficinaNombre}
+        filtros={{ oficina, anio, mes }} 
+      />
     </>
   );
 }
@@ -266,8 +280,6 @@ export default function EstadisticasPage() {
   const [fuenteSnapshot, setFuenteSnapshot] = useState("live");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
-
-  const [calidadGeneralData, setCalidadGeneralData] = useState({ sin_patente: 0, sin_vehiculo: 0, sin_compania: 0 });
 
   useEffect(() => {
     const fetchOficinasDb = async () => {
@@ -288,7 +300,6 @@ export default function EstadisticasPage() {
     fetchOficinasDb();
   }, [apiBase]);
 
-  // 🚀 LIMPIEZA TOTAL DE HARDCODEO. Ahora 100% dinámico leyendo el array de oficinasList
   const getOficinaNombre = useCallback((id) => {
     if (!id) return "Sin oficina";
     const strId = String(id).trim();
@@ -298,10 +309,7 @@ export default function EstadisticasPage() {
     const arr = Array.isArray(oficinasList) ? oficinasList : [];
     const match = arr.find(o => String(o.id) === strId || String(o.codigo) === strId);
     
-    // Si la encuentra en la DB, devuelve el nombre real (Ej: "HOME OFFICE BARRACAS")
     if (match) return match.nombre;
-
-    // Si aún no cargó la API o la oficina fue borrada, devuelve "Oficina X"
     return `Oficina ${strId}`;
   }, [oficinasList]);
 
@@ -338,8 +346,6 @@ export default function EstadisticasPage() {
           <TabButton active={tab === "duplicados"} onClick={() => setTab("duplicados")}>Duplicados</TabButton>
           <TabButton active={tab === "asegurados"} onClick={() => setTab("asegurados")}>Asegurados</TabButton>
           <TabButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")}>Contabilidad</TabButton>
-          
-          {/* 🚀 NUEVA PESTAÑA COBRANZAS */}
           <TabButton active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>Cobranzas</TabButton>
         </div>
 
@@ -390,7 +396,6 @@ export default function EstadisticasPage() {
             </motion.div>
           )}
 
-          {/* 🚀 RENDERIZADO DEL NUEVO PANEL */}
           {tab === "cobranzas" && (
             <motion.div key="cobranzas" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
               <EfectividadMensajesPanel 

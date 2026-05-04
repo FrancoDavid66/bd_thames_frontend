@@ -9,7 +9,6 @@ import {
   HiCalendar,
 } from "react-icons/hi";
 
-/* Helpers */
 const safe = (v, d = "—") =>
   v === null || v === undefined || v === "" ? d : v;
 
@@ -20,16 +19,11 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 2,
   }).format(Number(n || 0));
 
-/**
- * Formatea fechas SIN romper por timezone.
- * - Si viene "YYYY-MM-DD" → la formatea a "DD/MM/YYYY" manualmente (sin Date).
- * - Si viene Date u otro tipo → usa dayjs como fallback.
- */
 const fmtDate = (d) => {
   if (!d) return "—";
   try {
     if (typeof d === "string") {
-      const dateStr = d.slice(0, 10); // soporta "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm..."
+      const dateStr = d.slice(0, 10); 
       const parts = dateStr.split("-");
       if (parts.length === 3) {
         const [yyyy, mm, dd] = parts;
@@ -46,7 +40,6 @@ const fmtDate = (d) => {
   }
 };
 
-/** Determina si la cuota se pagó después del vencimiento */
 const isPagoAtrasado = (cuota) => {
   if (!cuota || !cuota.pagado) return false;
   const { fecha_vencimiento, fecha_pago } = cuota;
@@ -57,7 +50,16 @@ const isPagoAtrasado = (cuota) => {
   return p.isAfter(v);
 };
 
-// 🚀 NUEVA FUNCIÓN: Suma 48hs hábiles (salta fines de semana)
+// 🚀 NUEVA FUNCIÓN: Suma 1 día (24hs)
+const calcularDiaSiguienteStr = (fechaPago) => {
+    if (!fechaPago) return "—";
+    const d = new Date(fechaPago);
+    if (isNaN(d.getTime())) return "—";
+    d.setDate(d.getDate() + 1);
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+// Suma 48hs hábiles
 const calcularRehabilitacionStr = (fechaPago) => {
     if (!fechaPago) return "—";
     const d = new Date(fechaPago);
@@ -73,16 +75,20 @@ const calcularRehabilitacionStr = (fechaPago) => {
 export default function FacturaCuota({ cliente, poliza, cuota }) {
   if (!cliente || !poliza || !cuota) return null;
 
-  const pagoAtrasado = isPagoAtrasado(cuota);
+  const cuotaNroStr = String(safe(cuota.cuota_nro));
+  const esPrimeraCuota = cuotaNroStr === "1";
+  const pagoAtrasado = !esPrimeraCuota && isPagoAtrasado(cuota);
   
-  // Calculamos la fecha estimada de reactivación si está pagado
+  const fechaDiaSiguiente = cuota.pagado 
+    ? calcularDiaSiguienteStr(cuota.pago_registrado_en || cuota.fecha_pago) 
+    : "—";
+
   const fechaRehabilitacion = cuota.pagado 
     ? calcularRehabilitacionStr(cuota.pago_registrado_en || cuota.fecha_pago) 
     : "—";
 
   return (
     <div className="max-w-3xl mx-auto rounded-2xl border border-neutral-300/20 bg-neutral-500 text-neutral-100 shadow print:bg-white print:text-black print:border-none print:shadow-none">
-      {/* Encabezado */}
       <div className="rounded-t-2xl bg-primary-400 text-neutral-900 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-neutral-900/10">
@@ -106,7 +112,6 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Datos Cliente y Póliza */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <section className="rounded-xl border border-neutral-300/20 bg-neutral-400/30 p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -180,7 +185,6 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
           </section>
         </div>
 
-        {/* Detalle del Pago */}
         <section className="rounded-xl border border-neutral-300/20 bg-neutral-400/30 p-4">
           <div className="flex items-center gap-2 mb-2">
             <HiCash className="w-5 h-5 opacity-80" />
@@ -237,7 +241,17 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
           </div>
         </section>
 
-        {/* Aviso por pago atrasado */}
+        {/* 🚀 ALERTA PRIMERA CUOTA */}
+        {esPrimeraCuota && (
+          <div className="rounded-lg border border-sky-400/60 bg-sky-500/10 text-sky-100 text-sm px-5 py-4 text-justify print:border-sky-500/80 print:text-sky-900 print:bg-transparent">
+            <p className="font-bold uppercase mb-2 text-center">Aviso Legal: Inicio de Cobertura</p>
+            <p>
+              El cliente toma conocimiento de que su vehículo comenzará a tener cobertura a partir del <strong className="font-bold">día siguiente</strong> a la realización de este primer pago (Fecha estimada: <strong className="font-bold">{fechaDiaSiguiente}</strong>).
+            </p>
+          </div>
+        )}
+
+        {/* 🚀 ALERTA PAGO ATRASADO */}
         {pagoAtrasado && (
           <div className="rounded-lg border border-rose-400/60 bg-rose-500/10 text-rose-100 text-sm px-5 py-4 text-justify print:border-red-500/80 print:text-red-900 print:bg-transparent">
             <p className="font-bold uppercase mb-2 text-center">Aviso Legal: Pago fuera de término</p>
@@ -245,12 +259,11 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
               El cliente acepta y confirma bajo juramento que <strong className="font-bold">NO ha tenido ningún siniestro ni reclamo</strong> en los días previos a este pago, durante los cuales la póliza se encontraba vencida.
             </p>
             <p className="mt-2">
-              Asimismo, toma conocimiento de que la cobertura retomará su vigencia recién a las <strong className="font-bold">48 horas hábiles</strong> de este pago (Fecha estimada: <strong className="font-bold">{fechaRehabilitacion}</strong>), período en el cual <strong className="font-bold">TAMPOCO TENDRÁ COBERTURA</strong>.
+              Asimismo, toma conocimiento de que la cobertura retomará su vigencia a partir del <strong className="font-bold">día siguiente o a las 48 horas hábiles</strong> de este pago (Fecha máxima estimada: <strong className="font-bold">{fechaRehabilitacion}</strong>), período en el cual <strong className="font-bold">TAMPOCO TENDRÁ COBERTURA</strong>.
             </p>
           </div>
         )}
 
-        {/* Footer */}
         <div className="text-center text-xs text-neutral-200/70 print:text-neutral-600">
           Gracias por confiar en nosotros.
         </div>

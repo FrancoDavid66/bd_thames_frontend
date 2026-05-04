@@ -19,14 +19,15 @@ import {
   HiChevronUp,
 } from "react-icons/hi";
 
-// 🚀 IMPORTAMOS CONTEXTO Y EL NUEVO COMPONENTE
+// 🚀 IMPORTAMOS CONTEXTO Y COMPONENTES
 import { useAuth } from "../../context/AuthContext";
 import { marcarCuotaComoPagada } from "../../store/slices/pagosSlice";
 import DescargarFactura from "./DescargarFactura";
 import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
 import EnviarFacturaWhatsapp from "./EnviarFacturaWhatsapp";
 import ModalFormaPago from "./ModalFormaPago";
-import ConfirmarPagoModal from "./ConfirmarPagoModal"; // <--- HIJO NUEVO
+import ConfirmarPagoModal from "./ConfirmarPagoModal";
+import RegistrarTraspasoModal from "./RegistrarTraspasoModal"; // <--- 🚀 NUEVO MODAL DE VENTAS
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
@@ -230,6 +231,10 @@ export default function PagosList({
   const [ajustarSiguientes, setAjustarSiguientes] = useState(true);
   const [isSubmittingFecha, setIsSubmittingFecha] = useState(false);
 
+  // 🚀 ESTADOS PARA EL MODAL DE TRASPASO/VENTAS
+  const [traspasoModalOpen, setTraspasoModalOpen] = useState(false);
+  const [clienteTraspaso, setClienteTraspaso] = useState(null);
+
   const items = useMemo(() => {
     return (Array.isArray(cuotas) ? cuotas : []).filter((c) => !ocultarPagadas || !c.pagado);
   }, [cuotas, ocultarPagadas]);
@@ -312,6 +317,9 @@ export default function PagosList({
     const fv = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
     const hoyDate = dayjs().startOf("day");
 
+    // 💡 Extraemos datos del cliente para pasárselos al Traspaso Modal si el usuario lo cliclea
+    const cli = resolveCliente(pol, cuota);
+
     setConfirmData({
       datos,
       cuota,
@@ -319,9 +327,11 @@ export default function PagosList({
       numeroPoliza: pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "-",
       cuotaNro: cuota.cuota_nro,
       polizaEstado: String(pol.estado || "").toUpperCase(),
-      polizaCobertura: String(pol.cobertura || ""), // 💡 Extraemos la cobertura para el cross-selling
+      polizaCobertura: String(pol.cobertura || ""), 
+      polizaCompania: String(pol.compania_nombre || pol.compania?.nombre || pol.compania || ""), // 🚀 Compañía inyectada
       oficinaLabel: getOficinaName(extractRawOficina(cuota)),
       diasAtraso: fv && fv.isBefore(hoyDate) ? hoyDate.diff(fv, "day") : 0,
+      clienteNombre: cli?.nombreCompleto || "Asegurado", // 🚀 Nombre para el modal
     });
     cerrarPagar();
   }, [cuotaSeleccionada, cerrarPagar]);
@@ -370,6 +380,13 @@ export default function PagosList({
     setConfirmData(null);
     if (cuota) setCuotaSeleccionada(cuota);
   }, [confirmData]);
+
+  // 🚀 FUNCIÓN PARA ABRIR EL MODAL DE VENTAS DESDE CONFIRMAR PAGO
+  const handleOpenTraspaso = useCallback((data) => {
+    setConfirmData(null); // Cerramos el modal de pago
+    setClienteTraspaso({ nombre: data.clienteNombre }); // Guardamos el cliente
+    setTraspasoModalOpen(true); // Abrimos el modal de ventas
+  }, []);
 
   const datosNoti = useMemo(() => {
     if (!cuotaSeleccionada) return null;
@@ -475,7 +492,6 @@ export default function PagosList({
         clienteNombreApellido={datosNoti?.nombreAp || ""} clienteDni={datosNoti?.dni || ""} polizaCompania={datosNoti?.compania || ""} polizaCobertura={datosNoti?.cobertura || ""} pagoCuota={datosNoti?.cuotaTxt || ""}
       />
 
-      {/* 🚀 ACÁ RENDERIZAMOS EL NUEVO COMPONENTE MODAL */}
       <ConfirmarPagoModal 
         isOpen={!!confirmData}
         confirmData={confirmData}
@@ -483,6 +499,14 @@ export default function PagosList({
         onClose={handleCancelarConfirm}
         onConfirm={ejecutarPagoConfirmado}
         isWebAdmin={isWebAdmin}
+        onOpenTraspaso={handleOpenTraspaso} // 🚀 PASAMOS LA FUNCIÓN
+      />
+
+      {/* 🚀 MODAL DE TRASPASO/VENTAS */}
+      <RegistrarTraspasoModal 
+        isOpen={traspasoModalOpen}
+        onClose={() => setTraspasoModalOpen(false)}
+        clienteData={clienteTraspaso}
       />
 
       {/* MODAL DE CAMBIAR FECHA */}

@@ -1,3 +1,4 @@
+// src/store/slices/balanceSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -7,7 +8,7 @@ const BASE_URL = import.meta.env.VITE_API_URL;
  * 🔐 Función auxiliar para obtener el token del almacenamiento local.
  */
 const getAuthHeaders = () => {
-  const token = localStorage.getItem("access_token"); 
+  const token = localStorage.getItem("access_token") || localStorage.getItem("token"); 
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -20,15 +21,13 @@ export const fetchBalanceDiario = createAsyncThunk(
     try {
       const params = {};
       if (fecha) params.fecha = fecha;
-      
-      // Enviamos la oficina seleccionada
-      if (oficina !== undefined && oficina !== null) {
+      if (oficina !== undefined && oficina !== null && oficina !== 'ALL') {
         params.oficina = oficina;
       }
 
       const res = await axios.get(`${BASE_URL}balance-diario/`, { 
         params,
-        headers: getAuthHeaders() // 🔑 Seguridad agregada
+        headers: getAuthHeaders() 
       });
       return res.data;
     } catch (err) {
@@ -46,46 +45,41 @@ export const enviarBalanceWhatsapp = createAsyncThunk(
       const payload = {};
       if (fecha) payload.fecha = fecha;
       if (destinatario) payload.destinatario = destinatario;
-      if (oficina) payload.oficina = oficina;
+      if (oficina && oficina !== 'ALL') payload.oficina = oficina;
 
       const res = await axios.post(`${BASE_URL}balance-diario/enviar/`, payload, {
-        headers: getAuthHeaders() // 🔑 Seguridad agregada
+        headers: getAuthHeaders() 
       });
       return res.data; 
     } catch (err) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        "No se pudo enviar el balance por WhatsApp";
+      const msg = err?.response?.data?.detail || err?.response?.data?.error || "No se pudo enviar el balance por WhatsApp";
       return rejectWithValue(msg);
     }
   }
 );
 
-// 🚀 NUEVO: GET Categorías Oficiales
+// GET Categorías Oficiales
 export const fetchCategorias = createAsyncThunk(
   "balance/fetchCategorias",
   async (tipo, { rejectWithValue }) => {
     try {
-      // Si pasamos tipo="INGRESO" o "EGRESO", el backend filtra. Si no, trae todas.
       const params = tipo ? { tipo } : {};
       const res = await axios.get(`${BASE_URL}categorias/`, {
         params,
         headers: getAuthHeaders(),
       });
-      return res.data; 
+      return res.data.results || res.data; 
     } catch (err) {
       return rejectWithValue(err?.response?.data || "Error al obtener categorías");
     }
   }
 );
 
-// 🚀 NUEVO: POST Crear Categoría Oficial
+// POST Crear Categoría Oficial
 export const createCategoria = createAsyncThunk(
   "balance/createCategoria",
   async (data, { rejectWithValue }) => {
     try {
-      // data debe ser un objeto: { nombre: "Limpieza", tipo: "EGRESO" }
       const res = await axios.post(`${BASE_URL}categorias/`, data, {
         headers: getAuthHeaders(),
       });
@@ -96,18 +90,67 @@ export const createCategoria = createAsyncThunk(
   }
 );
 
+// 🚀 NUEVO: GET Lista de Oficinas (Para el selector de admin)
+export const fetchOficinasList = createAsyncThunk(
+  "balance/fetchOficinasList",
+  async (_, { rejectWithValue }) => {
+    try {
+      // Ajusta la ruta a 'usuarios/oficinas/' si en tu backend está allí
+      const res = await axios.get(`${BASE_URL}oficinas/`, {
+        headers: getAuthHeaders(),
+      });
+      return res.data.results || res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || "Error al cargar las oficinas");
+    }
+  }
+);
+
+// 🚀 NUEVO: POST Crear un Ingreso
+export const createIngreso = createAsyncThunk(
+  "balance/createIngreso",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await axios.post(`${BASE_URL}ingresos/`, data, {
+        headers: getAuthHeaders(),
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || "Error al registrar el ingreso");
+    }
+  }
+);
+
+// 🚀 NUEVO: POST Crear un Egreso
+export const createEgreso = createAsyncThunk(
+  "balance/createEgreso",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await axios.post(`${BASE_URL}egresos/`, data, {
+        headers: getAuthHeaders(),
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || "Error al registrar el egreso");
+    }
+  }
+);
+
 // =============== SLICE ===============
 const initialState = {
   data: null,
   status: "idle",
   error: null,
+  
   envioStatus: "idle",
   envioError: null,
   mensajeEnviado: null,
   
-  // 🚀 NUEVOS ESTADOS PARA CATEGORÍAS
   categorias: [],
   categoriasStatus: "idle",
+
+  oficinas: [],
+  oficinasStatus: "idle",
 };
 
 const balanceSlice = createSlice({
@@ -122,7 +165,7 @@ const balanceSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // --- GET datos del balance ---
+      // --- Balance Diario ---
       .addCase(fetchBalanceDiario.pending, (state) => {
         state.status = "loading";
         state.error = null;
@@ -136,7 +179,7 @@ const balanceSlice = createSlice({
         state.error = action.payload || action.error?.message || "Error desconocido";
       })
 
-      // --- POST enviar por WhatsApp ---
+      // --- WhatsApp ---
       .addCase(enviarBalanceWhatsapp.pending, (state) => {
         state.envioStatus = "loading";
         state.envioError = null;
@@ -151,23 +194,31 @@ const balanceSlice = createSlice({
         state.envioError = action.payload || action.error?.message || "Error desconocido";
       })
 
-      // --- GET Categorías ---
+      // --- Categorías ---
       .addCase(fetchCategorias.pending, (state) => {
         state.categoriasStatus = "loading";
       })
       .addCase(fetchCategorias.fulfilled, (state, action) => {
         state.categoriasStatus = "succeeded";
-        // Si el backend usa paginación vendrá en .results, sino es directo el array
-        state.categorias = action.payload.results || action.payload; 
+        state.categorias = action.payload; 
       })
       .addCase(fetchCategorias.rejected, (state) => {
         state.categoriasStatus = "failed";
       })
-
-      // --- POST Categoría ---
       .addCase(createCategoria.fulfilled, (state, action) => {
-        // Agregamos la nueva categoría al estado automáticamente
         state.categorias.push(action.payload);
+      })
+
+      // --- Oficinas ---
+      .addCase(fetchOficinasList.pending, (state) => {
+        state.oficinasStatus = "loading";
+      })
+      .addCase(fetchOficinasList.fulfilled, (state, action) => {
+        state.oficinasStatus = "succeeded";
+        state.oficinas = action.payload;
+      })
+      .addCase(fetchOficinasList.rejected, (state) => {
+        state.oficinasStatus = "failed";
       });
   },
 });
