@@ -30,6 +30,22 @@ const getApiBase = () => {
   return raw.endsWith("/") ? raw : `${raw}/`;
 };
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const getFilenameFromDisposition = (contentDisposition, fallback) => {
+  const value = String(contentDisposition || "");
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1].replace(/['"]/g, ""));
+
+  const normalMatch = value.match(/filename="?([^";]+)"?/i);
+  if (normalMatch?.[1]) return normalMatch[1].replace(/['"]/g, "");
+
+  return fallback;
+};
+
 const formatMixPercent = (value, total) => {
   const v = Number(value || 0);
   const t = Number(total || 0);
@@ -76,8 +92,7 @@ function DistribucionPanel({ apiBase, oficina }) {
       if (soloActivas) params.set("solo_activas", "1");
 
       const url = `${apiBase}estadisticas/vehiculos/resumen/?${params.toString()}`;
-      const token = localStorage.getItem('access_token');
-      const res = await fetch(url, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
+      const res = await fetch(url, { headers: getAuthHeaders() });
       const json = await res.json();
       setData(json);
     } catch (e) {
@@ -193,8 +208,7 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
       if (fuenteSnapshot === "snapshot") params.set("usar_snapshot", "1");
 
       const url = `${apiBase}estadisticas/polizas/por-oficina/?${params.toString()}`;
-      const token = localStorage.getItem('access_token');
-      const res = await fetch(url, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
       const data = await res.json();
 
@@ -236,6 +250,47 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
     setShowListado(true);
   };
 
+  // 🚀 Descarga Excel completo desde las tarjetas.
+  // La tabla/modal puede seguir paginada; este endpoint exporta TODO el queryset filtrado.
+  const handleDownloadExcel = async (tipo) => {
+    const tipoSeguro = String(tipo || "TOTALES").trim().toUpperCase();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("formato", "xlsx");
+      params.set("tipo_listado", tipoSeguro); // TOTALES, ACTIVAS, ALTAS, VENCIDAS, BAJAS
+      params.set("anio", anio); // período del reporte
+      params.set("mes", mes); // período del reporte
+      params.set("export_all", "1"); // defensivo: la descarga NO debe paginar
+      if (oficina) params.set("oficina", oficina);
+
+      const url = `${apiBase}estadisticas/vehiculos/export/?${params.toString()}`;
+      const response = await fetch(url, { headers: getAuthHeaders() });
+
+      if (!response.ok) {
+        const msg = await response.text().catch(() => "");
+        throw new Error(msg || `Error HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const oficinaLabel = oficina ? `Oficina_${oficina}` : "Todas_las_oficinas";
+      const fallbackName = `Listado_${tipoSeguro}_${oficinaLabel}_${String(mes).padStart(2, "0")}_${anio}.xlsx`;
+      const fileName = getFilenameFromDisposition(response.headers.get("content-disposition"), fallbackName);
+
+      link.href = downloadUrl;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Error en la descarga:", err);
+      alert("No se pudo descargar el Excel completo. Intente nuevamente.");
+    }
+  };
+
   return (
     <>
       <EstadisticasHeader periodoLabel={periodoLabel} fuenteRespuesta={fuenteRespuesta} loading={loading} onRefresh={fetchEstadisticas} onOpenExport={() => setShowExport(true)} />
@@ -243,7 +298,12 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
       {error && <AnimatedCard index={2}><div className="rounded-xl border border-rose-500/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-100">{error}</div></AnimatedCard>}
       
       {/* 🚀 PASAMOS EL HANDLER A LAS TARJETAS */}
-      <EstadisticasSummaryCards totales={totales} churnGlobal={churnGlobal} onCardClick={handleCardClick} />
+      <EstadisticasSummaryCards 
+        totales={totales} 
+        churnGlobal={churnGlobal} 
+        onCardClick={handleCardClick} 
+        onDownloadExcel={handleDownloadExcel} 
+      />
       
       <OficinasTable oficinasData={oficinasData} getOficinaNombre={getOficinaNombre} formatMixPercent={formatMixPercent} />
       <AltasPolizasPanel apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} defaultOficina={oficina} />
@@ -284,9 +344,8 @@ export default function EstadisticasPage() {
   useEffect(() => {
     const fetchOficinasDb = async () => {
       try {
-        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const res = await fetch(`${apiBase}usuarios/oficinas/`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          headers: getAuthHeaders()
         });
         if (res.ok) {
           const data = await res.json();
