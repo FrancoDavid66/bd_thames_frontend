@@ -156,11 +156,23 @@ export default function EstadisticasSummaryCards({
               )}
             </div>
 
-            {/* Badge mora — solo si backend ya devuelve el campo */}
+            {/* Badge mora — clickeable, solo si backend ya devuelve el campo */}
             {enMora !== null && !loading && (
-              <div className="mt-2">
-                <span className="inline-flex items-center gap-1 text-[11px] font-mono border border-amber-700/60 bg-amber-900/30 text-amber-400 rounded px-2 py-0.5">
-                  {formatNumber(enMora)} con cuota vencida
+              <div className="mt-2 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); if (typeof onCardClick === "function") onCardClick("ACTIVAS_EN_MORA"); }}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono border border-amber-700/60 bg-amber-900/30 text-amber-400 rounded px-2 py-0.5 hover:bg-amber-700/40 transition-colors cursor-pointer"
+                >
+                  {formatNumber(enMora)} con cuota vencida →
+                </button>
+                <span
+                  role="button"
+                  title="Descargar Excel — en mora"
+                  onClick={(e) => { e.stopPropagation(); if (typeof onDownloadExcel === "function") onDownloadExcel("ACTIVAS_EN_MORA"); }}
+                  className="inline-flex items-center justify-center h-5 w-5 rounded text-slate-500 hover:text-amber-400 hover:bg-amber-900/30 transition-colors cursor-pointer"
+                >
+                  <HiDownload className="text-xs" />
                 </span>
               </div>
             )}
