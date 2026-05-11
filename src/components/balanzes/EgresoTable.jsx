@@ -140,21 +140,22 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
     [filteredData]
   );
 
-  const handleDelete = async (egreso) => {
-    if (!isWebAdmin) {
-      alert("No tienes permisos para eliminar egresos. Contacta al administrador.");
-      return;
-    }
-    const ok = window.confirm("¿Seguro que querés eliminar este egreso? Esta acción afectará el balance.");
-    if (!ok) return;
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
+  const handleDelete = (egreso) => {
+    if (!isWebAdmin) return;
+    setConfirmDelete(egreso);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
     try {
-      await dispatch(deleteEgreso(egreso.id)).unwrap();
-      if (!Array.isArray(egresosProp)) {
-        dispatch(fetchEgresos({ page }));
-      }
+      await dispatch(deleteEgreso(confirmDelete.id)).unwrap();
+      if (!Array.isArray(egresosProp)) dispatch(fetchEgresos({ page }));
     } catch (err) {
       console.error(err);
+    } finally {
+      setConfirmDelete(null);
     }
   };
 
@@ -204,101 +205,93 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
 
       {/* ===== Vista DESKTOP/TABLET ===== */}
       <div className="hidden md:block">
-        <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm">
+        <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950/60">
           <table className="min-w-full text-xs sm:text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-rose-600/95 text-white">
-                <th className="px-3 sm:px-4 py-3 text-left">Descripción</th>
-                <th className="px-3 sm:px-4 py-3 text-right">Monto</th>
-                <th className="px-3 sm:px-4 py-3 text-left">Fecha y Hora</th>
-                <th className="px-3 sm:px-4 py-3 text-center">Categoría / Forma</th>
-                <th className="px-3 sm:px-4 py-3 text-left">Cargado por</th>
-                <th className="px-3 sm:px-4 py-3 text-center">Acciones</th>
+            <thead>
+              <tr className="border-b border-zinc-800 bg-zinc-900">
+                <th className="px-3 sm:px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Descripción</th>
+                <th className="px-3 sm:px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Monto</th>
+                <th className="px-3 sm:px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Fecha</th>
+                <th className="px-3 sm:px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Categoría</th>
+                <th className="px-3 sm:px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Forma</th>
+                <th className="px-3 sm:px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Cargado por</th>
+                {isWebAdmin && <th className="px-3 sm:px-4 py-2.5 text-center text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Acciones</th>}
               </tr>
             </thead>
 
-            <tbody>
+            <tbody className="divide-y divide-zinc-800/60">
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={`sk-${i}`} className="border-b border-zinc-800/70">
-                    <td className="px-3 sm:px-4 py-4"><div className="h-3 w-32 sm:w-40 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-4 text-right"><div className="h-3 w-16 sm:w-24 bg-zinc-800 rounded ml-auto" /></td>
-                    <td className="px-3 sm:px-4 py-4"><div className="h-3 w-20 sm:w-24 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-4"><div className="h-6 w-24 sm:w-28 bg-zinc-800 rounded mx-auto" /></td>
-                    <td className="px-3 sm:px-4 py-4"><div className="h-3 w-24 sm:w-28 bg-zinc-800 rounded" /></td>
-                    <td className="px-3 sm:px-4 py-4 text-center"><div className="h-3 w-12 sm:w-16 bg-zinc-800 rounded mx-auto" /></td>
+                  <tr key={`sk-${i}`}>
+                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-40 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-3 text-right"><div className="h-3 w-20 bg-zinc-800 rounded ml-auto" /></td>
+                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-24 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-3"><div className="h-5 w-24 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-3"><div className="h-5 w-20 bg-zinc-800 rounded" /></td>
+                    <td className="px-3 sm:px-4 py-3"><div className="h-3 w-24 bg-zinc-800 rounded" /></td>
+                    {isWebAdmin && <td className="px-3 sm:px-4 py-3"><div className="h-5 w-16 bg-zinc-800 rounded mx-auto" /></td>}
                   </tr>
                 ))
               ) : filteredData?.length ? (
                 filteredData.map((egreso) => (
-                  <tr key={egreso.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/70">
+                  <tr key={egreso.id} className="hover:bg-zinc-900/60 transition-colors">
                     <td className="px-3 sm:px-4 py-3 align-middle">
-                      {/* 🚀 APLICAMOS EL NUEVO FORMATO DE DESCRIPCIÓN CON ENLACE */}
-                      {renderDescripcion(egreso.descripcion)}
-
+                      <div className="max-w-xs truncate text-zinc-200 text-xs">
+                        {renderDescripcion(egreso.descripcion)}
+                      </div>
                       {isWebAdmin && egreso.oficina_nombre && (
-                        <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1 font-semibold uppercase tracking-wider">
-                          <HiOfficeBuilding /> {egreso.oficina_nombre}
+                        <div className="text-[10px] text-zinc-600 mt-0.5 flex items-center gap-1 font-mono">
+                          <HiOfficeBuilding className="w-3 h-3" /> {egreso.oficina_nombre}
                         </div>
                       )}
                     </td>
-                    
-                    <td className="px-3 sm:px-4 py-3 text-right align-middle font-extrabold text-rose-400 text-base tracking-tight">
+                    <td className="px-3 sm:px-4 py-3 text-right align-middle font-mono font-semibold text-rose-400 text-sm">
                       -${fmtMoney(egreso.monto)}
                     </td>
-                    
                     <td className="px-3 sm:px-4 py-3 align-middle">
                       {renderFechaConHora(egreso)}
                     </td>
-                    
-                    <td className="px-3 sm:px-4 py-3 align-middle text-center">
-                      <div className="flex flex-col items-center gap-1.5">
-                        {renderFormaPago(egreso.forma_pago)}
-                        <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 truncate max-w-[100px]">
-                          {egreso.categoria || "S/C"}
-                        </span>
-                      </div>
-                    </td>
-
                     <td className="px-3 sm:px-4 py-3 align-middle">
-                      {/* 🚀 APLICAMOS EL AUMENTO DE TAMAÑO AL USUARIO */}
-                      <div className="flex items-center gap-1.5 text-zinc-200 text-sm font-semibold">
-                        <HiUser className="text-zinc-400" />
+                      <span className="text-[10px] font-mono border border-zinc-700 text-zinc-400 rounded px-1.5 py-0.5 bg-zinc-900">
+                        {egreso.categoria || "S/C"}
+                      </span>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 align-middle">
+                      {renderFormaPago(egreso.forma_pago)}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 align-middle">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs">
+                        <HiUser className="w-3 h-3 text-zinc-600" />
                         {egreso.usuario_nombre || "Sistema"}
                       </div>
                     </td>
-                    
-                    <td className="px-3 sm:px-4 py-3 align-middle text-center">
-                      <div className="flex items-center justify-center gap-1.5 sm:gap-2 relative z-20">
-                        {isWebAdmin ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setEgresoAEditar(egreso)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-zinc-800 hover:bg-rose-600 transition-colors"
-                              title="Editar egreso"
-                            >
-                              <HiPencil className="text-sm" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(egreso)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-zinc-800 hover:bg-rose-600 transition-colors"
-                              title="Eliminar egreso"
-                            >
-                              <HiTrash className="text-sm" />
-                            </button>
-                          </>
-                        ) : (
-                          <span className="text-[10px] text-zinc-600 italic">Solo Admin</span>
-                        )}
-                      </div>
-                    </td>
+                    {isWebAdmin && (
+                      <td className="px-3 sm:px-4 py-3 align-middle">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEgresoAEditar(egreso)}
+                            className="h-7 w-7 rounded-md bg-zinc-800 hover:bg-emerald-700 text-zinc-300 hover:text-white transition-colors inline-flex items-center justify-center"
+                            title="Editar"
+                          >
+                            <HiPencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(egreso)}
+                            className="h-7 w-7 rounded-md bg-zinc-800 hover:bg-rose-700 text-zinc-300 hover:text-white transition-colors inline-flex items-center justify-center"
+                            title="Eliminar"
+                          >
+                            <HiTrash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="px-4 py-12 text-center text-zinc-500" colSpan={6}>
+                  <td className="px-4 py-10 text-center text-zinc-600 text-sm" colSpan={isWebAdmin ? 7 : 6}>
                     No se encontraron egresos para este filtro.
                   </td>
                 </tr>
@@ -307,14 +300,14 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
 
             {filteredData?.length ? (
               <tfoot>
-                <tr className="bg-rose-900/20 border-t border-rose-800/30">
-                  <td className="px-3 sm:px-4 py-4 font-semibold text-zinc-300 uppercase tracking-widest text-xs">
-                    Total Filtrado
+                <tr className="border-t border-zinc-800 bg-zinc-900/60">
+                  <td className="px-3 sm:px-4 py-3 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+                    Total filtrado
                   </td>
-                  <td className="px-3 sm:px-4 py-4 text-right font-extrabold text-rose-400 text-lg tracking-tight">
-                    ${fmtMoney(totalVisible)}
+                  <td className="px-3 sm:px-4 py-3 text-right font-mono font-semibold text-rose-400">
+                    -${fmtMoney(totalVisible)}
                   </td>
-                  <td className="px-3 sm:px-4 py-4" colSpan={4} />
+                  <td colSpan={isWebAdmin ? 5 : 4} />
                 </tr>
               </tfoot>
             ) : null}
@@ -453,6 +446,36 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
           onClose={() => setEgresoAEditar(null)}
         />
       ) : null}
+
+      {/* Modal confirmación borrado */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl p-5 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">¿Eliminar egreso?</h3>
+              <p className="text-xs text-zinc-400 mt-1">
+                <span className="font-mono text-rose-400">-${fmtMoney(confirmDelete.monto)}</span>
+                {" — "}{confirmDelete.descripcion || "Sin descripción"}
+              </p>
+              <p className="text-xs text-zinc-600 mt-1">Esta acción afectará el balance. No se puede deshacer.</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="h-9 px-4 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={executeDelete}
+                className="h-9 px-4 rounded-lg bg-rose-700 hover:bg-rose-600 border border-rose-600 text-white text-sm font-medium transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

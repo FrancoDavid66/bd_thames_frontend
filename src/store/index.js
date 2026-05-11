@@ -39,6 +39,9 @@ import cotizacionesReducer from "./slices/cotizacionesSlice";
 // 🚀 NUEVO: Panel de Administración
 import adminReducer from "./slices/adminSlice"; 
 
+// Solicitudes
+import solicitudesReducer from "./slices/solicitudesSlice";
+
 export const store = configureStore({
   reducer: {
     clientes: clientesReducer,
@@ -76,6 +79,9 @@ export const store = configureStore({
 
     // 🚀 NUEVO: Panel Admin (Usuarios y Oficinas)
     admin: adminReducer,
+
+    // Solicitudes
+    solicitudes: solicitudesReducer,
   },
 });
 

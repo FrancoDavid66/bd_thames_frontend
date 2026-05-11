@@ -1,6 +1,6 @@
 // src/components/balanzes/BalanzesSettingsModal.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import {
   HiPlus,
   HiSearch,
@@ -13,10 +13,11 @@ import {
   HiCog,
   HiArrowLeft,
 } from "react-icons/hi";
-
-/* LocalStorage keys */
-const STORAGE_CATS = "balanzes_categorias";
-const STORAGE_WALLETS = "balanzes_billeteras";
+import {
+  fetchCategorias,
+  createCategoria,
+  deleteCategoria,
+} from "../../store/slices/balanceSlice";
 
 /* Utils */
 const uniqClean = (arr = []) =>
@@ -28,67 +29,57 @@ const uniqClean = (arr = []) =>
     )
   ).sort((a, b) => a.localeCompare(b));
 
-const readLS = (k, fallback) => {
-  try {
-    const v = JSON.parse(localStorage.getItem(k));
-    return Array.isArray(v) ? v : fallback;
-  } catch {
-    return fallback;
-  }
-};
-const writeLS = (k, v) => {
-  try {
-    localStorage.setItem(k, JSON.stringify(v));
-  } catch {}
-};
-
 export default function BalanzesSettingsModal({ isOpen, onClose }) {
+  const dispatch = useDispatch();
   const ingresos = useSelector((s) => s.ingresos?.list || []);
-  const egresos = useSelector((s) => s.egresos?.list || []);
+  const egresos  = useSelector((s) => s.egresos?.list  || []);
+
+  // Categorías desde Redux/backend
+  const categoriasBackend = useSelector((s) => s.balance?.categorias || []);
+  const cats = useMemo(
+    () => uniqClean(categoriasBackend.map((c) => c?.nombre || c)),
+    [categoriasBackend]
+  );
+
+  // Billeteras — siguen derivándose de los movimientos reales (no hay endpoint propio)
+  const wallets = useMemo(() =>
+    uniqClean([
+      ...ingresos.filter(i => ["TRANSFERENCIA","MERCADOPAGO","VIRTUAL"].includes(i?.forma_pago)).map(i => i?.billetera),
+      ...egresos.filter(e  => ["TRANSFERENCIA","MERCADOPAGO","VIRTUAL"].includes(e?.forma_pago)).map(e  => e?.billetera),
+    ]), [ingresos, egresos]
+  );
 
   /* ----- Paso actual: menu | cats | wallets ----- */
   const [step, setStep] = useState("menu");
 
-  /* ----- estado ----- */
-  const [cats, setCats] = useState([]);
-  const [wallets, setWallets] = useState([]);
-
   // inputs
-  const [newCat, setNewCat] = useState("");
-  const [newWallet, setNewWallet] = useState("");
-  const [catQuery, setCatQuery] = useState("");
-  const [walletQuery, setWalletQuery] = useState("");
+  const [newCat,       setNewCat]       = useState("");
+  const [catQuery,     setCatQuery]     = useState("");
+  const [walletQuery,  setWalletQuery]  = useState("");
 
   // selección + edición
-  const [selCat, setSelCat] = useState("");
-  const [renameCat, setRenameCat] = useState("");
+  const [selCat,        setSelCat]        = useState("");
+  const [renameCat,     setRenameCat]     = useState("");
   const [confirmDelCat, setConfirmDelCat] = useState(false);
-
-  const [selWallet, setSelWallet] = useState("");
-  const [renameWallet, setRenameWallet] = useState("");
-  const [confirmDelWallet, setConfirmDelWallet] = useState(false);
+  const [savingCat,     setSavingCat]     = useState(false);
 
   /* ----- lifecycle ----- */
   useEffect(() => {
     if (!isOpen) return;
 
-    setCats(readLS(STORAGE_CATS, []));
-    setWallets(readLS(STORAGE_WALLETS, []));
+    // Cargar categorías desde el backend
+    dispatch(fetchCategorias());
 
     // reset UI
     setStep("menu");
     setNewCat("");
-    setNewWallet("");
     setCatQuery("");
     setWalletQuery("");
     setSelCat("");
     setRenameCat("");
     setConfirmDelCat(false);
-    setSelWallet("");
-    setRenameWallet("");
-    setConfirmDelWallet(false);
+    setSavingCat(false);
 
-    // Esc y bloqueo scroll
     const onKey = (e) => e.key === "Escape" && onClose?.();
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -98,10 +89,7 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [isOpen, onClose]);
-
-  useEffect(() => writeLS(STORAGE_CATS, cats), [cats]);
-  useEffect(() => writeLS(STORAGE_WALLETS, wallets), [wallets]);
+  }, [isOpen, onClose, dispatch]);
 
   /* ----- stats / listas ----- */
   const catStats = useMemo(() => {
@@ -188,46 +176,46 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
       .map((x) => x.nombre || x)
       .filter(Boolean);
 
-  /* ----- actions categorías ----- */
-  const addCat = () => {
+  /* ----- actions categorías — ahora van al backend via Redux ----- */
+  const addCat = async () => {
     const v = (newCat || "").trim();
     if (!v) return;
-    setCats((prev) => uniqClean([...prev, v]));
-    setNewCat("");
-  };
-  const doRenameCat = () => {
-    const v = (renameCat || "").trim();
-    if (!selCat || !v) return;
-    setCats((prev) => uniqClean(prev.map((c) => (c === selCat ? v : c))));
-    setSelCat(v);
-    setRenameCat("");
-  };
-  const removeCat = () => {
-    if (!selCat) return;
-    setCats((prev) => prev.filter((c) => c !== selCat));
-    setSelCat("");
-    setConfirmDelCat(false);
+    setSavingCat(true);
+    try {
+      await dispatch(createCategoria({ nombre: v, tipo: "GENERAL" })).unwrap();
+      setNewCat("");
+      dispatch(fetchCategorias());
+    } catch { /* toast si querés */ }
+    finally { setSavingCat(false); }
   };
 
-  /* ----- actions billeteras ----- */
-  const addWallet = () => {
-    const v = (newWallet || "").trim();
-    if (!v) return;
-    setWallets((prev) => uniqClean([...prev, v]));
-    setNewWallet("");
+  const doRenameCat = async () => {
+    const v = (renameCat || "").trim();
+    if (!selCat || !v) return;
+    // El backend no tiene endpoint de rename aún — creamos la nueva y borramos la vieja
+    setSavingCat(true);
+    try {
+      await dispatch(createCategoria({ nombre: v, tipo: "GENERAL" })).unwrap();
+      const catObj = categoriasBackend.find(c => (c?.nombre || c) === selCat);
+      if (catObj?.id) await dispatch(deleteCategoria(catObj.id)).unwrap();
+      setSelCat(v);
+      setRenameCat("");
+      dispatch(fetchCategorias());
+    } catch {}
+    finally { setSavingCat(false); }
   };
-  const doRenameWallet = () => {
-    const v = (renameWallet || "").trim();
-    if (!selWallet || !v) return;
-    setWallets((prev) => uniqClean(prev.map((w) => (w === selWallet ? v : w))));
-    setSelWallet(v);
-    setRenameWallet("");
-  };
-  const removeWallet = () => {
-    if (!selWallet) return;
-    setWallets((prev) => prev.filter((w) => w !== selWallet));
-    setSelWallet("");
-    setConfirmDelWallet(false);
+
+  const removeCat = async () => {
+    if (!selCat) return;
+    setSavingCat(true);
+    try {
+      const catObj = categoriasBackend.find(c => (c?.nombre || c) === selCat);
+      if (catObj?.id) await dispatch(deleteCategoria(catObj.id)).unwrap();
+      setSelCat("");
+      setConfirmDelCat(false);
+      dispatch(fetchCategorias());
+    } catch {}
+    finally { setSavingCat(false); }
   };
 
   /* ----- UI helpers ----- */

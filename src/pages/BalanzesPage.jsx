@@ -37,39 +37,37 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 2,
   });
 
-/* 🚀 KPI card OPTIMIZADO */
+/* KPI card sobria */
 function KpiCard({ title, value, variant = "blue" }) {
   const variants = {
-    green: "bg-gradient-to-br from-emerald-600/70 via-emerald-600/40 to-emerald-500/60 border border-emerald-400/40 text-white",
-    red: "bg-gradient-to-br from-rose-600/70 via-rose-600/40 to-rose-500/60 border border-rose-400/40 text-white",
-    blue: "bg-gradient-to-br from-sky-600/70 via-sky-600/40 to-sky-500/60 border border-sky-400/40 text-white",
-    amber: "bg-gradient-to-br from-amber-600/70 via-amber-600/40 to-amber-500/60 border border-amber-400/40 text-white", 
+    green: "border-emerald-900/60 bg-emerald-950/30 text-emerald-300",
+    red:   "border-rose-900/60 bg-rose-950/30 text-rose-300",
+    blue:  "border-sky-900/60 bg-sky-950/30 text-sky-300",
+    amber: "border-amber-900/60 bg-amber-950/30 text-amber-300",
   };
   return (
-    <div className={`${variants[variant]} px-3 py-3 sm:px-4 sm:py-4 rounded-2xl shadow-sm transition-all duration-300 min-w-0 flex flex-col justify-center`}>
-      <h3 className="text-[10px] sm:text-xs uppercase tracking-wide opacity-90 truncate" title={title}>
-        {title}
-      </h3>
-      <p className="text-lg sm:text-xl lg:text-2xl font-black mt-1 tracking-tight">
+    <div className={`border rounded-lg px-3 py-3 flex flex-col justify-center min-w-0 ${variants[variant]}`}>
+      <p className="text-[10px] uppercase tracking-wider text-slate-500 truncate">{title}</p>
+      <p className="text-lg sm:text-xl font-mono font-semibold mt-1 tracking-tight text-slate-100">
         ${fmtMoney(value)}
       </p>
     </div>
   );
 }
 
-/* 🚀 COMPONENTE FILA DE KPIs (Para el Admin) */
+/* Grupo de KPIs por oficina */
 const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
-  <div className={`p-4 rounded-2xl border space-y-3 shadow-sm ${highlight ? "bg-zinc-900/50 border-zinc-700" : "bg-zinc-950/40 border-zinc-800/60"}`}>
-    <h2 className={`text-sm font-bold tracking-wider uppercase flex items-center gap-2 ${highlight ? "text-sky-400" : "text-emerald-400"}`}>
-      {highlight ? "🌍 " : "🏢 "} {title}
+  <div className={`p-4 rounded-lg border space-y-3 ${highlight ? "bg-slate-900 border-slate-700" : "bg-slate-900/40 border-slate-800"}`}>
+    <h2 className={`text-xs font-semibold tracking-wider uppercase flex items-center gap-2 ${highlight ? "text-sky-400" : "text-slate-400"}`}>
+      {title}
     </h2>
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-      <KpiCard title={`Ingresos Tot. ${suffix}`} value={metrics.tIn} variant="green" />
-      <KpiCard title={`Efectivo ${suffix}`} value={metrics.tInEfe} variant="green" />
-      <KpiCard title={`Transferencia ${suffix}`} value={metrics.tInTransf} variant="green" />
-      <KpiCard title={`Egresos Tot. ${suffix}`} value={metrics.tEg} variant="red" />
-      <KpiCard title={`Neto ${suffix}`} value={metrics.tBal} variant="blue" />
-      <KpiCard title={`Caja Chica ${suffix}`} value={metrics.tCajaChica} variant="amber" />
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
+      <KpiCard title={`Ingresos ${suffix}`}      value={metrics.tIn}        variant="green" />
+      <KpiCard title={`Efectivo ${suffix}`}       value={metrics.tInEfe}     variant="green" />
+      <KpiCard title={`Transf. ${suffix}`}        value={metrics.tInTransf}  variant="green" />
+      <KpiCard title={`Egresos ${suffix}`}        value={metrics.tEg}        variant="red"   />
+      <KpiCard title={`Neto ${suffix}`}           value={metrics.tBal}       variant="blue"  />
+      <KpiCard title={`Caja chica ${suffix}`}     value={metrics.tCajaChica} variant="amber" />
     </div>
   </div>
 );
@@ -172,30 +170,45 @@ const BalancesPage = () => {
         source = balanceData?.sin_oficina || null;
       }
 
-      const tIn = toNumber(source?.totales?.ingresos);
-      const tEg = toNumber(source?.totales?.egresos);
-      const tBal = toNumber(source?.totales?.balance);
+      const tIn        = toNumber(source?.totales?.ingresos);
+      const tEg        = toNumber(source?.totales?.egresos);
+      const tBal       = toNumber(source?.totales?.balance);
       const tCajaChica = toNumber(source?.totales?.saldo_caja_chica);
-      const inForma = source?.ingresos?.por_forma_pago || [];
-      const tInEfe = toNumber(inForma.find(f => f.forma_pago === "EFECTIVO")?.total);
-      const tInTransf = toNumber(inForma.find(f => f.forma_pago === "TRANSFERENCIA")?.total);
+      const inForma    = source?.ingresos?.por_forma_pago || [];
+      const tInEfe     = toNumber(inForma.find(f => f.forma_pago === "EFECTIVO")?.total);
+      const tInTransf  = toNumber(inForma.find(f => f.forma_pago === "TRANSFERENCIA")?.total);
 
       return { tIn, tEg, tBal, tCajaChica, tInEfe, tInTransf };
     } else {
-      const ingFiltrados = ofiCode === "ALL" ? ingresosMensuales : ofiCode === null ? ingresosMensuales.filter(i => !i.oficina) : ingresosMensuales.filter(i => String(i.oficina) === String(ofiCode));
-      const egFiltrados = ofiCode === "ALL" ? egresosMensuales : ofiCode === null ? egresosMensuales.filter(e => !e.oficina) : egresosMensuales.filter(e => String(e.oficina) === String(ofiCode));
+      // ── FIX: en vista mes, si el admin tiene una oficina seleccionada
+      // se filtra por esa oficina, no por "ALL"
+      const efectivaOfi = (isWebAdmin && oficinaSeleccionada !== "ALL")
+        ? String(oficinaSeleccionada)
+        : ofiCode;
 
-      const tIn = ingFiltrados.reduce((acc, i) => acc + toNumber(i.monto), 0);
-      const tEg = egFiltrados.reduce((acc, e) => acc + toNumber(e.monto), 0);
-      const tBal = tIn - tEg;
-      const tInEfe = ingFiltrados.filter(i => (i.forma_pago || '').toUpperCase() === 'EFECTIVO').reduce((acc, i) => acc + toNumber(i.monto), 0);
-      const tInTransf = ingFiltrados.filter(i => (i.forma_pago || '').toUpperCase() === 'TRANSFERENCIA').reduce((acc, i) => acc + toNumber(i.monto), 0);
-      const tEgEfe = egFiltrados.filter(e => (e.forma_pago || 'EFECTIVO').toUpperCase() === 'EFECTIVO').reduce((acc, e) => acc + toNumber(e.monto), 0);
+      const ingFiltrados = efectivaOfi === "ALL"
+        ? ingresosMensuales
+        : efectivaOfi === null
+          ? ingresosMensuales.filter(i => !i.oficina)
+          : ingresosMensuales.filter(i => String(i.oficina) === efectivaOfi);
+
+      const egFiltrados = efectivaOfi === "ALL"
+        ? egresosMensuales
+        : efectivaOfi === null
+          ? egresosMensuales.filter(e => !e.oficina)
+          : egresosMensuales.filter(e => String(e.oficina) === efectivaOfi);
+
+      const tIn      = ingFiltrados.reduce((acc, i) => acc + toNumber(i.monto), 0);
+      const tEg      = egFiltrados.reduce((acc, e) => acc + toNumber(e.monto), 0);
+      const tBal     = tIn - tEg;
+      const tInEfe   = ingFiltrados.filter(i => (i.forma_pago || "").toUpperCase() === "EFECTIVO").reduce((acc, i) => acc + toNumber(i.monto), 0);
+      const tInTransf= ingFiltrados.filter(i => (i.forma_pago || "").toUpperCase() === "TRANSFERENCIA").reduce((acc, i) => acc + toNumber(i.monto), 0);
+      const tEgEfe   = egFiltrados.filter(e => (e.forma_pago || "EFECTIVO").toUpperCase() === "EFECTIVO").reduce((acc, e) => acc + toNumber(e.monto), 0);
       const tCajaChica = tInEfe - tEgEfe;
 
       return { tIn, tEg, tBal, tCajaChica, tInEfe, tInTransf };
     }
-  }, [balanceData, ingresosMensuales, egresosMensuales]);
+  }, [balanceData, ingresosMensuales, egresosMensuales, isWebAdmin, oficinaSeleccionada]);
 
   const suffix = adminTimeView === "dia" ? "(Día)" : "(Mes)";
   const cargando = ingresosStatus === "loading" || egresosStatus === "loading" || balanceStatus === "loading";
@@ -451,9 +464,16 @@ const BalancesPage = () => {
           <section className="space-y-3 pt-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex flex-col gap-1 min-w-0">
-                <h2 className="text-sm md:text-base font-semibold truncate">
-                  Movimientos del mes (primeros 20)
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold truncate">
+                    Movimientos del mes
+                  </h2>
+                  <span className="text-[10px] font-mono text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5">
+                    {resumenMovTab === "ingresos"
+                      ? `${ingresosPreview.length} de ${ingresosMensuales.length}`
+                      : `${egresosPreview.length} de ${egresosMensuales.length}`}
+                  </span>
+                </div>
                 <div className="flex gap-1 bg-zinc-950 border border-zinc-800 rounded-full p-1 text-[11px] sm:text-xs">
                   <button
                     type="button"
@@ -478,26 +498,36 @@ const BalancesPage = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("detalle")}
-                className="text-[11px] sm:text-xs md:text-sm text-sky-300 hover:text-sky-200 underline-offset-2 hover:underline whitespace-nowrap shrink-0"
+                className="h-8 px-3 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors whitespace-nowrap shrink-0"
               >
-                Ver detalle
+                Ver todos →
               </button>
             </div>
 
             <div className="-mx-2 md:mx-0">
               {resumenMovTab === "ingresos" && (
-                <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-3 sm:p-4 overflow-x-auto">
-                  <h3 className="text-[11px] sm:text-xs font-semibold mb-2 text-emerald-300 uppercase tracking-wide">
-                    Ingresos del mes (primeros 20)
-                  </h3>
+                <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-3 sm:p-4 overflow-x-auto">
+                  {ingresosMensuales.length > 20 && (
+                    <p className="text-[10px] text-zinc-600 mb-2">
+                      Mostrando los primeros 20 de {ingresosMensuales.length}.{" "}
+                      <button onClick={() => setActiveTab("detalle")} className="text-sky-500 hover:text-sky-400 underline underline-offset-2">
+                        Ver todos
+                      </button>
+                    </p>
+                  )}
                   <IngresoTable ingresos={ingresosPreview} />
                 </div>
               )}
               {resumenMovTab === "egresos" && (
-                <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-3 sm:p-4 overflow-x-auto">
-                  <h3 className="text-[11px] sm:text-xs font-semibold mb-2 text-rose-300 uppercase tracking-wide">
-                    Egresos del mes (primeros 20)
-                  </h3>
+                <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-3 sm:p-4 overflow-x-auto">
+                  {egresosMensuales.length > 20 && (
+                    <p className="text-[10px] text-zinc-600 mb-2">
+                      Mostrando los primeros 20 de {egresosMensuales.length}.{" "}
+                      <button onClick={() => setActiveTab("detalle")} className="text-sky-500 hover:text-sky-400 underline underline-offset-2">
+                        Ver todos
+                      </button>
+                    </p>
+                  )}
                   <EgresoTable egresos={egresosPreview} />
                 </div>
               )}
@@ -509,6 +539,18 @@ const BalancesPage = () => {
       {/* TAB: Gráfico */}
       {activeTab === "grafico" && (
         <section className="space-y-4">
+          {/* Contexto de oficina para admin */}
+          {isWebAdmin && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-zinc-500">Mostrando:</span>
+              <span className="text-[10px] font-mono border border-zinc-700 bg-zinc-900 text-zinc-300 rounded px-2 py-0.5">
+                {oficinaSeleccionada === "ALL"
+                  ? "Todas las sucursales"
+                  : oficinasAdmin.find(o => String(o.id) === String(oficinaSeleccionada))?.nombre
+                    || `Sucursal ${oficinaSeleccionada}`}
+              </span>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3 mb-2">
             <div className="flex items-center gap-2">
               <span className="text-[11px] sm:text-xs text-zinc-400">Año</span>
@@ -556,101 +598,38 @@ const BalancesPage = () => {
       {/* TAB: Detalle */}
       {activeTab === "detalle" && (
         <section className="space-y-6">
-          {/* Vista simplificada para CELULAR */}
-          <div className="md:hidden space-y-4">
-            <div className="grid grid-cols-1 gap-3">
-              <div className="bg-emerald-600 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Ingresos del Día</h3>
-                <p className="text-2xl font-extrabold mt-1 truncate">
-                  ${fmtMoney(empMetricsDia.tIn)}
-                </p>
-              </div>
-              <div className="bg-rose-600 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Egresos del Día</h3>
-                <p className="text-2xl font-extrabold mt-1 truncate">
-                  ${fmtMoney(empMetricsDia.tEg)}
-                </p>
-              </div>
-              <div className="bg-sky-600/40 border border-sky-400/50 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Resultado del Día</h3>
-                <p
-                  className={`text-2xl font-extrabold mt-1 truncate ${
-                    empMetricsDia.tBal >= 0
-                      ? "text-sky-50"
-                      : "text-rose-100"
-                  }`}
-                >
-                  ${fmtMoney(empMetricsDia.tBal)}
-                </p>
-              </div>
-            </div>
-
-            {/* Listados resumidos */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Movimientos principales (vista móvil)</h3>
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-300">Ingresos (primeros 10)</p>
-                <ul className="space-y-1 text-xs">
-                  {ingresosMensuales.slice(0, 10).map((i) => (
-                    <li key={i.id} className="flex justify-between items-center gap-2 bg-zinc-950 rounded-xl px-2 py-1.5 min-w-0">
-                      <span className="truncate flex-1">{i.descripcion || "Ingreso"}</span>
-                      <span className="font-semibold shrink-0">${fmtMoney(i.monto)}</span>
-                    </li>
-                  ))}
-                  {ingresosMensuales.length === 0 && (
-                    <li className="text-zinc-400 text-xs">No hay ingresos este mes.</li>
-                  )}
-                </ul>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-300">Egresos (primeros 10)</p>
-                <ul className="space-y-1 text-xs">
-                  {egresosMensuales.slice(0, 10).map((e) => (
-                    <li key={e.id} className="flex justify-between items-center gap-2 bg-zinc-950 rounded-xl px-2 py-1.5 min-w-0">
-                      <span className="truncate flex-1">{e.descripcion || "Egreso"}</span>
-                      <span className="font-semibold shrink-0">${fmtMoney(e.monto)}</span>
-                    </li>
-                  ))}
-                  {egresosMensuales.length === 0 && (
-                    <li className="text-zinc-400 text-xs">No hay egresos este mes.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-zinc-500">
-              Para ver el detalle completo con todas las columnas y exportar el
-              Excel, usá la versión de escritorio.
-            </p>
+          {/* Export panel — solo desktop */}
+          <div className="hidden md:block -mx-2 sm:mx-0">
+            <BalanceExportPanel
+              ingresos={ingresosMensuales}
+              egresos={egresosMensuales}
+              fileName={`Balance_${dayjs().format("YYYY-MM")}.xlsx`}
+              className="w-full"
+            />
           </div>
 
-          {/* Vista completa SOLO DESKTOP */}
-          <div className="hidden md:block space-y-6">
-            <div className="-mx-2 sm:mx-0">
-              <BalanceExportPanel
-                ingresos={ingresosMensuales}
-                egresos={egresosMensuales}
-                fileName={`Balance_${dayjs().format("YYYY-MM")}.xlsx`}
-                className="w-full"
-              />
-            </div>
-
-            <section className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">Ingresos del mes</h2>
-              </div>
-              <div className="-mx-4 md:mx-0 overflow-x-auto">
+          {/* Tablas — visibles en TODOS los dispositivos */}
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-200 mb-3">
+                Ingresos del mes
+                <span className="ml-2 text-xs font-mono text-slate-500">({ingresosMensuales.length})</span>
+              </h2>
+              <div className="-mx-3 md:mx-0 overflow-x-auto">
                 <IngresoTable ingresos={ingresosMensuales} />
               </div>
+            </div>
 
-              <div className="mt-4">
-                <h2 className="text-lg font-semibold mb-2">Egresos del mes</h2>
-              </div>
-              <div className="-mx-4 md:mx-0 overflow-x-auto">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-200 mb-3">
+                Egresos del mes
+                <span className="ml-2 text-xs font-mono text-slate-500">({egresosMensuales.length})</span>
+              </h2>
+              <div className="-mx-3 md:mx-0 overflow-x-auto">
                 <EgresoTable egresos={egresosMensuales} />
               </div>
-            </section>
-          </div>
+            </div>
+          </section>
         </section>
       )}
 

@@ -1,116 +1,168 @@
 // src/components/estadisticas/OficinasTable.jsx
 import { motion } from "framer-motion";
 import { HiOfficeBuilding } from "react-icons/hi";
+import AnimatedCard from "./AnimatedCard";
 
-function ChurnBadge({ pct }) {
-  if (pct === 0) return <span className="text-slate-600 tabular-nums text-xs">0%</span>;
-  if (pct < 5)   return <span className="text-emerald-400 font-medium tabular-nums text-xs">{pct.toFixed(1)}%</span>;
-  if (pct < 10)  return <span className="text-amber-400 font-semibold tabular-nums text-xs">{pct.toFixed(1)}%</span>;
-  return <span className="text-rose-400 font-bold tabular-nums text-xs">{pct.toFixed(1)}%</span>;
-}
-
-function MiniBar({ value, total, color }) {
-  const pct = total > 0 ? Math.min(100, (value / total) * 100) : 0;
+export default function OficinasTable({
+  oficinasData,
+  getOficinaNombre,
+  formatMixPercent,
+}) {
   return (
-    <div className="h-1 w-14 rounded-full bg-slate-800 overflow-hidden">
-      <motion.div
-        className={`h-full rounded-full ${color}`}
-        initial={{ width: 0 }}
-        animate={{ width: `${pct}%` }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-      />
-    </div>
-  );
-}
-
-export default function OficinasTable({ oficinasData, getOficinaNombre, formatMixPercent }) {
-  if (!oficinasData?.length) return null;
-
-  return (
-    <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/50">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900/80">
-        <div className="flex items-center gap-2">
-          <HiOfficeBuilding className="text-sky-400 text-sm" />
-          <span className="text-xs font-semibold text-slate-200">Detalle por oficina</span>
+    <AnimatedCard
+      index={7}
+      interactive={false}
+      glow="from-indigo-500/50 via-sky-500/25 to-transparent"
+    >
+      <div>
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-100">
+            <HiOfficeBuilding className="text-sky-300" />
+            <span>Detalle por oficina</span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            {oficinasData.length} oficinas encontradas
+          </span>
         </div>
-        <span className="text-[10px] text-slate-600">{oficinasData.length} {oficinasData.length === 1 ? "oficina" : "oficinas"}</span>
+
+        {oficinasData.length === 0 ? (
+          <div className="px-1 py-4 text-xs sm:text-sm text-slate-400">
+            No hay datos para los filtros seleccionados.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs sm:text-sm">
+              <thead className="bg-slate-900/80 border-b border-slate-800">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-300">
+                    Oficina
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-300">
+                    Pólizas totales
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-emerald-300">
+                    Al día
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-amber-300">
+                    Con cuota vencida
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-emerald-200">
+                    Altas mes
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-rose-200">
+                    Bajas (Canceladas)
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-orange-200">
+                    En Mora (Vencidas)
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-200">
+                    Churn %
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {oficinasData.map((o, idx) => {
+                  const totalOf = Number(o.polizas_total || 0);
+                  const bajasOf = Number(o.bajas_mes || 0);
+                  const vencidasOf = Number(o.en_mora || o.vencidas_mes || 0);
+                  
+                  const mixCob = o.por_cobertura || {};
+                  const mixComp = o.por_compania || {};
+                  const antig = o.antiguedad || {};
+                  
+                  const churnPct = totalOf > 0 ? ((bajasOf + vencidasOf) / totalOf) * 100 : 0;
+
+                  // 🚀 FIX: OBLIGAMOS AL SISTEMA A USAR EL NOMBRE REAL DE LA BASE DE DATOS
+                  const oficinaNombre = getOficinaNombre ? getOficinaNombre(o.oficina) : (o.oficina_nombre || o.oficina || "—");
+
+                  const cobKeys = Object.keys(mixCob);
+                  const cobResumen = cobKeys
+                    .slice(0, 3)
+                    .map((k) => `${k}: ${formatMixPercent(mixCob[k], totalOf)}`)
+                    .join(" · ");
+
+                  const compKeys = Object.keys(mixComp);
+                  const compResumen = compKeys
+                    .slice(0, 3)
+                    .map((k) => {
+                      const count = Number(mixComp[k] || 0);
+                      const pct = formatMixPercent(count, totalOf);
+                      return `${k}: ${count} (${pct})`;
+                    })
+                    .join(" · ");
+
+                  const antigResumenParts = [];
+                  if (antig["0_1"]) antigResumenParts.push(`0–1: ${antig["0_1"]}`);
+                  if (antig["1_3"]) antigResumenParts.push(`1–3: ${antig["1_3"]}`);
+                  if (antig["3_5"]) antigResumenParts.push(`3–5: ${antig["3_5"]}`);
+                  if (antig["5_plus"]) antigResumenParts.push(`5+: ${antig["5_plus"]}`);
+                  const antigResumen = antigResumenParts.join(" · ");
+
+                  let churnColor = "text-slate-100";
+                  if (churnPct >= 5 && churnPct < 10) churnColor = "text-amber-300";
+                  else if (churnPct >= 10) churnColor = "text-rose-300";
+                  else if (churnPct > 0 && churnPct < 5) churnColor = "text-emerald-300";
+
+                  return (
+                    <motion.tr
+                      key={`${o.oficina || "SIN"}-${idx}`}
+                      className={idx % 2 === 0 ? "bg-slate-900/40" : "bg-slate-900/10"}
+                      whileHover={{ backgroundColor: "rgba(15,23,42,0.95)" }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap text-slate-100 align-top">
+                        {/* El Nombre Principal */}
+                        <div className="font-semibold text-sky-400">{oficinaNombre}</div>
+                        
+                        {/* El Código/ID chiquito abajo */}
+                        {o.oficina && String(o.oficina) !== "SIN_OFICINA" && String(o.oficina) !== "OTRAS" ? (
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Código / ID: {String(o.oficina)}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-1.5 text-[10px] text-slate-400 space-y-0.5">
+                          {cobResumen && <div>Coberturas: {cobResumen}</div>}
+                          {compResumen && <div>Compañías: {compResumen}</div>}
+                          {antigResumen && <div>Antigüedad (años): {antigResumen}</div>}
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-2 text-right text-slate-100 align-top font-bold">
+                        {totalOf.toLocaleString("es-AR")}
+                      </td>
+                      {/* Al día — activas SIN cuotas vencidas */}
+                      <td className="px-3 py-2 text-right align-top">
+                        <span className="font-bold text-emerald-400">
+                          {(o.activas_al_dia ?? o.polizas_activas ?? 0).toLocaleString("es-AR")}
+                        </span>
+                      </td>
+                      {/* Con cuota vencida — activas PERO con mora */}
+                      <td className="px-3 py-2 text-right align-top">
+                        <span className={(o.activas_en_mora ?? 0) > 0 ? "font-bold text-amber-400" : "text-slate-600"}>
+                          {(o.activas_en_mora ?? 0).toLocaleString("es-AR")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right text-emerald-200 align-top">
+                        {(o.nuevas_mes || 0).toLocaleString("es-AR")}
+                      </td>
+                      <td className="px-3 py-2 text-right text-rose-200 align-top">
+                        {bajasOf.toLocaleString("es-AR")}
+                      </td>
+                      <td className="px-3 py-2 text-right text-orange-300 align-top font-bold">
+                        {vencidasOf.toLocaleString("es-AR")}
+                      </td>
+                      <td className={`px-3 py-2 text-right align-top font-black tracking-widest ${churnColor}`}>
+                        {churnPct.toFixed(1)}%
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-xs">
-          <thead>
-            <tr className="border-b border-slate-800/60 bg-slate-950/30">
-              <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Oficina</th>
-              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total</th>
-              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Activas</th>
-              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Altas nuevas</th>
-              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-rose-600">Bajas</th>
-              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-amber-600">En mora</th>
-              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Churn</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/40">
-            {oficinasData.map((o, idx) => {
-              const total   = Number(o.polizas_total   || 0);
-              const activas = Number(o.polizas_activas  || 0);
-              const altas   = Number(o.altas_nuevas_mes ?? o.nuevas_mes ?? 0);
-              const bajas   = Number(o.bajas_mes        || 0);
-              const mora    = Number(o.en_mora || o.vencidas_mes || 0);
-              const churn   = total > 0 ? ((bajas + mora) / total) * 100 : 0;
-              const nombre  = getOficinaNombre ? getOficinaNombre(o.oficina) : (o.oficina_nombre || o.oficina || "—");
-
-              const compTop = Object.entries(o.por_compania || {})
-                .sort(([,a],[,b]) => b - a).slice(0, 2)
-                .map(([k, v]) => `${k} ${formatMixPercent(v, total)}`).join(" · ");
-
-              return (
-                <motion.tr
-                  key={`${o.oficina}-${idx}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2, delay: idx * 0.04 }}
-                  className="hover:bg-slate-800/25 transition-colors group"
-                >
-                  <td className="px-4 py-3.5 align-top min-w-[160px]">
-                    <div className="font-semibold text-slate-100 text-xs">{nombre}</div>
-                    {compTop && <div className="text-[10px] text-slate-600 mt-0.5">{compTop}</div>}
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="font-semibold text-slate-200 tabular-nums">{total.toLocaleString("es-AR")}</span>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <div className="flex flex-col items-end gap-1.5">
-                      <span className="text-slate-300 tabular-nums">{activas.toLocaleString("es-AR")}</span>
-                      <MiniBar value={activas} total={total} color="bg-slate-500" />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <div className="flex flex-col items-end gap-1.5">
-                      <span className="text-emerald-400 tabular-nums font-medium">{altas.toLocaleString("es-AR")}</span>
-                      <MiniBar value={altas} total={total} color="bg-emerald-500" />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <div className="flex flex-col items-end gap-1.5">
-                      <span className="text-rose-400 tabular-nums">{bajas.toLocaleString("es-AR")}</span>
-                      <MiniBar value={bajas} total={total} color="bg-rose-500" />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <div className="flex flex-col items-end gap-1.5">
-                      <span className="text-amber-400 tabular-nums font-semibold">{mora.toLocaleString("es-AR")}</span>
-                      <MiniBar value={mora} total={total} color="bg-amber-500" />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <ChurnBadge pct={churn} />
-                  </td>
-                </motion.tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </AnimatedCard>
   );
 }

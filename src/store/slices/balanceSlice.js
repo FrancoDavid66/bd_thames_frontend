@@ -70,7 +70,7 @@ export const fetchCategorias = createAsyncThunk(
       });
       return res.data.results || res.data; 
     } catch (err) {
-      return rejectWithValue(err?.response?.data || "Error al obtener categorías");
+      return rejectWithValue(err?.response?.data || "Error al obtener categorias");
     }
   }
 );
@@ -81,11 +81,25 @@ export const createCategoria = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await axios.post(`${BASE_URL}categorias/`, data, {
-        headers: getAuthHeaders(),
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
       });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err?.response?.data || "Error al crear categoría");
+      return rejectWithValue(err?.response?.data || "Error al crear categoria");
+    }
+  }
+);
+
+export const deleteCategoria = createAsyncThunk(
+  "balance/deleteCategoria",
+  async (id, { rejectWithValue }) => {
+    try {
+      await axios.delete(`${BASE_URL}categorias/${id}/`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+      });
+      return id;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || "Error al eliminar categoria");
     }
   }
 );
@@ -207,6 +221,11 @@ const balanceSlice = createSlice({
       })
       .addCase(createCategoria.fulfilled, (state, action) => {
         state.categorias.push(action.payload);
+      })
+      .addCase(deleteCategoria.fulfilled, (state, action) => {
+        state.categorias = state.categorias.filter(
+          (c) => c?.id !== action.payload
+        );
       })
 
       // --- Oficinas ---
