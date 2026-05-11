@@ -160,35 +160,221 @@ function buildResumenSheet(ingresos = [], egresos = [], polizas = []) {
   return ws;
 }
 
-// 🚀 FUNCIÓN EXPORTABLE
+// 🚀 FUNCIÓN EXPORTABLE — Excel profesional con colores y formato
 export function exportToExcel({ ingresos = [], egresos = [], polizas = [], fileName }) {
   const wb = XLSX.utils.book_new();
 
-  // 1. Hoja de Resumen Dashboard
-  XLSX.utils.book_append_sheet(
-    wb,
-    buildResumenSheet(ingresos, egresos, polizas),
-    "Dashboard Resumen"
-  );
+  // ── Colores ─────────────────────────────────────────────────────
+  const COLOR_HEADER_BG  = "1E293B"; // slate-900
+  const COLOR_HEADER_FG  = "FFFFFF";
+  const COLOR_TITLE_BG   = "0F172A"; // slate-950
+  const COLOR_TITLE_FG   = "7DD3FC"; // sky-300
+  const COLOR_SECTION_BG = "1E3A5F"; // azul oscuro
+  const COLOR_SECTION_FG = "BAE6FD"; // sky-200
+  const COLOR_ROW_ALT    = "F1F5F9"; // slate-100
+  const COLOR_TOTAL_BG   = "064E3B"; // emerald-900
+  const COLOR_TOTAL_FG   = "6EE7B7"; // emerald-300
+  const COLOR_NEG_BG     = "7F1D1D"; // red-900
+  const COLOR_NEG_FG     = "FCA5A5"; // red-300
 
-  // 2. Hoja Ingresos
-  const ingresosRows = buildIngresosRows(ingresos);
-  const wsIngresos = XLSX.utils.json_to_sheet(ingresosRows);
-  wsIngresos["!cols"] = autoFitColumns(ingresosRows);
-  XLSX.utils.book_append_sheet(wb, wsIngresos, "Detalle Ingresos");
-
-  // 3. Hoja Egresos
-  const egresosRows = buildEgresosRows(egresos);
-  const wsEgresos = XLSX.utils.json_to_sheet(egresosRows);
-  wsEgresos["!cols"] = autoFitColumns(egresosRows);
-  XLSX.utils.book_append_sheet(wb, wsEgresos, "Detalle Egresos");
-
-  const name = fileName || `Cierre_Caja_${dayjs().format("YYYY-MM-DD_HHmm")}.xlsx`;
-
-  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([wbout], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  const cellStyle = (opts = {}) => ({
+    font:      { bold: opts.bold || false, color: { rgb: opts.fg || "334155" }, sz: opts.sz || 11, name: "Calibri" },
+    fill:      opts.bg ? { patternType: "solid", fgColor: { rgb: opts.bg } } : undefined,
+    alignment: { horizontal: opts.align || "left", vertical: "center", wrapText: false },
+    border: {
+      top:    { style: "thin", color: { rgb: "E2E8F0" } },
+      bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+      left:   { style: "thin", color: { rgb: "E2E8F0" } },
+      right:  { style: "thin", color: { rgb: "E2E8F0" } },
+    },
+    numFmt: opts.numFmt || undefined,
   });
+
+  const applyStyle = (ws, cellRef, style) => {
+    if (!ws[cellRef]) ws[cellRef] = { t: "s", v: "" };
+    ws[cellRef].s = style;
+  };
+
+  const applyRangeStyle = (ws, startRow, endRow, startCol, endCol, styleFunc) => {
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startCol; c <= endCol; c++) {
+        const ref = XLSX.utils.encode_cell({ r: r - 1, c: c - 1 });
+        if (ws[ref]) ws[ref].s = styleFunc(r, c);
+      }
+    }
+  };
+
+  // ── Totales ──────────────────────────────────────────────────────
+  const totalIn  = ingresos.reduce((a, i) => a + toNumber(i?.monto), 0);
+  const totalEg  = egresos.reduce((a, e) => a + toNumber(e?.monto), 0);
+  const balance  = totalIn - totalEg;
+  const fmtAR    = (n) => `$ ${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // ══════════════════════════════════════════════════════════════════
+  // HOJA 1 — RESUMEN GERENCIAL
+  // ══════════════════════════════════════════════════════════════════
+  const aoa = [];
+
+  // Título
+  aoa.push(["REPORTE GERENCIAL DE BALANCE", "", ""]);
+  aoa.push([`Generado: ${dayjs().format("DD/MM/YYYY HH:mm")}`, "", ""]);
+  aoa.push([]);
+
+  // Sección: Balance general
+  aoa.push(["BALANCE GENERAL", "", ""]);
+  aoa.push(["Concepto", "Monto", "Cant. Operaciones"]);
+  aoa.push(["Total Ingresos",       fmtAR(totalIn),  ingresos.length]);
+  aoa.push(["Total Egresos",        fmtAR(totalEg),  egresos.length]);
+  aoa.push([balance >= 0 ? "Balance Positivo ▲" : "Balance Negativo ▼", fmtAR(balance), ""]);
+  aoa.push([]);
+
+  // Sección: Ingresos por forma de pago
+  const pagosMap = {};
+  ingresos.forEach((i) => {
+    const fp = (i.forma_pago || "EFECTIVO").toUpperCase();
+    if (!pagosMap[fp]) pagosMap[fp] = { monto: 0, cant: 0 };
+    pagosMap[fp].monto += toNumber(i.monto);
+    pagosMap[fp].cant  += 1;
+  });
+  aoa.push(["INGRESOS POR MEDIO DE PAGO", "", ""]);
+  aoa.push(["Medio de Pago", "Monto Total", "Cant. Operaciones"]);
+  Object.entries(pagosMap)
+    .sort((a, b) => b[1].monto - a[1].monto)
+    .forEach(([fp, d]) => aoa.push([fp, fmtAR(d.monto), d.cant]));
+  aoa.push([]);
+
+  // Sección: Rendimiento por sucursal
+  const ofiMap = {};
+  ingresos.forEach((i) => {
+    const ofi = i.oficina_nombre || "Sin Sucursal";
+    if (!ofiMap[ofi]) ofiMap[ofi] = { monto: 0, cant: 0 };
+    ofiMap[ofi].monto += toNumber(i.monto);
+    ofiMap[ofi].cant  += 1;
+  });
+  aoa.push(["RENDIMIENTO POR SUCURSAL (RECAUDACIÓN)", "", ""]);
+  aoa.push(["Sucursal", "Monto Recaudado", "Cant. Ingresos"]);
+  Object.entries(ofiMap)
+    .sort((a, b) => b[1].monto - a[1].monto)
+    .forEach(([ofi, d]) => aoa.push([ofi, fmtAR(d.monto), d.cant]));
+  aoa.push([]);
+
+  // Sección: Gastos por categoría
+  const catMap = {};
+  egresos.forEach((e) => {
+    const cat = e.categoria || "Sin categoría";
+    if (!catMap[cat]) catMap[cat] = { monto: 0, cant: 0 };
+    catMap[cat].monto += toNumber(e.monto);
+    catMap[cat].cant  += 1;
+  });
+  aoa.push(["TOP DE GASTOS POR CATEGORÍA", "", ""]);
+  aoa.push(["Categoría", "Monto Gastado", "Cant. Egresos"]);
+  Object.entries(catMap)
+    .sort((a, b) => b[1].monto - a[1].monto)
+    .forEach(([cat, d]) => aoa.push([cat, fmtAR(d.monto), d.cant]));
+
+  const wsResumen = XLSX.utils.aoa_to_sheet(aoa);
+  wsResumen["!cols"] = [{ wch: 38 }, { wch: 22 }, { wch: 20 }];
+
+  // Aplicar estilos a filas clave del resumen
+  if (wsResumen["A1"]) wsResumen["A1"].s = cellStyle({ bold: true, fg: COLOR_TITLE_FG, bg: COLOR_TITLE_BG, sz: 14 });
+  if (wsResumen["A2"]) wsResumen["A2"].s = cellStyle({ fg: "94A3B8", bg: COLOR_TITLE_BG, sz: 10 });
+
+  XLSX.utils.book_append_sheet(wb, wsResumen, "📊 Resumen");
+
+  // ══════════════════════════════════════════════════════════════════
+  // HOJA 2 — DETALLE INGRESOS
+  // ══════════════════════════════════════════════════════════════════
+  const ingHeaders = ["Sucursal", "Fecha y Hora", "Descripción", "Pagado por", "Categoría", "Forma de pago", "Monto", "Cargado por"];
+  const ingRows = ingresos.map((i) => [
+    i?.oficina_nombre || "—",
+    fmtDateTime(i),
+    i?.descripcion ?? "—",
+    i?.pagado_por   ?? "—",
+    i?.categoria    ?? "—",
+    (i?.forma_pago  || "efectivo").toUpperCase(),
+    toNumber(i?.monto),
+    i?.usuario_nombre || "Sistema",
+  ]);
+
+  const wsIngresos = XLSX.utils.aoa_to_sheet([ingHeaders, ...ingRows]);
+
+  // Estilo header
+  ingHeaders.forEach((_, ci) => {
+    const ref = XLSX.utils.encode_cell({ r: 0, c: ci });
+    if (wsIngresos[ref]) wsIngresos[ref].s = cellStyle({ bold: true, fg: COLOR_HEADER_FG, bg: COLOR_HEADER_BG, align: "center" });
+  });
+
+  // Estilo filas + formato monto
+  ingRows.forEach((_, ri) => {
+    const isBg = ri % 2 === 1;
+    ingHeaders.forEach((__, ci) => {
+      const ref = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
+      if (wsIngresos[ref]) {
+        wsIngresos[ref].s = cellStyle({ bg: isBg ? COLOR_ROW_ALT : "FFFFFF", align: ci === 6 ? "right" : "left" });
+        if (ci === 6) wsIngresos[ref].s.numFmt = '"$"#,##0.00';
+      }
+    });
+  });
+
+  // Fila de total
+  const ingTotalRow = ingRows.length + 1;
+  XLSX.utils.sheet_add_aoa(wsIngresos, [["", "", "", "", "", "TOTAL", totalIn, ""]], { origin: ingTotalRow });
+  const totalRefLabel = XLSX.utils.encode_cell({ r: ingTotalRow, c: 5 });
+  const totalRefVal   = XLSX.utils.encode_cell({ r: ingTotalRow, c: 6 });
+  if (wsIngresos[totalRefLabel]) wsIngresos[totalRefLabel].s = cellStyle({ bold: true, fg: COLOR_TOTAL_FG, bg: COLOR_TOTAL_BG, align: "right" });
+  if (wsIngresos[totalRefVal])   { wsIngresos[totalRefVal].s = cellStyle({ bold: true, fg: COLOR_TOTAL_FG, bg: COLOR_TOTAL_BG, align: "right" }); wsIngresos[totalRefVal].s.numFmt = '"$"#,##0.00'; }
+
+  wsIngresos["!cols"] = [{ wch: 16 }, { wch: 18 }, { wch: 42 }, { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
+  wsIngresos["!rows"] = [{ hpt: 20 }]; // altura del header
+  XLSX.utils.book_append_sheet(wb, wsIngresos, "💰 Ingresos");
+
+  // ══════════════════════════════════════════════════════════════════
+  // HOJA 3 — DETALLE EGRESOS
+  // ══════════════════════════════════════════════════════════════════
+  const egHeaders = ["Sucursal", "Fecha y Hora", "Categoría", "Descripción", "Forma de pago", "Monto", "Cargado por"];
+  const egRows = egresos.map((e) => [
+    e?.oficina_nombre || "—",
+    fmtDateTime(e),
+    e?.categoria    ?? "—",
+    e?.descripcion  ?? "—",
+    (e?.forma_pago  || "efectivo").toUpperCase(),
+    toNumber(e?.monto),
+    e?.usuario_nombre || "Sistema",
+  ]);
+
+  const wsEgresos = XLSX.utils.aoa_to_sheet([egHeaders, ...egRows]);
+
+  egHeaders.forEach((_, ci) => {
+    const ref = XLSX.utils.encode_cell({ r: 0, c: ci });
+    if (wsEgresos[ref]) wsEgresos[ref].s = cellStyle({ bold: true, fg: COLOR_HEADER_FG, bg: "7F1D1D", align: "center" });
+  });
+
+  egRows.forEach((_, ri) => {
+    const isBg = ri % 2 === 1;
+    egHeaders.forEach((__, ci) => {
+      const ref = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
+      if (wsEgresos[ref]) {
+        wsEgresos[ref].s = cellStyle({ bg: isBg ? "FEF2F2" : "FFFFFF", align: ci === 5 ? "right" : "left" });
+        if (ci === 5) wsEgresos[ref].s.numFmt = '"$"#,##0.00';
+      }
+    });
+  });
+
+  const egTotalRow = egRows.length + 1;
+  XLSX.utils.sheet_add_aoa(wsEgresos, [["", "", "", "", "TOTAL", totalEg, ""]], { origin: egTotalRow });
+  const egTotalLabel = XLSX.utils.encode_cell({ r: egTotalRow, c: 4 });
+  const egTotalVal   = XLSX.utils.encode_cell({ r: egTotalRow, c: 5 });
+  if (wsEgresos[egTotalLabel]) wsEgresos[egTotalLabel].s = cellStyle({ bold: true, fg: COLOR_NEG_FG, bg: COLOR_NEG_BG, align: "right" });
+  if (wsEgresos[egTotalVal])   { wsEgresos[egTotalVal].s = cellStyle({ bold: true, fg: COLOR_NEG_FG, bg: COLOR_NEG_BG, align: "right" }); wsEgresos[egTotalVal].s.numFmt = '"$"#,##0.00'; }
+
+  wsEgresos["!cols"] = [{ wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 42 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
+  wsEgresos["!rows"] = [{ hpt: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsEgresos, "💸 Egresos");
+
+  // ── Guardar ──────────────────────────────────────────────────────
+  const name = fileName || `Cierre_Caja_${dayjs().format("YYYY-MM-DD_HHmm")}.xlsx`;
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
+  const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   saveAs(blob, name);
 }
 

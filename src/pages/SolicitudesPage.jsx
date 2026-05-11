@@ -70,6 +70,21 @@ export default function SolicitudesPage() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Leer params de URL para precarga (viene desde banner de baja en Pagos)
+  const paramClienteId = searchParams.get("cliente_id") || searchParams.get("cliente") || "";
+  const paramPatente   = searchParams.get("patente") || "";
+  const paramCompania  = searchParams.get("compania") || "";
+  const paramNueva     = searchParams.get("nueva") === "1";
+
+  // Abrir automaticamente si viene ?nueva=1
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (paramNueva && !autoOpenedRef.current) {
+      autoOpenedRef.current = true;
+      setCreating(true);
+    }
+  }, [paramNueva]);
   
   const [hasLoaded, setHasLoaded] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -391,9 +406,12 @@ export default function SolicitudesPage() {
           <CreateSolicitudModal
             onClose={() => setCreating(false)}
             onCreated={() => { setCreating(false); if (hasLoaded) cargar({ silent: true, force: true }); }}
-            companias={companias}     // 🚀 VIAJAN DESDE REDUX AL WIZARD
-            coberturas={coberturas}   // 🚀 VIAJAN DESDE REDUX AL WIZARD
+            companias={companias}
+            coberturas={coberturas}
             oficinas={oficinasConfig}
+            initialClienteId={paramClienteId}
+            initialPatente={paramPatente}
+            initialCompania={paramCompania}
           />
         )}
       </section>

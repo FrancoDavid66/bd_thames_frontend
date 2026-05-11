@@ -1,243 +1,447 @@
 /* src/components/pagos/PagosSearch.jsx */
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import { HiSearch, HiX, HiChevronRight } from "react-icons/hi";
-import { useDispatch, useSelector } from "react-redux";
 import {
-  fetchBuscarClientePorDni,
-  fetchCuotasPorPoliza,
-  fetchCuotasBuscar,
-  pushRecienteDni,
-  clearBuscarCliente,
+  HiSearch, HiX, HiExclamation, HiPlus, HiShieldCheck,
+  HiShieldExclamation, HiBan, HiCheckCircle,
+  HiOutlineChevronRight, HiExclamationCircle,
+} from "react-icons/hi";
+import { useDispatch, useSelector } from "react-redux";
+import dayjs from "dayjs";
+import {
+  fetchBuscarClientePorDni, fetchCuotasPorPoliza,
+  fetchCuotasBuscar, pushRecienteDni, clearBuscarCliente,
 } from "../../store/slices/pagosSlice";
 import { useAuth } from "../../context/AuthContext";
 
-const onlyDigits = (s) => String(s || "").replace(/\D+/g, "");
+const onlyDigits       = (s) => String(s || "").replace(/\D+/g, "");
 const normalizePatente = (s) => String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
-const isLikelyDni = (raw) => {
-  const d = onlyDigits(raw);
-  return d.length >= 6 && d.length <= 11 && d === String(raw || "").replace(/\D+/g, "");
+const isLikelyDni      = (raw) => { const d = onlyDigits(raw); return d.length >= 6 && d.length <= 11 && d === String(raw || "").replace(/\D+/g, ""); };
+const getOficinaName   = (n) => ({ "1": "5 Esquinas", "2": "Axion", "3": "Km 39" })[String(n)] || `Ofi ${n}`;
+const fmtDias          = (n) => n === 1 ? "1 día" : `${n} días`;
+
+function polizaStatus(p) {
+  const estado = String(p?.estado || "").toLowerCase();
+  const fechaBaja = p?.fecha_baja ? dayjs(p.fecha_baja) : null;
+  const bajaReciente = fechaBaja && dayjs().diff(fechaBaja, "day") <= 7;
+  if (estado === "cancelada" && bajaReciente)
+    return { type: "baja_reciente", label: "Baja reciente", color: "amber",
+             icon: HiExclamation, fechaBaja, diasBaja: dayjs().diff(fechaBaja, "day"),
+             desc: `Dada de baja el ${fechaBaja.format("DD/MM/YYYY")}` };
+  if (estado === "cancelada")
+    return { type: "cancelada", label: "Cancelada", color: "red", icon: HiBan, desc: "Póliza cancelada" };
+  if (estado === "vencida")
+    return { type: "vencida", label: "Cuota vencida", color: "rose", icon: HiShieldExclamation, desc: "Última cuota vencida sin pagar" };
+  if (estado === "finalizada")
+    return { type: "finalizada", label: "Finalizada", color: "slate", icon: HiCheckCircle, desc: "Ciclo completo" };
+  return { type: "activa", label: "Activa", color: "emerald", icon: HiShieldCheck, desc: "Al día" };
+}
+
+const STATUS_STYLES = {
+  emerald: { badge: "bg-emerald-900/40 border-emerald-700/50 text-emerald-400", ring: "border-emerald-700/40", dot: "bg-emerald-400" },
+  amber:   { badge: "bg-amber-900/40 border-amber-700/50 text-amber-400",       ring: "border-amber-600/50",  dot: "bg-amber-400 animate-pulse" },
+  rose:    { badge: "bg-rose-900/40 border-rose-700/50 text-rose-400",           ring: "border-rose-700/40",   dot: "bg-rose-400 animate-pulse" },
+  red:     { badge: "bg-red-950/50 border-red-800/50 text-red-400",              ring: "border-red-800/40",    dot: "bg-red-500" },
+  slate:   { badge: "bg-slate-800/60 border-slate-700/50 text-slate-400",        ring: "border-slate-700/40",  dot: "bg-slate-500" },
 };
 
-const OFICINA_NAMES = { "1": "5 Esquinas", "2": "Axion", "3": "Km 39" };
+/* ── Modal de alerta — via createPortal para z-index correcto ── */
+function AlertaModal({ poliza, cliente, onClose, onConfirm, loading }) {
+  if (!poliza) return null;
+  const st = polizaStatus(poliza);
 
+  useEffect(() => {
+    const fn = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [onClose]);
+
+  const cfgs = {
+    vencida: {
+      headerBg:   "bg-rose-950/80 border-b border-rose-800/50",
+      modalBorder:"border-rose-800/60",
+      iconBg:     "bg-rose-900/60",
+      iconColor:  "text-rose-400",
+      Icon:       HiShieldExclamation,
+      title:      "Cuota vencida sin pagar",
+      titleColor: "text-rose-300",
+      body: (
+        <div className="space-y-4 text-sm text-slate-300">
+          <p>La <span className="font-bold text-white">última cuota</span> venció y <span className="font-bold text-rose-300">no fue pagada</span>.</p>
+          <div className="rounded-xl border border-rose-900/60 bg-rose-950/30 p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-rose-400 mb-3">Antes de cobrar verificá:</p>
+            <ul className="space-y-2 text-sm text-rose-200/80 list-disc pl-4">
+              <li>Que la póliza <strong className="text-rose-200">no esté dada de baja</strong> en la compañía</li>
+              <li>Que el cliente <strong className="text-rose-200">no tuvo siniestros</strong> durante el período vencido</li>
+            </ul>
+          </div>
+          <p className="text-xs text-slate-400">Si todo está en orden, podés registrar el cobro a continuación.</p>
+        </div>
+      ),
+      btnLabel:  "Entendido — Ver cuotas y cobrar",
+      btnClass:  "bg-rose-700 hover:bg-rose-600 text-white",
+      action:    "confirm",
+    },
+    baja_reciente: {
+      headerBg:   "bg-amber-950/80 border-b border-amber-800/50",
+      modalBorder:"border-amber-700/60",
+      iconBg:     "bg-amber-900/60",
+      iconColor:  "text-amber-400",
+      Icon:       HiExclamation,
+      title:      "Póliza dada de baja recientemente",
+      titleColor: "text-amber-300",
+      body: (
+        <div className="space-y-4 text-sm text-slate-300">
+          <p>Esta póliza fue <span className="font-bold text-amber-300">cancelada</span> y <strong className="text-white">no se puede cobrar</strong>.</p>
+          <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 p-4">
+            <div className="grid grid-cols-2 gap-3 mb-1">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-amber-500 mb-1">Fecha de baja</p>
+                <p className="text-base font-semibold text-amber-300">{st.fechaBaja?.format("DD/MM/YYYY") || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-amber-500 mb-1">Días transcurridos</p>
+                <p className="text-base font-semibold text-amber-300">{st.diasBaja != null ? fmtDias(st.diasBaja) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-amber-500 mb-1">Patente</p>
+                <p className="text-base font-semibold text-amber-300 font-mono">{poliza?.patente || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-amber-500 mb-1">Compañía</p>
+                <p className="text-base font-semibold text-amber-300">{poliza?.compania || "—"}</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Para regularizar:</p>
+            <ul className="space-y-2 text-sm text-slate-400 list-disc pl-4">
+              <li>Contactar a la compañía para emitir una <strong className="text-slate-200">nueva póliza</strong></li>
+              <li>Crear una nueva solicitud de emisión en el sistema</li>
+            </ul>
+          </div>
+        </div>
+      ),
+      btnLabel:  "Crear nueva solicitud de póliza",
+      btnClass:  "bg-emerald-700 hover:bg-emerald-600 text-white",
+      action:    "nueva",
+    },
+    cancelada: {
+      headerBg:   "bg-slate-800/80 border-b border-slate-700/50",
+      modalBorder:"border-slate-700/60",
+      iconBg:     "bg-slate-800",
+      iconColor:  "text-slate-400",
+      Icon:       HiBan,
+      title:      "Póliza cancelada",
+      titleColor: "text-slate-300",
+      body: (
+        <div className="space-y-3 text-sm text-slate-400">
+          <p>Esta póliza fue <span className="font-bold text-slate-300">cancelada</span> y no tiene acciones disponibles.</p>
+          <p className="text-xs text-slate-500">Si el cliente quiere volver a asegurarse, hay que emitir una póliza completamente nueva desde el flujo de solicitudes.</p>
+        </div>
+      ),
+      btnLabel:  null,
+      action:    null,
+    },
+  };
+
+  const cfg = cfgs[st.type];
+  if (!cfg) return null;
+  const { Icon } = cfg;
+
+  return createPortal(
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* Backdrop */}
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }} onClick={onClose} />
+
+      {/* Modal */}
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1,   opacity: 1, y: 0 }}
+        exit={{    scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+        style={{ position: "relative", zIndex: 10000, width: "100%", maxWidth: "560px" }}
+        className={`rounded-2xl border shadow-2xl overflow-hidden bg-slate-900 ${cfg.modalBorder}`}
+      >
+        {/* Header */}
+        <div className={`px-5 py-4 flex items-center gap-3 ${cfg.headerBg}`}>
+          <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${cfg.iconBg}`}>
+            <Icon className={`w-6 h-6 ${cfg.iconColor}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className={`text-lg font-bold ${cfg.titleColor}`}>{cfg.title}</h3>
+            <p className="text-xs text-slate-400 mt-0.5 font-mono truncate">
+              {poliza?.patente || "—"} · {poliza?.compania || "—"}
+            </p>
+          </div>
+          <button onClick={onClose}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors shrink-0">
+            <HiX className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5">{cfg.body}</div>
+
+        {/* Footer */}
+        <div className="px-5 pb-5 flex flex-col gap-2.5">
+          {cfg.action === "confirm" && (
+            <button disabled={loading} onClick={onConfirm}
+              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-base font-semibold transition-colors disabled:opacity-50 ${cfg.btnClass}`}>
+              {loading
+                ? <><span className="w-5 h-5 rounded-full border-2 border-white/50 border-t-transparent animate-spin" /> Cargando…</>
+                : <><HiCheckCircle className="w-5 h-5" /> {cfg.btnLabel}</>}
+            </button>
+          )}
+          {cfg.action === "nueva" && (
+            <a href={`/solicitudes?nueva=1&cliente_id=${cliente?.id || ""}&patente=${poliza?.patente || ""}&compania=${poliza?.compania || ""}`}
+              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-base font-semibold transition-colors ${cfg.btnClass}`}>
+              <HiPlus className="w-5 h-5" /> {cfg.btnLabel}
+            </a>
+          )}
+          <button onClick={onClose}
+            className="w-full py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors border border-slate-800">
+            Cerrar
+          </button>
+        </div>
+      </motion.div>
+    </div>,
+    document.body
+  );
+}
+
+/* ── Componente principal ─────────────────────────────────────── */
 export default function PagosSearch({ onBuscar }) {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const inputRef = useRef(null);
-  const [query, setQuery] = useState("");
-  const [selectedPolizaId, setSelectedPolizaId] = useState("");
 
-  const {
-    buscarClienteData,
-    buscarClienteStatus,
-    cuotasPolizaStatus,
-    cuotasBuscarStatus,
-    recientesDni,
-  } = useSelector((s) => s.pagos || {});
+  const [query,        setQuery]        = useState("");
+  const [alertaPoliza, setAlertaPoliza] = useState(null);
 
-  const busy = buscarClienteStatus === "loading" || cuotasPolizaStatus === "loading" || cuotasBuscarStatus === "loading";
+  const { buscarClienteData, buscarClienteStatus, cuotasPolizaStatus, cuotasBuscarStatus, recientesDni }
+    = useSelector((s) => s.pagos || {});
+
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+  const busy = buscarClienteStatus === "loading" || cuotasPolizaStatus === "loading" || cuotasBuscarStatus === "loading";
 
   useEffect(() => { inputRef.current?.focus?.(); }, []);
-
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const active = document.activeElement;
-        if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA") return;
-        e.preventDefault();
-        inputRef.current?.focus?.();
-      }
+    const fn = (e) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const a = document.activeElement;
+      if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) return;
+      e.preventDefault(); inputRef.current?.focus?.();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", fn); return () => window.removeEventListener("keydown", fn);
   }, []);
 
   const recientes = useMemo(() => (Array.isArray(recientesDni) ? recientesDni : []).slice(0, 6), [recientesDni]);
+  const polizas   = useMemo(() => Array.isArray(buscarClienteData?.polizas) ? buscarClienteData.polizas : [], [buscarClienteData]);
+  const cliente   = buscarClienteData?.cliente || null;
 
   const limpiar = useCallback(() => {
-    setQuery("");
-    setSelectedPolizaId("");
+    setQuery(""); setAlertaPoliza(null);
     dispatch(clearBuscarCliente());
     requestAnimationFrame(() => inputRef.current?.focus?.());
   }, [dispatch]);
 
-  const usarReciente = useCallback((q) => {
-    setQuery(String(q || ""));
-    setSelectedPolizaId("");
-    dispatch(clearBuscarCliente());
-    requestAnimationFrame(() => inputRef.current?.focus?.());
-  }, [dispatch]);
-
-  const buscarClientePorDni = useCallback(async (dniRaw) => {
-    const dniDigits = onlyDigits(dniRaw);
-    if (!dniDigits) { toast.error("Escribí un DNI válido."); return; }
-    const res = await dispatch(fetchBuscarClientePorDni({ dni: dniDigits })).unwrap();
-    const polizas = Array.isArray(res?.polizas) ? res.polizas : [];
-    if (!res?.cliente) { toast("No se encontró cliente."); return; }
-    dispatch(pushRecienteDni(dniDigits));
-    if (polizas.length === 0) { toast("Sin pólizas para ese DNI."); return; }
-    if (polizas.length === 1 && polizas[0]?.poliza_id) setSelectedPolizaId(String(polizas[0].poliza_id));
-    else setSelectedPolizaId("");
-  }, [dispatch]);
-
-  const traerCuotasDePoliza = useCallback(async (polizaId, dniMeta = "") => {
-    const pid = String(polizaId || "").trim();
-    if (!pid) { toast.error("Elegí una póliza."); return; }
-    const res = await dispatch(fetchCuotasPorPoliza({ poliza_id: pid, solo_pendientes: 0, page_size: 200, dni: dniMeta })).unwrap();
+  const traerCuotas = useCallback(async (pid, dniMeta = "") => {
+    const id = String(pid || "").trim();
+    if (!id) { toast.error("Elegí una póliza."); return; }
+    const res = await dispatch(fetchCuotasPorPoliza({ poliza_id: id, solo_pendientes: 0, page_size: 200, dni: dniMeta })).unwrap();
     const items = Array.isArray(res?.items) ? res.items : [];
-    onBuscar?.(items, res?.meta || { count: items.length }, dniMeta || pid);
-    if (!items.length) toast("Sin cuotas para esa póliza.");
+    onBuscar?.(items, res?.meta || { count: items.length, next: null, previous: null }, dniMeta || id);
+    if (!items.length) toast("No hay cuotas para esa póliza.");
+    setAlertaPoliza(null);
   }, [dispatch, onBuscar]);
 
-  const traerCuotasPorPatente = useCallback(async (patenteRaw) => {
-    const q = normalizePatente(patenteRaw);
+  const buscarPorDni = useCallback(async (dniRaw) => {
+    const d = onlyDigits(dniRaw);
+    if (!d) { toast.error("Escribí un DNI válido."); return; }
+    const res = await dispatch(fetchBuscarClientePorDni({ dni: d })).unwrap();
+    if (!res?.cliente) { toast("No se encontró cliente con ese DNI."); return; }
+    dispatch(pushRecienteDni(d));
+    const pols = Array.isArray(res?.polizas) ? res.polizas : [];
+    if (!pols.length) { toast("Sin pólizas para ese DNI."); return; }
+  }, [dispatch]);
+
+  const buscarPorPatente = useCallback(async (raw) => {
+    const q = normalizePatente(raw);
     if (!q) { toast.error("Escribí una patente."); return; }
-    dispatch(clearBuscarCliente());
-    setSelectedPolizaId("");
+    setAlertaPoliza(null); dispatch(clearBuscarCliente());
     const res = await dispatch(fetchCuotasBuscar({ q, solo_pendientes: 0, page_size: 200 })).unwrap();
     const items = Array.isArray(res?.items) ? res.items : [];
-    onBuscar?.(items, res?.meta || { count: items.length }, q);
-    if (!items.length) toast("Sin cuotas para esa patente.");
+    onBuscar?.(items, res?.meta || { count: items.length, next: null, previous: null }, q);
+    if (!items.length) { toast("No hay cuotas para esa patente."); return; }
+    const dni = onlyDigits(items[0]?.poliza?.cliente?.dni_cuit_cuil || items[0]?.cliente?.dni_cuit_cuil || items[0]?.dni_cuit_cuil || "");
+    if (dni) { try { await dispatch(fetchBuscarClientePorDni({ dni })).unwrap(); } catch {} }
   }, [dispatch, onBuscar]);
 
-  const handleSubmit = useCallback(async (e, qOverride = null) => {
+  const handleSubmit = useCallback(async (e, override = null) => {
     e?.preventDefault?.();
-    const q = String(qOverride ?? query).trim();
+    const q = String(override ?? query).trim();
     if (!q) return;
-    if (isLikelyDni(q)) await buscarClientePorDni(q);
-    else await traerCuotasPorPatente(q);
-  }, [buscarClientePorDni, query, traerCuotasPorPatente]);
+    if (isLikelyDni(q)) await buscarPorDni(q);
+    else await buscarPorPatente(q);
+  }, [buscarPorDni, buscarPorPatente, query]);
 
-  const polizas = useMemo(() => {
-    const arr = buscarClienteData?.polizas;
-    return Array.isArray(arr) ? arr : [];
-  }, [buscarClienteData]);
-
-  const clienteLabel = useMemo(() => {
-    const c = buscarClienteData?.cliente;
-    if (!c) return "";
-    return [String(c?.dni || "").trim(), String(c?.nombre_apellido || "").trim()].filter(Boolean).join(" · ");
-  }, [buscarClienteData]);
+  const handleCardClick = useCallback((p) => {
+    const st = polizaStatus(p);
+    const pid = String(p?.poliza_id ?? "");
+    if (st.type === "activa" || st.type === "finalizada") {
+      traerCuotas(pid, onlyDigits(cliente?.dni || query));
+    } else {
+      setAlertaPoliza(p);
+    }
+  }, [cliente, query, traerCuotas]);
 
   return (
-    <div className="w-full space-y-3">
-      {/* Buscador */}
-      <form onSubmit={handleSubmit} className="w-full">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <HiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Escape") limpiar(); }}
-              placeholder="DNI o patente..."
-              inputMode="text"
-              className="w-full h-10 bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-slate-500 focus:outline-none rounded-lg pl-9 pr-9 text-sm text-slate-100 placeholder-slate-500 transition-colors"
-            />
-            {query && (
-              <button type="button" onClick={limpiar} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors">
-                <HiX className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="h-10 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-          >
-            {busy
-              ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" /> Buscando</>
-              : <><HiSearch className="w-4 h-4" /> Buscar</>
-            }
+    <div className="w-full space-y-4">
+
+      {/* MODAL — via portal al body para z-index correcto */}
+      <AnimatePresence>
+        {alertaPoliza && (
+          <AlertaModal
+            poliza={alertaPoliza}
+            cliente={cliente}
+            onClose={() => setAlertaPoliza(null)}
+            onConfirm={() => traerCuotas(String(alertaPoliza?.poliza_id ?? ""), onlyDigits(cliente?.dni || query))}
+            loading={cuotasPolizaStatus === "loading"}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* BUSCADOR HERO */}
+      <div className="relative group">
+        <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary-500/20 via-emerald-500/10 to-primary-500/20 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 blur-sm pointer-events-none" />
+        <form onSubmit={handleSubmit}
+          className="relative flex items-center gap-3 bg-slate-950/80 border border-slate-700/60 group-focus-within:border-primary-500/40 rounded-2xl px-5 py-4 transition-all duration-200">
+          {busy
+            ? <span className="w-6 h-6 rounded-full border-2 border-primary-400/60 border-t-transparent animate-spin shrink-0" />
+            : <HiSearch className="w-6 h-6 text-slate-500 group-focus-within:text-primary-400 transition-colors shrink-0" />}
+          <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") limpiar(); }}
+            placeholder="DNI o patente del cliente…"
+            className="flex-1 bg-transparent text-lg text-slate-100 placeholder:text-slate-600 outline-none min-w-0" />
+          {query && (
+            <button type="button" onClick={limpiar}
+              className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-600 hover:text-slate-300 transition-colors shrink-0">
+              <HiX className="w-5 h-5" />
+            </button>
+          )}
+          <button type="submit" disabled={busy || !query}
+            className="shrink-0 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-40 text-white text-sm font-semibold transition-colors">
+            Buscar
           </button>
-        </div>
-        <p className="mt-1.5 text-[11px] text-slate-600">
-          <kbd className="font-mono">/</kbd> para enfocar · <kbd className="font-mono">Esc</kbd> para limpiar · DNI o patente
-        </p>
-      </form>
+        </form>
+      </div>
 
       {/* Recientes */}
-      {recientes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-slate-600 uppercase tracking-wider">Recientes:</span>
-          {recientes.map((q) => (
-            <button key={q} type="button" onClick={() => usarReciente(q)}
-              className="h-7 px-2.5 rounded-md border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs transition-colors font-mono">
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {recientes.length > 0 && !cliente && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="flex flex-wrap items-center gap-2 pl-1">
+            <span className="text-xs text-slate-600">Recientes:</span>
+            {recientes.map((q) => (
+              <button key={q} type="button" onClick={() => { setQuery(String(q)); handleSubmit(null, q); }}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 text-slate-400 text-xs font-mono transition-colors">
+                {q}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Resultado cliente */}
-      {buscarClienteData?.cliente && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/50 divide-y divide-slate-800">
-          {/* Header cliente */}
-          <div className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Cliente encontrado</div>
-              <div className="text-sm font-medium text-slate-100 flex items-center gap-2 flex-wrap">
-                {clienteLabel || "Cliente"}
-                {isWebAdmin && buscarClienteData?.cliente?.oficina && (
-                  <span className="text-[10px] font-mono text-slate-400 border border-slate-700 rounded px-1.5 py-0.5">
-                    {OFICINA_NAMES[String(buscarClienteData.cliente.oficina)] || `Ofi ${buscarClienteData.cliente.oficina}`}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button onClick={limpiar} className="h-8 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors">
-              Limpiar
-            </button>
-          </div>
+      {/* RESULTADO CLIENTE */}
+      <AnimatePresence>
+        {cliente && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }} className="space-y-3">
 
-          {/* Pólizas */}
-          <div className="px-4 py-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">
-              {polizas.length} póliza{polizas.length !== 1 ? "s" : ""}
-            </div>
-            {polizas.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {polizas.map((p, idx) => {
-                    const pid = String(p?.poliza_id ?? "");
-                    const isSel = pid && pid === String(selectedPolizaId);
-                    return (
-                      <button key={pid || idx} type="button" onClick={() => setSelectedPolizaId(pid)}
-                        className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${isSel ? "border-slate-500 bg-slate-800" : "border-slate-800 bg-slate-900/40 hover:bg-slate-800/60"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-mono font-medium text-slate-100">
-                            {String(p?.patente || "").trim() || "Sin patente"}
-                          </span>
-                          {isSel && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          {String(p?.compania || "").trim() || "—"} · {String(p?.modelo || "").trim() || "—"}
-                        </div>
-                      </button>
-                    );
-                  })}
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-full bg-primary-500/20 border border-primary-500/30 flex items-center justify-center text-primary-300 font-bold text-lg shrink-0">
+                  {String(cliente?.nombre_apellido || "?")[0]?.toUpperCase()}
                 </div>
-                <button
-                  type="button"
-                  disabled={!selectedPolizaId || cuotasPolizaStatus === "loading"}
-                  onClick={() => traerCuotasDePoliza(selectedPolizaId, onlyDigits(buscarClienteData?.cliente?.dni || query))}
-                  className="mt-2 h-9 px-4 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  {cuotasPolizaStatus === "loading"
-                    ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/60 border-t-transparent animate-spin" /> Cargando...</>
-                    : <><HiChevronRight className="w-4 h-4" /> Ver cuotas</>
-                  }
-                </button>
-              </>
-            ) : (
-              <p className="text-sm text-slate-500">Sin pólizas para este cliente.</p>
+                <div>
+                  <div className="text-base font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
+                    {cliente?.nombre_apellido || "Cliente"}
+                    {isWebAdmin && cliente?.oficina && (
+                      <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                        {getOficinaName(String(cliente.oficina))}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 font-mono mt-0.5">DNI {cliente?.dni}</div>
+                </div>
+              </div>
+              <button type="button" onClick={limpiar}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/50 border border-slate-700/40 hover:bg-slate-700/50 text-slate-400 text-xs transition-colors">
+                Nueva búsqueda
+              </button>
+            </div>
+
+            {/* Cards pólizas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {polizas.map((p, idx) => {
+                const pid    = String(p?.poliza_id ?? "");
+                const st     = polizaStatus(p);
+                const styles = STATUS_STYLES[st.color] || STATUS_STYLES.slate;
+                const Icon   = st.icon;
+                const needsAlert = ["vencida", "baja_reciente", "cancelada"].includes(st.type);
+
+                return (
+                  <motion.button key={pid || idx} type="button"
+                    initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.04 }}
+                    onClick={() => handleCardClick(p)}
+                    className={`w-full text-left rounded-2xl border p-4 transition-all duration-150 bg-slate-900/50 hover:bg-slate-800/50 cursor-pointer ${styles.ring}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-sm font-bold text-white tracking-widest bg-slate-800/80 border border-slate-700/40 px-2.5 py-0.5 rounded-lg">
+                            {p?.patente || "—"}
+                          </span>
+                          <span className="text-sm text-slate-400 truncate">{p?.compania || "—"}</span>
+                        </div>
+                        {p?.modelo && <div className="text-xs text-slate-500 mt-1.5 truncate">{p.modelo}</div>}
+                        <div className="flex items-center gap-2 mt-2.5">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`} />
+                          <span className={`text-[11px] font-semibold ${styles.badge.split(" ").find(c => c.startsWith("text-"))}`}>
+                            {st.label}
+                          </span>
+                          {needsAlert && (
+                            <span className="text-[10px] text-slate-600 flex items-center gap-0.5">
+                              <HiExclamationCircle className="w-3 h-3" /> Ver detalle
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${styles.badge}`}>
+                          <Icon className="w-3 h-3" />{st.label}
+                        </span>
+                        <HiOutlineChevronRight className="w-4 h-4 text-slate-600" />
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {polizas.length === 0 && (
+              <p className="text-sm text-slate-500 px-1">No hay pólizas para este cliente.</p>
             )}
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

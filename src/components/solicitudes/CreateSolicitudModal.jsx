@@ -85,7 +85,10 @@ export default function CreateSolicitudModal({
   onClose,
   companias = [],
   coberturas = [],
-  oficinas = [], 
+  oficinas = [],
+  initialClienteId = "",
+  initialPatente = "",
+  initialCompania = "",
   onCreated,
   skipResponsableGate = false,
   initialResponsableId = "",
@@ -107,14 +110,14 @@ export default function CreateSolicitudModal({
     }
   }, [skipResponsableGate, initialResponsableId]);
 
-  const [clienteModo, setClienteModo] = useState("nuevo");
-  const [clienteId, setClienteId] = useState("");
+  const [clienteModo, setClienteModo] = useState(initialClienteId ? "existente" : "nuevo");
+  const [clienteId, setClienteId] = useState(initialClienteId ? String(initialClienteId) : "");
   const [cliente, setCliente] = useState({ nombre: "", apellido: "", telefono: "", email: "", dni_cuit_cuil: "", direccion: "", localidad: "" });
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
 
   const [polizaModo, setPolizaModo] = useState("nueva");
   const [polizaId, setPolizaId] = useState("");
-  const [poliza, setPoliza] = useState({ compania: "", numero_poliza: "", cobertura: "", oficina: "", patente: "", marca: "", modelo: "", anio: "", tipo: "Auto", precio_cuota: "", cantidad_cuotas_override: "", primer_vencimiento: "", fecha_emision: ymdLocal(new Date()), dias_a_vencer: 30, generar_cuotas_ahora: true });
+  const [poliza, setPoliza] = useState({ compania: initialCompania || "", numero_poliza: "", cobertura: "", oficina: "", patente: initialPatente || "", marca: "", modelo: "", anio: "", tipo: "Auto", precio_cuota: "", cantidad_cuotas_override: "", primer_vencimiento: "", fecha_emision: ymdLocal(new Date()), dias_a_vencer: 30, generar_cuotas_ahora: true });
 
   const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);

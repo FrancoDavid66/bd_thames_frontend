@@ -70,7 +70,7 @@ export const fetchCategorias = createAsyncThunk(
       });
       return res.data.results || res.data; 
     } catch (err) {
-      return rejectWithValue(err?.response?.data || "Error al obtener categorias");
+      return rejectWithValue(err?.response?.data || "Error al obtener categorías");
     }
   }
 );
@@ -81,25 +81,26 @@ export const createCategoria = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await axios.post(`${BASE_URL}categorias/`, data, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: getAuthHeaders(),
       });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err?.response?.data || "Error al crear categoria");
+      return rejectWithValue(err?.response?.data || "Error al crear categoría");
     }
   }
 );
 
+// DELETE Eliminar Categoría
 export const deleteCategoria = createAsyncThunk(
   "balance/deleteCategoria",
   async (id, { rejectWithValue }) => {
     try {
       await axios.delete(`${BASE_URL}categorias/${id}/`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: getAuthHeaders(),
       });
       return id;
     } catch (err) {
-      return rejectWithValue(err?.response?.data || "Error al eliminar categoria");
+      return rejectWithValue(err?.response?.data || "Error al eliminar categoría");
     }
   }
 );
@@ -165,6 +166,13 @@ const initialState = {
 
   oficinas: [],
   oficinasStatus: "idle",
+
+  // Historial de ingresos
+  historialItems: [],
+  historialCount: 0,
+  historialNext: null,
+  historialPrev: null,
+  historialStatus: "idle",
 };
 
 const balanceSlice = createSlice({
@@ -223,9 +231,7 @@ const balanceSlice = createSlice({
         state.categorias.push(action.payload);
       })
       .addCase(deleteCategoria.fulfilled, (state, action) => {
-        state.categorias = state.categorias.filter(
-          (c) => c?.id !== action.payload
-        );
+        state.categorias = state.categorias.filter((c) => c.id !== action.payload);
       })
 
       // --- Oficinas ---
@@ -238,9 +244,71 @@ const balanceSlice = createSlice({
       })
       .addCase(fetchOficinasList.rejected, (state) => {
         state.oficinasStatus = "failed";
+      })
+
+      // --- Historial Ingresos ---
+      .addCase(fetchHistorialIngresos.pending, (state) => {
+        state.historialStatus = "loading";
+      })
+      .addCase(fetchHistorialIngresos.fulfilled, (state, action) => {
+        state.historialStatus = "succeeded";
+        const data = action.payload;
+        state.historialItems = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+        state.historialCount = data.count ?? state.historialItems.length;
+        state.historialNext  = data.next  ?? null;
+        state.historialPrev  = data.previous ?? null;
+      })
+      .addCase(fetchHistorialIngresos.rejected, (state) => {
+        state.historialStatus = "failed";
       });
   },
 });
 
 export const { clearEnvioState } = balanceSlice.actions;
 export default balanceSlice.reducer;
+// ── Historial de ingresos (con filtros completos) ──────────────────
+export const fetchHistorialIngresos = createAsyncThunk(
+  "balance/fetchHistorialIngresos",
+  async ({ oficina, desde, hasta, forma_pago, q, page = 1, page_size = 50 } = {}, { rejectWithValue }) => {
+    try {
+      const params = { page, page_size };
+      if (oficina && oficina !== "ALL") params.oficina = oficina;
+      if (desde)      params.fecha__gte = desde;
+      if (hasta)      params.fecha__lte = hasta;
+      if (forma_pago && forma_pago !== "TODAS") params.forma_pago = forma_pago.toLowerCase();
+      if (q)          params.search = q;
+      const res = await axios.get(`${BASE_URL}ingresos/`, { params, headers: getAuthHeaders() });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || "Error al obtener historial");
+    }
+  }
+);
+
+// ── Exportar historial a Excel ────────────────────────────────────
+export const exportHistorialExcel = createAsyncThunk(
+  "balance/exportHistorialExcel",
+  async ({ oficina, desde, hasta, forma_pago, q } = {}, { rejectWithValue }) => {
+    try {
+      const params = { formato: "excel", page_size: 9999 };
+      if (oficina && oficina !== "ALL") params.oficina = oficina;
+      if (desde)      params.fecha__gte = desde;
+      if (hasta)      params.fecha__lte = hasta;
+      if (forma_pago && forma_pago !== "TODAS") params.forma_pago = forma_pago.toLowerCase();
+      if (q)          params.search = q;
+      const res = await axios.get(`${BASE_URL}ingresos/export/`, {
+        params, headers: getAuthHeaders(), responseType: "blob"
+      });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      const hoy = new Date().toISOString().slice(0, 10);
+      a.download = `Historial_Pagos_${hoy}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      return { ok: true };
+    } catch (err) {
+      return rejectWithValue("No se pudo descargar el Excel");
+    }
+  }
+);

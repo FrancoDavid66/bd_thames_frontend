@@ -89,10 +89,10 @@ export default function ConfirmarPagoModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 12 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className={`relative z-[66] w-full max-w-[420px] rounded-xl border px-5 py-5 shadow-xl ${modalBgConfirm} max-h-[95vh] overflow-y-auto custom-scrollbar`}
+          className={`relative z-[66] w-full max-w-2xl rounded-2xl border px-6 py-6 shadow-2xl ${modalBgConfirm} max-h-[95vh] overflow-y-auto custom-scrollbar`}
           >
             <div className="flex items-start justify-between gap-3 mb-3">
-              <h3 className={`text-base font-semibold text-slate-100`}>Confirmar pago</h3>
+              <h3 className={`text-xl font-bold text-slate-100`}>Confirmar pago</h3>
               <button
                 onClick={onClose}
                 disabled={confirmandoPago}
@@ -114,8 +114,8 @@ export default function ConfirmarPagoModal({
 
             {!isCancelada && da >= 15 && (
               <div className="mb-4 p-4 bg-rose-700/50 border border-rose-400/50 rounded-xl text-white text-sm border-l-2 border-rose-500">
-                <div className="font-black text-base mb-2">🚨 PELIGRO: ATRASO DE {da} DÍAS</div>
-                <ul className="list-disc pl-5 font-bold space-y-1 text-white/90">
+                <div className="font-black text-xl mb-3">🚨 PELIGRO: ATRASO DE {da} DÍAS</div>
+                <ul className="list-disc pl-5 font-bold space-y-2 text-white/90 text-base">
                   <li>VERIFICAR QUE LA PÓLIZA NO ESTÉ DADA DE BAJA EN LA COMPAÑÍA.</li>
                   <li>PREGUNTAR Y REVISAR SI TIENE O TUVO ALGÚN SINIESTRO.</li>
                 </ul>
@@ -124,8 +124,8 @@ export default function ConfirmarPagoModal({
 
             {!isCancelada && da >= 4 && da <= 14 && (
               <div className="mb-4 p-4 bg-amber-950/60 border border-amber-800 rounded-lg text-amber-100 text-sm">
-                <div className="font-bold text-base mb-2">⚠️ ATENCIÓN: ATRASO DE {da} DÍAS</div>
-                <ul className="list-disc pl-5 font-semibold space-y-1 text-white/90">
+                <div className="font-bold text-xl mb-3">⚠️ ATENCIÓN: ATRASO DE {da} DÍAS</div>
+                <ul className="list-disc pl-5 font-semibold space-y-2 text-white/90 text-base">
                   <li>VERIFICAR QUE LA PÓLIZA NO ESTÉ DADA DE BAJA EN LA COMPAÑÍA.</li>
                   <li>PREGUNTAR Y REVISAR SI TIENE O TUVO ALGÚN SINIESTRO.</li>
                 </ul>
@@ -134,8 +134,8 @@ export default function ConfirmarPagoModal({
 
             {!isCancelada && da >= 1 && da <= 3 && (
               <div className="mb-4 p-3 bg-yellow-950/40 border border-yellow-900 rounded-lg text-yellow-100 text-sm">
-                <div className="font-bold mb-1">👀 PRECAUCIÓN: {da} {da === 1 ? 'DÍA' : 'DÍAS'} DE ATRASO</div>
-                <ul className="list-disc pl-5 font-medium text-yellow-50/90">
+                <div className="font-bold text-lg mb-2">👀 PRECAUCIÓN: {da} {da === 1 ? 'DÍA' : 'DÍAS'} DE ATRASO</div>
+                <ul className="list-disc pl-5 font-medium text-yellow-50/90 text-sm space-y-1.5">
                   <li>Preguntar y revisar si tiene o tuvo algún siniestro.</li>
                 </ul>
               </div>
@@ -219,7 +219,7 @@ export default function ConfirmarPagoModal({
 
             {/* CONTENIDO DEL PAGO */}
             <div className={`space-y-3 p-4 rounded-lg border ${'bg-slate-950 border-slate-800'}`}>
-              <p className={`text-xs sm:text-sm ${da >= 1 || isCancelada ? 'text-white/90' : 'text-slate-300'}`}>
+                <p className={`text-sm ${da >= 1 || isCancelada ? 'text-white/90' : 'text-slate-300'}`}>
                 Vas a pagar la cuota <span className={`font-bold ${da >= 1 || isCancelada ? 'text-white' : 'text-emerald-400'}`}>#{confirmData.cuotaNro ?? "?"}</span> de la póliza <span className="font-bold text-white">{confirmData.numeroPoliza}</span>.
               </p>
 
@@ -230,18 +230,18 @@ export default function ConfirmarPagoModal({
               )}
 
               <div className="mt-2 text-center">
-                <p className={`text-[10px] sm:text-xs uppercase tracking-[0.18em] mb-1 font-bold ${da >= 1 || isCancelada ? 'text-white/70' : 'text-slate-400'}`}>Importe a pagar</p>
-                <p className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight ${'text-emerald-400'}`}>
+                <p className={`text-xs uppercase tracking-[0.18em] mb-2 font-bold ${da >= 1 || isCancelada ? 'text-white/70' : 'text-slate-400'}`}>Importe a pagar</p>
+                <p className={`text-4xl sm:text-5xl font-bold font-mono tracking-tight ${'text-emerald-400'}`}>
                   $ {fmtMoney(confirmData.monto)}
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
               <button
                 onClick={onClose}
                 disabled={confirmandoPago}
-                className={`h-9 px-4 rounded-lg border text-sm font-medium cursor-pointer transition-colors ${
+                className={`h-11 px-6 rounded-xl border text-base font-medium cursor-pointer transition-colors ${
                   confirmandoPago ? "bg-slate-900/40 border-slate-800 text-slate-600" : da >= 1 || isCancelada ? "bg-black/30 hover:bg-black/50 border-black/40 text-white" : "bg-slate-900/50 hover:bg-slate-800 border-slate-600/50 text-white"
                 }`}
               >
@@ -250,12 +250,12 @@ export default function ConfirmarPagoModal({
               <button
                 onClick={onConfirm}
                 disabled={botonBloqueado}
-                className={`h-9 px-5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors border ${
-                  botonBloqueado 
-                    ? "bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed" 
-                    : da >= 15 || isCancelada ? "bg-white text-rose-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer" 
-                    : da >= 4 ? "bg-white text-amber-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer" 
-                    : da >= 1 ? "bg-white text-yellow-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer" 
+                className={`h-11 px-6 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-colors border ${
+                  botonBloqueado
+                    ? "bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed"
+                    : da >= 15 || isCancelada ? "bg-white text-rose-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer"
+                    : da >= 4 ? "bg-white text-amber-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer"
+                    : da >= 1 ? "bg-white text-yellow-700 hover:bg-slate-100 shadow-[0_0_15px_rgba(255,255,255,0.3)] border-slate-200 cursor-pointer"
                     : "bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] border-emerald-400 cursor-pointer"
                 }`}
               >
