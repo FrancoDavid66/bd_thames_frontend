@@ -282,7 +282,7 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
 
             {/* Paginación */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800/60 bg-slate-950/40">
+              <div className="flex items-center justify-between  px-4 py-3 border-t border-slate-800/60 bg-slate-950/40">
                 <span className="text-xs text-slate-500">
                   Página {page} de {totalPages} · {historialCount.toLocaleString("es-AR")} resultados
                 </span>
