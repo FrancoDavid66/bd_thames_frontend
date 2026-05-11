@@ -41,7 +41,7 @@ const fmtMoney = (n) =>
 /* 🚀 KPI card OPTIMIZADO */
 function KpiCard({ title, value, variant = "blue" }) {
   const variants = {
-    green: "bg-gradient-to-br from-emerald-600/70 via-emerald-600/40 to-emerald-500/60 border border-emerald-400/40 text-white",
+    green: "bg-gradient-to-br from-emerald-600/70 via-emerald-600/40  to-emerald-500/60 border border-emerald-400/40 text-white",
     red: "bg-gradient-to-br from-rose-600/70 via-rose-600/40 to-rose-500/60 border border-rose-400/40 text-white",
     blue: "bg-gradient-to-br from-sky-600/70 via-sky-600/40 to-sky-500/60 border border-sky-400/40 text-white",
     amber: "bg-gradient-to-br from-amber-600/70 via-amber-600/40 to-amber-500/60 border border-amber-400/40 text-white", 
