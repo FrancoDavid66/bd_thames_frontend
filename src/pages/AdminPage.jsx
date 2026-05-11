@@ -6,7 +6,7 @@ import AdminOficinas from "../components/admin/AdminOficinas";
 import AdminUsuarios from "../components/admin/AdminUsuarios";
 import AdminResponsables from "../components/admin/AdminResponsables";
 import AdminCatalogos from "../components/admin/AdminCatalogos";
-import AdminCorreosBajas from "../components/admin/AdminCorreosBajas";
+import AdminCorreosBajas from "../components/admin/Admincorreosbajas";
 
 export default function AdminPage() {
   const [tab, setTab] = useState("responsables");
