@@ -155,7 +155,7 @@ export default function DescargarFactura({
   const toneClasses =
     tone === "primary"
       ? "bg-primary-500 hover:bg-primary-400 text-white ring-1 ring-primary-400/40"
-      : "bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white";
+      : "bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200";
 
   return (
     <button
@@ -164,7 +164,7 @@ export default function DescargarFactura({
       disabled={downloading}
       aria-busy={downloading ? "true" : "false"}
       className={[
-        "h-11 px-4 rounded-2xl inline-flex items-center gap-2 transition outline-none",
+        "h-9 px-3 rounded-lg inline-flex items-center gap-2 transition-colors outline-none text-sm",
         "focus-visible:ring-2 focus-visible:ring-primary-400/60",
         toneClasses,
         "disabled:opacity-60 disabled:cursor-not-allowed",

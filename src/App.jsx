@@ -90,6 +90,9 @@ function App() {
   // --- Contador Bajas ---
   const [bajasPendientes, setBajasPendientes] = useState(0);
 
+  // --- Pólizas en verificación (para padding del layout y Header) ---
+  const [verificacionCount, setVerificacionCount] = useState(0);
+
   // ====== Helper: API ROOT ======
   const getApiRoot = () => {
     const raw = (
@@ -223,6 +226,16 @@ function App() {
     } catch {}
   };
 
+  // ====== Pólizas en verificación: fetch ======
+  const fetchVerificacionCount = async () => {
+    if (!user) return;
+    try {
+      const apiRoot = getApiRoot();
+      const data = await fetchJSON(`${apiRoot}polizas/?estado=en_verificacion&page_size=1`);
+      if (data) setVerificacionCount(Number(data.count) || 0);
+    } catch {}
+  };
+
   // ========================================================
   // 🚀 USE-EFFECTS
   // ========================================================
@@ -253,6 +266,7 @@ function App() {
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
     fetchBajasCountersApp();
+    fetchVerificacionCount();
 
     return () => { try { unsub && unsub(); } catch {} };
   }, [user]); 
@@ -272,6 +286,7 @@ function App() {
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
     fetchBajasCountersApp();
+    fetchVerificacionCount();
   }, [location.pathname, location.search, user]);
 
   useEffect(() => {
@@ -281,6 +296,7 @@ function App() {
       fetchCuponerasCounters();
       fetchRenovacionesCounters();
       fetchBajasCountersApp();
+      fetchVerificacionCount();
     }, 60_000);
     return () => clearInterval(id);
   }, [DISABLE_POLL, user]);
@@ -381,10 +397,12 @@ function App() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+          <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} verificacionCount={verificacionCount} />
 
           <motion.main
-            className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pt-16 pb-20 lg:pb-8 overflow-y-auto"
+            className={`flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pb-20 lg:pb-8 overflow-y-auto transition-all duration-200 ${
+              verificacionCount > 0 ? "pt-24" : "pt-16"
+            }`}
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -30, opacity: 0 }}

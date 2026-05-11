@@ -111,18 +111,22 @@ function saveHistorialCache(state, cacheKey, items, meta) {
 }
 
 function savePolizaByIdCache(state, polizasByIdMap) {
-  if (!polizasByIdMap || typeof polizasByIdMap.forEach !== "function") return;
+  if (!polizasByIdMap) return;
   const now = Date.now();
 
-  polizasByIdMap.forEach((pol, id) => {
-    const pid = Number(id);
-    if (!Number.isFinite(pid) || pid <= 0) return;
-    if (!pol || typeof pol !== "object") return;
+  // Soporta tanto Map como objeto plano (el payload serializa Map a objeto)
+  const entries = polizasByIdMap instanceof Map
+    ? Array.from(polizasByIdMap.entries())
+    : Object.entries(polizasByIdMap);
 
+  for (const [id, pol] of entries) {
+    const pid = Number(id);
+    if (!Number.isFinite(pid) || pid <= 0) continue;
+    if (!pol || typeof pol !== "object") continue;
     state.polizaByIdCache[pid] = { ts: now, poliza: pol };
     const prev = Array.isArray(state.polizaByIdOrder) ? state.polizaByIdOrder : [];
     state.polizaByIdOrder = [pid, ...prev.filter((x) => x !== pid)].slice(0, POLIZA_BY_ID_MAX);
-  });
+  }
 
   const keep = new Set(state.polizaByIdOrder || []);
   Object.keys(state.polizaByIdCache || {}).forEach((k) => {

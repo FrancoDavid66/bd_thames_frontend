@@ -102,12 +102,12 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
 
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
-            <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-3xl border border-indigo-500/50 bg-slate-900 shadow-2xl transition-all">
+            <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-xl border border-indigo-800 bg-slate-900 shadow-md transition-all">
               
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-indigo-900/50 to-slate-900 px-6 py-4">
+              <div className="flex items-center justify-between border-b border-white/5 bg-slate-900 px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-indigo-400">
                     <HiOutlineSwitchHorizontal className="text-xl" />
                   </div>
                   <div>
@@ -147,7 +147,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
                 <div className="grid grid-cols-2 gap-3">
                   {/* 1. Compañía Destino */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pasar a Compañía</label>
+                    <label className="text-[10px] uppercase tracking-wider text-slate-500">Pasar a Compañía</label>
                     <select 
                       value={companiaDestino} 
                       onChange={(e) => { setCompaniaDestino(e.target.value); setCoberturaDestino(""); }}
@@ -161,7 +161,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
 
                   {/* 2. Cobertura Destino */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cobertura</label>
+                    <label className="text-[10px] uppercase tracking-wider text-slate-500">Cobertura</label>
                     <select 
                       value={coberturaDestino} 
                       onChange={(e) => setCoberturaDestino(e.target.value)}
@@ -189,7 +189,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
                       initial={{ opacity: 0, height: 0 }} 
                       animate={{ opacity: 1, height: "auto" }} 
                       exit={{ opacity: 0, height: 0 }}
-                      className="rounded-xl border border-sky-500/50 bg-sky-900/30 p-3 text-sky-100 text-xs shadow-md"
+                      className="rounded-xl border border-sky-800 bg-slate-900 p-3 text-sky-100 text-xs shadow-md"
                     >
                       <div className="flex items-center gap-1.5 font-bold mb-1">
                         <HiCamera className="text-sky-400 text-base" /> ¡OBLIGATORIO!
@@ -209,7 +209,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
                       className="grid grid-cols-2 gap-3"
                     >
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Costo Compañía</label>
+                        <label className="text-[10px] uppercase tracking-wider text-slate-500">Costo Compañía</label>
                         <input 
                           type="number" 
                           placeholder="$"
@@ -219,7 +219,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Cobrado al Cliente</label>
+                        <label className="text-[10px] uppercase tracking-wider text-emerald-500">Cobrado al Cliente</label>
                         <input 
                           type="number" 
                           placeholder="$"
@@ -238,13 +238,13 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
                     <motion.div 
                       initial={{ scale: 0.9, opacity: 0 }} 
                       animate={{ scale: 1, opacity: 1 }} 
-                      className="mt-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                      className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5 text-center data-none=[20px_rgba(16,185,129,0.15)]"
                     >
                       <div className="flex items-center justify-center gap-2 text-emerald-400 mb-1">
                         <HiSparkles className="text-xl" />
                         <span className="text-xs font-bold uppercase tracking-widest">Tu comisión a ganar</span>
                       </div>
-                      <div className="text-4xl font-black text-emerald-300 drop-shadow-md">
+                      <div className="text-4xl font-semibold text-emerald-300 drop-shadow-md">
                         {MONEY_FMT.format(comisionCalculada)}
                       </div>
                       {companiaDestino === "AMCA" && (
@@ -262,7 +262,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
               <div className="border-t border-white/5 bg-slate-900/80 p-4 flex flex-col gap-3">
                 <button 
                   onClick={handleRegistrar}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 transition-all hover:bg-emerald-500 hover:-translate-y-0.5"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3.5 text-sm font-bold text-white  transition-all hover:bg-emerald-600 "
                 >
                   <HiCurrencyDollar className="text-xl" /> ¡Lo Vendí! Registrar Traspaso
                 </button>
@@ -276,7 +276,7 @@ export default function RegistrarTraspasoModal({ isOpen, onClose, clienteData })
                   </button>
                   <button 
                     onClick={handleOportunidad}
-                    className="flex-[2] flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/50 bg-amber-600/20 px-4 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-600/30 transition-colors"
+                    className="flex-[2] flex items-center justify-center gap-1.5 rounded-xl border border-amber-800 bg-amber-950/30 px-4 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-600/30 transition-colors"
                   >
                     <HiClock className="text-lg" /> Lo va a pensar (Reserva 15d)
                   </button>

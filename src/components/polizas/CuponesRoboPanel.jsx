@@ -66,6 +66,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
     isConfirming: false 
   });
   const [montoValue, setMontoValue] = useState("");
+  const [costoCompaniaValue, setCostoCompaniaValue] = useState("");
 
   const { byPoliza, loadingByPoliza, updatingById } = useSelector(
     (s) => s.cuponesRobo || {}
@@ -94,6 +95,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
   const handleEditMonto = (cupon) => {
     setMontoValue(cupon.monto !== null ? String(cupon.monto) : "");
+    setCostoCompaniaValue(""); // en edición de monto no requerimos costo compañía
     setMontoModal({ isOpen: true, file: null, cuponId: cupon.id, editMode: true, isConfirming: false });
   };
 
@@ -105,6 +107,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
     const defaultMonto = uploadTarget.monto ? String(uploadTarget.monto) : "";
     
     setMontoValue(defaultMonto);
+    setCostoCompaniaValue(""); // siempre limpiamos el costo al abrir
     setMontoModal({ isOpen: true, file, cuponId, editMode: false, isConfirming: false });
     setUploadTarget(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -134,6 +137,10 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
     if (!cuponId) return;
 
     const parsed = Number(montoValue.replace(",", ".").trim());
+    // costo_compania solo aplica cuando es un pago nuevo (no edición de monto)
+    const costoCompaniaParsed = !editMode
+      ? Number((costoCompaniaValue || "0").replace(",", ".").trim()) || 0
+      : 0;
 
     try {
       setUploadingById((prev) => ({ ...prev, [cuponId]: true }));
@@ -152,6 +159,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
         polizaId: finalPolizaId,
         estado: "PAGADA",
         monto: parsed,
+        costo_compania: costoCompaniaParsed, // ✅ ahora siempre se manda al backend
       };
 
       if (secure_url) {
@@ -163,6 +171,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
       
       toast.success(editMode ? "Monto corregido correctamente." : "Pago de cupón registrado correctamente.");
       setMontoModal({ isOpen: false, file: null, cuponId: null, editMode: false, isConfirming: false });
+      setCostoCompaniaValue("");
       
     } catch (error) {
       console.error(error);
@@ -182,6 +191,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
   const closeModal = () => {
     if (isModalUploading) return;
     setMontoModal({ isOpen: false, file: null, cuponId: null, editMode: false, isConfirming: false });
+    setCostoCompaniaValue("");
   };
 
   return (
@@ -413,22 +423,63 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
               {/* 🚀 CONDICIONAL: Muestra formulario o pantalla de confirmación */}
               {!montoModal.isConfirming ? (
                 <div className="space-y-4">
-                  <div className={`flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-3 focus-within:ring-2 ring-emerald-500/40 transition-all ${isModalUploading ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                    <span className="text-neutral-500 font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      className="flex-1 bg-transparent text-sm font-bold text-neutral-50 outline-none w-full"
-                      value={montoValue}
-                      onChange={(e) => setMontoValue(e.target.value)}
-                      autoFocus
-                      disabled={isModalUploading}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !isModalUploading) handleInitiateConfirm();
-                      }}
-                    />
+                  {/* Monto cobrado al cliente */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1.5 font-medium">
+                      Monto cobrado al cliente
+                    </label>
+                    <div className={`flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-3 focus-within:ring-2 ring-emerald-500/40 transition-all ${isModalUploading ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                      <span className="text-neutral-500 font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="flex-1 bg-transparent text-sm font-bold text-neutral-50 outline-none w-full"
+                        value={montoValue}
+                        onChange={(e) => setMontoValue(e.target.value)}
+                        autoFocus
+                        disabled={isModalUploading}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !isModalUploading) handleInitiateConfirm();
+                        }}
+                      />
+                    </div>
                   </div>
+
+                  {/* Costo compañía — solo en pago nuevo, no en edición de monto */}
+                  {!montoModal.editMode && (
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1.5 font-medium">
+                        Costo de la compañía
+                        <span className="ml-1 text-neutral-600 normal-case">(para calcular comisión)</span>
+                      </label>
+                      <div className={`flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-3 focus-within:ring-2 ring-sky-500/40 transition-all ${isModalUploading ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                        <span className="text-neutral-500 font-bold">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          className="flex-1 bg-transparent text-sm font-bold text-neutral-50 outline-none w-full"
+                          value={costoCompaniaValue}
+                          onChange={(e) => setCostoCompaniaValue(e.target.value)}
+                          disabled={isModalUploading}
+                        />
+                      </div>
+                      {/* Ganancia en vivo */}
+                      {montoValue && costoCompaniaValue && (
+                        (() => {
+                          const cobrado = Number(montoValue) || 0;
+                          const costo   = Number(costoCompaniaValue) || 0;
+                          const ganancia = cobrado - costo;
+                          return (
+                            <p className={`mt-1.5 text-xs font-mono ${ganancia > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              Ganancia: $ {ganancia.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                            </p>
+                          );
+                        })()
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -455,10 +506,23 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                   animate={{ opacity: 1, x: 0 }}
                   className="space-y-4"
                 >
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-center">
-                    <p className="text-sm text-neutral-300 font-medium">
-                      ¿Estás seguro que el monto a registrar es de <strong className="text-emerald-400 font-black text-lg ml-1">${montoValue}</strong>?
-                    </p>
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-neutral-400">Cobrado al cliente</span>
+                      <strong className="text-emerald-400 font-mono">$ {Number(montoValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                    {!montoModal.editMode && costoCompaniaValue && (
+                      <>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-neutral-400">Costo compañía</span>
+                          <strong className="text-rose-400 font-mono">$ {Number(costoCompaniaValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                        <div className="flex justify-between items-center text-sm border-t border-white/10 pt-2">
+                          <span className="text-neutral-300 font-medium">Ganancia</span>
+                          <strong className="text-sky-400 font-mono">$ {(Number(montoValue || 0) - Number(costoCompaniaValue || 0)).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">

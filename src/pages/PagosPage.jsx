@@ -21,8 +21,9 @@ import {
   HiCalendar,
   HiUserGroup,
   HiIdentification,
+  HiExclamation,
   HiChevronRight as HiChevronRightMini,
-  HiChartBar, // 🚀 NUEVO ICONO PARA MÉTRICAS
+  HiChartBar,
 } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
@@ -701,57 +702,46 @@ const PagosPage = () => {
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-10 2xl:px-12 py-4 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight flex items-center gap-2">
-              <span>Pagos y recordatorios</span>
-              <span className="inline-flex items-center rounded-full bg-primary-500/10 text-primary-300 text-xs px-2 py-0.5 border border-primary-500/30">
-                <HiSparkles className="mr-1" />
-                <span>Panel operativo</span>
-              </span>
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-100 tracking-tight">
+              Pagos y recordatorios
             </h1>
-            <p className="text-slate-400 text-sm sm:text-base mt-1">
-              Administrá cuotas, medios de cobro y envíos de recordatorios desde un solo lugar.
-              {!isWebAdmin && <span className="text-emerald-400 ml-2 font-bold tracking-widest text-xs uppercase">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
+            <p className="text-slate-500 text-sm mt-0.5">
+              {!isWebAdmin && (
+                <span className="font-mono text-slate-400">{user?.perfil?.oficina_nombre || "Sucursal"} · </span>
+              )}
+              Gestión de cuotas y envío de recordatorios
             </p>
           </div>
-          
-          {/* 🚀 ESCUDO ADMIN: Solo vos ves estos botones */}
+
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             {isWebAdmin && (
               <>
-                <motion.button
+                <button
                   type="button"
                   onClick={() => setShowCuentasModal(true)}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl bg-slate-800/70 border border-slate-700 px-3 py-2 h-10 sm:h-11 text-xs sm:text-sm text-slate-200 shadow-sm hover:bg-slate-700/80 cursor-pointer"
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2 h-9 text-sm text-slate-300 transition-colors"
                 >
-                  <HiCog className="text-base sm:text-lg" />
+                  <HiCog className="text-base" />
                   <span>Medios de cobro</span>
-                </motion.button>
+                </button>
 
-                <motion.button
+                <button
                   type="button"
                   onClick={() => setShowRecordatoriosModal(true)}
-                  whileHover={{ scale: 1.06 }}
-                  whileTap={{ scale: 0.96 }}
-                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80"
-                  style={{ backgroundColor: "#25D366" }}
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg border border-emerald-800 bg-emerald-900/50 hover:bg-emerald-800/60 px-3 py-2 h-9 text-sm text-emerald-300 font-medium transition-colors"
                 >
-                  <HiSpeakerphone className="text-base sm:text-lg" />
+                  <HiSpeakerphone className="text-base" />
                   <span>{sendingRecordatorios ? "Enviando..." : "Recordatorios"}</span>
-                </motion.button>
+                </button>
 
-                {/* 🚀 BOTÓN NUEVO DE MÉTRICAS */}
-                <motion.button
+                <button
                   type="button"
                   onClick={() => setShowReporteModal(true)}
-                  whileHover={{ scale: 1.06 }}
-                  whileTap={{ scale: 0.96 }}
-                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] cursor-pointer border border-sky-500/50 bg-sky-600 hover:bg-sky-500 transition-colors"
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2 h-9 text-sm text-slate-300 transition-colors"
                 >
-                  <HiChartBar className="text-base sm:text-lg" />
+                  <HiChartBar className="text-base" />
                   <span className="hidden sm:inline">Efectividad</span>
-                </motion.button>
+                </button>
               </>
             )}
           </div>
@@ -795,63 +785,56 @@ const PagosPage = () => {
                 }`}
               >
                 <HiClock className="text-sm sm:text-base" />
-                <span className="truncate">Alertas</span>
+                <span className="truncate">Historial</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => handleChangeTab("alertas")}
+              className={`flex-1 justify-center sm:flex-none relative inline-flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                tab === "alertas"
+                  ? "bg-slate-800 text-slate-50"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              <HiExclamation className="text-sm sm:text-base" />
+              <span className="truncate">Avisos</span>
+            </button>
           </div>
         </div>
 
         {tab === "pagos" && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4 sm:mb-4">
-            {kpis.map(({ label, value, icon: Icon, hint }) => (
-              <motion.div
-                key={label}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl bg-slate-900/80 border border-slate-800 px-3 py-2.5 sm:px-4 sm:py-3 flex flex-col justify-between shadow-[0_0_18px_rgba(15,23,42,0.75)]"
-              >
-                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                  <span className="text-[0.65rem] sm:text-xs uppercase tracking-wide text-slate-400">
-                    {label}
-                  </span>
-                  <Icon className="text-slate-400 text-sm sm:text-base" />
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+            {kpis.map(({ label, value, icon: Icon }) => (
+              <div key={label} className="rounded-lg bg-slate-900 border border-slate-800 px-3 py-2.5 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+                  <div className="text-xl font-mono font-semibold text-slate-100 mt-0.5">{value}</div>
                 </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg sm:text-2xl font-semibold tabular-nums">{value}</span>
-                  <span className="text-[0.6rem] sm:text-[0.7rem] text-slate-500">{hint}</span>
-                </div>
-              </motion.div>
+                <Icon className="text-slate-700 text-xl" />
+              </div>
             ))}
           </div>
         )}
 
         {tab === "pagos" ? (
-          <motion.div
-            key="tab-pagos"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-3 sm:space-y-4"
-          >
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4 space-y-3">
+          <motion.div key="tab-pagos" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 sm:p-4 space-y-3">
               <PagosSearch onBuscar={handleBuscarPolizas} />
               <button
                 type="button"
                 onClick={() => setOcultarPagadas((v) => !v)}
-                className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-slate-100 cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
               >
-                <span
-                  className={`w-4 h-4 rounded border flex items-center justify-center ${
-                    ocultarPagadas ? "bg-slate-200 border-slate-100" : "border-slate-500"
-                  }`}
-                >
-                  {ocultarPagadas && <span className="w-2 h-2 rounded bg-slate-900" />}
+                <span className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${ocultarPagadas ? "bg-slate-400 border-slate-400" : "border-slate-600"}`}>
+                  {ocultarPagadas && <span className="w-2 h-2 rounded-sm bg-slate-900" />}
                 </span>
-                <HiEyeOff className="w-4 h-4 opacity-70" />
-                <span>Ocultar cuotas pagadas</span>
+                <HiEyeOff className="w-3.5 h-3.5" />
+                Ocultar cuotas pagadas
               </button>
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-200">
@@ -947,12 +930,6 @@ const PagosPage = () => {
                 </div>
               )}
             </div>
-
-            <CuotasAlertas 
-              oficina={alertasOficina} 
-              onOficinaChange={setAlertasOficina} 
-              isWebAdmin={isWebAdmin} 
-            />
 
             <AnimatePresence>
               {!!clienteSeleccionado && (
@@ -1106,12 +1083,28 @@ const PagosPage = () => {
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : tab === "historial_recordatorios" ? (
           <motion.div key="tab-alertas" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4">
             <HistorialRecordatorios items={historialRecordatorios} loading={loadingHistorialRecordatorios} onRefresh={handleRefreshHistorialRecordatorios} />
           </motion.div>
-        )}
+        ) : null}
       </div>
+
+      {/* ── Tab AVISOS — full width fuera del contenedor limitado ── */}
+      {tab === "alertas" && (
+        <motion.div
+          key="tab-avisos"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="px-3 sm:px-4 lg:px-6 pb-8"
+        >
+          <CuotasAlertas
+            oficina={alertasOficina}
+            onOficinaChange={setAlertasOficina}
+            isWebAdmin={isWebAdmin}
+          />
+        </motion.div>
+      )}
 
       <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
       <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} isWebAdmin={isWebAdmin} userOficina={userOficina} />

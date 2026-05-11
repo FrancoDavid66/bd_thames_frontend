@@ -1,25 +1,52 @@
 // src/components/layout/Header.jsx
-import { useState } from "react";
-import { HiMenu, HiX } from "react-icons/hi";
+import { useState, useEffect } from "react";
+import { HiMenu, HiX, HiExclamation } from "react-icons/hi";
 import { FaPowerOff } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { motion, AnimatePresence } from "framer-motion"; // 🚀 Importamos animación
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function Header({ sidebarOpen, toggleSidebar }) {
+const BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
+
+export default function Header({ sidebarOpen, toggleSidebar, verificacionCount = 0 }) {
   const { user, logout } = useAuth();
-  const [isLoggingOut, setIsLoggingOut] = useState(false); // 🚀 Estado para controlar la salida
+  const navigate = useNavigate();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // soloId: si hay exactamente 1 póliza en verificación, guardamos su id
+  const [verificacionSoloId, setVerificacionSoloId] = useState(null);
+
+  useEffect(() => {
+    if (verificacionCount !== 1) { setVerificacionSoloId(null); return; }
+    const fetchId = async () => {
+      try {
+        const token = localStorage.getItem("access_token") || localStorage.getItem("token") || "";
+        const res = await fetch(`${BASE}/polizas/?estado=en_verificacion&page_size=1`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.results?.length === 1) setVerificacionSoloId(data.results[0].id);
+      } catch {}
+    };
+    fetchId();
+  }, [verificacionCount]);
+
+  const handleVerPolizas = () => {
+    if (verificacionSoloId) {
+      navigate(`/polizas/${verificacionSoloId}`);
+    } else {
+      navigate("/polizas?estado=en_verificacion");
+    }
+  };
 
   const isAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
   const nombreOficina = isAdmin ? 'Administrador' : (user?.perfil?.oficina_nombre || 'Oficina');
   const avatarLetter = nombreOficina.charAt(0).toUpperCase();
 
-  // 🚀 Función de deslogueo con demora épica
   const handleLogoutSequence = () => {
     setIsLoggingOut(true);
-    // Esperamos 2.2 segundos para que termine la animación antes de borrar el usuario
-    setTimeout(() => {
-      logout();
-    }, 2200);
+    setTimeout(() => { logout(); }, 2200);
   };
 
   return (
@@ -144,6 +171,49 @@ export default function Header({ sidebarOpen, toggleSidebar }) {
           
         </div>
       </header>
+
+      {/* ── Barra de alerta EN VERIFICACIÓN — fija debajo del header ── */}
+      <AnimatePresence>
+        {verificacionCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            className={`
+              fixed inset-x-0 z-30
+              flex items-center justify-between
+              px-4 sm:px-6 py-2
+              bg-orange-500 text-orange-950
+              transition-all duration-300
+              ${sidebarOpen ? "lg:pl-64" : ""}
+            `}
+            style={{ top: "80px" }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-950/20 shrink-0">
+                <HiExclamation className="text-sm" />
+              </span>
+              <p className="text-xs font-semibold">
+                <span className="font-black">
+                  {verificacionCount} póliza{verificacionCount > 1 ? "s" : ""} en verificación
+                </span>
+                {" "}—{" "}
+                {verificacionCount > 1
+                  ? "Estos clientes pueden estar sin cobertura."
+                  : "Este cliente puede estar sin cobertura."}
+                {" "}Verificar con la compañía si la baja fue procesada.
+              </p>
+            </div>
+            <button
+              onClick={handleVerPolizas}
+              className="shrink-0 ml-4 px-3 py-1 rounded-lg bg-orange-950/20 hover:bg-orange-950/30 text-orange-950 text-xs font-bold transition-colors whitespace-nowrap"
+            >
+              {verificacionCount === 1 ? "Ver póliza →" : "Ver pólizas →"}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

@@ -88,150 +88,150 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
     : "—";
 
   return (
-    <div className="max-w-3xl mx-auto rounded-2xl border border-neutral-300/20 bg-neutral-500 text-neutral-100 shadow print:bg-white print:text-black print:border-none print:shadow-none">
-      <div className="rounded-t-2xl bg-primary-400 text-neutral-900 px-6 py-4 flex items-center justify-between">
+    <div className="max-w-3xl mx-auto rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm print:shadow-none">
+      <div className="rounded-t-lg bg-slate-800 text-slate-100 px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-neutral-900/10">
+          <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/10">
             <HiReceiptTax className="w-6 h-6" />
           </span>
           <div className="leading-tight">
-            <h1 className="text-xl font-bold">
+            <h1 className="text-base font-mono font-medium text-slate-800">
               Factura / Recibo de Pago de Cuota
             </h1>
-            <p className="text-xs opacity-80">
+            <p className="text-xs text-slate-400">
               Emitida el {fmtDate(new Date())}
             </p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs opacity-70">Nº de comprobante</p>
-          <p className="text-base font-semibold">
+          <p className="text-[10px] text-slate-400">Nº de comprobante</p>
+          <p className="text-base font-mono font-medium text-slate-800">
             {String(cuota.id).padStart(6, "0")}
           </p>
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <section className="rounded-xl border border-neutral-300/20 bg-neutral-400/30 p-4">
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <HiUser className="w-5 h-5 opacity-80" />
-              <h2 className="font-semibold">Datos del Cliente</h2>
+              <HiUser className="w-5 h-5 text-slate-500" />
+              <h2 className="font-medium text-slate-800">Datos del Cliente</h2>
             </div>
             <ul className="text-sm space-y-1">
               <li>
-                <span className="opacity-80">Nombre:</span>{" "}
-                <span className="font-medium">
+                <span className="text-slate-500">Nombre:</span>{" "}
+                <span className="font-medium text-slate-800">
                   {safe(cliente.nombre)} {safe(cliente.apellido)}
                 </span>
               </li>
               <li>
-                <span className="opacity-80">DNI / CUIT:</span>{" "}
-                <span className="font-medium">
+                <span className="text-slate-500">DNI / CUIT:</span>{" "}
+                <span className="font-medium text-slate-800">
                   {safe(cliente.dni_cuit_cuil)}
                 </span>
               </li>
               <li>
-                <span className="opacity-80">Teléfono:</span>{" "}
-                <span className="font-medium">{safe(cliente.telefono)}</span>
+                <span className="text-slate-500">Teléfono:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(cliente.telefono)}</span>
               </li>
               <li>
-                <span className="opacity-80">Email:</span>{" "}
-                <span className="font-medium">{safe(cliente.email)}</span>
+                <span className="text-slate-500">Email:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(cliente.email)}</span>
               </li>
               <li>
-                <span className="opacity-80">Dirección:</span>{" "}
-                <span className="font-medium">{safe(cliente.direccion)}</span>
+                <span className="text-slate-500">Dirección:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(cliente.direccion)}</span>
               </li>
             </ul>
           </section>
 
-          <section className="rounded-xl border border-neutral-300/20 bg-neutral-400/30 p-4">
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <HiOfficeBuilding className="w-5 h-5 opacity-80" />
-              <h2 className="font-semibold">Datos de la Póliza / Vehículo</h2>
+              <HiOfficeBuilding className="w-5 h-5 text-slate-500" />
+              <h2 className="font-medium text-slate-800">Datos de la Póliza / Vehículo</h2>
             </div>
             <ul className="text-sm space-y-1">
               <li>
-                <span className="opacity-80">Póliza Nº:</span>{" "}
-                <span className="font-medium">
+                <span className="text-slate-500">Póliza Nº:</span>{" "}
+                <span className="font-medium text-slate-800">
                   {safe(poliza.numero_poliza)}
                 </span>
               </li>
               <li>
-                <span className="opacity-80">Compañía:</span>{" "}
-                <span className="font-medium">{safe(poliza.compania)}</span>
+                <span className="text-slate-500">Compañía:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(poliza.compania)}</span>
               </li>
               <li>
-                <span className="opacity-80">Cobertura:</span>{" "}
-                <span className="font-medium">{safe(poliza.cobertura)}</span>
+                <span className="text-slate-500">Cobertura:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(poliza.cobertura)}</span>
               </li>
               <li>
-                <span className="opacity-80">Vehículo:</span>{" "}
-                <span className="font-medium">
+                <span className="text-slate-500">Vehículo:</span>{" "}
+                <span className="font-medium text-slate-800">
                   {safe(poliza.marca)} {safe(poliza.modelo)}{" "}
                   {poliza.anio ? `(${poliza.anio})` : ""}
                 </span>
               </li>
               <li>
-                <span className="opacity-80">Patente:</span>{" "}
-                <span className="font-medium">{safe(poliza.patente)}</span>
+                <span className="text-slate-500">Patente:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(poliza.patente)}</span>
               </li>
               <li>
-                <span className="opacity-80">Tipo:</span>{" "}
-                <span className="font-medium">{safe(poliza.tipo)}</span>
+                <span className="text-slate-500">Tipo:</span>{" "}
+                <span className="font-medium text-slate-800">{safe(poliza.tipo)}</span>
               </li>
             </ul>
           </section>
         </div>
 
-        <section className="rounded-xl border border-neutral-300/20 bg-neutral-400/30 p-4">
+        <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <HiCash className="w-5 h-5 opacity-80" />
-            <h2 className="font-semibold">Detalle del Pago</h2>
+            <HiCash className="w-5 h-5 text-slate-500" />
+            <h2 className="font-medium text-slate-800">Detalle del Pago</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div className="rounded-lg border border-neutral-300/20 bg-neutral-500/20 p-3">
-              <p className="opacity-80">Cuota</p>
-              <p className="text-lg font-semibold">#{safe(cuota.cuota_nro)}</p>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="text-slate-500">Cuota</p>
+              <p className="text-lg font-medium text-slate-800">#{safe(cuota.cuota_nro)}</p>
             </div>
-            <div className="rounded-lg border border-neutral-300/20 bg-neutral-500/20 p-3">
-              <p className="opacity-80">Monto</p>
-              <p className="text-lg font-semibold">
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="text-slate-500">Monto</p>
+              <p className="text-lg font-medium text-slate-800">
                 {fmtMoney(cuota.monto)}
               </p>
             </div>
-            <div className="rounded-lg border border-neutral-300/20 bg-neutral-500/20 p-3">
-              <p className="opacity-80">Estado</p>
-              <p className="text-lg font-semibold">
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="text-slate-500">Estado</p>
+              <p className="text-lg font-medium text-slate-800">
                 {cuota.pagado ? "Pagada" : "Pendiente"}
               </p>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div className="rounded-lg border border-neutral-300/20 bg-neutral-500/20 p-3">
-              <p className="flex items-center gap-1 opacity-80">
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="flex items-center gap-1 text-slate-500">
                 <HiCalendar className="w-4 h-4" /> Vencimiento
               </p>
-              <p className="font-medium">
+              <p className="font-medium text-slate-800">
                 {fmtDate(cuota.fecha_vencimiento)}
               </p>
             </div>
-            <div className="rounded-lg border border-neutral-300/20 bg-neutral-500/20 p-3">
-              <p className="flex items-center gap-1 opacity-80">
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="flex items-center gap-1 text-slate-500">
                 <HiCalendar className="w-4 h-4" /> Fecha de pago
               </p>
-              <p className="font-medium">
-                {cuota.pagado
-                  ? fmtDate(cuota.fecha_pago || new Date())
+              <p className="font-medium text-slate-800">
+                {cuota.pagado && (cuota.pago_registrado_en || cuota.fecha_pago)
+                  ? fmtDate(cuota.pago_registrado_en || cuota.fecha_pago)
                   : "—"}
               </p>
             </div>
-            <div className="rounded-lg border border-neutral-300/20 bg-neutral-500/20 p-3">
-              <p className="opacity-80">Forma de pago</p>
-              <p className="font-medium">
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="text-slate-500">Forma de pago</p>
+              <p className="font-medium text-slate-800">
                 {cuota.forma_pago
                   ? cuota.forma_pago.charAt(0).toUpperCase() +
                     cuota.forma_pago.slice(1)
@@ -243,8 +243,8 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
 
         {/* 🚀 ALERTA PRIMERA CUOTA */}
         {esPrimeraCuota && (
-          <div className="rounded-lg border border-sky-400/60 bg-sky-500/10 text-sky-100 text-sm px-5 py-4 text-justify print:border-sky-500/80 print:text-sky-900 print:bg-transparent">
-            <p className="font-bold uppercase mb-2 text-center">Aviso Legal: Inicio de Cobertura</p>
+          <div className="rounded-md border border-sky-200 bg-sky-50 text-slate-700 text-sm px-4 py-3 text-justify">
+            <p className="font-semibold uppercase text-xs tracking-wider mb-2 text-center text-slate-600">Aviso Legal: Inicio de Cobertura</p>
             <p>
               El cliente toma conocimiento de que su vehículo comenzará a tener cobertura a partir del <strong className="font-bold">día siguiente</strong> a la realización de este primer pago (Fecha estimada: <strong className="font-bold">{fechaDiaSiguiente}</strong>).
             </p>
@@ -253,8 +253,8 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
 
         {/* 🚀 ALERTA PAGO ATRASADO */}
         {pagoAtrasado && (
-          <div className="rounded-lg border border-rose-400/60 bg-rose-500/10 text-rose-100 text-sm px-5 py-4 text-justify print:border-red-500/80 print:text-red-900 print:bg-transparent">
-            <p className="font-bold uppercase mb-2 text-center">Aviso Legal: Pago fuera de término</p>
+          <div className="rounded-md border border-rose-200 bg-rose-50 text-slate-700 text-sm px-4 py-3 text-justify">
+            <p className="font-semibold uppercase text-xs tracking-wider mb-2 text-center text-slate-600">Aviso Legal: Pago fuera de término</p>
             <p>
               El cliente acepta y confirma bajo juramento que <strong className="font-bold">NO ha tenido ningún siniestro ni reclamo</strong> en los días previos a este pago, durante los cuales la póliza se encontraba vencida.
             </p>
@@ -264,7 +264,7 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
           </div>
         )}
 
-        <div className="text-center text-xs text-neutral-200/70 print:text-neutral-600">
+        <div className="text-center text-xs text-slate-400">
           Gracias por confiar en nosotros.
         </div>
       </div>

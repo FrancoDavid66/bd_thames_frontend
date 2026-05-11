@@ -126,11 +126,11 @@ export default function HistorialRecordatorios({
   }, [items, search, oficinaFilter]);
 
   return (
-    <div className="rounded-2xl bg-gray-900/70 border border-gray-800 ring-1 ring-gray-800/80 text-gray-100 shadow-sm">
+    <div className="rounded-lg bg-gray-900/70 border border-gray-800 ring-1 ring-gray-800/80 text-gray-100 shadow-sm">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-gray-800">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
             <HiClock className="w-4 h-4 text-emerald-300" />
           </div>
           <div>

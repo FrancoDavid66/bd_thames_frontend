@@ -220,15 +220,15 @@ export default function ImprimirFacturaTicket({
       disabled={printing}
       className={[
         "inline-flex items-center justify-center gap-2",
-        "rounded-2xl border px-4 py-2 text-sm font-extrabold",
-        "bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800",
+        "rounded-lg border px-3 py-2 text-xs font-medium",
+        "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200",
         printing ? "opacity-70 cursor-not-allowed" : "cursor-pointer",
         className,
       ].join(" ")}
       title="Imprimir factura en ticket térmico"
       aria-busy={printing ? "true" : "false"}
     >
-      <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-white/70 ring-1 ring-black/10">
+      <span className="inline-flex w-4 h-4 items-center justify-center">
         <HiPrinter className="w-4 h-4" />
       </span>
       {printing ? "Imprimiendo…" : label}

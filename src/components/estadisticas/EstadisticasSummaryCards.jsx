@@ -1,4 +1,5 @@
-import React from "react";
+// src/components/estadisticas/EstadisticasSummaryCards.jsx
+import { motion } from "framer-motion";
 import {
   HiDownload,
   HiOutlineChartBar,
@@ -6,156 +7,173 @@ import {
   HiOutlineTrendingUp,
   HiOutlineExclamation,
   HiOutlineTrendingDown,
+  HiOutlineRefresh,
 } from "react-icons/hi";
 
-const CARD_META = {
-  TOTALES: {
-    title: "PÓLIZAS\nTOTALES",
-    description: "Stock total de pólizas en las oficinas.",
-    linkText: "Ver lista →",
-    icon: HiOutlineChartBar,
-    iconClass: "text-cyan-400",
-    linkClass: "text-cyan-400",
-  },
-  ACTIVAS: {
-    title: "PÓLIZAS\nACTIVAS",
-    description: "Pólizas en estado activa.",
-    linkText: "Ver lista →",
-    icon: HiOutlineShieldCheck,
-    iconClass: "text-emerald-400",
-    linkClass: "text-emerald-400",
-  },
-  ALTAS: {
-    title: "ALTAS DEL MES",
-    description: "Emitidas en el período.",
-    linkText: "Ver lista →",
-    icon: HiOutlineTrendingUp,
-    iconClass: "text-emerald-400",
-    linkClass: "text-emerald-400",
-  },
-  VENCIDAS: {
-    title: "VENCIDAS\n(MORA)",
-    description: "Fuera de término o sin cobertura.",
-    linkText: "Ver morosos →",
-    icon: HiOutlineExclamation,
-    iconClass: "text-orange-400",
-    linkClass: "text-orange-400",
-  },
-  BAJAS: {
-    title: "BAJAS DEL MES",
-    description: "Cancelaciones exactas.",
-    linkText: "Ver lista →",
-    icon: HiOutlineTrendingDown,
-    iconClass: "text-rose-400",
-    linkClass: "text-rose-400",
-  },
-};
+// ─── Definición de cards ──────────────────────────────────────────────────────
+// "altas_nuevas" y "renovaciones" son cards separadas.
+// "altas_total" muestra nuevas + renovaciones como total de emisiones.
 
-const DEFAULT_ORDER = ["TOTALES", "ACTIVAS", "ALTAS", "VENCIDAS", "BAJAS"];
+const CARDS = [
+  {
+    key:      "TOTALES",
+    label:    "Pólizas totales",
+    icon:     HiOutlineChartBar,
+    color:    "text-slate-300",
+    bar:      "bg-slate-600",
+    getValue: (t) => t.total ?? t.polizas_total ?? 0,
+    sub:      ()  => "Stock completo de la cartera",
+    download: true,
+  },
+  {
+    key:      "ACTIVAS",
+    label:    "Activas",
+    icon:     HiOutlineShieldCheck,
+    color:    "text-emerald-400",
+    bar:      "bg-emerald-500",
+    getValue: (t) => t.activas ?? t.polizas_activas ?? 0,
+    sub:      (t) => {
+      const pct = t.total > 0 ? ((t.activas / t.total) * 100).toFixed(0) : 0;
+      return `${pct}% del total`;
+    },
+    download: true,
+  },
+  {
+    key:      "ALTAS",
+    label:    "Altas nuevas",
+    icon:     HiOutlineTrendingUp,
+    color:    "text-sky-400",
+    bar:      "bg-sky-500",
+    getValue: (t) => t.altas_nuevas ?? t.altas_nuevas_mes ?? 0,
+    sub:      ()  => "Pólizas nuevas, sin renovaciones",
+    download: true,
+  },
+  {
+    key:      "RENOVACIONES",
+    label:    "Renovaciones",
+    icon:     HiOutlineRefresh,
+    color:    "text-violet-400",
+    bar:      "bg-violet-500",
+    getValue: (t) => t.renovaciones ?? t.renovaciones_mes ?? 0,
+    sub:      (t) => {
+      const total_altas = (t.altas_nuevas ?? 0) + (t.renovaciones ?? 0);
+      const pct = total_altas > 0 ? ((t.renovaciones / total_altas) * 100).toFixed(0) : 0;
+      return `${pct}% de las emisiones del mes`;
+    },
+    download: false,
+  },
+  {
+    key:      "ALTAS_TOTAL",
+    label:    "Emisiones totales",
+    icon:     HiOutlineTrendingUp,
+    color:    "text-cyan-400",
+    bar:      "bg-cyan-500",
+    getValue: (t) => (t.altas_nuevas ?? 0) + (t.renovaciones ?? 0),
+    sub:      (t) => {
+      const n = t.altas_nuevas ?? 0;
+      const r = t.renovaciones ?? 0;
+      return `${n} nuevas + ${r} renov.`;
+    },
+    download: false,
+  },
+  {
+    key:      "VENCIDAS",
+    label:    "En mora",
+    icon:     HiOutlineExclamation,
+    color:    "text-amber-400",
+    bar:      "bg-amber-500",
+    getValue: (t) => t.vencidas ?? t.en_mora ?? 0,
+    sub:      (t) => {
+      const pct = t.total > 0 ? ((t.vencidas / t.total) * 100).toFixed(1) : 0;
+      return `${pct}% con cuotas vencidas`;
+    },
+    download: true,
+  },
+  {
+    key:      "BAJAS",
+    label:    "Bajas del mes",
+    icon:     HiOutlineTrendingDown,
+    color:    "text-rose-400",
+    bar:      "bg-rose-500",
+    getValue: (t) => t.bajas ?? t.bajas_mes ?? 0,
+    sub:      (t) => {
+      const churn = t.total > 0 ? ((t.bajas / t.total) * 100).toFixed(1) : 0;
+      return `${churn}% churn del período`;
+    },
+    download: true,
+  },
+];
 
-function formatNumber(value) {
-  const n = Number(value || 0);
-  return new Intl.NumberFormat("es-AR").format(Number.isFinite(n) ? n : 0);
-}
-
-function getCardValue(type, totales = {}) {
-  if (type === "TOTALES") return totales.total ?? totales.polizas_total ?? 0;
-  if (type === "ACTIVAS") return totales.activas ?? totales.polizas_activas ?? 0;
-  if (type === "ALTAS") return totales.altas ?? totales.nuevas_mes ?? 0;
-  if (type === "VENCIDAS") return totales.vencidas ?? totales.en_mora ?? 0;
-  if (type === "BAJAS") return totales.bajas ?? totales.bajas_mes ?? 0;
-  return 0;
+function fmt(n) {
+  const v = Number(n || 0);
+  return new Intl.NumberFormat("es-AR").format(Number.isFinite(v) ? v : 0);
 }
 
 export default function EstadisticasSummaryCards({
   totales = {},
-  churnGlobal = 0,
-  churnPromedio = 0,
   onCardClick,
   onDownloadExcel,
   loading = false,
   downloadingType = null,
 }) {
-  const handleOpenList = (type) => {
-    if (typeof onCardClick === "function") onCardClick(type);
-  };
-
-  const handleDownload = (event, type) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (typeof onDownloadExcel === "function") {
-      onDownloadExcel(type);
-    }
-  };
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-      {DEFAULT_ORDER.map((type) => {
-        const meta = CARD_META[type];
-        const Icon = meta.icon;
-        const value = getCardValue(type, totales);
-        const isDownloading = downloadingType === type;
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+      {CARDS.map((c, idx) => {
+        const Icon         = c.icon;
+        const value        = c.getValue(totales);
+        const subText      = c.sub(totales);
+        const isDownloading = downloadingType === c.key;
+        const isClickable  = c.download; // solo las que tienen download abren el listado
 
         return (
-          <button
-            key={type}
-            type="button"
-            onClick={() => handleOpenList(type)}
-            className="group relative w-full text-left rounded-2xl bg-slate-800/95 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 shadow-xl transition-all duration-200 px-7 py-8 min-h-[204px] focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-            title={`Ver lista ${type.toLowerCase()}`}
+          <motion.div
+            key={c.key}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: idx * 0.04, ease: "easeOut" }}
+            className={`group relative rounded-2xl border border-slate-800 bg-slate-900/80 transition-all duration-200 overflow-hidden ${isClickable ? "hover:border-slate-700 hover:bg-slate-900 cursor-pointer" : "cursor-default"}`}
+            onClick={() => isClickable && typeof onCardClick === "function" && onCardClick(c.key)}
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <h3 className="text-[13px] font-black tracking-wide text-slate-300 whitespace-pre-line uppercase leading-5">
-                  {meta.title}
-                </h3>
-              </div>
+            {/* Barra top de color */}
+            <div className={`h-0.5 w-full ${c.bar} opacity-60`} />
 
-              <div className="flex items-center gap-3 shrink-0">
-                <span
-                  role="button"
-                  tabIndex={0}
-                  title={`Descargar Excel ${type.toLowerCase()}`}
-                  aria-label={`Descargar Excel ${type.toLowerCase()}`}
-                  onClick={(event) => handleDownload(event, type)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      handleDownload(event, type);
-                    }
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/80 transition disabled:opacity-50"
-                >
-                  {isDownloading ? (
-                    <span className="h-4 w-4 rounded-full border-2 border-slate-500 border-t-white animate-spin" />
-                  ) : (
-                    <HiDownload className="text-lg" />
+            <div className="p-4">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-[10px] font-semibold uppercase tracking-widest ${c.color} opacity-80`}>
+                  {c.label}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {c.download && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        typeof onDownloadExcel === "function" && onDownloadExcel(c.key);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-800"
+                      title={`Descargar ${c.label}`}
+                    >
+                      {isDownloading
+                        ? <span className="w-3 h-3 rounded-full border border-slate-500 border-t-slate-200 animate-spin block" />
+                        : <HiDownload className="text-xs" />
+                      }
+                    </button>
                   )}
-                </span>
-                <Icon className={`text-2xl ${meta.iconClass}`} />
+                  <Icon className={`text-base ${c.color} opacity-50`} />
+                </div>
               </div>
+
+              {/* Número grande */}
+              <div className={`text-3xl font-light tabular-nums tracking-tight ${loading ? "text-slate-700" : c.color}`}>
+                {loading ? "—" : fmt(value)}
+              </div>
+
+              {/* Sub texto */}
+              <p className="mt-1.5 text-[10px] text-slate-600 leading-tight">
+                {loading ? "Cargando..." : subText}
+              </p>
             </div>
-
-            <div className="mt-5 flex items-end gap-2">
-              <span className="text-3xl font-black tracking-tight text-white">
-                {loading ? "—" : formatNumber(value)}
-              </span>
-
-              {type === "BAJAS" && (
-                <span className="pb-1 text-sm font-extrabold text-rose-400">
-                  ({Number(churnGlobal || churnPromedio || 0).toFixed(1)}% Churn)
-                </span>
-              )}
-            </div>
-
-            <p className="mt-4 text-sm leading-5 text-slate-400 max-w-[190px]">
-              {meta.description}
-            </p>
-
-            <span className={`mt-1 inline-block text-sm font-extrabold ${meta.linkClass}`}>
-              {meta.linkText}
-            </span>
-          </button>
+          </motion.div>
         );
       })}
     </div>

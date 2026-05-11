@@ -21,45 +21,45 @@ const FILTERS = [
     key: "ALL",
     label: "Todas",
     active:
-      "bg-gradient-to-r from-sky-300 via-cyan-300 to-blue-300 text-slate-950 border-white/30 shadow-[0_0_34px_rgba(56,189,248,0.55)]",
+      "bg-slate-700 text-slate-100 border-slate-600 ",
     inactive:
-      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-sky-300/60 hover:shadow-[0_0_24px_rgba(56,189,248,0.25)] hover:bg-slate-900/70",
+      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-sky-300/60 hover: hover:bg-slate-900/70",
     ring: "focus-visible:ring-sky-200/80",
-    badgeActive: "bg-slate-950/15 text-slate-950",
-    badgeInactive: "bg-white/10 text-slate-200",
+    badgeActive: "bg-slate-600 text-slate-100",
+    badgeInactive: "bg-slate-800 text-slate-400",
   },
   {
     key: "1",
     label: "5 esquinas (1)",
     active:
-      "bg-gradient-to-r from-emerald-300 via-lime-300 to-emerald-200 text-slate-950 border-white/30 shadow-[0_0_34px_rgba(52,211,153,0.55)]",
+      "bg-slate-700 text-slate-100 border-slate-600 ",
     inactive:
-      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-emerald-300/60 hover:shadow-[0_0_24px_rgba(52,211,153,0.25)] hover:bg-slate-900/70",
+      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-emerald-300/60 hover: hover:bg-slate-900/70",
     ring: "focus-visible:ring-emerald-200/80",
-    badgeActive: "bg-slate-950/15 text-slate-950",
-    badgeInactive: "bg-white/10 text-slate-200",
+    badgeActive: "bg-slate-600 text-slate-100",
+    badgeInactive: "bg-slate-800 text-slate-400",
   },
   {
     key: "2",
     label: "axion (2)",
     active:
-      "bg-gradient-to-r from-cyan-300 via-teal-300 to-cyan-200 text-slate-950 border-white/30 shadow-[0_0_34px_rgba(34,211,238,0.55)]",
+      "bg-slate-700 text-slate-100 border-slate-600 ",
     inactive:
-      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-cyan-200/60 hover:shadow-[0_0_24px_rgba(34,211,238,0.25)] hover:bg-slate-900/70",
+      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-cyan-200/60 hover: hover:bg-slate-900/70",
     ring: "focus-visible:ring-cyan-100/80",
-    badgeActive: "bg-slate-950/15 text-slate-950",
-    badgeInactive: "bg-white/10 text-slate-200",
+    badgeActive: "bg-slate-600 text-slate-100",
+    badgeInactive: "bg-slate-800 text-slate-400",
   },
   {
     key: "3",
     label: "kilometro 39 (3)",
     active:
-      "bg-gradient-to-r from-fuchsia-300 via-pink-300 to-fuchsia-200 text-slate-950 border-white/30 shadow-[0_0_34px_rgba(232,121,249,0.55)]",
+      "bg-slate-700 text-slate-100 border-slate-600 ",
     inactive:
-      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-fuchsia-200/60 hover:shadow-[0_0_24px_rgba(232,121,249,0.25)] hover:bg-slate-900/70",
+      "bg-slate-900/50 text-slate-100 border-slate-700/80 hover:border-fuchsia-200/60 hover: hover:bg-slate-900/70",
     ring: "focus-visible:ring-fuchsia-200/80",
-    badgeActive: "bg-slate-950/15 text-slate-950",
-    badgeInactive: "bg-white/10 text-slate-200",
+    badgeActive: "bg-slate-600 text-slate-100",
+    badgeInactive: "bg-slate-800 text-slate-400",
   },
 ];
 
@@ -158,20 +158,20 @@ function getCardStyleByDias(dias) {
   if (dias < 0) {
     return {
       label: `Vencida hace ${Math.abs(dias)} días`,
-      classes: "bg-rose-500/10 border-rose-500/30 text-rose-100",
+      classes: "bg-rose-950/30 border-rose-900 text-rose-200",
       Icon: HiExclamation,
     };
   }
   if (dias === 0) {
     return {
       label: "Vence hoy",
-      classes: "bg-cyan-500/10 border-cyan-500/30 text-cyan-100",
+      classes: "bg-slate-900 border-slate-700 text-slate-200",
       Icon: HiClock,
     };
   }
   return {
     label: `Vence en ${dias} días`,
-    classes: "bg-amber-500/10 border-amber-500/30 text-amber-100",
+    classes: "bg-amber-950/20 border-amber-900 text-amber-200",
     Icon: HiClock,
   };
 }
@@ -370,13 +370,13 @@ function CuotaAlertaCard({ cuota, dias }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className={`rounded-2xl border p-4 ${classes}`}
+      className={`rounded-lg border p-3 ${classes}`}
     >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-base sm:text-lg font-extrabold tracking-tight">{asegurado}</p>
+          <p className="text-base sm:text-lg font-medium">{asegurado}</p>
           {patente && (
-            <span className="shrink-0 inline-flex items-center rounded-xl border border-white/15 bg-white/5 px-3 py-1 text-sm sm:text-base font-extrabold tracking-wider">
+            <span className="shrink-0 inline-flex items-center rounded-xl border border-white/15 bg-white/5 px-3 py-1 text-sm sm:text-base font-mono font-medium">
               {patente}
             </span>
           )}
@@ -431,21 +431,21 @@ function BucketSection({ bucket, items }) {
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/20 p-4">
+    <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-slate-50">
+          <h3 className="text-sm font-medium text-slate-200">
             {bucket.title} <span className="text-slate-300 font-normal">({items.length})</span>
           </h3>
-          <p className="text-xs text-slate-300 mt-0.5">{bucket.subtitle}</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">{bucket.subtitle}</p>
         </div>
 
-        <div className="text-xs text-slate-200 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+        <div className="text-xs text-slate-500 rounded-md border border-slate-800 bg-slate-900/60 px-2 py-1.5">
           {bucket.message}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
         {items.map(({ cuota, dias }) => (
           <CuotaAlertaCard key={cuota.id} cuota={cuota} dias={dias} />
         ))}
@@ -729,7 +729,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
   if (!hasSearched) {
     return (
       <motion.div
-        className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-[0_0_30px_rgba(15,23,42,0.55)]"
+        className="mt-4 rounded-lg border border-slate-800 bg-slate-900/60 p-4"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
@@ -741,7 +741,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
             </span>
             <div>
               <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
-              <p className="text-xs text-slate-300 mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 La búsqueda es intencional para que la página cargue más rápido.
               </p>
             </div>
@@ -750,14 +750,14 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
           <button
             type="button"
             onClick={runSearch}
-            className="h-10 px-4 rounded-2xl border text-sm font-semibold transition cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100"
+            className="h-9 px-3 rounded-lg border text-sm font-medium transition-colors cursor-pointer bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
             title="Buscar cuotas a vencer/vencidas"
           >
             Buscar
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
+        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/30 p-4 text-slate-400">
           Elegí filtros (opcional) y tocá <span className="font-semibold">Buscar</span> para cargar las alertas.
         </div>
       </motion.div>
@@ -789,7 +789,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
   if (!cuotasAVencer || cuotasAVencer.length === 0) {
     return (
       <motion.div
-        className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-[0_0_30px_rgba(15,23,42,0.55)]"
+        className="mt-4 rounded-lg border border-slate-800 bg-slate-900/60 p-4"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
@@ -801,21 +801,21 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
             </span>
             <div>
               <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
-              <p className="text-xs text-slate-300 mt-0.5">Sin resultados para esta búsqueda.</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Sin resultados para esta búsqueda.</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={runSearch}
-            className="h-10 px-4 rounded-2xl border text-sm font-semibold transition cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100"
+            className="h-9 px-3 rounded-lg border text-sm font-medium transition-colors cursor-pointer bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
             title="Volver a buscar"
           >
             Buscar
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
+        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/30 p-4 text-slate-400">
           Probá cambiar filtros y tocá <span className="font-semibold">Buscar</span> otra vez.
         </div>
       </motion.div>
@@ -835,7 +835,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
 
   return (
     <motion.div
-      className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-[0_0_30px_rgba(15,23,42,0.55)]"
+      className="mt-4 rounded-lg border border-slate-800 bg-slate-900/60 p-4"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
@@ -847,7 +847,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
           </span>
           <div>
             <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
-            <p className="text-xs text-slate-300 mt-0.5">
+            <p className="text-[11px] text-slate-500 mt-0.5">
               Mostrando <span className="font-semibold text-slate-50">{totalMostrado}</span> (filtradas) de{" "}
               <span className="font-semibold text-slate-50">{cuotasAVencer.length}</span> (totales)
             </p>
@@ -859,7 +859,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
           <button
             type="button"
             onClick={runSearch}
-            className="h-10 px-4 rounded-2xl border text-sm font-semibold transition cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100"
+            className="h-9 px-3 rounded-lg border text-sm font-medium transition-colors cursor-pointer bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
             title="Actualizar búsqueda"
           >
             Buscar
@@ -898,8 +898,8 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
             className={[
               "h-10 px-4 rounded-2xl border text-sm font-semibold transition",
               totalMostrado === 0
-                ? "opacity-40 cursor-not-allowed bg-neutral-950 border-neutral-800 text-neutral-400"
-                : "cursor-pointer bg-white/10 hover:bg-white/15 border-white/15 text-slate-100",
+                ? "opacity-40 cursor-not-allowed bg-slate-900 border-slate-800 text-slate-500"
+                : "cursor-pointer bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200",
             ].join(" ")}
             title="Exporta los asegurados visibles (según filtros)"
           >
@@ -997,7 +997,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
           })
         ) : (
           // 🚀 Si no es admin, mostramos solo su oficina fija como un badge
-          <div className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition backdrop-blur-md border-emerald-400/50 bg-emerald-500/10 text-emerald-200">
+          <div className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition backdrop-blur-md border-slate-600 bg-slate-800 text-slate-300">
             <span className="font-semibold">{getFilterMeta(oficinaSel).label}</span>
             <span className="ml-1 inline-flex min-w-[28px] justify-center rounded-xl px-2 py-0.5 text-xs font-semibold bg-slate-950/30 text-emerald-100">
               {conteosOficina?.[oficinaSel] ?? 0}
@@ -1015,19 +1015,19 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
         <BucketSection bucket={BUCKETS[4]} items={buckets?.["30_despues"]} />
 
         {otros.length > 0 && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/10 p-4">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/20 p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
-                <h3 className="text-base font-semibold text-slate-50">
+                <h3 className="text-sm font-medium text-slate-200">
                   Otros <span className="text-slate-300 font-normal">({otros.length})</span>
                 </h3>
-                <p className="text-xs text-slate-300 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Fuera de 3_antes / hoy / 3_despues / 7_despues / 30_despues
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
               {otros.map(({ cuota, dias }) => (
                 <CuotaAlertaCard key={cuota.id} cuota={cuota} dias={dias} />
               ))}
@@ -1036,7 +1036,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
         )}
 
         {!anyBucket && totalMostrado === 0 && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4 text-slate-200">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-4 text-slate-400">
             No hay alertas para <span className="font-semibold">{getFilterMeta(oficinaSel).label}</span>
             {companiaSel !== "ALL" ? (
               <>

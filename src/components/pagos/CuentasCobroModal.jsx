@@ -225,12 +225,12 @@ export default function RecordatoriosCuotasModal({
               leaveFrom="opacity-100 translate-y-0 scale-100"
               leaveTo="opacity-0 translate-y-2 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-lg rounded-3xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800/80 text-white shadow-2xl">
+              <Dialog.Panel className="w-full max-w-lg rounded-xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800/80 text-white shadow-md">
                 {/* header */}
                 <div className="relative px-6 pt-6 pb-4 border-b border-neutral-800">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
-                      <HiSpeakerphone className="w-5 h-5 text-emerald-300" />
+                    <div className="w-10 h-10 rounded-lg bg-emerald-700/15 border border-emerald-700/40 flex items-center justify-center">
+                      <HiSpeakerphone className="w-5 h-5 text-emerald-400" />
                     </div>
                     <div>
                       <Dialog.Title className="text-lg font-semibold">
@@ -257,7 +257,7 @@ export default function RecordatoriosCuotasModal({
                 {/* body */}
                 <div className="px-6 py-5 space-y-4">
                   {/* Form CRUD */}
-                  <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 space-y-3">
+                  <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="text-sm font-semibold">
                         {editingId ? "Editar billetera" : "Agregar billetera"}
@@ -332,7 +332,7 @@ export default function RecordatoriosCuotasModal({
                         disabled={
                           saving || !form.aliasCbu.trim() || !form.titular.trim()
                         }
-                        className="h-9 px-3 rounded-2xl bg-emerald-500/90 text-xs font-medium text-neutral-950 hover:bg-emerald-400 disabled:opacity-50 inline-flex items-center gap-2"
+                        className="h-9 px-3 rounded-lg bg-emerald-700/90 text-xs font-medium text-neutral-950 hover:bg-emerald-600 disabled:opacity-50 inline-flex items-center gap-2"
                       >
                         {saving ? (
                           <span className="inline-block w-3 h-3 border-2 border-emerald-900/40 border-t-emerald-900 rounded-full animate-spin" />
@@ -346,7 +346,7 @@ export default function RecordatoriosCuotasModal({
 
                   {/* Lista y selección */}
                   {mediosAptos.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-neutral-700 bg-neutral-900/40 p-4 text-sm text-neutral-200">
+                    <div className="rounded-lg border border-dashed border-neutral-700 bg-neutral-900/40 p-4 text-sm text-neutral-200">
                       <p className="font-medium mb-1">
                         No tenés alias ni billeteras configuradas para recordatorios.
                       </p>
@@ -381,9 +381,9 @@ export default function RecordatoriosCuotasModal({
                                   setSelectedId(m.id);
                                 }
                               }}
-                              className={`w-full flex items-center justify-between rounded-2xl border px-3 py-3 text-left transition cursor-pointer ${
+                              className={`w-full flex items-center justify-between rounded-lg border px-3 py-3 text-left transition cursor-pointer ${
                                 isSelected
-                                  ? "border-emerald-400/70 bg-emerald-500/10 ring-1 ring-emerald-400/40"
+                                  ? "border-emerald-700/70 bg-emerald-950/30 ring-1 ring-emerald-400/40"
                                   : "border-neutral-800 bg-neutral-900/60 hover:border-neutral-700"
                               }`}
                             >
@@ -391,7 +391,7 @@ export default function RecordatoriosCuotasModal({
                                 <div
                                   className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                                     isSelected
-                                      ? "bg-emerald-500/20 text-emerald-200"
+                                      ? "bg-emerald-700/20 text-emerald-200"
                                       : "bg-neutral-800 text-neutral-300"
                                   }`}
                                 >
@@ -427,7 +427,7 @@ export default function RecordatoriosCuotasModal({
                                     e.stopPropagation();
                                     handleEditClick(m);
                                   }}
-                                  className="w-7 h-7 rounded-full border border-neutral-700 bg-neutral-900/70 flex items-center justify-center text-neutral-300 hover:border-emerald-400/70 hover:text-emerald-200 text-[11px]"
+                                  className="w-7 h-7 rounded-full border border-neutral-700 bg-neutral-900/70 flex items-center justify-center text-neutral-300 hover:border-emerald-700/70 hover:text-emerald-200 text-[11px]"
                                 >
                                   <HiPencil className="w-3.5 h-3.5" />
                                 </button>
@@ -451,7 +451,7 @@ export default function RecordatoriosCuotasModal({
                                 <div
                                   className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                                     isSelected
-                                      ? "border-emerald-400 bg-emerald-500/20"
+                                      ? "border-emerald-700 bg-emerald-700/20"
                                       : "border-neutral-600"
                                   }`}
                                 >
@@ -468,7 +468,7 @@ export default function RecordatoriosCuotasModal({
                   )}
 
                   {/* 🚀 ESCUDO DE SUCURSAL: Mostrar opciones separadas SOLO si es Admin */}
-                  <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 space-y-2">
+                  <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 space-y-2">
                     <p className="text-xs text-neutral-200 font-medium">
                       ¿Hacia qué clientes enviamos los recordatorios?
                     </p>
@@ -488,7 +488,7 @@ export default function RecordatoriosCuotasModal({
                             className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
                               !canEnviar || saving
                                 ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
-                                : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                                : "border-emerald-700 bg-emerald-700/20 text-emerald-100 hover:bg-emerald-700/25"
                             }`}
                           >
                             <span>Oficina 1 – 5 esquinas</span>
@@ -501,7 +501,7 @@ export default function RecordatoriosCuotasModal({
                             className={`flex-1 rounded-xl border px-3 py-2 text-xs sm:text-sm flex items-center justify-center gap-2 ${
                               !canEnviar || saving
                                 ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
-                                : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                                : "border-emerald-700 bg-emerald-700/20 text-emerald-100 hover:bg-emerald-700/25"
                             }`}
                           >
                             <span>Oficina 2 – Axion</span>
@@ -516,7 +516,7 @@ export default function RecordatoriosCuotasModal({
                             className={`w-full rounded-xl border px-3 py-2 text-sm font-bold flex items-center justify-center gap-2 ${
                               !canEnviar || saving
                                 ? "border-neutral-700 bg-neutral-950 text-neutral-400 opacity-60 cursor-not-allowed"
-                                : "border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25"
+                                : "border-emerald-700 bg-emerald-700/20 text-emerald-100 hover:bg-emerald-700/25"
                             }`}
                           >
                             <span>Enviar a los clientes de mi sucursal</span>
@@ -537,7 +537,7 @@ export default function RecordatoriosCuotasModal({
                       type="button"
                       onClick={onClose}
                       disabled={sending}
-                      className="h-10 px-4 rounded-2xl bg-neutral-900 border border-neutral-700 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
+                      className="h-10 px-4 rounded-lg bg-neutral-900 border border-neutral-700 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
                     >
                       Cerrar ventana
                     </button>

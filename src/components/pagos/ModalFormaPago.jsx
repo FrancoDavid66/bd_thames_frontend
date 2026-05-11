@@ -256,7 +256,7 @@ export default function ModalFormaPago({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px]" />
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -270,14 +270,14 @@ export default function ModalFormaPago({
               leaveFrom="opacity-100 translate-y-0 scale-100"
               leaveTo="opacity-0 translate-y-2 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-xl overflow-hidden rounded-2xl bg-neutral-950 border border-neutral-800 ring-1 ring-neutral-800 text-white shadow-xl">
-                <div className="relative px-6 py-5 border-b border-neutral-800">
-                  <Dialog.Title className="text-xl font-bold">
+              <Dialog.Panel className="w-full max-w-xl overflow-hidden rounded-xl bg-slate-950 border border-slate-800 text-white shadow-xl">
+                <div className="relative px-5 py-4 border-b border-slate-800">
+                  <Dialog.Title className="text-base font-semibold text-slate-100">
                     {moneyTitle}
                   </Dialog.Title>
                   <button
                     onClick={onClose}
-                    className="absolute right-3 top-3 rounded-lg p-2 hover:bg-neutral-800 border border-transparent hover:border-neutral-700"
+                    className="absolute right-3 top-3 rounded-lg p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
                     aria-label="Cerrar"
                     title="Cerrar"
                   >
@@ -285,7 +285,7 @@ export default function ModalFormaPago({
                   </button>
                 </div>
 
-                <div className="px-6 py-6 space-y-6">
+                <div className="px-5 py-5 space-y-4">
                   <fieldset className="space-y-3">
                     <legend className={legendCls}>Método</legend>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -303,7 +303,7 @@ export default function ModalFormaPago({
                           className="accent-primary-400"
                         />
                         <span className="inline-flex items-center gap-2">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-neutral-800">
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-800">
                             <HiCash className="w-4 h-4" />
                           </span>
                           Efectivo <span className="opacity-80">💵</span>
@@ -324,7 +324,7 @@ export default function ModalFormaPago({
                           className="accent-primary-400"
                         />
                         <span className="inline-flex items-center gap-2">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-neutral-800">
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-800">
                             <HiRefresh className="w-4 h-4" />
                           </span>
                           Transferencia <span className="opacity-80">💳</span>
@@ -363,7 +363,7 @@ export default function ModalFormaPago({
                       </div>
 
                       {verOpciones && (
-                        <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-3">
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                               <p className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
@@ -379,7 +379,7 @@ export default function ModalFormaPago({
                                     ? mediosMP.map((m) => (
                                         <span
                                           key={`mp-${m.id}`}
-                                          className="px-3 h-8 inline-flex items-center rounded-xl border text-sm border-neutral-700 text-neutral-300 bg-neutral-900/70"
+                                          className="px-2.5 h-7 inline-flex items-center rounded-md border text-xs border-slate-700 text-slate-400 bg-slate-900"
                                         >
                                           {m.display}
                                         </span>
@@ -387,7 +387,7 @@ export default function ModalFormaPago({
                                     : mpStrings.map((name) => (
                                         <span
                                           key={`mp-s-${name}`}
-                                          className="px-3 h-8 inline-flex items-center rounded-xl border text-sm border-neutral-700 text-neutral-300 bg-neutral-900/70"
+                                          className="px-2.5 h-7 inline-flex items-center rounded-md border text-xs border-slate-700 text-slate-400 bg-slate-900"
                                         >
                                           {name}
                                         </span>
@@ -410,7 +410,7 @@ export default function ModalFormaPago({
                                     ? mediosBil.map((m) => (
                                         <span
                                           key={`bil-${m.id}`}
-                                          className="px-3 h-8 inline-flex items-center rounded-xl border text-sm border-neutral-700 text-neutral-300 bg-neutral-900/70"
+                                          className="px-2.5 h-7 inline-flex items-center rounded-md border text-xs border-slate-700 text-slate-400 bg-slate-900"
                                         >
                                           {m.display}
                                         </span>
@@ -418,7 +418,7 @@ export default function ModalFormaPago({
                                     : bilStrings.map((name) => (
                                         <span
                                           key={`bil-s-${name}`}
-                                          className="px-3 h-8 inline-flex items-center rounded-xl border text-sm border-neutral-700 text-neutral-300 bg-neutral-900/70"
+                                          className="px-2.5 h-7 inline-flex items-center rounded-md border text-xs border-slate-700 text-slate-400 bg-slate-900"
                                         >
                                           {name}
                                         </span>
@@ -436,14 +436,14 @@ export default function ModalFormaPago({
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <label className="block">
-                          <span className="block text-sm font-medium text-neutral-300 mb-1">
+                          <span className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 font-medium">
                             Destino (cuenta o billetera)
                           </span>
                           <div className="relative">
                             <select
                               value={destinoCuenta}
                               onChange={(e) => setDestinoCuenta(e.target.value)}
-                              className="h-12 w-full pr-10 pl-3 rounded-2xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 outline-none transition appearance-none"
+                              className="h-10 w-full pr-10 pl-3 rounded-lg bg-slate-900 border border-slate-700 focus:border-slate-500 focus:outline-none outline-none transition-colors appearance-none text-sm"
                             >
                               <option value="" disabled>
                                 Seleccionar…
@@ -497,7 +497,7 @@ export default function ModalFormaPago({
 
                         {destinoEsOtra && (
                           <label className="block">
-                            <span className="block text-sm font-medium text-neutral-300 mb-1">
+                            <span className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 font-medium">
                               Nombre de la cuenta/billetera
                             </span>
                             <input
@@ -505,7 +505,7 @@ export default function ModalFormaPago({
                               value={destinoOtra}
                               onChange={(e) => setDestinoOtra(e.target.value)}
                               placeholder="Ej: MP Sucursal Centro"
-                              className="h-12 w-full rounded-2xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 px-3 outline-none transition"
+                              className="h-10 w-full rounded-lg bg-slate-900 border border-slate-700 focus:border-slate-500 focus:outline-none px-3 outline-none transition-colors text-sm"
                             />
                           </label>
                         )}
@@ -514,11 +514,11 @@ export default function ModalFormaPago({
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-neutral-300 mb-1">
-                      Monto a pagar <span className="opacity-90">💸🤑</span>
+                    <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 font-medium">
+                      Monto a pagar
                     </label>
                     <div className="flex items-stretch">
-                      <span className="rounded-l-2xl border border-neutral-800 bg-neutral-900 px-4 h-14 inline-flex items-center text-sm text-neutral-300">
+                      <span className="rounded-l-lg border border-slate-700 bg-slate-900 px-3 h-10 inline-flex items-center text-sm text-slate-400 font-mono">
                         AR$
                       </span>
                       <input
@@ -528,14 +528,14 @@ export default function ModalFormaPago({
                         value={monto}
                         onChange={(e) => setMonto(e.target.value)}
                         placeholder={placeholderMonto}
-                        className="h-14 w-full rounded-r-2xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 px-4 text-lg outline-none transition"
+                        className="h-10 w-full rounded-r-lg bg-slate-900 border border-slate-700 focus:border-slate-500 focus:outline-none px-3 text-base font-mono outline-none transition-colors"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="block text-sm font-medium text-neutral-300 mb-1">
+                      <span className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 font-medium">
                         Fecha de pago
                       </span>
                       <div className="relative">
@@ -546,13 +546,13 @@ export default function ModalFormaPago({
                           type="date"
                           value={fechaPago}
                           onChange={(e) => setFechaPago(e.target.value)}
-                          className="h-12 w-full pl-10 pr-3 rounded-2xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 outline-none transition"
+                          className="h-10 w-full pl-9 pr-3 rounded-lg bg-slate-900 border border-slate-700 focus:border-slate-500 focus:outline-none outline-none transition-colors text-sm"
                         />
                       </div>
                     </label>
 
                     <label className="block">
-                      <span className="block text-sm font-medium text-neutral-300 mb-1">
+                      <span className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 font-medium">
                         Observaciones (opcional)
                       </span>
                       <div className="relative">
@@ -564,17 +564,17 @@ export default function ModalFormaPago({
                           value={observaciones}
                           onChange={(e) => setObservaciones(e.target.value)}
                           placeholder="Detalle o referencia del pago…"
-                          className="w-full pl-10 pr-3 py-2 rounded-2xl bg-neutral-900 border border-neutral-800 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 outline-none transition"
+                          className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-700 focus:border-slate-500 focus:outline-none outline-none transition-colors text-sm"
                         />
                       </div>
                     </label>
                   </div>
                 </div>
 
-                <div className="px-6 pb-6 pt-2 flex justify-end gap-2">
+                <div className="px-5 pb-5 pt-3 flex justify-end gap-2 border-t border-slate-800">
                   <button
                     onClick={onClose}
-                    className="h-12 px-5 rounded-2xl bg-neutral-800 text-white hover:bg-neutral-700 border border-neutral-700 transition"
+                    className="h-9 px-4 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 text-sm transition-colors"
                   >
                     Cancelar
                   </button>
@@ -583,11 +583,11 @@ export default function ModalFormaPago({
                     whileTap={{ scale: isValid ? 0.98 : 1 }}
                     onClick={confirm}
                     disabled={!isValid}
-                    className={`h-12 px-6 rounded-2xl font-semibold outline-none ring-1 transition inline-flex items-center gap-2 justify-center
+                    className={`h-9 px-4 rounded-lg font-medium outline-none transition-colors inline-flex items-center gap-2 justify-center text-sm
                       ${
                         isValid
-                          ? "bg-primary-500 hover:bg-primary-400 text-white ring-primary-400/40"
-                          : "bg-neutral-800 text-neutral-400 border border-neutral-700 cursor-not-allowed ring-neutral-700/50"
+                          ? "bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white"
+                          : "bg-slate-800 text-slate-600 border border-slate-700 cursor-not-allowed"
                       }`}
                   >
                     <span aria-hidden="true" className="text-lg leading-none">

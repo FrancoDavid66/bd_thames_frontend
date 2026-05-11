@@ -1,100 +1,51 @@
-/* src/components/pagos/PagosSearch.jsx — DNI-first + Patente (rápido, con Redux)
-   ✅ DNI: fetchBuscarClientePorDni -> GET /api/pagos/buscar-cliente/?dni=...
-   ✅ Cuotas por póliza: fetchCuotasPorPoliza -> GET /api/pagos/buscar/?poliza_id=...&solo_pendientes=0
-   ✅ Patente: fetchCuotasBuscar -> GET /api/pagos/buscar/?q=...&solo_pendientes=0   (NUEVO)
-   ✅ Mantiene: recientes DNI, "/", anti-stale (via abort en thunks), Esc limpia.
-*/
-
+/* src/components/pagos/PagosSearch.jsx */
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { motion } from "framer-motion";
 import toast from "react-hot-toast";
-import { HiSearch, HiX } from "react-icons/hi";
+import { HiSearch, HiX, HiChevronRight } from "react-icons/hi";
 import { useDispatch, useSelector } from "react-redux";
-
 import {
   fetchBuscarClientePorDni,
   fetchCuotasPorPoliza,
-  // ✅ NUEVO thunk (lo agregamos en pagosSlice.js)
   fetchCuotasBuscar,
   pushRecienteDni,
   clearBuscarCliente,
 } from "../../store/slices/pagosSlice";
+import { useAuth } from "../../context/AuthContext";
 
-import { useAuth } from "../../context/AuthContext"; // 🚀 Importamos el contexto de autenticación
-
-/* Solo dígitos (para DNI) */
 const onlyDigits = (s) => String(s || "").replace(/\D+/g, "");
-
-/* Normaliza patente: AAA123 o AA123BB, etc */
-const normalizePatente = (s) =>
-  String(s || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, ""); // saca espacios/guiones/puntos
-
-/* Heurística: si (solo) dígitos => DNI */
+const normalizePatente = (s) => String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
 const isLikelyDni = (raw) => {
   const d = onlyDigits(raw);
-  if (!d) return false;
-  // DNI típico 7-9 dígitos (Argentina)
   return d.length >= 6 && d.length <= 11 && d === String(raw || "").replace(/\D+/g, "");
 };
 
-// Función auxiliar para mapear el número de oficina a un nombre más legible
-const getOficinaName = (oficinaNumber) => {
-  const map = {
-    "1": "5 Esquinas",
-    "2": "Axion",
-    "3": "Kilómetro 39"
-  };
-  return map[oficinaNumber] || `Oficina ${oficinaNumber}`;
-};
+const OFICINA_NAMES = { "1": "5 Esquinas", "2": "Axion", "3": "Km 39" };
 
 export default function PagosSearch({ onBuscar }) {
   const dispatch = useDispatch();
-  const { user } = useAuth(); // 🚀 Obtenemos el usuario autenticado
-
+  const { user } = useAuth();
   const inputRef = useRef(null);
-
   const [query, setQuery] = useState("");
   const [selectedPolizaId, setSelectedPolizaId] = useState("");
 
   const {
     buscarClienteData,
     buscarClienteStatus,
-    buscarClienteError,
     cuotasPolizaStatus,
-    cuotasPolizaError,
-    // ⚠️ si no existe en tu slice, no pasa nada (queda undefined)
     cuotasBuscarStatus,
-    cuotasBuscarError,
     recientesDni,
   } = useSelector((s) => s.pagos || {});
 
-  const busy =
-    buscarClienteStatus === "loading" ||
-    cuotasPolizaStatus === "loading" ||
-    cuotasBuscarStatus === "loading";
+  const busy = buscarClienteStatus === "loading" || cuotasPolizaStatus === "loading" || cuotasBuscarStatus === "loading";
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
-  // Verificamos si el usuario actual es administrador
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+  useEffect(() => { inputRef.current?.focus?.(); }, []);
 
-  useEffect(() => {
-    inputRef.current?.focus?.();
-  }, []);
-
-  // Atajo: "/" enfoca el buscador
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const active = document.activeElement;
-        const isTyping =
-          active &&
-          (active.tagName === "INPUT" ||
-            active.tagName === "TEXTAREA" ||
-            active.getAttribute?.("contenteditable") === "true");
-        if (isTyping) return;
-
+        if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA") return;
         e.preventDefault();
         inputRef.current?.focus?.();
       }
@@ -103,10 +54,7 @@ export default function PagosSearch({ onBuscar }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const recientes = useMemo(() => {
-    const arr = Array.isArray(recientesDni) ? recientesDni : [];
-    return arr.slice(0, 6);
-  }, [recientesDni]);
+  const recientes = useMemo(() => (Array.isArray(recientesDni) ? recientesDni : []).slice(0, 6), [recientesDni]);
 
   const limpiar = useCallback(() => {
     setQuery("");
@@ -115,363 +63,181 @@ export default function PagosSearch({ onBuscar }) {
     requestAnimationFrame(() => inputRef.current?.focus?.());
   }, [dispatch]);
 
-  const usarReciente = useCallback(
-    (q) => {
-      setQuery(String(q || ""));
-      setSelectedPolizaId("");
-      dispatch(clearBuscarCliente());
-      requestAnimationFrame(() => inputRef.current?.focus?.());
-    },
-    [dispatch]
-  );
+  const usarReciente = useCallback((q) => {
+    setQuery(String(q || ""));
+    setSelectedPolizaId("");
+    dispatch(clearBuscarCliente());
+    requestAnimationFrame(() => inputRef.current?.focus?.());
+  }, [dispatch]);
 
-  // 1) Buscar cliente + pólizas (por DNI)
-  const buscarClientePorDni = useCallback(
-    async (dniRaw) => {
-      const dniDigits = onlyDigits(dniRaw);
-      if (!dniDigits) {
-        toast.error("Escribí un DNI (solo números).");
-        return;
-      }
+  const buscarClientePorDni = useCallback(async (dniRaw) => {
+    const dniDigits = onlyDigits(dniRaw);
+    if (!dniDigits) { toast.error("Escribí un DNI válido."); return; }
+    const res = await dispatch(fetchBuscarClientePorDni({ dni: dniDigits })).unwrap();
+    const polizas = Array.isArray(res?.polizas) ? res.polizas : [];
+    if (!res?.cliente) { toast("No se encontró cliente."); return; }
+    dispatch(pushRecienteDni(dniDigits));
+    if (polizas.length === 0) { toast("Sin pólizas para ese DNI."); return; }
+    if (polizas.length === 1 && polizas[0]?.poliza_id) setSelectedPolizaId(String(polizas[0].poliza_id));
+    else setSelectedPolizaId("");
+  }, [dispatch]);
 
-      const res = await dispatch(fetchBuscarClientePorDni({ dni: dniDigits })).unwrap();
+  const traerCuotasDePoliza = useCallback(async (polizaId, dniMeta = "") => {
+    const pid = String(polizaId || "").trim();
+    if (!pid) { toast.error("Elegí una póliza."); return; }
+    const res = await dispatch(fetchCuotasPorPoliza({ poliza_id: pid, solo_pendientes: 0, page_size: 200, dni: dniMeta })).unwrap();
+    const items = Array.isArray(res?.items) ? res.items : [];
+    onBuscar?.(items, res?.meta || { count: items.length }, dniMeta || pid);
+    if (!items.length) toast("Sin cuotas para esa póliza.");
+  }, [dispatch, onBuscar]);
 
-      // res: { cliente, polizas }
-      const polizas = Array.isArray(res?.polizas) ? res.polizas : [];
-      const cliente = res?.cliente || null;
+  const traerCuotasPorPatente = useCallback(async (patenteRaw) => {
+    const q = normalizePatente(patenteRaw);
+    if (!q) { toast.error("Escribí una patente."); return; }
+    dispatch(clearBuscarCliente());
+    setSelectedPolizaId("");
+    const res = await dispatch(fetchCuotasBuscar({ q, solo_pendientes: 0, page_size: 200 })).unwrap();
+    const items = Array.isArray(res?.items) ? res.items : [];
+    onBuscar?.(items, res?.meta || { count: items.length }, q);
+    if (!items.length) toast("Sin cuotas para esa patente.");
+  }, [dispatch, onBuscar]);
 
-      if (!cliente) {
-        toast("No se encontró cliente con ese DNI.");
-        return;
-      }
-
-      // Guardar recientes
-      dispatch(pushRecienteDni(dniDigits));
-
-      if (polizas.length === 0) {
-        toast("No encontré pólizas para ese DNI.");
-        return;
-      }
-
-      // Auto-selección si hay 1 póliza
-      if (polizas.length === 1 && polizas[0]?.poliza_id) {
-        setSelectedPolizaId(String(polizas[0].poliza_id));
-      } else {
-        setSelectedPolizaId(""); // que elija
-      }
-    },
-    [dispatch]
-  );
-
-  // 2) Traer SOLO cuotas de una póliza
-  const traerCuotasDePoliza = useCallback(
-    async (polizaId, dniDigitsForMeta = "") => {
-      const pid = String(polizaId || "").trim();
-      if (!pid) {
-        toast.error("Elegí una póliza.");
-        return;
-      }
-
-      const res = await dispatch(
-        fetchCuotasPorPoliza({
-          poliza_id: pid,
-          solo_pendientes: 0, // ✅ MODIFICADO A 0
-          page_size: 200,
-          dni: dniDigitsForMeta,
-        })
-      ).unwrap();
-
-      const items = Array.isArray(res?.items) ? res.items : [];
-      const meta = res?.meta || { count: items.length, next: null, previous: null };
-
-      onBuscar?.(items, meta, dniDigitsForMeta || pid);
-
-      if (!items || items.length === 0) {
-        toast("No hay cuotas pendientes para esa póliza.");
-      }
-    },
-    [dispatch, onBuscar]
-  );
-
-  // ✅ NUEVO: Traer cuotas directo por PATENTE (o cualquier q general)
-  const traerCuotasPorPatente = useCallback(
-    async (patenteRaw) => {
-      const q = normalizePatente(patenteRaw);
-      if (!q) {
-        toast.error("Escribí una patente.");
-        return;
-      }
-
-      // importante: si venías de un DNI, limpiamos el bloque de cliente
-      dispatch(clearBuscarCliente());
-      setSelectedPolizaId("");
-
-      const res = await dispatch(
-        fetchCuotasBuscar({
-          q,
-          solo_pendientes: 0, // ✅ MODIFICADO A 0
-          page_size: 200,
-        })
-      ).unwrap();
-
-      const items = Array.isArray(res?.items) ? res.items : [];
-      const meta = res?.meta || { count: items.length, next: null, previous: null };
-
-      onBuscar?.(items, meta, q);
-
-      if (!items || items.length === 0) {
-        toast("No hay cuotas pendientes para esa patente.");
-      }
-    },
-    [dispatch, onBuscar]
-  );
-
-  const handleSubmit = useCallback(
-    async (e, qOverride = null) => {
-      e?.preventDefault?.();
-      const q = String(qOverride ?? query).trim();
-      if (!q) return;
-
-      // DNI (solo números) => flujo actual
-      if (isLikelyDni(q)) {
-        await buscarClientePorDni(q);
-        return;
-      }
-
-      // Patente / texto => cuotas directo
-      await traerCuotasPorPatente(q);
-    },
-    [buscarClientePorDni, query, traerCuotasPorPatente]
-  );
-
-  // Mensajes de error (opcionales)
-  useEffect(() => {
-    if (buscarClienteError && typeof buscarClienteError === "string") {
-      // toast.error(buscarClienteError)
-    }
-  }, [buscarClienteError]);
-
-  useEffect(() => {
-    if (cuotasPolizaError && typeof cuotasPolizaError === "string") {
-      // toast.error(cuotasPolizaError)
-    }
-  }, [cuotasPolizaError]);
-
-  useEffect(() => {
-    if (cuotasBuscarError && typeof cuotasBuscarError === "string") {
-      // toast.error(cuotasBuscarError)
-    }
-  }, [cuotasBuscarError]);
-
-  const clienteLabel = useMemo(() => {
-    const c = buscarClienteData?.cliente;
-    if (!c) return "";
-    const dni = String(c?.dni || "").trim();
-    const nom = String(c?.nombre_apellido || "").trim();
-    // No agregamos la oficina aquí directamente al texto base
-    return [dni, nom].filter(Boolean).join(" · ");
-  }, [buscarClienteData]);
+  const handleSubmit = useCallback(async (e, qOverride = null) => {
+    e?.preventDefault?.();
+    const q = String(qOverride ?? query).trim();
+    if (!q) return;
+    if (isLikelyDni(q)) await buscarClientePorDni(q);
+    else await traerCuotasPorPatente(q);
+  }, [buscarClientePorDni, query, traerCuotasPorPatente]);
 
   const polizas = useMemo(() => {
     const arr = buscarClienteData?.polizas;
     return Array.isArray(arr) ? arr : [];
   }, [buscarClienteData]);
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="w-full"
-    >
-      <motion.form
-        onSubmit={handleSubmit}
-        className="w-full"
-        role="search"
-        aria-label="Buscar cliente por DNI o patente para gestionar pagos"
-      >
-        <div className="flex w-full gap-2">
-          <label className="relative flex-1">
-            <span className="sr-only">Buscar</span>
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-60">
-              <HiSearch className="w-6 h-6" />
-            </span>
+  const clienteLabel = useMemo(() => {
+    const c = buscarClienteData?.cliente;
+    if (!c) return "";
+    return [String(c?.dni || "").trim(), String(c?.nombre_apellido || "").trim()].filter(Boolean).join(" · ");
+  }, [buscarClienteData]);
 
+  return (
+    <div className="w-full space-y-3">
+      {/* Buscador */}
+      <form onSubmit={handleSubmit} className="w-full">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <HiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") limpiar();
-              }}
-              placeholder="Buscar por DNI o Patente…"
+              onKeyDown={(e) => { if (e.key === "Escape") limpiar(); }}
+              placeholder="DNI o patente..."
               inputMode="text"
-              className="w-full h-14 bg-neutral-900/70 border border-neutral-700/70 focus:border-primary-400/60 focus:ring-4 focus:ring-primary-400/20 rounded-2xl pl-12 pr-12 text-base md:text-lg outline-none transition"
+              className="w-full h-10 bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-slate-500 focus:outline-none rounded-lg pl-9 pr-9 text-sm text-slate-100 placeholder-slate-500 transition-colors"
             />
-
             {query && (
-              <button
-                type="button"
-                onClick={limpiar}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl hover:bg-neutral-800/80 border border-transparent hover:border-neutral-700 transition"
-                aria-label="Limpiar búsqueda"
-                title="Limpiar"
-              >
-                <HiX className="w-5 h-5 opacity-70" />
+              <button type="button" onClick={limpiar} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors">
+                <HiX className="w-4 h-4" />
               </button>
             )}
-          </label>
-
-          <motion.button
+          </div>
+          <button
             type="submit"
-            whileTap={{ scale: 0.98 }}
             disabled={busy}
-            className="h-14 px-6 rounded-2xl bg-primary-500/90 hover:bg-primary-500 text-white font-semibold shadow-sm ring-1 ring-primary-400/40 disabled:opacity-60 disabled:cursor-not-allowed transition flex items-center gap-2"
+            className="h-10 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            {busy ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
-                Buscando…
-              </span>
-            ) : (
-              <>
-                <HiSearch className="w-5 h-5" />
-                Buscar
-              </>
-            )}
-          </motion.button>
+            {busy
+              ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" /> Buscando</>
+              : <><HiSearch className="w-4 h-4" /> Buscar</>
+            }
+          </button>
         </div>
-
-        <p className="mt-2 text-xs md:text-sm text-neutral-400">
-          Tip: <span className="font-semibold">Enter</span> para buscar •{" "}
-          <span className="font-semibold">/</span> para enfocar rápido •{" "}
-          <span className="font-semibold">Esc</span> para limpiar.
+        <p className="mt-1.5 text-[11px] text-slate-600">
+          <kbd className="font-mono">/</kbd> para enfocar · <kbd className="font-mono">Esc</kbd> para limpiar · DNI o patente
         </p>
-      </motion.form>
+      </form>
 
+      {/* Recientes */}
       {recientes.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-500 mr-1">Recientes (DNI):</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-slate-600 uppercase tracking-wider">Recientes:</span>
           {recientes.map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => usarReciente(q)}
-              className="h-9 px-3 rounded-xl border border-neutral-800 bg-neutral-950/60 hover:bg-neutral-900 text-neutral-200 text-sm transition"
-              title={`Usar: ${q}`}
-            >
+            <button key={q} type="button" onClick={() => usarReciente(q)}
+              className="h-7 px-2.5 rounded-md border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs transition-colors font-mono">
               {q}
             </button>
           ))}
         </div>
       )}
 
-      {/* Resultados: Cliente + Pólizas (solo para DNI) */}
+      {/* Resultado cliente */}
       {buscarClienteData?.cliente && (
-        <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950/50 p-4">
-          <div className="flex items-start justify-between gap-3">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/50 divide-y divide-slate-800">
+          {/* Header cliente */}
+          <div className="flex items-center justify-between px-4 py-3">
             <div>
-              <div className="text-xs uppercase tracking-wide text-neutral-500">
-                Datos del cliente
-              </div>
-              <div className="mt-1 text-sm md:text-base text-neutral-100 font-semibold flex items-center flex-wrap gap-2">
-                <span>{clienteLabel || "Cliente"}</span>
-                {/* 🚀 BADGE DE SUCURSAL PARA ADMINS */}
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Cliente encontrado</div>
+              <div className="text-sm font-medium text-slate-100 flex items-center gap-2 flex-wrap">
+                {clienteLabel || "Cliente"}
                 {isWebAdmin && buscarClienteData?.cliente?.oficina && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 ml-2">
-                    {getOficinaName(String(buscarClienteData.cliente.oficina))}
+                  <span className="text-[10px] font-mono text-slate-400 border border-slate-700 rounded px-1.5 py-0.5">
+                    {OFICINA_NAMES[String(buscarClienteData.cliente.oficina)] || `Ofi ${buscarClienteData.cliente.oficina}`}
                   </span>
                 )}
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={limpiar}
-              className="h-9 px-3 rounded-xl border border-neutral-800 bg-neutral-950/60 hover:bg-neutral-900 text-neutral-200 text-sm transition"
-              title="Nueva búsqueda"
-            >
-              Nueva búsqueda
+            <button onClick={limpiar} className="h-8 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors">
+              Limpiar
             </button>
           </div>
 
-          <div className="mt-4">
-            <div className="text-xs uppercase tracking-wide text-neutral-500">
-              Pólizas del cliente
+          {/* Pólizas */}
+          <div className="px-4 py-3 space-y-2">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">
+              {polizas.length} póliza{polizas.length !== 1 ? "s" : ""}
             </div>
-
             {polizas.length > 0 ? (
               <>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {polizas.map((p, idx) => {
                     const pid = String(p?.poliza_id ?? "");
-                    const isSelected = pid && pid === String(selectedPolizaId);
-
+                    const isSel = pid && pid === String(selectedPolizaId);
                     return (
-                      <button
-                        key={pid || `${idx}`}
-                        type="button"
-                        onClick={() => setSelectedPolizaId(pid)}
-                        className={[
-                          "text-left p-3 rounded-2xl border transition",
-                          isSelected
-                            ? "border-primary-400/60 bg-primary-500/10"
-                            : "border-neutral-800 bg-neutral-950/40 hover:bg-neutral-900/60",
-                        ].join(" ")}
-                      >
-                        <div className="text-sm font-semibold text-neutral-100">
-                          {String(p?.patente || "").trim() || "Sin patente"}{" "}
-                          <span className="text-neutral-400 font-normal">
-                            · {String(p?.compania || "").trim() || "Sin compañía"}
+                      <button key={pid || idx} type="button" onClick={() => setSelectedPolizaId(pid)}
+                        className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${isSel ? "border-slate-500 bg-slate-800" : "border-slate-800 bg-slate-900/40 hover:bg-slate-800/60"}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-mono font-medium text-slate-100">
+                            {String(p?.patente || "").trim() || "Sin patente"}
                           </span>
+                          {isSel && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                         </div>
-                        <div className="text-xs text-neutral-400 mt-1">
-                          {String(p?.modelo || "").trim() || "Sin modelo"}{" "}
-                          {p?.oficina ? (
-                            <span className="text-neutral-500">· {String(p.oficina)}</span>
-                          ) : null}
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {String(p?.compania || "").trim() || "—"} · {String(p?.modelo || "").trim() || "—"}
                         </div>
                       </button>
                     );
                   })}
                 </div>
-
-                <div className="mt-3 flex items-center gap-2">
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.98 }}
-                    disabled={!selectedPolizaId || cuotasPolizaStatus === "loading"}
-                    onClick={() =>
-                      traerCuotasDePoliza(
-                        selectedPolizaId,
-                        onlyDigits(buscarClienteData?.cliente?.dni || query)
-                      )
-                    }
-                    className="h-11 px-4 rounded-2xl bg-emerald-500/90 hover:bg-emerald-500 text-white font-semibold shadow-sm ring-1 ring-emerald-400/40 disabled:opacity-60 disabled:cursor-not-allowed transition flex items-center gap-2"
-                  >
-                    {cuotasPolizaStatus === "loading" ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
-                        Cargando cuotas…
-                      </span>
-                    ) : (
-                      <>Ver cuotas para pagar</>
-                    )}
-                  </motion.button>
-
-                  <div className="text-xs text-neutral-500">
-                    Elegí una póliza y tocá “Ver cuotas para pagar”.
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  disabled={!selectedPolizaId || cuotasPolizaStatus === "loading"}
+                  onClick={() => traerCuotasDePoliza(selectedPolizaId, onlyDigits(buscarClienteData?.cliente?.dni || query))}
+                  className="mt-2 h-9 px-4 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {cuotasPolizaStatus === "loading"
+                    ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/60 border-t-transparent animate-spin" /> Cargando...</>
+                    : <><HiChevronRight className="w-4 h-4" /> Ver cuotas</>
+                  }
+                </button>
               </>
             ) : (
-              <div className="mt-2 text-sm text-neutral-400">
-                No hay pólizas para este cliente.
-              </div>
+              <p className="text-sm text-slate-500">Sin pólizas para este cliente.</p>
             )}
           </div>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

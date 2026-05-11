@@ -21,30 +21,27 @@ const DEFAULT_FILTER_OPTIONS = {
   anios: [],
   modelos: [],
   companias: [],
-  oficinas: [], // 🚀 NUEVO: Agregamos oficinas al estado inicial
+  oficinas: [],
+  tipos: [],      // 🚀 NUEVO: Para filtrar por Auto, Moto, Camión, etc.
+  coberturas: [], // 🚀 NUEVO: Para filtrar por B1, Todo Riesgo, etc.
 };
 
 const initialState = {
-  // Datos de audiencia y previsualización
   audiencia: null,
   audienciaStatus: "idle",
   audienciaError: null,
 
-  // Opciones de selectores
   filterOptions: DEFAULT_FILTER_OPTIONS,
   filterOptionsStatus: "idle",
 
-  // Listado de campañas
   historial: [],
   historialStatus: "idle",
   
-  // Detalle y logs individuales indexados por ID
   historialDetalleById: {}, 
   logsById: {},
   logsStatusById: {},
   logsErrorById: {},
 
-  // Estado del proceso de envío (activa el modal/GIF de carga)
   sendStatus: "idle",
   sendResult: null,
   sendError: null,
@@ -72,22 +69,18 @@ export const fetchMarketingFilterOptions = createAsyncThunk(
         anios: Array.isArray(data?.anios) ? data.anios : [],
         modelos: Array.isArray(data?.modelos) ? data.modelos : [],
         companias: Array.isArray(data?.companias) ? data.companias : [],
-        oficinas: Array.isArray(data?.oficinas) ? data.oficinas : [], // 🚀 NUEVO: Capturamos las oficinas que manda el backend
+        oficinas: Array.isArray(data?.oficinas) ? data.oficinas : [],
+        tipos: Array.isArray(data?.tipos) ? data.tipos : [],           // 🚀 CAPTURADO: Tipos de vehículo
+        coberturas: Array.isArray(data?.coberturas) ? data.coberturas : [], // 🚀 CAPTURADO: Coberturas
       };
     } catch (err) { return rejectWithValue(toError(err)); }
   }
 );
 
-/**
- * Lanza la campaña. 
- * CAMBIO: El payload ahora es un FormData si se sube una imagen desde el PC.
- */
 export const sendMensajeMarketingThunk = createAsyncThunk(
   "marketing/send",
   async (payload, { rejectWithValue }) => {
     try { 
-      // Si enviamos una imagen desde el PC, payload es un objeto FormData.
-      // Si es solo texto, puede seguir siendo un objeto JSON plano.
       return await MarketingAPI.enviarMensaje(payload); 
     } catch (err) { 
       return rejectWithValue(toError(err)); 
@@ -102,16 +95,6 @@ export const fetchHistorialMarketing = createAsyncThunk(
       const data = await MarketingAPI.listarHistorial(params);
       return Array.isArray(data) ? data : (data?.results || []);
     } catch (err) { return rejectWithValue(toError(err)); }
-  }
-);
-
-export const fetchHistorialDetalle = createAsyncThunk(
-  "marketing/fetchHistorialDetalle",
-  async (id, { rejectWithValue }) => {
-    try {
-      const data = await MarketingAPI.obtenerHistorial(id);
-      return { id, data };
-    } catch (err) { return rejectWithValue({ id, error: toError(err) }); }
   }
 );
 
@@ -150,7 +133,6 @@ const marketingSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Resumen de Audiencia
       .addCase(fetchAudienciaResumen.pending, (state) => { 
         state.audienciaStatus = "loading"; 
         state.audienciaError = null; 
@@ -163,14 +145,10 @@ const marketingSlice = createSlice({
         state.audienciaStatus = "failed";
         state.audienciaError = action.payload;
       })
-
-      // Opciones de Filtros
       .addCase(fetchMarketingFilterOptions.fulfilled, (state, action) => {
         state.filterOptions = action.payload;
         state.filterOptionsStatus = "succeeded";
       })
-
-      // Envío de Campaña (IMPORTANTE para el modal de carga)
       .addCase(sendMensajeMarketingThunk.pending, (state) => { 
         state.sendStatus = "loading"; 
         state.sendError = null; 
@@ -183,8 +161,6 @@ const marketingSlice = createSlice({
         state.sendStatus = "failed";
         state.sendError = action.payload;
       })
-
-      // Historial
       .addCase(fetchHistorialMarketing.pending, (state) => {
         state.historialStatus = "loading";
       })
@@ -192,10 +168,7 @@ const marketingSlice = createSlice({
         state.historialStatus = "succeeded";
         state.historial = action.payload;
       })
-
-      // Logs Detallados
       .addCase(fetchLogsHistorial.pending, (state, action) => {
-        // action.meta.arg es el objeto { id } pasado al thunk
         const id = action.meta.arg.id;
         state.logsStatusById[id] = "loading";
       })
@@ -217,19 +190,13 @@ export const { clearMarketingErrors, clearMarketingSendResult, clearLogsHistoria
 
 // --- Selectors ---
 
-export const selectMarketing = (state) => state.marketing;
 export const selectMarketingAudiencia = (state) => state.marketing.audiencia;
 export const selectMarketingAudienciaStatus = (state) => state.marketing.audienciaStatus;
-export const selectMarketingAudienciaError = (state) => state.marketing.audienciaError;
 export const selectMarketingFilterOptions = (state) => state.marketing.filterOptions;
 export const selectMarketingHistorial = (state) => state.marketing.historial;
 export const selectMarketingHistorialStatus = (state) => state.marketing.historialStatus;
 export const selectMarketingSendStatus = (state) => state.marketing.sendStatus;
-export const selectMarketingSendResult = (state) => state.marketing.sendResult;
-export const selectMarketingSendError = (state) => state.marketing.sendError;
 
 export const selectMarketingLogsById = (state, id) => state.marketing.logsById[id] || { items: [] };
-export const selectMarketingLogsStatusById = (state, id) => state.marketing.logsStatusById[id] || "idle";
-export const selectMarketingLogsErrorById = (state, id) => state.marketing.logsErrorById?.[id] || null;
 
 export default marketingSlice.reducer;

@@ -395,7 +395,7 @@ export const fetchPagosBuscar = createAsyncThunk("pagos/fetchPagosBuscar", async
       polizaByIdToCache = enriched.polizasById || null;
     }
 
-    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache };
+    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache instanceof Map ? Object.fromEntries(polizaByIdToCache) : (polizaByIdToCache || null) };
   } catch (error) {
     if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED" || error?.name === "AbortError") return rejectWithValue({ _aborted: true });
     return rejectWithValue(error?.response?.data || "Error al buscar pagos");
@@ -430,7 +430,7 @@ export const fetchCuotasBuscar = createAsyncThunk("pagos/fetchCuotasBuscar", asy
       polizaByIdToCache = enriched.polizasById || null;
     }
 
-    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache };
+    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache instanceof Map ? Object.fromEntries(polizaByIdToCache) : (polizaByIdToCache || null) };
   } catch (error) {
     if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED" || error?.name === "AbortError") return rejectWithValue({ _aborted: true });
     return rejectWithValue(error?.response?.data || "Error al buscar cuotas");

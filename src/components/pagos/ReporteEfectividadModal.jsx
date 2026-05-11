@@ -51,12 +51,12 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            className="relative bg-slate-950 border border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]"
+            className="relative bg-slate-950 border border-slate-800 rounded-xl w-full max-w-5xl shadow-md flex flex-col overflow-hidden max-h-[90vh]"
           >
             {/* HEADER */}
-            <div className="flex justify-between items-center p-5 sm:p-6 border-b border-slate-800 bg-slate-900/50 shrink-0">
+            <div className="flex justify-between items-center p-5 sm:p-6 border-b border-slate-800 bg-slate-900 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400 border border-sky-500/30">
+                <div className="h-10 w-10 rounded-xl bg-slate-800 flex items-center justify-center text-sky-400 border border-slate-700">
                   <HiChartBar className="text-xl" />
                 </div>
                 <div>
@@ -76,11 +76,11 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
             <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar">
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20">
-                  <div className="w-10 h-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mb-4" />
+                  <div className="w-10 h-10 border-4 border-slate-700 border-t-sky-500 rounded-full animate-spin mb-3" />
                   <p className="text-slate-400 text-sm font-semibold animate-pulse">Calculando métricas de cobranza...</p>
                 </div>
               ) : error ? (
-                <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-center text-rose-400">
+                <div className="bg-rose-950/30 border border-rose-500/30 rounded-lg p-6 text-center text-rose-400">
                   <p className="font-semibold">Oops, hubo un problema al cargar el reporte.</p>
                   <p className="text-xs mt-2 opacity-80">{typeof error === 'string' ? error : 'Error desconocido'}</p>
                 </div>
@@ -98,7 +98,7 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                       label="Cobrados post-aviso" 
                       value={kpis.pagos_recuperados || 0} 
                       icon={<HiCurrencyDollar />} 
-                      color="text-emerald-400" bg="bg-emerald-500/10" border="border-emerald-500/20"
+                      color="text-emerald-400" bg="bg-emerald-950/30" border="border-emerald-900"
                     />
                     <KpiCard 
                       label="Tasa de Pago" 
@@ -110,7 +110,7 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                       label="Reacción Promedio" 
                       value={`${kpis.tiempo_promedio_respuesta_horas || 0} hs`} 
                       icon={<HiClock />} 
-                      color="text-indigo-400" bg="bg-indigo-500/10" border="border-indigo-500/20"
+                      color="text-indigo-400" bg="bg-slate-800" border="border-slate-700"
                     />
                   </div>
 
@@ -121,7 +121,7 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                         onClick={() => setActiveTab("pagados")}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
                           activeTab === "pagados" 
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                            ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900" 
                             : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
                         }`}
                       >
@@ -132,7 +132,7 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                         onClick={() => setActiveTab("pendientes")}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
                           activeTab === "pendientes" 
-                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" 
+                            ? "bg-rose-950/30 text-rose-400 border border-rose-900" 
                             : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
                         }`}
                       >
@@ -144,11 +144,11 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                     {/* TABLA: PAGADOS */}
                     {activeTab === "pagados" && (
                       pagados.length === 0 ? (
-                        <div className="text-center py-10 bg-slate-900/30 border border-slate-800 rounded-2xl">
+                        <div className="text-center py-10 bg-slate-900/30 border border-slate-800 rounded-lg">
                           <p className="text-slate-500 text-sm">Aún no hay registros de pagos realizados tras recibir un aviso.</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+                        <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/40">
                           <table className="w-full text-left text-sm text-slate-300 whitespace-nowrap">
                             <thead className="bg-slate-900 text-xs uppercase font-bold text-slate-400 border-b border-slate-800">
                               <tr>
@@ -173,9 +173,9 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                                   <td className="px-4 py-3 text-xs text-emerald-400 font-medium">{d.fecha_pago}</td>
                                   <td className="px-4 py-3">
                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                      d.horas_tardanza <= 24 ? 'bg-emerald-500/20 text-emerald-400' :
-                                      d.horas_tardanza <= 72 ? 'bg-amber-500/20 text-amber-400' :
-                                      'bg-rose-500/20 text-rose-400'
+                                      d.horas_tardanza <= 24 ? 'bg-emerald-950/40 text-emerald-400' :
+                                      d.horas_tardanza <= 72 ? 'bg-amber-950/40 text-amber-400' :
+                                      'bg-rose-950/40 text-rose-400'
                                     }`}>
                                       {d.horas_tardanza} hs
                                     </span>
@@ -194,11 +194,11 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                     {/* TABLA: PENDIENTES */}
                     {activeTab === "pendientes" && (
                       pendientes.length === 0 ? (
-                        <div className="text-center py-10 bg-slate-900/30 border border-slate-800 rounded-2xl">
+                        <div className="text-center py-10 bg-slate-900/30 border border-slate-800 rounded-lg">
                           <p className="text-slate-500 text-sm">No hay avisos pendientes de cobro actualmente.</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+                        <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/40">
                           <table className="w-full text-left text-sm text-slate-300 whitespace-nowrap">
                             <thead className="bg-slate-900 text-xs uppercase font-bold text-slate-400 border-b border-slate-800">
                               <tr>
@@ -223,8 +223,8 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
                                   <td className="px-4 py-3 text-xs text-slate-300 capitalize">{d.tipo_mensaje.replace("_", " ")}</td>
                                   <td className="px-4 py-3">
                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                      d.dias_sin_pagar <= 2 ? 'bg-amber-500/20 text-amber-400' :
-                                      'bg-rose-500/20 text-rose-400'
+                                      d.dias_sin_pagar <= 2 ? 'bg-amber-950/40 text-amber-400' :
+                                      'bg-rose-950/40 text-rose-400'
                                     }`}>
                                       {d.dias_sin_pagar} días
                                     </span>
@@ -253,12 +253,12 @@ export default function ReporteEfectividadModal({ isOpen, onClose }) {
 
 function KpiCard({ label, value, icon, color, bg, border }) {
   return (
-    <div className={`p-4 rounded-2xl border ${border} ${bg} flex flex-col gap-2`}>
+    <div className={`p-4 rounded-lg border ${border} ${bg} flex flex-col gap-2`}>
       <div className="flex items-center gap-2">
         <div className={`text-lg ${color}`}>{icon}</div>
         <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-400">{label}</span>
       </div>
-      <div className={`text-2xl sm:text-3xl font-black ${color}`}>{value}</div>
+      <div className={`text-2xl sm:text-3xl font-semibold ${color}`}>{value}</div>
     </div>
   );
 }

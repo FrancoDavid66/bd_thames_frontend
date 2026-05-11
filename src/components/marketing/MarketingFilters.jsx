@@ -1,4 +1,3 @@
-// src/components/marketing/MarketingFilters.jsx
 import { useState, useEffect } from "react";
 import { FaDownload, FaEye, FaFilter, FaTimes } from "react-icons/fa";
 
@@ -102,7 +101,10 @@ export default function MarketingFilters({
   const modelos = toOptions(options.modelos);
   const companias = toOptions(options.companias);
   
-  // 🚀 FIX: Traemos las oficinas directo del backend para asegurarnos de tener el ID y el estado 'activa'
+  // 🚀 NUEVOS FILTROS DINÁMICOS
+  const tiposVehiculo = toOptions(options.tipos);
+  const coberturas = toOptions(options.coberturas);
+  
   const [oficinasReal, setOficinasReal] = useState([]);
 
   useEffect(() => {
@@ -115,7 +117,6 @@ export default function MarketingFilters({
     .then(res => res.ok ? res.json() : [])
     .then(data => {
       const arr = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      // Solo mostramos las activas
       setOficinasReal(arr.filter(ofi => ofi.activa === true));
     })
     .catch(err => console.error("Error cargando oficinas en marketing:", err));
@@ -126,7 +127,7 @@ export default function MarketingFilters({
       <Section
         icon={FaFilter}
         title="Filtros de Campaña"
-        subtitle="Segmentá tu audiencia por fecha de vencimiento, oficina, marca, etc."
+        subtitle="Segmentá tu audiencia por tipo de vehículo, cobertura, vencimiento y más."
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 items-start">
           
@@ -151,7 +152,6 @@ export default function MarketingFilters({
               onChange={(e) => onChange("estado", e.target.value)}
               className="w-full h-12 rounded-xl bg-yellow-400/5 border border-yellow-400/20 px-4 outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50 text-yellow-400 font-bold cursor-pointer text-sm transition-all hover:bg-yellow-400/10"
             >
-              {/* 🚀 EL HACK DEFINITIVO: Le pasamos TODOS los estados literalmente escritos */}
               <option value="activa,vencida,pendiente,nueva,cotizar,renovacion" className="text-black bg-white">🌐 Sin filtro (Absolutamente todas)</option>
               <option value="activa" className="text-black bg-white">✅ Activas (Al día)</option>
               <option value="vencida" className="text-black bg-white">⚠️ Vencidas (Con deuda)</option>
@@ -183,6 +183,28 @@ export default function MarketingFilters({
               value={values.dias_cantidad || ""}
               onChange={(e) => onChange("dias_cantidad", e.target.value)}
               className="w-full h-12 rounded-xl bg-slate-950/50 border border-white/10 px-4 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/50 text-white text-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            />
+          </Field>
+
+          {/* 🆕 FILTRO DE TIPO DE VEHÍCULO */}
+          <Field label="Tipo de Vehículo">
+            <MultiSelect 
+              values={values.tipo} 
+              options={tiposVehiculo} 
+              onChange={(newArr) => onChange("tipo", newArr)} 
+              placeholder="Todos los tipos" 
+              addLabel="+ Agregar Tipo" 
+            />
+          </Field>
+
+          {/* 🆕 FILTRO DE COBERTURAS */}
+          <Field label="Coberturas">
+            <MultiSelect 
+              values={values.cobertura} 
+              options={coberturas} 
+              onChange={(newArr) => onChange("cobertura", newArr)} 
+              placeholder="Todas las coberturas" 
+              addLabel="+ Agregar Cobertura" 
             />
           </Field>
 

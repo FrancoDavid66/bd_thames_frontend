@@ -64,6 +64,12 @@ function PolizaStatusBanner({ estadoInicial, polizaId }) {
       color: "bg-blue-500/10 border-blue-500/50 text-blue-400",
       icon: <HiShieldCheck className="w-8 h-8 md:w-10 md:h-10" />,
     },
+    en_verificacion: {
+      label: "EN VERIFICACIÓN",
+      sub: "Verificar con la compañía si la baja fue procesada",
+      color: "bg-orange-500/10 border-orange-500/50 text-orange-400",
+      icon: <HiExclamation className="w-8 h-8 md:w-10 md:h-10 animate-pulse" />,
+    },
   };
 
   const current = statusMap[estado?.toLowerCase()] || {
@@ -135,6 +141,7 @@ function PolizaStatusBanner({ estadoInicial, polizaId }) {
             <option value="vencida">🔴 Vencida</option>
             <option value="cancelada">⚫ Cancelada</option>
             <option value="finalizada">🔵 Finalizada</option>
+            <option value="en_verificacion">🟠 En verificación</option>
           </select>
         </div>
       )}

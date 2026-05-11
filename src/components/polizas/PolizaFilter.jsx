@@ -23,6 +23,7 @@ const ESTADOS_POLIZAS = [
   { key: "vencida", label: "VENCIDAS" },
   { key: "cancelada", label: "CANCELADAS" },
   { key: "finalizada", label: "FINALIZADAS" },
+  { key: "en_verificacion", label: "EN VERIFICACIÓN" },
 ];
 
 /** Estados FINANCIEROS (mora) */
@@ -41,7 +42,8 @@ const DOT_CUOTAS = {
 };
 
 const DOT_POLIZAS = {
-  todos: "bg-gray-400", activa: "bg-emerald-500", vencida: "bg-red-600", cancelada: "bg-slate-500", finalizada: "bg-purple-500",
+  todos: "bg-gray-400", activa: "bg-emerald-500", vencida: "bg-red-600",
+  cancelada: "bg-slate-500", finalizada: "bg-purple-500", en_verificacion: "bg-orange-400",
 };
 
 const DOT_FINANCIERO = {

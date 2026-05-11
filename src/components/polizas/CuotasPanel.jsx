@@ -113,9 +113,50 @@ export default function CuotasPanel({ poliza, polizaId }) {
     }
   };
 
+  // ─── Helpers de cobertura (misma lógica que PolizaCuotasCard y FacturaCuota) ─
+
+  const sumarDiasHabiles = (fecha, dias) => {
+    const d = new Date(fecha);
+    if (isNaN(d.getTime())) return null;
+    let added = 0;
+    while (added < dias) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+    }
+    return dayjs(d).startOf("day");
+  };
+
+  const calcularCobertura = (cuota, idx) => {
+    const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
+    const fechaPago = cuota?.pago_registrado_en || cuota?.fecha_pago;
+    const fp = fechaPago ? dayjs(fechaPago).startOf("day") : null;
+
+    const cuotaAnterior  = idx > 0 ? rows[idx - 1] : null;
+    const cuotaSiguiente = idx < rows.length - 1 ? rows[idx + 1] : null;
+    const fvAnterior  = cuotaAnterior?.fecha_vencimiento  ? dayjs(cuotaAnterior.fecha_vencimiento).startOf("day")  : null;
+    const fvSiguiente = cuotaSiguiente?.fecha_vencimiento ? dayjs(cuotaSiguiente.fecha_vencimiento).startOf("day") : null;
+
+    const pagoAtrasado = cuota?.pagado && fp && fv ? fp.isAfter(fv) : false;
+
+    if (!cuota?.pagado) {
+      return { tipo: "sin_cobertura", desde: fv, hasta: null };
+    }
+    if (pagoAtrasado) {
+      const desde = fp ? sumarDiasHabiles(fechaPago, 2) : null;
+      const hasta = fvSiguiente || (fv ? fv.add(1, "month") : null);
+      return { tipo: "atrasado", desde, hasta };
+    }
+    const desde = idx === 0
+      ? (poliza?.fecha_emision ? dayjs(poliza.fecha_emision).startOf("day") : fv)
+      : (fvAnterior ? fvAnterior.add(1, "day") : null);
+    return { tipo: "ok", desde, hasta: fv };
+  };
+
+  const fmt = (d) => (d && d.isValid && d.isValid()) ? d.format("DD/MM/YYYY") : "-";
+
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-950/90 p-4 sm:p-5 shadow-lg shadow-black/40">
-      
+
       {/* Header + CTAs */}
       <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
@@ -160,13 +201,13 @@ export default function CuotasPanel({ poliza, polizaId }) {
 
       {/* Lista de cuotas */}
       <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-950/70 divide-y divide-neutral-800">
-        {rows.map((cuota) => {
+        {rows.map((cuota, idx) => {
           const estado = estadoCuota(cuota);
           const isBusy = !!busyIds[cuota.id];
-
           const vto = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
           const vtoFormat = vto ? vto.format("DD/MM/YYYY") : "-";
-          const cubreHasta = vto ? vto.add(1, 'month').format("DD/MM/YYYY") : "-";
+
+          const cobertura = calcularCobertura(cuota, idx);
 
           return (
             <div key={cuota.id} className="p-4 sm:p-5 bg-neutral-950 hover:bg-neutral-900/90 transition-colors">
@@ -184,16 +225,37 @@ export default function CuotasPanel({ poliza, polizaId }) {
 
                 <div className="grid grid-cols-2 gap-4 flex-1 md:px-6">
                   <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                    <div className="text-[10px] uppercase tracking-wide text-rose-300/80 mb-0.5">Día de Pago (Vto)</div>
+                    <div className="text-[10px] uppercase tracking-wide text-rose-300/80 mb-0.5">Vencimiento</div>
                     <div className="font-bold text-white text-sm">{vtoFormat}</div>
+                    {cuota.fecha_pago && (
+                      <div className="text-[10px] text-emerald-400/70 mt-0.5">
+                        Pagada: {dayjs(cuota.pago_registrado_en || cuota.fecha_pago).format("DD/MM/YYYY")}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="bg-sky-500/5 rounded-lg p-2 border border-sky-500/10">
-                    <div className="text-[10px] uppercase tracking-wide text-sky-300/80 mb-0.5">Cubre Cobertura del:</div>
-                    <div className="font-medium text-white text-xs">
-                      {vtoFormat} <span className="text-sky-400 mx-1">al</span> {cubreHasta}
+                  {cobertura.tipo === "sin_cobertura" ? (
+                    <div className="bg-rose-500/10 rounded-lg p-2 border border-rose-500/30">
+                      <div className="text-[10px] uppercase tracking-wide text-rose-400 mb-0.5">⚠️ Sin cobertura</div>
+                      <div className="font-medium text-rose-300 text-xs">
+                        Desde {fmt(cobertura.desde)}
+                      </div>
                     </div>
-                  </div>
+                  ) : cobertura.tipo === "atrasado" ? (
+                    <div className="bg-orange-500/10 rounded-lg p-2 border border-orange-500/30">
+                      <div className="text-[10px] uppercase tracking-wide text-orange-400 mb-0.5">⏱ Cubre (pago tardío)</div>
+                      <div className="font-medium text-orange-200 text-xs">
+                        {fmt(cobertura.desde)} <span className="text-orange-400 mx-1">al</span> {fmt(cobertura.hasta)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-sky-500/5 rounded-lg p-2 border border-sky-500/10">
+                      <div className="text-[10px] uppercase tracking-wide text-sky-300/80 mb-0.5">Cubre</div>
+                      <div className="font-medium text-white text-xs">
+                        {fmt(cobertura.desde)} <span className="text-sky-400 mx-1">al</span> {fmt(cobertura.hasta)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex md:justify-end md:w-48">
