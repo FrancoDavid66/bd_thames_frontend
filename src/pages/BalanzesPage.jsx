@@ -23,7 +23,7 @@ import EgresoTable from "../components/balanzes/EgresoTable";
 import DescargarBalanceDiarioButton from "../components/balanzes/DescargarBalanceDiarioButton";
 import BalanceChart from "../components/balanzes/BalanceChart";
 import BalanceExportPanel from "../components/balanzes/BalanceExportPanel";
-import HistorialPagosPanel from "../components/balanzes/HistorialPagosPanel";
+// import HistorialPagosPanel from "../components/balanzes/HistorialPagosPanel"; // se agrega cuando el archivo esté en el repo
 import BalanzesSettingsModal from "../components/balanzes/BalanzesSettingsModal";
 
 /* -------------------- Helpers -------------------- */
@@ -659,7 +659,9 @@ const BalancesPage = () => {
       {/* ── Tab: Historial de Pagos ── */}
       {activeTab === "historial" && (
         <section className="mt-2">
-          <HistorialPagosPanel oficinasAdmin={oficinasAdmin} />
+          <div className="py-8 text-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-2xl">
+            Historial de pagos — próximamente disponible.
+          </div>
         </section>
       )}
 
