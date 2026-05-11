@@ -34,7 +34,7 @@ const fmtDate = (d) => d ? dayjs(d).format("DD/MM/YYYY") : "—";
 function FormaPagoBadge({ forma }) {
   const f = (forma || "EFECTIVO").toUpperCase();
   if (f === "EFECTIVO")
-    return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-900/40 border border-emerald-700/50 text-emerald-400">💵 Efectivo</span>;
+    return <span className="inline-flex items-center  gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-900/40 border border-emerald-700/50 text-emerald-400">💵 Efectivo</span>;
   if (f === "TRANSFERENCIA")
     return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-900/40 border border-sky-700/50 text-sky-400">🏦 Transf.</span>;
   return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">💳 {f}</span>;
