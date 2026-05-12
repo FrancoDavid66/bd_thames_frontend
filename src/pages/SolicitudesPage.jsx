@@ -71,6 +71,9 @@ export default function SolicitudesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // searchParams debe declararse ANTES de usarse
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Leer params de URL para precarga (viene desde banner de baja en Pagos)
   const paramClienteId = searchParams.get("cliente_id") || searchParams.get("cliente") || "";
   const paramPatente   = searchParams.get("patente") || "";
@@ -88,7 +91,6 @@ export default function SolicitudesPage() {
   
   const [hasLoaded, setHasLoaded] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
