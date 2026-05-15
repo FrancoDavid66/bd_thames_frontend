@@ -39,7 +39,7 @@ import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal
 import {
   fetchMediosCobro,
   enviarRecordatoriosCuotas,
-  enviarRecordatoriosTodasOficinas,
+  enviarTodasOficinas,
   fetchHistorialRecordatorios,
   fetchHistorialPagos,
   downloadHistorialPagosCSV,
@@ -579,6 +579,7 @@ const PagosPage = () => {
             medio_cobro_id: medioCobroId || undefined,
             alias,
             oficina,
+            async: true,
           })
         ).unwrap();
         dispatch(fetchHistorialRecordatorios());
@@ -610,7 +611,7 @@ const PagosPage = () => {
         const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
         const alias = medio ? medio.etiqueta || medio.valor : undefined;
         const result = await dispatch(
-          enviarRecordatoriosTodasOficinas({
+          enviarTodasOficinas({
             medio_cobro_id: medioCobroId || undefined,
             alias,
           })

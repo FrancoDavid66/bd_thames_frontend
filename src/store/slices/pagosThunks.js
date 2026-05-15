@@ -332,6 +332,26 @@ export const enviarRecordatoriosTodasOficinas = createAsyncThunk(
   }
 );
 
+export const enviarTodasOficinas = createAsyncThunk(
+  "pagos/enviarTodasOficinas",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const body = {
+        alias:                payload?.alias,
+        medio_cobro_id:       payload?.medio_cobro_id || undefined,
+        pausa_entre_oficinas: payload?.pausa || 300,
+      };
+      console.log("[enviarTodasOficinas] 🚀 body:", body);
+      const res = await apiSegura.post(API("notificaciones/cuotas/enviar-todas-oficinas/"), body);
+      console.log("[enviarTodasOficinas] ✅ response:", res.status, res.data);
+      return res.data;
+    } catch (err) {
+      console.error("[enviarTodasOficinas] ❌ error:", err?.response?.status, err?.response?.data);
+      return rejectWithValue(err?.response?.data || err?.message);
+    }
+  }
+);
+
 export const fetchHistorialRecordatorios = createAsyncThunk("pagos/fetchHistorialRecordatorios", async (_, { rejectWithValue }) => {
   try { const { data } = await apiSegura.get(API("notificaciones/cuotas/historial/")); return unwrap(data); } 
   catch (error) { return rejectWithValue(error?.response?.data || "Error al obtener historial de recordatorios"); }
