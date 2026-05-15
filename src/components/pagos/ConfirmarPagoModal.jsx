@@ -141,60 +141,6 @@ export default function ConfirmarPagoModal({
               </div>
             )}
 
-            {/* 🚀 MISIÓN NRE (SÚPER DESTACADA CON BOTÓN) */}
-            {!isCancelada && isNRE && isCoberturaA && (
-              <div className="mb-4 p-4 bg-slate-900 border border-indigo-800 rounded-lg text-indigo-100 text-sm">
-                <div className="flex items-center gap-2 font-black text-white text-base mb-2">
-                  <HiSparkles className="w-5 h-5 text-indigo-400" />
-                  🚀 ¡MISIÓN NRE! GANA COMISIÓN
-                </div>
-                <p className="mb-3 text-[12px] leading-tight text-indigo-200">
-                  Este cliente tiene NRE (RC). ¡Convencelo de migrar y sumá a tu sueldo ahora mismo!
-                </p>
-                <ul className="space-y-1.5 mb-4">
-                  <li className="flex justify-between items-center bg-slate-950/60 p-2 rounded border border-slate-800">
-                    <span className="text-xs text-slate-300">A PROF (Sin grúa)</span>
-                    <span className="font-mono font-semibold text-emerald-400">+$10.000</span>
-                  </li>
-                  <li className="flex justify-between items-center bg-slate-950/60 p-2 rounded border border-slate-800">
-                    <span className="text-xs text-slate-300">A PROF (+ Grúa)</span>
-                    <span className="font-mono font-semibold text-emerald-400">+$15.000</span>
-                  </li>
-                  <li className="flex justify-between items-center bg-slate-950/60 p-2 rounded border border-slate-800">
-                    <span className="text-xs text-slate-300">A AMCA / ROBO</span>
-                    <span className="font-mono font-semibold text-emerald-400">+$10.000 + EXTRAS</span>
-                  </li>
-                </ul>
-                
-                {/* BOTÓN MÁGICO */}
-                <button 
-                  onClick={() => onOpenTraspaso(confirmData)}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-800 hover:bg-indigo-700 border border-indigo-700 px-4 py-2 text-sm font-medium text-white transition-colors cursor-pointer"
-                >
-                  <HiOutlineSwitchHorizontal className="text-lg" /> Registrar Traspaso y Ganar
-                </button>
-              </div>
-            )}
-
-            {/* 💡 CROSS-SELLING: OPORTUNIDAD PERSONALIZADA CON BOTÓN */}
-            {!isCancelada && !isNRE && isCoberturaA && (
-              <div className="mb-4 p-3 bg-slate-900 border border-indigo-900 rounded-lg text-indigo-100 text-sm">
-                <div className="flex items-center gap-1.5 font-bold mb-1 text-indigo-300">
-                  <HiSparkles className="w-4 h-4 text-indigo-400" />
-                  OPORTUNIDAD DE VENTA
-                </div>
-                <p className="text-indigo-200/90 text-[13px] leading-tight font-semibold">
-                  Asegurado con R.C.: Ofrecele un seguro con ROBO o un servicio con GRÚA a $55.000.
-                </p>
-                <button 
-                  onClick={() => onOpenTraspaso(confirmData)}
-                  className="mt-2 w-full flex items-center justify-center gap-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 text-xs font-medium text-slate-300 transition-colors cursor-pointer"
-                >
-                  Registrar Venta Extra
-                </button>
-              </div>
-            )}
-
             {/* 📸 VALIDACIÓN DE CUPONERA */}
             {tieneRobo && (
               <div className="mb-4 p-4 bg-slate-900 border border-sky-800 rounded-lg text-sky-100 text-sm">

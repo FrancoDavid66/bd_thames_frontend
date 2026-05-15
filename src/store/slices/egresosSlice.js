@@ -20,14 +20,17 @@ const getAuthHeaders = () => {
 export const fetchEgresos = createAsyncThunk(
   'egresos/fetch',
   async (params = {}, { rejectWithValue }) => {
-    const page = params.page || 1;
-    // Si la oficina es null o undefined, enviamos vacío para que el backend lo maneje
-    const oficina = (params.oficina !== undefined && params.oficina !== null) ? params.oficina : '';
-
+    const page      = params.page || 1;
+    const oficina   = (params.oficina !== undefined && params.oficina !== null) ? params.oficina : '';
+    const page_size = params.page_size || 500;
     try {
-      const res = await axios.get(`${BASE_URL}egresos/`, { 
-        params: { page, oficina },
-        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+      const queryParams = { page, page_size };
+      if (oficina)       queryParams.oficina    = oficina;
+      if (params.desde)  queryParams.fecha__gte = params.desde;
+      if (params.hasta)  queryParams.fecha__lte = params.hasta;
+      const res = await axios.get(`${BASE_URL}egresos/`, {
+        params: queryParams,
+        headers: getAuthHeaders()
       });
       return res.data; // { results, count, next, previous }
     } catch (error) {

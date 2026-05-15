@@ -17,20 +17,21 @@ const getAuthHeaders = () => {
 export const fetchIngresos = createAsyncThunk(
   'ingresos/fetch',
   async (params = {}, { rejectWithValue }) => {
-    const page = params.page || 1;
-    // Si la oficina es null o undefined, enviamos vacío para que el backend lo maneje
-    const oficina = (params.oficina !== undefined && params.oficina !== null) ? params.oficina : '';
-    
+    const page      = params.page || 1;
+    const oficina   = (params.oficina !== undefined && params.oficina !== null) ? params.oficina : '';
+    const page_size = params.page_size || 500;
     try {
+      const queryParams = { page, page_size };
+      if (oficina)       queryParams.oficina    = oficina;
+      if (params.desde)  queryParams.fecha__gte = params.desde;
+      if (params.hasta)  queryParams.fecha__lte = params.hasta;
       const res = await axios.get(`${BASE_URL}ingresos/`, {
-        params: { page, oficina },
-        headers: getAuthHeaders() // 🔑 Agregamos seguridad
+        params: queryParams,
+        headers: getAuthHeaders()
       });
       return res.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data || 'Error al obtener los ingresos'
-      );
+      return rejectWithValue(error.response?.data || 'Error al obtener los ingresos');
     }
   }
 );

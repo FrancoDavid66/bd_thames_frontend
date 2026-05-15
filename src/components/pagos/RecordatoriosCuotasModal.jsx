@@ -175,6 +175,7 @@ export default function RecordatoriosCuotasModal({
   mediosCobro = [],
   sending = false,
   onEnviar,
+  onEnviarTodas,
   isWebAdmin,
   userOficina,
 }) {
@@ -189,6 +190,12 @@ export default function RecordatoriosCuotasModal({
   const [saving,              setSaving]              = useState(false);
   const [deletingId,          setDeletingId]          = useState(null);
   const [lastResult,          setLastResult]          = useState(null);
+
+  // 🚀 Protección anti doble-click para "Todas las oficinas"
+  // Una vez que se envía a todas, queda bloqueado hasta recargar la página
+  const [todasEnviado,        setTodasEnviado]        = useState(false);
+  const [confirmTodasOpen,    setConfirmTodasOpen]    = useState(false);
+  const [enviandoTodas,       setEnviandoTodas]       = useState(false);
 
   const getOficinaNombre = (num) => {
     const found = oficinasReal.find(o => String(o.id) === String(num));
@@ -270,7 +277,14 @@ export default function RecordatoriosCuotasModal({
       const enviados = safeNum(pickFirst(result || {}, ["mensajes_enviados", "enviados"], 0));
       const omitidos = (result?.omitidos || []).length;
       if (result?.ok) {
-        toast.success(`${enviados} mensajes enviados${omitidos ? ` · ${omitidos} omitidos` : ""}`);
+        if (result?.async) {
+          toast.success(
+            `✅ Envío iniciado — los mensajes se enviarán durante las próximas 2 horas`,
+            { duration: 6000 }
+          );
+        } else {
+          toast.success(`${enviados} mensajes enviados${omitidos ? ` · ${omitidos} omitidos` : ""}`);
+        }
       } else {
         toast.error(result?.error || "Error en el envío.");
       }
@@ -495,10 +509,44 @@ export default function RecordatoriosCuotasModal({
                       Cerrar
                     </button>
                     {isWebAdmin && (
-                      <button onClick={handleConfirm} disabled={sending || !selectedId || mediosAptos.length === 0}
+                      <>
+                        <button onClick={handleConfirm} disabled={sending || !selectedId || mediosAptos.length === 0}
                         className="px-6 py-2.5 rounded-2xl bg-emerald-500 text-neutral-950 text-sm font-bold hover:bg-emerald-400 transition-all flex items-center gap-2 shadow-lg disabled:opacity-30 disabled:cursor-not-allowed">
-                        {sending ? "Procesando..." : <><HiSpeakerphone className="w-4 h-4" /> Enviar Masivo</>}
-                      </button>
+                          {sending ? "Procesando..." : <><HiSpeakerphone className="w-4 h-4" /> Enviar Masivo</>}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!onEnviarTodas) { console.error("onEnviarTodas no definido"); return; }
+                            if (todasEnviado) {
+                              toast("Ya enviaste a todas las oficinas en esta sesión. Si necesitás reenviar, recargá la página (F5).", {
+                                icon: "⚠️",
+                                duration: 5000,
+                              });
+                              return;
+                            }
+                            setConfirmTodasOpen(true);
+                          }}
+                          disabled={sending || enviandoTodas || todasEnviado}
+                          title={todasEnviado ? "Ya se envió a todas las oficinas en esta sesión" : "Disparar envío a las 4 oficinas en paralelo"}
+                          className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg disabled:cursor-not-allowed ${
+                            todasEnviado
+                              ? "bg-neutral-800 text-neutral-500 border border-neutral-700"
+                              : "bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30"
+                          }`}
+                        >
+                          {todasEnviado ? (
+                            <>
+                              <HiCheckCircle className="w-4 h-4" />
+                              Ya enviado hoy
+                            </>
+                          ) : (
+                            <>
+                              <HiSpeakerphone className="w-4 h-4" />
+                              Todas las oficinas
+                            </>
+                          )}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -507,6 +555,96 @@ export default function RecordatoriosCuotasModal({
           </div>
         </div>
       </Dialog>
+
+      {/* ─── Modal de confirmación: enviar a TODAS las oficinas ───────────── */}
+      <Transition appear show={confirmTodasOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-[80]" onClose={() => !enviandoTodas && setConfirmTodasOpen(false)}>
+          <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
+                <Dialog.Panel className="w-full max-w-md rounded-2xl bg-neutral-950 border border-indigo-700/50 p-6 shadow-2xl">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-900/40 border border-indigo-700/50 flex items-center justify-center shrink-0">
+                      <HiSpeakerphone className="w-6 h-6 text-indigo-300" />
+                    </div>
+                    <div>
+                      <Dialog.Title className="text-lg font-bold text-white">
+                        Enviar a todas las oficinas
+                      </Dialog.Title>
+                      <p className="text-xs text-neutral-400 mt-1">
+                        Vas a disparar el envío de recordatorios a las 4 oficinas en paralelo. Cada una envía desde su propio celular UltraMsg.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-amber-950/30 border border-amber-700/40 p-3 mb-4">
+                    <p className="text-xs font-bold text-amber-300 mb-1">⚠️ Importante</p>
+                    <ul className="text-xs text-amber-200/90 space-y-1 list-disc pl-4">
+                      <li>Esta acción <b>no se puede deshacer</b>.</li>
+                      <li>El botón <b>queda bloqueado</b> hasta recargar la página.</li>
+                      <li>El proceso completo tarda alrededor de 2 horas.</li>
+                      <li>La app sigue funcionando normal mientras se envía.</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setConfirmTodasOpen(false)}
+                      disabled={enviandoTodas}
+                      className="px-5 py-2.5 text-sm font-medium text-neutral-300 hover:text-white bg-neutral-800/60 hover:bg-neutral-800 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setEnviandoTodas(true);
+                        try {
+                          const result = await onEnviarTodas(selectedId || null);
+                          console.log("[BtnTodas] result:", result);
+                          if (result?.ok) {
+                            setTodasEnviado(true);          // ← bloqueo definitivo
+                            setConfirmTodasOpen(false);
+                            toast.success(
+                              `✅ Enviando a ${result.oficinas?.length || 4} oficinas en paralelo. Podés seguir usando la app.`,
+                              { duration: 8000 }
+                            );
+                            onClose();
+                          } else {
+                            toast.error(result?.error || "Error al iniciar el envío");
+                          }
+                        } catch (e) {
+                          console.error("[BtnTodas] catch:", e);
+                          toast.error("No se pudo iniciar el envío a todas las oficinas");
+                        } finally {
+                          setEnviandoTodas(false);
+                        }
+                      }}
+                      disabled={enviandoTodas}
+                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {enviandoTodas ? (
+                        <>
+                          <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                          Disparando...
+                        </>
+                      ) : (
+                        <>
+                          <HiSpeakerphone className="w-4 h-4" />
+                          Sí, enviar ahora
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </Transition>
   );
 }

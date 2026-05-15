@@ -28,6 +28,7 @@ export const registrarPagoYBalance = async ({
   formaPago,
   monto,
   registrarEnBalance = true,
+  extraData = {},       // 🔑 datos extra del wizard (cuit, nro_op, billetera, etc.)
   onSuccess,
 }) => {
   // --- Helpers locales ---
@@ -53,13 +54,21 @@ export const registrarPagoYBalance = async ({
 
     const fechaPago = todayISO();
 
-    // 1) Marcar cuota como pagada
+    // 1) Marcar cuota como pagada — con todos los datos del wizard
     await dispatch(
       marcarCuotaComoPagada({
         id: cuota.id,
         forma_pago: formaPago,
         monto: montoFinal,
-        fecha_pago: fechaPago, // ✅ enviamos fecha local YYYY-MM-DD
+        fecha_pago: fechaPago,
+        // 🔑 Datos de transferencia del wizard
+        destino_cuenta:  extraData?.destino_cuenta  || "",
+        enviado_por:     extraData?.enviado_por      || "",
+        cuit_remitente:  extraData?.cuit_remitente   || "",
+        nro_operacion:   extraData?.nro_operacion    || "",
+        observaciones:   extraData?.observaciones    || "",
+        medio_cobro_id:  extraData?.medio_cobro_id   || undefined,
+        registrar_en_balance: registrarEnBalance,
       })
     ).unwrap();
 

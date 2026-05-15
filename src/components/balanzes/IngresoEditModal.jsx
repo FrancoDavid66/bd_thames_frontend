@@ -9,6 +9,7 @@ dayjs.locale("es");
 import { useAuth } from "../../context/AuthContext";
 
 import { updateIngreso } from "../../store/slices/ingresosSlice";
+import { fetchMediosCobro } from "../../store/slices/pagosSlice";
 import ModalWrapper from "../comunes/ModalWrapper";
 
 /* Sugerencias locales */
@@ -53,6 +54,8 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
   
   // 🚀 AHORA TRAEMOS LAS OFICINAS DESDE EL ESTADO GLOBAL
   const { oficinas } = useSelector((s) => s.balance || {});
+  const mediosCobro = useSelector((s) => (s.pagos?.mediosCobro || []).filter(m => m.activo !== false));
+  useEffect(() => { dispatch(fetchMediosCobro({ activo: true })); }, [dispatch]);
 
   const [form, setForm] = useState({
     monto: "",
@@ -319,29 +322,34 @@ export default function IngresoEditModal({ isOpen, onClose, ingreso }) {
 
         {/* Billetera (si es virtual) */}
         {isVirtual && (
-          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
-              Billetera / Cuenta destino <span className="text-emerald-400">*</span>
-            </label>
-            <input
-              ref={billeRef}
-              name="billetera"
-              value={form.billetera}
-              onChange={handleChange}
-              list="wallet-suggestions-edit-ingreso"
-              placeholder="Ej: MP de Manu, Banco Nación…"
-              className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-            />
-            <datalist id="wallet-suggestions-edit-ingreso">
-              {walletOpciones.map((opt) => (
-                <option key={opt} value={opt} />
-              ))}
-            </datalist>
-            {errors.billetera && (
-              <p className="text-[11px] text-rose-400 mt-1">
-                {errors.billetera}
-              </p>
-            )}
+          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800 space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+                Cuenta destino (del estudio) <span className="text-emerald-400">*</span>
+              </label>
+              {mediosCobro.length > 0 ? (
+                <select name="billetera" value={form.billetera} onChange={handleChange}
+                  className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors">
+                  <option value="">Seleccionar cuenta…</option>
+                  {mediosCobro.map((m) => (
+                    <option key={m.id} value={m.valor}>
+                      {m.etiqueta || m.titular_nombre} — {m.valor} ({m.proveedor?.replace("_", " ")})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input ref={billeRef} name="billetera" value={form.billetera} onChange={handleChange}
+                  placeholder="Ej: MP de Manu, Banco Nación…"
+                  className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors" />
+              )}
+              {errors.billetera && <p className="text-[11px] text-rose-400 mt-1">{errors.billetera}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">Enviado por (cliente / remitente)</label>
+              <input name="pagado_por" value={form.pagado_por} onChange={handleChange}
+                placeholder="Ej: Juan Pérez, nombre del banco…"
+                className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors" />
+            </div>
           </div>
         )}
 

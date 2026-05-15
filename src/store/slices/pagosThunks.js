@@ -280,6 +280,9 @@ export const marcarCuotaComoPagada = createAsyncThunk("pagos/marcarCuotaComoPaga
       medio_cobro_id: payload?.medio_cobro_id,
       medio_cobro_valor: payload?.medio_cobro_valor ?? payload?.destino_cuenta ?? payload?.referencia,
       destino_cuenta: payload?.destino_cuenta,
+      enviado_por: payload?.enviado_por,
+      cuit_remitente: payload?.cuit_remitente,
+      nro_operacion: payload?.nro_operacion,
       registrar_en_balance: payload?.registrar_en_balance,
     });
 
@@ -302,6 +305,32 @@ export const enviarRecordatoriosCuotas = createAsyncThunk("pagos/enviarRecordato
     return data;
   } catch (error) { return rejectWithValue(error?.response?.data || "Error al enviar recordatorios"); }
 });
+
+// 🚀 Dispara envío en paralelo a TODAS las oficinas activas.
+// El backend lanza un thread por oficina y devuelve 202 inmediato.
+// El progreso se consulta después con fetchHistorialRecordatorios.
+export const enviarRecordatoriosTodasOficinas = createAsyncThunk(
+  "pagos/enviarRecordatoriosTodasOficinas",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const body = compact({
+        alias: payload?.alias,
+        alias_transferencia: payload?.alias_transferencia,
+        medio_cobro_id: payload?.medio_cobro_id,
+      });
+      // timeout corto: el endpoint devuelve casi inmediato porque trabaja en background
+      const { data } = await apiSegura.post(
+        API("notificaciones/cuotas/enviar-todas-oficinas/"),
+        body,
+        { timeout: 15000 }
+      );
+      if (data && typeof data === "object" && data.ok === false) return rejectWithValue(data);
+      return data;
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || "Error al iniciar el envío masivo a todas las oficinas");
+    }
+  }
+);
 
 export const fetchHistorialRecordatorios = createAsyncThunk("pagos/fetchHistorialRecordatorios", async (_, { rejectWithValue }) => {
   try { const { data } = await apiSegura.get(API("notificaciones/cuotas/historial/")); return unwrap(data); } 
@@ -395,7 +424,7 @@ export const fetchPagosBuscar = createAsyncThunk("pagos/fetchPagosBuscar", async
       polizaByIdToCache = enriched.polizasById || null;
     }
 
-    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache instanceof Map ? Object.fromEntries(polizaByIdToCache) : (polizaByIdToCache || null) };
+    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache };
   } catch (error) {
     if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED" || error?.name === "AbortError") return rejectWithValue({ _aborted: true });
     return rejectWithValue(error?.response?.data || "Error al buscar pagos");
@@ -430,7 +459,7 @@ export const fetchCuotasBuscar = createAsyncThunk("pagos/fetchCuotasBuscar", asy
       polizaByIdToCache = enriched.polizasById || null;
     }
 
-    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache instanceof Map ? Object.fromEntries(polizaByIdToCache) : (polizaByIdToCache || null) };
+    return { items, meta, originalQuery: queryStr, cacheKey, fromCache: false, _force: force, _polizaByIdToCache: polizaByIdToCache };
   } catch (error) {
     if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED" || error?.name === "AbortError") return rejectWithValue({ _aborted: true });
     return rejectWithValue(error?.response?.data || "Error al buscar cuotas");

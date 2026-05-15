@@ -44,17 +44,31 @@ function autoFitAOA(aoa) {
 }
 
 function buildIngresosRows(ingresos = []) {
-  return ingresos.map((i) => ({
-    Sucursal: i?.oficina_nombre || "—",
-    "Fecha y Hora": fmtDateTime(i), // 🚀 HORA EXACTA
-    Descripción: i?.descripcion ?? "—",
-    Monto: toNumber(i?.monto),
-    Categoría: i?.categoria ?? "—",
-    "Forma de pago": i?.forma_pago ?? "—",
-    "Pagado por": i?.pagado_por ?? "—",
-    "Cargado por": i?.usuario_nombre || "Sistema",
-    Observaciones: i?.observaciones ?? "—",
-  }));
+  return ingresos.map((i) => {
+    // Extraer CUIT y N° op de observaciones si vienen ahí
+    const obs = i?.observaciones ?? "";
+    const cuitMatch = obs.match(/CUIT:\s*([^\s|]+)/);
+    const opMatch   = obs.match(/Op:\s*([^\s|]+)/);
+    const cuit = i?.cuit_remitente || (cuitMatch ? cuitMatch[1] : "");
+    const op   = i?.nro_operacion  || (opMatch   ? opMatch[1]   : "");
+    // Observaciones limpias (sin los datos ya separados)
+    const obsFinal = obs.replace(/CUIT:\s*[^\s|]+\s*\|?\s*/g, "").replace(/Op:\s*[^\s|]+\s*\|?\s*/g, "").trim().replace(/^\||\|$/, "").trim();
+
+    return {
+      Sucursal:           i?.oficina_nombre || "—",
+      "Fecha y Hora":     fmtDateTime(i),
+      Descripción:        i?.descripcion ?? "—",
+      "Enviado por":      i?.pagado_por ?? "—",
+      "CUIT/CUIL remitente": cuit || "—",
+      "Cuenta destino":   i?.billetera ?? "—",
+      "N° Operación":     op || "—",
+      "Forma de pago":    (i?.forma_pago ?? "—").toUpperCase(),
+      Categoría:          i?.categoria ?? "—",
+      Monto:              toNumber(i?.monto),
+      "Cargado por":      i?.usuario_nombre || "Sistema",
+      Observaciones:      obsFinal || "—",
+    };
+  });
 }
 
 function buildEgresosRows(egresos = []) {
@@ -284,17 +298,29 @@ export function exportToExcel({ ingresos = [], egresos = [], polizas = [], fileN
   // ══════════════════════════════════════════════════════════════════
   // HOJA 2 — DETALLE INGRESOS
   // ══════════════════════════════════════════════════════════════════
-  const ingHeaders = ["Sucursal", "Fecha y Hora", "Descripción", "Pagado por", "Categoría", "Forma de pago", "Monto", "Cargado por"];
-  const ingRows = ingresos.map((i) => [
-    i?.oficina_nombre || "—",
-    fmtDateTime(i),
-    i?.descripcion ?? "—",
-    i?.pagado_por   ?? "—",
-    i?.categoria    ?? "—",
-    (i?.forma_pago  || "efectivo").toUpperCase(),
-    toNumber(i?.monto),
-    i?.usuario_nombre || "Sistema",
-  ]);
+  const ingHeaders = ["Sucursal", "Fecha y Hora", "Descripción", "Enviado por", "CUIT/CUIL remitente", "Cuenta destino", "N° Operación", "Forma de pago", "Categoría", "Monto", "Cargado por", "Observaciones"];
+  const ingRows = ingresos.map((i) => {
+    const obs = i?.observaciones ?? "";
+    const cuitMatch = obs.match(/CUIT:\s*([^\s|]+)/);
+    const opMatch   = obs.match(/Op:\s*([^\s|]+)/);
+    const cuit = i?.cuit_remitente || (cuitMatch ? cuitMatch[1] : "") || "—";
+    const op   = i?.nro_operacion  || (opMatch   ? opMatch[1]   : "") || "—";
+    const obsFinal = obs.replace(/CUIT:\s*[^\s|]+\s*\|?\s*/g, "").replace(/Op:\s*[^\s|]+\s*\|?\s*/g, "").trim().replace(/^\||\|$/, "").trim() || "—";
+    return [
+      i?.oficina_nombre || "—",
+      fmtDateTime(i),
+      i?.descripcion    || "—",
+      i?.pagado_por     || "—",
+      cuit,
+      i?.billetera      || "—",
+      op,
+      (i?.forma_pago || "efectivo").toUpperCase(),
+      i?.categoria      || "—",
+      toNumber(i?.monto),
+      i?.usuario_nombre || "Sistema",
+      obsFinal,
+    ];
+  });
 
   const wsIngresos = XLSX.utils.aoa_to_sheet([ingHeaders, ...ingRows]);
 
@@ -304,27 +330,27 @@ export function exportToExcel({ ingresos = [], egresos = [], polizas = [], fileN
     if (wsIngresos[ref]) wsIngresos[ref].s = cellStyle({ bold: true, fg: COLOR_HEADER_FG, bg: COLOR_HEADER_BG, align: "center" });
   });
 
-  // Estilo filas + formato monto
+  // Estilo filas + formato monto (columna 9 = Monto)
   ingRows.forEach((_, ri) => {
     const isBg = ri % 2 === 1;
     ingHeaders.forEach((__, ci) => {
       const ref = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
       if (wsIngresos[ref]) {
-        wsIngresos[ref].s = cellStyle({ bg: isBg ? COLOR_ROW_ALT : "FFFFFF", align: ci === 6 ? "right" : "left" });
-        if (ci === 6) wsIngresos[ref].s.numFmt = '"$"#,##0.00';
+        wsIngresos[ref].s = cellStyle({ bg: isBg ? COLOR_ROW_ALT : "FFFFFF", align: ci === 9 ? "right" : "left" });
+        if (ci === 9) wsIngresos[ref].s.numFmt = '"$"#,##0.00';
       }
     });
   });
 
   // Fila de total
   const ingTotalRow = ingRows.length + 1;
-  XLSX.utils.sheet_add_aoa(wsIngresos, [["", "", "", "", "", "TOTAL", totalIn, ""]], { origin: ingTotalRow });
-  const totalRefLabel = XLSX.utils.encode_cell({ r: ingTotalRow, c: 5 });
-  const totalRefVal   = XLSX.utils.encode_cell({ r: ingTotalRow, c: 6 });
+  XLSX.utils.sheet_add_aoa(wsIngresos, [["", "", "", "", "", "", "", "", "TOTAL", totalIn, "", ""]], { origin: ingTotalRow });
+  const totalRefLabel = XLSX.utils.encode_cell({ r: ingTotalRow, c: 8 });
+  const totalRefVal   = XLSX.utils.encode_cell({ r: ingTotalRow, c: 9 });
   if (wsIngresos[totalRefLabel]) wsIngresos[totalRefLabel].s = cellStyle({ bold: true, fg: COLOR_TOTAL_FG, bg: COLOR_TOTAL_BG, align: "right" });
   if (wsIngresos[totalRefVal])   { wsIngresos[totalRefVal].s = cellStyle({ bold: true, fg: COLOR_TOTAL_FG, bg: COLOR_TOTAL_BG, align: "right" }); wsIngresos[totalRefVal].s.numFmt = '"$"#,##0.00'; }
 
-  wsIngresos["!cols"] = [{ wch: 16 }, { wch: 18 }, { wch: 42 }, { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
+  wsIngresos["!cols"] = [{ wch: 14 }, { wch: 18 }, { wch: 38 }, { wch: 26 }, { wch: 20 }, { wch: 24 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 24 }];
   wsIngresos["!rows"] = [{ hpt: 20 }]; // altura del header
   XLSX.utils.book_append_sheet(wb, wsIngresos, "💰 Ingresos");
 

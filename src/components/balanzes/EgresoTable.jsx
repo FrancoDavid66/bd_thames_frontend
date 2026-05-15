@@ -257,7 +257,14 @@ const EgresoTable = ({ egresos: egresosProp, className = "" }) => {
                       </span>
                     </td>
                     <td className="px-3 sm:px-4 py-3 align-middle">
-                      {renderFormaPago(egreso.forma_pago)}
+                      <div className="flex flex-col items-start gap-1.5">
+                        {renderFormaPago(egreso.forma_pago)}
+                        {egreso.billetera && egreso.forma_pago !== "EFECTIVO" && (
+                          <span className="text-[10px] font-mono text-rose-400/80 bg-rose-950/40 border border-rose-800/40 px-2 py-0.5 rounded-md truncate max-w-[140px]" title={egreso.billetera}>
+                            {egreso.billetera}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 sm:px-4 py-3 align-middle">
                       <div className="flex items-center gap-1.5 text-zinc-400 text-xs">

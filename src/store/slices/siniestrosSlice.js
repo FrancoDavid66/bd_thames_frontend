@@ -2,16 +2,18 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/';
 
-// ──────── SINIESTROS ────────
+const getToken = () =>
+  localStorage.getItem('access_token') || localStorage.getItem('token') || '';
+
+const authHeader = () => ({ Authorization: `Bearer ${getToken()}` });
+
+// ──────── SINIESTROS CRUD ────────
 
 export const getSiniestros = createAsyncThunk('siniestros/getSiniestros', async (_, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    const response = await axios.get(`${BASE_URL}siniestros/`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.get(`${BASE_URL}siniestros/`, { headers: authHeader() });
     return response.data.results || response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Error al obtener los siniestros');
@@ -20,10 +22,7 @@ export const getSiniestros = createAsyncThunk('siniestros/getSiniestros', async 
 
 export const addSiniestro = createAsyncThunk('siniestros/addSiniestro', async (siniestro, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    const response = await axios.post(`${BASE_URL}siniestros/`, siniestro, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.post(`${BASE_URL}siniestros/`, siniestro, { headers: authHeader() });
     return response.data.results || response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Error al crear el siniestro');
@@ -32,10 +31,7 @@ export const addSiniestro = createAsyncThunk('siniestros/addSiniestro', async (s
 
 export const editSiniestro = createAsyncThunk('siniestros/editSiniestro', async ({ id, siniestro }, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    const response = await axios.put(`${BASE_URL}siniestros/${id}/`, siniestro, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.put(`${BASE_URL}siniestros/${id}/`, siniestro, { headers: authHeader() });
     return response.data.results || response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Error al actualizar el siniestro');
@@ -44,24 +40,18 @@ export const editSiniestro = createAsyncThunk('siniestros/editSiniestro', async 
 
 export const removeSiniestro = createAsyncThunk('siniestros/removeSiniestro', async (id, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    await axios.delete(`${BASE_URL}siniestros/${id}/`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await axios.delete(`${BASE_URL}siniestros/${id}/`, { headers: authHeader() });
     return id;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Error al eliminar el siniestro');
   }
 });
 
-// 🚀 RUTA CORREGIDA PARA EVENTOS
+// ──────── EVENTOS ────────
+
 export const addEvento = createAsyncThunk('siniestros/addEvento', async (evento, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    // El backend ahora usa /eventos/ gracias al router
-    const response = await axios.post(`${BASE_URL}eventos/`, evento, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.post(`${BASE_URL}eventos/`, evento, { headers: authHeader() });
     return response.data.results || response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Error al crear el evento del siniestro');
@@ -70,15 +60,37 @@ export const addEvento = createAsyncThunk('siniestros/addEvento', async (evento,
 
 export const getEventosBySiniestro = createAsyncThunk('siniestros/getEventosBySiniestro', async (siniestroId, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    const response = await axios.get(`${BASE_URL}siniestros/${siniestroId}/eventos/`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.get(`${BASE_URL}siniestros/${siniestroId}/eventos/`, { headers: authHeader() });
     return response.data.results || response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Error al obtener los eventos del siniestro');
   }
 });
+
+// ──────── ANTI-FRAUDE: siniestros recientes por póliza o cliente ────────
+
+/**
+ * Consulta siniestros recientes para una póliza o cliente.
+ * Usado en PagosList para detectar riesgo de fraude antes de cobrar.
+ * @param {{ poliza_id?: number, cliente_id?: number, dias?: number }} params
+ */
+export const fetchSiniestrosRecientes = createAsyncThunk(
+  'siniestros/fetchSiniestrosRecientes',
+  async ({ poliza_id, cliente_id, dias = 60 }, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams({ dias });
+      if (poliza_id)   params.append('poliza_id',  poliza_id);
+      if (cliente_id)  params.append('cliente_id', cliente_id);
+      const response = await axios.get(
+        `${BASE_URL}siniestros/recientes/?${params.toString()}`,
+        { headers: authHeader() }
+      );
+      return response.data.results || response.data || [];
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Error al consultar siniestros recientes');
+    }
+  }
+);
 
 const siniestrosSlice = createSlice({
   name: 'siniestros',

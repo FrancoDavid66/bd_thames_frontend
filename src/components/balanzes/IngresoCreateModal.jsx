@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import { useAuth } from "../../context/AuthContext";
 import { createIngreso } from "../../store/slices/ingresosSlice";
 import { fetchBalanceDiario, createCategoria } from "../../store/slices/balanceSlice";
+import { fetchMediosCobro } from "../../store/slices/pagosSlice";
 import ModalWrapper from "../comunes/ModalWrapper";
 import CategoriaSelect from "./CategoriaSelect"; // 🚀 IMPORTAMOS NUESTRO SELECTOR
 
@@ -20,6 +21,10 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
 
   // 🚀 AHORA TRAEMOS LAS OFICINAS DESDE EL ESTADO GLOBAL
   const { categorias, oficinas } = useSelector((s) => s.balance || {});
+  const mediosCobro = useSelector((s) => (s.pagos?.mediosCobro || []).filter(m => m.activo !== false));
+
+  // Cargar medios de cobro al abrir
+  useEffect(() => { dispatch(fetchMediosCobro({ activo: true })); }, [dispatch]);
 
   const [form, setForm] = useState({
     monto: "",
@@ -181,10 +186,50 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
         </div>
 
         {form.forma_pago !== "EFECTIVO" && (
-          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-            <label className="block text-xs font-medium mb-1.5 text-zinc-400">Billetera / Banco <span className="text-emerald-400">*</span></label>
-            <input name="billetera" value={form.billetera} onChange={handleChange} placeholder="Ej: Banco Nación, Ualá…" className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500" />
-            {errors.billetera && <p className="text-[11px] text-rose-400 mt-1">{errors.billetera}</p>}
+          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800 space-y-3">
+            {/* Cuenta destino — selector de billeteras del estudio */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+                Cuenta destino (del estudio) <span className="text-emerald-400">*</span>
+              </label>
+              {mediosCobro.length > 0 ? (
+                <select
+                  name="billetera"
+                  value={form.billetera}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                >
+                  <option value="">Seleccionar cuenta…</option>
+                  {mediosCobro.map((m) => (
+                    <option key={m.id} value={m.valor}>
+                      {m.etiqueta || m.titular_nombre} — {m.valor} ({m.proveedor?.replace("_", " ")})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  name="billetera"
+                  value={form.billetera}
+                  onChange={handleChange}
+                  placeholder="Ej: Banco Nación, alias.mp…"
+                  className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500"
+                />
+              )}
+              {errors.billetera && <p className="text-[11px] text-rose-400 mt-1">{errors.billetera}</p>}
+            </div>
+            {/* Quién envió */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+                Enviado por (cliente / remitente)
+              </label>
+              <input
+                name="pagado_por"
+                value={form.pagado_por}
+                onChange={handleChange}
+                placeholder="Ej: Juan Pérez, nombre del banco…"
+                className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
           </div>
         )}
 
@@ -203,10 +248,12 @@ export default function IngresoCreateModal({ isOpen, onClose }) {
             <label className="block text-xs font-medium mb-1.5 text-zinc-400">Descripción <span className="text-zinc-500 font-normal">(Opcional)</span></label>
             <input name="descripcion" value={form.descripcion} onChange={handleChange} placeholder="Detalle del ingreso…" className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500" />
           </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5 text-zinc-400">Pagado por <span className="text-zinc-500 font-normal">(Opcional)</span></label>
-            <input name="pagado_por" value={form.pagado_por} onChange={handleChange} placeholder="Ej: Juan Pérez" className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500" />
-          </div>
+          {form.forma_pago === "EFECTIVO" && (
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">Pagado por <span className="text-zinc-500 font-normal">(Opcional)</span></label>
+              <input name="pagado_por" value={form.pagado_por} onChange={handleChange} placeholder="Ej: Juan Pérez" className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-emerald-500" />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-zinc-800">

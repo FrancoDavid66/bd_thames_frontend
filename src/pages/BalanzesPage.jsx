@@ -23,7 +23,8 @@ import EgresoTable from "../components/balanzes/EgresoTable";
 import DescargarBalanceDiarioButton from "../components/balanzes/DescargarBalanceDiarioButton";
 import BalanceChart from "../components/balanzes/BalanceChart";
 import BalanceExportPanel from "../components/balanzes/BalanceExportPanel";
-// import HistorialPagosPanel from "../components/balanzes/HistorialPagosPanel"; // se agrega cuando el archivo esté en el repo
+import HistorialPagosPanel from "../components/balanzes/HistorialPagosPanel";
+import TransferenciasPanel from "../components/balanzes/TransferenciasPanel";
 import BalanzesSettingsModal from "../components/balanzes/BalanzesSettingsModal";
 
 /* -------------------- Helpers -------------------- */
@@ -79,7 +80,8 @@ const TABS = [
   { id: "resumen",   label: "Resumen" },
   { id: "grafico",   label: "Gráfico" },
   { id: "detalle",   label: "Detalle" },
-  { id: "historial", label: "📋 Historial de Pagos" },
+  { id: "historial",       label: "📋 Historial de Pagos" },
+  { id: "transferencias",  label: "🏦 Transferencias" },
 ];
 
 const BalancesPage = () => {
@@ -135,31 +137,33 @@ const BalancesPage = () => {
   // REFRESCO TOTAL
   useEffect(() => {
     const ofi = isWebAdmin ? oficinaSeleccionada : userOficina;
+    // Primer y último día del mes actual para traer todo el mes
+    const desde = dayjs().startOf("month").format("YYYY-MM-DD");
+    const hasta  = dayjs().endOf("month").format("YYYY-MM-DD");
     dispatch(fetchBalanceDiario({ fecha, oficina: ofi }));
-    dispatch(fetchIngresos({ oficina: ofi }));
-    dispatch(fetchEgresos({ oficina: ofi }));
+    dispatch(fetchIngresos({ oficina: ofi, desde, hasta, page_size: 500 }));
+    dispatch(fetchEgresos({  oficina: ofi, desde, hasta, page_size: 500 }));
   }, [dispatch, fecha, oficinaSeleccionada, isWebAdmin, userOficina]);
 
   const hoy = useMemo(() => dayjs(), []);
   const mesActual = hoy.month();
   const anioActual = hoy.year();
 
+  // El backend ya filtra por mes (fecha__gte/lte), solo aplicamos filtro de oficina
   const ingresosMensuales = useMemo(() =>
     ingresos.filter((i) => {
-      const f = dayjs(i.fecha);
-      const ofiOk = isWebAdmin ? (oficinaSeleccionada === "ALL" || String(i.oficina) === String(oficinaSeleccionada)) : true;
-      return f.month() === mesActual && f.year() === anioActual && ofiOk;
+      if (!isWebAdmin) return true;
+      return oficinaSeleccionada === "ALL" || String(i.oficina) === String(oficinaSeleccionada);
     }),
-    [ingresos, mesActual, anioActual, isWebAdmin, oficinaSeleccionada]
+    [ingresos, isWebAdmin, oficinaSeleccionada]
   );
 
   const egresosMensuales = useMemo(() =>
     egresos.filter((e) => {
-      const f = dayjs(e.fecha);
-      const ofiOk = isWebAdmin ? (oficinaSeleccionada === "ALL" || String(e.oficina) === String(oficinaSeleccionada)) : true;
-      return f.month() === mesActual && f.year() === anioActual && ofiOk;
+      if (!isWebAdmin) return true;
+      return oficinaSeleccionada === "ALL" || String(e.oficina) === String(oficinaSeleccionada);
     }),
-    [egresos, mesActual, anioActual, isWebAdmin, oficinaSeleccionada]
+    [egresos, isWebAdmin, oficinaSeleccionada]
   );
 
   // ==========================================
@@ -659,9 +663,13 @@ const BalancesPage = () => {
       {/* ── Tab: Historial de Pagos ── */}
       {activeTab === "historial" && (
         <section className="mt-2">
-          <div className="py-8 text-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-2xl">
-            Historial de pagos — próximamente disponible.
-          </div>
+          <HistorialPagosPanel oficinasAdmin={oficinasAdmin} />
+        </section>
+      )}
+
+      {activeTab === "transferencias" && (
+        <section className="mt-2">
+          <TransferenciasPanel />
         </section>
       )}
 

@@ -9,6 +9,7 @@ dayjs.locale("es");
 import { useAuth } from "../../context/AuthContext";
 
 import { updateEgreso } from "../../store/slices/egresosSlice";
+import { fetchMediosCobro } from "../../store/slices/pagosSlice";
 import ModalWrapper from "../comunes/ModalWrapper";
 import CategoriaSelect from "./CategoriaSelect";
 
@@ -56,6 +57,8 @@ const EgresoEditModal = ({ isOpen, onClose, egreso }) => {
 
   // 🚀 TRAEMOS LAS OFICINAS DEL STORE
   const { oficinas } = useSelector((s) => s.balance || {});
+  const mediosCobro = useSelector((s) => (s.pagos?.mediosCobro || []).filter(m => m.activo !== false));
+  useEffect(() => { dispatch(fetchMediosCobro({ activo: true })); }, [dispatch]);
 
   const [form, setForm] = useState({
     descripcion: "",
@@ -257,22 +260,34 @@ const EgresoEditModal = ({ isOpen, onClose, egreso }) => {
         </div>
 
         {isVirtual && (
-          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-            <label className="block text-xs font-medium mb-1.5 text-zinc-400">
-              Cuenta / Billetera de origen <span className="text-rose-400">*</span>
-            </label>
-            <input
-              name="billetera"
-              list="billetera-opciones-egreso-edit"
-              onChange={handleChange}
-              value={form.billetera}
-              placeholder="Ej: Banco Provincia, Ualá…"
-              className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-rose-500 transition-colors"
-            />
-            <datalist id="billetera-opciones-egreso-edit">
-              {walletOpciones.map((w) => (<option key={w} value={w} />))}
-            </datalist>
-            {errors.billetera && <p className="text-[11px] text-rose-400 mt-1">{errors.billetera}</p>}
+          <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800 space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+                Cuenta origen (del estudio) <span className="text-rose-400">*</span>
+              </label>
+              {mediosCobro.length > 0 ? (
+                <select name="billetera" value={form.billetera} onChange={handleChange}
+                  className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-rose-500 transition-colors">
+                  <option value="">Seleccionar cuenta…</option>
+                  {mediosCobro.map((m) => (
+                    <option key={m.id} value={m.valor}>
+                      {m.etiqueta || m.titular_nombre} — {m.valor} ({m.proveedor?.replace("_", " ")})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input name="billetera" value={form.billetera} onChange={handleChange}
+                  placeholder="Ej: Banco Provincia, Ualá…"
+                  className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-rose-500 transition-colors" />
+              )}
+              {errors.billetera && <p className="text-[11px] text-rose-400 mt-1">{errors.billetera}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-zinc-400">Destinatario / A quién se pagó</label>
+              <input name="destinatario" value={form.destinatario || ""} onChange={handleChange}
+                placeholder="Ej: Proveedor X, nombre del titular…"
+                className="w-full px-3 py-2.5 border rounded-lg bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-rose-500 transition-colors" />
+            </div>
           </div>
         )}
 

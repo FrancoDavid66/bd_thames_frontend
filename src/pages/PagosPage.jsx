@@ -39,6 +39,7 @@ import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal
 import {
   fetchMediosCobro,
   enviarRecordatoriosCuotas,
+  enviarRecordatoriosTodasOficinas,
   fetchHistorialRecordatorios,
   fetchHistorialPagos,
   downloadHistorialPagosCSV,
@@ -600,6 +601,40 @@ const PagosPage = () => {
     [dispatch, mediosCobro]
   );
 
+  // 🚀 Dispara envío a TODAS las oficinas activas en paralelo (backend usa threads).
+  // Devuelve inmediato; el progreso se ve en el panel que hace polling al historial.
+  const handleEnviarTodasOficinas = useCallback(
+    async (medioCobroId) => {
+      setSendingRecordatorios(true);
+      try {
+        const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
+        const alias = medio ? medio.etiqueta || medio.valor : undefined;
+        const result = await dispatch(
+          enviarRecordatoriosTodasOficinas({
+            medio_cobro_id: medioCobroId || undefined,
+            alias,
+          })
+        ).unwrap();
+        // refrescar historial para que el panel arranque mostrando algo
+        dispatch(fetchHistorialRecordatorios());
+        return result;
+      } catch (err) {
+        console.error("[PagosPage] Error enviando a todas las oficinas:", err);
+        const data = err?.data || err?.response?.data || err?.payload || null;
+        const msg =
+          (typeof data === "string" && data) ||
+          data?.detail ||
+          data?.error ||
+          err?.message ||
+          "No se pudo iniciar el envío a todas las oficinas.";
+        return { ok: false, error: msg, raw: data || err };
+      } finally {
+        setSendingRecordatorios(false);
+      }
+    },
+    [dispatch, mediosCobro]
+  );
+
   const { totalCuotas, alDia, porVencer, venceHoy, vencidas } = useMemo(() => {
     const hoy = dayjs().startOf("day");
     const stats = { totalCuotas: 0, alDia: 0, porVencer: 0, venceHoy: 0, vencidas: 0 };
@@ -1114,7 +1149,7 @@ const PagosPage = () => {
       </div>
 
       <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
-      <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} isWebAdmin={isWebAdmin} userOficina={userOficina} />
+      <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} onEnviarTodas={handleEnviarTodasOficinas} isWebAdmin={isWebAdmin} userOficina={userOficina} />
       
       {/* 🚀 MODAL NUEVO */}
       <ReporteEfectividadModal isOpen={showReporteModal} onClose={() => setShowReporteModal(false)} />

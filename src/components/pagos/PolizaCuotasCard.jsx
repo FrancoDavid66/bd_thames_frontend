@@ -1,707 +1,1219 @@
-/* src/components/pagos/PolizaCuotasCard.jsx — Tarjetas pastel sólidas (app moderna) */
-import { useState, memo } from "react";
-import { useDispatch } from "react-redux";
-import dayjs from "dayjs";
-import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
-import toast from "react-hot-toast";
-import {
-  HiCash,
-  HiBadgeCheck,
-  HiClock,
-  HiDocumentText,
-  HiX,
-  HiPencil,
-  HiUser,
-  HiExclamationCircle,
-  HiDeviceMobile,
-  HiQuestionMarkCircle
-} from "react-icons/hi";
+# pagos/views.py
+import calendar
+from datetime import timedelta, date
+from decimal import Decimal, InvalidOperation
+import csv
+from io import StringIO, BytesIO
 
-// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
-import { useAuth } from "../../context/AuthContext";
+from django.db import models, transaction
+from django.http import FileResponse, HttpResponse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.db.models import Q
+from django.db.models import OuterRef, Subquery
+from django.db.models import Max, Avg, Count, F, ExpressionWrapper, FloatField
+from django.core.exceptions import FieldDoesNotExist
+from django.db.models.functions import Coalesce, ExtractDay, ExtractHour, ExtractMinute
 
-import { registrarPagoYBalance } from "../../utils/pagos/registrarPagoYBalance";
-import DescargarFactura from "./DescargarFactura";
-import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
-import EnviarFacturaWhatsapp from "./EnviarFacturaWhatsapp";
-import ModalFormaPago from "./ModalFormaPago";
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 
-const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
 
-/* ====== Paleta pastel sólida ====== */
-const P = {
-  // contenedor principal
-  card: "rounded-lg border border-slate-200 bg-white p-4 ",
-  headerIcon: "bg-slate-100 text-slate-600 border border-slate-200",
-  title: "text-slate-800",
-  subtitle: "text-slate-500",
-  // estados
-  paid: {
-    chipBg: "bg-emerald-50",
-    chipTxt: "text-emerald-800",
-    chipBd: "border-emerald-200",
-    rowBg: "bg-emerald-50",
-    rowBd: "border-emerald-200",
-    rowTxt: "text-emerald-800",
-    btn: "bg-emerald-50 hover:bg-emerald-500 text-emerald-800 border-emerald-500",
-    stripe: "bg-emerald-500",
-    text: "text-emerald-800",
-    border: "border-emerald-200",
-    chipText: "text-emerald-800",
-    chipBorder: "border-emerald-200",
-    dot: "bg-emerald-600",
-    noteBg: "bg-emerald-50",
-    noteText: "text-emerald-900",
-    cardBg: "bg-emerald-50",
-  },
-  pending: {
-    chipBg: "bg-amber-100",
-    chipTxt: "text-amber-800",
-    chipBd: "border-amber-200",
-    rowBg: "bg-amber-50",
-    rowBd: "border-amber-200",
-    rowTxt: "text-amber-800",
-    btn: "bg-amber-100 hover:bg-amber-400 text-amber-800 border-amber-500",
-    stripe: "bg-amber-400",
-    text: "text-amber-800",
-    border: "border-amber-200",
-    chipText: "text-amber-800",
-    chipBorder: "border-amber-200",
-    dot: "bg-amber-600",
-    noteBg: "bg-amber-100",
-    noteText: "text-amber-900",
-    cardBg: "bg-white",
-  },
-  overdue: {
-    chipBg: "bg-rose-100",
-    chipTxt: "text-rose-800",
-    chipBd: "border-rose-200",
-    rowBg: "bg-rose-50",
-    rowBd: "border-rose-200",
-    rowTxt: "text-rose-800",
-    btn: "bg-rose-100 hover:bg-rose-400 text-rose-800 border-rose-500",
-    stripe: "bg-rose-400",
-    text: "text-rose-800",
-    border: "border-rose-200",
-    chipText: "text-rose-800",
-    chipBorder: "border-rose-200",
-    dot: "bg-rose-600",
-    noteBg: "bg-rose-100",
-    noteText: "text-rose-900",
-    cardBg: "bg-rose-50",
-  },
-  link: "bg-slate-600 hover:bg-slate-700 text-white border-slate-600",
-  tip: "bg-slate-100 text-slate-600 border-slate-200",
-  ticketBtn: "bg-slate-600 hover:bg-slate-700 text-white border-slate-600",
-  neutralBtn: "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200",
-  actionBtn: "bg-slate-700 hover:bg-slate-600 text-white border-slate-600",
-};
+from .models import Pago, Cuota, MedioCobro, AlertaEnviada
+from polizas.models import Poliza
+from balanzes.models import Ingreso as BalanceIngreso
 
-const fmtMoney = (n) =>
-  new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(n || 0));
+from pagos.management.commands.enviar_alertas import ejecutar_alertas
+from pagos.handlers.registrar_pago import registrar_pago_handler
+from pagos.utils.factura import generar_factura_pdf
 
-const toYmd = (d) => {
-  if (!d) return "";
-  const s = String(d);
-  return s.length >= 10 ? s.slice(0, 10) : s;
-};
+MAX_HISTORIAL_ALL_ROWS = 50000
 
-/* ====== Badge de estado (pastel) ====== */
-function EstadoBadge({ pagado, fecha_vencimiento }) {
-  if (pagado) {
-    return (
-      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${P.paid.chipBg} ${P.paid.chipTxt} ${P.paid.chipBd}`}>
-        <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-white/50 ring-1 ring-black/10">
-          <HiBadgeCheck className="w-4 h-4" />
-        </span>
-        ¡Al día!
-      </span>
-    );
-  }
-  const fv = fecha_vencimiento ? dayjs(fecha_vencimiento) : null;
-  let label = "Por pagar";
-  let style = P.pending;
-  if (fv) {
-    const hoy = dayjs().startOf("day");
-    if (fv.isBefore(hoy)) {
-      label = "Vencida";
-      style = P.overdue;
-    } else if (fv.isSame(hoy)) {
-      label = "¡Vence hoy!";
-      style = P.pending;
-    }
-  }
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${style.chipBg} ${style.chipTxt} ${style.chipBd}`}>
-      <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-white/50 ring-1 ring-black/10">
-        <HiClock className="w-4 h-4" />
-      </span>
-      {label}
-    </span>
-  );
-}
 
-export default function PolizaCuotasCard({ poliza }) {
-  const dispatch = useDispatch();
-  
-  // 🚀 Obtenemos rol de Admin para el botón de cambio de fecha
-  const { user } = useAuth();
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+# -------------------------
+# 🚀 SUPER TRADUCTOR MULTI-TENANT (A PRUEBA DE FALLOS)
+# -------------------------
+def _get_seguridad_oficina_brute(request, requested_oficina=""):
+    user = request.user
+    if not user.is_authenticated:
+        return ["BLOQUEADO"]
+        
+    es_admin = user.is_superuser or (hasattr(user, 'perfil') and user.perfil.rol == 'ADMIN')
+    
+    target = None
+    if es_admin:
+        val = str(requested_oficina or "").strip()
+        if not val or val.upper() == "ALL":
+            return [] # Sin filtro
+        target = val
+    else:
+        if hasattr(user, 'perfil') and user.perfil.oficina:
+            target = user.perfil.oficina
+        else:
+            return ["BLOQUEADO"]
+            
+    synonyms = set()
+    
+    if hasattr(target, 'codigo') and target.codigo:
+        synonyms.add(str(target.codigo).strip().lower())
+    if hasattr(target, 'id') and target.id:
+        synonyms.add(str(target.id).strip().lower())
+    if hasattr(target, 'nombre') and target.nombre:
+        synonyms.add(str(target.nombre).strip().lower())
+        
+    if isinstance(target, str):
+        s = target.strip().lower()
+        synonyms.add(s)
+        try:
+            from django.apps import apps
+            Oficina = apps.get_model("usuarios", "Oficina")
+            if s.isdigit():
+                ofi = Oficina.objects.filter(Q(codigo=s) | Q(id=s)).first()
+            else:
+                ofi = Oficina.objects.filter(nombre__icontains=s).first()
+            if ofi:
+                synonyms.add(str(ofi.codigo).strip().lower())
+                synonyms.add(str(ofi.id).strip().lower())
+                synonyms.add(str(ofi.nombre).strip().lower())
+        except Exception:
+            pass
+            
+    final_synonyms = set(synonyms)
+    for s in synonyms:
+        if "1" == s or "esquina" in s or "5 esquinas" in s:
+            final_synonyms.update(["1", "5 esquinas", "ofi 1", "ofi1"])
+        elif "2" == s or "axion" in s:
+            final_synonyms.update(["2", "axion", "ofi 2", "ofi2"])
+        elif "3" == s or "39" in s or "kilometro" in s:
+            final_synonyms.update(["3", "39", "kilometro 39", "ofi 3", "ofi3"])
+            
+    return list(final_synonyms)
 
-  const [cuotasLocal, setCuotasLocal] = useState(poliza?.cuotas || []);
-  const [cuotaSeleccionada, setCuotaSeleccionada] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [obsAbiertaId, setObsAbiertaId] = useState(null);
-  const [detalleAbierto, setDetalleAbierto] = useState(null);
 
-  // datos para el modal de confirmación visual
-  const [confirmData, setConfirmData] = useState(null);
+def _is_poliza_oficina_fk() -> bool:
+    try:
+        f = Poliza._meta.get_field("oficina")
+        return bool(getattr(f, "is_relation", False))
+    except (FieldDoesNotExist, Exception):
+        return False
 
-  // 🚀 ESTADOS PARA EL MODAL DE CAMBIO DE FECHA
-  const [modalFechaOpen, setModalFechaOpen] = useState(false);
-  const [cuotaFechaSeleccionada, setCuotaFechaSeleccionada] = useState(null);
-  const [nuevaFecha, setNuevaFecha] = useState("");
-  const [ajustarSiguientes, setAjustarSiguientes] = useState(true);
-  const [isSubmittingFecha, setIsSubmittingFecha] = useState(false);
 
-  const polizaEstado = String(poliza?.estado || "").toUpperCase();
+def _build_oficina_q_from_keys(keys):
+    if not keys: return Q()
+    if "BLOQUEADO" in keys: return Q(pk__isnull=True)
+    
+    is_fk = _is_poliza_oficina_fk()
+    q_final = Q()
+    
+    for k in keys:
+        s = str(k).strip()
+        if not s: continue
+        
+        if is_fk:
+            if s.isdigit():
+                q_final |= Q(poliza__oficina_id=int(s))
+            q_final |= Q(poliza__oficina__nombre__icontains=s)
+            try: q_final |= Q(poliza__oficina__codigo=s)
+            except Exception: pass
+        else:
+            q_final |= Q(poliza__oficina__icontains=s)
+            q_final |= Q(poliza__oficina__iexact=s)
+            
+    return q_final
 
-  const toggleObs = (id) => {
-    setObsAbiertaId((prev) => (prev === id ? null : id));
-  };
 
-  const abrirPagar = (cuota) => {
-    setCuotaSeleccionada(cuota);
-    setModalOpen(true);
-  };
+def _parse_mes_yyyy_mm(raw: str):
+    s = str(raw or "").strip()
+    if not s:
+        return None, None
+    try:
+        parts = s.split("-")
+        if len(parts) != 2:
+            return None, None
+        y = int(parts[0])
+        m = int(parts[1])
+        if m < 1 or m > 12:
+            return None, None
+        first = date(y, m, 1)
+        if m == 12:
+            nxt = date(y + 1, 1, 1)
+        else:
+            nxt = date(y, m + 1, 1)
+        return first, nxt
+    except Exception:
+        return None, None
 
-  const abrirDetalle = (cuota) => {
-    setDetalleAbierto(cuota);
-  };
 
-  const cerrarDetalle = () => {
-    setDetalleAbierto(null);
-  };
+def _parse_ymd(raw: str):
+    s = str(raw or "").strip()
+    if not s:
+        return None
+    return parse_date(s)
 
-  // 🚀 Funciones para Cambiar Fecha
-  const abrirModalFecha = (cuota) => {
-    setCuotaFechaSeleccionada(cuota);
-    setNuevaFecha(toYmd(cuota.fecha_vencimiento) || dayjs().format('YYYY-MM-DD'));
-    setAjustarSiguientes(true);
-    setModalFechaOpen(true);
-  };
 
-  const cerrarModalFecha = () => {
-    setModalFechaOpen(false);
-    setCuotaFechaSeleccionada(null);
-  };
+def _to_bool(v):
+    s = str(v or "").strip().lower()
+    return s in {"1", "true", "t", "yes", "y", "on", "si", "sí"}
 
-  const handleCambiarFecha = async () => {
-    if (!cuotaFechaSeleccionada || !nuevaFecha) return;
-    setIsSubmittingFecha(true);
-    try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
-      const res = await axios.patch(
-        `${BASE_URL.replace(/\/+$/, '')}/cuotas/${cuotaFechaSeleccionada.id}/cambiar-fecha/`,
-        { nueva_fecha: nuevaFecha, ajustar_siguientes: ajustarSiguientes },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
 
-      const cambiadas = res.data?.cuotas_modificadas || 1;
-      toast.success(`¡Listo! Se actualizaron ${cambiadas} cuotas.`);
-      toast.success("Recargando para ver los cambios...");
-      
-      setTimeout(() => window.location.reload(), 1500);
-      setModalFechaOpen(false);
-    } catch (error) {
-      toast.error(error.response?.data?.nueva_fecha || error.response?.data?.detail || "Error al cambiar la fecha");
-    } finally {
-      setIsSubmittingFecha(false);
-    }
-  };
+def _to_int(v, default=None):
+    try:
+        if v is None or v == "":
+            return default
+        return int(str(v).strip())
+    except Exception:
+        return default
 
-  // 1) Confirmar Pago Visual
-  const confirmarPago = (datos) => {
-    if (!cuotaSeleccionada) return;
-    const cuota = cuotaSeleccionada;
-    const monto = Number(datos.monto ?? cuota.monto);
-    const numeroPoliza = poliza?.numero_poliza || poliza?.numero || "-";
 
-    setConfirmData({
-      datos,
-      cuota,
-      monto,
-      numeroPoliza,
-      cuotaNro: cuota.cuota_nro,
-      polizaEstado, // Para las alertas de Cancelada/Vencida
-    });
-    setModalOpen(false);
-  };
+def _only_digits(s: str) -> str:
+    return "".join([c for c in str(s or "") if c.isdigit()])
 
-  // 2) Ejecutar el pago después de confirmar
-  const ejecutarPagoConfirmado = async () => {
-    if (!confirmData) return;
 
-    const { datos, cuota, monto } = confirmData;
-    const formaPago = datos.metodo || datos.forma_pago || "efectivo";
+def _compania_nombre_robusto(poliza):
+    try:
+        if not poliza:
+            return ""
+        comp = getattr(poliza, "compania", None)
+        if comp is None:
+            cn = getattr(poliza, "compania_nombre", None)
+            return str(cn or "").strip()
+        if hasattr(comp, "nombre"):
+            return str(getattr(comp, "nombre", "") or "").strip()
+        return str(comp).strip()
+    except Exception:
+        return ""
 
-    // Lógica de Reactivación Inteligente
-    const overdueCount = cuotasLocal.filter(c => !c.pagado && dayjs(c.fecha_vencimiento).isBefore(dayjs().startOf("day"))).length;
-    const remainingOverdue = Math.max(0, overdueCount - 1);
 
-    await registrarPagoYBalance({
-      dispatch, cuota, poliza, formaPago, monto,
-      onSuccess: () => {
-        setCuotasLocal((prev) =>
-          prev.map((c) =>
-            c.id === cuota.id
-              ? {
-                  ...c,
-                  pagado: true,
-                  forma_pago: formaPago,
-                  monto: monto ?? c.monto,
-                  fecha_pago: dayjs().toISOString(),
-                  pago_registrado_en: dayjs().toISOString(),
+class MedioCobroViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = MedioCobro.objects.all()
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["proveedor", "tipo", "activo"]
+    search_fields = ["valor", "etiqueta", "titular_nombre"]
+    ordering_fields = ["creado", "actualizado", "ultimo_uso", "usos_totales"]
+    ordering = ["-activo", "etiqueta", "proveedor", "tipo"]
+
+    def get_serializer_class(self):
+        from .serializers import MedioCobroSerializer
+        return MedioCobroSerializer
+
+    @action(detail=True, methods=["post"], url_path="activar")
+    def activar(self, request, pk=None):
+        obj = self.get_object()
+        obj.activo = True
+        obj.save(update_fields=["activo"])
+        return Response({"detail": "Activado"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="desactivar")
+    def desactivar(self, request, pk=None):
+        obj = self.get_object()
+        obj.activo = False
+        obj.save(update_fields=["activo"])
+        return Response({"detail": "Desactivado"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="marcar-uso")
+    def marcar_uso(self, request, pk=None):
+        obj = self.get_object()
+        mark = getattr(obj, "marcar_uso", None)
+        if callable(mark):
+            mark()
+        else:
+            from django.utils import timezone as _tz
+            obj.ultimo_uso = _tz.now()
+            obj.usos_totales = (obj.usos_totales or 0) + 1
+            obj.save(update_fields=["ultimo_uso", "usos_totales"])
+        return Response({"detail": "Uso registrado"}, status=status.HTTP_200_OK)
+
+
+class PagoViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Pago.objects.all().select_related("poliza", "cuota")
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["poliza", "cuota", "cuota_nro", "metodo", "registrado_en_balance"]
+    search_fields = ["poliza__numero_poliza"]
+    ordering_fields = ["fecha", "monto"]
+    ordering = ["-fecha", "poliza_id", "cuota_nro"]
+
+    def get_serializer_class(self):
+        from .serializers import PagoSerializer
+        return PagoSerializer
+
+    @action(detail=False, methods=["post"], url_path="registrar")
+    def registrar_pago(self, request):
+        try:
+            result = registrar_pago_handler(request.data, request)
+            if isinstance(result, Response):
+                return result
+            return Response(result, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="enviar-alertas")
+    def enviar_alertas_manual(self, request):
+        user = request.user
+        es_admin = user.is_superuser or (hasattr(user, 'perfil') and user.perfil.rol == 'ADMIN')
+        
+        if not es_admin:
+            return Response(
+                {"error": "Acceso denegado. Solo el Administrador puede disparar los mensajes recordatorios masivos."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            cantidad = ejecutar_alertas()
+            return Response({"mensaje": f"{cantidad} alertas enviadas"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # 🚀 ENDPOINT ACTUALIZADO: Efectividad con Filtros de Fecha para el Tablero
+    @action(detail=False, methods=["get"], url_path="reporte-efectividad")
+    def reporte_efectividad(self, request):
+        oficina_keys = _get_seguridad_oficina_brute(request, request.query_params.get("oficina", ""))
+        if "BLOQUEADO" in oficina_keys:
+            return Response({"detail": "Acceso denegado"}, status=403)
+
+        alertas_qs = AlertaEnviada.objects.select_related(
+            "cuota", 
+            "cuota__poliza", 
+            "cuota__poliza__cliente"
+        ).filter(enviada=True)
+
+        if oficina_keys:
+            alertas_qs = alertas_qs.filter(_build_oficina_q_from_keys(oficina_keys))
+
+        # 🚀 APLICAR FILTROS DE FECHA
+        desde = request.query_params.get("desde")
+        hasta = request.query_params.get("hasta")
+        anio = request.query_params.get("anio")
+        mes = request.query_params.get("mes")
+
+        if desde or hasta:
+            d1 = _parse_ymd(desde) if desde else None
+            d2 = _parse_ymd(hasta) if hasta else None
+            if d1:
+                alertas_qs = alertas_qs.filter(fecha__gte=d1)
+            if d2:
+                alertas_qs = alertas_qs.filter(fecha__lt=(d2 + timedelta(days=1)))
+        elif anio and mes:
+            try:
+                y = int(anio)
+                m = int(mes)
+                first = date(y, m, 1)
+                if m == 12:
+                    nxt = date(y + 1, 1, 1)
+                else:
+                    nxt = date(y, m + 1, 1)
+                alertas_qs = alertas_qs.filter(fecha__gte=first, fecha__lt=nxt)
+            except Exception:
+                pass
+        elif anio:
+             try:
+                y = int(anio)
+                first = date(y, 1, 1)
+                nxt = date(y + 1, 1, 1)
+                alertas_qs = alertas_qs.filter(fecha__gte=first, fecha__lt=nxt)
+             except Exception:
+                pass
+
+        # 🚀 ORDENAR DE MÁS NUEVO A MÁS VIEJO
+        alertas_qs = alertas_qs.order_by("-fecha")
+
+        resultados_pagados = []
+        resultados_pendientes = []
+        
+        horas_totales = 0
+        pagos_recuperados = 0
+        total_enviadas = 0
+        
+        hoy = timezone.now()
+
+        for alerta in alertas_qs:
+            total_enviadas += 1
+            cli = alerta.cuota.poliza.cliente
+            nombre_cliente = f"{getattr(cli, 'nombre', '')} {getattr(cli, 'apellido', '')}".strip()
+
+            if alerta.cuota.pagado and alerta.cuota.pago_registrado_en:
+                delta = alerta.cuota.pago_registrado_en - alerta.fecha
+                if delta.total_seconds() >= 0:
+                    horas_pasadas = delta.total_seconds() / 3600.0
+                    resultados_pagados.append({
+                        "alerta_id": alerta.id,
+                        "tipo_mensaje": alerta.tipo,
+                        "fecha_mensaje": timezone.localtime(alerta.fecha).strftime("%d/%m/%Y %H:%M"),
+                        "fecha_pago": timezone.localtime(alerta.cuota.pago_registrado_en).strftime("%d/%m/%Y %H:%M"),
+                        "horas_tardanza": round(horas_pasadas, 1),
+                        "cuota_nro": alerta.cuota.cuota_nro,
+                        "monto_recuperado": float(alerta.cuota.monto) if alerta.cuota.monto else 0.0,
+                        "cliente": nombre_cliente,
+                        "patente": alerta.cuota.poliza.patente
+                    })
+                    horas_totales += horas_pasadas
+                    pagos_recuperados += 1
+            else:
+                delta_pendiente = hoy - alerta.fecha
+                dias_pasados = delta_pendiente.total_seconds() / 86400.0
+                resultados_pendientes.append({
+                    "alerta_id": alerta.id,
+                    "tipo_mensaje": alerta.tipo,
+                    "fecha_mensaje": timezone.localtime(alerta.fecha).strftime("%d/%m/%Y %H:%M"),
+                    "dias_sin_pagar": round(max(0, dias_pasados), 1),
+                    "cuota_nro": alerta.cuota.cuota_nro,
+                    "monto_adeudado": float(alerta.cuota.monto) if alerta.cuota.monto else 0.0,
+                    "cliente": nombre_cliente,
+                    "patente": alerta.cuota.poliza.patente
+                })
+
+        promedio_horas = round(horas_totales / pagos_recuperados, 1) if pagos_recuperados > 0 else 0
+        tasa_conversion = round((pagos_recuperados / total_enviadas) * 100, 1) if total_enviadas > 0 else 0
+
+        return Response({
+            "kpis": {
+                "total_mensajes_enviados": total_enviadas,
+                "pagos_recuperados": pagos_recuperados,
+                "tasa_conversion": f"{tasa_conversion}%",
+                "tiempo_promedio_respuesta_horas": promedio_horas
+            },
+            "detalle_pagados": resultados_pagados,
+            "detalle_pendientes": resultados_pendientes 
+        }, status=status.HTTP_200_OK)
+
+
+    @action(detail=False, methods=["get"], url_path="buscar-cliente")
+    def buscar_cliente(self, request):
+        dni_raw = (request.query_params.get("dni") or request.query_params.get("q") or "").strip()
+        dni = _only_digits(dni_raw)
+
+        if not dni:
+            return Response({"detail": "Falta parámetro dni (solo números)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        pol_qs = (
+            Poliza.objects.select_related("cliente", "oficina")
+            .only(
+                "id",
+                "oficina",
+                "compania",
+                "patente",
+                "marca",
+                "modelo",
+                "estado",
+                "fecha_baja",
+                "cliente_id",
+                "cliente__apellido",
+                "cliente__nombre",
+                "cliente__dni_cuit_cuil",
+            )
+            .filter(
+                Q(cliente__dni_cuit_cuil__iexact=dni_raw)
+                | Q(cliente__dni_cuit_cuil__iexact=dni)
+                | Q(cliente__dni_cuit_cuil__icontains=dni)
+            )
+        )
+        
+        oficina_keys = _get_seguridad_oficina_brute(request)
+        if "BLOQUEADO" in oficina_keys:
+            return Response({"detail": "Acceso denegado"}, status=403)
+        if oficina_keys:
+            pol_qs = pol_qs.filter(_build_oficina_q_from_keys(oficina_keys))
+
+        pol_qs = pol_qs.order_by("-id")[:50]
+
+        first = pol_qs.first()
+        if not first or not getattr(first, "cliente", None):
+            return Response({"detail": "No se encontró cliente con ese DNI en su sucursal."}, status=status.HTTP_404_NOT_FOUND)
+
+        cli = first.cliente
+        nombre_apellido = f"{(cli.apellido or '').strip()} {(cli.nombre or '').strip()}".strip()
+
+        def get_ofi_str(ofi_obj):
+            if not ofi_obj: return ""
+            if hasattr(ofi_obj, 'nombre'): return str(ofi_obj.nombre)
+            return str(ofi_obj)
+
+        oficina_str = get_ofi_str(getattr(first, "oficina", None))
+        try:
+            counts = {}
+            for p in pol_qs:
+                o_str = get_ofi_str(getattr(p, "oficina", None))
+                if not o_str:
+                    continue
+                counts[o_str] = counts.get(o_str, 0) + 1
+            if counts:
+                oficina_str = sorted(counts.items(), key=lambda x: (-x[1], str(x[0])))[0][0]
+        except Exception:
+            pass
+
+        polizas = []
+        for p in pol_qs:
+            modelo_txt = f"{(getattr(p, 'marca', '') or '').strip()} {(getattr(p, 'modelo', '') or '').strip()}".strip()
+            fecha_baja = getattr(p, "fecha_baja", None)
+            polizas.append(
+                {
+                    "poliza_id":  p.id,
+                    "compania":   _compania_nombre_robusto(p),
+                    "patente":    getattr(p, "patente", "") or "",
+                    "modelo":     modelo_txt,
+                    "oficina":    get_ofi_str(getattr(p, "oficina", None)),
+                    "estado":     getattr(p, "estado", "") or "",
+                    "fecha_baja": fecha_baja.isoformat() if fecha_baja else None,
                 }
-              : c
-          )
-        );
-        setConfirmData(null);
-        setModalOpen(false);
+            )
 
-        if (polizaEstado === "CANCELADA" || polizaEstado === "ANULADA") {
-          toast.success("Deuda cobrada (Póliza CANCELADA).", { icon: "💀", duration: 5000 });
-        } else if (polizaEstado === "VENCIDA") {
-          if (remainingOverdue === 0) {
-            toast.success("Pago registrado. ¡La póliza vuelve a estar ACTIVA! 🟢", { duration: 6000 });
-          } else {
-            toast.success(`Pago registrado. Aún debe ${remainingOverdue} cuotas (La póliza sigue VENCIDA). 🔴`, { duration: 6000 });
-          }
-        } else {
-          toast.success("Pago registrado exitosamente");
-        }
-      },
-    });
-  };
+        return Response(
+            {
+                "cliente": {"dni": getattr(cli, "dni_cuit_cuil", "") or dni, "nombre_apellido": nombre_apellido, "oficina": oficina_str},
+                "polizas": polizas,
+            },
+            status=status.HTTP_200_OK,
+        )
 
-  const handleCancelarConfirm = () => {
-    if (!confirmData) return;
-    const { cuota } = confirmData;
-    setConfirmData(null);
-    if (cuota) {
-      setCuotaSeleccionada(cuota);
-      setModalOpen(true);
-    }
-  };
+    @action(detail=False, methods=["get"], url_path="buscar")
+    def buscar(self, request):
+        q = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
+        
+        oficina_raw = (request.query_params.get("oficina") or "").strip()
+        oficina_keys = _get_seguridad_oficina_brute(request, oficina_raw)
+        
+        if "BLOQUEADO" in oficina_keys:
+            return Response({"detail": "Acceso denegado"}, status=403)
 
-  // ─── Helpers de cobertura (misma lógica que FacturaCuota.jsx) ──────────────
+        poliza_id = _to_int(request.query_params.get("poliza_id") or request.query_params.get("poliza"), None)
+        ocultar_pagadas = _to_bool(request.query_params.get("ocultar_pagadas") or request.query_params.get("solo_pendientes"))
 
-  // Suma 2 días hábiles — igual que calcularRehabilitacionStr en FacturaCuota
-  const sumarDiasHabiles = (fecha, dias) => {
-    const d = new Date(fecha);
-    if (isNaN(d.getTime())) return null;
-    let added = 0;
-    while (added < dias) {
-      d.setDate(d.getDate() + 1);
-      if (d.getDay() !== 0 && d.getDay() !== 6) added++;
-    }
-    return dayjs(d).startOf("day");
-  };
+        pagado_raw = request.query_params.get("pagado")
+        pagado_filter = None
+        if pagado_raw not in (None, ""):
+            pagado_filter = _to_bool(pagado_raw)
 
-  const fmtDayjs = (d) => d ? d.format("DD/MM/YYYY") : "—";
+        vencidas = _to_bool(request.query_params.get("vencidas"))
+        por_vencer = _to_bool(request.query_params.get("por_vencer"))
+        por_vencer_dias = _to_int(request.query_params.get("por_vencer_dias"), 7)
+        por_vencer_dias = max(1, min(365, por_vencer_dias or 7))
 
-  // Armamos los modelos de fila para pasarle al componente CuotaRow
-  const rowModels = cuotasLocal.map((c, idx) => {
-    const fv          = c?.fecha_vencimiento ? dayjs(c.fecha_vencimiento).startOf("day") : null;
-    const fechaPago   = c?.pago_registrado_en || c?.fecha_pago;
-    const fp          = fechaPago ? dayjs(fechaPago).startOf("day") : null;
-    const dias        = fv ? fv.diff(dayjs().startOf("day"), "day") : null;
-    const state       = c?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
-    const label       = state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente";
-    const observacion = ((c?.observaciones_pago || c?.ultima_observacion_pago || "") || "").toString().trim();
+        ordering = (request.query_params.get("ordering") or "").strip()
 
-    // Cuota anterior y siguiente para calcular cobertura
-    const cuotaAnterior = idx > 0 ? cuotasLocal[idx - 1] : null;
-    const cuotaSiguiente = idx < cuotasLocal.length - 1 ? cuotasLocal[idx + 1] : null;
-    const fvAnterior = cuotaAnterior?.fecha_vencimiento
-      ? dayjs(cuotaAnterior.fecha_vencimiento).startOf("day") : null;
-    const fvSiguiente = cuotaSiguiente?.fecha_vencimiento
-      ? dayjs(cuotaSiguiente.fecha_vencimiento).startOf("day") : null;
+        page_size = _to_int(request.query_params.get("page_size"), None)
+        limit = _to_int(request.query_params.get("limit"), None)
+        if page_size is None and limit is not None:
+            page_size = limit
+        if page_size is None:
+            page_size = 150
+        page_size = max(1, min(500, page_size))
 
-    // Determinar si el pago fue atrasado (misma lógica que isPagoAtrasado en FacturaCuota)
-    const pagoAtrasado = c?.pagado && fp && fv ? fp.isAfter(fv) : false;
+        _PAGE_SIZE = page_size
 
-    // ── Cálculo de "Cubre desde / hasta" ──────────────────────────────────
-    let cubreDesde = null;
-    let cubreHasta = null;
-    let sinCobertura = false;
+        class _SearchPagination(PageNumberPagination):
+            page_size = _PAGE_SIZE
+            page_size_query_param = "page_size"
+            max_page_size = 500
 
-    if (!c?.pagado) {
-      // No pagó — sin cobertura desde el vencimiento
-      sinCobertura = true;
-      cubreDesde = fv;
-      cubreHasta = null;
+        total_cuotas_sq = Subquery(
+            Cuota.objects.filter(poliza_id=OuterRef("poliza_id"))
+            .order_by()
+            .values("poliza_id")
+            .annotate(mx=Max("cuota_nro"))
+            .values("mx")[:1]
+        )
 
-    } else if (pagoAtrasado) {
-      // Pagó atrasado — cobertura arranca +2 días hábiles desde la fecha de pago
-      // Coincide exactamente con calcularRehabilitacionStr de FacturaCuota
-      cubreDesde = fp ? sumarDiasHabiles(fechaPago, 2) : null;
-      // Cubre hasta el vencimiento de la próxima cuota (o +1 mes si no hay próxima)
-      cubreHasta = fvSiguiente || (fv ? fv.add(1, "month") : null);
+        qs = (
+            Cuota.objects.all()
+            .select_related("poliza", "poliza__cliente")
+            .annotate(total_cuotas=total_cuotas_sq)
+            .only(
+                "id",
+                "cuota_nro",
+                "monto",
+                "pagado",
+                "fecha_vencimiento",
+                "fecha_pago",
+                "pago_registrado_en",
+                "forma_pago",
+                "observaciones_pago",
+                "ultima_observacion_pago",
+                "poliza_id",
+                "poliza__numero_poliza",
+                "poliza__patente",
+                "poliza__marca",
+                "poliza__modelo",
+                "poliza__cobertura",
+                "poliza__oficina",
+                "poliza__compania",
+                "poliza__cantidad_cuotas",
+                "poliza__cliente_id",
+                "poliza__cliente__apellido",
+                "poliza__cliente__nombre",
+                "poliza__cliente__dni_cuit_cuil",
+                "poliza__cliente__telefono",
+            )
+        )
 
-    } else {
-      // Pagó a tiempo
-      if (idx === 0) {
-        // Primera cuota — desde la fecha de emisión de la póliza
-        cubreDesde = poliza?.fecha_emision
-          ? dayjs(poliza.fecha_emision).startOf("day")
-          : fv;
-      } else {
-        // Cuota N — desde el día siguiente al vencimiento de la cuota anterior
-        cubreDesde = fvAnterior ? fvAnterior.add(1, "day") : null;
-      }
-      // Cubre hasta el vencimiento de esta cuota
-      cubreHasta = fv;
-    }
+        if poliza_id:
+            qs = qs.filter(poliza_id=poliza_id)
 
-    // Textos finales
-    let cubreDesdeTxt, cubreHastaTxt;
-    if (sinCobertura) {
-      cubreDesdeTxt = fv ? `Sin cobertura desde ${fmtDayjs(fv)}` : "Sin cobertura";
-      cubreHastaTxt = "";
-    } else {
-      cubreDesdeTxt = fmtDayjs(cubreDesde);
-      cubreHastaTxt = fmtDayjs(cubreHasta);
-    }
+        if pagado_filter is not None:
+            qs = qs.filter(pagado=pagado_filter)
+        elif ocultar_pagadas:
+            qs = qs.filter(pagado=False)
 
-    return {
-      cuota: c,
-      poliza,
-      nombreCompleto: poliza?.cliente ? `${poliza.cliente.apellido}, ${poliza.cliente.nombre}` : "Cliente",
-      patente: poliza?.patente,
-      modelo: [poliza?.marca, poliza?.modelo].filter(Boolean).join(" "),
-      observacion,
-      hasObs: !!observacion,
-      isObsOpen: obsAbiertaId === c.id,
-      state, label, dias, polizaEstado,
-      sinCobertura,
-      pagoAtrasado,
-      venceTxt:      fmtDayjs(fv),
-      // ✅ Fecha de pago: nunca fallback a hoy — coincide con FacturaCuota
-      pagaTxt:       fp ? fmtDayjs(fp) : null,
-      montoTxt:      fmtMoney(c?.monto),
-      cubreDesdeTxt,
-      cubreHastaTxt,
-      altaTxt:       poliza?.fecha_emision ? dayjs(poliza.fecha_emision).format("DD/MM/YYYY") : null,
-      isWebAdmin, abrirModalFecha,
-    };
-  });
+        if oficina_keys:
+            qs = qs.filter(_build_oficina_q_from_keys(oficina_keys))
 
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={P.card}>
-      {/* Encabezado */}
-      <div className="flex items-start md:items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center justify-center rounded-lg w-12 h-12 shadow ${P.headerIcon}`} title="Pagos">
-            <HiCash className="w-7 h-7" />
-          </span>
-          <div className="leading-tight">
-            <h3 className={`text-xl font-semibold ${P.title}`}>
-              {poliza?.marca} {poliza?.modelo} <span className="opacity-70">({poliza?.patente})</span>
-            </h3>
-            <p className={`text-sm ${P.subtitle} flex flex-wrap gap-x-2`}>
-              <span>Póliza: <span className="font-semibold">{poliza?.numero_poliza || "—"}</span></span>
-              <span className="opacity-50">•</span>
-              <span>Alta: <span className="font-semibold text-indigo-600">{poliza?.fecha_emision ? dayjs(poliza.fecha_emision).format("DD/MM/YYYY") : "—"}</span></span>
-              <span className="opacity-50">•</span>
-              <span>Cobertura: <span className="font-semibold">{poliza?.cobertura || "—"}</span></span>
-            </p>
-            {poliza?.cliente && (
-              <p className={`text-sm ${P.subtitle}`}>Asegurado: <span className="font-semibold">{poliza.cliente.nombre} {poliza.cliente.apellido}</span></p>
-            )}
-          </div>
-        </div>
-      </div>
+        if (not poliza_id) and q:
+            terminos = q.split()
+            for t in terminos:
+                qs = qs.filter(
+                    Q(poliza__numero_poliza__icontains=t)
+                    | Q(poliza__patente__icontains=t)
+                    | Q(poliza__cliente__apellido__icontains=t)
+                    | Q(poliza__cliente__nombre__icontains=t)
+                    | Q(poliza__cliente__dni_cuit_cuil__icontains=t)
+                )
 
-      {/* Lista de cuotas usando CuotaRow (similar a la app global) */}
-      <div className="mt-5 space-y-3">
-        {rowModels.map((m, i) => (
-          <motion.div
-            key={m.cuota.id}
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.22, delay: i * 0.03, ease: "easeOut" }}
-            className="relative"
-          >
-            <CuotaRow model={m} abrirPagar={abrirPagar} abrirDetalle={abrirDetalle} onToggleObs={toggleObs} />
-          </motion.div>
-        ))}
-      </div>
+        hoy = timezone.localdate()
+        if vencidas:
+            qs = qs.filter(pagado=False, fecha_vencimiento__lt=hoy)
 
-      <div className="mt-4 flex items-center gap-2 text-xs text-neutral-700">
-        <span className={`inline-block px-2 py-1 rounded-md border ${P.tip}`}>✨ tip</span>
-        Podés registrar pagos parciales desde el modal y dejar una nota.
-      </div>
+        if por_vencer:
+            hasta = hoy + timedelta(days=por_vencer_dias)
+            qs = qs.filter(pagado=False, fecha_vencimiento__gte=hoy, fecha_vencimiento__lte=hasta)
 
-      {modalOpen && cuotaSeleccionada && (
-        <ModalFormaPago
-          isOpen={modalOpen} onClose={() => setModalOpen(false)} onConfirm={confirmarPago}
-          defaultMonto={cuotaSeleccionada?.monto} title={`Pagar cuota #${cuotaSeleccionada?.cuota_nro}`}
-        />
-      )}
+        if ordering in ("vencimiento", "fecha_vencimiento"):
+            qs = qs.order_by("fecha_vencimiento", "poliza_id", "cuota_nro", "id")
+        elif ordering in ("-vencimiento", "-fecha_vencimiento"):
+            qs = qs.order_by("-fecha_vencimiento", "poliza_id", "cuota_nro", "id")
+        elif ordering == "poliza":
+            qs = qs.order_by("poliza__numero_poliza", "cuota_nro", "id")
+        elif ordering == "-poliza":
+            qs = qs.order_by("-poliza__numero_poliza", "cuota_nro", "id")
+        elif ordering == "cuota":
+            qs = qs.order_by("cuota_nro", "poliza_id", "id")
+        elif ordering == "-cuota":
+            qs = qs.order_by("-cuota_nro", "poliza_id", "id")
+        else:
+            qs = qs.order_by("poliza_id", "cuota_nro", "id")
 
-      {/* 🚀 MODAL PARA CAMBIAR FECHA */}
-      <AnimatePresence>
-        {modalFechaOpen && cuotaFechaSeleccionada && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center px-3">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={isSubmittingFecha ? undefined : cerrarModalFecha} />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 12 }} transition={{ type: "spring", stiffness: 300, damping: 26 }} className="relative z-[71] w-[min(420px,92vw)] rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-2xl">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <h3 className="text-lg font-semibold text-slate-800">Cambiar Vencimiento</h3>
-                <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-8 w-8 rounded-lg border flex items-center justify-center text-slate-500 bg-slate-100 hover:bg-slate-200 border-slate-200 cursor-pointer">
-                  <HiX className="w-4 h-4" />
-                </button>
-              </div>
+        from .serializers import CuotaFlatSerializer
 
-              <div className="space-y-4">
-                <p className="text-sm text-neutral-700">Cuota <span className="font-semibold text-slate-800">#{cuotaFechaSeleccionada.cuota_nro}</span></p>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Nueva fecha</label>
-                  <input type="date" value={nuevaFecha} onChange={(e) => setNuevaFecha(e.target.value)} className="w-full h-11 px-3 rounded-xl bg-white border border-neutral-300 text-slate-800 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-400" />
-                </div>
-                <label className="flex items-start gap-3 cursor-pointer mt-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <input type="checkbox" checked={ajustarSiguientes} onChange={(e) => setAjustarSiguientes(e.target.checked)} className="mt-1 accent-slate-600 w-4 h-4" />
-                  <span className="text-sm text-slate-700">Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).</span>
-                </label>
+        paginator = _SearchPagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+        if page is not None:
+            ser = CuotaFlatSerializer(page, many=True, context={"only_cuotas": bool(poliza_id)})
+            return paginator.get_paginated_response(ser.data)
 
-                <div className="mt-5 flex justify-end gap-2">
-                  <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="cursor-pointer h-9 px-3 rounded-lg border border-slate-200 bg-slate-100 text-sm text-slate-600 hover:bg-slate-200">Cancelar</button>
-                  <button onClick={handleCambiarFecha} disabled={isSubmittingFecha || !nuevaFecha} className="cursor-pointer h-9 px-3 rounded-lg border border-transparent bg-slate-700 text-sm font-medium text-white hover:bg-slate-600 flex items-center gap-2">
-                    {isSubmittingFecha ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        ser = CuotaFlatSerializer(qs[:page_size], many=True)
+        return Response({"count": len(ser.data), "results": ser.data}, status=status.HTTP_200_OK)
 
-      {/* Modal de confirmación visual */}
-      <AnimatePresence>
-        {confirmData && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleCancelarConfirm} />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 8 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 8 }} transition={{ type: "spring", stiffness: 260, damping: 22 }} className="relative z-[61] w-[min(420px,92vw)] rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-2xl">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <h3 className="text-lg font-semibold text-slate-800">Confirmar pago</h3>
-                <button onClick={handleCancelarConfirm} className="cursor-pointer h-9 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-700 inline-flex items-center gap-2 text-sm">
-                  <HiX className="w-5 h-5" /> <span className="hidden sm:inline">Cancelar</span>
-                </button>
-              </div>
 
-              {/* 🚀 ADVERTENCIA SI LA PÓLIZA ESTÁ CANCELADA */}
-              {(confirmData.polizaEstado === "CANCELADA" || confirmData.polizaEstado === "ANULADA") && (
-                <div className="mb-4 p-3 bg-rose-100 border border-rose-200 rounded-xl text-rose-800 text-sm ">
-                  ⚠️ <strong className="text-rose-900">PÓLIZA DADA DE BAJA:</strong> Estás a punto de cobrar una cuota de una póliza cancelada. Esto se registrará en el sistema como <b>recupero de deuda</b>.
-                </div>
-              )}
+class CuotaViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Cuota.objects.all().select_related("poliza", "poliza__cliente")
 
-              <div className="space-y-3">
-                <p className="text-sm text-neutral-700">Vas a pagar la cuota <span className="font-semibold">#{confirmData.cuotaNro ?? "?"}</span> de la póliza <span className="font-semibold">{confirmData.numeroPoliza}</span>.</p>
-                <div className="mt-2 mb-4 text-center">
-                  <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-1">Importe a pagar</p>
-                  <p className="text-4xl sm:text-5xl font-semibold tracking-tight text-emerald-500">$ {fmtMoney(confirmData.monto)}</p>
-                </div>
-              </div>
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["poliza", "pagado", "fecha_vencimiento"]
 
-              <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
-                <button onClick={handleCancelarConfirm} className="cursor-pointer h-10 px-4 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-700 text-sm">Volver y corregir</button>
-                <button onClick={ejecutarPagoConfirmado} className="cursor-pointer h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm inline-flex items-center justify-center gap-2  shadow-emerald-500/30">
-                  <HiCash className="w-5 h-5" /> Confirmar pago
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    search_fields = [
+        "poliza__numero_poliza",
+        "poliza__patente",
+        "poliza__cliente__apellido",
+        "poliza__cliente__nombre",
+        "poliza__cliente__dni_cuit_cuil",
+    ]
 
-      <AnimatePresence>
-        {detalleAbierto && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center px-3">
-            <div onClick={cerrarDetalle} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26 }} className="relative z-[61] w-full max-w-[680px] max-h-[85vh] overflow-y-auto rounded-lg border border-neutral-200 bg-white p-4 sm:p-5 shadow-2xl custom-scrollbar">
-              <div className="flex items-start justify-between gap-3 sticky top-0 bg-white pb-3 z-10 border-b border-neutral-200 mb-3">
-                <h3 className="text-base sm:text-lg font-bold text-slate-800">Detalle de cuota</h3>
-                <button onClick={cerrarDetalle} className="cursor-pointer h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-lg sm:rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-700 flex items-center justify-center">
-                  <HiX className="w-4 h-4 sm:w-5 sm:h-5" /> <span className="hidden sm:inline ml-1 text-sm font-medium">Cerrar</span>
-                </button>
-              </div>
-              <div className="space-y-3 text-xs sm:text-sm">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <InfoRow label="Cliente" value={detalleAbierto.poliza?.cliente ? `${detalleAbierto.poliza.cliente.apellido}, ${detalleAbierto.poliza.cliente.nombre}` : "—"} />
-                  <InfoRow label="DNI/CUIT" value={detalleAbierto.poliza?.cliente?.dni_cuit_cuil || "—"} />
-                  <InfoRow label="Patente" value={(detalleAbierto.poliza?.patente || "").toUpperCase() || "—"} />
-                  <InfoRow label="Vehículo" value={[detalleAbierto.poliza?.marca, detalleAbierto.poliza?.modelo].filter(Boolean).join(" ") || "—"} />
-                  <InfoRow label="Cobertura" value={detalleAbierto.poliza?.cobertura || "—"} />
-                  <InfoRow label="Compañía" value={detalleAbierto.poliza?.compania_nombre || detalleAbierto.poliza?.compania || "—"} />
-                  <InfoRow label="Cuota" value={detalleAbierto.cuota_nro || "—"} />
-                  <InfoRow label="Monto" value={`$ ${fmtMoney(detalleAbierto.monto)}`} />
-                  <InfoRow label="Vencimiento" value={detalleAbierto.fecha_vencimiento ? dayjs(detalleAbierto.fecha_vencimiento).format("DD/MM/YYYY") : "—"} />
-                  <InfoRow label="Fecha de pago" value={detalleAbierto.fecha_pago ? dayjs(detalleAbierto.fecha_pago).format("DD/MM/YYYY") : "—"} />
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
+    ordering_fields = ["fecha_vencimiento", "cuota_nro", "monto"]
+    ordering = ["poliza_id", "cuota_nro"]
 
-// 🚀 FILA RESUELTA PARA EL TEMA PASTEL (POLIZA INDIVIDUAL)
-const CuotaRow = memo(function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs }) {
-  const {
-    cuota, poliza, nombreCompleto, patente, modelo, observacion, hasObs, isObsOpen,
-    state, label, dias, polizaEstado, venceTxt, pagaTxt, montoTxt,
-    cubreDesdeTxt, cubreHastaTxt, sinCobertura, pagoAtrasado,
-    isWebAdmin, abrirModalFecha
-  } = model;
+    def get_serializer_class(self):
+        from .serializers import CuotaSerializer, CuotaPagoHistorialSerializer
+        if getattr(self, "action", "") == "historial_pagos":
+            return CuotaPagoHistorialSerializer
+        return CuotaSerializer
 
-  const S = P[state];
-  const Icon = state === "paid" ? HiBadgeCheck : HiClock;
+    @action(detail=True, methods=["patch"], url_path="pagar")
+    def pagar(self, request, pk=None):
+        cuota: Cuota = self.get_object()
 
-  const isPolicyVencida = polizaEstado === "VENCIDA";
-  const isPolicyCancelada = polizaEstado === "CANCELADA" || polizaEstado === "ANULADA";
+        if cuota.pagado:
+            return Response({"detail": "La cuota ya figura como pagada."}, status=status.HTTP_409_CONFLICT)
 
-  let bgClass = S.rowBg;
-  let borderClass = S.rowBd;
-  let textClass = S.rowTxt;
+        ahora = timezone.now()
 
-  if (isPolicyCancelada && !cuota.pagado) {
-    bgClass = "bg-neutral-100 opacity-80 grayscale-[20%]";
-    borderClass = "border-neutral-300";
-    textClass = "text-slate-500";
-  } else if (isPolicyVencida && !cuota.pagado) {
-    bgClass = "bg-orange-50 border-l-2 border-amber-400";
-    borderClass = "border-orange-300";
-  }
+        fecha_pago_raw = request.data.get("fecha_pago")
+        if fecha_pago_raw:
+            if isinstance(fecha_pago_raw, str):
+                _fecha_pago = parse_date(fecha_pago_raw)
+                if not _fecha_pago:
+                    return Response({"fecha_pago": "Formato inválido. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+                fecha_pago = _fecha_pago
+            else:
+                fecha_pago = fecha_pago_raw
+        else:
+            fecha_pago = ahora.date()
 
-  return (
-    <div className={`mx-0 my-0 sm:rounded-lg border p-3 sm:p-4  ${bgClass} ${borderClass} ${textClass} relative`}>
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 pl-2 sm:pl-0">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span className="inline-flex items-center justify-center w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-white/50 text-slate-500 ring-1 ring-black/5">
-              <HiUser className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
-            </span>
-            <span className="truncate max-w-[40ch] sm:max-w-[60ch] font-semibold text-sm sm:text-base">
-              {nombreCompleto}
-            </span>
-            {isPolicyCancelada && !cuota.pagado && (
-              <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 text-[10px] font-black uppercase border border-rose-200 ">💀 Deuda Baja</span>
-            )}
-            {isPolicyVencida && !cuota.pagado && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase border border-amber-200 text-amber-700 rounded px-1.5 py-0.5 bg-amber-50">⚠️ Reactivar</span>
-            )}
-            <span className="text-xs text-neutral-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Cuota #{cuota?.cuota_nro ?? "?"}</span>
-          </div>
+        forma_pago = request.data.get("forma_pago")
+        if forma_pago and forma_pago not in ("efectivo", "transferencia"):
+            return Response({"forma_pago": 'Valor inválido. Use "efectivo" o "transferencia".'}, status=status.HTTP_400_BAD_REQUEST)
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
-            <span className={`inline-flex items-center gap-1 sm:gap-2 rounded-md sm:rounded-full border px-2 sm:px-3 h-6 sm:h-8 ${S.chipBg} ${S.chipTxt} ${S.chipBd} text-[10px] sm:text-xs font-medium`}>
-              <Icon className="w-3 h-3 sm:w-4 sm:h-4" /> {label}
-            </span>
+        metodo = request.data.get("metodo")
+        if metodo in ("mercado_pago", "tarjeta"):
+            metodo = "transferencia"
+        if metodo and metodo not in ("efectivo", "transferencia"):
+            return Response({"metodo": 'Valor inválido. Use "efectivo" o "transferencia".'}, status=status.HTTP_400_BAD_REQUEST)
 
-            <span className="text-neutral-300 hidden sm:inline">•</span>
+        if not forma_pago and metodo:
+            forma_pago = "efectivo" if metodo == "efectivo" else "transferencia"
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="rounded-md px-2 py-1 border border-rose-200 bg-rose-50 flex items-center gap-1 w-fit">
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">Vence:</span>
-                <span className="text-xs font-bold text-slate-800">{venceTxt || "—"}</span>
-                {/* 🚀 TEMPORAL: Quitamos isWebAdmin para que todos lo vean */}
-                {!cuota.pagado && (
-                  <button type="button" onClick={() => model.abrirModalFecha(cuota)} className="ml-1 text-rose-500 hover:text-rose-700 transition cursor-pointer">
-                    <HiPencil className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              {sinCobertura ? (
-                <div className="rounded-md px-2 py-1 border border-rose-200 bg-rose-50 flex items-center gap-1 w-fit">
-                  <span className="text-[10px] uppercase tracking-wider text-rose-600 font-bold">⚠️ {cubreDesdeTxt}</span>
-                </div>
-              ) : (
-                <div className={`rounded-md px-2 py-1 border flex items-center gap-1 w-fit ${pagoAtrasado ? "bg-orange-50/80 border-orange-300" : "bg-indigo-50/80 border-indigo-200"}`}>
-                  <span className={`text-[10px] uppercase tracking-wider font-bold ${pagoAtrasado ? "text-orange-600" : "text-slate-500"}`}>
-                    {pagoAtrasado ? "⏱ Cubre:" : "Cubre:"}
-                  </span>
-                  <span className={`text-xs font-medium ${pagoAtrasado ? "text-orange-900" : "text-slate-700"}`}>
-                    {cubreDesdeTxt} {cubreHastaTxt ? <><span className={`text-[10px] ${pagoAtrasado ? "text-orange-400" : "text-slate-400"}`}>al</span> {cubreHastaTxt}</> : ""}
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="text-[11px] sm:text-sm text-neutral-500 flex flex-wrap items-center gap-x-2 w-full sm:w-auto">
-              {!!pagaTxt && <span>Pagada: {pagaTxt}</span>}
-              {dias !== null && !cuota?.pagado && <span>{dias < 0 ? `Atraso: ${Math.abs(dias)} días` : `Faltan: ${dias} días`}</span>}
-            </div>
-          </div>
+        monto_raw = request.data.get("monto")
+        monto_decimal = None
+        if monto_raw not in (None, ""):
+            try:
+                monto_decimal = Decimal(str(monto_raw))
+                if monto_decimal < 0:
+                    return Response({"monto": "Debe ser un número positivo."}, status=status.HTTP_400_BAD_REQUEST)
+            except (InvalidOperation, TypeError, ValueError):
+                return Response({"monto": "Monto inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
-          {hasObs && isObsOpen && (
-            <div className="mt-2.5 rounded-xl border px-2.5 py-2 bg-neutral-100 text-neutral-700 border-neutral-300">
-              <div className="flex items-start gap-1.5"><HiExclamationCircle className="w-4 h-4 mt-0.5" /> <div className="text-sm"><span className="font-semibold">Obs: </span>{observacion}</div></div>
-            </div>
-          )}
-        </div>
+        observaciones = request.data.get("observaciones", "")
+        registrar_en_balance = request.data.get("registrar_en_balance", True)
 
-        <div className="flex flex-col items-stretch lg:items-end gap-2.5 sm:gap-3 w-full lg:w-auto mt-1 sm:mt-0">
-          <p className={`text-xl font-mono font-semibold tracking-tight text-left lg:text-right w-full ${isPolicyVencida && !cuota.pagado ? 'text-amber-600' : ''}`}>
-            $ {montoTxt}
-          </p>
+        with transaction.atomic():
+            txt_obs = str(observaciones or "").strip()
+            if txt_obs:
+                try:
+                    cuota.observaciones_pago = txt_obs
+                    cuota.ultima_observacion_pago = txt_obs
+                except Exception:
+                    pass
 
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full">
-            <button onClick={() => abrirDetalle(cuota)} className={`flex-1 sm:flex-none h-8 sm:h-10 px-2 sm:px-3 rounded-lg border ${P.neutralBtn} transition inline-flex items-center justify-center gap-1.5 cursor-pointer text-xs`}>
-              <HiQuestionMarkCircle className="w-4 h-4" /> Info
-            </button>
-            {hasObs && (
-              <button onClick={() => onToggleObs(cuota?.id)} className={`flex-1 sm:flex-none h-8 sm:h-10 px-2 sm:px-3 rounded-lg border bg-amber-100 hover:bg-amber-50 text-amber-800 border-amber-200 transition cursor-pointer text-xs`}>
-                <HiExclamationCircle className="w-4 h-4" /> Nota
-              </button>
-            )}
-            {!cuota?.pagado && (
-              <button onClick={() => abrirPagar(cuota)} className={`flex-[2] sm:flex-none h-8 sm:h-10 px-3 rounded-lg ${isPolicyVencida ? 'bg-amber-600 hover:bg-amber-700 text-white' : P.actionBtn} transition inline-flex items-center justify-center gap-1.5 cursor-pointer text-xs font-semibold`}>
-                <HiCash className="w-4 h-4" /> {isPolicyVencida ? "Reactivar" : "Pagar"}
-              </button>
-            )}
-            {cuota?.pagado && (
-              <>
-                <DescargarFactura cliente={poliza?.cliente} poliza={poliza} cuota={cuota} tone="neutral" label="Bajar" className="flex-1 h-8 sm:h-10 px-1 rounded-lg text-xs" />
-                <ImprimirFacturaTicket cliente={poliza?.cliente} poliza={poliza} cuota={cuota} label="Ticket" className={`flex-1 h-8 sm:h-10 px-1 rounded-lg border transition inline-flex items-center justify-center gap-1.5 text-xs cursor-pointer ${P.ticketBtn}`} />
-              </>
-            )}
-            <div className="flex-[2] sm:flex-none">
-              <EnviarFacturaWhatsapp cuota={cuota}>
-                <button className={`w-full h-8 sm:h-10 px-2 rounded-lg border ${P.neutralBtn} transition inline-flex items-center justify-center gap-1.5 cursor-pointer text-xs`}>
-                  <HiDeviceMobile className="w-4 h-4" /> WPP
-                </button>
-              </EnviarFacturaWhatsapp>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
+            cuota.pagado = True
+            cuota.fecha_pago = fecha_pago
+            cuota.pago_registrado_en = ahora
 
-function InfoRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-      <span className="text-slate-500 text-xs">{label}</span>
-      <span className="text-slate-800 truncate max-w-[65%] text-right font-medium text-xs sm:text-sm">
-        {value}
-      </span>
-    </div>
-  );
-}
+            if forma_pago:
+                cuota.forma_pago = forma_pago
+            if monto_decimal is not None:
+                cuota.monto = monto_decimal
+
+            update_fields = ["pagado", "fecha_pago", "pago_registrado_en", "forma_pago", "monto"]
+            if txt_obs:
+                update_fields += ["observaciones_pago", "ultima_observacion_pago"]
+
+            cuota.save(update_fields=update_fields)
+
+            pago_defaults = {
+                "fecha": fecha_pago,
+                "monto": monto_decimal if monto_decimal is not None else cuota.monto,
+                "metodo": (metodo if metodo else (forma_pago if forma_pago in ("efectivo", "transferencia") else "transferencia")),
+                "observaciones": observaciones,
+            }
+            pago, creado = Pago.objects.get_or_create(
+                poliza=cuota.poliza,
+                cuota=cuota,
+                cuota_nro=cuota.cuota_nro,
+                defaults=pago_defaults,
+            )
+            if not creado:
+                for k, v in pago_defaults.items():
+                    setattr(pago, k, v)
+                pago.save()
+
+            medio_id = request.data.get("medio_cobro_id")
+            medio_valor = request.data.get("medio_cobro_valor") or request.data.get("destino_cuenta")
+            try:
+                medio = None
+                if medio_id:
+                    medio = MedioCobro.objects.filter(id=medio_id).first()
+                if not medio and medio_valor:
+                    medio = MedioCobro.objects.filter(valor=medio_valor).first() or MedioCobro.objects.filter(etiqueta=medio_valor).first()
+                if medio:
+                    mark = getattr(medio, "marcar_uso", None)
+                    if callable(mark):
+                        mark()
+                    else:
+                        medio.ultimo_uso = timezone.now()
+                        medio.usos_totales = (medio.usos_totales or 0) + 1
+                        medio.save(update_fields=["ultimo_uso", "usos_totales"])
+            except Exception:
+                pass
+
+            if registrar_en_balance and not getattr(pago, "registrado_en_balance", False):
+                pago.registrado_en_balance = True
+                pago.save(update_fields=["registrado_en_balance"])
+
+                poliza_obj = cuota.poliza
+                ofi_code = str(getattr(poliza_obj.oficina, 'id', poliza_obj.oficina or ""))
+                
+                forma_balance = "efectivo" if (pago.metodo == "efectivo") else "transferencia"
+
+                cliente_nombre = ""
+                try:
+                    c = poliza_obj.cliente
+                    if c:
+                        nom = (getattr(c, "nombre", "") or "").strip()
+                        ape = (getattr(c, "apellido", "") or "").strip()
+                        if ape and nom:
+                            cliente_nombre = f"{ape}, {nom}"
+                        else:
+                            cliente_nombre = ape or nom
+                except Exception:
+                    pass
+
+                # Datos de transferencia del wizard
+                destino_cuenta = (
+                    request.data.get("destino_cuenta") or
+                    request.data.get("medio_cobro_valor") or
+                    ""
+                )
+                enviado_por    = request.data.get("enviado_por")    or cliente_nombre or ""
+                cuit_remitente = request.data.get("cuit_remitente") or ""
+                nro_operacion  = request.data.get("nro_operacion")  or ""
+
+                # Observaciones con trazabilidad
+                obs_partes = []
+                if observaciones:     obs_partes.append(str(observaciones).strip())
+                if cuit_remitente:    obs_partes.append(f"CUIT: {cuit_remitente}")
+                if nro_operacion:     obs_partes.append(f"Op: {nro_operacion}")
+                obs_final = " | ".join(obs_partes) or ""
+
+                ingreso_data = {
+                    "monto":        pago.monto,
+                    "categoria":    "Cobro de Cuota",
+                    "forma_pago":   forma_balance,
+                    "pagado_por":   enviado_por,
+                    "billetera":    destino_cuenta,
+                    "cuit_remitente": cuit_remitente,
+                    "nro_operacion":  nro_operacion,
+                    "observaciones":  obs_final,
+                    "descripcion":  f"Pago cuota {pago.cuota_nro} - Póliza {poliza_obj.numero_poliza}"
+                }
+                
+                try:
+                    ingreso_data["fecha"] = fecha_pago
+                except Exception: pass
+                
+                try:
+                    # ✅ CORRECCIÓN: Le agregamos _id para que Django entienda que es el número identificador
+                    ingreso_data["oficina_id"] = ofi_code
+                except Exception: pass
+                
+                try:
+                    ingreso_data["usuario"] = request.user
+                except Exception: pass
+                
+                BalanceIngreso.objects.create(**ingreso_data)
+
+            # 🚀===================================================
+            # 🚀 LÓGICA DE REACTIVACIÓN INTELIGENTE
+            # ===================================================
+            poliza: Poliza = cuota.poliza
+            hoy = timezone.localdate()
+            hay_vencidas = poliza.cuotas.filter(pagado=False, fecha_vencimiento__lt=hoy).exists()
+            
+            estado_actual = str(getattr(poliza, "estado", "")).strip().upper()
+
+            if estado_actual in ("CANCELADA", "ANULADA"):
+                pass
+            elif estado_actual == "VENCIDA" and not hay_vencidas:
+                poliza.estado = "activa"
+                poliza.save(update_fields=["estado"])
+            elif not hay_vencidas and estado_actual != "ACTIVA" and estado_actual not in ("CANCELADA", "ANULADA"):
+                poliza.estado = "activa"
+                poliza.save(update_fields=["estado"])
+            # ===================================================
+
+        serializer = self.get_serializer(cuota)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post", "patch"], url_path="cambiar-fecha")
+    def cambiar_fecha(self, request, pk=None):
+        cuota = self.get_object()
+        nueva_fecha_raw = request.data.get("nueva_fecha")
+        
+        if not nueva_fecha_raw:
+            return Response({"nueva_fecha": "Este campo es requerido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        nueva_fecha = _parse_ymd(nueva_fecha_raw)
+        if not nueva_fecha:
+            return Response({"nueva_fecha": "Formato inválido. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ajustar_siguientes = _to_bool(request.data.get("ajustar_siguientes", False))
+
+        def add_months(sourcedate, months):
+            month = sourcedate.month - 1 + months
+            year = sourcedate.year + month // 12
+            month = month % 12 + 1
+            day = min(sourcedate.day, calendar.monthrange(year, month)[1])
+            return date(year, month, day)
+
+        with transaction.atomic():
+            cuota.fecha_vencimiento = nueva_fecha
+            cuota.save(update_fields=["fecha_vencimiento"])
+            modificadas = 1
+
+            if ajustar_siguientes:
+                siguientes = Cuota.objects.filter(
+                    poliza=cuota.poliza,
+                    cuota_nro__gt=cuota.cuota_nro
+                ).order_by("cuota_nro")
+
+                meses_a_sumar = 1
+                for sig in siguientes:
+                    sig.fecha_vencimiento = add_months(nueva_fecha, meses_a_sumar)
+                    sig.save(update_fields=["fecha_vencimiento"])
+                    meses_a_sumar += 1
+                    modificadas += 1
+
+        return Response({
+            "detail": "Fechas actualizadas correctamente.",
+            "cuotas_modificadas": modificadas
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="factura")
+    def factura(self, request, pk=None):
+        cuota = self.get_object()
+        
+        oficina_keys = _get_seguridad_oficina_brute(request)
+        if "BLOQUEADO" in oficina_keys:
+            return Response({"detail": "No tienes acceso a esta factura."}, status=403)
+            
+        pdf_filelike = generar_factura_pdf(cuota)
+        return FileResponse(
+            pdf_filelike,
+            as_attachment=True,
+            filename=f"factura_cuota_{cuota.id}.pdf",
+            content_type="application/pdf",
+        )
+
+    @action(detail=False, methods=["get"], url_path="a-vencer")
+    def cuotas_a_vencer(self, request):
+        hoy = timezone.localdate()
+        hitos = {hoy - timedelta(days=30), hoy - timedelta(days=7), hoy - timedelta(days=3), hoy, hoy + timedelta(days=3)}
+        
+        oficina_keys = _get_seguridad_oficina_brute(request, request.query_params.get("oficina", ""))
+        if "BLOQUEADO" in oficina_keys:
+            return Response({"detail": "Acceso denegado"}, status=403)
+            
+        qs = Cuota.objects.filter(pagado=False, fecha_vencimiento__in=hitos).select_related("poliza", "poliza__cliente")
+        
+        if oficina_keys:
+            qs = qs.filter(_build_oficina_q_from_keys(oficina_keys))
+            
+        qs = qs.order_by("fecha_vencimiento", "poliza_id", "cuota_nro")
+        
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _historial_pagos_base_queryset(self):
+        last_pago_registrado_en_sq = Subquery(
+            Pago.objects.filter(
+                poliza_id=OuterRef("poliza_id"),
+                cuota_nro=OuterRef("cuota_nro"),
+            )
+            .order_by("-registrado_en", "-id")
+            .values("registrado_en")[:1]
+        )
+
+        return (
+            Cuota.objects.filter(pagado=True)
+            .select_related("poliza", "poliza__cliente")
+            .annotate(
+                pago_ts=Coalesce(F("pago_registrado_en"), last_pago_registrado_en_sq)
+            )
+            .only(
+                "id",
+                "fecha_pago",
+                "pago_registrado_en",
+                "cuota_nro",
+                "monto",
+                "forma_pago",
+                "observaciones_pago",
+                "ultima_observacion_pago",
+                "poliza_id",
+                "poliza__numero_poliza",
+                "poliza__patente",
+                "poliza__marca",
+                "poliza__modelo",
+                "poliza__oficina",
+                "poliza__compania",
+                "poliza__cantidad_cuotas",
+                "poliza__cliente_id",
+                "poliza__cliente__apellido",
+                "poliza__cliente__nombre",
+                "poliza__cliente__dni_cuit_cuil",
+                "poliza__cliente__telefono",
+            )
+        )
+
+    def _apply_historial_filters(self, qs, request, *, mes="", dia="", desde="", hasta="", oficina="", search=""):
+        mes = (mes or "").strip()
+        dia = (dia or "").strip()
+        desde = (desde or "").strip()
+        hasta = (hasta or "").strip()
+        search = (search or "").strip()
+        
+        oficina_keys = _get_seguridad_oficina_brute(request, (oficina or "").strip())
+        if "BLOQUEADO" in oficina_keys:
+            raise ValueError("Acceso denegado a esta oficina.")
+
+        if dia:
+            d = _parse_ymd(dia)
+            if not d:
+                raise ValueError("Parámetro 'dia' inválido. Use YYYY-MM-DD (ej: 2026-02-10).")
+            qs = qs.filter(fecha_pago=d)
+
+        elif desde or hasta:
+            d1 = _parse_ymd(desde) if desde else None
+            d2 = _parse_ymd(hasta) if hasta else None
+            if desde and not d1:
+                raise ValueError("Parámetro 'desde' inválido. Use YYYY-MM-DD.")
+            if hasta and not d2:
+                raise ValueError("Parámetro 'hasta' inválido. Use YYYY-MM-DD.")
+            if d1 and d2 and d2 < d1:
+                raise ValueError("Rango inválido: 'hasta' no puede ser menor que 'desde'.")
+
+            if d1:
+                qs = qs.filter(fecha_pago__gte=d1)
+            if d2:
+                qs = qs.filter(fecha_pago__lt=(d2 + timedelta(days=1)))
+
+        elif mes:
+            first, nxt = _parse_mes_yyyy_mm(mes)
+            if not first:
+                raise ValueError("Parámetro 'mes' inválido. Use YYYY-MM (ej: 2026-02).")
+            qs = qs.filter(fecha_pago__gte=first, fecha_pago__lt=nxt)
+
+        if oficina_keys:
+            qs = qs.filter(_build_oficina_q_from_keys(oficina_keys))
+
+        if search:
+            terminos = search.split()
+            for t in terminos:
+                qs = qs.filter(
+                    Q(poliza__numero_poliza__icontains=t)
+                    | Q(poliza__patente__icontains=t)
+                    | Q(poliza__cliente__apellido__icontains=t)
+                    | Q(poliza__cliente__nombre__icontains=t)
+                    | Q(poliza__cliente__dni_cuit_cuil__icontains=t)
+                )
+
+        return qs
+
+    def _apply_historial_ordering(self, qs, ordering_raw: str):
+        ordering = (ordering_raw or "-fecha_pago").strip()
+        allowed = {"fecha_pago", "-fecha_pago", "monto", "-monto", "cuota_nro", "-cuota_nro"}
+        if ordering not in allowed:
+            ordering = "-fecha_pago"
+
+        if ordering == "monto":
+            return qs.order_by("monto", "poliza_id", "cuota_nro")
+        if ordering == "-monto":
+            return qs.order_by("-monto", "-fecha_pago", "poliza_id", "cuota_nro")
+        if ordering == "cuota_nro":
+            return qs.order_by("cuota_nro", "-fecha_pago", "poliza_id")
+        if ordering == "-cuota_nro":
+            return qs.order_by("-cuota_nro", "-fecha_pago", "poliza_id")
+
+        return qs.order_by("-fecha_pago", "poliza_id", "cuota_nro")
+
+    def _render_historial_csv(self, qs, filename="historial_pagos.csv"):
+        out = StringIO()
+        writer = csv.writer(out)
+
+        writer.writerow(
+            [
+                "fecha_pago",
+                "cuota_nro",
+                "monto",
+                "forma_pago",
+                "numero_poliza",
+                "patente",
+                "compania",
+                "oficina",
+                "cliente_apellido",
+                "cliente_nombre",
+                "cliente_dni",
+                "cliente_telefono",
+            ]
+        )
+
+        for c in qs.iterator(chunk_size=2000):
+            pol = getattr(c, "poliza", None)
+            cli = getattr(pol, "cliente", None) if pol else None
+
+            writer.writerow(
+                [
+                    getattr(c, "fecha_pago", "") or "",
+                    getattr(c, "cuota_nro", "") or "",
+                    getattr(c, "monto", "") or "",
+                    getattr(c, "forma_pago", "") or "",
+                    getattr(pol, "numero_poliza", "") if pol else "",
+                    getattr(pol, "patente", "") if pol else "",
+                    _compania_nombre_robusto(pol),
+                    getattr(pol, "oficina", "") if pol else "",
+                    getattr(cli, "apellido", "") if cli else "",
+                    getattr(cli, "nombre", "") if cli else "",
+                    getattr(cli, "dni_cuit_cuil", "") if cli else "",
+                    getattr(cli, "telefono", "") if cli else "",
+                ]
+            )
+
+        resp = HttpResponse(out.getvalue(), content_type="text/csv; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return resp
+
+    def _render_historial_pdf(self, qs, filename="historial_pagos.pdf", titulo="Historial de pagos"):
+        buff = BytesIO()
+        pdf = canvas.Canvas(buff, pagesize=landscape(A4))
+        width, height = landscape(A4)
+
+        left = 12 * mm
+        top = height - 12 * mm
+        line_h = 6.2 * mm
+
+        pdf.setTitle(filename)
+
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(left, top, titulo)
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(left, top - 8 * mm, f"Generado: {timezone.localtime().strftime('%d/%m/%Y %H:%M')}")
+
+        y = top - 16 * mm
+
+        cols = [
+            ("Fecha", 22 * mm),
+            ("Asegurado", 60 * mm),
+            ("DNI", 26 * mm),
+            ("Patente", 24 * mm),
+            ("Póliza", 26 * mm),
+            ("Compañía", 40 * mm),
+            ("Oficina", 22 * mm),
+            ("Importe", 24 * mm),
+            ("Medio", 26 * mm),
+        ]
+
+        def draw_row(values, y, bold=False):
+            x = left
+            pdf.setFont("Helvetica-Bold" if bold else "Helvetica", 9)
+            for (txt, w), v in zip(cols, values):
+                s = str(v or "")
+                if len(s) > 38 and w <= 60 * mm:
+                    s = s[:35] + "…"
+                pdf.drawString(x, y, s)
+                x += w
+
+        draw_row([t for (t, _) in cols], y, bold=True)
+        y -= line_h
+        pdf.setLineWidth(0.4)
+        pdf.line(left, y + 2 * mm, width - left, y + 2 * mm)
+
+        for item in qs.iterator(chunk_size=2000):
+            if y < 12 * mm:
+                pdf.showPage()
+                pdf.setFont("Helvetica-Bold", 14)
+                pdf.drawString(left, top, titulo)
+                pdf.setFont("Helvetica", 9)
+                pdf.drawString(left, top - 8 * mm, f"Generado: {timezone.localtime().strftime('%d/%m/%Y %H:%M')}")
+                y = top - 16 * mm
+                draw_row([t for (t, _) in cols], y, bold=True)
+                y -= line_h
+                pdf.line(left, y + 2 * mm, width - left, y + 2 * mm)
+
+            pol = getattr(item, "poliza", None)
+            cli = getattr(pol, "cliente", None) if pol else None
+
+            fecha = getattr(item, "fecha_pago", None) or ""
+            if fecha:
+                try:
+                    fecha = fecha.strftime("%d/%m/%Y")
+                except Exception:
+                    fecha = str(fecha)
+
+            ape = getattr(cli, "apellido", "") if cli else ""
+            nom = getattr(cli, "nombre", "") if cli else ""
+            asegurado = f"{ape}, {nom}".strip(", ").strip()
+
+            dni = getattr(cli, "dni_cuit_cuil", "") if cli else ""
+            patente = getattr(pol, "patente", "") if pol else ""
+            numero_poliza = getattr(pol, "numero_poliza", "") if pol else ""
+            compania = _compania_nombre_robusto(pol)
+            oficina = getattr(pol, "oficina", "") if pol else ""
+            monto = getattr(item, "monto", "") or ""
+            medio = getattr(item, "forma_pago", "") or ""
+
+            draw_row([fecha, asegurado, dni, patente, numero_poliza, compania, oficina, monto, medio], y, bold=False)
+            y -= line_h
+
+        pdf.save()
+        buff.seek(0)
+        return FileResponse(buff, as_attachment=True, filename=filename, content_type="application/pdf")
+
+    @action(detail=False, methods=["get"], url_path="pagos")
+    def historial_pagos(self, request):
+        mes = (request.query_params.get("mes") or "").strip()
+        dia = (request.query_params.get("dia") or "").strip()
+        desde = (request.query_params.get("desde") or "").strip()
+        hasta = (request.query_params.get("hasta") or "").strip()
+        oficina = (request.query_params.get("oficina") or "").strip()
+        search = (request.query_params.get("search") or request.query_params.get("q") or "").strip()
+        ordering = (request.query_params.get("ordering") or "-fecha_pago").strip()
+
+        export = (request.query_params.get("export") or "").strip().lower()
+        all_flag = _to_bool(request.query_params.get("all") or request.query_params.get("todos"))
+
+        qs = self._historial_pagos_base_queryset()
+
+        try:
+            qs = self._apply_historial_filters(qs, request, mes=mes, dia=dia, desde=desde, hasta=hasta, oficina=oficina, search=search)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = self._apply_historial_ordering(qs, ordering)
+
+        if export == "csv":
+            filename = "historial_pagos.csv"
+            if dia:
+                filename = f"pagos_{dia}.csv"
+            elif desde or hasta:
+                filename = f"pagos_{desde or 'inicio'}_a_{hasta or 'hoy'}.csv"
+            elif mes:
+                filename = f"pagos_{mes}.csv"
+            return self._render_historial_csv(qs, filename=filename)
+
+        if export == "pdf":
+            filename = "historial_pagos.pdf"
+            titulo = "Historial de pagos"
+            if dia:
+                filename = f"pagos_{dia}.pdf"
+                titulo = f"Pagos del día {dia}"
+            elif desde or hasta:
+                filename = f"pagos_{desde or 'inicio'}_a_{hasta or 'hoy'}.pdf"
+                titulo = f"Pagos {desde or 'inicio'} a {hasta or 'hoy'}"
+            elif mes:
+                filename = f"pagos_{mes}.pdf"
+                titulo = f"Pagos del mes {mes}"
+            return self._render_historial_pdf(qs, filename=filename, titulo=titulo)
+
+        if all_flag:
+            from .serializers import CuotaPagoHistorialSerializer
+            items = list(qs[:MAX_HISTORIAL_ALL_ROWS])
+            ser = CuotaPagoHistorialSerializer(items, many=True)
+            return Response(
+                {"count": len(items), "results": ser.data, "all": True, "max_rows": MAX_HISTORIAL_ALL_ROWS},
+                status=status.HTTP_200_OK,
+            )
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            ser = self.get_serializer(page, many=True)
+            return self.get_paginated_response(ser.data)
+
+        ser = self.get_serializer(qs, many=True)
+        return Response(ser.data, status=status.HTTP_200_OK)

@@ -103,7 +103,7 @@ function NotificationsDropdown({ items, total, onClose }) {
 }
 
 /* ─── Header ───────────────────────────────────────────────── */
-export default function Header({ sidebarOpen, toggleSidebar }) {
+export default function Header({ sidebarOpen, toggleSidebar, verificacionCount = 0, siniestrosAbiertos = 0 }) {
   const dispatch = useDispatch();
   const { user, logout } = useAuth();
 
@@ -136,7 +136,7 @@ export default function Header({ sidebarOpen, toggleSidebar }) {
   const bajasPendientes     = Number(globalCountersBajas?.pendiente_envio || 0);
 
   // Total general
-  const totalNotif = solAlta + solEnvio + cuponVencidas + renovPendientes + bajasPendientes;
+  const totalNotif = solAlta + solEnvio + cuponVencidas + renovPendientes + bajasPendientes + Number(verificacionCount || 0) + Number(siniestrosAbiertos || 0);
 
   // ── Fetch inicial + polling de todos los contadores ─────────
   useEffect(() => {
@@ -195,6 +195,22 @@ export default function Header({ sidebarOpen, toggleSidebar }) {
       count:    bajasPendientes,
       dotColor: "bg-slate-500",
       badgeCls: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+    },
+    Number(verificacionCount) > 0 && {
+      to:       "/polizas?estado=en_verificacion",
+      label:    "Pólizas en verificación",
+      desc:     "Cobros con baja reciente — revisar",
+      count:    Number(verificacionCount),
+      dotColor: "bg-orange-500",
+      badgeCls: "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800",
+    },
+    Number(siniestrosAbiertos) > 0 && {
+      to:       "/siniestros",
+      label:    "Siniestros abiertos",
+      desc:     "Reclamos pendientes de resolución",
+      count:    Number(siniestrosAbiertos),
+      dotColor: "bg-red-500",
+      badgeCls: "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800",
     },
   ].filter(Boolean);
 

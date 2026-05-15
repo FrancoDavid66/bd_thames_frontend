@@ -27,57 +27,59 @@ import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
 import EnviarFacturaWhatsapp from "./EnviarFacturaWhatsapp";
 import ModalFormaPago from "./ModalFormaPago";
 import ConfirmarPagoModal from "./ConfirmarPagoModal";
-import RegistrarTraspasoModal from "./RegistrarTraspasoModal"; // <--- 🚀 NUEVO MODAL DE VENTAS
+import RegistrarTraspasoModal from "./RegistrarTraspasoModal";
+import AlertaPolizaModal, { detectarAlerta } from "./AlertaPolizaModal";
+import { fetchSiniestrosRecientes } from "../../store/slices/siniestrosSlice";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
 /* ====== PALETA SOBRIA — INDUSTRIAL/OPERATIVA ====== */
 const PALETTE = {
-  basePanel: "bg-slate-950 border-slate-800",
-  header: "bg-slate-900 text-slate-200 border-b border-slate-800",
-  divider: "divide-slate-800",
+  basePanel: "bg-slate-950 border-slate-800/60",
+  header: "bg-slate-900/80 text-slate-200 border-b border-slate-800/60",
+  divider: "divide-slate-800/40",
   paid: {
-    stripe: "bg-emerald-600",
-    cardBg: "bg-slate-900 border-slate-800",
-    text: "text-slate-200",
+    stripe:     "bg-emerald-500",
+    cardBg:     "bg-slate-900/40",
+    border:     "border-slate-800/50",
+    text:       "text-slate-300",
     amountText: "text-emerald-400",
-    border: "border-slate-800",
-    chipBg: "bg-emerald-900/60",
-    chipText: "text-emerald-300",
-    chipBorder: "border-emerald-800",
-    noteBg: "bg-slate-800",
-    noteText: "text-slate-300",
-    btn: "bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600",
+    chipBg:     "bg-emerald-900/40",
+    chipText:   "text-emerald-400",
+    chipBorder: "border-emerald-800/50",
+    noteBg:     "bg-slate-800/60",
+    noteText:   "text-slate-400",
+    btn:        "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
   },
   pending: {
-    stripe: "bg-slate-700",
-    cardBg: "bg-slate-900/60 border-slate-800",
-    text: "text-slate-400",
-    amountText: "text-slate-300",
-    border: "border-slate-800",
-    chipBg: "bg-slate-800",
-    chipText: "text-slate-400",
-    chipBorder: "border-slate-700",
-    noteBg: "bg-slate-800",
-    noteText: "text-slate-400",
-    btn: "bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600",
+    stripe:     "bg-slate-600",
+    cardBg:     "bg-slate-900/60",
+    border:     "border-slate-800/50",
+    text:       "text-slate-200",
+    amountText: "text-sky-300",
+    chipBg:     "bg-slate-800/60",
+    chipText:   "text-slate-400",
+    chipBorder: "border-slate-700/50",
+    noteBg:     "bg-slate-800/60",
+    noteText:   "text-slate-400",
+    btn:        "bg-primary-600 hover:bg-primary-500 text-white border-primary-500",
   },
   overdue: {
-    stripe: "bg-rose-700",
-    cardBg: "bg-slate-900 border-rose-900/60",
-    text: "text-slate-200",
+    stripe:     "bg-rose-500",
+    cardBg:     "bg-rose-950/20",
+    border:     "border-rose-900/40",
+    text:       "text-slate-200",
     amountText: "text-rose-400",
-    border: "border-rose-900/60",
-    chipBg: "bg-rose-900/50",
-    chipText: "text-rose-300",
-    chipBorder: "border-rose-800",
-    noteBg: "bg-slate-800",
-    noteText: "text-slate-300",
-    btn: "bg-rose-800 hover:bg-rose-700 text-rose-100 border-rose-700",
+    chipBg:     "bg-rose-900/40",
+    chipText:   "text-rose-400",
+    chipBorder: "border-rose-800/50",
+    noteBg:     "bg-slate-800/60",
+    noteText:   "text-slate-300",
+    btn:        "bg-amber-600 hover:bg-amber-500 text-white border-amber-500",
   },
-  neutralBtn: "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
-  actionBtn: "bg-slate-700 hover:bg-slate-600 text-white border-slate-600",
-  ticketBtn: "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700",
+  neutralBtn:  "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
+  actionBtn:   "bg-slate-700 hover:bg-slate-600 text-white border-slate-600",
+  ticketBtn:   "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700",
 };
 
 const MONEY_FMT = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -222,6 +224,11 @@ export default function PagosList({
   const [obsAbiertaId, setObsAbiertaId] = useState(null);
   const [detalleAbierto, setDetalleAbierto] = useState(null);
 
+  // ── Nuevo flujo: alerta → pasarela ──────────────────────
+  const [alertaData, setAlertaData] = useState(null);
+  const [cuotaParaAlerta, setCuotaParaAlerta] = useState(null);
+  const [siniestrosRecientes, setSiniestrosRecientes] = useState([]); // siniestros del cliente/póliza
+
   const [confirmData, setConfirmData] = useState(null);
   const [confirmandoPago, setConfirmandoPago] = useState(false);
 
@@ -262,7 +269,36 @@ export default function PagosList({
   const visibleItems = useMemo(() => modoRapido ? items.slice(0, renderLimit) : items, [items, modoRapido, renderLimit]);
   const showFastControls = items.length >= SHOW_FAST_TOGGLE_FROM;
 
-  const abrirPagar = useCallback((cuota) => setCuotaSeleccionada(cuota), []);
+  const abrirPagar = useCallback(async (cuota) => {
+    const pol      = cuota?.poliza || {};
+    const polizaId = pol?.id || cuota?.poliza_id;
+    const clienteId= pol?.cliente?.id || pol?.cliente_id || cuota?.cliente_id;
+
+    // 1. Consultar siniestros recientes (anti-fraude)
+    let siniestros = [];
+    try {
+      const res = await dispatch(fetchSiniestrosRecientes({
+        poliza_id:  polizaId  || undefined,
+        cliente_id: !polizaId ? (clienteId || undefined) : undefined,
+        dias: 90,
+      })).unwrap();
+      siniestros = Array.isArray(res) ? res : [];
+    } catch { siniestros = []; }
+
+    setSiniestrosRecientes(siniestros);
+
+    // 2. Detectar alerta por estado de póliza
+    const alerta = detectarAlerta(pol, cuota);
+
+    if (alerta || siniestros.length > 0) {
+      // Hay alerta de estado y/o siniestros recientes — mostrar modal primero
+      setCuotaParaAlerta(cuota);
+      setAlertaData(alerta || { tipo: "activa" }); // "activa" = solo hay siniestros
+    } else {
+      // Todo limpio → ir directo a la pasarela
+      setCuotaSeleccionada(cuota);
+    }
+  }, [dispatch]);
   const cerrarPagar = useCallback(() => setCuotaSeleccionada(null), []);
   const abrirDetalle = useCallback((cuota) => setDetalleAbierto(cuota), []);
   const cerrarDetalle = useCallback(() => setDetalleAbierto(null), []);
@@ -327,11 +363,12 @@ export default function PagosList({
       numeroPoliza: pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "-",
       cuotaNro: cuota.cuota_nro,
       polizaEstado: String(pol.estado || "").toUpperCase(),
-      polizaCobertura: String(pol.cobertura || ""), 
-      polizaCompania: String(pol.compania_nombre || pol.compania?.nombre || pol.compania || ""), // 🚀 Compañía inyectada
+      polizaCobertura: String(pol.cobertura || ""),
+      polizaCompania: String(pol.compania_nombre || pol.compania?.nombre || pol.compania || ""),
       oficinaLabel: getOficinaName(extractRawOficina(cuota)),
       diasAtraso: fv && fv.isBefore(hoyDate) ? hoyDate.diff(fv, "day") : 0,
-      clienteNombre: cli?.nombreCompleto || "Asegurado", // 🚀 Nombre para el modal
+      clienteNombre: cli?.nombreCompleto || "Asegurado",
+      _alertaTipo: cuota?._alertaTipo || null, // tipo de alerta que vino del modal previo
     });
     cerrarPagar();
   }, [cuotaSeleccionada, cerrarPagar]);
@@ -343,9 +380,12 @@ export default function PagosList({
     const remainingOverdue = Math.max(0, cuotasMismaPoliza.filter(c => !c.pagado && dayjs(c.fecha_vencimiento).isBefore(dayjs().startOf("day"))).length - 1);
 
     const payload = { id: cuota.id, metodo: datos.metodo, forma_pago: datos.forma_pago, monto, fecha_pago: datos.fecha_pago, observaciones: datos.observaciones };
-    if (datos.medio_cobro_id) payload.medio_cobro_id = datos.medio_cobro_id;
-    if (datos.destino_tipo) payload.destino_tipo = datos.destino_tipo;
-    if (datos.destino_cuenta) payload.destino_cuenta = datos.destino_cuenta;
+    if (datos.medio_cobro_id)  payload.medio_cobro_id  = datos.medio_cobro_id;
+    if (datos.destino_tipo)    payload.destino_tipo    = datos.destino_tipo;
+    if (datos.destino_cuenta)  payload.destino_cuenta  = datos.destino_cuenta;
+    if (datos.enviado_por)     payload.enviado_por     = datos.enviado_por;
+    if (datos.cuit_remitente)  payload.cuit_remitente  = datos.cuit_remitente;
+    if (datos.nro_operacion)   payload.nro_operacion   = datos.nro_operacion;
 
     try {
       setConfirmandoPago(true);
@@ -358,6 +398,23 @@ export default function PagosList({
       } else if (polizaEstado === "VENCIDA") {
         toast.success(remainingOverdue === 0 ? "Pago registrado. ¡Póliza ACTIVA! 🟢" : `Aún debe ${remainingOverdue} cuotas (Sigue VENCIDA). 🔴`, { duration: 6000 });
       } else toast.success("Cuota marcada como pagada");
+
+      // Si era baja reciente → marcar póliza como en_verificacion
+      const alertaTipo = confirmData?._alertaTipo;
+      if (alertaTipo === "baja_reciente") {
+        try {
+          const polizaId = cuota?.poliza?.id || cuota?.poliza_id;
+          const token = localStorage.getItem("access_token") || "";
+          await fetch(`${BASE_URL}polizas/${polizaId}/`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ estado: "en_verificacion" }),
+          });
+          toast("🔍 Póliza marcada para verificación por cobro con baja reciente.", { duration: 5000 });
+        } catch {
+          // no interrumpir el flujo si falla
+        }
+      }
 
       const conObs = {
         ...cuotaActualizada,
@@ -395,6 +452,8 @@ export default function PagosList({
     const total = cuotaSeleccionada?.cantidad_cuotas ?? (Array.isArray(pol.cuotas) ? pol.cuotas.length : null);
     return {
       nombreAp: cliR?.nombreAp || "", dni: cliR?.dni || "",
+      clienteId: cliR?.id || pol?.cliente?.id || pol?.cliente_id || cuotaSeleccionada?.cliente_id || null,
+      polizaId: pol?.id || cuotaSeleccionada?.poliza_id || null,
       compania: (pol.compania_nombre || pol.compania?.nombre || pol.compania || "").toString().trim(),
       cobertura: (pol.cobertura || "").toString().trim(),
       cuotaTxt: typeof cuotaSeleccionada.cuota_nro === "number" ? (total ? `Cuota ${cuotaSeleccionada.cuota_nro}/${total}` : `Cuota ${cuotaSeleccionada.cuota_nro}`) : "",
@@ -526,11 +585,36 @@ export default function PagosList({
         )}
       </div>
 
+      {/* ── Modal de alerta según estado de póliza (PASO 1) ── */}
+      <AlertaPolizaModal
+        isOpen={!!alertaData && !!cuotaParaAlerta}
+        alerta={alertaData}
+        cliente={cuotaParaAlerta ? resolveCliente(cuotaParaAlerta?.poliza || {}, cuotaParaAlerta)?.nombreCompleto : ""}
+        numeroPoliza={cuotaParaAlerta?.poliza?.numero_poliza || ""}
+        compania={cuotaParaAlerta?.poliza?.compania_nombre || ""}
+        siniestrosRecientes={siniestrosRecientes}
+        onContinuar={() => {
+          const cuota = cuotaParaAlerta;
+          const tipo  = alertaData?.tipo;
+          setAlertaData(null);
+          setCuotaParaAlerta(null);
+          setSiniestrosRecientes([]);
+          setCuotaSeleccionada({ ...cuota, _alertaTipo: tipo });
+        }}
+        onCancelar={() => {
+          setAlertaData(null);
+          setCuotaParaAlerta(null);
+          setSiniestrosRecientes([]);
+        }}
+      />
+
       <ModalFormaPago
         isOpen={!!cuotaSeleccionada} onClose={cerrarPagar} onConfirm={confirmarPago} defaultMonto={cuotaSeleccionada?.monto}
         title={`Confirmar pago — Cuota #${cuotaSeleccionada?.cuota_nro ?? "?"}`}
         cuentasMercadoPago={cuentasMercadoPago} billeterasVirtuales={billeterasVirtuales} mediosCobro={mediosCobro}
         clienteNombreApellido={datosNoti?.nombreAp || ""} clienteDni={datosNoti?.dni || ""} polizaCompania={datosNoti?.compania || ""} polizaCobertura={datosNoti?.cobertura || ""} pagoCuota={datosNoti?.cuotaTxt || ""}
+        clienteId={datosNoti?.clienteId || null}
+        polizaActualId={datosNoti?.polizaId || null}
       />
 
       <ConfirmarPagoModal 
@@ -668,96 +752,106 @@ const CuotaRow = memo(
     const isPolicyCancelada = polizaEstado === "CANCELADA" || polizaEstado === "ANULADA";
 
     let extraClasses = "";
-    if (isPolicyCancelada && !cuota.pagado) extraClasses = "opacity-60";
-    else if (isPolicyVencida && !cuota.pagado) extraClasses = "border-rose-900/50";
+    if (isPolicyCancelada && !cuota.pagado) extraClasses = "opacity-70 border-rose-900/40";
+    else if (isPolicyVencida && !cuota.pagado) extraClasses = "border-amber-900/40";
+
+    // Badge de estado de póliza
+    const polizaBadge = isPolicyCancelada ? (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-900/50 border border-rose-700/50 text-rose-400 uppercase tracking-wider">
+        ⛔ {polizaEstado}
+      </span>
+    ) : isPolicyVencida ? (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-900/40 border border-amber-700/40 text-amber-400 uppercase tracking-wider">
+        ⚠ Póliza vencida
+      </span>
+    ) : null;
 
     return (
       <>
-        <span className={`absolute left-0 top-0 h-full w-0.5 ${S.stripe}`} aria-hidden />
-        <div className={`mx-0 sm:mx-2 my-0 sm:my-1 sm:rounded-lg border p-3 sm:p-4 ${S.cardBg} ${S.border} ${extraClasses} relative`}>
-          <div className="pl-2 sm:pl-0 flex flex-col gap-3">
-            {/* Header fila */}
-            <div className="flex justify-between items-start gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`truncate max-w-[200px] sm:max-w-md font-medium text-sm ${state === "overdue" ? "text-rose-200" : "text-slate-200"}`}>
-                    {nombreCompleto}
-                  </span>
+        <span className={`absolute left-0 top-0 h-full w-1 rounded-l-sm ${S.stripe}`} aria-hidden />
+        <div className={`mx-0 sm:mx-2 my-0.5 sm:my-1.5 sm:rounded-2xl border p-4 sm:p-5 ${S.cardBg} ${S.border} ${extraClasses} transition-colors relative`}>
+          <div className="pl-3 sm:pl-0 flex flex-col gap-4">
+
+            {/* Header: nombre + monto */}
+            <div className="flex justify-between items-start gap-3">
+              <div className="min-w-0 flex-1">
+                {polizaBadge && <div className="mb-2">{polizaBadge}</div>}
+                <p className={`font-bold text-[15px] leading-tight truncate ${state === "overdue" ? "text-slate-100" : "text-slate-200"}`}>
+                  {nombreCompleto}
+                </p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className="text-xs font-mono text-slate-500">#{cuota?.cuota_nro ?? "?"}</span>
+                  {patente && <><span className="text-slate-700">·</span><span className="text-xs font-mono text-slate-400">{patente}</span></>}
+                  {modelo && <><span className="text-slate-700">·</span><span className="text-xs text-slate-500 truncate max-w-[120px]">{modelo}</span></>}
                   {isWebAdmin && oficinaLabel && (
-                    <span className="text-[10px] font-mono text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">
+                    <span className="text-[10px] font-mono text-slate-600 border border-slate-700/50 rounded-md px-1.5 py-0.5 bg-slate-900/40">
                       {oficinaLabel}
                     </span>
                   )}
-                  {isPolicyCancelada && !cuota.pagado && (
-                    <span className="text-[10px] font-mono text-rose-400 border border-rose-800 rounded px-1.5 py-0.5">BAJA</span>
-                  )}
-                  {isPolicyVencida && !cuota.pagado && (
-                    <span className="text-[10px] font-mono text-amber-400 border border-amber-800 rounded px-1.5 py-0.5">REACTIVAR</span>
-                  )}
-                </div>
-                <div className="text-xs text-slate-600 mt-1 flex items-center gap-2 font-mono">
-                  <span>#{cuota?.cuota_nro ?? "?"}</span>
-                  {patente && <><span>·</span><span>{patente}</span></>}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <span className={`text-lg sm:text-xl font-mono font-semibold ${isPolicyVencida && !cuota.pagado ? "text-amber-400" : S.amountText}`}>
-                  $ {montoTxt}
+                <p className={`text-xl font-black tabular-nums ${S.amountText}`}>$ {montoTxt}</p>
+                <span className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${S.chipBg} ${S.chipText} border ${S.chipBorder}`}>
+                  {label}
                 </span>
-                <div className={`mt-1 text-[10px] font-mono uppercase tracking-wider ${S.chipText}`}>{label}</div>
               </div>
             </div>
 
             {/* Fechas */}
-            <div className="flex flex-col sm:flex-row gap-1.5">
-              <div className="flex-1 flex items-center justify-between rounded-md px-3 py-2 bg-slate-800/50 border border-slate-700/50">
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Vence</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-mono font-medium ${state === "overdue" ? "text-rose-400" : "text-slate-200"}`}>{venceTxt || "—"}</span>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl px-3 py-2.5 bg-slate-800/40 border border-slate-700/30">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Vence</p>
+                <div className="flex items-center justify-between">
+                  <p className={`text-sm font-mono font-semibold ${state === "overdue" ? "text-rose-400" : "text-slate-300"}`}>{venceTxt || "—"}</p>
                   {!cuota?.pagado && (
-                    <button type="button" onClick={() => abrirModalFecha(cuota)} className="text-slate-600 hover:text-slate-300 transition-colors p-1">
-                      <HiPencil className="w-3 h-3" />
+                    <button type="button" onClick={() => abrirModalFecha(cuota)} className="text-slate-600 hover:text-slate-300 transition-colors ml-1">
+                      <HiPencil className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
               </div>
-              <div className="flex-1 flex items-center justify-between rounded-md px-3 py-2 bg-slate-800/50 border border-slate-700/50">
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">
+              <div className="rounded-xl px-3 py-2.5 bg-slate-800/40 border border-slate-700/30">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">
                   {sinCobertura ? "Sin cobertura" : "Cubre"}
-                </span>
-                <span className={`text-xs font-mono ${sinCobertura ? "text-rose-400" : pagoAtrasado ? "text-amber-300" : "text-slate-300"}`}>
+                </p>
+                <p className={`text-sm font-mono ${sinCobertura ? "text-rose-400" : pagoAtrasado ? "text-amber-400" : "text-slate-300"}`}>
                   {sinCobertura ? `desde ${cubreDesdeTxt}` : `${cubreDesdeTxt}${cubreHastaTxt ? ` → ${cubreHastaTxt}` : ""}`}
-                </span>
+                </p>
               </div>
             </div>
 
-            {/* Acción principal */}
-            <div className="flex items-center gap-2 w-full">
+            {/* Botón acción */}
+            <div className="flex items-center gap-2">
               {!cuota?.pagado ? (
                 <button
                   onClick={() => abrirPagar(cuota)}
-                  className={`w-full h-10 px-4 rounded-lg border transition-colors inline-flex items-center justify-center gap-2 font-medium text-sm ${
-                    isPolicyVencida
-                      ? "bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 border-amber-800"
-                      : "bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 border-emerald-800"
-                  }`}
-                >
+                  className={`
+                    flex-1 h-12 px-4 rounded-xl border transition-all font-bold text-sm
+                    inline-flex items-center justify-center gap-2
+                    ${isPolicyCancelada
+                      ? "bg-rose-900/50 hover:bg-rose-800/60 text-rose-300 border-rose-800/50"
+                      : isPolicyVencida
+                      ? "bg-amber-800/50 hover:bg-amber-700/60 text-amber-200 border-amber-700/50"
+                      : "bg-primary-600 hover:bg-primary-500 text-white border-primary-500/50"
+                    }
+                  `}>
                   <HiCash className="w-4 h-4" />
-                  {isPolicyVencida ? "Pagar y reactivar" : "Registrar pago"}
+                  {isPolicyCancelada ? "Cobrar (póliza cancelada)" : isPolicyVencida ? "Pagar y reactivar" : "Registrar pago"}
                 </button>
               ) : (
-                <div className="flex gap-1.5 w-full">
+                <div className="flex gap-2 w-full">
                   <div className="flex-1">
                     <DescargarFactura cliente={model?.pol?.cliente} poliza={model?.pol} cuota={cuotaPdf || cuota} label="PDF" tone="neutral"
-                      className="w-full h-10 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
+                      className="w-full h-10 px-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
                   </div>
                   <div className="flex-1">
                     <ImprimirFacturaTicket cliente={model?.pol?.cliente} poliza={model?.pol} cuota={cuotaPdf || cuota} label="Ticket"
-                      className="w-full h-10 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
+                      className="w-full h-10 px-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
                   </div>
                   <div className="flex-1">
                     <EnviarFacturaWhatsapp cuota={cuota}>
-                      <button className="w-full h-10 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5">
+                      <button className="w-full h-10 px-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5">
                         <HiDeviceMobile className="w-4 h-4" /><span className="hidden sm:inline">WhatsApp</span><span className="sm:hidden">WPP</span>
                       </button>
                     </EnviarFacturaWhatsapp>
@@ -769,7 +863,7 @@ const CuotaRow = memo(
             {/* Expandible */}
             <button
               onClick={() => setExpanded(!expanded)}
-              className="w-full py-1.5 flex items-center justify-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
+              className="w-full py-1 flex items-center justify-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
             >
               {expanded ? <><HiChevronUp className="w-3.5 h-3.5" /> Ocultar</> : <><HiChevronDown className="w-3.5 h-3.5" /> Ver detalles</>}
             </button>
@@ -777,29 +871,26 @@ const CuotaRow = memo(
             <AnimatePresence>
               {expanded && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <div className="pt-3 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                    {modelo && <div className="flex justify-between px-2 py-1.5 rounded bg-slate-800/50"><span className="text-slate-500">Vehículo</span><span className="text-slate-300 font-mono">{modelo}</span></div>}
-                    {altaTxt && <div className="flex justify-between px-2 py-1.5 rounded bg-slate-800/50"><span className="text-slate-500">Alta póliza</span><span className="text-slate-300 font-mono">{altaTxt}</span></div>}
-                    {!!pagaTxt && <div className="flex justify-between px-2 py-1.5 rounded bg-slate-800/50"><span className="text-slate-500">Pagada el</span><span className="text-emerald-400 font-mono">{pagaTxt}</span></div>}
-                    {dias !== null && !cuota?.pagado && <div className="flex justify-between px-2 py-1.5 rounded bg-slate-800/50"><span className="text-slate-500">Estado</span><span className={`font-mono ${dias < 0 ? "text-rose-400" : "text-slate-300"}`}>{dias < 0 ? `Atraso ${Math.abs(dias)}d` : `Faltan ${dias}d`}</span></div>}
+                  <div className="pt-3 border-t border-slate-800/60 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                    {modelo && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Vehículo</span><span className="text-slate-300 font-mono">{modelo}</span></div>}
+                    {altaTxt && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Alta póliza</span><span className="text-slate-300 font-mono">{altaTxt}</span></div>}
+                    {!!pagaTxt && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Pagada el</span><span className="text-emerald-400 font-mono">{pagaTxt}</span></div>}
+                    {dias !== null && !cuota?.pagado && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Estado</span><span className={`font-mono ${dias < 0 ? "text-rose-400" : "text-slate-300"}`}>{dias < 0 ? `Atraso ${Math.abs(dias)}d` : `Faltan ${dias}d`}</span></div>}
                   </div>
                   <div className="mt-2 flex gap-1.5">
-                    <button onClick={() => abrirDetalle(cuota)} className="h-8 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
+                    <button onClick={() => abrirDetalle(cuota)} className="h-8 px-3 rounded-xl border border-slate-700/50 bg-slate-800/40 hover:bg-slate-700/50 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
                       <HiQuestionMarkCircle className="w-3.5 h-3.5" /> Info
                     </button>
                     {hasObs && (
-                      <button onClick={() => onToggleObs(cuota?.id)} className="h-8 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
+                      <button onClick={() => onToggleObs(cuota?.id)} className="h-8 px-3 rounded-xl border border-slate-700/50 bg-slate-800/40 hover:bg-slate-700/50 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
                         <HiExclamationCircle className="w-3.5 h-3.5" /> Nota
                       </button>
                     )}
                   </div>
                   {hasObs && isObsOpen && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-slate-300">
-                      <div className="flex items-start gap-2">
-                        <HiExclamationCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
-                        <span className="whitespace-pre-wrap">{observacion}</span>
-                      </div>
-                    </motion.div>
+                    <div className={`mt-2 rounded-xl px-3 py-2.5 text-sm ${S.noteBg} ${S.noteText} border border-slate-700/40`}>
+                      {observacion}
+                    </div>
                   )}
                 </motion.div>
               )}
@@ -808,10 +899,6 @@ const CuotaRow = memo(
         </div>
       </>
     );
-  },
-  (prev, next) => {
-    const a = prev?.model, b = next?.model;
-    if (a === b) return true;
     if (a?.isObsOpen !== b?.isObsOpen) return false;
     const ca = a?.cuota, cb = b?.cuota;
     if (ca?.id !== cb?.id || ca?.pagado !== cb?.pagado || ca?.monto !== cb?.monto || ca?.fecha_vencimiento !== cb?.fecha_vencimiento || ca?.fecha_pago !== cb?.fecha_pago || ca?.observaciones_pago !== cb?.observaciones_pago || ca?.ultima_observacion_pago !== cb?.ultima_observacion_pago || a?.nombreCompleto !== b?.nombreCompleto || a?.patente !== b?.patente || a?.modelo !== b?.modelo) return false;
