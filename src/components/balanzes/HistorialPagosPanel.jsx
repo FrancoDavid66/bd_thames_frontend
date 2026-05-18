@@ -10,15 +10,10 @@ import {
   HiSearch, HiX, HiDownload, HiRefresh, HiChevronLeft, HiChevronRight,
   HiCash, HiCreditCard, HiOfficeBuilding, HiCalendar, HiFilter,
 } from "react-icons/hi";
-import { fetchHistorialIngresos, exportHistorialExcel } from "../../store/slices/balanceSlice";
+import { fetchHistorialPagos, downloadHistorialPagosCSV, downloadHistorialPagosPDF } from "../../store/slices/pagosSlice";
+import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
-const OFICINAS = [
-  { value: "ALL", label: "Todas las oficinas" },
-  { value: "1",   label: "5 Esquinas" },
-  { value: "2",   label: "Axion" },
-  { value: "3",   label: "Km 39" },
-];
 
 const FORMAS = [
   { value: "TODAS",         label: "Todas las formas" },
@@ -40,9 +35,8 @@ function FormaPagoBadge({ forma }) {
   return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">💳 {f}</span>;
 }
 
-function OficinaLabel({ oficina }) {
-  const map = { "1": "5 Esquinas", "2": "Axion", "3": "Km 39" };
-  const name = map[String(oficina)] || String(oficina || "—");
+function OficinaLabel({ oficina, oficinasMap = {} }) {
+  const name = oficinasMap[String(oficina)] || String(oficina || "—");
   return (
     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-900/30 border border-indigo-700/40 text-indigo-400">
       {name}
@@ -68,21 +62,49 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
   const [qInput,     setQInput]     = useState("");
   const [page,       setPage]       = useState(1);
   const [exporting,  setExporting]  = useState(false);
+  const [exportFormat, setExportFormat] = useState("excel"); // "excel" | "pdf"
+  const [oficinas,    setOficinas]    = useState([]);
+
+  // Cargar oficinas dinámicamente
+  useEffect(() => {
+    if (!isWebAdmin) return;
+    api.get("usuarios/oficinas/")
+      .then(({ data }) => setOficinas(Array.isArray(data) ? data : (data.results || [])))
+      .catch(() => setOficinas([]));
+  }, [isWebAdmin]);
+
+  const oficinasMap = useMemo(() => {
+    const m = {};
+    oficinas.forEach(o => { m[String(o.id)] = o.nombre; });
+    return m;
+  }, [oficinas]);
+
+  const oficinasOpciones = useMemo(() => [
+    { value: "ALL", label: "Todas las oficinas" },
+    ...oficinas.map(o => ({ value: String(o.id), label: o.nombre })),
+  ], [oficinas]);
 
   const PAGE_SIZE = 50;
 
   // Redux state
-  const historialStatus  = useSelector((s) => s.balance?.historialStatus  || "idle");
-  const historialItems   = useSelector((s) => s.balance?.historialItems   || []);
-  const historialCount   = useSelector((s) => s.balance?.historialCount   || 0);
-  const historialNext    = useSelector((s) => s.balance?.historialNext    || null);
-  const historialPrev    = useSelector((s) => s.balance?.historialPrev    || null);
+  const historialStatus  = useSelector((s) => s.pagos?.historialPagosStatus  || "idle");
+  const historialItems   = useSelector((s) => s.pagos?.historialPagosItems   || []);
+  const historialCount   = useSelector((s) => s.pagos?.historialPagosMeta?.count || 0);
+  const historialNext    = useSelector((s) => s.pagos?.historialPagosMeta?.next    || null);
+  const historialPrev    = useSelector((s) => s.pagos?.historialPagosMeta?.previous || null);
 
   const loading = historialStatus === "loading";
   const totalPages = Math.max(1, Math.ceil(historialCount / PAGE_SIZE));
 
   const cargar = useCallback((p = 1) => {
-    dispatch(fetchHistorialIngresos({ oficina, desde, hasta, forma_pago: formaPago, q, page: p, page_size: PAGE_SIZE }));
+    dispatch(fetchHistorialPagos({
+      oficina: oficina !== "ALL" ? oficina : undefined,
+      desde, hasta,
+      forma_pago: formaPago !== "TODAS" ? formaPago : undefined,
+      q: q || undefined,
+      page: p, page_size: PAGE_SIZE,
+      ordering: "-fecha_pago", force: true,
+    }));
   }, [dispatch, oficina, desde, hasta, formaPago, q]);
 
   useEffect(() => { setPage(1); cargar(1); }, [oficina, desde, hasta, formaPago, q]);
@@ -143,11 +165,18 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
             className="p-2 rounded-xl border border-slate-700/50 hover:bg-slate-800/60 text-slate-400 transition-colors">
             <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button onClick={handleExport} disabled={exporting || loading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors">
-            <HiDownload className="w-4 h-4" />
-            {exporting ? "Descargando…" : "Excel"}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <select value={exportFormat} onChange={e => setExportFormat(e.target.value)}
+              className="h-9 px-2 rounded-xl bg-slate-800 border border-slate-700/50 text-sm text-slate-300 outline-none">
+              <option value="excel">Excel</option>
+              <option value="pdf">PDF</option>
+            </select>
+            <button onClick={handleExport} disabled={exporting || loading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors">
+              <HiDownload className="w-4 h-4" />
+              {exporting ? "Descargando…" : exportFormat === "pdf" ? "Descargar PDF" : "Descargar Excel"}
+            </button>
+          </div>
         </div>
 
         {/* Fila 2 — filtros */}
@@ -177,7 +206,7 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
               <HiOfficeBuilding className="w-4 h-4 text-slate-500 shrink-0" />
               <select value={oficina} onChange={(e) => setOficina(e.target.value)}
                 className="bg-transparent text-sm text-slate-300 outline-none">
-                {OFICINAS.map(o => <option key={o.value} value={o.value} className="bg-slate-900">{o.label}</option>)}
+                {oficinasOpciones.map(o => <option key={o.value} value={o.value} className="bg-slate-900">{o.label}</option>)}
               </select>
             </div>
           )}
@@ -220,10 +249,13 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
         ) : (
           <>
             {/* Header */}
-            <div className="grid grid-cols-[1fr_1.5fr_1fr_0.8fr_1fr] gap-3 px-4 py-3 bg-slate-950/60 border-b border-slate-800/60 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+            <div className={`grid gap-2 px-4 py-3 bg-slate-950/60 border-b border-slate-800/60 text-[10px] uppercase tracking-wider text-slate-500 font-semibold ${isWebAdmin ? "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr_0.7fr]" : "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr]"}`}>
               <div>Fecha</div>
-              <div>Descripción / Asegurado</div>
-              <div>Forma de pago</div>
+              <div>Asegurado</div>
+              <div>Patente</div>
+              <div>Modelo</div>
+              <div>Forma</div>
+              <div>Enviado por / Cuenta</div>
               {isWebAdmin && <div>Oficina</div>}
               <div className="text-right">Monto</div>
             </div>
@@ -235,26 +267,34 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
                   <motion.div key={item.id || idx}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                    className={`grid gap-3 px-4 py-3 hover:bg-slate-800/30 transition-colors ${isWebAdmin ? "grid-cols-[1fr_1.5fr_1fr_0.8fr_1fr]" : "grid-cols-[1fr_1.5fr_1fr_1fr]"}`}>
+                    className={`grid gap-2 px-4 py-3 hover:bg-slate-800/30 transition-colors text-sm ${isWebAdmin ? "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr_0.7fr]" : "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr]"}`}>
 
                     {/* Fecha */}
                     <div className="flex flex-col justify-center">
-                      <span className="text-sm text-slate-300 font-medium">{fmtDate(item.fecha)}</span>
-                      {item.created_at && (
-                        <span className="text-[10px] text-slate-600 mt-0.5">{dayjs(item.created_at).format("HH:mm")} hs</span>
-                      )}
+                      <span className="text-slate-300 font-medium">{fmtDate(item.fecha_pago || item.fecha)}</span>
+                      {item.pago_hm && <span className="text-[10px] text-slate-600">{item.pago_hm} hs</span>}
                     </div>
 
-                    {/* Descripción */}
+                    {/* Asegurado */}
                     <div className="flex flex-col justify-center min-w-0">
-                      <span className="text-sm text-slate-200 truncate" title={item.descripcion || ""}>
-                        {item.descripcion || "—"}
+                      <span className="text-slate-200 font-medium truncate" title={item.cliente_nombre || "—"}>
+                        {item.cliente_nombre || "—"}
                       </span>
-                      {item.pagado_por && (
-                        <span className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {item.pagado_por}
-                        </span>
-                      )}
+                      {item.cliente_dni && <span className="text-[10px] text-slate-500">DNI: {item.cliente_dni}</span>}
+                    </div>
+
+                    {/* Patente */}
+                    <div className="flex items-center">
+                      {item.patente
+                        ? <span className="font-mono text-[11px] font-bold bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-lg text-slate-200 tracking-widest uppercase">{item.patente}</span>
+                        : <span className="text-slate-600">—</span>}
+                    </div>
+
+                    {/* Modelo */}
+                    <div className="flex items-center min-w-0">
+                      <span className="text-slate-300 truncate text-[12px]">
+                        {[item.marca, item.modelo].filter(Boolean).join(" ") || "—"}
+                      </span>
                     </div>
 
                     {/* Forma pago */}
@@ -262,18 +302,37 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
                       <FormaPagoBadge forma={item.forma_pago} />
                     </div>
 
+                    {/* Enviado por / Cuenta destino */}
+                    <div className="flex flex-col justify-center min-w-0">
+                      {(() => {
+                        const obs = item.observaciones || "";
+                        const cuitM = obs.match(/CUIT:\s*([^\s|]+)/);
+                        const opM   = obs.match(/Op:\s*([^\s|]+)/);
+                        const cuit  = cuitM ? cuitM[1] : "";
+                        const op    = opM   ? opM[1]   : "";
+                        const medio = item.medio || "";
+                        return (
+                          <>
+                            {item.pagado_por && <span className="text-[11px] text-slate-300 truncate">{item.pagado_por}</span>}
+                            {medio && <span className="text-[10px] text-indigo-400 truncate">{medio}</span>}
+                            {cuit  && <span className="text-[10px] text-slate-500">CUIT: {cuit}</span>}
+                            {op    && <span className="text-[10px] text-slate-500">Op: {op}</span>}
+                            {!item.pagado_por && !medio && !cuit && <span className="text-slate-600">—</span>}
+                          </>
+                        );
+                      })()}
+                    </div>
+
                     {/* Oficina (admin only) */}
                     {isWebAdmin && (
                       <div className="flex items-center">
-                        <OficinaLabel oficina={item.oficina} />
+                        <OficinaLabel oficinasMap={oficinasMap} oficina={item.oficina_bucket || item.oficina} />
                       </div>
                     )}
 
                     {/* Monto */}
                     <div className="flex items-center justify-end">
-                      <span className="text-sm font-bold tabular-nums text-emerald-400">
-                        {fmtMoney(item.monto)}
-                      </span>
+                      <span className="font-bold tabular-nums text-emerald-400">{fmtMoney(item.monto)}</span>
                     </div>
                   </motion.div>
                 ))}

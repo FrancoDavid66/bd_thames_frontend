@@ -297,6 +297,26 @@ const normalizeResumen = (data) => {
 };
 
 /**
+ * Thunk: marcar póliza como "no renueva" — la saca de la lista
+ */
+export const marcarNoRenueva = createAsyncThunk(
+  "renovaciones/marcarNoRenueva",
+  async ({ polizaId, motivo = "" }, { rejectWithValue }) => {
+    try {
+      await api.patch(`polizas/${polizaId}/`, {
+        estado: "NO_RENUEVA",
+        observaciones: motivo ? `No renueva: ${motivo}` : "No renueva",
+      });
+      return { polizaId };
+    } catch (err) {
+      return rejectWithValue(
+        err?.response?.data?.detail || err?.message || "Error al marcar"
+      );
+    }
+  }
+);
+
+/**
  * Thunk: traer bandeja de renovaciones
  * ✅ Importante: devolvemos desde cache dentro del thunk.
  * ✅ Si params.force === true => bypass cache y pega a red sí o sí.
@@ -787,6 +807,15 @@ const renovacionesSlice = createSlice({
         }
 
         state.oficinasStatus = "loading";
+      })
+      .addCase(marcarNoRenueva.fulfilled, (state, action) => {
+        const { polizaId } = action.payload;
+        // Sacar la póliza de la lista local inmediatamente
+        state.items = (state.items || []).filter(p => p.id !== polizaId);
+        state.totalCount = Math.max(0, (state.totalCount || 1) - 1);
+      })
+      .addCase(marcarNoRenueva.rejected, (state, action) => {
+        console.error("[renovaciones] Error marcarNoRenueva:", action.payload);
       })
       .addCase(fetchRenovacionesOficinas.fulfilled, (state, action) => {
         state.oficinasStatus = "succeeded";
