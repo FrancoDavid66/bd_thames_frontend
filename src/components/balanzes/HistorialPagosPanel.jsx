@@ -249,7 +249,7 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
         ) : (
           <>
             {/* Header */}
-            <div className={`grid gap-2 px-4 py-3 bg-slate-950/60 border-b border-slate-800/60 text-[10px] uppercase tracking-wider text-slate-500 font-semibold ${isWebAdmin ? "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr_0.7fr]" : "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr]"}`}>
+            <div className={`grid gap-2 px-4 py-3 bg-slate-950/60 border-b border-slate-800/60 text-[10px] uppercase tracking-wider text-slate-500 font-semibold ${isWebAdmin ? "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_1.3fr_0.7fr_0.7fr]" : "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_1.3fr_0.7fr]"}`}>
               <div>Fecha</div>
               <div>Asegurado</div>
               <div>Patente</div>
@@ -267,7 +267,7 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
                   <motion.div key={item.id || idx}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                    className={`grid gap-2 px-4 py-3 hover:bg-slate-800/30 transition-colors text-sm ${isWebAdmin ? "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr_0.7fr]" : "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_0.9fr_0.7fr]"}`}>
+                    className={`grid gap-2 px-4 py-3 hover:bg-slate-800/30 transition-colors text-sm ${isWebAdmin ? "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_1.3fr_0.7fr_0.7fr]" : "grid-cols-[0.8fr_1.2fr_0.8fr_0.9fr_0.7fr_1.3fr_0.7fr]"}`}>
 
                     {/* Fecha */}
                     <div className="flex flex-col justify-center">
@@ -303,21 +303,44 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
                     </div>
 
                     {/* Enviado por / Cuenta destino */}
-                    <div className="flex flex-col justify-center min-w-0">
+                    <div className="flex flex-col justify-center min-w-0 gap-0.5">
                       {(() => {
-                        const obs = item.observaciones || "";
+                        const obs  = item.observaciones || "";
                         const cuitM = obs.match(/CUIT:\s*([^\s|]+)/);
                         const opM   = obs.match(/Op:\s*([^\s|]+)/);
                         const cuit  = cuitM ? cuitM[1] : "";
                         const op    = opM   ? opM[1]   : "";
-                        const medio = item.medio || "";
+                        // destino_cuenta viene del serializer (si está) o del campo medio
+                        const cuenta = item.destino_cuenta || item.billetera || "";
+                        // medio es forma_pago — no la cuenta, así que lo ignoramos
+                        const hayDatos = item.pagado_por || cuenta || cuit || op;
+                        if (!hayDatos) return <span className="text-slate-600 text-sm">—</span>;
                         return (
                           <>
-                            {item.pagado_por && <span className="text-[11px] text-slate-300 truncate">{item.pagado_por}</span>}
-                            {medio && <span className="text-[10px] text-indigo-400 truncate">{medio}</span>}
-                            {cuit  && <span className="text-[10px] text-slate-500">CUIT: {cuit}</span>}
-                            {op    && <span className="text-[10px] text-slate-500">Op: {op}</span>}
-                            {!item.pagado_por && !medio && !cuit && <span className="text-slate-600">—</span>}
+                            {/* Nombre de quien envió */}
+                            {item.pagado_por && (
+                              <span className="text-sm font-medium text-slate-200 truncate" title={item.pagado_por}>
+                                {item.pagado_por}
+                              </span>
+                            )}
+                            {/* Cuenta destino — la más importante */}
+                            {cuenta && (
+                              <span className="text-xs font-bold text-indigo-300 truncate bg-indigo-950/40 border border-indigo-800/40 px-1.5 py-0.5 rounded-md" title={cuenta}>
+                                → {cuenta}
+                              </span>
+                            )}
+                            {/* CUIT */}
+                            {cuit && (
+                              <span className="text-[11px] text-slate-400">
+                                CUIT: {cuit}
+                              </span>
+                            )}
+                            {/* N° operación */}
+                            {op && (
+                              <span className="text-[11px] text-slate-500">
+                                Op: {op}
+                              </span>
+                            )}
                           </>
                         );
                       })()}
