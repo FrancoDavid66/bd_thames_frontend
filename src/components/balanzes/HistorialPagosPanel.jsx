@@ -291,10 +291,15 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
                     </div>
 
                     {/* Modelo */}
-                    <div className="flex items-center min-w-0">
+                    <div className="flex flex-col justify-center min-w-0">
                       <span className="text-slate-300 truncate text-[12px]">
                         {[item.marca, item.modelo].filter(Boolean).join(" ") || "—"}
                       </span>
+                      {item.compania_nombre && (
+                        <span className="text-[10px] text-slate-500 truncate">
+                          {item.compania_nombre}
+                        </span>
+                      )}
                     </div>
 
                     {/* Forma pago */}
