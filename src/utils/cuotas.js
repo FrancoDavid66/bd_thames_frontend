@@ -247,18 +247,41 @@ export function getUltimaCuota(cuotas = []) {
 }
 
 /**
+ * 🎯 Devuelve la cuota IMPAGA MÁS ANTIGUA que YA VENCIÓ.
+ *
+ * Esta es la cuota que define cuánto tiempo lleva en mora la póliza.
+ * Ejemplo: si el cliente tiene cuotas 3 y 4 impagas (cuota 3 venció hace
+ * 34 días, cuota 4 hace 4 días), la deuda real arranca en la cuota 3.
+ *
+ * @returns la cuota impaga vencida más antigua, o null si todas están
+ *          pagas o las impagas son futuras.
+ */
+export function getCuotaImpagaMasAntigua(cuotas = []) {
+  const rows = Array.isArray(cuotas) ? cuotas : [];
+  const hoy = today();
+  const impagasVencidas = rows
+    .filter((c) => !c?.pagado && c?.fecha_vencimiento)
+    .filter((c) => dayjs(c.fecha_vencimiento).startOf("day").diff(hoy, "day") < 0)
+    .sort((a, b) => dayjs(a.fecha_vencimiento).valueOf() - dayjs(b.fecha_vencimiento).valueOf());
+
+  return impagasVencidas[0] || null;
+}
+
+/**
  * 🎯 ÚNICA fuente de verdad: días que una póliza lleva vencida.
  *
- * REGLA: días_vencida = hoy − fecha_vencimiento_última_cuota
+ * REGLA: días_vencida = hoy − fecha_vencimiento_cuota_impaga_más_antigua
  *
- *   - Si la última cuota vence en el FUTURO → devuelve 0 (no está vencida)
- *   - Si la última cuota venció HOY → devuelve 0
- *   - Si la última cuota venció HACE N DÍAS → devuelve N (positivo)
+ *   - Si NO tiene cuotas impagas vencidas → devuelve 0
+ *   - Si la cuota impaga más antigua venció HACE N DÍAS → devuelve N
+ *
+ * Ejemplo: cliente con cuota 3 impaga (venció 15/04, hace 34 días)
+ *          y cuota 4 impaga (venció 15/05, hace 4 días) → devuelve 34.
  *
  * Acepta:
- *   - una póliza con .cuotas[]  → toma la última cuota
+ *   - una póliza con .cuotas[]  → toma la cuota impaga más antigua vencida
  *   - una póliza con campos planos del backend
- *     (ultima_cuota_vencimiento, max_vto_impaga, etc)
+ *     (proxima_vencimiento_impaga, min_vto_impaga, etc → mismo concepto)
  *   - una fecha directa (string ISO o dayjs)
  *
  * @returns {number} días vencida (0 si no está vencida, N si lleva N días)
@@ -272,15 +295,14 @@ export function getDiasVencida(input) {
 /**
  * 🎯 Hermana de getDiasVencida pero con SIGNO.
  *
- * REGLA: días_para_vencer = vto_última_cuota − hoy  (con signo)
+ * REGLA: días_para_vencer = vto_cuota_impaga_más_antigua − hoy  (con signo)
  *
- *   - POSITIVO (+5)  → faltan 5 días para vencer
+ *   - POSITIVO (+5)  → faltan 5 días para que venza la primera impaga
+ *                       (sólo aplica si NO hay impagas vencidas; toma la
+ *                        próxima a vencer en ese caso)
  *   - CERO (0)       → vence hoy
- *   - NEGATIVO (-3)  → venció hace 3 días
+ *   - NEGATIVO (-3)  → la cuota impaga más antigua venció hace 3 días
  *   - null           → no se pudo determinar
- *
- * Usado por la sección de Vencimientos donde se muestran las 3 categorías
- * a la vez (por vencer / hoy / vencidas).
  *
  * Acepta los mismos inputs que getDiasVencida.
  *
@@ -289,24 +311,32 @@ export function getDiasVencida(input) {
 export function getDiasParaVencer(input) {
   if (!input) return null;
 
-  // Resolver fecha de referencia (vto última cuota)
+  // Resolver fecha de referencia
   let fechaRef = null;
 
   // Caso 1: viene una fecha directamente
   if (typeof input === "string" || input instanceof Date || dayjs.isDayjs(input)) {
     fechaRef = input;
   }
-  // Caso 2: viene una póliza con cuotas[]
+  // Caso 2: viene una póliza con cuotas[] cargadas
   else if (Array.isArray(input?.cuotas) && input.cuotas.length > 0) {
-    const ultima = getUltimaCuota(input.cuotas);
-    fechaRef = ultima?.fecha_vencimiento || null;
+    // a) Primero buscamos la impaga MÁS ANTIGUA que ya venció
+    const masAntiguaVencida = getCuotaImpagaMasAntigua(input.cuotas);
+    if (masAntiguaVencida) {
+      fechaRef = masAntiguaVencida.fecha_vencimiento;
+    } else {
+      // b) Si no hay impagas vencidas, tomamos la próxima a vencer
+      const proxima = getProximaCuota(input.cuotas);
+      fechaRef = proxima?.fecha_vencimiento || null;
+    }
   }
   // Caso 3: viene una póliza con campos planos del backend
   if (!fechaRef && typeof input === "object") {
     fechaRef =
-      input?.ultima_cuota_vencimiento ||
-      input?.max_vto_impaga ||
+      input?.proxima_vencimiento_impaga ||   // ← cuota IMPAGA más antigua (backend la nombra así)
+      input?.min_vto_impaga ||                // ← idem (campo de kpis.py)
       input?.ultima_vencimiento_impaga ||
+      input?.ultima_cuota_vencimiento ||
       input?.vto_referencia ||
       input?.fecha_vto_poliza ||
       input?.fecha_vencimiento ||
