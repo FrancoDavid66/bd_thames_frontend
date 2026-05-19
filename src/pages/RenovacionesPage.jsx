@@ -6,13 +6,12 @@ import { motion } from "framer-motion";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import toast from "react-hot-toast";
-import { HiRefresh, HiClipboardCheck, HiArrowRight, HiExclamation , HiX } from "react-icons/hi";
+import { HiRefresh, HiClipboardCheck, HiArrowRight, HiExclamation } from "react-icons/hi";
 
 import {
   fetchRenovaciones,
   renovarPoliza,
   fetchRenovacionesOficinas,
-  marcarNoRenueva,
   fetchRenovacionesResumen,
   fetchRenovacionesGlobalResumen, // 🚀 NUEVO THUNK
   selectRenovacionesItems,
@@ -28,6 +27,9 @@ import RenovacionModal from "../components/renovaciones/RenovacionModal";
 import RenovacionesFiltersBar from "../components/renovaciones/RenovacionesFiltersBar";
 import RenovacionesBucketsBar from "../components/renovaciones/RenovacionesBucketsBar";
 import { useAuth } from "../context/AuthContext"; // 🚀 IMPORTAMOS AUTH
+
+// 🎯 Lógica unificada de fechas/vencimientos (misma que Bajas)
+import { getDiasVencida, getTonoUrgencia, fmtFecha } from "../utils/cuotas";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
@@ -78,33 +80,21 @@ const Badge = ({ children, tone = "neutral" }) => {
   );
 };
 
-function fmtDate(d) {
-  if (!d) return "—";
-  try {
-    return dayjs(d).format("DD/MM/YYYY");
-  } catch {
-    return String(d);
-  }
-}
+// 🎯 fmtDate y calcUrgencyTone migrados a utils/cuotas.js
+// (fmtFecha y getTonoUrgencia respectivamente)
+const fmtDate = fmtFecha;
+const calcUrgencyTone = getTonoUrgencia;
 
+// 🎯 Devuelve la fecha de referencia para mostrar el vencimiento de una póliza.
+// Prioriza la última cuota porque es la regla unificada (misma que Bajas).
 function pickVtoRef(item) {
   return (
-    item?.vto_referencia ||
     item?.ultima_cuota_vencimiento ||
+    item?.vto_referencia ||
     item?.fecha_vencimiento ||
     item?.proxima_vencimiento_impaga ||
     null
   );
-}
-
-function calcUrgencyTone(dias) {
-  if (dias == null || Number.isNaN(Number(dias))) return "neutral";
-  const n = Number(dias);
-  if (n < 0) return "red";
-  if (n === 0) return "yellow";
-  if (n <= 3) return "yellow";
-  if (n <= 7) return "blue";
-  return "neutral";
 }
 
 function getClienteNombreApellido(p) {
@@ -182,8 +172,6 @@ export default function RenovacionesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [noRenuevaId, setNoRenuevaId] = useState(null);   // póliza a marcar como no renueva
-  const [noRenuevaMot, setNoRenuevaMot] = useState("");    // motivo opcional
 
   const loading = status === "loading";
 
@@ -324,20 +312,6 @@ export default function RenovacionesPage() {
 
   const canPrev = safePage > 1;
   const canNext = totalCount ? safePage < totalPages : receivedCount === pageSize;
-
-  const handleNoRenueva = async (polizaId) => {
-    if (!polizaId) return;
-    setSubmitting(true);
-    try {
-      await dispatch(marcarNoRenueva({ polizaId, motivo: noRenuevaMot })).unwrap();
-      setNoRenuevaId(null);
-      setNoRenuevaMot("");
-    } catch (e) {
-      console.error("Error marcando no renueva:", e);
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
@@ -487,8 +461,11 @@ export default function RenovacionesPage() {
         ) : (
           items.map((p) => {
             const vtoRef = pickVtoRef(p);
-            const diasVto = p?.dias_para_vencer_poliza;
-            const tone = calcUrgencyTone(diasVto);
+            // 🎯 Misma lógica que Bajas: días vencida = hoy − vto última cuota
+            const diasVencida = getDiasVencida(p);
+            // Para el tono usamos los días vencida como negativos (la urgencia
+            // crece cuanto MAS vencida está)
+            const tone = calcUrgencyTone(diasVencida > 0 ? -diasVencida : 0);
 
             const patente = getPatente(p);
             const asegurado = getClienteNombreApellido(p);
@@ -518,7 +495,8 @@ export default function RenovacionesPage() {
                       </div>
                     </div>
                     <Badge tone={tone}>
-                      Vence: {fmtDate(vtoRef)} {diasVto != null ? `(${diasVto}d)` : ""}
+                      Vence: {fmtDate(vtoRef)}
+                      {diasVencida > 0 ? ` · vencida hace ${diasVencida}d` : ""}
                     </Badge>
                   </div>
 
@@ -560,19 +538,6 @@ export default function RenovacionesPage() {
                   >
                     <HiClipboardCheck className="text-sm" />
                     Renovar
-                  </button>
-
-
-
-                  {/* Botón No renueva */}
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => setNoRenuevaId(p.id)}
-                    className="flex w-full md:w-auto h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 text-rose-400 hover:bg-rose-500/10 transition-colors text-sm px-3 font-medium"
-                  >
-                    <HiX className="text-sm" />
-                    No renueva
                   </button>
 
                   <Link
@@ -628,42 +593,6 @@ export default function RenovacionesPage() {
         }}
         submitting={submitting}
       />
-
-
-      {/* Modal confirmación No renueva */}
-      {noRenuevaId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-base font-bold text-slate-100 mb-2">¿Marcar como No renueva?</h3>
-            <p className="text-sm text-slate-400 mb-4">
-              La póliza desaparecerá de la lista de renovaciones. Podés agregar un motivo opcional.
-            </p>
-            <input
-              type="text"
-              placeholder="Motivo (opcional)"
-              value={noRenuevaMot}
-              onChange={e => setNoRenuevaMot(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-sm mb-4 outline-none focus:border-indigo-400"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleNoRenueva(noRenuevaId)}
-                disabled={submitting}
-                className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm transition-colors disabled:opacity-50"
-              >
-                {submitting ? "Guardando..." : "Confirmar"}
-              </button>
-              <button
-                onClick={() => { setNoRenuevaId(null); setNoRenuevaMot(""); }}
-                disabled={submitting}
-                className="flex-1 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-sm transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

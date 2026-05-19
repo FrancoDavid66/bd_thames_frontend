@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import { HiX, HiExclamation } from "react-icons/hi";
 
+// 🎯 Lógica unificada de cuotas
+import { getUltimaCuota } from "../../utils/cuotas";
+
 const cx = (...a) => a.filter(Boolean).join(" ");
 
 export default function RenovacionModal({ open, item, onClose, onSubmit, submitting }) {
@@ -23,22 +26,21 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
       item?.precio_cuota != null && item?.precio_cuota !== "" ? String(item?.precio_cuota) : ""
     );
 
-    // 🚀 LÓGICA INTELIGENTE DE FECHAS
+    // 🎯 LÓGICA UNIFICADA: la nueva póliza empieza el MISMO DÍA que venció
+    // la última cuota de la póliza vieja (sin gap). Esto coincide con la
+    // regla del backend en renovacion.py (inicio_vigencia = ancla).
     let fechaCalculada = null;
 
-    if (item?.cuotas && item.cuotas.length > 0) {
-      // 1. Agarramos todas las cuotas y buscamos la que tenga el número más alto
-      const ultimaCuota = [...item.cuotas].sort((a, b) => b.cuota_nro - a.cuota_nro)[0];
-      
-      if (ultimaCuota?.fecha_vencimiento) {
-        // 2. Le sumamos exactamente 1 mes a la fecha de esa última cuota
-        fechaCalculada = dayjs(ultimaCuota.fecha_vencimiento).add(1, 'month');
-      }
+    // Usamos getUltimaCuota del módulo unificado (misma lógica en toda la app)
+    const ultimaCuota = getUltimaCuota(item?.cuotas);
+    if (ultimaCuota?.fecha_vencimiento) {
+      // ✅ Mismo día que venció la última cuota (sin sumar nada)
+      fechaCalculada = dayjs(ultimaCuota.fecha_vencimiento);
     }
 
-    // 3. Fallback: Si no tiene cuotas, busca otras referencias de la póliza
+    // Fallback: Si no tiene cuotas cargadas, busca otras referencias de la póliza
     if (!fechaCalculada) {
-      const fallbackStr = item?.vto_referencia || item?.ultima_cuota_vencimiento || item?.fecha_vencimiento || item?.primer_pago;
+      const fallbackStr = item?.ultima_cuota_vencimiento || item?.vto_referencia || item?.fecha_vencimiento || item?.primer_pago;
       if (fallbackStr) {
         fechaCalculada = dayjs(fallbackStr);
       }

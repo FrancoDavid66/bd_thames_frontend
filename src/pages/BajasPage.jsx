@@ -17,6 +17,9 @@ import {
 } from "react-icons/hi";
 import ExcelJS from "exceljs";
 
+// 🎯 Lógica unificada de fechas/vencimientos
+import { getDiasVencida } from "../utils/cuotas";
+
 import {
   fetchBajas,
   fetchBajasOficinas,
@@ -45,21 +48,7 @@ const LS = {
 };
 
 // --- Helpers ---
-function parseDateRobusta(v) {
-  if (!v) return null;
-  const s = String(v).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const [yy, mm, dd] = s.split("-").map(Number);
-    return new Date(yy, mm - 1, dd);
-  }
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function daysBetween(a, b) {
-  if (!a || !b) return 0;
-  return Math.floor((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
-}
+// 🎯 parseDateRobusta y daysBetween migrados a utils/cuotas.js (getDiasVencida)
 
 function getClienteInfo(p) {
   const nombre =
@@ -199,15 +188,9 @@ export default function BajasPage() {
   }, [search]); // 🚀 LA CURA 2: Solo depende de search. Si escribis, busca. Si cambiás de página, esto NO se ejecuta.
 
   const enriched = useMemo(() => {
-    const hoy = new Date();
     let data = (items || []).map((p) => {
-      // Usamos la ÚLTIMA cuota vencida (max_vto_impaga) para calcular mora
-      // Si no viene del backend, caemos al min_vto_impaga como fallback
-      const ultimaImpaga = parseDateRobusta(
-        p.max_vto_impaga || p.ultima_vencimiento_impaga || 
-        p.min_vto_impaga || p.proxima_vencimiento_impaga
-      );
-      const diasMora = ultimaImpaga ? daysBetween(hoy, ultimaImpaga) : 0;
+      // 🎯 Regla unificada: días vencida = hoy − vencimiento de la última cuota
+      const diasMora = getDiasVencida(p);
       const { nombre } = getClienteInfo(p);
       return {
         ...p,

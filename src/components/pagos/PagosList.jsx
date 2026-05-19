@@ -27,60 +27,69 @@ import ImprimirFacturaTicket from "./ImprimirFacturaTicket";
 import EnviarFacturaWhatsapp from "./EnviarFacturaWhatsapp";
 import ModalFormaPago from "./ModalFormaPago";
 import ConfirmarPagoModal from "./ConfirmarPagoModal";
-import RegistrarTraspasoModal from "./RegistrarTraspasoModal";
-import AlertaPolizaModal, { detectarAlerta } from "./AlertaPolizaModal";
-import { fetchSiniestrosRecientes } from "../../store/slices/siniestrosSlice";
+import RegistrarTraspasoModal from "./RegistrarTraspasoModal"; // <--- 🚀 NUEVO MODAL DE VENTAS
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
 /* ====== PALETA SOBRIA — INDUSTRIAL/OPERATIVA ====== */
 const PALETTE = {
-  basePanel: "bg-slate-950 border-slate-800/60",
-  header: "bg-slate-900/80 text-slate-200 border-b border-slate-800/60",
-  divider: "divide-slate-800/40",
+  basePanel: "bg-slate-950 border-slate-800",
+  header: "bg-slate-900 text-slate-200 border-b border-slate-800",
+  divider: "divide-slate-800",
   paid: {
-    stripe:     "bg-emerald-500",
-    cardBg:     "bg-slate-900/40",
-    border:     "border-slate-800/50",
-    text:       "text-slate-300",
+    stripe: "bg-emerald-600",
+    cardBg: "bg-slate-900 border-slate-800",
+    text: "text-slate-200",
     amountText: "text-emerald-400",
-    chipBg:     "bg-emerald-900/40",
-    chipText:   "text-emerald-400",
-    chipBorder: "border-emerald-800/50",
-    noteBg:     "bg-slate-800/60",
-    noteText:   "text-slate-400",
-    btn:        "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
+    border: "border-slate-800",
+    chipBg: "bg-emerald-900/60",
+    chipText: "text-emerald-300",
+    chipBorder: "border-emerald-800",
+    noteBg: "bg-slate-800",
+    noteText: "text-slate-300",
+    btn: "bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600",
   },
   pending: {
-    stripe:     "bg-slate-600",
-    cardBg:     "bg-slate-900/60",
-    border:     "border-slate-800/50",
-    text:       "text-slate-200",
-    amountText: "text-sky-300",
-    chipBg:     "bg-slate-800/60",
-    chipText:   "text-slate-400",
-    chipBorder: "border-slate-700/50",
-    noteBg:     "bg-slate-800/60",
-    noteText:   "text-slate-400",
-    btn:        "bg-primary-600 hover:bg-primary-500 text-white border-primary-500",
+    stripe: "bg-slate-700",
+    cardBg: "bg-slate-900/60 border-slate-800",
+    text: "text-slate-400",
+    amountText: "text-slate-300",
+    border: "border-slate-800",
+    chipBg: "bg-slate-800",
+    chipText: "text-slate-400",
+    chipBorder: "border-slate-700",
+    noteBg: "bg-slate-800",
+    noteText: "text-slate-400",
+    btn: "bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600",
   },
   overdue: {
-    stripe:     "bg-rose-500",
-    cardBg:     "bg-rose-950/20",
-    border:     "border-rose-900/40",
-    text:       "text-slate-200",
+    stripe: "bg-rose-700",
+    cardBg: "bg-slate-900 border-rose-900/60",
+    text: "text-slate-200",
     amountText: "text-rose-400",
-    chipBg:     "bg-rose-900/40",
-    chipText:   "text-rose-400",
-    chipBorder: "border-rose-800/50",
-    noteBg:     "bg-slate-800/60",
-    noteText:   "text-slate-300",
-    btn:        "bg-amber-600 hover:bg-amber-500 text-white border-amber-500",
+    border: "border-rose-900/60",
+    chipBg: "bg-rose-900/50",
+    chipText: "text-rose-300",
+    chipBorder: "border-rose-800",
+    noteBg: "bg-slate-800",
+    noteText: "text-slate-300",
+    btn: "bg-rose-800 hover:bg-rose-700 text-rose-100 border-rose-700",
   },
-  neutralBtn:  "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
-  actionBtn:   "bg-slate-700 hover:bg-slate-600 text-white border-slate-600",
-  ticketBtn:   "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700",
+  neutralBtn: "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
+  actionBtn: "bg-slate-700 hover:bg-slate-600 text-white border-slate-600",
+  ticketBtn: "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700",
 };
+
+// 🎯 Lógica unificada de cuotas (única fuente de verdad para fechas/estados)
+import {
+  sumarDiasHabiles as utilSumarDiasHabiles,
+  getEstadoCuota,
+  getBadgeClasses,
+  getBadgeLabel,
+  calcCobertura,
+  resumenCuotas,
+  fmtFecha,
+} from "../../utils/cuotas";
 
 const MONEY_FMT = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtMoney = (n) => MONEY_FMT.format(Number(n || 0));
@@ -224,11 +233,6 @@ export default function PagosList({
   const [obsAbiertaId, setObsAbiertaId] = useState(null);
   const [detalleAbierto, setDetalleAbierto] = useState(null);
 
-  // ── Nuevo flujo: alerta → pasarela ──────────────────────
-  const [alertaData, setAlertaData] = useState(null);
-  const [cuotaParaAlerta, setCuotaParaAlerta] = useState(null);
-  const [siniestrosRecientes, setSiniestrosRecientes] = useState([]); // siniestros del cliente/póliza
-
   const [confirmData, setConfirmData] = useState(null);
   const [confirmandoPago, setConfirmandoPago] = useState(false);
 
@@ -269,36 +273,7 @@ export default function PagosList({
   const visibleItems = useMemo(() => modoRapido ? items.slice(0, renderLimit) : items, [items, modoRapido, renderLimit]);
   const showFastControls = items.length >= SHOW_FAST_TOGGLE_FROM;
 
-  const abrirPagar = useCallback(async (cuota) => {
-    const pol      = cuota?.poliza || {};
-    const polizaId = pol?.id || cuota?.poliza_id;
-    const clienteId= pol?.cliente?.id || pol?.cliente_id || cuota?.cliente_id;
-
-    // 1. Consultar siniestros recientes (anti-fraude)
-    let siniestros = [];
-    try {
-      const res = await dispatch(fetchSiniestrosRecientes({
-        poliza_id:  polizaId  || undefined,
-        cliente_id: !polizaId ? (clienteId || undefined) : undefined,
-        dias: 90,
-      })).unwrap();
-      siniestros = Array.isArray(res) ? res : [];
-    } catch { siniestros = []; }
-
-    setSiniestrosRecientes(siniestros);
-
-    // 2. Detectar alerta por estado de póliza
-    const alerta = detectarAlerta(pol, cuota);
-
-    if (alerta || siniestros.length > 0) {
-      // Hay alerta de estado y/o siniestros recientes — mostrar modal primero
-      setCuotaParaAlerta(cuota);
-      setAlertaData(alerta || { tipo: "activa" }); // "activa" = solo hay siniestros
-    } else {
-      // Todo limpio → ir directo a la pasarela
-      setCuotaSeleccionada(cuota);
-    }
-  }, [dispatch]);
+  const abrirPagar = useCallback((cuota) => setCuotaSeleccionada(cuota), []);
   const cerrarPagar = useCallback(() => setCuotaSeleccionada(null), []);
   const abrirDetalle = useCallback((cuota) => setDetalleAbierto(cuota), []);
   const cerrarDetalle = useCallback(() => setDetalleAbierto(null), []);
@@ -363,12 +338,11 @@ export default function PagosList({
       numeroPoliza: pol.numero_poliza || pol.numero || pol.nro_poliza || pol.n_poliza || "-",
       cuotaNro: cuota.cuota_nro,
       polizaEstado: String(pol.estado || "").toUpperCase(),
-      polizaCobertura: String(pol.cobertura || ""),
-      polizaCompania: String(pol.compania_nombre || pol.compania?.nombre || pol.compania || ""),
+      polizaCobertura: String(pol.cobertura || ""), 
+      polizaCompania: String(pol.compania_nombre || pol.compania?.nombre || pol.compania || ""), // 🚀 Compañía inyectada
       oficinaLabel: getOficinaName(extractRawOficina(cuota)),
       diasAtraso: fv && fv.isBefore(hoyDate) ? hoyDate.diff(fv, "day") : 0,
-      clienteNombre: cli?.nombreCompleto || "Asegurado",
-      _alertaTipo: cuota?._alertaTipo || null, // tipo de alerta que vino del modal previo
+      clienteNombre: cli?.nombreCompleto || "Asegurado", // 🚀 Nombre para el modal
     });
     cerrarPagar();
   }, [cuotaSeleccionada, cerrarPagar]);
@@ -380,12 +354,9 @@ export default function PagosList({
     const remainingOverdue = Math.max(0, cuotasMismaPoliza.filter(c => !c.pagado && dayjs(c.fecha_vencimiento).isBefore(dayjs().startOf("day"))).length - 1);
 
     const payload = { id: cuota.id, metodo: datos.metodo, forma_pago: datos.forma_pago, monto, fecha_pago: datos.fecha_pago, observaciones: datos.observaciones };
-    if (datos.medio_cobro_id)  payload.medio_cobro_id  = datos.medio_cobro_id;
-    if (datos.destino_tipo)    payload.destino_tipo    = datos.destino_tipo;
-    if (datos.destino_cuenta)  payload.destino_cuenta  = datos.destino_cuenta;
-    if (datos.enviado_por)     payload.enviado_por     = datos.enviado_por;
-    if (datos.cuit_remitente)  payload.cuit_remitente  = datos.cuit_remitente;
-    if (datos.nro_operacion)   payload.nro_operacion   = datos.nro_operacion;
+    if (datos.medio_cobro_id) payload.medio_cobro_id = datos.medio_cobro_id;
+    if (datos.destino_tipo) payload.destino_tipo = datos.destino_tipo;
+    if (datos.destino_cuenta) payload.destino_cuenta = datos.destino_cuenta;
 
     try {
       setConfirmandoPago(true);
@@ -398,23 +369,6 @@ export default function PagosList({
       } else if (polizaEstado === "VENCIDA") {
         toast.success(remainingOverdue === 0 ? "Pago registrado. ¡Póliza ACTIVA! 🟢" : `Aún debe ${remainingOverdue} cuotas (Sigue VENCIDA). 🔴`, { duration: 6000 });
       } else toast.success("Cuota marcada como pagada");
-
-      // Si era baja reciente → marcar póliza como en_verificacion
-      const alertaTipo = confirmData?._alertaTipo;
-      if (alertaTipo === "baja_reciente") {
-        try {
-          const polizaId = cuota?.poliza?.id || cuota?.poliza_id;
-          const token = localStorage.getItem("access_token") || "";
-          await fetch(`${BASE_URL}polizas/${polizaId}/`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ estado: "en_verificacion" }),
-          });
-          toast("🔍 Póliza marcada para verificación por cobro con baja reciente.", { duration: 5000 });
-        } catch {
-          // no interrumpir el flujo si falla
-        }
-      }
 
       const conObs = {
         ...cuotaActualizada,
@@ -452,25 +406,14 @@ export default function PagosList({
     const total = cuotaSeleccionada?.cantidad_cuotas ?? (Array.isArray(pol.cuotas) ? pol.cuotas.length : null);
     return {
       nombreAp: cliR?.nombreAp || "", dni: cliR?.dni || "",
-      clienteId: cliR?.id || pol?.cliente?.id || pol?.cliente_id || cuotaSeleccionada?.cliente_id || null,
-      polizaId: pol?.id || cuotaSeleccionada?.poliza_id || null,
       compania: (pol.compania_nombre || pol.compania?.nombre || pol.compania || "").toString().trim(),
       cobertura: (pol.cobertura || "").toString().trim(),
       cuotaTxt: typeof cuotaSeleccionada.cuota_nro === "number" ? (total ? `Cuota ${cuotaSeleccionada.cuota_nro}/${total}` : `Cuota ${cuotaSeleccionada.cuota_nro}`) : "",
     };
   }, [cuotaSeleccionada]);
 
-  // Helpers de cobertura — misma lógica que PolizaCuotasCard y CuotasPanel
-  const sumarDiasHabiles = useCallback((fecha, dias) => {
-    const d = new Date(fecha);
-    if (isNaN(d.getTime())) return null;
-    let added = 0;
-    while (added < dias) {
-      d.setDate(d.getDate() + 1);
-      if (d.getDay() !== 0 && d.getDay() !== 6) added++;
-    }
-    return dayjs(d).startOf("day");
-  }, []);
+  // 🎯 sumarDiasHabiles ahora viene del módulo unificado (utils/cuotas.js)
+  const sumarDiasHabiles = useCallback((fecha, dias) => utilSumarDiasHabiles(fecha, dias), []);
 
   const rowModels = useMemo(() => {
     return visibleItems.map((cuota, idx) => {
@@ -585,36 +528,11 @@ export default function PagosList({
         )}
       </div>
 
-      {/* ── Modal de alerta según estado de póliza (PASO 1) ── */}
-      <AlertaPolizaModal
-        isOpen={!!alertaData && !!cuotaParaAlerta}
-        alerta={alertaData}
-        cliente={cuotaParaAlerta ? resolveCliente(cuotaParaAlerta?.poliza || {}, cuotaParaAlerta)?.nombreCompleto : ""}
-        numeroPoliza={cuotaParaAlerta?.poliza?.numero_poliza || ""}
-        compania={cuotaParaAlerta?.poliza?.compania_nombre || ""}
-        siniestrosRecientes={siniestrosRecientes}
-        onContinuar={() => {
-          const cuota = cuotaParaAlerta;
-          const tipo  = alertaData?.tipo;
-          setAlertaData(null);
-          setCuotaParaAlerta(null);
-          setSiniestrosRecientes([]);
-          setCuotaSeleccionada({ ...cuota, _alertaTipo: tipo });
-        }}
-        onCancelar={() => {
-          setAlertaData(null);
-          setCuotaParaAlerta(null);
-          setSiniestrosRecientes([]);
-        }}
-      />
-
       <ModalFormaPago
         isOpen={!!cuotaSeleccionada} onClose={cerrarPagar} onConfirm={confirmarPago} defaultMonto={cuotaSeleccionada?.monto}
         title={`Confirmar pago — Cuota #${cuotaSeleccionada?.cuota_nro ?? "?"}`}
         cuentasMercadoPago={cuentasMercadoPago} billeterasVirtuales={billeterasVirtuales} mediosCobro={mediosCobro}
         clienteNombreApellido={datosNoti?.nombreAp || ""} clienteDni={datosNoti?.dni || ""} polizaCompania={datosNoti?.compania || ""} polizaCobertura={datosNoti?.cobertura || ""} pagoCuota={datosNoti?.cuotaTxt || ""}
-        clienteId={datosNoti?.clienteId || null}
-        polizaActualId={datosNoti?.polizaId || null}
       />
 
       <ConfirmarPagoModal 
@@ -701,27 +619,242 @@ export default function PagosList({
                 const c = detalleAbierto;
                 const pol = c?.poliza || {};
                 const cliR = resolveCliente(pol, c);
-                const total = c?.cantidad_cuotas ?? (Array.isArray(pol?.cuotas) ? pol.cuotas.length : null);
+                const todasCuotas = Array.isArray(pol?.cuotas) ? [...pol.cuotas].sort((a, b) => (a?.cuota_nro || 0) - (b?.cuota_nro || 0)) : [];
+                const total = c?.cantidad_cuotas ?? (todasCuotas.length || null);
+
+                // Posición de la cuota actual dentro del array de cuotas
+                const idxActual = todasCuotas.findIndex((x) => x?.id === c?.id);
+
+                // 🎯 Cobertura unificada del módulo
+                const coberturaActual = idxActual >= 0
+                  ? calcCobertura(c, todasCuotas, idxActual, pol?.fecha_emision)
+                  : null;
+
+                // Cuota siguiente (para mostrar "la próxima vence el…")
+                const cuotaSiguiente = idxActual >= 0 && idxActual < todasCuotas.length - 1
+                  ? todasCuotas[idxActual + 1]
+                  : null;
+
+                // Resumen agregado
+                const resumen = resumenCuotas(todasCuotas);
+
+                // Vto final de la póliza = vto de la última cuota
+                const ultimaCuota = todasCuotas[todasCuotas.length - 1] || null;
+                const finPoliza = ultimaCuota?.fecha_vencimiento || pol?.fecha_vencimiento || pol?.fecha_vto_poliza || null;
+
+                const estadoActual = getEstadoCuota(c);
 
                 return (
-                  <div className="space-y-3 text-xs sm:text-sm">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <InfoRow label="Cliente" value={cliR?.nombreCompleto || "Cliente"} />
-                      <InfoRow label="Cliente ID" value={cliR?.id != null ? `#${cliR.id}` : "—"} />
-                      <InfoRow label="DNI/CUIT" value={cliR?.dni || "—"} />
-                      <InfoRow label="Patente" value={(pol?.patente || "").toUpperCase() || "—"} />
-                      <InfoRow label="Vehículo" value={[pol?.marca, pol?.modelo].filter(Boolean).join(" ") || "—"} />
-                      <InfoRow label="Cobertura" value={pol?.cobertura || "—"} />
-                      <InfoRow label="Compañía" value={pol?.compania_nombre || pol?.compania?.nombre || pol?.compania || "—"} />
-                      <InfoRow label="Fecha de Alta" value={fmtDate(pol?.fecha_emision)} />
-                      <InfoRow label="Cuota" value={typeof c?.cuota_nro === "number" ? (total ? `${c.cuota_nro}/${total}` : `${c.cuota_nro}`) : "—"} />
-                      <InfoRow label="Monto" value={`$ ${fmtMoney(c?.monto)}`} />
-                      <InfoRow label="Vencimiento" value={fmtDate(c?.fecha_vencimiento)} />
-                      <InfoRow label="Fecha de pago" value={fmtDate(c?.fecha_pago)} />
-                      <InfoRow label="Estado" value={c?.pagado ? "Pagada" : c?.fecha_vencimiento && dayjs(c.fecha_vencimiento).isBefore(dayjs(), "day") ? "Vencida" : "Pendiente"} />
-                    </div>
+                  <div className="space-y-4 text-xs sm:text-sm">
+
+                    {/* ═══ 1. CLIENTE Y VEHÍCULO ═══ */}
+                    <SectionCard title="Cliente y vehículo" icon={<HiUser className="w-4 h-4" />}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <InfoRow label="Cliente" value={cliR?.nombreCompleto || "—"} />
+                        <InfoRow label="DNI/CUIT" value={cliR?.dni || "—"} />
+                        <InfoRow label="Patente" value={(pol?.patente || "").toUpperCase() || "—"} />
+                        <InfoRow label="Vehículo" value={[pol?.marca, pol?.modelo].filter(Boolean).join(" ") || "—"} />
+                        <InfoRow label="Compañía" value={pol?.compania_nombre || pol?.compania?.nombre || pol?.compania || "—"} />
+                        <InfoRow label="Cobertura" value={pol?.cobertura || "—"} />
+                      </div>
+                    </SectionCard>
+
+                    {/* ═══ 2. LÍNEA DE TIEMPO DETALLADA (stepper) ═══ */}
+                    <SectionCard title="Línea de tiempo de la póliza" icon={<HiClock className="w-4 h-4" />}>
+
+                      {/* Resumen */}
+                      {resumen.total > 0 && (
+                        <div className="flex flex-wrap gap-2 text-[11px] mb-3">
+                          <span className="px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                            {resumen.pagadas} pagadas
+                          </span>
+                          <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
+                            {resumen.pendientes} pendientes
+                          </span>
+                          {resumen.vencidas > 0 && (
+                            <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/20">
+                              {resumen.vencidas} vencidas
+                            </span>
+                          )}
+                          {resumen.venceHoy > 0 && (
+                            <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">
+                              {resumen.venceHoy} vence hoy
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Stepper */}
+                      <div className="space-y-0">
+
+                        {/* HITO: Inicio de póliza */}
+                        <div className="flex items-center gap-2.5 p-2.5 bg-emerald-500/5 border-l-[3px] border-emerald-500 rounded-r-md">
+                          <div className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">🚀</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Inicio de póliza</div>
+                            <div className="text-sm font-semibold text-white">{fmtFecha(pol?.fecha_emision)}</div>
+                            <div className="text-[10px] text-slate-400">
+                              Asegurado · {todasCuotas.length || total || "—"} cuota{todasCuotas.length === 1 ? "" : "s"} mensual{todasCuotas.length === 1 ? "" : "es"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Lista de cuotas con conector */}
+                        {todasCuotas.map((cu, i) => {
+                          const esActual = cu?.id === c?.id;
+                          const estado = getEstadoCuota(cu);
+                          const cob = calcCobertura(cu, todasCuotas, i, pol?.fecha_emision);
+                          const cuotaPagada = !!cu?.pagado;
+                          const fechaPago = cu?.pago_registrado_en || cu?.fecha_pago;
+                          const fv = cu?.fecha_vencimiento ? dayjs(cu.fecha_vencimiento).startOf("day") : null;
+                          const fp = fechaPago ? dayjs(fechaPago).startOf("day") : null;
+                          const pagoAtrasadoCu = cuotaPagada && fp && fv ? fp.isAfter(fv) : false;
+                          const diasFaltan = !cuotaPagada && fv ? fv.diff(hoy, "day") : null;
+                          const esUltima = i === todasCuotas.length - 1;
+
+                          // Estilo visual según estado
+                          let dotBg = "bg-slate-600";
+                          let dotText = "text-slate-300";
+                          let cardBg = "bg-slate-900/50";
+                          let cardBorder = "border-slate-700";
+                          let opacity = "";
+
+                          if (esActual) {
+                            dotBg = "bg-indigo-500";
+                            dotText = "text-white";
+                            cardBg = "bg-indigo-500/10";
+                            cardBorder = "border-indigo-500 border-2";
+                          } else if (cuotaPagada) {
+                            dotBg = pagoAtrasadoCu ? "bg-orange-500" : "bg-emerald-500";
+                            dotText = "text-white";
+                            cardBg = pagoAtrasadoCu ? "bg-orange-500/5" : "bg-emerald-500/5";
+                            cardBorder = pagoAtrasadoCu ? "border-orange-500/30" : "border-emerald-500/25";
+                          } else if (estado === "vencida") {
+                            dotBg = "bg-red-500";
+                            dotText = "text-white";
+                            cardBg = "bg-red-500/5";
+                            cardBorder = "border-red-500/30";
+                          } else {
+                            opacity = "opacity-75";
+                          }
+
+                          // Si está paga y se asegura ese mismo día (cuota 1, fecha pago = fecha vto = fecha emisión), 
+                          // el recibo se emite al día hábil siguiente
+                          const inicioPolizaYmd = pol?.fecha_emision ? dayjs(pol.fecha_emision).format("YYYY-MM-DD") : null;
+                          const cuotaVtoYmd = cu?.fecha_vencimiento ? dayjs(cu.fecha_vencimiento).format("YYYY-MM-DD") : null;
+                          const pagoYmd = fechaPago ? dayjs(fechaPago).format("YYYY-MM-DD") : null;
+                          const esCuotaPrimera = cu?.cuota_nro === 1;
+                          // Si se pagó el mismo día que arrancó la póliza, el recibo cae al día siguiente hábil
+                          const reciboEmitido = (cuotaPagada && pagoYmd && esCuotaPrimera && pagoYmd === inicioPolizaYmd)
+                            ? utilSumarDiasHabiles(fechaPago, 1)
+                            : null;
+
+                          // Si fue pago tardío, la cobertura recién arranca a las 48hs hábiles
+                          const inicioCoberturaTardia = pagoAtrasadoCu && cob?.desde ? cob.desde : null;
+
+                          return (
+                            <div key={cu.id || i}>
+                              {/* Conector vertical */}
+                              <div className="ml-[18px] w-[2px] h-3 bg-slate-700"></div>
+
+                              <div className={`flex items-stretch gap-2.5 ${opacity}`}>
+                                <div className="flex flex-col items-center shrink-0">
+                                  <div className={`${esActual ? "w-10 h-10" : "w-9 h-9"} rounded-full ${dotBg} ${dotText} flex items-center justify-center text-sm font-bold ${esActual ? "ring-2 ring-indigo-500/40 ring-offset-2 ring-offset-slate-800" : ""}`}>
+                                    {cuotaPagada && !esActual ? "✓" : (cu?.cuota_nro || (i + 1))}
+                                  </div>
+                                </div>
+
+                                <div className={`flex-1 p-2.5 ${cardBg} border ${cardBorder} rounded-lg min-w-0`}>
+                                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                                    <div className="min-w-0">
+                                      {esActual && (
+                                        <div className="text-[9px] uppercase tracking-wider text-indigo-300 font-bold mb-0.5">📍 Aquí estás</div>
+                                      )}
+                                      <div className="text-xs font-bold text-white">
+                                        Cuota {cu?.cuota_nro || (i + 1)}
+                                        {esUltima && <span className="ml-1 text-[10px] text-rose-300 font-normal">· Última</span>}
+                                      </div>
+                                    </div>
+                                    <span className={getBadgeClasses(estado)}>{getBadgeLabel(estado)}</span>
+                                  </div>
+
+                                  {/* Datos clave: vence + monto */}
+                                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-300 mb-1">
+                                    <div>📅 <span className="text-slate-500">Vence:</span> <span className="font-medium">{fmtFecha(cu?.fecha_vencimiento)}</span></div>
+                                    <div>💵 <span className="text-slate-500">Monto:</span> <span className="font-medium">${fmtMoney(cu?.monto)}</span></div>
+
+                                    {cuotaPagada ? (
+                                      <>
+                                        <div className="col-span-2 text-emerald-300">
+                                          ✅ <span className="text-slate-400">Pagada el:</span> <span className="font-semibold">{fmtFecha(fechaPago)}</span>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {diasFaltan !== null && (
+                                          <div className={`col-span-2 ${diasFaltan < 0 ? "text-red-300" : diasFaltan === 0 ? "text-orange-300" : "text-yellow-300"}`}>
+                                            ⏳ {diasFaltan > 0 ? `Faltan ${diasFaltan} día${diasFaltan === 1 ? "" : "s"}` : diasFaltan === 0 ? "Vence hoy" : `Venció hace ${Math.abs(diasFaltan)} día${Math.abs(diasFaltan) === 1 ? "" : "s"}`}
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* AVISO: recibo emitido al día hábil siguiente */}
+                                  {reciboEmitido && (
+                                    <div className="mt-1.5 text-[10px] px-2 py-1 rounded bg-sky-500/10 border border-sky-500/20 text-sky-200">
+                                      📝 <span className="font-semibold">Recibo emitido:</span> {fmtFecha(reciboEmitido)}
+                                      <span className="text-sky-400/70 ml-1">(al día hábil siguiente del aseguramiento)</span>
+                                    </div>
+                                  )}
+
+                                  {/* AVISO: pago tardío recupera cobertura a las 48hs hábiles */}
+                                  {pagoAtrasadoCu && inicioCoberturaTardia && (
+                                    <div className="mt-1.5 text-[10px] px-2 py-1 rounded bg-orange-500/10 border border-orange-500/30 text-orange-200">
+                                      ⚠️ <span className="font-semibold">Pago atrasado:</span> recupera cobertura el {fmtFecha(inicioCoberturaTardia)}
+                                      <span className="text-orange-400/70 ml-1">(48hs hábiles después del pago)</span>
+                                    </div>
+                                  )}
+
+                                  {/* Cobertura */}
+                                  {cob && cob.tipo === "sin_cobertura" && (
+                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-rose-500/20 text-[10px] text-rose-300">
+                                      🛡 Sin cobertura desde {fmtFecha(cob.desde)}
+                                    </div>
+                                  )}
+                                  {cob && cob.tipo === "ok" && cob.desde && cob.hasta && (
+                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-emerald-500/20 text-[10px] text-emerald-300">
+                                      🛡 Cubre: {fmtFecha(cob.desde)} → {fmtFecha(cob.hasta)}
+                                    </div>
+                                  )}
+                                  {cob && cob.tipo === "atrasado" && cob.desde && cob.hasta && (
+                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-orange-500/20 text-[10px] text-orange-300">
+                                      🛡 Cubre: {fmtFecha(cob.desde)} → {fmtFecha(cob.hasta)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* HITO: Vto final */}
+                        <div className="ml-[18px] w-[2px] h-3 bg-rose-300/60"></div>
+                        <div className="flex items-center gap-2.5 p-2.5 bg-rose-500/5 border-l-[3px] border-rose-500 rounded-r-md">
+                          <div className="shrink-0 w-9 h-9 rounded-full bg-rose-500 text-white flex items-center justify-center text-sm font-bold">🏁</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] uppercase tracking-wider text-rose-300 font-bold">Vto final de la póliza</div>
+                            <div className="text-sm font-semibold text-white">{fmtFecha(finPoliza)}</div>
+                            <div className="text-[10px] text-slate-400">Renovar antes de esta fecha</div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </SectionCard>
+
+                    {/* Observación si existe */}
                     {(c?.observaciones_pago || c?.ultima_observacion_pago) && (
-                      <div className="rounded-xl border border-rose-500/50 bg-rose-900/40 p-3 sm:p-4 text-rose-100 mt-4 shadow-inner">
+                      <div className="rounded-xl border border-rose-500/50 bg-rose-900/40 p-3 sm:p-4 text-rose-100 shadow-inner">
                         <div className="flex items-start gap-2">
                           <HiExclamationCircle className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 shrink-0 text-rose-400" />
                           <div className="whitespace-pre-wrap break-words text-xs sm:text-sm">
@@ -752,106 +885,157 @@ const CuotaRow = memo(
     const isPolicyCancelada = polizaEstado === "CANCELADA" || polizaEstado === "ANULADA";
 
     let extraClasses = "";
-    if (isPolicyCancelada && !cuota.pagado) extraClasses = "opacity-70 border-rose-900/40";
-    else if (isPolicyVencida && !cuota.pagado) extraClasses = "border-amber-900/40";
-
-    // Badge de estado de póliza
-    const polizaBadge = isPolicyCancelada ? (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-900/50 border border-rose-700/50 text-rose-400 uppercase tracking-wider">
-        ⛔ {polizaEstado}
-      </span>
-    ) : isPolicyVencida ? (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-900/40 border border-amber-700/40 text-amber-400 uppercase tracking-wider">
-        ⚠ Póliza vencida
-      </span>
-    ) : null;
+    if (isPolicyCancelada && !cuota.pagado) extraClasses = "opacity-60";
+    else if (isPolicyVencida && !cuota.pagado) extraClasses = "border-rose-900/50";
 
     return (
       <>
-        <span className={`absolute left-0 top-0 h-full w-1 rounded-l-sm ${S.stripe}`} aria-hidden />
-        <div className={`mx-0 sm:mx-2 my-0.5 sm:my-1.5 sm:rounded-2xl border p-4 sm:p-5 ${S.cardBg} ${S.border} ${extraClasses} transition-colors relative`}>
-          <div className="pl-3 sm:pl-0 flex flex-col gap-4">
+        <span className={`absolute left-0 top-0 h-full w-1 ${S.stripe}`} aria-hidden />
+        <div className={`mx-0 sm:mx-2 my-0 sm:my-1 sm:rounded-lg border p-3 sm:p-4 ${S.cardBg} ${S.border} ${extraClasses} relative`}>
+          <div className="pl-2 sm:pl-2.5 flex flex-col gap-3">
 
-            {/* Header: nombre + monto */}
+            {/* ═══ HEADER: cliente + monto + estado ═══ */}
             <div className="flex justify-between items-start gap-3">
               <div className="min-w-0 flex-1">
-                {polizaBadge && <div className="mb-2">{polizaBadge}</div>}
-                <p className={`font-bold text-[15px] leading-tight truncate ${state === "overdue" ? "text-slate-100" : "text-slate-200"}`}>
-                  {nombreCompleto}
-                </p>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <span className="text-xs font-mono text-slate-500">#{cuota?.cuota_nro ?? "?"}</span>
-                  {patente && <><span className="text-slate-700">·</span><span className="text-xs font-mono text-slate-400">{patente}</span></>}
-                  {modelo && <><span className="text-slate-700">·</span><span className="text-xs text-slate-500 truncate max-w-[120px]">{modelo}</span></>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`truncate max-w-[200px] sm:max-w-md font-semibold text-sm ${state === "overdue" ? "text-rose-200" : "text-white"}`}>
+                    {nombreCompleto}
+                  </span>
                   {isWebAdmin && oficinaLabel && (
-                    <span className="text-[10px] font-mono text-slate-600 border border-slate-700/50 rounded-md px-1.5 py-0.5 bg-slate-900/40">
+                    <span className="text-[10px] font-mono text-slate-400 border border-slate-700 rounded px-1.5 py-0.5">
                       {oficinaLabel}
                     </span>
                   )}
+                  {isPolicyCancelada && !cuota.pagado && (
+                    <span className="text-[10px] font-mono text-rose-400 border border-rose-800 rounded px-1.5 py-0.5">BAJA</span>
+                  )}
+                  {isPolicyVencida && !cuota.pagado && (
+                    <span className="text-[10px] font-mono text-amber-400 border border-amber-800 rounded px-1.5 py-0.5">REACTIVAR</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-mono">
+                  <span>Cuota #{cuota?.cuota_nro ?? "?"}</span>
+                  {patente && <><span>·</span><span>{patente}</span></>}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className={`text-xl font-black tabular-nums ${S.amountText}`}>$ {montoTxt}</p>
-                <span className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${S.chipBg} ${S.chipText} border ${S.chipBorder}`}>
+                <div className={`text-lg sm:text-xl font-mono font-bold ${isPolicyVencida && !cuota.pagado ? "text-amber-400" : S.amountText}`}>
+                  $ {montoTxt}
+                </div>
+                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${S.chipBg} ${S.chipText} border ${S.chipBorder}`}>
                   {label}
                 </span>
               </div>
             </div>
 
-            {/* Fechas */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl px-3 py-2.5 bg-slate-800/40 border border-slate-700/30">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Vence</p>
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm font-mono font-semibold ${state === "overdue" ? "text-rose-400" : "text-slate-300"}`}>{venceTxt || "—"}</p>
+            {/* ═══ FECHAS: pagada/falta + vencimiento ═══ */}
+            <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+              <div>
+                {cuota?.pagado ? (
+                  <>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5 flex items-center gap-1">
+                      ✅ Pagada el
+                    </div>
+                    <div className="text-sm font-mono font-semibold text-emerald-400 flex items-center gap-1.5">
+                      {pagaTxt || "—"}
+                      {pagoAtrasado && dias !== null && (
+                        <span className="text-[10px] text-amber-400 font-medium">
+                          (+{Math.abs(dias)}d)
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5 flex items-center gap-1">
+                      {dias !== null && dias < 0 ? "⚠️ Atraso" : "⏳ Falta"}
+                    </div>
+                    <div className={`text-sm font-mono font-semibold ${dias !== null && dias < 0 ? "text-rose-400" : "text-yellow-300"}`}>
+                      {dias !== null
+                        ? (dias < 0 ? `${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"}` : dias === 0 ? "Hoy" : `${dias} día${dias === 1 ? "" : "s"}`)
+                        : "—"}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5 flex items-center gap-1">
+                  📅 Vencimiento
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-sm font-mono font-semibold ${state === "overdue" ? "text-rose-400" : "text-slate-200"}`}>
+                    {venceTxt || "—"}
+                  </span>
                   {!cuota?.pagado && (
-                    <button type="button" onClick={() => abrirModalFecha(cuota)} className="text-slate-600 hover:text-slate-300 transition-colors ml-1">
-                      <HiPencil className="w-3.5 h-3.5" />
+                    <button type="button" onClick={() => abrirModalFecha(cuota)} className="text-slate-600 hover:text-slate-300 transition-colors">
+                      <HiPencil className="w-3 h-3" />
                     </button>
                   )}
                 </div>
               </div>
-              <div className="rounded-xl px-3 py-2.5 bg-slate-800/40 border border-slate-700/30">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-                  {sinCobertura ? "Sin cobertura" : "Cubre"}
-                </p>
-                <p className={`text-sm font-mono ${sinCobertura ? "text-rose-400" : pagoAtrasado ? "text-amber-400" : "text-slate-300"}`}>
-                  {sinCobertura ? `desde ${cubreDesdeTxt}` : `${cubreDesdeTxt}${cubreHastaTxt ? ` → ${cubreHastaTxt}` : ""}`}
-                </p>
+            </div>
+
+            {/* ═══ COBERTURA destacada ═══ */}
+            <div className={`flex items-center gap-2.5 p-2.5 rounded-lg border ${
+              sinCobertura
+                ? "bg-rose-500/10 border-rose-500/30"
+                : pagoAtrasado
+                ? "bg-amber-500/10 border-amber-500/30"
+                : "bg-emerald-500/10 border-emerald-500/30"
+            }`}>
+              <div className="text-base shrink-0">🛡</div>
+              <div className="flex-1 min-w-0">
+                <div className={`text-[9px] uppercase tracking-wider font-bold mb-0.5 ${
+                  sinCobertura ? "text-rose-300" : pagoAtrasado ? "text-amber-300" : "text-emerald-300"
+                }`}>
+                  {sinCobertura ? "Sin cobertura" : pagoAtrasado ? "Cobertura (pago tardío)" : "Cobertura activa"}
+                </div>
+                <div className="text-xs font-mono text-slate-200">
+                  {sinCobertura ? (
+                    <>desde <span className="font-bold">{cubreDesdeTxt}</span></>
+                  ) : (
+                    <>
+                      <span className="font-bold">{cubreDesdeTxt}</span>
+                      <span className={`mx-1.5 ${pagoAtrasado ? "text-amber-400" : "text-emerald-400"}`}>→</span>
+                      <span className="font-bold">{cubreHastaTxt}</span>
+                    </>
+                  )}
+                </div>
+                {pagoAtrasado && !sinCobertura && (
+                  <div className="text-[10px] text-amber-400/80 mt-0.5">
+                    Activación 48hs hábiles post-pago
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Botón acción */}
-            <div className="flex items-center gap-2">
+            {/* ═══ ACCIÓN PRINCIPAL ═══ */}
+            <div className="flex items-center gap-2 w-full">
               {!cuota?.pagado ? (
                 <button
                   onClick={() => abrirPagar(cuota)}
-                  className={`
-                    flex-1 h-12 px-4 rounded-xl border transition-all font-bold text-sm
-                    inline-flex items-center justify-center gap-2
-                    ${isPolicyCancelada
-                      ? "bg-rose-900/50 hover:bg-rose-800/60 text-rose-300 border-rose-800/50"
-                      : isPolicyVencida
-                      ? "bg-amber-800/50 hover:bg-amber-700/60 text-amber-200 border-amber-700/50"
-                      : "bg-primary-600 hover:bg-primary-500 text-white border-primary-500/50"
-                    }
-                  `}>
+                  className={`w-full h-10 px-4 rounded-lg border transition-colors inline-flex items-center justify-center gap-2 font-semibold text-sm ${
+                    isPolicyVencida
+                      ? "bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 border-amber-800"
+                      : "bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 border-emerald-800"
+                  }`}
+                >
                   <HiCash className="w-4 h-4" />
-                  {isPolicyCancelada ? "Cobrar (póliza cancelada)" : isPolicyVencida ? "Pagar y reactivar" : "Registrar pago"}
+                  {isPolicyVencida ? "Pagar y reactivar" : "Registrar pago"}
                 </button>
               ) : (
-                <div className="flex gap-2 w-full">
+                <div className="flex gap-1.5 w-full">
                   <div className="flex-1">
                     <DescargarFactura cliente={model?.pol?.cliente} poliza={model?.pol} cuota={cuotaPdf || cuota} label="PDF" tone="neutral"
-                      className="w-full h-10 px-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
+                      className="w-full h-10 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
                   </div>
                   <div className="flex-1">
                     <ImprimirFacturaTicket cliente={model?.pol?.cliente} poliza={model?.pol} cuota={cuotaPdf || cuota} label="Ticket"
-                      className="w-full h-10 px-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
+                      className="w-full h-10 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
                   </div>
                   <div className="flex-1">
                     <EnviarFacturaWhatsapp cuota={cuota}>
-                      <button className="w-full h-10 px-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5">
+                      <button className="w-full h-10 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5">
                         <HiDeviceMobile className="w-4 h-4" /><span className="hidden sm:inline">WhatsApp</span><span className="sm:hidden">WPP</span>
                       </button>
                     </EnviarFacturaWhatsapp>
@@ -863,7 +1047,7 @@ const CuotaRow = memo(
             {/* Expandible */}
             <button
               onClick={() => setExpanded(!expanded)}
-              className="w-full py-1 flex items-center justify-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
+              className="w-full py-1.5 flex items-center justify-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
             >
               {expanded ? <><HiChevronUp className="w-3.5 h-3.5" /> Ocultar</> : <><HiChevronDown className="w-3.5 h-3.5" /> Ver detalles</>}
             </button>
@@ -871,26 +1055,27 @@ const CuotaRow = memo(
             <AnimatePresence>
               {expanded && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <div className="pt-3 border-t border-slate-800/60 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                    {modelo && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Vehículo</span><span className="text-slate-300 font-mono">{modelo}</span></div>}
-                    {altaTxt && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Alta póliza</span><span className="text-slate-300 font-mono">{altaTxt}</span></div>}
-                    {!!pagaTxt && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Pagada el</span><span className="text-emerald-400 font-mono">{pagaTxt}</span></div>}
-                    {dias !== null && !cuota?.pagado && <div className="flex justify-between px-2 py-1.5 rounded-lg bg-slate-800/40"><span className="text-slate-500">Estado</span><span className={`font-mono ${dias < 0 ? "text-rose-400" : "text-slate-300"}`}>{dias < 0 ? `Atraso ${Math.abs(dias)}d` : `Faltan ${dias}d`}</span></div>}
+                  <div className="pt-3 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                    {modelo && <div className="flex justify-between px-2 py-1.5 rounded bg-slate-800/50"><span className="text-slate-500">Vehículo</span><span className="text-slate-300 font-mono">{modelo}</span></div>}
+                    {altaTxt && <div className="flex justify-between px-2 py-1.5 rounded bg-slate-800/50"><span className="text-slate-500">Alta póliza</span><span className="text-slate-300 font-mono">{altaTxt}</span></div>}
                   </div>
                   <div className="mt-2 flex gap-1.5">
-                    <button onClick={() => abrirDetalle(cuota)} className="h-8 px-3 rounded-xl border border-slate-700/50 bg-slate-800/40 hover:bg-slate-700/50 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
-                      <HiQuestionMarkCircle className="w-3.5 h-3.5" /> Info
+                    <button onClick={() => abrirDetalle(cuota)} className="h-8 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
+                      <HiQuestionMarkCircle className="w-3.5 h-3.5" /> Info completa
                     </button>
                     {hasObs && (
-                      <button onClick={() => onToggleObs(cuota?.id)} className="h-8 px-3 rounded-xl border border-slate-700/50 bg-slate-800/40 hover:bg-slate-700/50 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
+                      <button onClick={() => onToggleObs(cuota?.id)} className="h-8 px-3 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors inline-flex items-center gap-1.5">
                         <HiExclamationCircle className="w-3.5 h-3.5" /> Nota
                       </button>
                     )}
                   </div>
                   {hasObs && isObsOpen && (
-                    <div className={`mt-2 rounded-xl px-3 py-2.5 text-sm ${S.noteBg} ${S.noteText} border border-slate-700/40`}>
-                      {observacion}
-                    </div>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-slate-300">
+                      <div className="flex items-start gap-2">
+                        <HiExclamationCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+                        <span className="whitespace-pre-wrap">{observacion}</span>
+                      </div>
+                    </motion.div>
                   )}
                 </motion.div>
               )}
@@ -899,6 +1084,10 @@ const CuotaRow = memo(
         </div>
       </>
     );
+  },
+  (prev, next) => {
+    const a = prev?.model, b = next?.model;
+    if (a === b) return true;
     if (a?.isObsOpen !== b?.isObsOpen) return false;
     const ca = a?.cuota, cb = b?.cuota;
     if (ca?.id !== cb?.id || ca?.pagado !== cb?.pagado || ca?.monto !== cb?.monto || ca?.fecha_vencimiento !== cb?.fecha_vencimiento || ca?.fecha_pago !== cb?.fecha_pago || ca?.observaciones_pago !== cb?.observaciones_pago || ca?.ultima_observacion_pago !== cb?.ultima_observacion_pago || a?.nombreCompleto !== b?.nombreCompleto || a?.patente !== b?.patente || a?.modelo !== b?.modelo) return false;
@@ -911,6 +1100,20 @@ function InfoRow({ label, value }) {
     <div className="flex items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-900 px-2.5 py-1.5">
       <span className="text-slate-500 text-xs">{label}</span>
       <span className="text-slate-200 truncate max-w-[60%] text-right text-xs font-mono">{value}</span>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon, children }) {
+  return (
+    <div className="rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/80 border-b border-slate-800">
+        {icon && <span className="text-indigo-400">{icon}</span>}
+        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-300">{title}</span>
+      </div>
+      <div className="p-3">
+        {children}
+      </div>
     </div>
   );
 }

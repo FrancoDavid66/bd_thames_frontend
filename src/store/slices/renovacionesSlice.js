@@ -303,9 +303,8 @@ export const marcarNoRenueva = createAsyncThunk(
   "renovaciones/marcarNoRenueva",
   async ({ polizaId, motivo = "" }, { rejectWithValue }) => {
     try {
-      await api.patch(`polizas/${polizaId}/`, {
-        estado: "NO_RENUEVA",
-        observaciones: motivo ? `No renueva: ${motivo}` : "No renueva",
+      await api.post(`polizas/${polizaId}/marcar-no-renueva/`, {
+        motivo: motivo || "",
       });
       return { polizaId };
     } catch (err) {

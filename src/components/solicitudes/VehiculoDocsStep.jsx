@@ -373,20 +373,29 @@ export default function CreateSolicitudModal({
         tipoSeguro: solicitud.tipoSeguro || "ROBO",
       };
 
-      // ===== FOTOS DEL VEHÍCULO (solo keys válidas)
+      // ===== FOTOS DEL VEHÍCULO → bloque "fotos" (solo keys válidas)
       const _FOTO_SLOTS = FOTO_SLOTS; // ya filtrados por regla
-      _FOTO_SLOTS.forEach(({key})=>{
-        const s=fotoSlots[key];
-        if(!s?.url || !isHttpUrl(s.url)) return;
-        const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key; // compat
-        if (ALLOWED_FOTO_KEYS_SOLICITUD.has(key) || sendKey === "EQUIPO_GNC"){
-          payload.fotos[sendKey] = { url:s.url, public_id:s.public_id||"" };
+      const fotosOmitidasPorKey = [];
+      _FOTO_SLOTS.forEach(({ key }) => {
+        const s = fotoSlots[key];
+        if (!s?.url || !isHttpUrl(s.url)) return;
+        const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key; // compat backend
+        if (ALLOWED_FOTO_KEYS_SOLICITUD.has(key) || sendKey === "EQUIPO_GNC") {
+          payload.fotos[sendKey] = { url: s.url, public_id: s.public_id || "" };
+        } else {
+          fotosOmitidasPorKey.push(key);
         }
       });
 
-      // ===== DOCUMENTOS DEL VEHÍCULO → bloque “documentos”
-      Object.entries(docSlots || {}).forEach(([key, s])=>{
-        if(!s?.url || !isHttpUrl(s.url)) return;
+      // ===== DOCUMENTOS DEL VEHÍCULO → bloque "documentos"
+      // (cédula verde/azul, título, oblea GNC, VTV, permiso, etc.)
+      // 🐛 FIX: El backend ya replica estos a PolizaDocumento vía
+      // `_importar_desde_solicitud_hacia_poliza`. NO hace falta duplicarlos
+      // en payload.fotos como hacía el "espejo" anterior — eso provocaba
+      // que el backend intentara crear FotoVehiculo con tipos inválidos
+      // (CEDULA_VERDE no existe en TipoFotoVehiculo) y ensuciaba datos.
+      Object.entries(docSlots || {}).forEach(([key, s]) => {
+        if (!s?.url || !isHttpUrl(s.url)) return;
         payload.documentos[key] = {
           url: s.url,
           public_id: s.public_id || "",
@@ -395,27 +404,50 @@ export default function CreateSolicitudModal({
         };
       });
 
-      // ===== Espejo para creación de PolizaDocumento en backend
-      const DOC_KEYS_TO_IMPORT = new Set([
-        "CEDULA_VERDE", "CEDULA_VERDE_FRENTE", "CEDULA_VERDE_DORSO",
-        "CEDULA_AZUL",  "CEDULA_AZUL_FRENTE", "CEDULA_AZUL_DORSO",
-        "TITULO", "OBLEA_GNC", "VTV", "PERMISO"
-      ]);
-      Object.entries(docSlots || {}).forEach(([key, s])=>{
-        if(!s?.url || !isHttpUrl(s.url)) return;
-        if (DOC_KEYS_TO_IMPORT.has(key)) {
-          payload.fotos[key] = { url: s.url, public_id: s.public_id || "" };
-        }
+      // 🔎 Diagnóstico
+      const fotosCount = Object.keys(payload.fotos || {}).length;
+      const docsCount = Object.keys(payload.documentos || {}).length;
+      const dniCount = Object.keys(payload.cliente_fotos || {}).length;
+      const fotosSubidas = Object.values(fotoSlots || {}).filter(s => s?.url && isHttpUrl(s.url)).length;
+      const docsSubidos = Object.values(docSlots || {}).filter(s => s?.url && isHttpUrl(s.url)).length;
+      console.debug("[CREAR_COMPLETO][payload]", {
+        fotos: fotosCount,
+        documentos: docsCount,
+        cliente_fotos: dniCount,
+        fotos_subidas_total: fotosSubidas,
+        docs_subidos_total: docsSubidos,
+        fotos_omitidas_por_key_invalida: fotosOmitidasPorKey,
+        full: payload,
       });
 
-      console.debug("[CREAR_COMPLETO][payload]", JSON.stringify(payload,null,2));
+      // 🛡️ Alerta visual si quedaron archivos afuera
+      if (fotosSubidas > fotosCount) {
+        toast.error(`Se perdieron ${fotosSubidas - fotosCount} foto(s) del vehículo. Revisá la consola.`);
+      }
+      if (docsSubidos > docsCount) {
+        toast.error(`Se perdieron ${docsSubidos - docsCount} documento(s). Revisá la consola.`);
+      }
+      if (fotosOmitidasPorKey.length > 0) {
+        console.warn("[CREAR_COMPLETO] Keys de foto no permitidas por backend:", fotosOmitidasPorKey);
+      }
 
       const raw = await solicitudesApi.crearCompleto(payload);
 
       const polizaIdResp  = raw?.poliza_id ?? raw?.poliza?.id ?? (polizaModo==="existente" ? Number(polizaId) : null);
       const clienteIdResp = raw?.cliente_id ?? raw?.cliente?.id ?? (clienteModo==="existente" ? Number(clienteId) : null);
 
-      toast.success("Solicitud + Póliza + Cliente creados");
+      // Mensaje de éxito con conteo + chequeo de fallidos reportados por backend
+      const docsFallidos = Array.isArray(raw?.docs_fallidos) ? raw.docs_fallidos.length : 0;
+      if (docsFallidos > 0) {
+        toast.error(`Creado pero ${docsFallidos} archivo(s) fallaron al guardarse. Revisá la consola.`);
+        console.error("[CREAR_COMPLETO] Docs fallidos:", raw.docs_fallidos);
+      } else {
+        toast.success(
+          fotosCount > 0 || docsCount > 0
+            ? `Solicitud + Póliza + Cliente (${fotosCount} foto(s), ${docsCount} doc(s))`
+            : "Solicitud + Póliza + Cliente creados"
+        );
+      }
 
       /* ===== Email al admin (SOLO claves del template) ===== */
       try {

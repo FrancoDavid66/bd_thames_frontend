@@ -23,6 +23,9 @@ import VencimientosPolizasTable from "../components/vencimientos/VencimientosPol
 import VencimientosAseguradosTable from "../components/vencimientos/VencimientosAseguradosTable";
 import VencimientosExportModal from "../components/vencimientos/VencimientosExportModal";
 
+// 🎯 Lógica unificada (compartida con Bajas y Renovaciones)
+import { getDiasParaVencer } from "../utils/cuotas";
+
 // 🔹 helper debounce simple
 function useDebounced(value, ms = 350) {
   const [v, setV] = useState(value);
@@ -112,20 +115,9 @@ function isFinalizada(p) {
 
 function computeDiasFallback(p) {
   if (isFinalizada(p)) return null;
-
-  const dRaw = p?.dias_para_vencer;
-  const d = typeof dRaw === "number" ? dRaw : Number(dRaw);
-  if (Number.isFinite(d)) return d;
-
-  const vto = p?.vto_referencia || p?.fecha_vencimiento;
-  const vtoDate = parseToLocalDateOnly(vto);
-  if (!vtoDate) return null;
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const ms = vtoDate.getTime() - hoy.getTime();
-  return Math.round(ms / 86400000);
+  // 🎯 Misma fuente que Bajas y Renovaciones (vto última cuota − hoy, con signo)
+  const d = getDiasParaVencer(p);
+  return Number.isFinite(d) ? d : null;
 }
 
 // 📞 TEL robusto

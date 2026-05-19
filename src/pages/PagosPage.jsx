@@ -39,7 +39,6 @@ import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal
 import {
   fetchMediosCobro,
   enviarRecordatoriosCuotas,
-  enviarTodasOficinas,
   fetchHistorialRecordatorios,
   fetchHistorialPagos,
   downloadHistorialPagosCSV,
@@ -127,28 +126,53 @@ function normalizeCuotaFlat(item) {
   const cliIn = it.cliente && typeof it.cliente === "object" ? it.cliente : {};
   const polIn = it.poliza && typeof it.poliza === "object" ? it.poliza : {};
 
+  // 🔎 LOG TEMPORAL - sacar después de confirmar el fix
+  if (typeof window !== "undefined" && !window.__normalizerLogged) {
+    window.__normalizerLogged = true;
+    console.debug("[normalizeCuotaFlat] PRIMER item recibido:", {
+      item_completo: it,
+      cliIn,
+      polIn,
+      "cliIn.cliente_id": cliIn?.cliente_id,
+      "polIn.poliza_id": polIn?.poliza_id,
+    });
+  }
+
+  // 🚀 FIX: el cliente puede tener el id en `id` (estándar DRF) o en `cliente_id` (custom flat).
+  // Aceptamos ambos formatos para evitar perder datos.
   const cliente = {
-    id: cliIn?.cliente_id ?? null,
-    apellido: String(cliIn?.apellido ?? "").trim(),
-    nombre: String(cliIn?.nombre ?? "").trim(),
-    dni_cuit_cuil: String(cliIn?.dni_cuit_cuil ?? "").trim(),
-    telefono: String(cliIn?.telefono ?? "").trim(),
+    id: cliIn?.id ?? cliIn?.cliente_id ?? it?.cliente_id ?? null,
+    apellido: String(cliIn?.apellido ?? it?.cliente_apellido ?? "").trim(),
+    nombre: String(cliIn?.nombre ?? it?.cliente_nombre ?? "").trim(),
+    dni_cuit_cuil: String(cliIn?.dni_cuit_cuil ?? cliIn?.dni ?? it?.cliente_dni_cuit_cuil ?? it?.cliente_dni ?? "").trim(),
+    telefono: String(cliIn?.telefono ?? cliIn?.celular ?? cliIn?.whatsapp ?? "").trim(),
   };
 
+  // 🚀 FIX: similar para póliza — id puede venir como `id` o `poliza_id`
   const poliza = {
-    id: polIn?.poliza_id ?? null,
-    numero_poliza: String(polIn?.numero_poliza ?? "").trim(),
-    patente: String(polIn?.patente ?? "").trim(),
-    marca: String(polIn?.marca ?? "").trim(),
-    modelo: String(polIn?.modelo ?? "").trim(),
-    cobertura: String(polIn?.cobertura ?? "").trim(),
-    compania_nombre: String(polIn?.compania_nombre ?? "").trim(),
-    oficina: String(polIn?.oficina ?? "").trim(),
+    id: polIn?.id ?? polIn?.poliza_id ?? it?.poliza_id ?? null,
+    numero_poliza: String(polIn?.numero_poliza ?? it?.numero_poliza ?? "").trim(),
+    patente: String(polIn?.patente ?? it?.patente ?? "").trim(),
+    marca: String(polIn?.marca ?? it?.marca ?? "").trim(),
+    modelo: String(polIn?.modelo ?? it?.modelo ?? "").trim(),
+    anio: polIn?.anio ?? it?.anio ?? null,
+    cobertura: String(polIn?.cobertura ?? polIn?.cobertura_nombre ?? it?.cobertura ?? "").trim(),
+    compania_nombre: String(polIn?.compania_nombre ?? polIn?.compania ?? it?.compania_nombre ?? it?.compania ?? "").trim(),
+    compania: String(polIn?.compania ?? polIn?.compania_nombre ?? it?.compania ?? "").trim(),
+    oficina: String(polIn?.oficina ?? polIn?.oficina_nombre ?? it?.oficina ?? "").trim(),
+    oficina_nombre: String(polIn?.oficina_nombre ?? polIn?.oficina ?? "").trim(),
+    fecha_emision: polIn?.fecha_emision ?? it?.fecha_emision ?? null,
+    fecha_inicio: polIn?.fecha_inicio ?? null,
+    fecha_vencimiento: polIn?.fecha_vencimiento ?? null,
+    estado: String(polIn?.estado ?? it?.poliza_estado ?? "").trim(),
+    cantidad_cuotas: polIn?.cantidad_cuotas ?? it?.cantidad_cuotas ?? it?.total_cuotas ?? null,
     cliente,
     cliente_id: cliente.id ?? null,
     cliente_nombre: cliente.nombre,
     cliente_apellido: cliente.apellido,
+    cliente_dni_cuit_cuil: cliente.dni_cuit_cuil,
     cliente_nombre_apellido: `${cliente.apellido} ${cliente.nombre}`.trim(),
+    cliente_nombre_completo: `${cliente.apellido}, ${cliente.nombre}`.trim().replace(/^,\s*|\s*,$/g, ""),
   };
 
   const pago_registrado_en = it?.pago_registrado_en ?? null;
@@ -171,8 +195,10 @@ function normalizeCuotaFlat(item) {
     ultima_observacion_pago: String(it?.ultima_observacion_pago ?? "").trim(),
     total_cuotas: it?.total_cuotas ?? null,
     cuota_label: String(it?.cuota_label ?? "").trim(),
-    cantidad_cuotas: it?.total_cuotas ?? null,
+    cantidad_cuotas: it?.total_cuotas ?? it?.cantidad_cuotas ?? null,
+    poliza_id: poliza.id,
     poliza,
+    cliente_id: cliente.id,
     cliente,
   };
 }
@@ -579,7 +605,6 @@ const PagosPage = () => {
             medio_cobro_id: medioCobroId || undefined,
             alias,
             oficina,
-            async: true,
           })
         ).unwrap();
         dispatch(fetchHistorialRecordatorios());
@@ -595,40 +620,6 @@ const PagosPage = () => {
           "No se pudieron enviar los recordatorios.";
         const errores = Array.isArray(data?.errores) ? data.errores : Array.isArray(data) ? data : [];
         return { ok: false, error: msg, errores, raw: data || err };
-      } finally {
-        setSendingRecordatorios(false);
-      }
-    },
-    [dispatch, mediosCobro]
-  );
-
-  // 🚀 Dispara envío a TODAS las oficinas activas en paralelo (backend usa threads).
-  // Devuelve inmediato; el progreso se ve en el panel que hace polling al historial.
-  const handleEnviarTodasOficinas = useCallback(
-    async (medioCobroId) => {
-      setSendingRecordatorios(true);
-      try {
-        const medio = mediosCobro.find((m) => m.id === medioCobroId) || null;
-        const alias = medio ? medio.etiqueta || medio.valor : undefined;
-        const result = await dispatch(
-          enviarTodasOficinas({
-            medio_cobro_id: medioCobroId || undefined,
-            alias,
-          })
-        ).unwrap();
-        // refrescar historial para que el panel arranque mostrando algo
-        dispatch(fetchHistorialRecordatorios());
-        return result;
-      } catch (err) {
-        console.error("[PagosPage] Error enviando a todas las oficinas:", err);
-        const data = err?.data || err?.response?.data || err?.payload || null;
-        const msg =
-          (typeof data === "string" && data) ||
-          data?.detail ||
-          data?.error ||
-          err?.message ||
-          "No se pudo iniciar el envío a todas las oficinas.";
-        return { ok: false, error: msg, raw: data || err };
       } finally {
         setSendingRecordatorios(false);
       }
@@ -1150,7 +1141,7 @@ const PagosPage = () => {
       </div>
 
       <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
-      <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} onEnviarTodas={handleEnviarTodasOficinas} isWebAdmin={isWebAdmin} userOficina={userOficina} />
+      <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} isWebAdmin={isWebAdmin} userOficina={userOficina} />
       
       {/* 🚀 MODAL NUEVO */}
       <ReporteEfectividadModal isOpen={showReporteModal} onClose={() => setShowReporteModal(false)} />

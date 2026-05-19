@@ -331,19 +331,69 @@ export default function CreateSolicitudModal({
         compania_preferida: finalCompania.trim(),
       };
 
+      // ===== DOCUMENTOS DEL VEHÍCULO → bloque "documentos"
+      // (cédula, título, VTV, oblea GNC, permiso, etc.)
       Object.entries(docSlots || {}).forEach(([key, s]) => {
         if (!s?.url) return;
-        payload.documentos[key] = { url: s.url, public_id: s.public_id, mime: s.mime || guessMime(s?.file?.name || ""), nombre: key };
+        payload.documentos[key] = {
+          url: s.url,
+          public_id: s.public_id,
+          mime: s.mime || guessMime(s?.file?.name || ""),
+          nombre: key,
+        };
       });
 
+      // ===== FOTOS DEL VEHÍCULO → bloque "fotos" (NO "documentos")
+      // 🐛 FIX: Antes iban a `payload.documentos` y el backend no las marcaba como
+      // ES_FOTO, por lo que `_importar_desde_solicitud_hacia_poliza` no creaba el
+      // FotoVehiculo en la póliza. Solo el DNI se guardaba porque viaja por
+      // cliente_fotos y se setea directo en el modelo Cliente.
       Object.entries(fotoSlots || {}).forEach(([key, s]) => {
         if (!s?.url) return;
         const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
-        payload.documentos[sendKey] = { url: s.url, public_id: s.public_id, mime: guessMime(), nombre: sendKey };
+        payload.fotos[sendKey] = {
+          url: s.url,
+          public_id: s.public_id || "",
+        };
       });
 
+      // 🔎 Diagnóstico (silencioso en prod, útil con DevTools abierto)
+      const fotosCount = Object.keys(payload.fotos || {}).length;
+      const docsCount = Object.keys(payload.documentos || {}).length;
+      const dniCount = Object.keys(payload.cliente_fotos || {}).length;
+      const fotosSubidas = Object.values(fotoSlots || {}).filter(s => s?.url).length;
+      const docsSubidos = Object.values(docSlots || {}).filter(s => s?.url).length;
+      console.debug("[CREAR_COMPLETO][payload]", {
+        fotos: fotosCount,
+        documentos: docsCount,
+        cliente_fotos: dniCount,
+        fotos_subidas_total: fotosSubidas,
+        docs_subidos_total: docsSubidos,
+        full: payload,
+      });
+
+      // 🛡️ Alerta visual si subieron archivos pero ninguno llegó al payload
+      if (fotosSubidas > fotosCount) {
+        toast.error(`Se perdieron ${fotosSubidas - fotosCount} foto(s) del vehículo. Revisá la consola.`);
+      }
+      if (docsSubidos > docsCount) {
+        toast.error(`Se perdieron ${docsSubidos - docsCount} documento(s). Revisá la consola.`);
+      }
+
       const raw = await solicitudesApi.crearCompleto(payload);
-      toast.success("Solicitud creada con éxito");
+
+      // Mensaje de éxito con conteo, también detecta si el backend reportó fallidos
+      const docsFallidos = Array.isArray(raw?.docs_fallidos) ? raw.docs_fallidos.length : 0;
+      if (docsFallidos > 0) {
+        toast.error(`Solicitud creada pero ${docsFallidos} archivo(s) fallaron al guardarse. Revisá la consola.`);
+        console.error("[CREAR_COMPLETO] Docs fallidos:", raw.docs_fallidos);
+      } else {
+        toast.success(
+          fotosCount > 0 || docsCount > 0
+            ? `Solicitud creada (${fotosCount} foto(s), ${docsCount} doc(s))`
+            : "Solicitud creada con éxito"
+        );
+      }
 
       try {
         await sendAdminNuevaSolicitud({
