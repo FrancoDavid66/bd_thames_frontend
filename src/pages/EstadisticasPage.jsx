@@ -231,7 +231,11 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
     return oficinasData.reduce((acc, o) => {
         acc.total    += Number(o.polizas_total   || 0);
         acc.activas  += Number(o.polizas_activas || 0);
-        acc.nuevas   += Number(o.nuevas_mes      || 0);
+        // 🔧 FIX: usamos "altas_nuevas_mes" que el backend filtra es_renovacion=False.
+        // Fallback a "nuevas_mes" por compatibilidad con snapshots viejos.
+        acc.nuevas   += Number(
+          o.altas_nuevas_mes != null ? o.altas_nuevas_mes : (o.nuevas_mes || 0)
+        );
         acc.bajas    += Number(o.bajas_mes       || 0);
         acc.vencidas += Number(o.en_mora || o.vencidas_mes || o.polizas_vencidas || 0);
         // Nuevos campos — solo si el backend ya los devuelve

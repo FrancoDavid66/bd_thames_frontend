@@ -1,64 +1,100 @@
 // src/pages/RenovacionesPage.jsx
-import { useEffect, useMemo, useState, useCallback, memo } from "react";
+//
+// Bandeja de renovaciones con 3 tabs:
+//   - Pendientes:   pólizas que aún no se renovaron y siguen vivas
+//   - Renovadas:    pólizas que ya tienen una versión nueva (es_renovacion=true)
+//   - No renovaron: vencidas hace 30+ días sin renovar, o marcadas manualmente
+//
+// El front filtra/segmenta los datos. El backend se ajustará después para
+// devolver campos extra (primera_cuota_pagada, cuotas_pagadas, no_renueva_manual, etc.)
+
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import toast from "react-hot-toast";
-import { HiRefresh, HiClipboardCheck, HiArrowRight, HiExclamation } from "react-icons/hi";
+import {
+  HiRefresh,
+  HiClipboardCheck,
+  HiExclamation,
+  HiCheckCircle,
+  HiXCircle,
+} from "react-icons/hi";
 
 import {
   fetchRenovaciones,
   renovarPoliza,
+  marcarNoRenueva,
+  desmarcarNoRenueva,
   fetchRenovacionesOficinas,
   fetchRenovacionesResumen,
-  fetchRenovacionesGlobalResumen, // 🚀 NUEVO THUNK
+  fetchRenovacionesGlobalResumen,
   selectRenovacionesItems,
   selectRenovacionesStatus,
   selectRenovacionesError,
   selectRenovacionesCount,
   selectRenovacionesOficinas,
   selectRenovacionesResumen,
-  selectRenovacionesGlobalResumen, // 🚀 NUEVO SELECTOR
+  selectRenovacionesGlobalResumen,
 } from "../store/slices/renovacionesSlice";
 
 import RenovacionModal from "../components/renovaciones/RenovacionModal";
 import RenovacionesFiltersBar from "../components/renovaciones/RenovacionesFiltersBar";
 import RenovacionesBucketsBar from "../components/renovaciones/RenovacionesBucketsBar";
-import { useAuth } from "../context/AuthContext"; // 🚀 IMPORTAMOS AUTH
-
-// 🎯 Lógica unificada de fechas/vencimientos (misma que Bajas)
-import { getDiasVencida, getTonoUrgencia, fmtFecha } from "../utils/cuotas";
+import RenovacionesTabs from "../components/renovaciones/RenovacionesTabs";
+import RenovacionesTable from "../components/renovaciones/RenovacionesTable";
+import { useAuth } from "../context/AuthContext";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
-const EstadoPolizaBadge = memo(function EstadoPolizaBadge({ estado }) {
-  const statusStr = (estado || "desconocido").toString().toLowerCase();
-  
-  let config = { 
-    label: statusStr.toUpperCase(), 
-    clase: "border-white/20 text-white/70 bg-white/5",
-    dot: "bg-white/50"
-  };
+/* =========================================================
+ * Helpers de detección de estado en frontend
+ * (mientras el backend no devuelva los flags)
+ * ========================================================= */
 
-  if (statusStr === "activa") {
-    config = { label: "ACTIVA", clase: "border-emerald-500/60 text-emerald-300 bg-emerald-500/10", dot: "bg-emerald-400" };
-  } else if (statusStr === "vencida") {
-    config = { label: "VENCIDA", clase: "border-rose-500/60 text-rose-300 bg-rose-500/10", dot: "bg-rose-400 animate-pulse" };
-  } else if (statusStr === "cancelada") {
-    config = { label: "CANCELADA", clase: "border-gray-600 text-gray-400 bg-gray-800", dot: "bg-gray-500" };
-  } else if (statusStr === "finalizada") {
-    config = { label: "FINALIZADA", clase: "border-blue-500/60 text-blue-300 bg-blue-500/10", dot: "bg-blue-400" };
-  }
+const DIAS_SIN_GESTION_LIMITE = 30;
 
+function getVencimiento(p) {
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${config.clase}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
-      {config.label}
-    </span>
+    p?.ultima_cuota_vencimiento ||
+    p?.vto_referencia ||
+    p?.fecha_vencimiento ||
+    p?.proxima_vencimiento_impaga ||
+    null
   );
-});
+}
+
+function diasVencidaDe(p) {
+  const v = getVencimiento(p);
+  if (!v) return 0;
+  try {
+    const d = dayjs().startOf("day").diff(dayjs(v).startOf("day"), "day");
+    return d > 0 ? d : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function isRenovada(p) {
+  return !!p?.es_renovacion || !!p?.poliza_origen || !!p?.poliza_origen_id;
+}
+
+function isMarcadaNoRenueva(p) {
+  return !!(p?.no_renueva_manual || p?.motivo_no_renueva || p?.no_renueva);
+}
+
+function isVencidaSinGestion(p) {
+  // Vencida hace 30+ días, no renovada, sin marca manual
+  if (isRenovada(p)) return false;
+  if (isMarcadaNoRenueva(p)) return false;
+  const dv = diasVencidaDe(p);
+  return dv >= DIAS_SIN_GESTION_LIMITE;
+}
+
+/* =========================================================
+ * Badges chiquitos
+ * ========================================================= */
 
 const Badge = ({ children, tone = "neutral" }) => {
   const map = {
@@ -67,11 +103,12 @@ const Badge = ({ children, tone = "neutral" }) => {
     yellow: "bg-amber-500/15 text-amber-100 border-amber-400/30",
     red: "bg-rose-500/15 text-rose-100 border-rose-400/30",
     blue: "bg-sky-500/15 text-sky-100 border-sky-400/30",
+    sky: "bg-sky-500/15 text-sky-100 border-sky-400/30",
   };
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
         map[tone] || map.neutral
       )}
     >
@@ -80,45 +117,48 @@ const Badge = ({ children, tone = "neutral" }) => {
   );
 };
 
-// 🎯 fmtDate y calcUrgencyTone migrados a utils/cuotas.js
-// (fmtFecha y getTonoUrgencia respectivamente)
-const fmtDate = fmtFecha;
-const calcUrgencyTone = getTonoUrgencia;
+/* =========================================================
+ * KPIs en cards
+ * ========================================================= */
 
-// 🎯 Devuelve la fecha de referencia para mostrar el vencimiento de una póliza.
-// Prioriza la última cuota porque es la regla unificada (misma que Bajas).
-function pickVtoRef(item) {
+function KpiCard({ label, value, tone = "neutral", hint }) {
+  const toneMap = {
+    neutral: "border-white/10 bg-white/5",
+    green: "border-emerald-400/20 bg-emerald-500/5",
+    yellow: "border-amber-400/20 bg-amber-500/5",
+    red: "border-rose-400/20 bg-rose-500/5",
+    sky: "border-sky-400/20 bg-sky-500/5",
+  };
+  const valueColor = {
+    neutral: "text-white",
+    green: "text-emerald-200",
+    yellow: "text-amber-200",
+    red: "text-rose-200",
+    sky: "text-sky-200",
+  };
   return (
-    item?.ultima_cuota_vencimiento ||
-    item?.vto_referencia ||
-    item?.fecha_vencimiento ||
-    item?.proxima_vencimiento_impaga ||
-    null
+    <div
+      className={cx(
+        "rounded-xl border px-3 py-2.5",
+        toneMap[tone] || toneMap.neutral
+      )}
+    >
+      <div className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+        {label}
+      </div>
+      <div className={cx("mt-0.5 text-xl font-extrabold tabular-nums", valueColor[tone] || valueColor.neutral)}>
+        {value ?? 0}
+      </div>
+      {hint && (
+        <div className="mt-0.5 text-[10px] text-white/40">{hint}</div>
+      )}
+    </div>
   );
 }
 
-function getClienteNombreApellido(p) {
-  const ap = p?.cliente?.apellido ?? p?.cliente_apellido ?? p?.clienteApellido ?? p?.apellido ?? "";
-  const no = p?.cliente?.nombre ?? p?.cliente_nombre ?? p?.clienteNombre ?? p?.nombre ?? "";
-  const full = `${ap} ${no}`.trim();
-  return full || "Asegurado desconocido";
-}
-
-function getPatente(p) {
-  return p?.patente || p?.vehiculo_patente || p?.vehiculo?.patente || "SIN PATENTE";
-}
-
-function getOficinaLabel(p, oficinasOptions) {
-  const raw = p?.oficina;
-  if (!raw) return "—";
-  if (typeof raw === "object") return raw?.nombre || raw?.label || raw?.value || "—";
-
-  const s = String(raw);
-  const match = (Array.isArray(oficinasOptions) ? oficinasOptions : []).find(
-    (o) => String(o?.value) === s || String(o?.label) === s
-  ) || null;
-  return match?.label || s;
-}
+/* =========================================================
+ * Normalización de oficinas
+ * ========================================================= */
 
 function normalizeOficinaOption(x) {
   if (x == null) return null;
@@ -128,8 +168,24 @@ function normalizeOficinaOption(x) {
     return { value: s, label: s };
   }
   if (typeof x === "object") {
-    const value = x.value ?? x.id ?? x.pk ?? x.codigo ?? x.key ?? x.nombre ?? x.name ?? x.label ?? "";
-    const label = x.label ?? x.nombre ?? x.name ?? x.descripcion ?? x.value ?? x.id ?? "";
+    const value =
+      x.value ??
+      x.id ??
+      x.pk ??
+      x.codigo ??
+      x.key ??
+      x.nombre ??
+      x.name ??
+      x.label ??
+      "";
+    const label =
+      x.label ??
+      x.nombre ??
+      x.name ??
+      x.descripcion ??
+      x.value ??
+      x.id ??
+      "";
     const v = String(value || "").trim();
     const l = String(label || "").trim();
     if (!v && !l) return null;
@@ -138,12 +194,19 @@ function normalizeOficinaOption(x) {
   return null;
 }
 
+/* =========================================================
+ * Componente principal
+ * ========================================================= */
+
+const TABS_VALIDAS = ["pendientes", "renovadas", "no_renovaron"];
+
 export default function RenovacionesPage() {
   dayjs.locale("es");
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useAuth(); // 🚀 Obtenemos el usuario activo
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+  const { user } = useAuth();
+  const isWebAdmin =
+    user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
   const items = useSelector(selectRenovacionesItems);
   const status = useSelector(selectRenovacionesStatus);
@@ -152,9 +215,19 @@ export default function RenovacionesPage() {
 
   const oficinas = useSelector(selectRenovacionesOficinas);
   const resumen = useSelector(selectRenovacionesResumen);
-  const globalResumen = useSelector(selectRenovacionesGlobalResumen) || {}; // 🚀 KPIs Globales
+  const globalResumen = useSelector(selectRenovacionesGlobalResumen) || {};
 
-  // 🚀 Forzamos la oficina si no es Admin
+  // 🆕 Tab activo (persistido en localStorage)
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem("renovaciones.tab");
+    return TABS_VALIDAS.includes(saved) ? saved : "pendientes";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("renovaciones.tab", tab);
+  }, [tab]);
+
+  // Oficina (admin elige, no-admin forzado)
   const [oficina, setOficina] = useState(() => {
     if (!isWebAdmin && user?.perfil?.oficina) {
       return String(user.perfil.oficina.id || user.perfil.oficina);
@@ -172,6 +245,10 @@ export default function RenovacionesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Modal de "marcar no renueva" con motivo opcional
+  const [noRenuevaModal, setNoRenuevaModal] = useState({ open: false, item: null });
+  const [noRenuevaMotivo, setNoRenuevaMotivo] = useState("");
 
   const loading = status === "loading";
 
@@ -197,11 +274,25 @@ export default function RenovacionesPage() {
     return out;
   }, [oficinas]);
 
+  /* ============ CARGA DE DATOS según TAB ============
+     Estrategia:
+     - tab=pendientes  → endpoint normal (oculta ya renovadas por default).
+     - tab=renovadas   → include_renovadas=1 (trae también las renovadas).
+                         Después filtramos en frontend con es_renovacion=true.
+     - tab=no_renovaron → include_renovadas=1 (necesitamos verlas).
+                         Filtramos en frontend a las que entran en la regla.
+  ============================================================== */
+
+  const includeRenovadas = tab !== "pendientes";
+
   const load = useCallback(
     async (opts = {}) => {
-      const ofi = !isWebAdmin && user?.perfil?.oficina 
-                  ? String(user.perfil.oficina.id || user.perfil.oficina) 
-                  : (opts.oficina !== undefined ? opts.oficina : oficina);
+      const ofi =
+        !isWebAdmin && user?.perfil?.oficina
+          ? String(user.perfil.oficina.id || user.perfil.oficina)
+          : opts.oficina !== undefined
+          ? opts.oficina
+          : oficina;
 
       const payload = {
         dias: 30,
@@ -212,6 +303,8 @@ export default function RenovacionesPage() {
         bucket: bucket || undefined,
         page,
         page_size: pageSize,
+        tab, // 🆕 (informativo; el backend puede ignorarlo por ahora)
+        include_renovadas: includeRenovadas ? 1 : undefined,
         ...opts,
       };
 
@@ -219,14 +312,29 @@ export default function RenovacionesPage() {
         await dispatch(fetchRenovaciones(payload)).unwrap();
       } catch {}
     },
-    [soloPendientes, search, oficina, bucket, page, pageSize, dispatch, isWebAdmin, user]
+    [
+      soloPendientes,
+      search,
+      oficina,
+      bucket,
+      page,
+      pageSize,
+      dispatch,
+      isWebAdmin,
+      user,
+      tab,
+      includeRenovadas,
+    ]
   );
 
   const loadResumen = useCallback(
     async (opts = {}) => {
-      const ofi = !isWebAdmin && user?.perfil?.oficina 
-                  ? String(user.perfil.oficina.id || user.perfil.oficina) 
-                  : (opts.oficina !== undefined ? opts.oficina : oficina);
+      const ofi =
+        !isWebAdmin && user?.perfil?.oficina
+          ? String(user.perfil.oficina.id || user.perfil.oficina)
+          : opts.oficina !== undefined
+          ? opts.oficina
+          : oficina;
 
       const payload = {
         dias: 30,
@@ -237,67 +345,143 @@ export default function RenovacionesPage() {
       };
 
       try {
-        // 1. Carga resumen de la sucursal actual
         dispatch(fetchRenovacionesResumen(payload));
-        
-        // 2. Si es Admin, carga el resumen global (sin filtro de oficina)
+
         if (isWebAdmin) {
-          dispatch(fetchRenovacionesGlobalResumen({
-            dias: 30,
-            solo_pendientes: soloPendientes,
-            search: (search || "").trim()
-          }));
+          dispatch(
+            fetchRenovacionesGlobalResumen({
+              dias: 30,
+              solo_pendientes: soloPendientes,
+              search: (search || "").trim(),
+            })
+          );
         }
       } catch {}
     },
     [soloPendientes, search, oficina, dispatch, isWebAdmin, user]
   );
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { loadResumen(); }, [loadResumen]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useEffect(() => {
+    loadResumen();
+  }, [loadResumen]);
 
-  // 🚀 Guardamos preferencia si es Admin
-  useEffect(() => { 
+  // Guardamos preferencia si es Admin
+  useEffect(() => {
     if (isWebAdmin) {
-      localStorage.setItem("scope.renovaciones.oficina", oficina); 
+      localStorage.setItem("scope.renovaciones.oficina", oficina);
     }
   }, [oficina, isWebAdmin]);
 
-  const quickButtons = useMemo(
-    () => [
-      { id: "", label: "Todas", count: resumen?.buckets?.todas, tone: "neutral" },
-      { id: "proximos_3", label: "Próx. 3 días", count: resumen?.buckets?.proximos_3, tone: "blue" },
-      { id: "vence_hoy", label: "Hoy", count: resumen?.buckets?.vence_hoy, tone: "yellow" },
-      { id: "vencidas_3", label: "Venc. 3 días", count: resumen?.buckets?.vencidas_3, tone: "red" },
-      { id: "vencidas", label: "Vencidas Antiguas", count: resumen?.buckets?.vencidas, tone: "red" },
-    ],
-    [resumen]
-  );
+  // Cuando cambia el tab, volvemos a página 1
+  useEffect(() => {
+    setPage(1);
+  }, [tab]);
 
-  // 🚀 Botones Globales
-  const globalQuickButtons = useMemo(
-    () => [
-      { id: "", label: "Todas", count: globalResumen?.buckets?.todas, tone: "neutral" },
-      { id: "proximos_3", label: "Próx. 3 días", count: globalResumen?.buckets?.proximos_3, tone: "blue" },
-      { id: "vence_hoy", label: "Hoy", count: globalResumen?.buckets?.vence_hoy, tone: "yellow" },
-      { id: "vencidas_3", label: "Venc. 3 días", count: globalResumen?.buckets?.vencidas_3, tone: "red" },
-      { id: "vencidas", label: "Vencidas Antiguas", count: globalResumen?.buckets?.vencidas, tone: "red" },
-    ],
-    [globalResumen]
-  );
+  /* ============ FILTRADO EN FRONTEND POR TAB ============ */
+  const itemsRaw = Array.isArray(items) ? items : [];
 
-  const counters = useMemo(() => {
-    const arr = Array.isArray(items) ? items : [];
-    const urgentes = arr.filter((x) => {
-      const d = x?.dias_para_vencer_poliza;
-      return d != null && Number(d) <= 3;
-    }).length;
-    return { urgentes };
-  }, [items]);
+  const itemsForTab = useMemo(() => {
+    if (tab === "pendientes") {
+      // Quitamos las que ya están renovadas o marcadas como no renueva
+      return itemsRaw.filter(
+        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p)
+      );
+    }
+    if (tab === "renovadas") {
+      return itemsRaw.filter(isRenovada);
+    }
+    if (tab === "no_renovaron") {
+      return itemsRaw.filter(
+        (p) => isMarcadaNoRenueva(p) || isVencidaSinGestion(p)
+      );
+    }
+    return itemsRaw;
+  }, [itemsRaw, tab]);
+
+  /* ============ CONTADORES PARA TABS Y KPIs ============ */
+  const tabCounts = useMemo(() => {
+    return {
+      pendientes: itemsRaw.filter(
+        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p)
+      ).length,
+      renovadas: itemsRaw.filter(isRenovada).length,
+      no_renovaron: itemsRaw.filter(
+        (p) => isMarcadaNoRenueva(p) || isVencidaSinGestion(p)
+      ).length,
+    };
+  }, [itemsRaw]);
+
+  // KPIs específicos del tab activo
+  const kpis = useMemo(() => {
+    if (tab === "pendientes") {
+      const urgentes = itemsForTab.filter((x) => {
+        const d = x?.dias_para_vencer_poliza;
+        return d != null && Number(d) <= 3;
+      }).length;
+      const venceHoy = itemsForTab.filter((x) => {
+        const d = x?.dias_para_vencer_poliza;
+        return d != null && Number(d) === 0;
+      }).length;
+      const vencidas = itemsForTab.filter((x) => diasVencidaDe(x) > 0).length;
+      return {
+        total: itemsForTab.length,
+        urgentes,
+        venceHoy,
+        vencidas,
+      };
+    }
+
+    if (tab === "renovadas") {
+      const pago1ra = itemsForTab.filter(
+        (x) => x?.primera_cuota_pagada === true
+      ).length;
+      const noPago1ra = itemsForTab.filter(
+        (x) => x?.primera_cuota_pagada === false
+      ).length;
+      const enMora = itemsForTab.filter(
+        (x) => x?.estado_pago_renovacion === "mora"
+      ).length;
+      const alDia = itemsForTab.filter(
+        (x) => x?.estado_pago_renovacion === "al_dia"
+      ).length;
+      const pagadasTotal = itemsForTab.filter(
+        (x) => x?.estado_pago_renovacion === "pagada_total"
+      ).length;
+      return {
+        total: itemsForTab.length,
+        pago1ra,
+        noPago1ra,
+        enMora,
+        alDia,
+        pagadasTotal,
+      };
+    }
+
+    if (tab === "no_renovaron") {
+      const manuales = itemsForTab.filter(isMarcadaNoRenueva).length;
+      const automaticas = itemsForTab.filter(
+        (p) => !isMarcadaNoRenueva(p) && isVencidaSinGestion(p)
+      ).length;
+      const masDe60 = itemsForTab.filter((p) => diasVencidaDe(p) >= 60).length;
+      return {
+        total: itemsForTab.length,
+        manuales,
+        automaticas,
+        masDe60,
+      };
+    }
+    return {};
+  }, [tab, itemsForTab]);
 
   const totalCount = Number(count || 0);
-  const receivedCount = Array.isArray(items) ? items.length : 0;
-  const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
+  const receivedCount = itemsForTab.length;
+  // ⚠️ Mientras el backend no implemente tabs, totalPages se basa en `count`
+  // que viene del endpoint (NO del filtro local). Por eso forzamos al menos 1.
+  const totalPages =
+    pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   const safePage = Math.min(Math.max(1, page), totalPages);
 
   useEffect(() => {
@@ -311,27 +495,99 @@ export default function RenovacionesPage() {
   };
 
   const canPrev = safePage > 1;
-  const canNext = totalCount ? safePage < totalPages : receivedCount === pageSize;
+  const canNext = totalCount
+    ? safePage < totalPages
+    : receivedCount === pageSize;
 
+  /* ============ Quick buttons (solo en tab pendientes) ============ */
+  const quickButtons = useMemo(
+    () => [
+      { id: "", label: "Todas", count: resumen?.buckets?.todas, tone: "neutral" },
+      { id: "proximos_3", label: "Próx. 3 días", count: resumen?.buckets?.proximos_3, tone: "blue" },
+      { id: "vence_hoy", label: "Hoy", count: resumen?.buckets?.vence_hoy, tone: "yellow" },
+      { id: "vencidas_3", label: "Venc. 3 días", count: resumen?.buckets?.vencidas_3, tone: "red" },
+      { id: "vencidas", label: "Vencidas Antiguas", count: resumen?.buckets?.vencidas, tone: "red" },
+    ],
+    [resumen]
+  );
+
+  const globalQuickButtons = useMemo(
+    () => [
+      { id: "", label: "Todas", count: globalResumen?.buckets?.todas, tone: "neutral" },
+      { id: "proximos_3", label: "Próx. 3 días", count: globalResumen?.buckets?.proximos_3, tone: "blue" },
+      { id: "vence_hoy", label: "Hoy", count: globalResumen?.buckets?.vence_hoy, tone: "yellow" },
+      { id: "vencidas_3", label: "Venc. 3 días", count: globalResumen?.buckets?.vencidas_3, tone: "red" },
+      { id: "vencidas", label: "Vencidas Antiguas", count: globalResumen?.buckets?.vencidas, tone: "red" },
+    ],
+    [globalResumen]
+  );
+
+  /* ============ Handlers de "No renueva" ============ */
+  const openNoRenuevaModal = useCallback((item) => {
+    setNoRenuevaMotivo("");
+    setNoRenuevaModal({ open: true, item });
+  }, []);
+
+  const closeNoRenuevaModal = useCallback(() => {
+    setNoRenuevaModal({ open: false, item: null });
+    setNoRenuevaMotivo("");
+  }, []);
+
+  const confirmarNoRenueva = useCallback(async () => {
+    const item = noRenuevaModal.item;
+    if (!item?.id) return;
+    try {
+      await dispatch(
+        marcarNoRenueva({ polizaId: item.id, motivo: noRenuevaMotivo })
+      ).unwrap();
+      toast.success("Marcada como no renueva");
+      closeNoRenuevaModal();
+      await load({ force: true });
+      await loadResumen({ force: true });
+    } catch (e) {
+      toast.error(e?.message || "No se pudo marcar (¿endpoint backend pendiente?)");
+    }
+  }, [dispatch, noRenuevaModal.item, noRenuevaMotivo, load, loadResumen, closeNoRenuevaModal]);
+
+  const handleDesmarcarNoRenueva = useCallback(
+    async (item) => {
+      if (!item?.id) return;
+      try {
+        await dispatch(desmarcarNoRenueva({ polizaId: item.id })).unwrap();
+        toast.success("Marca eliminada");
+        await load({ force: true });
+        await loadResumen({ force: true });
+      } catch (e) {
+        toast.error(e?.message || "No se pudo deshacer (¿endpoint backend pendiente?)");
+      }
+    },
+    [dispatch, load, loadResumen]
+  );
+
+  /* =========================================================
+   * Render
+   * ========================================================= */
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
       <div className="mb-4 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-lg">
+        {/* ============ Header ============ */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
               <HiClipboardCheck className="text-emerald-400" />
-              Renovaciones y Vencimientos
+              Renovaciones
             </h1>
             <p className="mt-1 text-sm text-white/60">
-              Gestioná las pólizas próximas a vencer o ya vencidas.
-              {!isWebAdmin && <span className="text-sky-400 ml-2 font-bold uppercase tracking-widest text-[10px]">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
+              Gestioná las pólizas próximas a vencer, las renovadas y las que no se renovarán.
+              {!isWebAdmin && (
+                <span className="text-sky-400 ml-2 font-bold uppercase tracking-widest text-[10px]">
+                  ({user?.perfil?.oficina_nombre || "Tu Sucursal"})
+                </span>
+              )}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge tone="neutral">Total filtrado: {totalCount}</Badge>
-            <Badge tone="red">Urgentes (≤3d): {counters.urgentes}</Badge>
-
+          <div className="flex flex-wrap items-center gap-2">
             <button
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 transition-colors"
               onClick={() => {
@@ -360,41 +616,49 @@ export default function RenovacionesPage() {
           oficinasOptions={oficinasOptions}
           resumenBuckets={resumen?.buckets}
           onApply={applyFilters}
-          isWebAdmin={isWebAdmin} // 🚀 Pasamos isWebAdmin para ocultarlo dentro
+          isWebAdmin={isWebAdmin}
+          totalCount={totalCount}
         />
 
-        {/* 🚀 DOBLE FILA DE KPIs PARA EL ADMIN */}
-        {isWebAdmin ? (
-          <div className="flex flex-col gap-6 mt-6">
-            <div>
-              <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">Métricas Globales (Toda la Empresa)</h3>
-              <RenovacionesBucketsBar
-                quickButtons={globalQuickButtons}
-                activeBucket={bucket}
-                onSelectBucket={setBucket}
-                onClearBucket={() => setBucket("")}
-              />
-            </div>
-            <div>
-              <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">Métricas por Sucursal (Según filtro actual)</h3>
-              <RenovacionesBucketsBar
-                quickButtons={quickButtons}
-                activeBucket={bucket}
-                onSelectBucket={setBucket}
-                onClearBucket={() => setBucket("")}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="mt-6">
-             <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">Métricas de Tu Sucursal</h3>
-             <RenovacionesBucketsBar
-                quickButtons={quickButtons}
-                activeBucket={bucket}
-                onSelectBucket={setBucket}
-                onClearBucket={() => setBucket("")}
-              />
-          </div>
+        {/* Buckets bar — solo visible en tab Pendientes (es lo que tiene sentido ahí) */}
+        {tab === "pendientes" && (
+          <>
+            {isWebAdmin ? (
+              <div className="flex flex-col gap-6 mt-6">
+                <div>
+                  <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">
+                    Métricas Globales (Toda la Empresa)
+                  </h3>
+                  <RenovacionesBucketsBar
+                    quickButtons={globalQuickButtons}
+                    activeBucket={bucket}
+                    onSelectBucket={setBucket}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">
+                    Métricas por Sucursal (Según filtro actual)
+                  </h3>
+                  <RenovacionesBucketsBar
+                    quickButtons={quickButtons}
+                    activeBucket={bucket}
+                    onSelectBucket={setBucket}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6">
+                <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">
+                  Métricas de Tu Sucursal
+                </h3>
+                <RenovacionesBucketsBar
+                  quickButtons={quickButtons}
+                  activeBucket={bucket}
+                  onSelectBucket={setBucket}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {!!error && (
@@ -405,10 +669,60 @@ export default function RenovacionesPage() {
         )}
       </div>
 
+      {/* ============ TABS ============ */}
+      <div className="mb-4 rounded-xl border border-white/10 bg-slate-900/40 px-4 pt-3">
+        <RenovacionesTabs
+          activeTab={tab}
+          onChange={setTab}
+          counts={tabCounts}
+        />
+
+        {/* KPIs del tab activo */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 py-4">
+          {tab === "pendientes" && (
+            <>
+              <KpiCard label="Total" value={kpis.total} tone="neutral" />
+              <KpiCard label="Urgentes ≤3d" value={kpis.urgentes} tone="yellow" />
+              <KpiCard label="Vence hoy" value={kpis.venceHoy} tone="red" />
+              <KpiCard label="Ya vencidas" value={kpis.vencidas} tone="red" />
+            </>
+          )}
+          {tab === "renovadas" && (
+            <>
+              <KpiCard label="Total renovadas" value={kpis.total} tone="sky" />
+              <KpiCard label="Pagó 1ª cuota" value={kpis.pago1ra} tone="green" hint="Confirmadas" />
+              <KpiCard label="No pagó 1ª" value={kpis.noPago1ra} tone="yellow" hint="Riesgo" />
+              <KpiCard label="Al día" value={kpis.alDia} tone="green" />
+              <KpiCard label="En mora" value={kpis.enMora} tone="red" />
+              <KpiCard label="Pagadas total" value={kpis.pagadasTotal} tone="sky" />
+            </>
+          )}
+          {tab === "no_renovaron" && (
+            <>
+              <KpiCard label="Total" value={kpis.total} tone="neutral" />
+              <KpiCard label="Marcadas manual" value={kpis.manuales} tone="red" />
+              <KpiCard label="Automáticas (30+d)" value={kpis.automaticas} tone="yellow" hint="Sin gestión" />
+              <KpiCard label="60+ días vencidas" value={kpis.masDe60} tone="red" />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/65">
-          Página <span className="text-white font-semibold">{safePage}</span> de{" "}
-          <span className="text-white font-semibold">{totalPages}</span>
+          {tab !== "pendientes" ? (
+            <span>
+              Mostrando <span className="text-white font-semibold">{receivedCount}</span>{" "}
+              {tab === "renovadas" ? "renovadas" : "sin renovar"} de{" "}
+              <span className="text-white font-semibold">{totalCount}</span> pólizas en pantalla
+            </span>
+          ) : (
+            <span>
+              Página <span className="text-white font-semibold">{safePage}</span> de{" "}
+              <span className="text-white font-semibold">{totalPages}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -448,111 +762,22 @@ export default function RenovacionesPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {loading && receivedCount === 0 ? (
-          <div className="col-span-full py-12 text-center text-sm text-white/60">
-            <HiRefresh className="mx-auto h-6 w-6 animate-spin mb-2" />
-            Buscando renovaciones...
-          </div>
-        ) : receivedCount === 0 ? (
-          <div className="col-span-full py-12 text-center text-sm text-white/60">
-            No se encontraron pólizas para renovar con estos filtros.
-          </div>
-        ) : (
-          items.map((p) => {
-            const vtoRef = pickVtoRef(p);
-            // 🎯 Misma lógica que Bajas: días vencida = hoy − vto última cuota
-            const diasVencida = getDiasVencida(p);
-            // Para el tono usamos los días vencida como negativos (la urgencia
-            // crece cuanto MAS vencida está)
-            const tone = calcUrgencyTone(diasVencida > 0 ? -diasVencida : 0);
+      {/* ============ TABLA ============ */}
+      <RenovacionesTable
+        items={itemsForTab}
+        oficinasOptions={oficinasOptions}
+        loading={loading}
+        submitting={submitting}
+        tab={tab}
+        onRenovar={(p) => {
+          setSelected(p);
+          setModalOpen(true);
+        }}
+        onMarcarNoRenueva={openNoRenuevaModal}
+        onDesmarcarNoRenueva={handleDesmarcarNoRenueva}
+      />
 
-            const patente = getPatente(p);
-            const asegurado = getClienteNombreApellido(p);
-            const oficinaLabel = getOficinaLabel(p, oficinasOptions);
-
-            return (
-              <motion.div
-                key={p.id}
-                layoutId={`renov-${p.id}`}
-                className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-4 transition-all hover:bg-slate-900/80 hover:border-white/10 hover:shadow-lg"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-sky-400/20 to-emerald-400/20 opacity-0 transition-opacity group-hover:opacity-100" />
-                
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-500">
-                          Póliza
-                        </span>
-                        <EstadoPolizaBadge estado={p.estado} />
-                      </div>
-                      <div className="truncate font-mono text-sm font-bold text-white">
-                        {p.numero_poliza || `ID: ${p.id}`}
-                      </div>
-                    </div>
-                    <Badge tone={tone}>
-                      Vence: {fmtDate(vtoRef)}
-                      {diasVencida > 0 ? ` · vencida hace ${diasVencida}d` : ""}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-2.5">
-                    <div>
-                      <div className="text-[10px] uppercase text-slate-500">Cliente</div>
-                      <div className="truncate text-xs font-semibold text-slate-200">
-                        {asegurado || "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase text-slate-500">Vehículo</div>
-                      <div className="truncate text-xs font-semibold text-slate-200">
-                        {patente || "—"}
-                      </div>
-                    </div>
-                    <div className="col-span-2 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] uppercase text-slate-500">Compañía</div>
-                        <div className="truncate text-xs font-medium text-slate-300">
-                          {p?.compania_nombre || p?.compania || "—"}
-                        </div>
-                      </div>
-                      <div className="text-[10px] text-slate-400">
-                        {oficinaLabel}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-2 border-t border-white/5 pt-3">
-                  <button
-                    className="flex w-full md:w-auto h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 px-4 text-xs font-bold text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-                    disabled={submitting}
-                    onClick={() => {
-                      setSelected(p);
-                      setModalOpen(true);
-                    }}
-                  >
-                    <HiClipboardCheck className="text-sm" />
-                    Renovar
-                  </button>
-
-                  <Link
-                    to={`/polizas/${p.id}`}
-                    className="flex w-full md:w-auto h-9 items-center justify-center gap-1 rounded-lg border border-white/10 px-4 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors"
-                  >
-                    Ver detalles <HiArrowRight className="opacity-60" />
-                  </Link>
-                </div>
-              </motion.div>
-            );
-          })
-        )}
-      </div>
-
+      {/* ============ Modal de renovación ============ */}
       <RenovacionModal
         open={modalOpen}
         item={selected}
@@ -567,11 +792,17 @@ export default function RenovacionesPage() {
 
           const finalPayload = {
             ...(payload || {}),
-            transferir_grua: payload?.transferir_grua ?? payload?.transferirGrua ?? payload?.grua ?? 1,
+            transferir_grua:
+              payload?.transferir_grua ??
+              payload?.transferirGrua ??
+              payload?.grua ??
+              1,
           };
 
           try {
-            const res = await dispatch(renovarPoliza({ id: selected.id, payload: finalPayload })).unwrap();
+            const res = await dispatch(
+              renovarPoliza({ id: selected.id, payload: finalPayload })
+            ).unwrap();
             const nuevaId = res?.data?.id;
 
             toast.success("Póliza renovada correctamente");
@@ -593,6 +824,98 @@ export default function RenovacionesPage() {
         }}
         submitting={submitting}
       />
+
+      {/* ============ Modal "Marcar no renueva" ============ */}
+      {noRenuevaModal.open && (
+        <NoRenuevaModal
+          item={noRenuevaModal.item}
+          motivo={noRenuevaMotivo}
+          setMotivo={setNoRenuevaMotivo}
+          onConfirm={confirmarNoRenueva}
+          onClose={closeNoRenuevaModal}
+        />
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+ * Modal simple para marcar "no renueva" con motivo opcional
+ * ========================================================= */
+
+function NoRenuevaModal({ item, motivo, setMotivo, onConfirm, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
+          <div>
+            <div className="text-lg font-extrabold text-white">
+              Marcar como "no renueva"
+            </div>
+            <div className="mt-1 text-xs text-white/70">
+              {item?.patente ? (
+                <>
+                  <span className="font-semibold text-white font-mono">{item.patente}</span>
+                  {" · "}
+                  {item?.cliente?.apellido}, {item?.cliente?.nombre}
+                </>
+              ) : (
+                "Confirmá la acción"
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1 text-white hover:bg-white/15 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-amber-100">
+            La póliza saldrá del tab "Pendientes" y aparecerá en "No renovaron".
+            Podés revertirlo desde ese tab con "Deshacer".
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-white/80 mb-1.5 block">
+              Motivo (opcional)
+            </label>
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej: el cliente vendió el auto, migró a otra compañía, no contesta…"
+              rows={3}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/30 transition-colors"
+              maxLength={300}
+            />
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-white hover:bg-white/15 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="rounded-xl bg-rose-500/80 hover:bg-rose-500 px-5 py-2 font-extrabold text-white transition-colors"
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

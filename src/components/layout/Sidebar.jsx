@@ -9,7 +9,7 @@ import {
   HiChevronDown, HiRefresh,
   HiClock, HiBan, HiTruck, HiCash, HiReceiptTax,
   HiShieldCheck, HiX, HiCog,
-  HiViewGrid
+  HiViewGrid, HiBadgeCheck
 } from "react-icons/hi";
 import ThemeToggle from "./ThemeToggle";
 
@@ -32,6 +32,7 @@ const ICON_MAP = {
   shield:      HiShieldCheck,
   cog:         HiCog,
   grid:        HiViewGrid,
+  badge:       HiBadgeCheck,
 };
 
 export default function Sidebar({
@@ -43,6 +44,7 @@ export default function Sidebar({
   renovacionesPendientes = 0,
   bajasPendientes = 0,
   siniestrosAbiertos = 0,
+  pagosAtencion = 0,
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -72,7 +74,14 @@ export default function Sidebar({
           { to: "/solicitudes",label: "Solicitudes",       icon: "clipboard", badge: solTotal },
           { to: "/clientes",   label: "Clientes",          icon: "users" },
           { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "red" },
-          { to: "/pagos",      label: "Gestión de Pagos",  icon: "cash" },
+        ]
+      },
+      {
+        title: "Gestión de Pagos", id: "gestionpagos", icon: "cash",
+        items: [
+          { to: "/pagos?tab=pagos",             label: "Cobranza",        icon: "money" },
+          { to: "/pagos?tab=historial_pagos",   label: "Verificar pagos", icon: "badge",  badge: pagosAtencion, tone: "red" },
+          { to: "/pagos?tab=historial_recordatorios", label: "Alertas",   icon: "clock" },
         ]
       },
       {
@@ -105,9 +114,10 @@ export default function Sidebar({
         ]
       }] : [])
     ];
-  }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes]);
+  }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, siniestrosAbiertos, pagosAtencion]);
 
   const [open, setOpen] = useState({
+    gestionpagos: ["/pagos"].some(p => location.pathname.startsWith(p)),
     polizas:  ["/polizas", "/vencimientos", "/cuponeras"].some(p => location.pathname.startsWith(p)),
     finanzas: ["/recaudacion", "/balanzes"].some(p => location.pathname.startsWith(p)),
     admin:    ["/gruas", "/cotizaciones", "/marketing", "/estadisticas", "/competencia", "/geo", "/admin"].some(p => location.pathname.startsWith(p)),
@@ -254,23 +264,41 @@ export default function Sidebar({
                         <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-0.5 pb-1">
                           {group.items.map(item => {
                             const Icon = ICON_MAP[item.icon] || HiHome;
+                            // 🚀 Para items con query (?tab=...), comparar también el query
+                            const hasQuery = item.to.includes("?");
+                            const itemPath = hasQuery ? item.to.split("?")[0] : item.to;
+                            const itemTab  = hasQuery ? new URLSearchParams(item.to.split("?")[1]).get("tab") : null;
+                            const currentTab = new URLSearchParams(location.search).get("tab");
+                            const isActiveByQuery = hasQuery
+                              ? (location.pathname === itemPath && (currentTab || (group.items[0]?.to.includes(`tab=${itemTab}`) ? itemTab : null)) === itemTab)
+                              : null;
+
                             return (
-                              <NavLink key={item.to} to={item.to} end={item.to === "/polizas"}
-                                className={({ isActive }) => `
-                                  group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[14px]
-                                  transition-all duration-150
-                                  ${isActive
-                                    ? "bg-primary-600/20 text-primary-400 font-semibold"
-                                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium"
-                                  }
-                                `}>
-                                {({ isActive }) => (
-                                  <>
-                                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary-400" : "text-slate-500 group-hover:text-slate-400"}`} />
-                                    <span className="flex-1 truncate">{item.label}</span>
-                                    <Badge value={item.badge} tone={item.tone} />
-                                  </>
-                                )}
+                              <NavLink
+                                key={item.to}
+                                to={item.to}
+                                end={item.to === "/polizas" || hasQuery}
+                                className={({ isActive }) => {
+                                  const active = isActiveByQuery !== null ? isActiveByQuery : isActive;
+                                  return `
+                                    group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[14px]
+                                    transition-all duration-150
+                                    ${active
+                                      ? "bg-primary-600/20 text-primary-400 font-semibold"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium"
+                                    }
+                                  `;
+                                }}>
+                                {({ isActive }) => {
+                                  const active = isActiveByQuery !== null ? isActiveByQuery : isActive;
+                                  return (
+                                    <>
+                                      <Icon className={`w-4 h-4 shrink-0 ${active ? "text-primary-400" : "text-slate-500 group-hover:text-slate-400"}`} />
+                                      <span className="flex-1 truncate">{item.label}</span>
+                                      <Badge value={item.badge} tone={item.tone} />
+                                    </>
+                                  );
+                                }}
                               </NavLink>
                             );
                           })}

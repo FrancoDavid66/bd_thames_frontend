@@ -23,7 +23,12 @@ import {
   HiIdentification,
   HiChevronRight as HiChevronRightMini,
   HiChartBar, // 🚀 NUEVO ICONO PARA MÉTRICAS
+  HiCheckCircle,
+  HiExclamation,
+  HiQuestionMarkCircle,
 } from "react-icons/hi";
+import toast from "react-hot-toast";
+import { useSearchParams } from "react-router-dom";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
 import { useAuth } from "../context/AuthContext";
@@ -386,6 +391,195 @@ function extractHpCuota(it) {
   return { cuotaNro, cuotaLabel, vto, fpago, forma };
 }
 
+/* ============================================================
+   🚀 VERIFICACIÓN DE MICAELA — estados y dropdown
+   ============================================================ */
+
+const ESTADOS_VERIFICACION = [
+  {
+    key: "pendiente",
+    label: "Pendiente",
+    short: "Pendiente",
+    color: "bg-slate-500/20 text-slate-300 border-slate-500/40",
+    dot: "bg-slate-500",
+    icon: HiQuestionMarkCircle,
+  },
+  {
+    key: "verificado",
+    label: "Verificado · todo OK",
+    short: "Verificado",
+    color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    dot: "bg-emerald-500",
+    icon: HiCheckCircle,
+  },
+  {
+    key: "falta_emitir",
+    label: "Atención · Falta emitir en compañía",
+    short: "Falta emitir",
+    color: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+    dot: "bg-rose-500",
+    icon: HiExclamation,
+  },
+  {
+    key: "pago_post_baja",
+    label: "Atención · Pagó después de baja",
+    short: "Pagó post-baja",
+    color: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+    dot: "bg-rose-500",
+    icon: HiExclamation,
+  },
+  {
+    key: "avisar_vendedor",
+    label: "Atención · Avisar al vendedor",
+    short: "Avisar vendedor",
+    color: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    dot: "bg-amber-500",
+    icon: HiExclamation,
+  },
+  {
+    key: "revisar_mariano",
+    label: "Atención · Revisar con Mariano",
+    short: "Revisar Mariano",
+    color: "bg-orange-500/15 text-orange-300 border-orange-500/40",
+    dot: "bg-orange-500",
+    icon: HiExclamation,
+  },
+];
+
+function getEstadoConfig(key) {
+  return ESTADOS_VERIFICACION.find((e) => e.key === key) || ESTADOS_VERIFICACION[0];
+}
+
+function extractHpVerificacion(it) {
+  const estado = String(it?.estado_verificacion || "pendiente").trim();
+  const nota = String(it?.verificacion_nota || "").trim();
+  const verificadoPor = String(it?.verificado_por_username || "").trim();
+  return { estado, nota, verificadoPor };
+}
+
+/* Contadores de estado — cards clickables que filtran el historial */
+function VerificacionContadores({ items = [], overrides = {}, filtroActivo, onFiltrar }) {
+  // Contar cada estado en el listado actual
+  const conteos = useMemo(() => {
+    const base = { pendiente: 0, verificado: 0, falta_emitir: 0, pago_post_baja: 0, avisar_vendedor: 0, revisar_mariano: 0 };
+    for (const it of items) {
+      const pagoId = it?.id ?? it?.pago_id ?? null;
+      const estado = overrides[pagoId] || String(it?.estado_verificacion || "pendiente").trim();
+      if (base[estado] !== undefined) base[estado]++;
+    }
+    return base;
+  }, [items, overrides]);
+
+  const totalAtencion = conteos.falta_emitir + conteos.pago_post_baja + conteos.avisar_vendedor + conteos.revisar_mariano;
+
+  const cards = [
+    { key: "TODOS", label: "Todos", count: items.length, color: "bg-slate-500/20 text-slate-300 border-slate-500/40", dot: "bg-slate-500" },
+    { key: "pendiente", label: "Pendientes", count: conteos.pendiente, color: "bg-slate-500/15 text-slate-300 border-slate-500/30", dot: "bg-slate-400" },
+    { key: "verificado", label: "Verificados", count: conteos.verificado, color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-500" },
+    { key: "ATENCION", label: "En atención", count: totalAtencion, color: "bg-rose-500/15 text-rose-300 border-rose-500/40", dot: "bg-rose-500", destacado: totalAtencion > 0 },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+      {cards.map((c) => {
+        const isActive = filtroActivo === c.key;
+        return (
+          <motion.button
+            key={c.key}
+            onClick={() => onFiltrar(c.key)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            animate={c.destacado && !isActive ? { boxShadow: ["0 0 0 0 rgba(244,63,94,0)", "0 0 0 4px rgba(244,63,94,0.15)", "0 0 0 0 rgba(244,63,94,0)"] } : {}}
+            transition={c.destacado ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+            className={`relative overflow-hidden rounded-2xl border p-4 text-left cursor-pointer transition-all ${
+              isActive
+                ? `${c.color} ring-2 ring-current/30 shadow-lg`
+                : "bg-slate-900/40 border-slate-800/80 hover:border-slate-700"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+              {isActive && (
+                <HiCheckCircle className="w-4 h-4" />
+              )}
+            </div>
+            <div className={`text-2xl font-bold tabular-nums ${isActive ? "" : "text-slate-100"}`}>
+              {c.count}
+            </div>
+            <div className={`text-[11px] uppercase tracking-widest font-bold mt-1 ${isActive ? "" : "text-slate-500"}`}>
+              {c.label}
+            </div>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Dropdown reutilizable de cambio de estado */
+function VerificacionDropdown({ pagoId, estadoActual, onChange }) {
+  const [open, setOpen] = useState(false);
+  const config = getEstadoConfig(estadoActual);
+  const Icon = config.icon;
+
+  const handleClick = async (nuevoEstado) => {
+    setOpen(false);
+    if (nuevoEstado === estadoActual) return;
+    await onChange?.(pagoId, nuevoEstado);
+  };
+
+  return (
+    <div className="relative w-full sm:w-auto">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full sm:w-auto inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-bold border ${config.color} hover:brightness-125 transition min-w-[160px]`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon className="w-4 h-4 shrink-0" />
+          <span className="truncate">{config.short}</span>
+        </div>
+        <HiChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          {/* Click fuera para cerrar */}
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1.5 z-[61] w-72 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
+            {/* Header del dropdown */}
+            <div className="px-3 py-2 border-b border-slate-800 bg-slate-950/60">
+              <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+                Cambiar estado
+              </div>
+            </div>
+
+            {ESTADOS_VERIFICACION.map((e) => {
+              const ItemIcon = e.icon;
+              const activo = e.key === estadoActual;
+              return (
+                <button
+                  key={e.key}
+                  onClick={() => handleClick(e.key)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-800 transition border-b border-slate-800/40 last:border-b-0 ${
+                    activo ? "bg-slate-800/60" : ""
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full ${e.dot} shrink-0`} />
+                  <ItemIcon className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="text-sm text-slate-200 flex-1 leading-tight">
+                    {e.label}
+                  </span>
+                  {activo && <HiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ================== PAGE ================== */
 const PagosPage = () => {
   const dispatch = useDispatch();
@@ -397,7 +591,19 @@ const PagosPage = () => {
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
   const userOficina = user?.perfil?.oficina?.id || user?.perfil?.oficina || "";
 
-  const [tab, setTab] = useState("pagos");
+  // 🚀 Tab sincronizado con URL query (?tab=pagos|historial_pagos|historial_recordatorios)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const VALID_TABS = ["pagos", "historial_pagos", "historial_recordatorios"];
+  const [tab, setTab] = useState(VALID_TABS.includes(tabFromUrl) ? tabFromUrl : "pagos");
+
+  // Sincronizar cambios de URL → state (cuando el usuario clickea desde sidebar)
+  useEffect(() => {
+    if (VALID_TABS.includes(tabFromUrl) && tabFromUrl !== tab) {
+      setTab(tabFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabFromUrl]);
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
   const [showReporteModal, setShowReporteModal] = useState(false); // 🚀 NUEVO ESTADO
@@ -483,13 +689,15 @@ const PagosPage = () => {
     (nuevoTab) => {
       if (nuevoTab === tab) return;
       setTab(nuevoTab);
+      // Sincronizar con URL para que el sidebar marque el activo correcto
+      setSearchParams({ tab: nuevoTab }, { replace: true });
       if (nuevoTab === "historial_recordatorios") {
         dispatch(fetchHistorialRecordatorios());
         return;
       }
       if (nuevoTab === "historial_pagos") setHpPage(1);
     },
-    [dispatch, tab]
+    [dispatch, tab, setSearchParams]
   );
 
   const buildHistorialParams = useCallback(
@@ -566,6 +774,58 @@ const PagosPage = () => {
   const handleRefreshHistorialPagos = useCallback(() => {
     dispatch(fetchHistorialPagos(buildHistorialParams({ force: true })));
   }, [dispatch, buildHistorialParams]);
+
+  // 🚀 VERIFICACIÓN DE MICAELA — estado local + handler de cambio
+  // Guardamos los cambios localmente para que la UI sea instantánea
+  // sin tener que recargar todo el historial.
+  const [verificacionOverrides, setVerificacionOverrides] = useState({}); // { pagoId: "verificado", ... }
+
+  // 🚀 Filtro local rápido por estado de verificación (no llama al backend)
+  const [filtroEstadoLocal, setFiltroEstadoLocal] = useState("TODOS");
+
+  const handleCambiarEstadoVerificacion = useCallback(async (pagoId, nuevoEstado) => {
+    if (!pagoId) {
+      toast.error("No se puede cambiar el estado: pago sin ID");
+      return;
+    }
+
+    const apiBase = (import.meta.env.VITE_API_URL || "/api/").replace(/\/?$/, "/");
+    const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+
+    // Actualización optimista
+    setVerificacionOverrides((prev) => ({ ...prev, [pagoId]: nuevoEstado }));
+
+    try {
+      const res = await fetch(`${apiBase}pagos/${pagoId}/cambiar_estado_verificacion/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ estado_verificacion: nuevoEstado }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail || `Error HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const cfg = getEstadoConfig(data.estado_verificacion);
+      toast.success(`Estado: ${cfg.short}`, {
+        style: { background: "#0f172a", color: "#f8fafc", border: "1px solid rgba(255,255,255,0.1)" },
+      });
+    } catch (e) {
+      // Rollback si falla
+      setVerificacionOverrides((prev) => {
+        const n = { ...prev };
+        delete n[pagoId];
+        return n;
+      });
+      toast.error(e?.message || "Error al cambiar el estado");
+    }
+  }, []);
 
   const buildExportParams = useCallback(() => {
     const base = {
@@ -723,6 +983,18 @@ const PagosPage = () => {
 
   const historialItems = Array.isArray(historialPagosItems) ? historialPagosItems : [];
 
+  // 🚀 Filtrado local por estado de verificación
+  const historialItemsFiltrados = useMemo(() => {
+    if (filtroEstadoLocal === "TODOS") return historialItems;
+    const ATENCION_KEYS = ["falta_emitir", "pago_post_baja", "avisar_vendedor", "revisar_mariano"];
+    return historialItems.filter((it) => {
+      const pagoId = it?.id ?? it?.pago_id ?? null;
+      const estado = verificacionOverrides[pagoId] || String(it?.estado_verificacion || "pendiente").trim();
+      if (filtroEstadoLocal === "ATENCION") return ATENCION_KEYS.includes(estado);
+      return estado === filtroEstadoLocal;
+    });
+  }, [historialItems, filtroEstadoLocal, verificacionOverrides]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-10 2xl:px-12 py-4 sm:py-6">
@@ -784,45 +1056,45 @@ const PagosPage = () => {
           </div>
         </div>
 
-        {/* 🚀 TABS MOBILE-FRIENDLY */}
-        <div className="mb-3 sm:mb-4 overflow-hidden">
-          <div className="flex flex-wrap sm:inline-flex p-1 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-[0_0_18px_rgba(15,23,42,0.85)] w-full sm:w-auto">
+        {/* 🚀 TABS REDISEÑADAS — Cobranza primero (uso diario), Verificar segunda (Micaela) */}
+        <div className="mb-4 sm:mb-5">
+          <div className="inline-flex p-1 rounded-xl bg-slate-900/60 border border-slate-800 backdrop-blur w-full sm:w-auto">
             <button
               type="button"
               onClick={() => handleChangeTab("pagos")}
-              className={`flex-1 justify-center sm:flex-none relative inline-flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
-                tab === "pagos" ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:text-slate-100"
+              className={`flex-1 sm:flex-none relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                tab === "pagos"
+                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-slate-100"
               }`}
             >
-              <HiBadgeCheck className="text-sm sm:text-base" />
-              <span className="truncate">Pagos</span>
+              <HiReceiptTax className="text-base" />
+              <span>Cobranza</span>
             </button>
             <button
               type="button"
               onClick={() => handleChangeTab("historial_pagos")}
-              className={`flex-1 justify-center sm:flex-none relative inline-flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+              className={`flex-1 sm:flex-none relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 tab === "historial_pagos"
-                  ? "bg-slate-800 text-slate-50"
+                  ? "bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20"
                   : "text-slate-400 hover:text-slate-100"
               }`}
             >
-              <HiReceiptTax className="text-sm sm:text-base" />
-              <span className="truncate">Historial</span>
+              <HiBadgeCheck className="text-base" />
+              <span>Verificar pagos</span>
             </button>
-            
-            {/* Solo mostramos la pestaña de alertas (historial de recordatorios) si es admin */}
             {isWebAdmin && (
               <button
                 type="button"
                 onClick={() => handleChangeTab("historial_recordatorios")}
-                className={`flex-1 justify-center sm:flex-none relative inline-flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer ${
+                className={`flex-1 sm:flex-none relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                   tab === "historial_recordatorios"
                     ? "bg-slate-800 text-slate-50"
                     : "text-slate-400 hover:text-slate-100"
                 }`}
               >
-                <HiClock className="text-sm sm:text-base" />
-                <span className="truncate">Alertas</span>
+                <HiClock className="text-base" />
+                <span>Alertas</span>
               </button>
             )}
           </div>
@@ -1048,89 +1320,210 @@ const PagosPage = () => {
             key="tab-historial-pagos"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-3 sm:space-y-4"
+            className="space-y-4"
           >
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex flex-wrap sm:flex-nowrap p-1 rounded-2xl bg-slate-950/60 border border-slate-800 w-full sm:w-auto">
-                    <button onClick={() => setModo("MES")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm cursor-pointer ${hpModo === "MES" ? "bg-slate-800 text-slate-50" : "text-slate-400"}`}>Mes</button>
-                    <button onClick={() => setModo("DIA")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm cursor-pointer ${hpModo === "DIA" ? "bg-slate-800 text-slate-50" : "text-slate-400"}`}>Día</button>
-                    <button onClick={() => setModo("RANGO")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm cursor-pointer ${hpModo === "RANGO" ? "bg-slate-800 text-slate-50" : "text-slate-400"}`}>Rango</button>
-                  </div>
-                  <div className="ml-auto flex items-center gap-2 w-full sm:w-auto">
-                    <button onClick={handleRefreshHistorialPagos} className="flex-1 sm:flex-none justify-center h-10 px-3 rounded-2xl border text-xs sm:text-sm inline-flex items-center gap-2 bg-slate-950/60 border-slate-800 text-slate-200">
-                      <HiRefresh className="w-4 h-4" /> <span className="sm:inline">Actualizar</span>
+            {/* ╔═══════════════════════════════════════════════════════╗
+                ║  CONTADORES DE ESTADO — clickables como filtros       ║
+                ╚═══════════════════════════════════════════════════════╝ */}
+            <VerificacionContadores
+              items={historialItems}
+              overrides={verificacionOverrides}
+              filtroActivo={filtroEstadoLocal}
+              onFiltrar={setFiltroEstadoLocal}
+            />
+
+            {/* ╔═══════════════════════════════════════════════════════╗
+                ║  BARRA DE FILTROS — compacta y elegante               ║
+                ╚═══════════════════════════════════════════════════════╝ */}
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3 backdrop-blur-sm">
+              <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                {/* Selector de período */}
+                <div className="inline-flex p-0.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                  {["MES", "DIA", "RANGO"].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setModo(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                        hpModo === m
+                          ? "bg-slate-800 text-slate-50 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {m === "MES" ? "Mes" : m === "DIA" ? "Día" : "Rango"}
                     </button>
-                  </div>
+                  ))}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-                  <div className="lg:col-span-4">
-                    {hpModo === "MES" ? (
-                      <select value={hpMes} onChange={(e) => { setHpMes(e.target.value); setHpPage(1); }} className="w-full h-10 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm">
-                        {mesesOptions.map((ym) => <option key={ym} value={ym}>{monthLabel(ym)}</option>)}
-                      </select>
-                    ) : hpModo === "DIA" ? (
-                      <input type="date" value={hpDia} onChange={(e) => { setHpDia(e.target.value); setHpPage(1); }} className="w-full h-10 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm" />
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        <input type="date" value={hpDesde} onChange={(e) => { setHpDesde(e.target.value); setHpPage(1); }} className="w-full h-10 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm" />
-                        <input type="date" value={hpHasta} onChange={(e) => { setHpHasta(e.target.value); setHpPage(1); }} className="w-full h-10 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm" />
-                      </div>
-                    )}
-                  </div>
-                  {isWebAdmin ? (
-                    <div className="lg:col-span-2">
-                      <select value={hpOficina} onChange={onChangeOficina} className="w-full h-10 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm">
-                        {OFICINAS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
+
+                {/* Date inputs */}
+                <div className="flex-1">
+                  {hpModo === "MES" ? (
+                    <select value={hpMes} onChange={(e) => { setHpMes(e.target.value); setHpPage(1); }} className="w-full h-9 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm focus:border-sky-500/50 focus:outline-none transition">
+                      {mesesOptions.map((ym) => <option key={ym} value={ym}>{monthLabel(ym)}</option>)}
+                    </select>
+                  ) : hpModo === "DIA" ? (
+                    <input type="date" value={hpDia} onChange={(e) => { setHpDia(e.target.value); setHpPage(1); }} className="w-full h-9 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm focus:border-sky-500/50 focus:outline-none transition" />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="date" value={hpDesde} onChange={(e) => { setHpDesde(e.target.value); setHpPage(1); }} className="w-full h-9 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm focus:border-sky-500/50 focus:outline-none transition" />
+                      <input type="date" value={hpHasta} onChange={(e) => { setHpHasta(e.target.value); setHpPage(1); }} className="w-full h-9 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm focus:border-sky-500/50 focus:outline-none transition" />
                     </div>
-                  ) : <div className="hidden lg:block lg:col-span-2"></div>}
-                  <div className="lg:col-span-6">
-                    <div className="relative">
-                      <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input value={hpQInput} onChange={(e) => setHpQInput(e.target.value)} placeholder="Buscar (DNI, patente...)" className="w-full h-10 pl-10 pr-10 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 text-sm" />
-                    </div>
-                  </div>
+                  )}
                 </div>
+
+                {/* Oficina (solo admin) */}
+                {isWebAdmin && (
+                  <select value={hpOficina} onChange={onChangeOficina} className="lg:w-44 h-9 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 px-3 text-sm focus:border-sky-500/50 focus:outline-none transition">
+                    {OFICINAS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                )}
+
+                {/* Búsqueda */}
+                <div className="relative flex-1 lg:max-w-xs">
+                  <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                  <input value={hpQInput} onChange={(e) => setHpQInput(e.target.value)} placeholder="Patente, DNI, nombre..." className="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-100 text-sm placeholder:text-slate-600 focus:border-sky-500/50 focus:outline-none transition" />
+                </div>
+
+                {/* Refresh */}
+                <button onClick={handleRefreshHistorialPagos} className="h-9 px-3 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-300 hover:text-white hover:border-sky-500/40 inline-flex items-center justify-center gap-2 text-sm transition cursor-pointer">
+                  <HiRefresh className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-[0_0_24px_rgba(15,23,42,0.9)] p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="text-sm font-semibold text-slate-100">Pagos</div>
-                <div className="text-xs text-slate-400">Mostrando {historialItems.length} de {historialPagosMeta?.count || 0}</div>
+            {/* ╔═══════════════════════════════════════════════════════╗
+                ║  TABLA DE PAGOS — fila por fila, compacta y clara     ║
+                ╚═══════════════════════════════════════════════════════╝ */}
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-sm">
+              {/* Header con contador */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 bg-slate-950/40">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-semibold text-slate-100">
+                    {filtroEstadoLocal === "TODOS" ? "Todos los pagos" : `Filtro: ${getEstadoConfig(filtroEstadoLocal).label}`}
+                  </div>
+                  {filtroEstadoLocal !== "TODOS" && (
+                    <button
+                      onClick={() => setFiltroEstadoLocal("TODOS")}
+                      className="text-[11px] text-sky-400 hover:text-sky-300 transition uppercase tracking-wider font-bold"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs text-slate-500 tabular-nums">
+                  {historialItemsFiltrados.length} de {historialItems.length}
+                </div>
               </div>
-              {historialItems.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center text-slate-400">
-                  No hay pagos para esos filtros.
+
+              {historialItemsFiltrados.length === 0 ? (
+                <div className="p-12 text-center">
+                  <div className="inline-flex h-14 w-14 rounded-full bg-slate-800/60 items-center justify-center mb-3">
+                    <HiSearch className="w-6 h-6 text-slate-500" />
+                  </div>
+                  <p className="text-sm text-slate-400">No hay pagos para mostrar.</p>
+                  <p className="text-xs text-slate-600 mt-1">Probá ajustar los filtros.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  {historialItems.map((it, idx) => {
+                <div className="divide-y divide-slate-800/50">
+                  {historialItemsFiltrados.map((it, idx) => {
                     const c = extractHpCliente(it);
                     const monto = extractHpMonto(it);
+                    const pol = extractHpPoliza(it);
+                    const ver = extractHpVerificacion(it);
+                    const pagoId = it?.id ?? it?.pago_id ?? null;
+                    const estadoMostrado = verificacionOverrides[pagoId] || ver.estado;
+                    const cfg = getEstadoConfig(estadoMostrado);
+                    const isAtencion = ["falta_emitir", "pago_post_baja", "avisar_vendedor", "revisar_mariano"].includes(estadoMostrado);
+
                     return (
-                      <div key={`hp-${idx}`} className="rounded-xl bg-slate-950/40 border border-slate-800 p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-slate-100 truncate">{c.label}</div>
-                            <div className="text-xs text-slate-400">DNI: {safe(c.dni)}</div>
+                      <motion.div
+                        key={`hp-${pagoId || idx}`}
+                        initial={{ opacity: 0, x: -4 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.015 }}
+                        className={`relative grid grid-cols-12 gap-3 px-4 py-3 hover:bg-slate-800/30 transition-colors ${
+                          isAtencion ? "bg-rose-500/5" : ""
+                        }`}
+                      >
+                        {/* Borde lateral coloreado según estado */}
+                        <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full ${cfg.dot}`} />
+
+                        {/* Patente + Compañía + Oficina */}
+                        <div className="col-span-12 sm:col-span-3 flex flex-col gap-1">
+                          <div className="text-[13px] font-mono font-bold text-sky-300 uppercase bg-sky-500/10 px-2.5 py-1 rounded-md border border-sky-500/20 tracking-wider truncate text-center">
+                            {pol.patente || "S/P"}
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-emerald-200 tabular-nums">${monto}</div>
-                            <div className="text-[10px] text-slate-500">{fmtRegistro(it)}</div>
+                          <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                            {pol.compania && (
+                              <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 truncate max-w-full">
+                                {pol.compania}
+                              </span>
+                            )}
+                            {pol.oficina && (
+                              <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 truncate max-w-full">
+                                {pol.oficina}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </div>
+
+                        {/* Cliente + DNI */}
+                        <div className="col-span-12 sm:col-span-3 min-w-0 flex flex-col justify-center">
+                          <div className="text-sm font-semibold text-slate-100 truncate">{c.label}</div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            DNI {safe(c.dni)}
+                          </div>
+                        </div>
+
+                        {/* Monto + fecha */}
+                        <div className="col-span-6 sm:col-span-3 text-right flex flex-col justify-center">
+                          <div className="text-sm font-bold text-emerald-300 tabular-nums">${monto}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{fmtRegistro(it)}</div>
+                        </div>
+
+                        {/* Dropdown verificación */}
+                        <div className="col-span-6 sm:col-span-3 flex items-center justify-end">
+                          <VerificacionDropdown
+                            pagoId={pagoId}
+                            estadoActual={estadoMostrado}
+                            onChange={handleCambiarEstadoVerificacion}
+                          />
+                        </div>
+
+                        {/* Nota (si existe) */}
+                        {ver.nota && (
+                          <div className="col-span-12 text-[11px] text-slate-400 italic bg-slate-950/60 rounded-lg px-3 py-1.5 border border-slate-800/60">
+                            <span className="text-slate-600">Nota:</span> "{ver.nota}"
+                            {ver.verificadoPor && <span className="text-slate-600 ml-2">— {ver.verificadoPor}</span>}
+                          </div>
+                        )}
+                      </motion.div>
                     );
                   })}
                 </div>
               )}
-              <div className="mt-4 flex justify-between gap-2">
-                <button onClick={onPrevPage} disabled={hpPage <= 1} className="h-10 px-4 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 text-sm">Anterior</button>
-                <button onClick={onNextPage} disabled={hpPage >= totalPagesHistorial} className="h-10 px-4 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 text-sm">Siguiente</button>
-              </div>
+
+              {/* Paginación */}
+              {historialItems.length > 0 && (
+                <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-slate-800/80 bg-slate-950/40">
+                  <button
+                    onClick={onPrevPage}
+                    disabled={hpPage <= 1}
+                    className="h-8 px-3 rounded-lg border border-slate-800 bg-slate-950 text-slate-300 text-xs hover:border-sky-500/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer inline-flex items-center gap-1"
+                  >
+                    <HiChevronLeft className="w-3.5 h-3.5" /> Anterior
+                  </button>
+                  <span className="text-xs text-slate-500 tabular-nums">
+                    Página {hpPage} de {totalPagesHistorial}
+                  </span>
+                  <button
+                    onClick={onNextPage}
+                    disabled={hpPage >= totalPagesHistorial}
+                    className="h-8 px-3 rounded-lg border border-slate-800 bg-slate-950 text-slate-300 text-xs hover:border-sky-500/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer inline-flex items-center gap-1"
+                  >
+                    Siguiente <HiChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         ) : (

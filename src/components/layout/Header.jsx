@@ -13,6 +13,9 @@ import { fetchCuponerasCounters }                                    from "../..
 import { fetchRenovacionesGlobalResumen, selectRenovacionesGlobalResumen } from "../../store/slices/renovacionesSlice";
 import { fetchBajasGlobalCounters, selectBajasGlobalCounters }      from "../../store/slices/bajasSlice";
 
+// 🚀 Banner de atención (pagos pendientes de Micaela)
+import AtencionBanner from "./AtencionBanner";
+
 const POLL_MS = 2 * 60 * 1000; // 2 minutos
 
 /* ─── NotificationsDropdown ────────────────────────────────── */
@@ -266,6 +269,11 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 🚀 Banner pulsante de pagos en atención — encima del header */}
+      <div className={`fixed inset-x-0 z-[45] ${sidebarOpen ? "lg:pl-64" : ""}`} style={{ top: 0 }}>
+        <AtencionBanner />
+      </div>
 
       {/* Header normal */}
       <header
