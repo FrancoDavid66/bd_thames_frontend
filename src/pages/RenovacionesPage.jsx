@@ -43,7 +43,7 @@ import RenovacionModal from "../components/renovaciones/RenovacionModal";
 import RenovacionesFiltersBar from "../components/renovaciones/RenovacionesFiltersBar";
 import RenovacionesBucketsBar from "../components/renovaciones/RenovacionesBucketsBar";
 import RenovacionesTabs from "../components/renovaciones/RenovacionesTabs";
-import RenovacionesTable from "../components/renovaciones/RenovacionesTable";
+import Renovacionestable from "../components/renovaciones/Renovacionestable";
 import { useAuth } from "../context/AuthContext";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
@@ -763,7 +763,7 @@ export default function RenovacionesPage() {
       </div>
 
       {/* ============ TABLA ============ */}
-      <RenovacionesTable
+      <Renovacionestable
         items={itemsForTab}
         oficinasOptions={oficinasOptions}
         loading={loading}
