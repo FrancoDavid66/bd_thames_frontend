@@ -1,34 +1,27 @@
-import axios from 'axios';
+// src/services/siniestros.js
+//
+// ⚠️ NOTA: La fuente de verdad es siniestrosSlice (Redux + thunks).
+// Este archivo se mantiene por compatibilidad si algún componente legacy
+// todavía lo importa. Ahora usa el wrapper `api` con interceptors y env var.
 
-const API_URL = 'http://127.0.0.1:8000/api/siniestros/';
-const EVENTO_URL = 'http://127.0.0.1:8000/api/eventos/';
+import api from './api';
 
 // Obtener todos los siniestros
-export const fetchSiniestros = async () => {
-  return await axios.get(API_URL);
-};
+export const fetchSiniestros = () => api.get('siniestros/');
 
 // Crear un nuevo siniestro
-export const createSiniestro = async (siniestro) => {
-  return await axios.post(API_URL, siniestro);
-};
+export const createSiniestro = (siniestro) => api.post('siniestros/', siniestro);
 
 // Actualizar un siniestro existente
-export const updateSiniestro = async (id, siniestro) => {
-  return await axios.put(`${API_URL}${id}/`, siniestro);
-};
+export const updateSiniestro = (id, siniestro) => api.put(`siniestros/${id}/`, siniestro);
 
 // Eliminar un siniestro
-export const deleteSiniestro = async (id) => {
-  return await axios.delete(`${API_URL}${id}/`);
-};
+export const deleteSiniestro = (id) => api.delete(`siniestros/${id}/`);
 
 // Crear un evento de siniestro
-export const createSiniestroEvento = async (evento) => {
-  return await axios.post(EVENTO_URL, evento);
-};
+// 🐛 FIX: ruta actualizada al nuevo basename del router.
+export const createSiniestroEvento = (evento) => api.post('siniestro-eventos/', evento);
 
 // Obtener eventos de un siniestro específico
-export const fetchEventosBySiniestro = async (siniestroId) => {
-  return await axios.get(`${API_URL}${siniestroId}/eventos/`);
-};
+export const fetchEventosBySiniestro = (siniestroId) =>
+  api.get(`siniestros/${siniestroId}/eventos/`);

@@ -1,6 +1,6 @@
 // src/App.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -38,6 +38,11 @@ import VencimientosPage from "./pages/VencimientosPage";
 import BajasPage from "./pages/BajasPage";
 import RecaudacionPage from "./pages/RecaudacionPage";
 
+// 🚀 NUEVA APP: SERVICIOS Y GASTOS FIJOS
+import ServiciosPage from "./pages/ServiciosPage";
+// 🚀 Thunk de contadores
+import { fetchContadoresServicios } from "./store/slices/serviciosSlice";
+
 // 🚀 NUEVA APP: COTIZACIONES
 import CotizacionesPage from "./pages/CotizacionesPage";
 
@@ -49,6 +54,7 @@ import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 function App() {
   const { mode } = useSelector((state) => state.theme);
   const location = useLocation();
+  const dispatch = useDispatch();
   
   // 🚀 EXTRAEMOS DATOS DE AUTENTICACIÓN
   const { user, loading } = useAuth();
@@ -95,6 +101,9 @@ function App() {
 
   // --- Contador Siniestros abiertos (no cerrados) ---
   const [siniestrosAbiertos, setSiniestrosAbiertos] = useState(0);
+
+  // 🚀 NUEVO: Contador de servicios fijos (vencidos + por vencer ≤3d)
+  const [serviciosAlertas, setServiciosAlertas] = useState(0);
 
   // ====== Helper: API ROOT ======
   const getApiRoot = () => {
@@ -249,6 +258,22 @@ function App() {
     } catch {}
   };
 
+  // 🚀 ====== Servicios Fijos: fetch (solo admin) ======
+  const fetchServiciosCounters = async () => {
+    if (!user) return;
+    const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+    if (!isAdmin) {
+      setServiciosAlertas(0);
+      return;
+    }
+    try {
+      const result = await dispatch(fetchContadoresServicios()).unwrap();
+      setServiciosAlertas(Number(result?.total_alertas) || 0);
+    } catch {
+      setServiciosAlertas(0);
+    }
+  };
+
   // ========================================================
   // 🚀 USE-EFFECTS
   // ========================================================
@@ -280,7 +305,8 @@ function App() {
     fetchRenovacionesCounters();
     fetchBajasCountersApp();
     fetchVerificacionCount();
-      fetchSiniestrosCount();
+    fetchSiniestrosCount();
+    fetchServiciosCounters();
 
     return () => { try { unsub && unsub(); } catch {} };
   }, [user]); 
@@ -301,7 +327,8 @@ function App() {
     fetchRenovacionesCounters();
     fetchBajasCountersApp();
     fetchVerificacionCount();
-      fetchSiniestrosCount();
+    fetchSiniestrosCount();
+    fetchServiciosCounters();
   }, [location.pathname, location.search, user]);
 
   useEffect(() => {
@@ -313,6 +340,7 @@ function App() {
       fetchBajasCountersApp();
       fetchVerificacionCount();
       fetchSiniestrosCount();
+      fetchServiciosCounters();
     }, 60_000);
     return () => clearInterval(id);
   }, [DISABLE_POLL, user]);
@@ -403,6 +431,7 @@ function App() {
           renovacionesPendientes={renovacionesPendientes}
           bajasPendientes={bajasPendientes}
           siniestrosAbiertos={siniestrosAbiertos}
+          serviciosAlertas={serviciosAlertas}
           user={user} 
         />
 
@@ -437,6 +466,13 @@ function App() {
                 <Route path="/vencimientos" element={<VencimientosPage />} />
                 <Route path="/pagos" element={<PagosPage />} />
                 <Route path="/balanzes" element={<BalanzesPage />} />
+                
+                {/* 🚀 RUTA PROTEGIDA: SERVICIOS Y GASTOS FIJOS (Solo Admin) */}
+                <Route 
+                  path="/servicios" 
+                  element={user.perfil?.rol === 'ADMIN' ? <ServiciosPage /> : <Navigate to="/" replace />} 
+                />
+                
                 <Route path="/siniestros" element={<SiniestrosPage />} />
                 <Route path="/cuponeras" element={<CuponerasPage />} />
                 <Route path="/geo" element={<GeoPage />} />
@@ -470,6 +506,7 @@ function App() {
             solPendienteEnvio={solPendienteEnvio}
             renovacionesPendientes={renovacionesPendientes}
             bajasPendientes={bajasPendientes}
+            serviciosAlertas={serviciosAlertas}
           />
         </motion.div>
       </div>

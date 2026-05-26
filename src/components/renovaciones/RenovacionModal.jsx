@@ -4,53 +4,105 @@ import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import { HiX, HiExclamation } from "react-icons/hi";
 
-// 🎯 Lógica unificada de cuotas
-import { getUltimaCuota } from "../../utils/cuotas";
+// 🆕 Banner para errores estructurados
+import ErrorBanner from "./ErrorBanner";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
-export default function RenovacionModal({ open, item, onClose, onSubmit, submitting }) {
+// 🎯 Helper interno: obtener la última cuota de una lista
+// (la de mayor cuota_nro y fecha_vencimiento)
+function getUltimaCuota(cuotas) {
+  if (!Array.isArray(cuotas) || cuotas.length === 0) return null;
+  return [...cuotas]
+    .filter((c) => c && c.fecha_vencimiento)
+    .sort((a, b) => {
+      // Primero por cuota_nro descendente
+      const nroA = Number(a.cuota_nro || 0);
+      const nroB = Number(b.cuota_nro || 0);
+      if (nroB !== nroA) return nroB - nroA;
+      // Después por fecha descendente
+      return new Date(b.fecha_vencimiento) - new Date(a.fecha_vencimiento);
+    })[0] || null;
+}
+
+export default function RenovacionModal({
+  open,
+  item,
+  onClose,
+  onSubmit,
+  submitting,
+  // 🆕 Error estructurado que viene del backend tras un intento fallido
+  // Formato: { error, message, detail, action, context }
+  error = null,
+}) {
   const [nuevoNumero, setNuevoNumero] = useState("");
   const [nuevaCompania, setNuevaCompania] = useState("");
-  const [nuevoPrecio, setNuevoPrecio] = useState("");
   const [nuevaFecha, setNuevaFecha] = useState("");
 
-  const [transferirGrua, setTransferirGrua] = useState(true);
+  // 🆕 Input que aparece SOLO cuando el backend dijo "COBERTURA_NO_CONFIGURADA"
+  const [cantidadCuotasOverride, setCantidadCuotasOverride] = useState("");
+
+  const necesitaOverride = error?.error === "COBERTURA_NO_CONFIGURADA";
 
   useEffect(() => {
     if (!open) return;
 
     setNuevoNumero(item?.numero_poliza || "");
     setNuevaCompania(item?.compania || "");
-    setNuevoPrecio(
-      item?.precio_cuota != null && item?.precio_cuota !== "" ? String(item?.precio_cuota) : ""
+
+    // Default sugerido para override = cantidad de cuotas de la póliza original
+    setCantidadCuotasOverride(
+      item?.cantidad_cuotas ? String(item.cantidad_cuotas) : ""
     );
 
     // 🎯 LÓGICA UNIFICADA: la nueva póliza empieza el MISMO DÍA que venció
-    // la última cuota de la póliza vieja (sin gap). Esto coincide con la
-    // regla del backend en renovacion.py (inicio_vigencia = ancla).
+    // la última cuota de la póliza vieja (sin gap).
     let fechaCalculada = null;
-
-    // Usamos getUltimaCuota del módulo unificado (misma lógica en toda la app)
     const ultimaCuota = getUltimaCuota(item?.cuotas);
     if (ultimaCuota?.fecha_vencimiento) {
-      // ✅ Mismo día que venció la última cuota (sin sumar nada)
       fechaCalculada = dayjs(ultimaCuota.fecha_vencimiento);
     }
 
-    // Fallback: Si no tiene cuotas cargadas, busca otras referencias de la póliza
     if (!fechaCalculada) {
-      const fallbackStr = item?.ultima_cuota_vencimiento || item?.vto_referencia || item?.fecha_vencimiento || item?.primer_pago;
+      const fallbackStr =
+        item?.ultima_cuota_vencimiento ||
+        item?.vto_referencia ||
+        item?.fecha_vencimiento ||
+        item?.primer_pago;
       if (fallbackStr) {
         fechaCalculada = dayjs(fallbackStr);
       }
     }
 
     setNuevaFecha(fechaCalculada ? fechaCalculada.format("YYYY-MM-DD") : "");
-    setTransferirGrua(true);
   }, [open, item]);
 
   if (!open) return null;
+
+  const handleSubmit = () => {
+    const payload = {
+      nuevoNumero: (nuevoNumero || "").trim() || undefined,
+      nuevaCompania: (nuevaCompania || "").trim() || undefined,
+      nuevaFecha: nuevaFecha || undefined,
+    };
+
+    // Si el banner muestra el input de cuotas y el usuario lo completó, lo enviamos
+    if (necesitaOverride) {
+      const n = parseInt(cantidadCuotasOverride, 10);
+      if (Number.isFinite(n) && n > 0) {
+        payload.cantidad_cuotas_override = n;
+        // El backend lo lee como snake_case
+        payload.cantidad_cuotas = n;
+      }
+    }
+
+    onSubmit(payload);
+  };
+
+  const canSubmit = necesitaOverride
+    ? Number.isFinite(parseInt(cantidadCuotasOverride, 10)) &&
+      parseInt(cantidadCuotasOverride, 10) > 0
+    : true;
 
   return (
     <AnimatePresence>
@@ -64,12 +116,12 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
         }}
       >
         <motion.div
-          className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900 backdrop-blur-xl shadow-2xl"
+          className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900 backdrop-blur-xl shadow-2xl max-h-[90vh] overflow-y-auto"
           initial={{ y: 18, opacity: 0, scale: 0.98 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 18, opacity: 0, scale: 0.98 }}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
+          <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4 sticky top-0 bg-slate-900 z-10">
             <div>
               <div className="text-lg font-extrabold text-white">Renovar póliza</div>
               <div className="mt-1 text-sm text-white/80">
@@ -98,6 +150,37 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
           </div>
 
           <div className="grid gap-3 p-4">
+            {/* 🆕 Banner de error estructurado (cuando viene del backend) */}
+            <AnimatePresence>
+              {error && (
+                <ErrorBanner error={error}>
+                  {/* Input inline solo si el error es "COBERTURA_NO_CONFIGURADA" */}
+                  {necesitaOverride && (
+                    <div className="bg-black/30 rounded-lg p-3 mt-1">
+                      <label className="text-xs font-bold text-white/90 mb-1.5 block">
+                        Cantidad de cuotas (manual)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={cantidadCuotasOverride}
+                          onChange={(e) => setCantidadCuotasOverride(e.target.value)}
+                          disabled={submitting}
+                          placeholder="Ej: 6"
+                          className="w-24 rounded-lg border border-white/15 bg-black/40 px-3 py-1.5 text-white text-sm outline-none focus:border-amber-400 transition-colors disabled:opacity-50"
+                        />
+                        <span className="text-[11px] text-white/60">
+                          cuotas mensuales se van a generar
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </ErrorBanner>
+              )}
+            </AnimatePresence>
+
             <div className="grid gap-2">
               <label className="text-xs font-semibold text-white/90">Nuevo número (opcional)</label>
               <input
@@ -121,64 +204,16 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="grid gap-2">
-                <label className="text-xs font-semibold text-white/90">Nuevo precio cuota (opcional)</label>
-                <input
-                  value={nuevoPrecio}
-                  onChange={(e) => setNuevoPrecio(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
-                  placeholder="Ej: 12000"
-                  inputMode="decimal"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <label className="text-xs font-semibold text-white/90">Nueva fecha (primer pago)</label>
-                <input
-                  type="date"
-                  value={nuevaFecha}
-                  onChange={(e) => setNuevaFecha(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="mt-1 rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-extrabold text-white">🚛 Mantener grúa en la renovación</div>
-                  <div className="text-xs text-white/65 mt-1">
-                    Si está activado, la póliza nueva queda con el servicio de grúa también (se transfiere la adhesión).
-                    Si lo apagás, la póliza nueva se renueva sin grúa.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => setTransferirGrua((v) => !v)}
-                  className={cx(
-                    "relative inline-flex h-9 w-[74px] items-center rounded-full border transition shrink-0",
-                    transferirGrua
-                      ? "bg-emerald-400/25 border-emerald-300/30"
-                      : "bg-white/10 border-white/15",
-                    submitting ? "opacity-70" : "hover:bg-white/15"
-                  )}
-                  aria-pressed={transferirGrua}
-                  title={transferirGrua ? "Se mantiene la grúa" : "No se transfiere la grúa"}
-                >
-                  <span
-                    className={cx(
-                      "absolute left-1 top-1 h-7 w-7 rounded-full shadow transition",
-                      transferirGrua ? "translate-x-[38px] bg-emerald-200" : "translate-x-0 bg-white/70"
-                    )}
-                  />
-                  <span className="sr-only">Transferir grúa</span>
-                  <span className="w-full text-[11px] font-extrabold text-white/80 text-center">
-                    {transferirGrua ? "SI" : "NO"}
-                  </span>
-                </button>
+            <div className="grid gap-2">
+              <label className="text-xs font-semibold text-white/90">Nueva fecha (primer pago)</label>
+              <input
+                type="date"
+                value={nuevaFecha}
+                onChange={(e) => setNuevaFecha(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
+              />
+              <div className="text-xs text-white/60">
+                Por defecto: el mismo día que vence la última cuota de la póliza actual.
               </div>
             </div>
 
@@ -186,7 +221,7 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <HiExclamation className="mt-0.5 shrink-0 text-xl text-amber-400" />
               <div className="text-[13px] leading-relaxed text-amber-100/90">
                 <strong className="block text-sm font-bold text-amber-400 mb-0.5">Atención</strong>
-                La póliza actual pasará a estado <strong>FINALIZADA</strong> y se creará una nueva versión <strong>ACTIVA</strong>. 
+                La póliza actual pasará a estado <strong>FINALIZADA</strong> y se creará una nueva versión <strong>ACTIVA</strong>.
                 <br />
                 <span className="mt-1 block opacity-90">No te olvides de emitir/subir la póliza en la página web de la aseguradora si corresponde.</span>
               </div>
@@ -205,21 +240,19 @@ export default function RenovacionModal({ open, item, onClose, onSubmit, submitt
               <button
                 className={cx(
                   "rounded-xl px-5 py-2 font-extrabold text-black transition-colors shadow-md",
-                  submitting ? "bg-white/40 shadow-none" : "bg-emerald-400 hover:bg-emerald-300 shadow-emerald-500/20"
+                  submitting || !canSubmit
+                    ? "bg-white/40 shadow-none cursor-not-allowed"
+                    : "bg-emerald-400 hover:bg-emerald-300 shadow-emerald-500/20"
                 )}
-                disabled={submitting}
+                disabled={submitting || !canSubmit}
                 type="button"
-                onClick={() =>
-                  onSubmit({
-                    nuevoNumero: (nuevoNumero || "").trim() || undefined,
-                    nuevaCompania: (nuevaCompania || "").trim() || undefined,
-                    nuevoPrecio: nuevoPrecio === "" ? undefined : Number(nuevoPrecio),
-                    nuevaFecha: nuevaFecha || undefined,
-                    transferir_grua: transferirGrua ? 1 : 0,
-                  })
-                }
+                onClick={handleSubmit}
               >
-                {submitting ? "Procesando..." : "Renovar póliza"}
+                {submitting
+                  ? "Procesando..."
+                  : necesitaOverride
+                  ? "Reintentar renovación"
+                  : "Renovar póliza"}
               </button>
             </div>
           </div>

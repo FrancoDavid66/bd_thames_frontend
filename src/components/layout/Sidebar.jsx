@@ -9,7 +9,7 @@ import {
   HiChevronDown, HiRefresh,
   HiClock, HiBan, HiTruck, HiCash, HiReceiptTax,
   HiShieldCheck, HiX, HiCog,
-  HiViewGrid, HiBadgeCheck
+  HiViewGrid
 } from "react-icons/hi";
 import ThemeToggle from "./ThemeToggle";
 
@@ -32,7 +32,6 @@ const ICON_MAP = {
   shield:      HiShieldCheck,
   cog:         HiCog,
   grid:        HiViewGrid,
-  badge:       HiBadgeCheck,
 };
 
 export default function Sidebar({
@@ -43,8 +42,8 @@ export default function Sidebar({
   cuponVencidas = 0,
   renovacionesPendientes = 0,
   bajasPendientes = 0,
-  siniestrosAbiertos = 0,
-  pagosAtencion = 0,
+  // 🚀 NUEVO: Badge de servicios fijos (vencidos + por vencer ≤3d)
+  serviciosAlertas = 0,
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -66,6 +65,23 @@ export default function Sidebar({
       ]
     }];
 
+    // 🚀 Items base de Finanzas
+    const finanzasItems = [
+      { to: "/recaudacion", label: "Recaudación", icon: "cash" },
+      { to: "/balanzes",    label: "Balances",    icon: "db" },
+    ];
+
+    // 🚀 Solo agregamos Servicios Fijos si es admin
+    if (isAdmin) {
+      finanzasItems.push({
+        to: "/servicios",
+        label: "Servicios Fijos",
+        icon: "receipt",
+        badge: serviciosAlertas,
+        tone: "red",
+      });
+    }
+
     return [
       {
         title: "Principal", flat: true,
@@ -73,15 +89,8 @@ export default function Sidebar({
           { to: "/",           label: "Inicio",           icon: "home" },
           { to: "/solicitudes",label: "Solicitudes",       icon: "clipboard", badge: solTotal },
           { to: "/clientes",   label: "Clientes",          icon: "users" },
-          { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "red" },
-        ]
-      },
-      {
-        title: "Gestión de Pagos", id: "gestionpagos", icon: "cash",
-        items: [
-          { to: "/pagos?tab=pagos",             label: "Cobranza",        icon: "money" },
-          { to: "/pagos?tab=historial_pagos",   label: "Verificar pagos", icon: "badge",  badge: pagosAtencion, tone: "red" },
-          { to: "/pagos?tab=historial_recordatorios", label: "Alertas",   icon: "clock" },
+          { to: "/siniestros", label: "Siniestros",        icon: "doc" },
+          { to: "/pagos",      label: "Gestión de Pagos",  icon: "cash" },
         ]
       },
       {
@@ -96,10 +105,7 @@ export default function Sidebar({
       },
       {
         title: "Finanzas", id: "finanzas", icon: "db",
-        items: [
-          { to: "/recaudacion", label: "Recaudación", icon: "cash" },
-          { to: "/balanzes",    label: "Balances",    icon: "db" },
-        ]
+        items: finanzasItems,
       },
       ...(isAdmin ? [{
         title: "Gerencia", id: "admin", icon: "shield",
@@ -114,16 +120,15 @@ export default function Sidebar({
         ]
       }] : [])
     ];
-  }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, siniestrosAbiertos, pagosAtencion]);
+  }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas]);
 
   const [open, setOpen] = useState({
-    gestionpagos: ["/pagos"].some(p => location.pathname.startsWith(p)),
     polizas:  ["/polizas", "/vencimientos", "/cuponeras"].some(p => location.pathname.startsWith(p)),
-    finanzas: ["/recaudacion", "/balanzes"].some(p => location.pathname.startsWith(p)),
+    finanzas: ["/recaudacion", "/balanzes", "/servicios"].some(p => location.pathname.startsWith(p)),
     admin:    ["/gruas", "/cotizaciones", "/marketing", "/estadisticas", "/competencia", "/geo", "/admin"].some(p => location.pathname.startsWith(p)),
   });
 
-  // Cerrar sidebar automáticamente al cambiar de ruta (sin llamar onClose manualmente)
+  // Cerrar sidebar automáticamente al cambiar de ruta
   useEffect(() => {
     if (isOpen) onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,7 +163,6 @@ export default function Sidebar({
         {/* Header */}
         <div className="px-4 py-4 border-b border-slate-800/60 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Logo / Avatar empresa */}
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shrink-0 shadow-lg shadow-primary-900/40">
               <span className="text-white font-black text-sm">T</span>
             </div>
@@ -239,14 +243,15 @@ export default function Sidebar({
                     <div className="flex items-center gap-2.5">
                       {(() => { const Icon = ICON_MAP[group.icon] || HiViewGrid; return <Icon className="w-5 h-5 shrink-0" />; })()}
                       <span>{group.title}</span>
+                      {/* Mini-badge en el header del grupo si hay alertas dentro */}
+                      <GroupBadge items={group.items} />
                     </div>
                     <motion.div
                       animate={{ rotate: open[group.id] ? 180 : 0 }}
                       transition={{ duration: 0.2 }}
                       className={`flex items-center justify-center h-6 w-6 rounded-lg transition-colors ${
-                        open[group.id] ? "bg-primary-600/30 text-primary-400" : "bg-slate-800 text-slate-500"
-                      }`}
-                    >
+                        open[group.id] ? "text-slate-300" : "text-slate-500 group-hover:text-slate-400"
+                      }`}>
                       <HiChevronDown className="w-4 h-4" />
                     </motion.div>
                   </button>
@@ -254,51 +259,32 @@ export default function Sidebar({
                   <AnimatePresence initial={false}>
                     {open[group.id] && (
                       <motion.div
-                        key="accordion"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
-                        <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-0.5 pb-1">
+                        <div className="pl-4 pt-1 space-y-0.5">
                           {group.items.map(item => {
                             const Icon = ICON_MAP[item.icon] || HiHome;
-                            // 🚀 Para items con query (?tab=...), comparar también el query
-                            const hasQuery = item.to.includes("?");
-                            const itemPath = hasQuery ? item.to.split("?")[0] : item.to;
-                            const itemTab  = hasQuery ? new URLSearchParams(item.to.split("?")[1]).get("tab") : null;
-                            const currentTab = new URLSearchParams(location.search).get("tab");
-                            const isActiveByQuery = hasQuery
-                              ? (location.pathname === itemPath && (currentTab || (group.items[0]?.to.includes(`tab=${itemTab}`) ? itemTab : null)) === itemTab)
-                              : null;
-
                             return (
-                              <NavLink
-                                key={item.to}
-                                to={item.to}
-                                end={item.to === "/polizas" || hasQuery}
-                                className={({ isActive }) => {
-                                  const active = isActiveByQuery !== null ? isActiveByQuery : isActive;
-                                  return `
-                                    group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[14px]
-                                    transition-all duration-150
-                                    ${active
-                                      ? "bg-primary-600/20 text-primary-400 font-semibold"
-                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium"
-                                    }
-                                  `;
-                                }}>
-                                {({ isActive }) => {
-                                  const active = isActiveByQuery !== null ? isActiveByQuery : isActive;
-                                  return (
-                                    <>
-                                      <Icon className={`w-4 h-4 shrink-0 ${active ? "text-primary-400" : "text-slate-500 group-hover:text-slate-400"}`} />
-                                      <span className="flex-1 truncate">{item.label}</span>
-                                      <Badge value={item.badge} tone={item.tone} />
-                                    </>
-                                  );
-                                }}
+                              <NavLink key={item.to} to={item.to}
+                                className={({ isActive }) => `
+                                  group flex items-center gap-3 px-3 py-2 rounded-lg text-sm
+                                  transition-all duration-150
+                                  ${isActive
+                                    ? "bg-primary-600/20 text-primary-400 font-semibold"
+                                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium"
+                                  }
+                                `}>
+                                {({ isActive }) => (
+                                  <>
+                                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary-400" : "text-slate-500 group-hover:text-slate-400"}`} />
+                                    <span className="flex-1 truncate">{item.label}</span>
+                                    <Badge value={item.badge} tone={item.tone} />
+                                  </>
+                                )}
                               </NavLink>
                             );
                           })}
@@ -331,6 +317,17 @@ function Badge({ value = 0, tone = "red" }) {
   return (
     <span className={`shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold ${cls}`}>
       {v}
+    </span>
+  );
+}
+
+// 🚀 Mini-badge en el header del grupo (suma de badges de sus items)
+function GroupBadge({ items }) {
+  const total = (items || []).reduce((acc, it) => acc + (Number(it.badge) || 0), 0);
+  if (total <= 0) return null;
+  return (
+    <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40">
+      {total}
     </span>
   );
 }

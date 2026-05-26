@@ -40,6 +40,10 @@ import CuentasCobroModal from "../components/pagos/CuentasCobroModal";
 import RecordatoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
 import HistorialRecordatorios from "../components/pagos/HistorialRecordatorios";
 import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal"; // 🚀 NUEVO COMPONENTE
+// 🚨 Sistema unificado de alertas del cliente (siniestros + póliza + cuotas + verificación)
+import AlertasClienteBadges from "../components/pagos/AlertasClienteBadges";
+import AlertasClienteModal from "../components/pagos/AlertasClienteModal";
+import AlertasClienteBanner from "../components/pagos/AlertasClienteBanner";
 
 import {
   fetchMediosCobro,
@@ -271,14 +275,23 @@ function computeClienteGroups(cuotasList) {
     const polId = pol?.id ?? null;
     const polLabel = uniquePolizaLabel(pol);
 
+    // 🚨 Extraemos el cliente_id real (puede venir como cliente.id o cliente_id flat)
+    const cliObj = c?.cliente || c?.poliza?.cliente || {};
+    const clienteId = cliObj?.id ?? cliObj?.cliente_id ?? c?.cliente_id ?? null;
+
     const hit =
       map.get(key) ||
       {
-        key, label, dni, cuotas: [], polizasSet: new Set(), polizasLabels: new Map(),
-        oficinasSet: new Set(), 
+        key, label, dni,
+        cliente_id: clienteId,   // 🚨 Para el banner de alertas
+        cuotas: [], polizasSet: new Set(), polizasLabels: new Map(),
+        oficinasSet: new Set(),
         total: 0, pagadas: 0, pendientes: 0, vencidas: 0, venceHoy: 0, porVencer: 0,
         totalMontoPendiente: 0, proximoVto: null,
       };
+
+    // Si el primer item no tuvo ID pero un item posterior sí, lo capturamos
+    if (!hit.cliente_id && clienteId) hit.cliente_id = clienteId;
 
     hit.cuotas.push(c);
     hit.total += 1;
@@ -607,6 +620,10 @@ const PagosPage = () => {
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
   const [showReporteModal, setShowReporteModal] = useState(false); // 🚀 NUEVO ESTADO
+
+  // 🚨 Aviso de alertas: el usuario debe confirmar "Entendido" para poder cobrar.
+  // Se resetea cada vez que cambia el cliente seleccionado.
+  const [avisoAlertasConfirmado, setAvisoAlertasConfirmado] = useState(false);
 
   const [cuotas, setCuotas] = useState([]);
   const [ocultarPagadas, setOcultarPagadas] = useState(false);
@@ -956,8 +973,15 @@ const PagosPage = () => {
     return (Array.isArray(cuotas) ? cuotas : []).filter((c) => clienteKeyFromCuota(c) === key);
   }, [cuotas, clienteSeleccionado]);
 
-  const abrirCliente = useCallback((g) => setClienteSeleccionado(g), []);
-  const cerrarClienteModal = useCallback(() => setClienteSeleccionado(null), []);
+  const abrirCliente = useCallback((g) => {
+    // 🚨 Al cambiar de cliente, el aviso de alertas vuelve a aparecer
+    setAvisoAlertasConfirmado(false);
+    setClienteSeleccionado(g);
+  }, []);
+  const cerrarClienteModal = useCallback(() => {
+    setClienteSeleccionado(null);
+    setAvisoAlertasConfirmado(false);
+  }, []);
 
   const setModo = useCallback((m) => {
     setHpModo(m);
@@ -1200,6 +1224,10 @@ const PagosPage = () => {
                               <div className="min-w-0">
                                 <div className="text-sm sm:text-base font-semibold text-slate-100 truncate flex items-center gap-2 flex-wrap">
                                   {g.label}
+                                  {/* 🚨 Badges múltiples: siniestros + póliza + atraso + verificación */}
+                                  {g.cliente_id && (
+                                    <AlertasClienteBadges clienteId={g.cliente_id} cuotas={g.cuotas} max={4} />
+                                  )}
                                   {isWebAdmin && g.oficinasLabel && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                                       {g.oficinasLabel}
@@ -1300,6 +1328,16 @@ const PagosPage = () => {
                     </div>
 
                     <div className="p-0 flex-1 overflow-y-auto custom-scrollbar">
+                      {/* 🚨 BANNER INLINE UNIFICADO — recordatorio mientras cobra */}
+                      {clienteSeleccionado?.cliente_id && avisoAlertasConfirmado && (
+                        <div className="px-4 sm:px-6 pt-4">
+                          <AlertasClienteBanner
+                            clienteId={clienteSeleccionado.cliente_id}
+                            cuotas={visibleCuotasEnModal}
+                          />
+                        </div>
+                      )}
+
                       <PagosList
                         cuotas={visibleCuotasEnModal}
                         actualizarCuotas={handleActualizarCuotas}
@@ -1314,6 +1352,18 @@ const PagosPage = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* 🚨 MODAL UNIFICADO DE ALERTAS
+                Aparece al abrir el modal del cliente, muestra TODAS las alertas
+                (siniestros + póliza + cuotas atrasadas + verificación). El usuario
+                debe apretar "Entendido" para poder cobrar. */}
+            <AlertasClienteModal
+              isOpen={!!clienteSeleccionado && !avisoAlertasConfirmado}
+              clienteId={clienteSeleccionado?.cliente_id}
+              clienteNombre={clienteSeleccionado?.label}
+              cuotas={visibleCuotasEnModal}
+              onConfirm={() => setAvisoAlertasConfirmado(true)}
+            />
           </motion.div>
         ) : tab === "historial_pagos" ? (
           <motion.div

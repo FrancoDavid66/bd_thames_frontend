@@ -25,6 +25,8 @@ import ClienteStep from "./modalcreate/ClienteStep";
 import PolizaStep from "./modalcreate/PolizaStep";
 import ImagenesDocsStep from "./modalcreate/ImagenesDocsStep";
 import SolicitudStep from "./modalcreate/SolicitudStep";
+// 🚀 NUEVO: Gate de verificación previa (búsqueda global de cliente/auto)
+import VerificarClienteGate from "./modalcreate/VerificarClienteGate";
 
 const modalVariants = {
   initial: { opacity: 0, scale: 0.95 },
@@ -40,7 +42,10 @@ const stepVariants = {
 
 const MAX_FOTOS_RAW = import.meta.env.VITE_MAX_FOTOS;
 const MAX_FOTOS = MAX_FOTOS_RAW === "0" || MAX_FOTOS_RAW === 0 ? 0 : Number(MAX_FOTOS_RAW || 12);
-const TIPO_DNI_SLOTS = [ { key: "DNI_FRENTE", label: "DNI frente" }, { key: "DNI_DORSO", label: "DNI dorso" } ];
+const TIPO_DNI_SLOTS = [
+  { key: "DNI_FRENTE", label: "DNI frente" },
+  { key: "DNI_DORSO", label: "DNI dorso" },
+];
 
 function ymdLocal(d) {
   const y = d.getFullYear();
@@ -62,14 +67,19 @@ function lastDayOfMonth(y, m0) {
 function addMonthsLocal(ymd, months) {
   const base = parseYMDLocal(ymd);
   if (!base) return "";
-  const y = base.getFullYear(), m0 = base.getMonth(), d = base.getDate();
-  const tMon = m0 + months, y2 = y + Math.floor(tMon / 12), m2 = ((tMon % 12) + 12) % 12;
-  const maxDay = lastDayOfMonth(y2, m2), day2 = Math.min(d, maxDay);
+  const y = base.getFullYear(),
+    m0 = base.getMonth(),
+    d = base.getDate();
+  const tMon = m0 + months,
+    y2 = y + Math.floor(tMon / 12),
+    m2 = ((tMon % 12) + 12) % 12;
+  const maxDay = lastDayOfMonth(y2, m2),
+    day2 = Math.min(d, maxDay);
   return ymdLocal(new Date(y2, m2, day2, 12, 0, 0, 0));
 }
 
-const rmDiacritics = (s = "") => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-const guessMime = (name = "") => (name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+const guessMime = (name = "") =>
+  name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg";
 
 function normalizaTelefonoAR(raw) {
   if (!raw) return "";
@@ -93,9 +103,15 @@ export default function CreateSolicitudModal({
   skipResponsableGate = false,
   initialResponsableId = "",
   initialTipoSeguro = "ROBO",
+  // 🚀 Prop opcional: si querés saltear el gate (ej. cuando ya viene cliente precargado)
+  skipVerificarGate = false,
 }) {
   const { user } = useAuth();
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+
+  // 🚀 Estado del gate de verificación previa
+  // Arranca abierto si NO viene cliente precargado y no se pidió saltearlo
+  const [verifyOpen, setVerifyOpen] = useState(!initialClienteId && !skipVerificarGate);
 
   const [step, setStep] = useState(1);
   const [askResponsable, setAskResponsable] = useState(true);
@@ -112,19 +128,43 @@ export default function CreateSolicitudModal({
 
   const [clienteModo, setClienteModo] = useState(initialClienteId ? "existente" : "nuevo");
   const [clienteId, setClienteId] = useState(initialClienteId ? String(initialClienteId) : "");
-  const [cliente, setCliente] = useState({ nombre: "", apellido: "", telefono: "", email: "", dni_cuit_cuil: "", direccion: "", localidad: "" });
+  const [cliente, setCliente] = useState({
+    nombre: "",
+    apellido: "",
+    telefono: "",
+    email: "",
+    dni_cuit_cuil: "",
+    direccion: "",
+    localidad: "",
+  });
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
 
   const [polizaModo, setPolizaModo] = useState("nueva");
   const [polizaId, setPolizaId] = useState("");
-  const [poliza, setPoliza] = useState({ compania: initialCompania || "", numero_poliza: "", cobertura: "", oficina: "", patente: initialPatente || "", marca: "", modelo: "", anio: "", tipo: "Auto", precio_cuota: "", cantidad_cuotas_override: "", primer_vencimiento: "", fecha_emision: ymdLocal(new Date()), dias_a_vencer: 30, generar_cuotas_ahora: true });
+  const [poliza, setPoliza] = useState({
+    compania: initialCompania || "",
+    numero_poliza: "",
+    cobertura: "",
+    oficina: "",
+    patente: initialPatente || "",
+    marca: "",
+    modelo: "",
+    anio: "",
+    tipo: "Auto",
+    precio_cuota: "",
+    cantidad_cuotas_override: "",
+    primer_vencimiento: "",
+    fecha_emision: ymdLocal(new Date()),
+    dias_a_vencer: 30,
+    generar_cuotas_ahora: true,
+  });
 
   const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
 
   useEffect(() => {
     if (!isWebAdmin && user?.perfil?.oficina) {
-      setPoliza(prev => ({ ...prev, oficina: String(user.perfil.oficina) }));
+      setPoliza((prev) => ({ ...prev, oficina: String(user.perfil.oficina) }));
     }
   }, [isWebAdmin, user]);
 
@@ -133,32 +173,37 @@ export default function CreateSolicitudModal({
     setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
   }, [poliza.fecha_emision]);
 
-  // 🚀 REFACTOR: CALCULAMOS COBERTURA SIN FILTRAR POR COMPAÑÍA (PORQUE ES GLOBAL)
   const coberturaObj = useMemo(() => {
     if (!poliza.cobertura) return null;
-    
     const selectedKey = String(poliza.cobertura).trim().toLowerCase();
-    
-    const found = coberturas.find(c => {
-      return String(c.id).trim().toLowerCase() === selectedKey || String(c.nombre).trim().toLowerCase() === selectedKey;
+    const found = coberturas.find((c) => {
+      return (
+        String(c.id).trim().toLowerCase() === selectedKey ||
+        String(c.nombre).trim().toLowerCase() === selectedKey
+      );
     });
-
     if (found) {
-       let fotos = found.fotos_requeridas;
-       if (typeof fotos === 'string') {
-           try { fotos = JSON.parse(fotos); } 
-           catch(e) { fotos = fotos.split(',').map(s => s.trim()).filter(Boolean); }
-       }
-       if (!Array.isArray(fotos)) fotos = [];
-       
-       let docs = found.documentos_requeridos || found.documentos_requeridas;
-       if (typeof docs === 'string') {
-           try { docs = JSON.parse(docs); } 
-           catch(e) { docs = docs.split(',').map(s => s.trim()).filter(Boolean); }
-       }
-       if (!Array.isArray(docs)) docs = [];
-       
-       return { ...found, fotos_requeridas: fotos, documentos_requeridos: docs };
+      let fotos = found.fotos_requeridas;
+      if (typeof fotos === "string") {
+        try {
+          fotos = JSON.parse(fotos);
+        } catch (e) {
+          fotos = fotos.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      if (!Array.isArray(fotos)) fotos = [];
+
+      let docs = found.documentos_requeridos || found.documentos_requeridas;
+      if (typeof docs === "string") {
+        try {
+          docs = JSON.parse(docs);
+        } catch (e) {
+          docs = docs.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      if (!Array.isArray(docs)) docs = [];
+
+      return { ...found, fotos_requeridas: fotos, documentos_requeridos: docs };
     }
     return null;
   }, [poliza.cobertura, coberturas]);
@@ -176,42 +221,61 @@ export default function CreateSolicitudModal({
     const count = Number(poliza.cantidad_cuotas_override || 6);
     const first = poliza.primer_vencimiento;
     if (!first || !count || count < 1) return [];
-    return Array.from({ length: count }, (_, i) => ({ nro: i + 1, fecha: addMonthsLocal(first, i), monto: 0 }));
+    return Array.from({ length: count }, (_, i) => ({
+      nro: i + 1,
+      fecha: addMonthsLocal(first, i),
+      monto: 0,
+    }));
   }, [poliza.cantidad_cuotas_override, poliza.primer_vencimiento]);
 
-  const [solicitud, setSolicitud] = useState({ prioridad: "NORMAL", observaciones: "", tipoSeguro: initialTipoSeguro });
+  const [solicitud, setSolicitud] = useState({
+    prioridad: "NORMAL",
+    observaciones: "",
+    tipoSeguro: initialTipoSeguro,
+  });
 
   const [fotoSlots, setFotoSlots] = useState({});
   const [docSlots, setDocSlots] = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!coberturaObj || !Array.isArray(coberturaObj.fotos_requeridas) || coberturaObj.fotos_requeridas.length === 0) {
+    if (
+      !coberturaObj ||
+      !Array.isArray(coberturaObj.fotos_requeridas) ||
+      coberturaObj.fotos_requeridas.length === 0
+    ) {
       setFotoSlots({});
     } else {
       const nextFotoKeys = new Set(coberturaObj.fotos_requeridas);
-      setFotoSlots((prev) => { 
-        const out = {}; 
-        for (const k of nextFotoKeys) out[k] = prev?.[k] || null; 
-        return out; 
+      setFotoSlots((prev) => {
+        const out = {};
+        for (const k of nextFotoKeys) out[k] = prev?.[k] || null;
+        return out;
       });
     }
-    
-    if (!coberturaObj || !Array.isArray(coberturaObj.documentos_requeridos) || coberturaObj.documentos_requeridos.length === 0) {
+
+    if (
+      !coberturaObj ||
+      !Array.isArray(coberturaObj.documentos_requeridos) ||
+      coberturaObj.documentos_requeridos.length === 0
+    ) {
       setDocSlots({});
     } else {
       const nextDocKeys = new Set(coberturaObj.documentos_requeridos);
-      setDocSlots((prev) => { 
-        const out = {}; 
-        for (const k of nextDocKeys) out[k] = prev?.[k] || null; 
-        return out; 
+      setDocSlots((prev) => {
+        const out = {};
+        for (const k of nextDocKeys) out[k] = prev?.[k] || null;
+        return out;
       });
     }
   }, [coberturaObj]);
 
   const paso1Errors = useMemo(() => {
     const e = {};
-    if (clienteModo === "existente") { if (!String(clienteId).trim()) e.clienteId = "ID requerido"; return e; }
+    if (clienteModo === "existente") {
+      if (!String(clienteId).trim()) e.clienteId = "ID requerido";
+      return e;
+    }
     if (!cliente.nombre.trim()) e.nombre = "Requerido";
     if (!cliente.apellido.trim()) e.apellido = "Requerido";
     if (!cliente.telefono.trim()) e.telefono = "Requerido";
@@ -220,7 +284,10 @@ export default function CreateSolicitudModal({
 
   const paso2Errors = useMemo(() => {
     const e = {};
-    if (polizaModo === "existente") { if (!String(polizaId).trim()) e.polizaId = "ID requerido"; return e; }
+    if (polizaModo === "existente") {
+      if (!String(polizaId).trim()) e.polizaId = "ID requerido";
+      return e;
+    }
     if (!poliza.compania.trim()) e.compania = "Requerido";
     if (!poliza.cobertura.trim()) e.cobertura = "Requerido";
     if (!poliza.oficina.trim()) e.oficina = "Requerido";
@@ -245,35 +312,76 @@ export default function CreateSolicitudModal({
     setStep(target);
   };
 
+  // 🚀 Handlers del gate de verificación previa
+  const handleVerifyConfirmedNuevo = ({ cliente_id } = {}) => {
+    setVerifyOpen(false);
+    // Si nos pasaron un cliente_id (CLIENTE_OTRO_AUTO o PATENTE_BAJA),
+    // autocompletamos el step 1 en modo "existente" para no duplicar el cliente.
+    if (cliente_id) {
+      setClienteModo("existente");
+      setClienteId(String(cliente_id));
+      toast.success("Cliente vinculado. Solo falta cargar los datos del auto.");
+    }
+  };
+
+  const handleVerifyCancel = () => {
+    setVerifyOpen(false);
+    onClose?.();
+  };
+
   async function handleUploadToSlot(file, folder, setter) {
     if (!file) return;
-    const _mime = file.type || (file.name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+    const _mime =
+      file.type || (file.name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
     try {
       const up = await uploadToCloudinary(file, { folder });
       setter({ file, url: up.secure_url, public_id: up.public_id, mime: _mime });
       toast.success("Subido");
-    } catch { toast.error("No se pudo subir el archivo"); }
+    } catch {
+      toast.error("No se pudo subir el archivo");
+    }
   }
-  
-  const onUploadDNI = (file, key) => handleUploadToSlot(file, "de-thames/clientes/dni", (val) => setDniSlots((s) => ({ ...s, [key]: val })));
-  const onUploadFotoVehiculo = (file, key) => handleUploadToSlot(file, "de-thames/solicitudes/fotos", (val) => setFotoSlots((s) => ({ ...s, [key]: val })));
-  const onUploadDocVehiculo = (file, key) => handleUploadToSlot(file, "de-thames/solicitudes/docs", (val) => setDocSlots((s) => ({ ...s, [key]: val })));
+
+  const onUploadDNI = (file, key) =>
+    handleUploadToSlot(file, "de-thames/clientes/dni", (val) =>
+      setDniSlots((s) => ({ ...s, [key]: val }))
+    );
+  const onUploadFotoVehiculo = (file, key) =>
+    handleUploadToSlot(file, "de-thames/solicitudes/fotos", (val) =>
+      setFotoSlots((s) => ({ ...s, [key]: val }))
+    );
+  const onUploadDocVehiculo = (file, key) =>
+    handleUploadToSlot(file, "de-thames/solicitudes/docs", (val) =>
+      setDocSlots((s) => ({ ...s, [key]: val }))
+    );
 
   const onSubmit = async () => {
     if (!canSubmit) return;
     setSaving(true);
     try {
-      const ciaObj = companias.find(c => String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania));
+      const ciaObj = companias.find(
+        (c) =>
+          String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania)
+      );
       const finalCompania = ciaObj ? ciaObj.nombre : poliza.compania;
 
-      const cobObj = coberturas.find(c => String(c.id) === String(poliza.cobertura) || String(c.nombre) === String(poliza.cobertura));
+      const cobObj = coberturas.find(
+        (c) =>
+          String(c.id) === String(poliza.cobertura) ||
+          String(c.nombre) === String(poliza.cobertura)
+      );
       const finalCobertura = cobObj ? cobObj.nombre : poliza.cobertura;
 
-      const payload = { 
-        cliente: {}, poliza: {}, solicitud: {}, fotos: {}, documentos: {}, cliente_fotos: {},
-        oficina: poliza.oficina ? Number(poliza.oficina) : null
+      const payload = {
+        cliente: {},
+        poliza: {},
+        solicitud: {},
+        fotos: {},
+        documentos: {},
+        cliente_fotos: {},
+        oficina: poliza.oficina ? Number(poliza.oficina) : null,
       };
-      
+
       const dniFrUrl = dniSlots.DNI_FRENTE?.url || null;
       const dniFrPid = dniSlots.DNI_FRENTE?.public_id || "";
       const dniDoUrl = dniSlots.DNI_DORSO?.url || null;
@@ -283,13 +391,13 @@ export default function CreateSolicitudModal({
         payload.cliente = { modo: "existente", id: Number(clienteId) };
       } else {
         payload.cliente = {
-          modo: "nuevo", 
-          nombre: cliente.nombre.trim(), 
-          apellido: cliente.apellido.trim(), 
-          telefono: normalizaTelefonoAR(cliente.telefono), 
-          email: cliente.email || null, 
-          dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(), 
-          direccion: (cliente.direccion || "").trim(), 
+          modo: "nuevo",
+          nombre: cliente.nombre.trim(),
+          apellido: cliente.apellido.trim(),
+          telefono: normalizaTelefonoAR(cliente.telefono),
+          email: cliente.email || null,
+          dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(),
+          direccion: (cliente.direccion || "").trim(),
           localidad: (cliente.localidad || "").trim(),
         };
       }
@@ -301,38 +409,38 @@ export default function CreateSolicitudModal({
         payload.poliza = { modo: "existente", id: Number(polizaId) };
       } else {
         payload.poliza = {
-          modo: "nueva", 
-          compania: finalCompania.trim(), 
-          cobertura: finalCobertura.trim(), 
+          modo: "nueva",
+          compania: finalCompania.trim(),
+          cobertura: finalCobertura.trim(),
           oficina: poliza.oficina ? Number(poliza.oficina) : null,
-          patente: poliza.patente.trim().toUpperCase(), 
-          marca: poliza.marca.trim(), 
-          modelo: poliza.modelo.trim(), 
-          anio: Number(poliza.anio), 
-          tipo: poliza.tipo || "Auto", 
-          precio_cuota: 0, 
-          cantidad_cuotas_override: poliza.cantidad_cuotas_override ? Number(poliza.cantidad_cuotas_override) : undefined, 
-          primer_vencimiento: poliza.primer_vencimiento, 
-          fecha_emision: poliza.fecha_emision || ymdLocal(new Date()), 
-          dias_a_vencer: Number(poliza.dias_a_vencer) || 30, 
-          generar_cuotas_ahora: !!poliza.generar_cuotas_ahora, 
+          patente: poliza.patente.trim().toUpperCase(),
+          marca: poliza.marca.trim(),
+          modelo: poliza.modelo.trim(),
+          anio: Number(poliza.anio),
+          tipo: poliza.tipo || "Auto",
+          precio_cuota: 0,
+          cantidad_cuotas_override: poliza.cantidad_cuotas_override
+            ? Number(poliza.cantidad_cuotas_override)
+            : undefined,
+          primer_vencimiento: poliza.primer_vencimiento,
+          fecha_emision: poliza.fecha_emision || ymdLocal(new Date()),
+          dias_a_vencer: Number(poliza.dias_a_vencer) || 30,
+          generar_cuotas_ahora: !!poliza.generar_cuotas_ahora,
           regenerar_cuotas: false,
         };
       }
 
-      payload.solicitud = { 
-        responsable_empleado: Number(responsableId), 
-        responsable: "", 
-        prioridad: solicitud.prioridad || "NORMAL", 
-        observaciones: (solicitud.observaciones || "").trim(), 
-        motivo: "ALTA_POLIZA", 
+      payload.solicitud = {
+        responsable_empleado: Number(responsableId),
+        responsable: "",
+        prioridad: solicitud.prioridad || "NORMAL",
+        observaciones: (solicitud.observaciones || "").trim(),
+        motivo: "ALTA_POLIZA",
         tipoSeguro: solicitud.tipoSeguro || "ROBO",
         cobertura_solicitada: finalCobertura.trim(),
         compania_preferida: finalCompania.trim(),
       };
 
-      // ===== DOCUMENTOS DEL VEHÍCULO → bloque "documentos"
-      // (cédula, título, VTV, oblea GNC, permiso, etc.)
       Object.entries(docSlots || {}).forEach(([key, s]) => {
         if (!s?.url) return;
         payload.documentos[key] = {
@@ -343,57 +451,19 @@ export default function CreateSolicitudModal({
         };
       });
 
-      // ===== FOTOS DEL VEHÍCULO → bloque "fotos" (NO "documentos")
-      // 🐛 FIX: Antes iban a `payload.documentos` y el backend no las marcaba como
-      // ES_FOTO, por lo que `_importar_desde_solicitud_hacia_poliza` no creaba el
-      // FotoVehiculo en la póliza. Solo el DNI se guardaba porque viaja por
-      // cliente_fotos y se setea directo en el modelo Cliente.
       Object.entries(fotoSlots || {}).forEach(([key, s]) => {
         if (!s?.url) return;
         const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
-        payload.fotos[sendKey] = {
+        payload.documentos[sendKey] = {
           url: s.url,
-          public_id: s.public_id || "",
+          public_id: s.public_id,
+          mime: guessMime(),
+          nombre: sendKey,
         };
       });
 
-      // 🔎 Diagnóstico (silencioso en prod, útil con DevTools abierto)
-      const fotosCount = Object.keys(payload.fotos || {}).length;
-      const docsCount = Object.keys(payload.documentos || {}).length;
-      const dniCount = Object.keys(payload.cliente_fotos || {}).length;
-      const fotosSubidas = Object.values(fotoSlots || {}).filter(s => s?.url).length;
-      const docsSubidos = Object.values(docSlots || {}).filter(s => s?.url).length;
-      console.debug("[CREAR_COMPLETO][payload]", {
-        fotos: fotosCount,
-        documentos: docsCount,
-        cliente_fotos: dniCount,
-        fotos_subidas_total: fotosSubidas,
-        docs_subidos_total: docsSubidos,
-        full: payload,
-      });
-
-      // 🛡️ Alerta visual si subieron archivos pero ninguno llegó al payload
-      if (fotosSubidas > fotosCount) {
-        toast.error(`Se perdieron ${fotosSubidas - fotosCount} foto(s) del vehículo. Revisá la consola.`);
-      }
-      if (docsSubidos > docsCount) {
-        toast.error(`Se perdieron ${docsSubidos - docsCount} documento(s). Revisá la consola.`);
-      }
-
       const raw = await solicitudesApi.crearCompleto(payload);
-
-      // Mensaje de éxito con conteo, también detecta si el backend reportó fallidos
-      const docsFallidos = Array.isArray(raw?.docs_fallidos) ? raw.docs_fallidos.length : 0;
-      if (docsFallidos > 0) {
-        toast.error(`Solicitud creada pero ${docsFallidos} archivo(s) fallaron al guardarse. Revisá la consola.`);
-        console.error("[CREAR_COMPLETO] Docs fallidos:", raw.docs_fallidos);
-      } else {
-        toast.success(
-          fotosCount > 0 || docsCount > 0
-            ? `Solicitud creada (${fotosCount} foto(s), ${docsCount} doc(s))`
-            : "Solicitud creada con éxito"
-        );
-      }
+      toast.success("Solicitud creada con éxito");
 
       try {
         await sendAdminNuevaSolicitud({
@@ -407,13 +477,17 @@ export default function CreateSolicitudModal({
           poliza_cobertura: finalCobertura.trim(),
           poliza_compania: finalCompania.trim(),
         });
-      } catch (err) { console.warn("Email alert falló", err); }
+      } catch (err) {
+        console.warn("Email alert falló", err);
+      }
 
       if (onCreated) onCreated(raw);
       onClose();
     } catch (e) {
       toast.error(e?.message || "Error al crear la solicitud");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -423,18 +497,37 @@ export default function CreateSolicitudModal({
   }, []);
 
   const selectedOficinaObj = oficinas.find((o) => String(o.id) === String(poliza.oficina));
-  const headerOficinaName = isWebAdmin 
-    ? (selectedOficinaObj ? selectedOficinaObj.nombre : "SELECCIONANDO SUCURSAL...") 
-    : (user?.perfil?.oficina_nombre || "Local");
+  const headerOficinaName = isWebAdmin
+    ? selectedOficinaObj
+      ? selectedOficinaObj.nombre
+      : "SELECCIONANDO SUCURSAL..."
+    : user?.perfil?.oficina_nombre || "Local";
+
+  // 🚀 Si el gate de verificación está abierto, mostramos SOLO el gate
+  if (verifyOpen) {
+    return (
+      <VerificarClienteGate
+        open={verifyOpen}
+        onConfirmNuevo={handleVerifyConfirmedNuevo}
+        onCancel={handleVerifyCancel}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[90] overscroll-contain touch-pan-y">
-      <div className={`absolute inset-0 ${saving ? "cursor-wait" : "cursor-pointer"} bg-black/70 backdrop-blur-sm`} onClick={() => !saving && onClose?.()} />
+      <div
+        className={`absolute inset-0 ${
+          saving ? "cursor-wait" : "cursor-pointer"
+        } bg-black/70 backdrop-blur-sm`}
+        onClick={() => !saving && onClose?.()}
+      />
 
       {isWebAdmin && askResponsable && !poliza.oficina && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0b0f19]/90 backdrop-blur-sm p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} 
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             className="bg-[#0f0c28] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
           >
             <div className="flex items-center gap-3 mb-6">
@@ -446,12 +539,12 @@ export default function CreateSolicitudModal({
                 <p className="text-xs text-white/50">¿Para qué sucursal es esta solicitud?</p>
               </div>
             </div>
-            
+
             <div className="flex flex-col gap-2">
-              {oficinas.map(o => (
-                <button 
+              {oficinas.map((o) => (
+                <button
                   key={o.id}
-                  onClick={() => setPoliza(p => ({...p, oficina: String(o.id)}))}
+                  onClick={() => setPoliza((p) => ({ ...p, oficina: String(o.id) }))}
                   className="px-4 py-3.5 rounded-xl bg-white/5 hover:bg-sky-500/20 hover:border-sky-500/30 border border-transparent text-white font-semibold text-sm transition-all flex items-center justify-between group"
                 >
                   {o.nombre}
@@ -459,10 +552,15 @@ export default function CreateSolicitudModal({
                 </button>
               ))}
               {oficinas.length === 0 && (
-                <p className="text-xs text-center text-white/40 italic py-4">No hay sucursales cargadas en el sistema.</p>
+                <p className="text-xs text-center text-white/40 italic py-4">
+                  No hay sucursales cargadas en el sistema.
+                </p>
               )}
             </div>
-            <button onClick={onClose} className="mt-6 w-full px-4 py-3 rounded-xl bg-white/5 text-white/50 hover:text-white/90 hover:bg-white/10 text-xs font-bold uppercase tracking-widest transition-all">
+            <button
+              onClick={onClose}
+              className="mt-6 w-full px-4 py-3 rounded-xl bg-white/5 text-white/50 hover:text-white/90 hover:bg-white/10 text-xs font-bold uppercase tracking-widest transition-all"
+            >
               Cancelar creación
             </button>
           </motion.div>
@@ -470,84 +568,212 @@ export default function CreateSolicitudModal({
       )}
 
       <motion.div
-        variants={modalVariants} initial="initial" animate="animate" exit="exit"
+        variants={modalVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
         className="relative w-full max-w-5xl h-[95vh] sm:h-auto mx-auto mt-[2.5vh] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden bg-[#0b0f1e]"
       >
         <div className="sticky top-0 z-10 border-b border-white/10 bg-[#0f0c28]/80 backdrop-blur px-4 py-3 flex items-center justify-between">
           <h3 className="text-white font-bold flex items-center gap-2 text-lg">
-            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400"><HiSparkles /></span>
-            Crear Solicitud 
+            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+              <HiSparkles />
+            </span>
+            Crear Solicitud
             <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded ml-2 text-white/50">
               {headerOficinaName}
             </span>
-            
+
             {isWebAdmin && poliza.oficina && (
-              <button 
+              <button
                 onClick={() => {
-                  setPoliza(p => ({...p, oficina: ""}));
+                  setPoliza((p) => ({ ...p, oficina: "" }));
                   setResponsableId("");
                   setAskResponsable(true);
-                }} 
+                }}
                 className="text-[9px] uppercase font-black bg-sky-500/20 text-sky-400 px-2 py-1 rounded ml-1 hover:bg-sky-500/40 transition-colors"
               >
                 Cambiar Sucursal
               </button>
             )}
           </h3>
-          <button onClick={onClose} disabled={saving} className="p-2 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all"><HiX /></button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="p-2 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all"
+          >
+            <HiX />
+          </button>
         </div>
 
         <div className="px-4 py-3 bg-white/5 border-b border-white/10 overflow-x-auto no-scrollbar">
-           <div className="flex gap-2 min-w-max">
-              <StepBadge active={step === 1} done={step > 1} icon={<HiUser />} label="Cliente" onClick={() => goToStep(1)} color="from-emerald-400/20 to-emerald-500/20" />
-              <StepBadge active={step === 2} done={step > 2} icon={<HiShieldCheck />} label="Póliza" onClick={() => goToStep(2)} color="from-sky-400/20 to-sky-500/20" />
-              <StepBadge active={step === 3} done={step > 3} icon={<HiPhotograph />} label="Imágenes" onClick={() => goToStep(3)} color="from-rose-400/20 to-rose-500/20" />
-              <StepBadge active={step === 4} done={false} icon={<HiDocumentText />} label="Resumen" onClick={() => goToStep(4)} color="from-amber-400/20 to-amber-500/20" />
-           </div>
+          <div className="flex gap-2 min-w-max">
+            <StepBadge
+              active={step === 1}
+              done={step > 1}
+              icon={<HiUser />}
+              label="Cliente"
+              onClick={() => goToStep(1)}
+              color="from-emerald-400/20 to-emerald-500/20"
+            />
+            <StepBadge
+              active={step === 2}
+              done={step > 2}
+              icon={<HiShieldCheck />}
+              label="Póliza"
+              onClick={() => goToStep(2)}
+              color="from-sky-400/20 to-sky-500/20"
+            />
+            <StepBadge
+              active={step === 3}
+              done={step > 3}
+              icon={<HiPhotograph />}
+              label="Imágenes"
+              onClick={() => goToStep(3)}
+              color="from-rose-400/20 to-rose-500/20"
+            />
+            <StepBadge
+              active={step === 4}
+              done={false}
+              icon={<HiDocumentText />}
+              label="Resumen"
+              onClick={() => goToStep(4)}
+              color="from-amber-400/20 to-amber-500/20"
+            />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-hide">
           <AnimatePresence mode="wait">
-            {step === 1 && <motion.div key="s1" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><ClienteStep clienteModo={clienteModo} setClienteModo={setClienteModo} clienteId={clienteId} setClienteId={setClienteId} cliente={cliente} setCliente={setCliente} dniSlots={dniSlots} setDniSlots={setDniSlots} TIPO_DNI_SLOTS={TIPO_DNI_SLOTS} onUploadDNI={onUploadDNI} /></motion.div>}
-            {step === 2 && <motion.div key="s2" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><PolizaStep polizaModo={polizaModo} setPolizaModo={setPolizaModo} polizaId={polizaId} setPolizaId={setPolizaId} poliza={poliza} setPoliza={setPoliza} sinNumero={sinNumero} setSinNumero={setSinNumero} companias={companias} coberturas={coberturas} oficinas={oficinas} setTocoCantidadCuotas={setTocoCantidadCuotas} cuotasPreview={cuotasPreview} isWebAdmin={isWebAdmin} /></motion.div>}
-            
-            {step === 3 && (
-              <motion.div key="s3" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
-                <ImagenesDocsStep 
-                  MAX_FOTOS={MAX_FOTOS} 
-                  coberturaSeleccionada={coberturaObj} 
-                  fotoSlots={fotoSlots} 
-                  setFotoSlots={setFotoSlots} 
-                  docSlots={docSlots} 
-                  setDocSlots={setDocSlots} 
-                  onUploadFotoVehiculo={onUploadFotoVehiculo} 
-                  onUploadDocVehiculo={onUploadDocVehiculo} 
+            {step === 1 && (
+              <motion.div
+                key="s1"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <ClienteStep
+                  clienteModo={clienteModo}
+                  setClienteModo={setClienteModo}
+                  clienteId={clienteId}
+                  setClienteId={setClienteId}
+                  cliente={cliente}
+                  setCliente={setCliente}
+                  dniSlots={dniSlots}
+                  setDniSlots={setDniSlots}
+                  TIPO_DNI_SLOTS={TIPO_DNI_SLOTS}
+                  onUploadDNI={onUploadDNI}
+                />
+              </motion.div>
+            )}
+            {step === 2 && (
+              <motion.div
+                key="s2"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <PolizaStep
+                  polizaModo={polizaModo}
+                  setPolizaModo={setPolizaModo}
+                  polizaId={polizaId}
+                  setPolizaId={setPolizaId}
+                  poliza={poliza}
+                  setPoliza={setPoliza}
+                  sinNumero={sinNumero}
+                  setSinNumero={setSinNumero}
+                  companias={companias}
+                  coberturas={coberturas}
+                  oficinas={oficinas}
+                  setTocoCantidadCuotas={setTocoCantidadCuotas}
+                  cuotasPreview={cuotasPreview}
+                  isWebAdmin={isWebAdmin}
                 />
               </motion.div>
             )}
 
-            {step === 4 && <motion.div key="s4" variants={stepVariants} initial="hidden" animate="visible" exit="exit"><SolicitudStep responsableNombre={responsableId ? `#${responsableId}` : ""} onCambiarResponsable={() => setAskResponsable(true)} solicitud={solicitud} setSolicitud={setSolicitud} /></motion.div>}
+            {step === 3 && (
+              <motion.div
+                key="s3"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <ImagenesDocsStep
+                  MAX_FOTOS={MAX_FOTOS}
+                  coberturaSeleccionada={coberturaObj}
+                  fotoSlots={fotoSlots}
+                  setFotoSlots={setFotoSlots}
+                  docSlots={docSlots}
+                  setDocSlots={setDocSlots}
+                  onUploadFotoVehiculo={onUploadFotoVehiculo}
+                  onUploadDocVehiculo={onUploadDocVehiculo}
+                />
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                key="s4"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <SolicitudStep
+                  responsableNombre={responsableId ? `#${responsableId}` : ""}
+                  onCambiarResponsable={() => setAskResponsable(true)}
+                  solicitud={solicitud}
+                  setSolicitud={setSolicitud}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
         <div className="sticky bottom-0 z-30 border-t border-white/10 bg-[#0f0c28]/95 backdrop-blur p-4 flex justify-between gap-3">
-            <button onClick={onClose} disabled={saving} className="px-6 py-2.5 rounded-xl bg-white/5 text-white/70 hover:bg-white/10 font-bold uppercase text-xs transition-all">Cancelar</button>
-            <div className="flex gap-2">
-              {step > 1 && <button onClick={() => setStep(s => s - 1)} className="px-6 py-2.5 rounded-xl bg-white/10 text-white font-bold uppercase text-xs transition-all flex items-center gap-2"><HiChevronLeft /> Atrás</button>}
-              {step < 4 ? (
-                <button onClick={() => goToStep(step + 1)} className="px-8 py-2.5 rounded-xl bg-sky-600 text-white font-bold uppercase text-xs shadow-lg shadow-sky-900/40 transition-all flex items-center gap-2">Siguiente <HiChevronRight /></button>
-              ) : (
-                <button onClick={onSubmit} disabled={!canSubmit} className="px-10 py-2.5 rounded-xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg shadow-emerald-900/40 transition-all active:scale-95 disabled:opacity-50">
-                  {saving ? "Procesando..." : "Finalizar Solicitud"}
-                </button>
-              )}
-            </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-xl bg-white/5 text-white/70 hover:bg-white/10 font-bold uppercase text-xs transition-all"
+          >
+            Cancelar
+          </button>
+          <div className="flex gap-2">
+            {step > 1 && (
+              <button
+                onClick={() => setStep((s) => s - 1)}
+                className="px-6 py-2.5 rounded-xl bg-white/10 text-white font-bold uppercase text-xs transition-all flex items-center gap-2"
+              >
+                <HiChevronLeft /> Atrás
+              </button>
+            )}
+            {step < 4 ? (
+              <button
+                onClick={() => goToStep(step + 1)}
+                className="px-8 py-2.5 rounded-xl bg-sky-600 text-white font-bold uppercase text-xs shadow-lg shadow-sky-900/40 transition-all flex items-center gap-2"
+              >
+                Siguiente <HiChevronRight />
+              </button>
+            ) : (
+              <button
+                onClick={onSubmit}
+                disabled={!canSubmit}
+                className="px-10 py-2.5 rounded-xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg shadow-emerald-900/40 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {saving ? "Procesando..." : "Finalizar Solicitud"}
+              </button>
+            )}
+          </div>
         </div>
 
         {(!isWebAdmin || poliza.oficina) && (
           <ResponsableManagerModal
             open={askResponsable}
-            oficinaId={poliza.oficina} 
+            oficinaId={poliza.oficina}
             onCancel={() => setAskResponsable(false)}
             onSelected={({ responsableId: selId }) => {
               setResponsableId(String(selId));
@@ -566,10 +792,16 @@ function StepBadge({ active, done, icon, label, onClick, color }) {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 rounded-xl px-4 py-2.5 border transition-all duration-300 min-w-[150px] ${
-        active ? `border-white/30 bg-gradient-to-br ${color} text-white shadow-lg` : "border-white/5 bg-white/5 text-white/40 hover:bg-white/10"
+        active
+          ? `border-white/30 bg-gradient-to-br ${color} text-white shadow-lg`
+          : "border-white/5 bg-white/5 text-white/40 hover:bg-white/10"
       }`}
     >
-      <span className={`h-6 w-6 rounded-lg flex items-center justify-center ${active ? 'bg-white/20' : 'bg-white/5'}`}>
+      <span
+        className={`h-6 w-6 rounded-lg flex items-center justify-center ${
+          active ? "bg-white/20" : "bg-white/5"
+        }`}
+      >
         {done ? <HiCheckCircle className="text-emerald-400" /> : icon}
       </span>
       <span className="text-[11px] font-bold uppercase tracking-tight">{label}</span>

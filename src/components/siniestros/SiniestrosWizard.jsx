@@ -9,6 +9,7 @@ import {
 import api from "../../services/api";
 import dayjs from "dayjs";
 import { toast } from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
 
 /* ── Tipos de siniestro ── */
 const TIPOS = [
@@ -116,7 +117,7 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [oficinaSel]);
 
   const handleChange = (e) => {
     const v = e.target.value;
@@ -164,7 +165,7 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="absolute z-50 top-full mt-2 w-full bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto"
+            className="absolute z-50 top-full mt-2 w-full bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden max-h-60 overflow-y-auto"
           >
             {results.map((p) => {
               const cli = p.cliente && typeof p.cliente === "object" ? p.cliente : null;
@@ -219,7 +220,25 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
 /* ─────────────────────────────────────────
    Componente principal: SiniestrosWizard
 ───────────────────────────────────────── */
-export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialData, isAdmin = false }) {
+export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialData, isAdmin: isAdminProp }) {
+  // 🚀 SEGURIDAD MULTI-TENANT
+  // Si el padre no pasa isAdmin, lo derivamos del perfil del usuario logueado.
+  const { user } = useAuth();
+  const isAdmin = typeof isAdminProp === "boolean"
+    ? isAdminProp
+    : (user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN" || !!user?.is_superuser);
+
+  // Oficina del usuario empleado (su perfil). Para Admin esto se ignora.
+  const oficinaPropiaId =
+    user?.perfil?.oficina?.id ??
+    user?.perfil?.oficina_id ??
+    (typeof user?.perfil?.oficina === "number" ? user.perfil.oficina : null);
+
+  const oficinaPropiaNombre =
+    user?.perfil?.oficina?.nombre ??
+    user?.perfil?.oficina_nombre ??
+    "";
+
   const [step,        setStep]        = useState(1);
   const [direction,   setDirection]   = useState(1);
   const [form,        setForm]        = useState(EMPTY);
@@ -254,6 +273,8 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
     }
     setStep(1);
     setSkipTercero(false);
+    // 🚀 SEGURIDAD: solo el admin elige oficina libre. El empleado siempre
+    // queda atado a su oficina (forzada vía oficinaPropiaId en la query).
     setOficinaSel("");
   }, [isOpen, initialData]);
 
@@ -279,6 +300,9 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
     set("marca_auto",  p.marca    || "");
     set("modelo_auto", p.modelo   || "");
     set("patente",     p.patente  || "");
+    // 🐛 FIX: el modelo Django requiere ano_auto (PositiveIntegerField, sin null).
+    // Lo derivamos del campo "anio" de la póliza. Si no hay, queda "" y handleSubmit lo manda como null/0.
+    set("ano_auto",    p.anio != null ? Number(p.anio) : "");
     set("_companiaNombre", p.compania_nombre || p.compania || "");
     set("_oficinaNombre",  p.oficina_nombre  || "");
 
@@ -311,14 +335,107 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
     if (submitting) return;
     setSubmitting(true);
     try {
-      // Limpiar campos internos antes de enviar al backend
-      const { _clienteNombre, _clienteDni, _companiaNombre, _oficinaNombre, ...payload } = form;
-      // Si es admin y eligió oficina, agregarla al payload
-      if (isAdmin && oficinaSel) payload.oficina = oficinaSel;
+      // 🐛 FIX DEFINITIVO: en vez de spread + delete, construimos el payload
+      // CAMPO POR CAMPO con whitelist. Así garantizamos que nada que sea
+      // string vacío, NaN o tipo raro llegue al backend.
+      const payload = {};
+
+      // ─── Campos obligatorios ───
+      if (form.cliente) payload.cliente = Number(form.cliente);
+      if (form.poliza)  payload.poliza  = Number(form.poliza);
+      payload.estado          = form.estado || "PENDIENTE";
+      payload.responsabilidad = form.responsabilidad || "CHOCO";
+      payload.descripcion     = String(form.descripcion || "").trim();
+
+      // ─── Campos del vehículo (TODOS opcionales).
+      //     Si el campo está vacío, NO lo incluimos en el payload.
+      //     El backend lo autocompleta desde la póliza en el save() del modelo. ───
+      const anoNum = Number(form.ano_auto);
+      if (Number.isFinite(anoNum) && anoNum > 1900 && anoNum < 2100) {
+        payload.ano_auto = anoNum;
+      }
+      const marca = String(form.marca_auto || "").trim();
+      if (marca) payload.marca_auto = marca;
+
+      const modelo = String(form.modelo_auto || "").trim();
+      if (modelo) payload.modelo_auto = modelo;
+
+      const patente = String(form.patente || "").toUpperCase().replace(/\s+/g, "");
+      if (patente) payload.patente = patente;
+
+      // ─── Fecha y nro de reclamo ───
+      if (form.fecha_siniestro) {
+        payload.fecha_siniestro = form.fecha_siniestro;
+      }
+      const nroReclamo = String(form.nro_reclamo_cia || "").trim();
+      if (nroReclamo) payload.nro_reclamo_cia = nroReclamo;
+
+      // ─── Tercero (siempre todos los 5 campos, vacíos si no aplica) ───
+      if (skipTercero) {
+        payload.tercero_nombre    = "";
+        payload.tercero_telefono  = "";
+        payload.tercero_patente   = "";
+        payload.tercero_compania  = "";
+        payload.tercero_poliza    = "";
+      } else {
+        payload.tercero_nombre    = String(form.tercero_nombre   || "").trim();
+        payload.tercero_telefono  = String(form.tercero_telefono || "").trim();
+        payload.tercero_patente   = String(form.tercero_patente  || "").toUpperCase().replace(/\s+/g, "");
+        payload.tercero_compania  = String(form.tercero_compania || "").trim();
+        payload.tercero_poliza    = String(form.tercero_poliza   || "").trim();
+      }
+
+      // ─── 🚀 SEGURIDAD MULTI-TENANT ───
+      // Admin: solo manda oficina si eligió una específica con los chips.
+      // Empleado: SIEMPRE manda su propia oficina (el backend igual lo valida).
+      if (isAdmin) {
+        if (oficinaSel) payload.oficina = Number(oficinaSel);
+      } else if (oficinaPropiaId) {
+        payload.oficina = Number(oficinaPropiaId);
+      }
+
+      // 🐛 DEBUG: log del payload final antes de mandarlo
+      console.group("🧪 [SiniestrosWizard] handleSubmit — payload final");
+      console.log("👤 isAdmin:", isAdmin);
+      console.log("🏢 oficinaPropiaId:", oficinaPropiaId);
+      console.log("🏢 oficinaSel (admin):", oficinaSel);
+      console.log("📋 form (state completo):", form);
+      console.log("📦 payload a enviar:", payload);
+      console.log("📦 payload JSON:", JSON.stringify(payload, null, 2));
+      console.groupEnd();
+
       await onSubmit(payload);
       onClose();
-    } catch {
-      toast.error("Error al guardar el siniestro");
+    } catch (err) {
+      // 🐛 FIX: el error puede venir en distintos formatos:
+      //   - AxiosError directo: err.response.data
+      //   - rejectWithValue del thunk: err es directamente el objeto del backend
+      //   - Excepción JS común: err.message
+      const detalle =
+        err?.response?.data ||
+        (err && typeof err === "object" && !err.message ? err : null) ||
+        err?.payload ||
+        err?.message;
+
+      console.error("[SiniestrosWizard] Error al guardar:", detalle);
+
+      if (detalle && typeof detalle === "object") {
+        // Backend devolvió {campo: [mensaje]} → mostramos el primer campo con error
+        const entries = Object.entries(detalle).filter(([k]) => k !== "detail");
+        if (entries.length > 0) {
+          const [campo, msg] = entries[0];
+          const txt = Array.isArray(msg) ? msg[0] : String(msg);
+          toast.error(`${campo}: ${txt}`);
+        } else if (detalle.detail) {
+          toast.error(String(detalle.detail));
+        } else {
+          toast.error("Error al guardar el siniestro");
+        }
+      } else if (typeof detalle === "string") {
+        toast.error(detalle);
+      } else {
+        toast.error("Error al guardar el siniestro");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -335,12 +452,12 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="w-full max-w-lg bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl overflow-hidden"
+        className="w-full max-w-lg bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl my-auto"
       >
         {/* ── Header: barra de progreso ── */}
         <div className="px-6 pt-6 pb-4 border-b border-slate-800">
@@ -383,7 +500,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
         </div>
 
         {/* ── Contenido animado ── */}
-        <div className="relative overflow-hidden" style={{ minHeight: 340 }}>
+        <div className="relative" style={{ minHeight: 340 }}>
           <AnimatePresence custom={direction} mode="wait">
             <motion.div
               key={step}
@@ -407,8 +524,12 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     <p className="text-sm text-slate-500 mt-1">Buscá por patente, cliente o número de póliza</p>
                   </div>
 
-                  {/* Selector de oficina — solo visible para admin */}
-                  {isAdmin && oficinas.length > 0 && (
+                  {/* 🚀 SEGURIDAD MULTI-TENANT
+                      Selector de oficina:
+                      - Admin: ve los chips (Todas + lista de oficinas) y puede filtrar.
+                      - Empleado/Vendedor: NO ve chips. Ve un badge con su oficina
+                        y el backend filtra automáticamente las pólizas. */}
+                  {isAdmin && oficinas.length > 0 ? (
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                         Oficina
@@ -441,6 +562,21 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                         ))}
                       </div>
                     </div>
+                  ) : (
+                    // Empleado / Vendedor: badge informativo, sin posibilidad de cambiar.
+                    oficinaPropiaNombre && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-900/30 border border-indigo-700/40">
+                        <span className="text-[10px] uppercase tracking-wider font-black text-indigo-400">
+                          Tu oficina
+                        </span>
+                        <span className="text-sm font-bold text-indigo-200">
+                          🏢 {oficinaPropiaNombre}
+                        </span>
+                        <span className="ml-auto text-[10px] text-indigo-400/60 italic">
+                          Solo verás pólizas de acá
+                        </span>
+                      </div>
+                    )
                   )}
 
                   <SearchPoliza

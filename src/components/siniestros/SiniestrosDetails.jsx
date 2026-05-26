@@ -1,218 +1,197 @@
 // src/components/siniestros/SiniestrosDetails.jsx
-import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiPencil, HiPlus, HiExternalLink, HiCalendar, HiClock } from "react-icons/hi";
-import dayjs from "dayjs";
-import { getEventosBySiniestro, addEvento } from "../../store/slices/siniestrosSlice";
-import SiniestroEventoForm from "./SiniestroEventoForm";
-import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
+import dayjs from 'dayjs';
+import SiniestroEventoForm from './SiniestroEventoForm';
+import SiniestroFotosPanel from './SiniestroFotosPanel';
+import { getEventosBySiniestro, addEvento } from '../../store/slices/siniestrosSlice';
+import { toast } from 'react-hot-toast';
 
-const ESTADO_CFG = {
-  PENDIENTE:   { cls: "bg-amber-900/40 text-amber-300 border-amber-700/50" },
-  DENUNCIADO:  { cls: "bg-blue-900/40 text-blue-300 border-blue-700/50" },
-  INSPECCION:  { cls: "bg-purple-900/40 text-purple-300 border-purple-700/50" },
-  LIQUIDACION: { cls: "bg-indigo-900/40 text-indigo-300 border-indigo-700/50" },
-  CERRADO:     { cls: "bg-emerald-900/40 text-emerald-300 border-emerald-700/50" },
-};
+const SiniestrosDetails = ({ isOpen, onClose, siniestro }) => {
+  const dispatch = useDispatch();
+  const sid = siniestro?.id;
+  const key = sid != null ? String(sid) : null;
 
-function DataRow({ label, value, mono }) {
-  if (!value) return null;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{label}</span>
-      <span className={`text-sm font-semibold text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</span>
-    </div>
+  // 🐛 FIX: claves normalizadas a string (match con el slice)
+  const eventos = useSelector(
+    (state) => (key ? state.siniestros.eventos[key] : null) || []
   );
-}
+  const eventosLoading = useSelector(
+    (state) => (key ? state.siniestros.eventosLoading?.[key] : false) || false
+  );
+  const eventosError = useSelector(
+    (state) => (key ? state.siniestros.eventosError?.[key] : null) || null
+  );
 
-export default function SiniestrosDetails({ isOpen, onClose, siniestro, onEdit }) {
-  const dispatch  = useDispatch();
-  const navigate  = useNavigate();
-  const eventos   = useSelector(s => s.siniestros.eventos[siniestro?.id] || []);
-  const [eventoFormOpen, setEventoFormOpen] = useState(false);
+  const [isEventoFormOpen, setIsEventoFormOpen] = useState(false);
 
+  // 🐛 FIX: dependencia estable (id, no objeto) y respeto del isOpen.
   useEffect(() => {
-    if (siniestro?.id) dispatch(getEventosBySiniestro(siniestro.id));
-  }, [dispatch, siniestro]);
+    if (isOpen && sid) {
+      dispatch(getEventosBySiniestro(sid));
+    }
+  }, [dispatch, isOpen, sid]);
 
-  const handleAddEvento = async (data) => {
+  // 🐛 FIX: una sola inyección de siniestro_id (antes se duplicaba).
+  const handleAddEvento = async (eventoData) => {
+    if (!sid) return;
     try {
-      await dispatch(addEvento({ ...data, siniestro_id: siniestro.id })).unwrap();
-      toast.success("Nota agregada a la bitácora");
-      setEventoFormOpen(false);
-    } catch { toast.error("Error al guardar la nota"); }
+      await dispatch(addEvento({ ...eventoData, siniestro_id: sid })).unwrap();
+      toast.success('Evento agregado a la bitácora');
+      setIsEventoFormOpen(false);
+    } catch (err) {
+      toast.error('Error al guardar el evento');
+    }
   };
 
   if (!isOpen || !siniestro) return null;
-
-  const cfg   = ESTADO_CFG[siniestro.estado] || { cls: "bg-slate-800 text-slate-400 border-slate-700" };
-  const dias  = siniestro.fecha_siniestro
-    ? dayjs().diff(dayjs(siniestro.fecha_siniestro), "day") : null;
 
   return (
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
         <motion.div
-          className="bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
-          initial={{ scale: 0.95, opacity: 0, y: 16 }}
+          className="bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col md:flex-row gap-6"
+          initial={{ scale: 0.95, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 16 }}>
-
-          {/* Header */}
-          <div className="flex items-start justify-between px-6 py-5 border-b border-slate-800 shrink-0">
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-xl font-black text-slate-100">Siniestro #{siniestro.id}</h2>
-                <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${cfg.cls}`}>
+          exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        >
+          {/* COLUMNA IZQUIERDA: DATOS DEL SINIESTRO */}
+          <div className="flex-1 space-y-6">
+            <div className="border-b border-slate-800 pb-4 flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-black text-white">Siniestro #{siniestro.id}</h2>
+                <p className="text-xs text-slate-400 mt-1">
                   {siniestro.estado_label || siniestro.estado}
-                </span>
-                {dias !== null && dias <= 30 && siniestro.estado !== "CERRADO" && (
-                  <span className="text-xs font-bold px-3 py-1 rounded-lg bg-rose-900/40 border border-rose-700/50 text-rose-300">
-                    ⚠ Reciente — {dias}d
-                  </span>
-                )}
+                  {siniestro.fecha_siniestro && (
+                    <> · {dayjs(siniestro.fecha_siniestro).format('DD/MM/YYYY')}</>
+                  )}
+                </p>
               </div>
-              {siniestro.nro_reclamo_cia && (
-                <p className="text-sm text-indigo-400 font-mono mt-1">Reclamo Cía: #{siniestro.nro_reclamo_cia}</p>
+            </div>
+
+            {/* Datos clave */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Cliente</span>
+                <span className="text-slate-200">{siniestro.cliente_label || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Póliza</span>
+                <span className="text-slate-200">{siniestro.poliza_label || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Vehículo</span>
+                <span className="text-slate-200">
+                  {siniestro.marca_auto} {siniestro.modelo_auto} ({siniestro.ano_auto})
+                </span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Patente</span>
+                <span className="text-slate-200 font-mono uppercase">{siniestro.patente || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Responsabilidad</span>
+                <span className="text-slate-200">{siniestro.responsabilidad_label || siniestro.responsabilidad}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">N° Reclamo Cía</span>
+                <span className="text-slate-200">{siniestro.nro_reclamo_cia || '—'}</span>
+              </div>
+            </div>
+
+            <div>
+              <span className="block text-xs text-slate-400 uppercase font-bold mb-2">Descripción de los Hechos</span>
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-sm whitespace-pre-wrap">
+                {siniestro.descripcion}
+              </div>
+            </div>
+
+            {/* 📸 Galería de fotos */}
+            <div className="bg-slate-950/50 border border-slate-800 rounded-xl">
+              <SiniestroFotosPanel siniestroId={siniestro.id} />
+            </div>
+
+            {/* Datos del Tercero (Solo si existen) */}
+            {(siniestro.tercero_nombre || siniestro.tercero_patente) && (
+              <div className="p-4 bg-rose-900/10 border border-rose-500/20 rounded-xl">
+                <span className="block text-xs text-rose-400 font-bold mb-3 uppercase">Datos del Tercero</span>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-slate-500">Nombre:</span> <span className="text-slate-200">{siniestro.tercero_nombre || '—'}</span></div>
+                  <div><span className="text-slate-500">Teléfono:</span> <span className="text-slate-200">{siniestro.tercero_telefono || '—'}</span></div>
+                  <div><span className="text-slate-500">Patente:</span> <span className="text-slate-200 uppercase">{siniestro.tercero_patente || '—'}</span></div>
+                  <div><span className="text-slate-500">Seguro:</span> <span className="text-slate-200">{siniestro.tercero_compania || '—'} ({siniestro.tercero_poliza || 'S/P'})</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* COLUMNA DERECHA: BITÁCORA DE EVENTOS */}
+          <div className="w-full md:w-80 flex flex-col border-t md:border-t-0 md:border-l border-slate-800 pt-6 md:pt-0 md:pl-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">⏱️ Bitácora</h3>
+              <button
+                onClick={() => setIsEventoFormOpen(true)}
+                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg shadow-md transition-colors"
+              >
+                + Nota
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+              {/* 🐛 FIX: estados de loading y error */}
+              {eventosLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="w-6 h-6 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : eventosError ? (
+                <div className="p-3 border border-rose-700/40 rounded-xl bg-rose-900/10 text-center">
+                  <p className="text-xs text-rose-400">Error al cargar la bitácora</p>
+                </div>
+              ) : eventos.length > 0 ? (
+                eventos.map((evento) => (
+                  <div key={evento.id} className="p-3 bg-slate-800/80 border border-slate-700/50 rounded-xl relative">
+                    <div className="absolute top-3 -left-[5px] w-2 h-2 rounded-full bg-sky-500"></div>
+                    <p className="text-[10px] font-bold text-sky-400 mb-1">
+                      {dayjs(evento.fecha_evento).format('DD MMM YYYY')}
+                    </p>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      {evento.descripcion_evento}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 border border-dashed border-slate-700 rounded-xl text-center">
+                  <p className="text-sm text-slate-500">No hay movimientos registrados en este siniestro.</p>
+                </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {onEdit && (
-                <button onClick={onEdit}
-                  className="h-9 px-4 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-700/40 text-sm font-bold flex items-center gap-2 transition-colors">
-                  <HiPencil className="w-3.5 h-3.5" /> Editar
-                </button>
-              )}
-              <button onClick={onClose}
-                className="h-9 w-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-colors">
-                <HiX className="w-5 h-5" />
+
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <button
+                onClick={onClose}
+                className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
+              >
+                Cerrar Panel
               </button>
             </div>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="flex flex-col md:flex-row h-full divide-y md:divide-y-0 md:divide-x divide-slate-800">
-
-              {/* Columna izquierda: datos */}
-              <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-
-                {/* Cliente y póliza con links */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4">
-                    <p className="text-[10px] uppercase tracking-wider font-black text-slate-500 mb-2">Cliente</p>
-                    <p className="font-bold text-slate-100 text-base">{siniestro.cliente_label || "—"}</p>
-                    {siniestro.cliente && (
-                      <button onClick={() => { onClose(); navigate(`/clientes/${siniestro.cliente}`); }}
-                        className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors">
-                        <HiExternalLink className="w-3 h-3" /> Ver perfil del cliente
-                      </button>
-                    )}
-                  </div>
-                  <div className="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4">
-                    <p className="text-[10px] uppercase tracking-wider font-black text-slate-500 mb-2">Póliza</p>
-                    <p className="font-bold text-slate-100 text-base truncate">{siniestro.poliza_label || "—"}</p>
-                    {siniestro.poliza && (
-                      <button onClick={() => { onClose(); navigate(`/polizas/${siniestro.poliza}`); }}
-                        className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors">
-                        <HiExternalLink className="w-3 h-3" /> Ver póliza
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Datos del siniestro */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <DataRow label="Fecha del accidente"
-                    value={siniestro.fecha_siniestro ? dayjs(siniestro.fecha_siniestro).format("DD/MM/YYYY") : null} />
-                  <DataRow label="Días transcurridos"
-                    value={dias !== null ? `${dias} días` : null} />
-                  <DataRow label="Responsabilidad"
-                    value={siniestro.responsabilidad_label || siniestro.responsabilidad} />
-                </div>
-
-                {/* Vehículo */}
-                <div className="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
-                  <p className="text-[10px] uppercase tracking-wider font-black text-slate-500 mb-3">Vehículo asegurado</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <DataRow label="Marca"   value={siniestro.marca_auto} />
-                    <DataRow label="Modelo"  value={siniestro.modelo_auto} />
-                    <DataRow label="Año"     value={siniestro.ano_auto} />
-                    <DataRow label="Patente" value={siniestro.patente} mono />
-                  </div>
-                </div>
-
-                {/* Relato */}
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider font-black text-slate-500 mb-2">Relato de los hechos</p>
-                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
-                    {siniestro.descripcion || "Sin descripción"}
-                  </div>
-                </div>
-
-                {/* Tercero */}
-                {(siniestro.tercero_nombre || siniestro.tercero_patente || siniestro.tercero_compania) && (
-                  <div className="bg-rose-950/20 border border-rose-800/30 rounded-2xl p-4">
-                    <p className="text-[10px] uppercase tracking-wider font-black text-rose-400 mb-3">Datos del tercero</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <DataRow label="Nombre"   value={siniestro.tercero_nombre} />
-                      <DataRow label="Teléfono" value={siniestro.tercero_telefono} />
-                      <DataRow label="Patente"  value={siniestro.tercero_patente} mono />
-                      <DataRow label="Compañía" value={siniestro.tercero_compania} />
-                      <DataRow label="Póliza"   value={siniestro.tercero_poliza} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Columna derecha: bitácora */}
-              <div className="w-full md:w-80 flex flex-col p-5">
-                <div className="flex items-center justify-between mb-4 shrink-0">
-                  <h3 className="font-black text-slate-200 flex items-center gap-2">
-                    <HiClock className="w-4 h-4 text-sky-400" /> Bitácora
-                  </h3>
-                  <button onClick={() => setEventoFormOpen(true)}
-                    className="h-8 px-3 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors">
-                    <HiPlus className="w-3.5 h-3.5" /> Nota
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
-                  {eventos.length > 0 ? eventos.map(ev => (
-                    <div key={ev.id} className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-3.5 relative pl-5">
-                      <div className="absolute left-2 top-4 w-1.5 h-1.5 rounded-full bg-sky-500" />
-                      <p className="text-[11px] font-bold text-sky-400 mb-1 flex items-center gap-1.5">
-                        <HiCalendar className="w-3 h-3" />
-                        {dayjs(ev.fecha_evento).format("DD MMM YYYY")}
-                      </p>
-                      <p className="text-sm text-slate-300 leading-relaxed">{ev.descripcion_evento}</p>
-                    </div>
-                  )) : (
-                    <div className="border border-dashed border-slate-700 rounded-xl p-6 text-center">
-                      <p className="text-sm text-slate-500">Sin movimientos registrados</p>
-                    </div>
-                  )}
-                </div>
-
-                <button onClick={onClose}
-                  className="mt-4 w-full h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold transition-colors shrink-0">
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* 🐛 FIX: ya NO inyectamos siniestro_id acá; lo hace handleAddEvento. */}
+          <SiniestroEventoForm
+            isOpen={isEventoFormOpen}
+            onClose={() => setIsEventoFormOpen(false)}
+            onSubmit={handleAddEvento}
+          />
         </motion.div>
       </motion.div>
-
-      <SiniestroEventoForm
-        isOpen={eventoFormOpen}
-        onClose={() => setEventoFormOpen(false)}
-        onSubmit={handleAddEvento}
-      />
     </AnimatePresence>
   );
-}
+};
+
+export default SiniestrosDetails;

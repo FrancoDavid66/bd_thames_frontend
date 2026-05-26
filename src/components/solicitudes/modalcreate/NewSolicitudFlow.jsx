@@ -1,48 +1,57 @@
 // src/components/solicitudes/modalcreate/NewSolicitudFlow.jsx
 import { useEffect, useState, useCallback } from "react";
 import ResponsableManagerModal from "./ResponsableManagerModal";
-import VerificadorDNIModal     from "./VerificadorDNIModal";
-import CreateSolicitudModal    from "./CreateSolicitudModal";
-import PagarCuotaModal         from "./PagarCuotaModal";
-import EnviarReciboModal       from "./EnviarReciboModal";
+import CreateSolicitudModal from "./CreateSolicitudModal";
+import PagarCuotaModal from "./PagarCuotaModal";
+import EnviarReciboModal from "./EnviarReciboModal";
+// 🚀 NUEVO: Gate de verificación previa
+import VerificarClienteGate from "./VerificarClienteGate";
 
 /**
- * Flujo completo:
- *  1. ResponsableManagerModal  — elegir responsable
- *  2. VerificadorDNIModal      — verificar DNI del cliente ← NUEVO
- *  3. CreateSolicitudModal     — 4 pasos (cliente, póliza, fotos, solicitud)
- *  4. PagarCuotaModal          — pago de primera cuota
- *  5. EnviarReciboModal        — enviar comprobante por WhatsApp
+ * Flujo: Verificar Cliente → Responsable → CreateSolicitudModal → (post) Pagar 1ª cuota → (post) Enviar comprobante
+ *
+ * Props:
+ * - open: boolean (mostrar/ocultar flujo completo)
+ * - onClose: fn() (se llama cuando termina todo el flujo)
+ * - onAsociarPolizaExistente: fn({ cliente_id, match }) → callback opcional para cuando
+ *   el usuario decide asociar una nueva póliza a un cliente existente.
+ * - companias, coberturas: listas a pasar al CreateSolicitudModal
  */
-export default function NewSolicitudFlow({ open, onClose, companias = [], coberturas = [] }) {
+export default function NewSolicitudFlow({
+  open,
+  onClose,
+  onAsociarPolizaExistente, // 🚀 NUEVO callback opcional
+  companias = [],
+  coberturas = [],
+}) {
+  // === 🚀 NUEVO: Gate de verificación ===
+  const [verifyOpen, setVerifyOpen] = useState(false);
 
-  // ── Paso 1: responsable ──
-  const [gateOpen,      setGateOpen]      = useState(false);
-  const [responsableId, setResponsableId] = useState("");
-  const [tipoSeguro,    setTipoSeguro]    = useState("ROBO");
-
-  // ── Paso 2: verificador DNI ──
-  const [verificadorOpen, setVerificadorOpen] = useState(false);
-
-  // ── Paso 3: crear solicitud ──
+  // === Modales de creación (UX original) ===
+  const [gateOpen, setGateOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [responsableId, setResponsableId] = useState("");
+  const [tipoSeguro, setTipoSeguro] = useState("ROBO");
 
-  // ── Pasos 4-5: post-creación ──
-  const [pagarOpen,        setPagarOpen]        = useState(false);
-  const [enviarOpen,       setEnviarOpen]        = useState(false);
-  const [cuotaId,          setCuotaId]           = useState(null);
-  const [montoSugerido,    setMontoSugerido]     = useState("");
-  const [telefonoCliente,  setTelefonoCliente]   = useState("");
-  const [facturaUrl,       setFacturaUrl]        = useState("");
+  // === Modales post-creación (pago + enviar) ===
+  const [pagarOpen, setPagarOpen] = useState(false);
+  const [enviarOpen, setEnviarOpen] = useState(false);
+  const [cuotaId, setCuotaId] = useState(null);
+  const [montoSugerido, setMontoSugerido] = useState("");
+  const [telefonoCliente, setTelefonoCliente] = useState("");
+  const [facturaUrl, setFacturaUrl] = useState("");
 
-  // ── Reset al abrir/cerrar ──
+  // Al abrir/cerrar el flujo global
   useEffect(() => {
     if (open) {
-      setGateOpen(true);
-      setVerificadorOpen(false);
+      // 🚀 Arranca en el gate de VERIFICACIÓN (no en el de responsable)
+      setVerifyOpen(true);
+      setGateOpen(false);
       setCreateOpen(false);
       setResponsableId("");
       setTipoSeguro("ROBO");
+
+      // asegurar que los post-modals estén cerrados
       setPagarOpen(false);
       setEnviarOpen(false);
       setCuotaId(null);
@@ -50,8 +59,8 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
       setTelefonoCliente("");
       setFacturaUrl("");
     } else {
+      setVerifyOpen(false);
       setGateOpen(false);
-      setVerificadorOpen(false);
       setCreateOpen(false);
       setPagarOpen(false);
       setEnviarOpen(false);
@@ -59,10 +68,41 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
     }
   }, [open]);
 
-  // ── Cierre total ──
-  const handleCloseAll = useCallback(() => {
+  // 🚀 NUEVO: El usuario confirmó que es cliente nuevo → pasa al gate de responsable
+  const handleVerifyConfirmedNuevo = useCallback(() => {
+    setVerifyOpen(false);
+    setGateOpen(true);
+  }, []);
+
+  // 🚀 NUEVO: El usuario decide asociar póliza a cliente existente → cierra todo y avisa al padre
+  const handleAsociarPoliza = useCallback(
+    ({ cliente_id, match }) => {
+      setVerifyOpen(false);
+      if (typeof onAsociarPolizaExistente === "function") {
+        onAsociarPolizaExistente({ cliente_id, match });
+      }
+      onClose?.();
+    },
+    [onAsociarPolizaExistente, onClose]
+  );
+
+  // Selección de Responsable (segundo modal ahora)
+  const handleGateSelected = useCallback(({ responsableId: rid, tipoSeguro: tseg }) => {
+    setResponsableId(String(rid || ""));
+    setTipoSeguro(tseg || "ROBO");
     setGateOpen(false);
-    setVerificadorOpen(false);
+    setCreateOpen(true);
+  }, []);
+
+  // Cerrar solo el modal de creación (sin cerrar el flujo global)
+  const handleCloseCreateOnly = useCallback(() => {
+    setCreateOpen(false);
+  }, []);
+
+  // Cierre total del flujo
+  const handleCloseAll = useCallback(() => {
+    setVerifyOpen(false);
+    setGateOpen(false);
     setCreateOpen(false);
     setPagarOpen(false);
     setEnviarOpen(false);
@@ -70,33 +110,7 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
     onClose?.();
   }, [onClose]);
 
-  // ── PASO 1 completado: responsable elegido → abrir verificador ──
-  const handleGateSelected = useCallback(({ responsableId: rid, tipoSeguro: tseg }) => {
-    setResponsableId(String(rid || ""));
-    setTipoSeguro(tseg || "ROBO");
-    setGateOpen(false);
-    setVerificadorOpen(true);   // ← NUEVO: va al verificador, no al create
-  }, []);
-
-  // ── PASO 2 completado: verificación OK → abrir solicitud ──
-  const handleVerificadorOk = useCallback(({ dni, clienteId, esAutoNuevo }) => {
-    setVerificadorOpen(false);
-    setCreateOpen(true);
-    // dni y clienteId disponibles si los necesitamos pre-cargar en CreateSolicitudModal
-  }, []);
-
-  // ── PASO 2 cancelado ──
-  const handleVerificadorCancel = useCallback(() => {
-    setVerificadorOpen(false);
-    handleCloseAll();
-  }, [handleCloseAll]);
-
-  // ── PASO 3 cerrado ──
-  const handleCloseCreateOnly = useCallback(() => {
-    setCreateOpen(false);
-  }, []);
-
-  // ── Helpers post-creación ──
+  // ====== Utils post-creación ======
   const getFacturaUrl = (id) => (id ? `/api/cuotas/${id}/factura` : "");
 
   const toWhatsE164 = (raw) => {
@@ -113,32 +127,53 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
   const buildWhatsAppUrl = (rawPhone, message) => {
     const phone = toWhatsE164(rawPhone);
     if (!phone) return null;
-    return `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(message || "")}`;
+    const text = encodeURIComponent(message || "");
+    return `https://wa.me/${encodeURIComponent(phone)}?text=${text}`;
   };
 
+  // Robust pickers desde la respuesta cruda (raw) del backend
   const pickMontoFromRaw = (raw) => {
     if (!raw) return "";
     if (raw.precio_cuota != null) return String(raw.precio_cuota);
     if (raw.poliza?.precio_cuota != null) return String(raw.poliza.precio_cuota);
-    const c0 = raw.cuotas?.[0] || raw.poliza?.cuotas?.[0] || raw.poliza_cuotas?.[0] || null;
+    const c0 =
+      raw.cuotas?.[0] ||
+      raw.poliza?.cuotas?.[0] ||
+      raw.poliza_cuotas?.[0] ||
+      null;
     if (c0?.monto != null) return String(c0.monto);
     return "";
   };
 
-  // ── PASO 3 completado: solicitud creada ──
+  // Hook que llega desde CreateSolicitudModal
   const handleCreated = useCallback(
-    ({ raw, primera_cuota_id, telefono }) => {
+    (payload) => {
+      // 🚀 Si el modal nos avisa de "asociar a cliente existente", lo derivamos al padre
+      if (payload?.__asociarPolizaExistente) {
+        handleAsociarPoliza({
+          cliente_id: payload.cliente_id,
+          match: payload.match || null,
+        });
+        return;
+      }
+
+      const { raw, primera_cuota_id, telefono } = payload || {};
       setCuotaId(primera_cuota_id || null);
       setTelefonoCliente(telefono || "");
       setMontoSugerido(pickMontoFromRaw(raw));
+
       setCreateOpen(false);
-      if (primera_cuota_id) setPagarOpen(true);
-      else handleCloseAll();
+
+      if (primera_cuota_id) {
+        setPagarOpen(true);
+      } else {
+        handleCloseAll();
+      }
     },
-    [handleCloseAll]
+    [handleCloseAll, handleAsociarPoliza]
   );
 
-  // ── PASO 4: pagar cuota ──
+  // PATCH pagar cuota
   async function pagarCuota(id, body) {
     const res = await fetch(`/api/cuotas/${id}/pagar`, {
       method: "PATCH",
@@ -163,7 +198,6 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
     [cuotaId]
   );
 
-  // ── PASO 5: enviar recibo ──
   const onEnviarRecibo = useCallback(
     ({ telefono }) => {
       const tel = telefono || telefonoCliente;
@@ -180,7 +214,15 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
 
   return (
     <>
-      {/* 1. Gate de Responsable */}
+      {/* 🚀 0) Gate de Verificación (NUEVO - primer paso) */}
+      <VerificarClienteGate
+        open={verifyOpen}
+        onConfirmNuevo={handleVerifyConfirmedNuevo}
+        onAsociarPoliza={handleAsociarPoliza}
+        onCancel={handleCloseAll}
+      />
+
+      {/* 1) Gate de Responsable (sin cambios, ahora es el segundo paso) */}
       {gateOpen && (
         <ResponsableManagerModal
           open={gateOpen}
@@ -189,16 +231,7 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
         />
       )}
 
-      {/* 2. Verificador de DNI ← NUEVO */}
-      {verificadorOpen && (
-        <VerificadorDNIModal
-          open={verificadorOpen}
-          onCancel={handleVerificadorCancel}
-          onContinuar={handleVerificadorOk}
-        />
-      )}
-
-      {/* 3. Crear solicitud */}
+      {/* 2) Modal de creación (recibe onCreated para post-flujo) */}
       {createOpen && (
         <CreateSolicitudModal
           onClose={handleCloseCreateOnly}
@@ -211,19 +244,25 @@ export default function NewSolicitudFlow({ open, onClose, companias = [], cobert
         />
       )}
 
-      {/* 4. Pagar primera cuota */}
+      {/* 3) Post-creación: Pagar 1ª cuota */}
       <PagarCuotaModal
         open={pagarOpen}
-        onClose={() => { setPagarOpen(false); handleCloseAll(); }}
+        onClose={() => {
+          setPagarOpen(false);
+          handleCloseAll();
+        }}
         onConfirm={onConfirmPagar}
         defaultMonto={montoSugerido}
         defaultFecha={new Date()}
       />
 
-      {/* 5. Enviar comprobante */}
+      {/* 4) Post-creación: Enviar comprobante por WhatsApp */}
       <EnviarReciboModal
         open={enviarOpen}
-        onClose={() => { setEnviarOpen(false); handleCloseAll(); }}
+        onClose={() => {
+          setEnviarOpen(false);
+          handleCloseAll();
+        }}
         onConfirm={onEnviarRecibo}
         telefono={telefonoCliente}
         previewUrl={facturaUrl}

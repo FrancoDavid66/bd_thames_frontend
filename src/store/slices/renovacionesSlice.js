@@ -243,17 +243,16 @@ const normalizeResumen = (data) => {
 };
 
 /**
- * Thunk: marcar póliza como "no renueva" — la saca de la lista
- * Nota: ajustado para que use el body con campo "motivo".
- * Si el endpoint no existe en backend todavía, el thunk falla con .rejected
- * y mostramos el toast — pero el UI sigue funcionando para todo lo demás.
+ * Thunk: marcar póliza como "no renueva" — la deja en la lista en gris/tachada.
+ * payload: { polizaId, motivo: "CAMBIO_COMPANIA"|"VENDIO_AUTO"|..., detalle: "..." }
  */
 export const marcarNoRenueva = createAsyncThunk(
   "renovaciones/marcarNoRenueva",
-  async ({ polizaId, motivo = "" }, { rejectWithValue }) => {
+  async ({ polizaId, motivo = "", detalle = "" }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`polizas/${polizaId}/marcar-no-renueva/`, {
+      const { data } = await api.post(`polizas/${polizaId}/descartar-renovacion/`, {
         motivo: motivo || "",
+        detalle: detalle || "",
       });
       return { polizaId, data };
     } catch (err) {
@@ -270,14 +269,13 @@ export const marcarNoRenueva = createAsyncThunk(
 );
 
 /**
- * 🆕 Deshacer "no renueva" (desmarcar).
- * Backend pendiente — el front llama y maneja el error si no existe aún.
+ * 🆕 Deshacer "no renueva" (la póliza vuelve a la pestaña de Pendientes).
  */
 export const desmarcarNoRenueva = createAsyncThunk(
   "renovaciones/desmarcarNoRenueva",
   async ({ polizaId }, { rejectWithValue }) => {
     try {
-      const { data } = await api.delete(`polizas/${polizaId}/marcar-no-renueva/`);
+      const { data } = await api.post(`polizas/${polizaId}/revertir-descarte-renovacion/`);
       return { polizaId, data };
     } catch (err) {
       return rejectWithValue({
@@ -287,6 +285,50 @@ export const desmarcarNoRenueva = createAsyncThunk(
           err?.response?.data?.error ||
           err?.message ||
           "Error al deshacer",
+      });
+    }
+  }
+);
+
+/**
+ * 🆕 Verificar renovación — marca la fila como "ya la revisé" (tilde gris).
+ */
+export const verificarRenovacion = createAsyncThunk(
+  "renovaciones/verificarRenovacion",
+  async ({ polizaId }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`polizas/${polizaId}/verificar-renovacion/`);
+      return { polizaId, data };
+    } catch (err) {
+      return rejectWithValue({
+        polizaId,
+        message:
+          err?.response?.data?.detail ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Error al verificar",
+      });
+    }
+  }
+);
+
+/**
+ * 🆕 Des-verificar (deshacer el tilde).
+ */
+export const desVerificarRenovacion = createAsyncThunk(
+  "renovaciones/desVerificarRenovacion",
+  async ({ polizaId }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`polizas/${polizaId}/des-verificar-renovacion/`);
+      return { polizaId, data };
+    } catch (err) {
+      return rejectWithValue({
+        polizaId,
+        message:
+          err?.response?.data?.detail ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Error al deshacer verificación",
       });
     }
   }
@@ -746,11 +788,21 @@ const renovacionesSlice = createSlice({
         if (id != null) setActionLoading(state, id, "no_renueva");
       })
       .addCase(marcarNoRenueva.fulfilled, (state, action) => {
-        const { polizaId } = action.payload || {};
+        const { polizaId, data } = action.payload || {};
         if (polizaId != null) setActionSuccess(state, polizaId, "no_renueva");
-        // Quitamos del listado actual para feedback inmediato
-        state.items = (state.items || []).filter((p) => p.id !== polizaId);
-        // Invalidar cache para que el refetch traiga datos frescos
+        // 🚀 NO la quitamos: queda en la lista en gris/tachada (pestaña "No renovaron")
+        // Actualizamos los flags localmente para feedback inmediato
+        state.items = (state.items || []).map((p) =>
+          p.id === polizaId
+            ? {
+                ...p,
+                renovacion_descartada: true,
+                renovacion_descartada_motivo: data?.renovacion_descartada_motivo || p.renovacion_descartada_motivo,
+                renovacion_descartada_detalle: data?.renovacion_descartada_detalle || p.renovacion_descartada_detalle,
+                renovacion_descartada_en: data?.renovacion_descartada_en || new Date().toISOString(),
+              }
+            : p
+        );
         invalidateAllCache(state);
       })
       .addCase(marcarNoRenueva.rejected, (state, action) => {
@@ -767,12 +819,70 @@ const renovacionesSlice = createSlice({
         const { polizaId } = action.payload || {};
         if (polizaId != null)
           setActionSuccess(state, polizaId, "desmarcar_no_renueva");
+        // Limpiamos los flags localmente
+        state.items = (state.items || []).map((p) =>
+          p.id === polizaId
+            ? {
+                ...p,
+                renovacion_descartada: false,
+                renovacion_descartada_motivo: null,
+                renovacion_descartada_detalle: "",
+                renovacion_descartada_en: null,
+              }
+            : p
+        );
         invalidateAllCache(state);
       })
       .addCase(desmarcarNoRenueva.rejected, (state, action) => {
         const id = action.payload?.polizaId ?? action.meta.arg?.polizaId;
         const msg = action.payload?.message || "Error al deshacer";
         if (id != null) setActionError(state, id, "desmarcar_no_renueva", msg);
+      })
+
+      // ── 🆕 VERIFICAR ──
+      .addCase(verificarRenovacion.pending, (state, action) => {
+        const id = action.meta.arg?.polizaId;
+        if (id != null) setActionLoading(state, id, "verificar");
+      })
+      .addCase(verificarRenovacion.fulfilled, (state, action) => {
+        const { polizaId, data } = action.payload || {};
+        if (polizaId != null) setActionSuccess(state, polizaId, "verificar");
+        state.items = (state.items || []).map((p) =>
+          p.id === polizaId
+            ? {
+                ...p,
+                renovacion_verificada: true,
+                renovacion_verificada_en: data?.renovacion_verificada_en || new Date().toISOString(),
+              }
+            : p
+        );
+        invalidateAllCache(state);
+      })
+      .addCase(verificarRenovacion.rejected, (state, action) => {
+        const id = action.payload?.polizaId ?? action.meta.arg?.polizaId;
+        const msg = action.payload?.message || "Error al verificar";
+        if (id != null) setActionError(state, id, "verificar", msg);
+      })
+
+      // ── 🆕 DES-VERIFICAR ──
+      .addCase(desVerificarRenovacion.pending, (state, action) => {
+        const id = action.meta.arg?.polizaId;
+        if (id != null) setActionLoading(state, id, "des_verificar");
+      })
+      .addCase(desVerificarRenovacion.fulfilled, (state, action) => {
+        const { polizaId } = action.payload || {};
+        if (polizaId != null) setActionSuccess(state, polizaId, "des_verificar");
+        state.items = (state.items || []).map((p) =>
+          p.id === polizaId
+            ? { ...p, renovacion_verificada: false, renovacion_verificada_en: null }
+            : p
+        );
+        invalidateAllCache(state);
+      })
+      .addCase(desVerificarRenovacion.rejected, (state, action) => {
+        const id = action.payload?.polizaId ?? action.meta.arg?.polizaId;
+        const msg = action.payload?.message || "Error al deshacer verificación";
+        if (id != null) setActionError(state, id, "des_verificar", msg);
       })
 
       .addCase(fetchRenovacionesOficinas.fulfilled, (state, action) => {

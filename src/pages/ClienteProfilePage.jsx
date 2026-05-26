@@ -120,11 +120,36 @@ const ClienteProfilePage = () => {
   }
 
   if (detailStatus === 'failed' || (status === 'failed' && !clienteParaMostrar)) {
+    // 🚨 Distinguimos el tipo de error para mostrar un mensaje útil
+    const httpStatus = detailError?.status || null;
+    let titulo, mensaje, icono;
+
+    if (httpStatus === 404) {
+      titulo = "Cliente no disponible";
+      mensaje = "Este cliente pertenece a otra oficina o ya no existe. No tenés permisos para acceder a su ficha.";
+    } else if (httpStatus === 403) {
+      titulo = "Acceso denegado";
+      mensaje = "Tu usuario no tiene permisos para ver este cliente.";
+    } else if (httpStatus === 401) {
+      titulo = "Sesión expirada";
+      mensaje = "Volvé a iniciar sesión para continuar.";
+    } else if (httpStatus >= 500) {
+      titulo = "Error del servidor";
+      mensaje = "El servidor tuvo un problema. Probá de nuevo en unos minutos.";
+    } else {
+      titulo = "Error de Conexión";
+      mensaje = "No se pudo cargar la ficha del cliente.";
+    }
+
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
         <HiExclamationCircle className="text-rose-500/50 text-6xl mb-4" />
-        <p className="text-sm font-bold text-rose-400 uppercase tracking-widest">Error de Conexión</p>
-        <button onClick={() => navigate('/clientes')} className="mt-6 px-6 py-3 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+        <p className="text-sm font-bold text-rose-400 uppercase tracking-widest">{titulo}</p>
+        <p className="text-sm text-slate-400 mt-2 max-w-md">{mensaje}</p>
+        {httpStatus && (
+          <p className="text-[10px] text-slate-600 mt-2 font-mono">HTTP {httpStatus}</p>
+        )}
+        <button onClick={() => navigate('/clientes')} className="mt-6 px-6 py-3 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px] hover:bg-white/10 transition-colors">
           Volver al Directorio
         </button>
       </div>

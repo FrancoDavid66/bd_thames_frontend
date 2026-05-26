@@ -77,7 +77,13 @@ export const fetchClienteById = createAsyncThunk(
       if (axios.isCancel?.(error) || error?.name === "CanceledError") {
         return rejectWithValue({ aborted: true });
       }
-      return rejectWithValue(error.response?.data || error.message || "Error al obtener cliente");
+      // 🚨 Capturamos también el status HTTP para distinguir 404 (sin permisos)
+      // de otros errores en la UI.
+      return rejectWithValue({
+        status: error?.response?.status || null,
+        data: error?.response?.data || null,
+        message: error?.message || "Error al obtener cliente",
+      });
     }
   },
   {

@@ -6,7 +6,8 @@ import {
   FaHome, FaClipboardList, FaUsers, FaFileAlt, FaMoneyCheckAlt,
   FaEllipsisH, FaBullhorn, FaMapMarkedAlt, FaChartBar, FaChartPie,
   FaDatabase, FaSyncAlt, FaTimes, FaBan, FaCashRegister, FaClock,
-  FaFileInvoiceDollar, FaCarCrash, FaTruckMoving, FaShieldAlt
+  FaFileInvoiceDollar, FaCarCrash, FaTruckMoving, FaShieldAlt,
+  FaReceipt, // 🚀 NUEVO ÍCONO PARA SERVICIOS FIJOS
 } from "react-icons/fa";
 
 import { useAuth } from "../../context/AuthContext";
@@ -26,7 +27,9 @@ export default function MobileTopBar({
   solPendienteEnvio = 0,
   renovacionesPendientes = 0,
   bajasPendientes = 0,
-  cuponVencidas = 0, 
+  cuponVencidas = 0,
+  // 🚀 NUEVO
+  serviciosAlertas = 0,
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -36,9 +39,9 @@ export default function MobileTopBar({
   const MOBILE_NAV_H = 68;
   const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
-  const isVendedor = user?.perfil?.rol === 'VENDEDOR'; // 🚀 NUEVO
+  const isVendedor = user?.perfil?.rol === 'VENDEDOR';
 
-  // 🌟 Pestañas de Abajo (Las más usadas cambian según el rol)
+  // 🌟 Pestañas de Abajo
   const primaryTabs = useMemo(() => {
     if (isVendedor) {
       return [
@@ -56,9 +59,24 @@ export default function MobileTopBar({
     ];
   }, [solTotal, isVendedor]);
 
-  // 🚀 Tramos del Menú "MÁS" organizados por Secciones (El vendedor no tiene menú MÁS)
+  // 🚀 Tramos del Menú "MÁS"
   const menuSections = useMemo(() => {
-    if (isVendedor) return []; // El vendedor no tiene secciones extras.
+    if (isVendedor) return [];
+
+    // 🚀 Items de Finanzas (con servicios fijos solo para admin)
+    const finanzasItems = [
+      { to: "/recaudacion", label: "Caja Local", icon: FaCashRegister },
+      { to: "/balanzes", label: "Balances", icon: FaDatabase },
+    ];
+
+    if (isWebAdmin) {
+      finanzasItems.push({
+        to: "/servicios",
+        label: "Servicios Fijos",
+        icon: FaReceipt,
+        badge: serviciosAlertas,
+      });
+    }
 
     return [
       {
@@ -75,10 +93,7 @@ export default function MobileTopBar({
       {
         title: "Finanzas",
         color: "text-emerald-300",
-        items: [
-          { to: "/recaudacion", label: "Caja Local", icon: FaCashRegister },
-          { to: "/balanzes", label: "Balances", icon: FaDatabase },
-        ]
+        items: finanzasItems,
       },
       ...(isWebAdmin ? [{
         title: "Gerencia & Admin",
@@ -94,10 +109,17 @@ export default function MobileTopBar({
         ]
       }] : [])
     ];
-  }, [isWebAdmin, isVendedor, cuponVencidas, renovacionesPendientes, bajasPendientes]);
+  }, [isWebAdmin, isVendedor, cuponVencidas, renovacionesPendientes, bajasPendientes, serviciosAlertas]);
 
   const isPrimaryActive = (to) => location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
   const sheetBottom = `calc(${MOBILE_NAV_H}px + env(safe-area-inset-bottom, 0px) + 10px)`;
+
+  // 🚀 Calculamos el total de alertas para el botón "Más"
+  const moreBadgeTotal = useMemo(() => {
+    return menuSections.reduce((acc, section) => {
+      return acc + section.items.reduce((sum, item) => sum + (Number(item.badge) || 0), 0);
+    }, 0);
+  }, [menuSections]);
 
   return (
     <>
@@ -143,11 +165,15 @@ export default function MobileTopBar({
                           onClick={() => { setMoreOpen(false); navigate(to); }}
                           className="cursor-pointer relative flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-3 text-left text-xs font-semibold text-white hover:bg-white/10 active:scale-[0.99] transition"
                         >
-                          <span className={`relative inline-flex items-center justify-center h-7 w-7 rounded-lg ${section.title === 'Finanzas' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10'}`}>
-                            <Icon />
-                            <Badge value={badge} />
+                          <span className={`relative inline-flex items-center justify-center h-7 w-7 rounded-lg ${
+                            section.title === 'Finanzas' ? 'bg-emerald-500/15 text-emerald-300' :
+                            section.title === 'Gerencia & Admin' ? 'bg-purple-500/15 text-purple-300' :
+                            'bg-blue-500/15 text-blue-300'
+                          }`}>
+                            <Icon className="h-3.5 w-3.5" />
+                            {badge > 0 && <Badge value={badge} />}
                           </span>
-                          <span className="min-w-0 truncate">{label}</span>
+                          <span className="truncate">{label}</span>
                         </button>
                       ))}
                     </div>
@@ -159,45 +185,51 @@ export default function MobileTopBar({
         )}
       </AnimatePresence>
 
-      <motion.nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-blue-800/95 dark:bg-gray-900/95 border-t border-blue-700 dark:border-gray-800 backdrop-blur"
-        style={{ height: `${MOBILE_NAV_H}px`, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-        initial={{ y: 18, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
+      {/* Barra fija inferior */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-950 border-t border-slate-200 dark:border-gray-800 shadow-lg"
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          height: `calc(${MOBILE_NAV_H}px + env(safe-area-inset-bottom, 0px))`,
+        }}
       >
-        <ul className="flex h-full">
-          {primaryTabs.map(({ to, label, icon: Icon, badge }) => (
-            <li key={to} className="flex-1">
+        <div className="flex items-center justify-around h-full px-1">
+          {primaryTabs.map(({ to, label, icon: Icon, badge }) => {
+            const active = isPrimaryActive(to);
+            return (
               <NavLink
+                key={to}
                 to={to}
-                className={() => `group relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${isPrimaryActive(to) ? "text-yellow-300" : "text-gray-300 hover:text-white"}`}
+                end={to === "/"}
+                className={`relative flex flex-col items-center justify-center flex-1 h-full transition gap-0.5 ${
+                  active ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+                }`}
               >
-                <span className="relative inline-flex items-center justify-center h-6 w-6 rounded-md">
-                  <Icon />
-                  <Badge value={badge} />
-                </span>
-                <span className="leading-none">{label}</span>
+                <div className="relative">
+                  <Icon className="h-5 w-5" />
+                  {badge > 0 && <Badge value={badge} />}
+                </div>
+                <span className="text-[10px] font-semibold leading-tight">{label}</span>
               </NavLink>
-            </li>
-          ))}
-          
-          {/* Si es vendedor, no renderizamos el botón Más porque no hay menú extra */}
+            );
+          })}
+
           {!isVendedor && (
-            <li className="flex-1">
-              <button
-                onClick={() => setMoreOpen(true)}
-                className="cursor-pointer group relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-gray-300 hover:text-white"
-              >
-                <span className="inline-flex items-center justify-center h-6 w-6 rounded-md">
-                  <FaEllipsisH />
-                </span>
-                <span className="leading-none">Más</span>
-              </button>
-            </li>
+            <button
+              onClick={() => setMoreOpen(true)}
+              className={`relative flex flex-col items-center justify-center flex-1 h-full transition gap-0.5 ${
+                moreOpen ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              <div className="relative">
+                <FaEllipsisH className="h-5 w-5" />
+                {moreBadgeTotal > 0 && <Badge value={moreBadgeTotal} />}
+              </div>
+              <span className="text-[10px] font-semibold leading-tight">Más</span>
+            </button>
           )}
-        </ul>
-      </motion.nav>
+        </div>
+      </nav>
     </>
   );
 }

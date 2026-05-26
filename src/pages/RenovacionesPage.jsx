@@ -27,6 +27,8 @@ import {
   renovarPoliza,
   marcarNoRenueva,
   desmarcarNoRenueva,
+  verificarRenovacion,
+  desVerificarRenovacion,
   fetchRenovacionesOficinas,
   fetchRenovacionesResumen,
   fetchRenovacionesGlobalResumen,
@@ -44,6 +46,10 @@ import RenovacionesFiltersBar from "../components/renovaciones/RenovacionesFilte
 import RenovacionesBucketsBar from "../components/renovaciones/RenovacionesBucketsBar";
 import RenovacionesTabs from "../components/renovaciones/RenovacionesTabs";
 import Renovacionestable from "../components/renovaciones/Renovacionestable";
+import DescartarRenovacionModal from "../components/renovaciones/DescartarRenovacionModal";
+import ProgresoDelDia from "../components/renovaciones/ProgresoDelDia";
+import PolizaYaRenovadaModal from "../components/renovaciones/PolizaYaRenovadaModal";
+import { useRenovacionesProgreso } from "../hooks/useRenovacionesProgreso";
 import { useAuth } from "../context/AuthContext";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
@@ -81,7 +87,17 @@ function isRenovada(p) {
 }
 
 function isMarcadaNoRenueva(p) {
-  return !!(p?.no_renueva_manual || p?.motivo_no_renueva || p?.no_renueva);
+  // 🚀 Campo nuevo del backend (renovacion_descartada). Mantenemos legacy por si quedó algo viejo.
+  return !!(
+    p?.renovacion_descartada ||
+    p?.no_renueva_manual ||
+    p?.motivo_no_renueva ||
+    p?.no_renueva
+  );
+}
+
+function isVerificada(p) {
+  return !!p?.renovacion_verificada;
 }
 
 function isVencidaSinGestion(p) {
@@ -198,7 +214,7 @@ function normalizeOficinaOption(x) {
  * Componente principal
  * ========================================================= */
 
-const TABS_VALIDAS = ["pendientes", "renovadas", "no_renovaron"];
+const TABS_VALIDAS = ["pendientes", "en_seguimiento", "renovadas", "no_renovaron"];
 
 export default function RenovacionesPage() {
   dayjs.locale("es");
@@ -248,7 +264,19 @@ export default function RenovacionesPage() {
 
   // Modal de "marcar no renueva" con motivo opcional
   const [noRenuevaModal, setNoRenuevaModal] = useState({ open: false, item: null });
-  const [noRenuevaMotivo, setNoRenuevaMotivo] = useState("");
+
+  // 🆕 Errores estructurados del backend
+  const [renovarError, setRenovarError] = useState(null);    // banner dentro del modal de renovar
+  const [polizaRenovadaModal, setPolizaRenovadaModal] = useState({ open: false, error: null });
+
+  // 🎮 Gamificación: tracking del progreso del día
+  const {
+    hechasHoy,
+    renovadasHoy,
+    verificadasHoy,
+    descartadasHoy,
+    registrar: registrarProgreso,
+  } = useRenovacionesProgreso();
 
   const loading = status === "loading";
 
@@ -276,14 +304,17 @@ export default function RenovacionesPage() {
 
   /* ============ CARGA DE DATOS según TAB ============
      Estrategia:
-     - tab=pendientes  → endpoint normal (oculta ya renovadas por default).
-     - tab=renovadas   → include_renovadas=1 (trae también las renovadas).
-                         Después filtramos en frontend con es_renovacion=true.
-     - tab=no_renovaron → include_renovadas=1 (necesitamos verlas).
-                         Filtramos en frontend a las que entran en la regla.
+     - tab=pendientes      → endpoint normal (oculta ya renovadas por default).
+                             Filtramos en frontend para quitar las "en seguimiento" también.
+     - tab=en_seguimiento  → endpoint normal (las verificadas siguen apareciendo).
+                             Filtramos en frontend a las que tienen renovacion_verificada=true.
+     - tab=renovadas       → include_renovadas=1 (trae también las renovadas).
+                             Después filtramos en frontend con es_renovacion=true.
+     - tab=no_renovaron    → include_renovadas=1 (necesitamos verlas).
+                             Filtramos en frontend a las que entran en la regla.
   ============================================================== */
 
-  const includeRenovadas = tab !== "pendientes";
+  const includeRenovadas = tab === "renovadas" || tab === "no_renovaron";
 
   const load = useCallback(
     async (opts = {}) => {
@@ -385,9 +416,15 @@ export default function RenovacionesPage() {
 
   const itemsForTab = useMemo(() => {
     if (tab === "pendientes") {
-      // Quitamos las que ya están renovadas o marcadas como no renueva
+      // Quitamos las que ya están renovadas, marcadas como no renueva, o en seguimiento
       return itemsRaw.filter(
-        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p)
+        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p) && !isVerificada(p)
+      );
+    }
+    if (tab === "en_seguimiento") {
+      // Las que el operador está laburando (verificadas pero sin decidir aún)
+      return itemsRaw.filter(
+        (p) => isVerificada(p) && !isRenovada(p) && !isMarcadaNoRenueva(p)
       );
     }
     if (tab === "renovadas") {
@@ -405,7 +442,10 @@ export default function RenovacionesPage() {
   const tabCounts = useMemo(() => {
     return {
       pendientes: itemsRaw.filter(
-        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p)
+        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p) && !isVerificada(p)
+      ).length,
+      en_seguimiento: itemsRaw.filter(
+        (p) => isVerificada(p) && !isRenovada(p) && !isMarcadaNoRenueva(p)
       ).length,
       renovadas: itemsRaw.filter(isRenovada).length,
       no_renovaron: itemsRaw.filter(
@@ -417,6 +457,25 @@ export default function RenovacionesPage() {
   // KPIs específicos del tab activo
   const kpis = useMemo(() => {
     if (tab === "pendientes") {
+      const urgentes = itemsForTab.filter((x) => {
+        const d = x?.dias_para_vencer_poliza;
+        return d != null && Number(d) <= 3;
+      }).length;
+      const venceHoy = itemsForTab.filter((x) => {
+        const d = x?.dias_para_vencer_poliza;
+        return d != null && Number(d) === 0;
+      }).length;
+      const vencidas = itemsForTab.filter((x) => diasVencidaDe(x) > 0).length;
+      return {
+        total: itemsForTab.length,
+        urgentes,
+        venceHoy,
+        vencidas,
+      };
+    }
+
+    if (tab === "en_seguimiento") {
+      // Mismos KPIs que pendientes (son pólizas en gestión activa)
       const urgentes = itemsForTab.filter((x) => {
         const d = x?.dias_para_vencer_poliza;
         return d != null && Number(d) <= 3;
@@ -499,69 +558,105 @@ export default function RenovacionesPage() {
     ? safePage < totalPages
     : receivedCount === pageSize;
 
-  /* ============ Quick buttons (solo en tab pendientes) ============ */
-  const quickButtons = useMemo(
-    () => [
-      { id: "", label: "Todas", count: resumen?.buckets?.todas, tone: "neutral" },
-      { id: "proximos_3", label: "Próx. 3 días", count: resumen?.buckets?.proximos_3, tone: "blue" },
-      { id: "vence_hoy", label: "Hoy", count: resumen?.buckets?.vence_hoy, tone: "yellow" },
-      { id: "vencidas_3", label: "Venc. 3 días", count: resumen?.buckets?.vencidas_3, tone: "red" },
-      { id: "vencidas", label: "Vencidas Antiguas", count: resumen?.buckets?.vencidas, tone: "red" },
-    ],
-    [resumen]
-  );
+  /* ============ Quick buttons — 3 burbujas: Todas / Próximas / Vencidas ============ */
+  // Mantenemos los IDs originales del backend para no romper el filtro server-side.
+  // - "" → Todas
+  // - "proximos_3" → Próximas (incluye hoy + próximos días hábiles)
+  // - "vencidas" → Vencidas (todas las vencidas, antiguas + recientes)
+  const quickButtons = useMemo(() => {
+    const b = resumen?.buckets || {};
+    // Sumamos counts agrupados para reflejar la consolidación
+    const proximas = (Number(b.proximos_3) || 0) + (Number(b.vence_hoy) || 0);
+    const vencidas = (Number(b.vencidas) || 0) + (Number(b.vencidas_3) || 0);
+    return [
+      { id: "", label: "Todas", count: b.todas, tone: "neutral" },
+      { id: "proximos_3", label: "Próximas", count: proximas, tone: "blue" },
+      { id: "vencidas", label: "Vencidas", count: vencidas, tone: "red" },
+    ];
+  }, [resumen]);
 
-  const globalQuickButtons = useMemo(
-    () => [
-      { id: "", label: "Todas", count: globalResumen?.buckets?.todas, tone: "neutral" },
-      { id: "proximos_3", label: "Próx. 3 días", count: globalResumen?.buckets?.proximos_3, tone: "blue" },
-      { id: "vence_hoy", label: "Hoy", count: globalResumen?.buckets?.vence_hoy, tone: "yellow" },
-      { id: "vencidas_3", label: "Venc. 3 días", count: globalResumen?.buckets?.vencidas_3, tone: "red" },
-      { id: "vencidas", label: "Vencidas Antiguas", count: globalResumen?.buckets?.vencidas, tone: "red" },
-    ],
-    [globalResumen]
-  );
+  const globalQuickButtons = useMemo(() => {
+    const b = globalResumen?.buckets || {};
+    const proximas = (Number(b.proximos_3) || 0) + (Number(b.vence_hoy) || 0);
+    const vencidas = (Number(b.vencidas) || 0) + (Number(b.vencidas_3) || 0);
+    return [
+      { id: "", label: "Todas", count: b.todas, tone: "neutral" },
+      { id: "proximos_3", label: "Próximas", count: proximas, tone: "blue" },
+      { id: "vencidas", label: "Vencidas", count: vencidas, tone: "red" },
+    ];
+  }, [globalResumen]);
 
   /* ============ Handlers de "No renueva" ============ */
   const openNoRenuevaModal = useCallback((item) => {
-    setNoRenuevaMotivo("");
     setNoRenuevaModal({ open: true, item });
   }, []);
 
   const closeNoRenuevaModal = useCallback(() => {
     setNoRenuevaModal({ open: false, item: null });
-    setNoRenuevaMotivo("");
   }, []);
 
-  const confirmarNoRenueva = useCallback(async () => {
+  // 🚀 Recibe { motivo, detalle } desde DescartarRenovacionModal
+  const confirmarNoRenueva = useCallback(async ({ motivo, detalle }) => {
     const item = noRenuevaModal.item;
     if (!item?.id) return;
     try {
+      setSubmitting(true);
       await dispatch(
-        marcarNoRenueva({ polizaId: item.id, motivo: noRenuevaMotivo })
+        marcarNoRenueva({ polizaId: item.id, motivo, detalle })
       ).unwrap();
-      toast.success("Marcada como no renueva");
+      registrarProgreso("descartar");
+      toast.success("Marcada como 'no renueva'");
       closeNoRenuevaModal();
       await load({ force: true });
       await loadResumen({ force: true });
     } catch (e) {
-      toast.error(e?.message || "No se pudo marcar (¿endpoint backend pendiente?)");
+      toast.error(e?.message || "No se pudo marcar");
+    } finally {
+      setSubmitting(false);
     }
-  }, [dispatch, noRenuevaModal.item, noRenuevaMotivo, load, loadResumen, closeNoRenuevaModal]);
+  }, [dispatch, noRenuevaModal.item, load, loadResumen, closeNoRenuevaModal, registrarProgreso]);
 
   const handleDesmarcarNoRenueva = useCallback(
     async (item) => {
       if (!item?.id) return;
       try {
         await dispatch(desmarcarNoRenueva({ polizaId: item.id })).unwrap();
-        toast.success("Marca eliminada");
+        toast.success("Marca eliminada — vuelve a Pendientes");
         await load({ force: true });
         await loadResumen({ force: true });
       } catch (e) {
-        toast.error(e?.message || "No se pudo deshacer (¿endpoint backend pendiente?)");
+        toast.error(e?.message || "No se pudo deshacer");
       }
     },
     [dispatch, load, loadResumen]
+  );
+
+  /* ============ Handlers de "Verificar" ============ */
+  const handleVerificar = useCallback(
+    async (item) => {
+      if (!item?.id) return;
+      try {
+        await dispatch(verificarRenovacion({ polizaId: item.id })).unwrap();
+        registrarProgreso("verificar");
+        toast.success("Verificada");
+      } catch (e) {
+        toast.error(e?.message || "No se pudo verificar");
+      }
+    },
+    [dispatch, registrarProgreso]
+  );
+
+  const handleDesVerificar = useCallback(
+    async (item) => {
+      if (!item?.id) return;
+      try {
+        await dispatch(desVerificarRenovacion({ polizaId: item.id })).unwrap();
+        toast.success("Verificación deshecha");
+      } catch (e) {
+        toast.error(e?.message || "No se pudo deshacer");
+      }
+    },
+    [dispatch]
   );
 
   /* =========================================================
@@ -620,46 +715,46 @@ export default function RenovacionesPage() {
           totalCount={totalCount}
         />
 
-        {/* Buckets bar — solo visible en tab Pendientes (es lo que tiene sentido ahí) */}
-        {tab === "pendientes" && (
-          <>
-            {isWebAdmin ? (
-              <div className="flex flex-col gap-6 mt-6">
-                <div>
-                  <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">
-                    Métricas Globales (Toda la Empresa)
-                  </h3>
-                  <RenovacionesBucketsBar
-                    quickButtons={globalQuickButtons}
-                    activeBucket={bucket}
-                    onSelectBucket={setBucket}
-                  />
-                </div>
-                <div>
-                  <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">
-                    Métricas por Sucursal (Según filtro actual)
-                  </h3>
-                  <RenovacionesBucketsBar
-                    quickButtons={quickButtons}
-                    activeBucket={bucket}
-                    onSelectBucket={setBucket}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="mt-6">
-                <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">
-                  Métricas de Tu Sucursal
-                </h3>
-                <RenovacionesBucketsBar
-                  quickButtons={quickButtons}
-                  activeBucket={bucket}
-                  onSelectBucket={setBucket}
-                />
-              </div>
-            )}
-          </>
-        )}
+        {/* ============ TABS principales ============ */}
+        <div className="mt-4">
+          <RenovacionesTabs
+            activeTab={tab}
+            onChange={setTab}
+            counts={tabCounts}
+          />
+        </div>
+
+        {/* ============ 🎮 Barra de progreso del día ============ */}
+        <div className="mt-3">
+          <ProgresoDelDia
+            hechasHoy={hechasHoy}
+            pendientesTotales={tabCounts?.pendientes || 0}
+            renovadasHoy={renovadasHoy}
+            verificadasHoy={verificadasHoy}
+            descartadasHoy={descartadasHoy}
+          />
+        </div>
+
+        {/* ============ Buckets de vencimiento (1 sola fila) ============ */}
+        {/* Si es admin y filtra por una sucursal, mostramos un toggle entre globales y sucursal */}
+        <div className="mt-3">
+          <RenovacionesBucketsBar
+            quickButtons={
+              isWebAdmin && !oficina
+                ? globalQuickButtons
+                : quickButtons
+            }
+            activeBucket={bucket}
+            onSelectBucket={setBucket}
+          />
+          {isWebAdmin && (
+            <div className="mt-1.5 text-[10px] text-white/35 ml-1">
+              {oficina
+                ? "Mostrando métricas de la sucursal seleccionada"
+                : "Mostrando métricas globales (toda la empresa)"}
+            </div>
+          )}
+        </div>
 
         {!!error && (
           <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-200 flex items-center gap-2">
@@ -669,13 +764,8 @@ export default function RenovacionesPage() {
         )}
       </div>
 
-      {/* ============ TABS ============ */}
+      {/* ============ KPIs del tab activo (sin tabs duplicados) ============ */}
       <div className="mb-4 rounded-xl border border-white/10 bg-slate-900/40 px-4 pt-3">
-        <RenovacionesTabs
-          activeTab={tab}
-          onChange={setTab}
-          counts={tabCounts}
-        />
 
         {/* KPIs del tab activo */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 py-4">
@@ -683,6 +773,14 @@ export default function RenovacionesPage() {
             <>
               <KpiCard label="Total" value={kpis.total} tone="neutral" />
               <KpiCard label="Urgentes ≤3d" value={kpis.urgentes} tone="yellow" />
+              <KpiCard label="Vence hoy" value={kpis.venceHoy} tone="red" />
+              <KpiCard label="Ya vencidas" value={kpis.vencidas} tone="red" />
+            </>
+          )}
+          {tab === "en_seguimiento" && (
+            <>
+              <KpiCard label="En seguimiento" value={kpis.total} tone="yellow" />
+              <KpiCard label="Vencen pronto ≤3d" value={kpis.urgentes} tone="yellow" hint="Atención" />
               <KpiCard label="Vence hoy" value={kpis.venceHoy} tone="red" />
               <KpiCard label="Ya vencidas" value={kpis.vencidas} tone="red" />
             </>
@@ -775,20 +873,25 @@ export default function RenovacionesPage() {
         }}
         onMarcarNoRenueva={openNoRenuevaModal}
         onDesmarcarNoRenueva={handleDesmarcarNoRenueva}
+        onVerificar={handleVerificar}
+        onDesVerificar={handleDesVerificar}
       />
 
       {/* ============ Modal de renovación ============ */}
       <RenovacionModal
         open={modalOpen}
         item={selected}
+        error={renovarError}
         onClose={() => {
           if (submitting) return;
           setModalOpen(false);
           setSelected(null);
+          setRenovarError(null);
         }}
         onSubmit={async (payload) => {
           if (!selected?.id) return;
           setSubmitting(true);
+          setRenovarError(null);
 
           const finalPayload = {
             ...(payload || {}),
@@ -805,9 +908,11 @@ export default function RenovacionesPage() {
             ).unwrap();
             const nuevaId = res?.data?.id;
 
+            registrarProgreso("renovar");
             toast.success("Póliza renovada correctamente");
             setModalOpen(false);
             setSelected(null);
+            setRenovarError(null);
 
             if (nuevaId) {
               navigate(`/polizas/${nuevaId}`);
@@ -817,7 +922,44 @@ export default function RenovacionesPage() {
             await load({ force: true });
             await loadResumen({ force: true });
           } catch (e) {
-            toast.error(e?.message || "No se pudo renovar");
+            // 🆕 Detectar error estructurado del backend
+            // Puede venir como e.raw (axios) o e.response.data dependiendo del slice
+            const backendError =
+              e?.raw ||
+              e?.response?.data ||
+              e?.data ||
+              (typeof e === "object" && e?.error ? e : null);
+
+            if (backendError?.error) {
+              // Error estructurado
+              const code = backendError.error;
+
+              if (code === "POLIZA_YA_RENOVADA") {
+                // Cerrar modal de renovar y abrir modal especial
+                setModalOpen(false);
+                setRenovarError(null);
+                setPolizaRenovadaModal({ open: true, error: backendError });
+              } else if (
+                code === "COBERTURA_NO_CONFIGURADA" ||
+                code === "SIN_CUOTAS_REFERENCIA" ||
+                code === "NUMERO_DUPLICADO" ||
+                code === "COMPANIA_INVALIDA"
+              ) {
+                // Mostrar banner DENTRO del modal de renovar
+                setRenovarError(backendError);
+              } else if (code === "POLIZA_FINALIZADA") {
+                // Cerrar modal con toast simple
+                setModalOpen(false);
+                setSelected(null);
+                toast.error(backendError.message);
+              } else {
+                // Otros errores: mostrar banner dentro del modal
+                setRenovarError(backendError);
+              }
+            } else {
+              // Error genérico (red, etc.)
+              toast.error(e?.message || "No se pudo renovar");
+            }
           } finally {
             setSubmitting(false);
           }
@@ -825,97 +967,24 @@ export default function RenovacionesPage() {
         submitting={submitting}
       />
 
+      {/* ============ Modal "Póliza ya renovada" ============ */}
+      <PolizaYaRenovadaModal
+        open={polizaRenovadaModal.open}
+        error={polizaRenovadaModal.error}
+        onClose={() => {
+          setPolizaRenovadaModal({ open: false, error: null });
+          setSelected(null);
+        }}
+      />
+
       {/* ============ Modal "Marcar no renueva" ============ */}
-      {noRenuevaModal.open && (
-        <NoRenuevaModal
-          item={noRenuevaModal.item}
-          motivo={noRenuevaMotivo}
-          setMotivo={setNoRenuevaMotivo}
-          onConfirm={confirmarNoRenueva}
-          onClose={closeNoRenuevaModal}
-        />
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
- * Modal simple para marcar "no renueva" con motivo opcional
- * ========================================================= */
-
-function NoRenuevaModal({ item, motivo, setMotivo, onConfirm, onClose }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
-          <div>
-            <div className="text-lg font-extrabold text-white">
-              Marcar como "no renueva"
-            </div>
-            <div className="mt-1 text-xs text-white/70">
-              {item?.patente ? (
-                <>
-                  <span className="font-semibold text-white font-mono">{item.patente}</span>
-                  {" · "}
-                  {item?.cliente?.apellido}, {item?.cliente?.nombre}
-                </>
-              ) : (
-                "Confirmá la acción"
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1 text-white hover:bg-white/15 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4 space-y-3">
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-amber-100">
-            La póliza saldrá del tab "Pendientes" y aparecerá en "No renovaron".
-            Podés revertirlo desde ese tab con "Deshacer".
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-white/80 mb-1.5 block">
-              Motivo (opcional)
-            </label>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: el cliente vendió el auto, migró a otra compañía, no contesta…"
-              rows={3}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/30 transition-colors"
-              maxLength={300}
-            />
-          </div>
-
-          <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-white hover:bg-white/15 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              className="rounded-xl bg-rose-500/80 hover:bg-rose-500 px-5 py-2 font-extrabold text-white transition-colors"
-            >
-              Confirmar
-            </button>
-          </div>
-        </div>
-      </div>
+      <DescartarRenovacionModal
+        open={noRenuevaModal.open}
+        item={noRenuevaModal.item}
+        onClose={closeNoRenuevaModal}
+        onSubmit={confirmarNoRenueva}
+        submitting={submitting}
+      />
     </div>
   );
 }

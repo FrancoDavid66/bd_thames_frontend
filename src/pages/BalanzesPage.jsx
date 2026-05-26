@@ -24,6 +24,8 @@ import DescargarBalanceDiarioButton from "../components/balanzes/DescargarBalanc
 import BalanceChart from "../components/balanzes/BalanceChart";
 import BalanceExportPanel from "../components/balanzes/BalanceExportPanel";
 import HistorialPagosPanel from "../components/balanzes/HistorialPagosPanel";
+import HistorialIngresosPanel from "../components/balanzes/HistorialIngresosPanel";
+import HistorialEgresosPanel from "../components/balanzes/HistorialEgresosPanel";
 import TransferenciasPanel from "../components/balanzes/TransferenciasPanel";
 import BalanzesSettingsModal from "../components/balanzes/BalanzesSettingsModal";
 
@@ -80,8 +82,10 @@ const TABS = [
   { id: "resumen",   label: "Resumen" },
   { id: "grafico",   label: "Gráfico" },
   { id: "detalle",   label: "Detalle" },
-  { id: "historial",       label: "📋 Historial de Pagos" },
-  { id: "transferencias",  label: "🏦 Transferencias" },
+  { id: "historial",         label: "📋 Historial de Pagos" },
+  { id: "hist_ingresos",     label: "💰 Historial de Ingresos" },
+  { id: "hist_egresos",      label: "💸 Historial de Egresos" },
+  { id: "transferencias",    label: "🏦 Transferencias" },
 ];
 
 const BalancesPage = () => {
@@ -331,8 +335,8 @@ const BalancesPage = () => {
       </div>
 
       {/* Tabs principales */}
-      <div className="mt-2 mb-5 border-b border-zinc-800 flex justify-between items-end">
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="mt-2 mb-5 border-b border-zinc-800 flex flex-wrap justify-between items-end gap-y-2">
+        <div className="flex flex-wrap gap-2 pb-1">
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
             return (
@@ -664,6 +668,20 @@ const BalancesPage = () => {
       {activeTab === "historial" && (
         <section className="mt-2">
           <HistorialPagosPanel oficinasAdmin={oficinasAdmin} />
+        </section>
+      )}
+
+      {/* ── Tab: Historial de Ingresos ── */}
+      {activeTab === "hist_ingresos" && (
+        <section className="mt-2">
+          <HistorialIngresosPanel oficinasAdmin={oficinasAdmin} />
+        </section>
+      )}
+
+      {/* ── Tab: Historial de Egresos ── */}
+      {activeTab === "hist_egresos" && (
+        <section className="mt-2">
+          <HistorialEgresosPanel oficinasAdmin={oficinasAdmin} />
         </section>
       )}
 

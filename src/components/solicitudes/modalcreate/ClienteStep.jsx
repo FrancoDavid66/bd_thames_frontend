@@ -1,11 +1,9 @@
 // src/components/solicitudes/modalcreate/ClienteStep.jsx
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-// 🚀 CORRECCIÓN: Agregado HiUser a la lista de iconos
 import { HiIdentification, HiTrash, HiUpload, HiLocationMarker, HiUser } from "react-icons/hi";
 import { useAuth } from "../../../context/AuthContext";
 
-// Definimos variants inline para animaciones profesionales
 const sectionVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
@@ -14,19 +12,6 @@ const sectionVariants = {
 const inputVariants = {
   initial: { opacity: 0, scale: 0.98 },
   animate: { opacity: 1, scale: 1 },
-  hover: { scale: 1.02 },
-  tap: { scale: 0.98 },
-};
-
-const buttonVariants = {
-  initial: { scale: 1 },
-  hover: { scale: 1.05 },
-  tap: { scale: 0.95 },
-};
-
-const cardVariants = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
   hover: { scale: 1.02 },
   tap: { scale: 0.98 },
 };
@@ -78,22 +63,23 @@ function Input({
   );
 }
 
-function Textarea({ label, value, onChange, className = "" }) {
+function Textarea({ label, value, onChange, placeholder = "", className = "" }) {
   return (
     <motion.label
       className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
       variants={inputVariants}
       initial="initial"
       animate="animate"
-      whileHover="hover"
-      whileTap="tap"
     >
-      <span className="block text-white/80 font-bold uppercase text-[10px] tracking-widest ml-1">{label}</span>
+      <span className="block text-white/80 font-bold uppercase text-[10px] tracking-widest ml-1">
+        {label}
+      </span>
       <textarea
-        rows={3}
+        rows={2}
         value={value}
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:ring-2 ring-rose-500/40 text-white placeholder:text-white/20 transition-all resize-none shadow-inner"
+        className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 outline-none focus:ring-2 ring-sky-500/40 text-white placeholder:text-white/20 transition-all resize-none shadow-inner"
       />
     </motion.label>
   );
@@ -101,93 +87,70 @@ function Textarea({ label, value, onChange, className = "" }) {
 
 function RadioPill({ checked, onChange, label }) {
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onChange}
-      className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-tighter transition-all shadow-lg ${
+      className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
         checked
-          ? "bg-gradient-to-br from-violet-400 to-indigo-500 text-white border-white/20"
-          : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
+          ? "bg-violet-500 text-white shadow-lg shadow-violet-900/40"
+          : "text-white/50 hover:text-white"
       }`}
-      variants={buttonVariants}
-      initial="initial"
-      whileHover="hover"
-      whileTap="tap"
     >
       {label}
-    </motion.button>
+    </button>
   );
 }
 
-function FotoSlot({
-  label,
-  slot,
-  onFile,
-  onRemove,
-  required,
-  accept = "image/*",
-  capture = false,
-}) {
-  const has = !!slot?.url;
-  const isPdf =
-    slot?.mime === "application/pdf" ||
-    (slot?.url || "").toLowerCase().endsWith(".pdf");
+function FotoSlot({ label, slot, accept, capture, onFile, onRemove }) {
+  const isPdf = slot?.mime === "application/pdf" || String(slot?.url || "").toLowerCase().endsWith(".pdf");
   return (
     <motion.div
-      variants={cardVariants}
+      variants={inputVariants}
       initial="initial"
       animate="animate"
-      whileHover="hover"
-      whileTap="tap"
-      className="rounded-xl border border-white/10 bg-black/20 p-2.5 shadow-xl transition-all hover:border-violet-500/30"
+      className="group relative rounded-xl bg-black/30 border border-white/10 overflow-hidden h-32 flex items-center justify-center hover:border-violet-400/40 transition-all"
     >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest ml-1">
-          {label} {required ? <span className="text-rose-400">*</span> : null}
-        </span>
-        {has && (
-          <motion.button
-            type="button"
-            onClick={onRemove}
-            className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
-            variants={buttonVariants}
+      <span className="absolute top-1.5 left-2 z-10 text-[9px] uppercase font-black tracking-widest text-white/70 bg-black/50 px-1.5 py-0.5 rounded">
+        {label}
+      </span>
+      {slot?.url && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1.5 right-1.5 z-10 p-1 rounded-lg bg-rose-500/80 hover:bg-rose-400 text-white opacity-0 group-hover:opacity-100 transition-all"
+        >
+          <HiTrash className="text-xs" />
+        </button>
+      )}
+      {slot?.url ? (
+        isPdf ? (
+          <a
+            href={slot.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-bold text-sky-400 underline decoration-sky-400/30 underline-offset-4"
+            title="Abrir PDF"
           >
-            <HiTrash /> Quitar
-          </motion.button>
-        )}
-      </div>
-
-      <div className="aspect-video rounded-lg overflow-hidden border border-white/5 bg-gray-900 flex items-center justify-center relative group">
-        {has ? (
-          isPdf ? (
-            <a
-              href={slot.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-bold text-sky-400 underline decoration-sky-400/30 underline-offset-4"
-              title="Abrir PDF"
-            >
-              Ver Documento PDF
-            </a>
-          ) : (
-            <img src={slot.url} alt={label} className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
-          )
+            Ver Documento PDF
+          </a>
         ) : (
-          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-white/80 font-bold text-xs border border-white/10 hover:bg-white/10 hover:border-violet-400/50 transition-all active:scale-95">
-            <HiUpload className="text-violet-400" /> Adjuntar
-            <input
-              type="file"
-              accept={accept}
-              {...(capture ? { capture: "environment" } : {})}
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFile(f);
-              }}
-            />
-          </label>
-        )}
-      </div>
+          <img src={slot.url} alt={label} className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
+        )
+      ) : (
+        <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-white/80 font-bold text-xs border border-white/10 hover:bg-white/10 hover:border-violet-400/50 transition-all active:scale-95">
+          <HiUpload className="text-violet-400" /> Adjuntar
+          <input
+            type="file"
+            accept={accept}
+            {...(capture ? { capture: "environment" } : {})}
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+            }}
+          />
+        </label>
+      )}
     </motion.div>
   );
 }
@@ -219,8 +182,8 @@ export default function ClienteStep({
   ],
   onUploadDNI,
 }) {
-  const { user } = useAuth(); // 🚀 Obtenemos el usuario logueado
-  
+  const { user } = useAuth();
+
   const errors = useMemo(() => {
     const e = {};
     if (clienteModo === "existente") {
@@ -264,8 +227,7 @@ export default function ClienteStep({
               </div>
             </div>
         </div>
-        
-        {/* Toggle modo */}
+
         <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10 self-start sm:self-center">
           <RadioPill
             checked={clienteModo === "nuevo"}

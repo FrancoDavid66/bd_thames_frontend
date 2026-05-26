@@ -3,11 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
-import { HiRefresh, HiCheck, HiChatAlt2 } from "react-icons/hi"; 
+import { HiRefresh, HiCheck } from "react-icons/hi";
 // 🗑️ PolizasAPI eliminada porque solo se usaba para renovar
 import { pagarCuota } from "../../store/slices/polizasSlice";
-// 🚀 INSTANCIA SEGURA: Mantenemos el interceptor de Token
-import api from "../../services/api";
+// 🗑️ Import de `api` eliminado — solo se usaba para el post-venta (ahora desactivado).
 
 const today = () => dayjs().startOf("day");
 
@@ -61,7 +60,6 @@ export default function CuotasPanel({ poliza, polizaId }) {
   }, [poliza?.cuotas]);
 
   const [busyIds, setBusyIds] = useState({});
-  const [enviandoPostVenta, setEnviandoPostVenta] = useState(false); 
 
   const resumen = useMemo(() => {
     const total = rows.length;
@@ -98,20 +96,7 @@ export default function CuotasPanel({ poliza, polizaId }) {
     }
   };
 
-  const handleEnviarPostVenta = async () => {
-    if (!id) return;
-    setEnviandoPostVenta(true);
-    try {
-      // 🚀 Usamos 'api' centralizada para evitar 401
-      await api.post(`polizas/${id}/enviar-postventa/`);
-      toast.success("Mensaje de post-venta enviado ✅");
-    } catch (err) {
-      console.error("Error Post-Venta:", err);
-      toast.error("Error al enviar mensaje.");
-    } finally {
-      setEnviandoPostVenta(false);
-    }
-  };
+  // 🗑️ handleEnviarPostVenta eliminado — el post-venta automático fue desactivado.
 
   // ─── Helpers de cobertura (misma lógica que PolizaCuotasCard y FacturaCuota) ─
 
@@ -164,17 +149,7 @@ export default function CuotasPanel({ poliza, polizaId }) {
           <h3 className="text-lg sm:text-xl font-semibold text-white">Gestión de Cuotas</h3>
         </div>
         <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
-          {/* BOTÓN POST VENTA */}
-          <button
-            onClick={handleEnviarPostVenta}
-            disabled={enviandoPostVenta}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-3 py-2 transition-colors disabled:opacity-60"
-            title="Enviar mensaje de bienvenida y postventa al cliente"
-          >
-            {enviandoPostVenta ? <HiRefresh className="w-4 h-4 animate-spin" /> : <HiChatAlt2 className="w-4 h-4" />}
-            Enviar Post-Venta
-          </button>
-
+          {/* 🗑️ Botón "Enviar Post-Venta" eliminado — el post-venta automático fue desactivado */}
           {/* 🗑️ Botón de Renovación eliminado de aquí */}
         </div>
       </div>
