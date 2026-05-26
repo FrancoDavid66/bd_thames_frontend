@@ -40,6 +40,7 @@ import CuentasCobroModal from "../components/pagos/CuentasCobroModal";
 import RecordatoriosCuotasModal from "../components/pagos/RecordatoriosCuotasModal";
 import HistorialRecordatorios from "../components/pagos/HistorialRecordatorios";
 import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal"; // 🚀 NUEVO COMPONENTE
+import ReporteContactosModal from "../components/pagos/ReporteContactosModal"; // 🆕 REPORTE PDF/EXCEL
 // 🚨 Sistema unificado de alertas del cliente (siniestros + póliza + cuotas + verificación)
 import AlertasClienteBadges from "../components/pagos/AlertasClienteBadges";
 import AlertasClienteModal from "../components/pagos/AlertasClienteModal";
@@ -620,6 +621,7 @@ const PagosPage = () => {
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
   const [showReporteModal, setShowReporteModal] = useState(false); // 🚀 NUEVO ESTADO
+  const [showContactosModal, setShowContactosModal] = useState(false); // 🆕 REPORTE CONTACTOS
 
   // 🚨 Aviso de alertas: el usuario debe confirmar "Entendido" para poder cobrar.
   // Se resetea cada vez que cambia el cliente seleccionado.
@@ -1074,6 +1076,19 @@ const PagosPage = () => {
                 >
                   <HiChartBar className="text-base sm:text-lg" />
                   <span className="hidden sm:inline">Efectividad</span>
+                </motion.button>
+
+                {/* 🆕 BOTÓN REPORTE CONTACTOS (PDF / Excel) */}
+                <motion.button
+                  type="button"
+                  onClick={() => setShowContactosModal(true)}
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] cursor-pointer border border-violet-500/50 bg-violet-600 hover:bg-violet-500 transition-colors"
+                  title="Descargar listado de clientes para contactar manualmente"
+                >
+                  <HiDownload className="text-base sm:text-lg" />
+                  <span className="hidden sm:inline">Reporte Contactos</span>
                 </motion.button>
               </>
             )}
@@ -1588,6 +1603,14 @@ const PagosPage = () => {
       
       {/* 🚀 MODAL NUEVO */}
       <ReporteEfectividadModal isOpen={showReporteModal} onClose={() => setShowReporteModal(false)} />
+
+      {/* 🆕 MODAL REPORTE CONTACTOS (PDF / Excel) */}
+      <ReporteContactosModal
+        isOpen={showContactosModal}
+        onClose={() => setShowContactosModal(false)}
+        isWebAdmin={isWebAdmin}
+        userOficina={userOficina}
+      />
     </div>
   );
 };
