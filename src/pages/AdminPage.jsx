@@ -1,12 +1,21 @@
 // src/pages/AdminPage.jsx
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { HiShieldCheck, HiOfficeBuilding, HiUsers, HiUserGroup, HiCollection, HiMail } from "react-icons/hi";
+import {
+  HiShieldCheck,
+  HiOfficeBuilding,
+  HiUsers,
+  HiUserGroup,
+  HiCollection,
+  HiMail,
+  HiClipboardCheck, // 🩺 NUEVO: icono para diagnóstico
+} from "react-icons/hi";
 import AdminOficinas from "../components/admin/AdminOficinas";
 import AdminUsuarios from "../components/admin/AdminUsuarios";
 import AdminResponsables from "../components/admin/AdminResponsables";
 import AdminCatalogos from "../components/admin/AdminCatalogos";
 import AdminCorreosBajas from "../components/admin/Admincorreosbajas";
+import AdminDiagnostico from "../components/admin/AdminDiagnostico"; // 🩺 NUEVO
 
 export default function AdminPage() {
   const [tab, setTab] = useState("responsables");
@@ -17,10 +26,18 @@ export default function AdminPage() {
     { key: "responsables",  label: "Responsables",         icon: <HiUserGroup      className="text-lg opacity-80" />, color: "sky" },
     { key: "catalogos",     label: "Catálogos (Aseguradoras)", icon: <HiCollection className="text-lg opacity-80" />, color: "amber" },
     { key: "correos_bajas", label: "Correos de bajas",     icon: <HiMail          className="text-lg opacity-80" />, color: "rose" },
+    // 🩺 NUEVO TAB
+    { key: "diagnostico",   label: "Salud de datos",       icon: <HiClipboardCheck className="text-lg opacity-80" />, color: "emerald" },
   ];
 
   const activeClass = (t) => {
-    const colorMap = { sky: "text-sky-400 border-sky-500/30", amber: "text-amber-400 border-amber-500/30", rose: "text-rose-400 border-rose-500/30", "": "text-white border-slate-700" };
+    const colorMap = {
+      sky: "text-sky-400 border-sky-500/30",
+      amber: "text-amber-400 border-amber-500/30",
+      rose: "text-rose-400 border-rose-500/30",
+      emerald: "text-emerald-400 border-emerald-500/30", // 🩺 NUEVO color
+      "": "text-white border-slate-700",
+    };
     return tab === t.key
       ? `bg-slate-800 shadow-sm border ${colorMap[t.color]} `
       : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent";
@@ -71,6 +88,7 @@ export default function AdminPage() {
           {tab === "responsables"  && <AdminResponsables />}
           {tab === "catalogos"     && <AdminCatalogos />}
           {tab === "correos_bajas" && <AdminCorreosBajas />}
+          {tab === "diagnostico"   && <AdminDiagnostico />} {/* 🩺 NUEVO */}
         </motion.div>
 
       </div>
