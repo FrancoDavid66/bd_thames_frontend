@@ -17,6 +17,11 @@ import {
   HiPencil,
   HiChevronDown,
   HiChevronUp,
+  HiCalendar,
+  HiShieldCheck,
+  HiShieldExclamation,
+  HiExclamation,
+  HiCheck,
 } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO Y COMPONENTES
@@ -89,6 +94,7 @@ import {
   calcCobertura,
   resumenCuotas,
   fmtFecha,
+  ESTADO_CUOTA,
 } from "../../utils/cuotas";
 
 const MONEY_FMT = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -99,6 +105,216 @@ const AUTO_FAST_THRESHOLD = 120;
 const FAST_INITIAL = 40;
 const FAST_STEP = 60;
 const SHOW_FAST_TOGGLE_FROM = 60;
+
+/* ═══════════════════════════════════════════════════════════════════
+   🎯 HELPERS Opción A — frase humana corta + fecha grande
+   ═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Construye {titulo (fecha grande), subtitulo (frase humana), tono} para una cuota.
+ * Lenguaje SIMPLE para operadores nuevos sin experiencia en seguros.
+ */
+function buildFraseEstado(cuota) {
+  if (!cuota) return { titulo: "—", subtitulo: "Sin datos", tono: "neutral" };
+
+  const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
+  const fechaPagoReal = cuota?.pago_registrado_en || cuota?.fecha_pago;
+  const fp = fechaPagoReal ? dayjs(fechaPagoReal).startOf("day") : null;
+  const hoy = dayjs().startOf("day");
+  const estado = getEstadoCuota(cuota);
+
+  // ── PAGADA ──
+  if (estado === ESTADO_CUOTA.PAGADA) {
+    const pagoAtrasado = fp && fv && fp.isAfter(fv);
+
+    if (pagoAtrasado) {
+      const diasAtraso = fp.diff(fv, "day");
+      return {
+        titulo: fmtFecha(fechaPagoReal),
+        subtitulo: `Pagó ${diasAtraso} día${diasAtraso === 1 ? "" : "s"} tarde`,
+        tono: "warning",
+        tooltip: `La cuota vencía el ${fmtFecha(cuota?.fecha_vencimiento)}. El cliente pagó el ${fmtFecha(fechaPagoReal)}, ${diasAtraso} día${diasAtraso === 1 ? "" : "s"} después.`,
+      };
+    }
+    const diasDesdePago = fp ? hoy.diff(fp, "day") : null;
+    let subtitulo;
+    if (diasDesdePago == null) subtitulo = "Pagó a tiempo";
+    else if (diasDesdePago === 0) subtitulo = "Pagó hoy";
+    else if (diasDesdePago === 1) subtitulo = "Pagó ayer";
+    else subtitulo = `Pagó hace ${diasDesdePago} días`;
+    return {
+      titulo: fmtFecha(fechaPagoReal),
+      subtitulo,
+      tono: "success",
+      tooltip: "El cliente pagó esta cuota en término (antes del vencimiento o el mismo día).",
+    };
+  }
+
+  // ── VENCIDA ──
+  if (estado === ESTADO_CUOTA.VENCIDA) {
+    const dias = fv ? fv.diff(hoy, "day") : null;
+    const abs = dias != null ? Math.abs(dias) : "?";
+    return {
+      titulo: fmtFecha(cuota?.fecha_vencimiento),
+      subtitulo: `Lleva ${abs} día${abs === 1 ? "" : "s"} sin pagar`,
+      tono: "danger",
+      tooltip: `Esta cuota tendría que haberse pagado el ${fmtFecha(cuota?.fecha_vencimiento)}. Ya pasaron ${abs} día${abs === 1 ? "" : "s"} y todavía no se pagó.`,
+    };
+  }
+
+  // ── VENCE HOY ──
+  if (estado === ESTADO_CUOTA.VENCE_HOY) {
+    return {
+      titulo: fmtFecha(cuota?.fecha_vencimiento),
+      subtitulo: "Tiene que pagar hoy",
+      tono: "warning",
+      tooltip: "Esta cuota vence hoy. Si el cliente no paga, mañana el auto queda sin cobertura.",
+    };
+  }
+
+  // ── POR VENCER ──
+  if (estado === ESTADO_CUOTA.POR_VENCER) {
+    const dias = fv ? fv.diff(hoy, "day") : null;
+    const subtitulo = dias === 1 ? "Le falta 1 día" : `Le faltan ${dias} días`;
+    return {
+      titulo: fmtFecha(cuota?.fecha_vencimiento),
+      subtitulo,
+      tono: dias != null && dias <= 3 ? "warning" : "neutral",
+      tooltip: `La cuota vence el ${fmtFecha(cuota?.fecha_vencimiento)}. Si no se paga, el auto va a quedar sin cobertura desde esa fecha.`,
+    };
+  }
+
+  // ── PENDIENTE ──
+  return {
+    titulo: "Sin fecha",
+    subtitulo: "Pendiente",
+    tono: "neutral",
+    tooltip: "Esta cuota no tiene fecha de vencimiento cargada.",
+  };
+}
+
+/**
+ * Construye {titulo, subtitulo, tono, tooltip} para la cobertura (auto protegido).
+ * Lenguaje SIMPLE: "AUTO PROTEGIDO" / "AUTO SIN PROTECCIÓN" en vez de "cobertura".
+ */
+function buildFraseCobertura(cobertura, cuota, esCuotaFutura) {
+  if (!cobertura) {
+    return { titulo: "—", subtitulo: "Sin cobertura", tono: "neutral", tooltip: "" };
+  }
+  const hoy = dayjs().startOf("day");
+
+  // ── SIN COBERTURA ──
+  if (cobertura.tipo === "sin_cobertura") {
+    // Si la cuota es FUTURA (todavía no venció), no es urgente: mostramos frase preventiva
+    if (esCuotaFutura) {
+      return {
+        titulo: "Quedará sin cobertura",
+        subtitulo: `Desde el ${fmtFecha(cobertura.desde)}, si no pagan la anterior`,
+        tono: "danger-soft",
+        tooltip: `Si no se paga la cuota anterior antes del ${fmtFecha(cobertura.desde)}, el auto va a quedar sin cobertura del seguro desde esa fecha.`,
+      };
+    }
+
+    // Cuota vencida sin pagar → urgente, rojo fuerte
+    const diasSinCob = cobertura.desde ? hoy.diff(cobertura.desde, "day") : null;
+    let subtitulo;
+    if (diasSinCob == null || diasSinCob < 0) subtitulo = "Desde su vencimiento";
+    else if (diasSinCob === 0) subtitulo = "Desde hoy";
+    else subtitulo = `El auto lleva ${diasSinCob} día${diasSinCob === 1 ? "" : "s"} sin cobertura`;
+    return {
+      titulo: `Sin protección desde ${fmtFecha(cobertura.desde)}`,
+      subtitulo,
+      tono: "danger",
+      tooltip: "El cliente no pagó esta cuota. Su auto NO tiene cobertura del seguro. Si tiene un accidente ahora, la compañía no lo cubre.",
+    };
+  }
+
+  // ── PAGADA CON ATRASO ──
+  if (cobertura.tipo === "atrasado") {
+    return {
+      titulo: `${fmtFecha(cobertura.desde)} → ${fmtFecha(cobertura.hasta)}`,
+      subtitulo: "Protección reactivada por pago tardío",
+      tono: "warning",
+      tooltip: `Como el cliente pagó tarde, la cobertura arrancó 2 días hábiles después del pago. En los días entre el vencimiento y el ${fmtFecha(cobertura.desde)}, el auto NO estuvo cubierto.`,
+    };
+  }
+
+  // ── PAGADA EN TÉRMINO ──
+  if (cuota?.pagado) {
+    return {
+      titulo: `${fmtFecha(cobertura.desde)} → ${fmtFecha(cobertura.hasta)}`,
+      subtitulo: "Cubierto durante este mes",
+      tono: "success",
+      tooltip: "El auto del cliente tuvo cobertura del seguro durante este período. Si tuvo un accidente acá, la compañía lo cubre.",
+    };
+  }
+
+  // ── POR VENCER / VENCE HOY (cuota futura no pagada pero anterior pagada) ──
+  return {
+    titulo: `Hasta el ${fmtFecha(cobertura.hasta)}`,
+    subtitulo: "Cubierto por la cuota anterior",
+    tono: "success",
+    tooltip: "El cliente está cubierto por la cuota anterior que ya pagó. La protección dura hasta el vencimiento de esta cuota.",
+  };
+}
+
+/**
+ * Estilos por tono semántico.
+ */
+const TONO_STYLES = {
+  success: {
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/30",
+    title: "text-emerald-100",
+    subtitle: "text-emerald-300/80",
+    iconColor: "text-emerald-400",
+    label: "text-emerald-300/80",
+  },
+  warning: {
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/30",
+    title: "text-orange-100",
+    subtitle: "text-orange-300/80",
+    iconColor: "text-orange-400",
+    label: "text-orange-300/80",
+  },
+  danger: {
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/30",
+    title: "text-rose-100",
+    subtitle: "text-rose-300/80",
+    iconColor: "text-rose-400",
+    label: "text-rose-300/80",
+  },
+  // "danger-soft" = rojo más suave, para advertencias preventivas (cuotas futuras)
+  "danger-soft": {
+    bg: "bg-rose-500/5",
+    border: "border-rose-500/20",
+    title: "text-rose-200",
+    subtitle: "text-rose-300/70",
+    iconColor: "text-rose-400/70",
+    label: "text-rose-300/70",
+  },
+  neutral: {
+    bg: "bg-slate-900/60",
+    border: "border-slate-800",
+    title: "text-slate-100",
+    subtitle: "text-slate-400",
+    iconColor: "text-slate-400",
+    label: "text-slate-500",
+  },
+};
+
+/**
+ * Devuelve el label del badge en lenguaje simple.
+ */
+function getLabelSimple(state) {
+  if (state === "paid") return "Pagada";
+  if (state === "overdue") return "Sin pagar";
+  return "Falta pagar";
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
 
 function todayKey() { return dayjs().format("YYYY-MM-DD"); }
 function msUntilNextDay() {
@@ -425,30 +641,28 @@ export default function PagosList({
       const state = cuota?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
       const proximoVtoYmd = pickNextVencimientoFromIndex(cuota, getPolizaId(pol, cuota), polizaIndex);
 
-      // Cobertura
+      // 🎯 Cobertura calculada con el helper unificado (cuotas.js)
+      // Tomamos las cuotas de la póliza para que cobertura se calcule bien
+      const cuotasPoliza = Array.isArray(pol?.cuotas) ? pol.cuotas : [cuota];
+      const idxEnPoliza = cuotasPoliza.findIndex((c) => c?.id === cuota?.id);
+      const idxValido = idxEnPoliza >= 0 ? idxEnPoliza : 0;
+      const cobertura = calcCobertura(cuota, cuotasPoliza, idxValido, pol?.fecha_emision);
+
       const pagoAtrasado = cuota?.pagado && fp && fv ? fp.isAfter(fv) : false;
-      const cuotaAnterior  = idx > 0 ? visibleItems[idx - 1] : null;
-      const cuotaSiguiente = idx < visibleItems.length - 1 ? visibleItems[idx + 1] : null;
-      const fvAnterior  = cuotaAnterior?.fecha_vencimiento  ? dayjs(cuotaAnterior.fecha_vencimiento).startOf("day")  : null;
-      const fvSiguiente = cuotaSiguiente?.fecha_vencimiento ? dayjs(cuotaSiguiente.fecha_vencimiento).startOf("day") : null;
+      const sinCobertura = cobertura?.tipo === "sin_cobertura";
 
-      let cubreDesde = null, cubreHasta = null, sinCobertura = false;
-      if (!cuota?.pagado) {
-        sinCobertura = true;
-        cubreDesde = fv;
-      } else if (pagoAtrasado) {
-        cubreDesde = fp ? sumarDiasHabiles(fechaPago, 2) : null;
-        cubreHasta = fvSiguiente || (fv ? fv.add(1, "month") : null);
-      } else {
-        cubreDesde = idx === 0
-          ? (pol?.fecha_emision ? dayjs(pol.fecha_emision).startOf("day") : fv)
-          : (fvAnterior ? fvAnterior.add(1, "day") : null);
-        cubreHasta = fv;
-      }
+      // ¿La cuota es FUTURA? (no venció todavía y no está pagada)
+      const esCuotaFutura = !cuota?.pagado && dias !== null && dias > 0;
 
-      const fmt = (d) => (d && d.isValid && d.isValid()) ? d.format("DD/MM/YYYY") : "—";
-      const cubreDesdeTxt = sinCobertura ? fmt(cubreDesde) : fmt(cubreDesde);
-      const cubreHastaTxt = sinCobertura ? "" : fmt(cubreHasta);
+      // 🎯 Frases humanas amigables Opción A
+      const fraseEstado = buildFraseEstado(cuota);
+      const fraseCobertura = buildFraseCobertura(cobertura, cuota, esCuotaFutura);
+
+      // Número de cuota legible: "Cuota X de Y" (si conocemos el total)
+      const totalCuotasPoliza = cuota?.cantidad_cuotas ?? (cuotasPoliza.length || null);
+      const cuotaTextoFull = totalCuotasPoliza
+        ? `Cuota ${cuota?.cuota_nro ?? "?"} de ${totalCuotasPoliza}`
+        : `Cuota ${cuota?.cuota_nro ?? "?"}`;
 
       return {
         cuota,
@@ -461,16 +675,17 @@ export default function PagosList({
         hasObs: !!(cuota?.observaciones_pago || cuota?.ultima_observacion_pago),
         isObsOpen: obsAbiertaId === cuota?.id,
         state,
-        label: state === "paid" ? "Pagada" : state === "overdue" ? "Vencida" : "Pendiente",
+        label: getLabelSimple(state),
         dias,
         polizaEstado: String(pol?.estado || "").toUpperCase(),
-        venceTxt: fmtDate(cuota?.fecha_vencimiento),
-        pagaTxt: fp ? fmt(fp) : null,
         montoTxt: fmtMoney(cuota?.monto),
-        cubreDesdeTxt,
-        cubreHastaTxt,
         sinCobertura,
         pagoAtrasado,
+        cuotaTextoFull,
+        // 🎯 Datos Opción A
+        fraseEstado,
+        fraseCobertura,
+        esCuotaFutura,
         altaTxt: pol?.fecha_emision ? fmtDate(pol.fecha_emision) : null,
         oficinaLabel: getOficinaName(extractRawOficina(cuota)),
         isWebAdmin,
@@ -878,7 +1093,14 @@ export default function PagosList({
 const CuotaRow = memo(
   function CuotaRow({ model, abrirDetalle, abrirPagar, onToggleObs, abrirModalFecha }) {
     const [expanded, setExpanded] = useState(false);
-    const { cuota, cuotaPdf, nombreCompleto, patente, modelo, observacion, hasObs, isObsOpen, state, label, dias, polizaEstado, venceTxt, pagaTxt, montoTxt, cubreDesdeTxt, cubreHastaTxt, sinCobertura, pagoAtrasado, altaTxt, oficinaLabel, isWebAdmin } = model || {};
+    const {
+      cuota, cuotaPdf, nombreCompleto, patente, modelo, observacion,
+      hasObs, isObsOpen, state, label, dias, polizaEstado,
+      montoTxt, sinCobertura, pagoAtrasado, altaTxt, oficinaLabel, isWebAdmin,
+      cuotaTextoFull,
+      // 🎯 Opción A amigable
+      fraseEstado, fraseCobertura, esCuotaFutura,
+    } = model || {};
     const S = PALETTE[state || "pending"];
 
     const isPolicyVencida = polizaEstado === "VENCIDA";
@@ -887,6 +1109,29 @@ const CuotaRow = memo(
     let extraClasses = "";
     if (isPolicyCancelada && !cuota.pagado) extraClasses = "opacity-60";
     else if (isPolicyVencida && !cuota.pagado) extraClasses = "border-rose-900/50";
+
+    // Estilos por tono para los dos bloques
+    const stEstado = TONO_STYLES[fraseEstado?.tono || "neutral"];
+    const stCob = TONO_STYLES[fraseCobertura?.tono || "neutral"];
+
+    // Iconos según contexto
+    const IconEstado = cuota?.pagado
+      ? HiCheck
+      : (fraseEstado?.tono === "danger" ? HiExclamation : HiCalendar);
+    const IconCob = fraseCobertura?.tono === "danger" || fraseCobertura?.tono === "danger-soft"
+      ? HiShieldExclamation
+      : HiShieldCheck;
+
+    // Labels en lenguaje simple
+    const labelEstado = cuota?.pagado ? "Cuándo pagó" : "Tiene que pagar el";
+    const labelEstadoVencida = "Tenía que pagar el";
+    const labelEstadoFinal = state === "overdue" ? labelEstadoVencida : labelEstado;
+    const labelCobertura = fraseCobertura?.tono === "danger" || fraseCobertura?.tono === "danger-soft"
+      ? "Auto sin protección"
+      : "Auto protegido";
+
+    // Botón de acción con texto simple
+    const textoBtnPagar = isPolicyVencida ? "Cobrar y reactivar el seguro" : "Cobrar esta cuota";
 
     return (
       <>
@@ -914,7 +1159,7 @@ const CuotaRow = memo(
                   )}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-mono">
-                  <span>Cuota #{cuota?.cuota_nro ?? "?"}</span>
+                  <span>{cuotaTextoFull}</span>
                   {patente && <><span>·</span><span>{patente}</span></>}
                 </div>
               </div>
@@ -928,85 +1173,69 @@ const CuotaRow = memo(
               </div>
             </div>
 
-            {/* ═══ FECHAS: pagada/falta + vencimiento ═══ */}
-            <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-              <div>
-                {cuota?.pagado ? (
-                  <>
-                    <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5 flex items-center gap-1">
-                      ✅ Pagada el
-                    </div>
-                    <div className="text-sm font-mono font-semibold text-emerald-400 flex items-center gap-1.5">
-                      {pagaTxt || "—"}
-                      {pagoAtrasado && dias !== null && (
-                        <span className="text-[10px] text-amber-400 font-medium">
-                          (+{Math.abs(dias)}d)
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5 flex items-center gap-1">
-                      {dias !== null && dias < 0 ? "⚠️ Atraso" : "⏳ Falta"}
-                    </div>
-                    <div className={`text-sm font-mono font-semibold ${dias !== null && dias < 0 ? "text-rose-400" : "text-yellow-300"}`}>
-                      {dias !== null
-                        ? (dias < 0 ? `${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"}` : dias === 0 ? "Hoy" : `${dias} día${dias === 1 ? "" : "s"}`)
-                        : "—"}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div>
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5 flex items-center gap-1">
-                  📅 Vencimiento
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-sm font-mono font-semibold ${state === "overdue" ? "text-rose-400" : "text-slate-200"}`}>
-                    {venceTxt || "—"}
-                  </span>
-                  {!cuota?.pagado && (
-                    <button type="button" onClick={() => abrirModalFecha(cuota)} className="text-slate-600 hover:text-slate-300 transition-colors">
-                      <HiPencil className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            {/* ═══ 🎯 OPCIÓN A: Cobertura (IZQUIERDA) + Vencimiento/Pago (DERECHA) ═══ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
 
-            {/* ═══ COBERTURA destacada ═══ */}
-            <div className={`flex items-center gap-2.5 p-2.5 rounded-lg border ${
-              sinCobertura
-                ? "bg-rose-500/10 border-rose-500/30"
-                : pagoAtrasado
-                ? "bg-amber-500/10 border-amber-500/30"
-                : "bg-emerald-500/10 border-emerald-500/30"
-            }`}>
-              <div className="text-base shrink-0">🛡</div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-[9px] uppercase tracking-wider font-bold mb-0.5 ${
-                  sinCobertura ? "text-rose-300" : pagoAtrasado ? "text-amber-300" : "text-emerald-300"
-                }`}>
-                  {sinCobertura ? "Sin cobertura" : pagoAtrasado ? "Cobertura (pago tardío)" : "Cobertura activa"}
-                </div>
-                <div className="text-xs font-mono text-slate-200">
-                  {sinCobertura ? (
-                    <>desde <span className="font-bold">{cubreDesdeTxt}</span></>
-                  ) : (
-                    <>
-                      <span className="font-bold">{cubreDesdeTxt}</span>
-                      <span className={`mx-1.5 ${pagoAtrasado ? "text-amber-400" : "text-emerald-400"}`}>→</span>
-                      <span className="font-bold">{cubreHastaTxt}</span>
-                    </>
+              {/* Bloque 1: COBERTURA — "Auto protegido" / "Auto sin protección" */}
+              <div
+                className={`rounded-lg border ${stCob.bg} ${stCob.border} p-2.5`}
+                title={fraseCobertura?.tooltip || ""}
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <IconCob className={`${stCob.iconColor} text-sm`} />
+                  <div className={`text-[10px] uppercase tracking-wide font-bold ${stCob.label}`}>
+                    {labelCobertura}
+                  </div>
+                  {fraseCobertura?.tooltip && (
+                    <HiQuestionMarkCircle
+                      className={`${stCob.iconColor} opacity-60 text-xs ml-auto cursor-help`}
+                      title={fraseCobertura.tooltip}
+                    />
                   )}
                 </div>
-                {pagoAtrasado && !sinCobertura && (
-                  <div className="text-[10px] text-amber-400/80 mt-0.5">
-                    Activación 48hs hábiles post-pago
-                  </div>
+                <div className={`text-base font-bold ${stCob.title}`}>{fraseCobertura?.titulo || "—"}</div>
+                {fraseCobertura?.subtitulo && (
+                  <div className={`text-[11px] ${stCob.subtitle} mt-0.5`}>{fraseCobertura.subtitulo}</div>
                 )}
               </div>
+
+              {/* Bloque 2: ESTADO — "Cuándo pagó" / "Tiene que pagar el" / "Tenía que pagar el" */}
+              <div
+                className={`rounded-lg border ${stEstado.bg} ${stEstado.border} p-2.5`}
+                title={fraseEstado?.tooltip || ""}
+              >
+                <div className="flex items-center justify-between gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <IconEstado className={`${stEstado.iconColor} text-sm`} />
+                    <div className={`text-[10px] uppercase tracking-wide font-bold ${stEstado.label}`}>
+                      {labelEstadoFinal}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {fraseEstado?.tooltip && (
+                      <HiQuestionMarkCircle
+                        className={`${stEstado.iconColor} opacity-60 text-xs cursor-help`}
+                        title={fraseEstado.tooltip}
+                      />
+                    )}
+                    {!cuota?.pagado && (
+                      <button
+                        type="button"
+                        onClick={() => abrirModalFecha(cuota)}
+                        className="text-slate-500 hover:text-slate-300 transition-colors"
+                        title="Cambiar fecha de vencimiento"
+                      >
+                        <HiPencil className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className={`text-base font-bold ${stEstado.title}`}>{fraseEstado?.titulo || "—"}</div>
+                {fraseEstado?.subtitulo && (
+                  <div className={`text-[11px] ${stEstado.subtitle} mt-0.5`}>{fraseEstado.subtitulo}</div>
+                )}
+              </div>
+
             </div>
 
             {/* ═══ ACCIÓN PRINCIPAL ═══ */}
@@ -1021,7 +1250,7 @@ const CuotaRow = memo(
                   }`}
                 >
                   <HiCash className="w-4 h-4" />
-                  {isPolicyVencida ? "Pagar y reactivar" : "Registrar pago"}
+                  {textoBtnPagar}
                 </button>
               ) : (
                 <div className="flex gap-1.5 w-full">

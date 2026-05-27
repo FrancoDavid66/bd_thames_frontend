@@ -133,14 +133,34 @@ export function diasHastaVencimiento(cuota) {
    ═══════════════════════════════════════════════════════════════════ */
 
 /**
- * Calcula qué período de tiempo cubre una cuota.
+ * 🎯 Calcula qué período de tiempo cubre una cuota.
  *
- * Reglas:
- *   - Si NO está pagada: sin cobertura desde su vencimiento.
- *   - Si está pagada en término: cubre desde el vto anterior (+1 día) hasta su vto.
- *     Si es la primera cuota: cubre desde fecha_emision de la póliza hasta su vto.
- *   - Si está pagada con ATRASO: cubre desde (fecha_pago + 2 días hábiles) hasta
- *     el vto siguiente (o fv + 1 mes si es la última).
+ * MODELO DE NEGOCIO (corregido):
+ * ──────────────────────────────
+ * Las cuotas se pagan POR ADELANTADO.
+ * Cuando alguien paga la cuota #1, está pagando la cobertura del mes que viene.
+ * Cuando se acerca el vencimiento de la #1, debe pagar la #2 para seguir cubierto.
+ *
+ * Por eso, cada cuota cubre DESDE el vencimiento anterior HASTA su propio vencimiento.
+ * - Cuota #1 → cubre desde fecha_emision hasta fecha_vencimiento de la #1
+ * - Cuota #2 → cubre desde vto #1 hasta vto #2
+ * - Cuota #N → cubre desde vto #(N-1) hasta vto #N
+ *
+ * REGLAS:
+ * ──────
+ *   A) Cuota #1 PAGADA → cubre del alta hasta su vencimiento
+ *   B) Cuota #1 IMPAGA → sin cobertura desde el alta (la póliza no arrancó)
+ *
+ *   C) Cuota #N (N>1) PAGADA en término → cubre del vto anterior a su vto
+ *   D) Cuota #N PAGADA con atraso → cubre desde (fecha_pago + 2 días hábiles)
+ *      hasta su vencimiento (la cuota se "activa" tarde)
+ *
+ *   E) Cuota #N (N>1) IMPAGA, pero la anterior está paga →
+ *      la cobertura SE ACABÓ en el vencimiento anterior (que es el inicio de
+ *      esta cuota impaga)
+ *
+ *   F) Cuota #N (N>1) IMPAGA y la anterior TAMBIÉN impaga →
+ *      sin cobertura desde el vto anterior (que es cuando se cortó por la anterior)
  *
  * @param {object} cuota - la cuota actual
  * @param {Array} todasLasCuotas - todas las cuotas de la póliza, ordenadas por cuota_nro
@@ -154,33 +174,51 @@ export function calcCobertura(cuota, todasLasCuotas = [], idx = 0, polizaFechaEm
   const fp = fechaPago ? dayjs(fechaPago).startOf("day") : null;
 
   const cuotaAnterior = idx > 0 ? todasLasCuotas[idx - 1] : null;
-  const cuotaSiguiente = idx < todasLasCuotas.length - 1 ? todasLasCuotas[idx + 1] : null;
   const fvAnterior = cuotaAnterior?.fecha_vencimiento
     ? dayjs(cuotaAnterior.fecha_vencimiento).startOf("day")
     : null;
-  const fvSiguiente = cuotaSiguiente?.fecha_vencimiento
-    ? dayjs(cuotaSiguiente.fecha_vencimiento).startOf("day")
-    : null;
 
+  const emision = polizaFechaEmision ? dayjs(polizaFechaEmision).startOf("day") : null;
   const pagoAtrasado = cuota?.pagado && fp && fv ? fp.isAfter(fv) : false;
 
-  // 1. No pagada → sin cobertura
-  if (!cuota?.pagado) {
-    return { tipo: "sin_cobertura", desde: fv, hasta: null };
+  // Punto de inicio "natural" de esta cuota:
+  //   - cuota #1 → fecha de emisión de la póliza
+  //   - cuota #N → vencimiento de la cuota anterior
+  const inicioPeriodo = idx === 0 ? emision : fvAnterior;
+
+  // ─── CASO 1: Cuota PAGADA ───
+  if (cuota?.pagado) {
+    // 1a) Pagada con atraso → cobertura activa desde (pago + 2 días hábiles)
+    //                          hasta su propio vencimiento
+    if (pagoAtrasado) {
+      const desde = fp ? sumarDiasHabiles(fechaPago, 2) : null;
+      return { tipo: "atrasado", desde, hasta: fv };
+    }
+
+    // 1b) Pagada en término → cubre del inicio del período hasta su vencimiento
+    return { tipo: "ok", desde: inicioPeriodo || fv, hasta: fv };
   }
 
-  // 2. Pagada con atraso → cobertura desde fp+2 días hábiles hasta vto siguiente
-  if (pagoAtrasado) {
-    const desde = fp ? sumarDiasHabiles(fechaPago, 2) : null;
-    const hasta = fvSiguiente || (fv ? fv.add(1, "month") : null);
-    return { tipo: "atrasado", desde, hasta };
+  // ─── CASO 2: Cuota IMPAGA ───
+  // Acá viene el cambio importante: NO siempre es "sin cobertura".
+  // Hay que mirar si la cuota anterior estaba paga.
+
+  // 2a) Cuota #1 impaga → la póliza nunca arrancó, sin cobertura desde la emisión
+  if (idx === 0) {
+    return { tipo: "sin_cobertura", desde: emision || fv, hasta: null };
   }
 
-  // 3. Pagada en término → cobertura normal
-  const desde = idx === 0
-    ? (polizaFechaEmision ? dayjs(polizaFechaEmision).startOf("day") : fv)
-    : (fvAnterior ? fvAnterior.add(1, "day") : null);
-  return { tipo: "ok", desde, hasta: fv };
+  // 2b) Cuota #N (N>1) impaga, pero la ANTERIOR está paga
+  //     → la cobertura DURÓ hasta el vencimiento anterior, ahí se cortó
+  //     → mostramos "sin cobertura DESDE vto anterior"
+  if (cuotaAnterior?.pagado) {
+    return { tipo: "sin_cobertura", desde: fvAnterior || fv, hasta: null };
+  }
+
+  // 2c) Cuota #N impaga y la anterior también impaga
+  //     → sin cobertura desde hace más tiempo (desde el inicio de la anterior, o más)
+  //     → para no romper la UI, mostramos desde el inicio de esta cuota
+  return { tipo: "sin_cobertura", desde: inicioPeriodo || fv, hasta: null };
 }
 
 /* ═══════════════════════════════════════════════════════════════════

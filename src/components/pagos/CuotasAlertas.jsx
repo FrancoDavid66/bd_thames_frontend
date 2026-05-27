@@ -10,8 +10,16 @@ import {
   HiOfficeBuilding,
   HiChevronDown,
   HiShieldCheck,
+  HiQuestionMarkCircle,
 } from "react-icons/hi";
 import { fetchCuotasAVencer } from "../../store/slices/pagosSlice";
+
+// 🎯 Lógica unificada de cuotas (fuente única de verdad)
+import {
+  diasHastaVencimiento,
+  fmtMoney as utilFmtMoney,
+  fmtFecha,
+} from "../../utils/cuotas";
 
 dayjs.locale("es");
 
@@ -72,7 +80,7 @@ const oficinaLabelFromKey = (k) => {
   return "Sin oficina";
 };
 
-/** Extrae un valor “raw” de oficina desde varios posibles campos */
+/** Extrae un valor "raw" de oficina desde varios posibles campos */
 const extractRawOficina = (cuota) => {
   return (
     cuota?.poliza?.oficina ??
@@ -133,13 +141,21 @@ const normalizeCompaniaKey = (raw) => String(raw ?? "").trim().toLowerCase();
 
 const labelCompania = (raw) => String(raw ?? "").trim() || "Sin compañía";
 
-/** Días relativos: fv - hoy */
+/**
+ * 🎯 Calcula días relativos usando helper unificado.
+ * Wrapper para no romper la API existente que pasa (fechaStr, hoy).
+ */
 function getDiasRelativos(fechaStr, hoy) {
+  if (!fechaStr) return null;
   const fv = dayjs(fechaStr);
   if (!fv.isValid()) return null;
+  // Usamos el `hoy` recibido para consistencia (en lugar de today() del util)
   return fv.startOf("day").diff(hoy, "day");
 }
 
+/**
+ * 🎯 Formato de moneda con 2 decimales (más legible para alertas).
+ */
 function fmtMoney(n) {
   return new Intl.NumberFormat("es-AR", {
     minimumFractionDigits: 2,
@@ -147,75 +163,91 @@ function fmtMoney(n) {
   }).format(Number(n || 0));
 }
 
+/**
+ * 🎯 Estilo + texto para una card de cuota según días relativos.
+ * Lenguaje SIMPLE para operadores nuevos.
+ */
 function getCardStyleByDias(dias) {
   if (dias === null) {
     return {
-      label: "Fecha inválida",
+      label: "Sin fecha de vencimiento",
       classes: "bg-neutral-400/20 border-neutral-300/30 text-neutral-100",
       Icon: HiExclamation,
+      tooltip: "Esta cuota no tiene fecha de vencimiento cargada.",
     };
   }
   if (dias < 0) {
+    const abs = Math.abs(dias);
     return {
-      label: `Vencida hace ${Math.abs(dias)} días`,
+      label: `Lleva ${abs} día${abs === 1 ? "" : "s"} sin pagar`,
       classes: "bg-rose-950/30 border-rose-900 text-rose-200",
       Icon: HiExclamation,
+      tooltip: `La cuota tenía que pagarse hace ${abs} día${abs === 1 ? "" : "s"}. El auto está SIN cobertura del seguro desde esa fecha.`,
     };
   }
   if (dias === 0) {
     return {
-      label: "Vence hoy",
+      label: "Tiene que pagar hoy",
       classes: "bg-slate-900 border-slate-700 text-slate-200",
       Icon: HiClock,
+      tooltip: "Esta cuota vence hoy. Si no se cobra, mañana el auto va a quedar sin cobertura.",
     };
   }
   return {
-    label: `Vence en ${dias} días`,
+    label: dias === 1 ? "Le falta 1 día" : `Le faltan ${dias} días`,
     classes: "bg-amber-950/20 border-amber-900 text-amber-200",
     Icon: HiClock,
+    tooltip: `Faltan ${dias} día${dias === 1 ? "" : "s"} para el vencimiento. Hay que avisarle al cliente.`,
   };
 }
 
+/**
+ * 🎯 Buckets con títulos en lenguaje simple para operadores nuevos.
+ *
+ * IMPORTANTE: los `key` se mantienen EXACTAMENTE iguales porque otros
+ * componentes del sistema los referencian. Solo cambian los textos.
+ * El campo `message` (usado para WhatsApp masivo) tampoco se toca.
+ */
 const BUCKETS = [
   {
     key: "3_antes",
-    title: "📌 Por vencer",
-    subtitle: "Vence en 1 a 3 días",
+    title: "📌 Hay que avisarles (vence pronto)",
+    subtitle: "Les faltan 1 a 3 días para pagar",
     message: "📌 Recordatorio: tenés cuotas que vencen pronto",
     match: (d) => d !== null && d >= 1 && d <= 3,
   },
   {
     key: "hoy",
-    title: "⚠️ Vencen hoy",
-    subtitle: "Vence hoy",
+    title: "⚠️ Hay que cobrar HOY",
+    subtitle: "Las cuotas vencen hoy",
     message: "⚠️ Hoy vencen tus cuotas",
     match: (d) => d === 0,
   },
   {
     key: "3_despues",
-    title: "🔔 Atraso leve",
-    subtitle: "Vencida hace 1 a 3 días",
+    title: "🔔 Atrasados pocos días",
+    subtitle: "Llevan 1 a 3 días sin pagar",
     message: "🔔 Tenés cuotas vencidas hace 3 días",
     match: (d) => d !== null && d <= -1 && d >= -3,
   },
   {
     key: "7_despues",
-    title: "❗ Atraso importante",
-    subtitle: "Vencida hace 4 a 7 días",
+    title: "❗ Atrasados 1 semana",
+    subtitle: "Llevan 4 a 7 días sin pagar",
     message: "❗ Atraso importante: cuotas vencidas hace 1 semana",
     match: (d) => d !== null && d <= -4 && d >= -7,
   },
   {
     key: "30_despues",
-    title: "🚨 Último aviso",
-    subtitle: "Vencida hace 30+ días",
+    title: "🚨 Atrasados más de 30 días",
+    subtitle: "Llevan 30 días o más sin pagar",
     message: "🚨 Último aviso para recuperar cobertura: cuotas vencidas hace 30 días",
     match: (d) => d !== null && d <= -30,
   },
   {
     key: "otros",
     title: "Otros",
-    subtitle: "Fuera de los buckets principales",
+    subtitle: "Fuera de los grupos principales",
     message: "Otros vencimientos / atrasos",
     remainder: true,
   },
@@ -232,7 +264,7 @@ function extractCliente(cuota) {
   );
 }
 
-/** Nombre asegurado “robusto” */
+/** Nombre asegurado "robusto" */
 function formatAseguradoName(cuota) {
   const cli = extractCliente(cuota) || {};
   const nombre = String(cli?.nombre || cli?.name || "").trim();
@@ -349,8 +381,11 @@ function openPrintToPDF({ title, header, rows }) {
   w.document.close();
 }
 
+/**
+ * 🎯 Card de cuota en alerta — lenguaje simple para operadores nuevos.
+ */
 function CuotaAlertaCard({ cuota, dias }) {
-  const { label, classes, Icon } = getCardStyleByDias(dias);
+  const { label, classes, Icon, tooltip } = getCardStyleByDias(dias);
 
   const rawOfi = extractRawOficina(cuota);
   const ofiNorm = normalizeOficina3(rawOfi);
@@ -363,6 +398,9 @@ function CuotaAlertaCard({ cuota, dias }) {
   const asegurado = formatAseguradoName(cuota);
   const patente = String(cuota?.poliza?.patente || "").toUpperCase().trim();
   const vehiculo = [cuota?.poliza?.marca, cuota?.poliza?.modelo].filter(Boolean).join(" ").trim();
+
+  // Etiqueta del bloque fecha: si está vencida → "Tenía que pagar el", si no → "Tiene que pagar el"
+  const labelVencimiento = dias !== null && dias < 0 ? "Tenía que pagar el" : "Tiene que pagar el";
 
   return (
     <motion.div
@@ -393,11 +431,21 @@ function CuotaAlertaCard({ cuota, dias }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-sm">
+        {/* 🎯 Estado simple con tooltip */}
+        <div
+          className="flex items-center gap-2 text-sm"
+          title={tooltip}
+        >
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-white/10">
             <Icon className="w-4 h-4" />
           </span>
           <p className="font-medium">{label}</p>
+          {tooltip && (
+            <HiQuestionMarkCircle
+              className="w-3.5 h-3.5 opacity-60 cursor-help"
+              title={tooltip}
+            />
+          )}
         </div>
 
         <p className="opacity-95">
@@ -410,7 +458,7 @@ function CuotaAlertaCard({ cuota, dias }) {
         </p>
 
         <p className="text-sm">
-          Vencimiento:{" "}
+          {labelVencimiento}:{" "}
           <span className="font-semibold">
             {cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).format("DD/MM/YYYY") : "—"}
           </span>
@@ -419,7 +467,7 @@ function CuotaAlertaCard({ cuota, dias }) {
         {cuota.pagado && cuota.fecha_pago && (
           <p className="flex items-center gap-1 text-sm">
             <HiBadgeCheck className="w-4 h-4" />
-            Pagado el: {dayjs(cuota.fecha_pago).format("DD/MM/YYYY")}
+            Pagó el: {dayjs(cuota.fecha_pago).format("DD/MM/YYYY")}
           </p>
         )}
       </div>
@@ -740,7 +788,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
               <HiClock className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
+              <h2 className="text-lg font-semibold">Alertas de cuotas (agrupadas por urgencia)</h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
                 La búsqueda es intencional para que la página cargue más rápido.
               </p>
@@ -751,14 +799,14 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
             type="button"
             onClick={runSearch}
             className="h-9 px-3 rounded-lg border text-sm font-medium transition-colors cursor-pointer bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
-            title="Buscar cuotas a vencer/vencidas"
+            title="Buscar cuotas por vencer o vencidas"
           >
             Buscar
           </button>
         </div>
 
         <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/30 p-4 text-slate-400">
-          Elegí filtros (opcional) y tocá <span className="font-semibold">Buscar</span> para cargar las alertas.
+          Elegí filtros (opcional) y tocá <span className="font-semibold">Buscar</span> para ver las alertas.
         </div>
       </motion.div>
     );
@@ -800,7 +848,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
               <HiClock className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
+              <h2 className="text-lg font-semibold">Alertas de cuotas (agrupadas por urgencia)</h2>
               <p className="text-[11px] text-slate-500 mt-0.5">Sin resultados para esta búsqueda.</p>
             </div>
           </div>
@@ -846,7 +894,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
             <HiClock className="w-5 h-5" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Alertas de cuotas (por bucket)</h2>
+            <h2 className="text-lg font-semibold">Alertas de cuotas (agrupadas por urgencia)</h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
               Mostrando <span className="font-semibold text-slate-50">{totalMostrado}</span> (filtradas) de{" "}
               <span className="font-semibold text-slate-50">{cuotasAVencer.length}</span> (totales)
@@ -1022,7 +1070,7 @@ export default function CuotasAlertas({ oficina, onOficinaChange, isWebAdmin }) 
                   Otros <span className="text-slate-300 font-normal">({otros.length})</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Fuera de 3_antes / hoy / 3_despues / 7_despues / 30_despues
+                  Cuotas que no entran en los grupos principales
                 </p>
               </div>
             </div>

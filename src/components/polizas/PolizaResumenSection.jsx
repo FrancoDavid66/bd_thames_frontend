@@ -208,9 +208,15 @@ function Chip({ tone = "default", children, title }) {
   );
 }
 
-function Stat({ label, value, hint }) {
+/**
+ * 🎯 Stat con tooltip opcional para que operadores nuevos entiendan qué significa cada número.
+ */
+function Stat({ label, value, hint, tooltip }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/90 px-3 sm:px-4 py-3">
+    <div
+      className="rounded-xl border border-gray-800 bg-gray-900/90 px-3 sm:px-4 py-3"
+      title={tooltip || undefined}
+    >
       <div className="text-[11px] sm:text-xs text-white/65">{label}</div>
       <div className="text-lg sm:text-xl font-semibold text-white mt-1">
         {value}
@@ -254,23 +260,52 @@ function getEstadoCuotas(poliza) {
   return { estado: "por_vencer", proximoVto: vto, diff };
 }
 
+/**
+ * 🎯 Chip de estado con palabras simples para operadores nuevos.
+ *
+ *   al_dia      → "Al día"           (verde)
+ *   por_vencer  → "Próximo cobro"    (amarillo) · faltan X días
+ *   vence_hoy   → "Cobrar hoy"       (naranja)
+ *   vencida     → "Atrasado"         (rojo)     · hace X días sin pagar
+ *   pendiente   → "Sin info"         (gris)
+ */
 function EstadoPagosChip({ estado, diff }) {
   const map = {
-    al_dia: { tone: "green", label: "Al día" },
-    por_vencer: { tone: "yellow", label: "Por vencer" },
-    vence_hoy: { tone: "orange", label: "Vence hoy" },
-    vencida: { tone: "red", label: "Con deuda" },
-    pendiente: { tone: "gray", label: "Pendiente" },
+    al_dia: {
+      tone: "green",
+      label: "Al día",
+      tooltip: "Todas las cuotas están pagas. El cliente está en regla.",
+    },
+    por_vencer: {
+      tone: "yellow",
+      label: "Próximo cobro",
+      tooltip: "La próxima cuota está por vencer. Hay que avisarle al cliente para que pague.",
+    },
+    vence_hoy: {
+      tone: "orange",
+      label: "Cobrar hoy",
+      tooltip: "Hoy vence una cuota. Si no se cobra, mañana el auto queda sin cobertura.",
+    },
+    vencida: {
+      tone: "red",
+      label: "Atrasado",
+      tooltip: "Hay cuotas sin pagar. El auto del cliente está sin cobertura del seguro.",
+    },
+    pendiente: {
+      tone: "gray",
+      label: "Sin info",
+      tooltip: "No hay datos suficientes de las cuotas.",
+    },
   };
   const cfg = map[estado] || map.pendiente;
   return (
-    <Chip tone={cfg.tone} title="Estado de pagos">
+    <Chip tone={cfg.tone} title={cfg.tooltip}>
       {cfg.label}
       {estado === "por_vencer" && typeof diff === "number" ? (
-        <span className="text-white/80"> · en {diff} d</span>
+        <span className="text-white/80"> · faltan {diff} día{diff === 1 ? "" : "s"}</span>
       ) : null}
       {estado === "vencida" && typeof diff === "number" ? (
-        <span className="text-white/80"> · hace {Math.abs(diff)} d</span>
+        <span className="text-white/80"> · hace {Math.abs(diff)} día{Math.abs(diff) === 1 ? "" : "s"} sin pagar</span>
       ) : null}
     </Chip>
   );
@@ -490,17 +525,28 @@ export default function PolizaResumenSection({ poliza, onOpenCuotas, polizaId })
               subtitle={numeroPoliza ? `Póliza ${numeroPoliza}` : undefined}
             />
 
+            {/* 🎯 Stats con labels simples + tooltips */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
-              <Stat label="Cuotas pagadas" value={`${pagadas}/${total}`} />
+              <Stat
+                label="Cuotas cobradas"
+                value={`${pagadas} de ${total}`}
+                tooltip={`El cliente ya pagó ${pagadas} cuota${pagadas === 1 ? "" : "s"} de las ${total} totales.`}
+              />
               <Stat
                 label="Progreso"
                 value={`${progresoPct}%`}
-                hint={typeof saldoPendiente === "number" ? `Saldo: ${fmtMoney(saldoPendiente)}` : undefined}
+                hint={typeof saldoPendiente === "number" ? `Falta cobrar: ${fmtMoney(saldoPendiente)}` : undefined}
+                tooltip="Porcentaje de cuotas pagadas sobre el total de la póliza."
               />
               <Stat
-                label="Próximo vencimiento"
+                label="Próxima cuota"
                 value={proximoVtoMostrar ? proximoVtoMostrar.format("DD/MM/YYYY") : "—"}
-                hint={ultimaFechaPago ? `Último pago: ${ultimaFechaPagoStr}` : undefined}
+                hint={ultimaFechaPago ? `Último cobro: ${ultimaFechaPagoStr}` : undefined}
+                tooltip={
+                  proximoVtoMostrar
+                    ? `La próxima cuota a cobrar vence el ${proximoVtoMostrar.format("DD/MM/YYYY")}.`
+                    : "No hay próximas cuotas pendientes."
+                }
               />
               <div className="flex items-center justify-start md:justify-center">
                 <EstadoPagosChip estado={estado} diff={diff} />

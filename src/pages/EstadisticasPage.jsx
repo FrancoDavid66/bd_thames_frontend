@@ -13,6 +13,8 @@ import AseguradosExportModal from "../components/estadisticas/AseguradosExportMo
 import VehiculosPanel from "../components/estadisticas/VehiculosPanel";
 import VehiculosExportModal from "../components/estadisticas/VehiculosExportModal";
 import AltasPolizasPanel from "../components/estadisticas/AltasPolizasPanel";
+// 🆕 NUEVO PANEL: Renovaciones por Oficina
+import RenovacionesPolizasPanel from "../components/estadisticas/RenovacionesPolizasPanel";
 
 import CalidadDatosPanel from "../components/estadisticas/CalidadDatosPanel";
 import DuplicadosPolizasPanel from "../components/estadisticas/DuplicadosPolizasPanel";
@@ -314,6 +316,17 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
       
       <OficinasTable oficinasData={oficinasData} getOficinaNombre={getOficinaNombre} formatMixPercent={formatMixPercent} />
       <AltasPolizasPanel apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} defaultOficina={oficina} />
+
+      {/* 🆕 NUEVO PANEL: Renovaciones por Oficina (solo es_renovacion=true) */}
+      <RenovacionesPolizasPanel
+        apiBase={apiBase}
+        oficinas={oficinasValidas}
+        getOficinaNombre={getOficinaNombre}
+        defaultOficina={oficina}
+        anio={anio}
+        mes={mes}
+      />
+
       <VehiculosPanel apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} defaultOficina={oficina} onOpenExport={() => setShowVehiculosExport(true)} />
       <FutureModulesCard />
 
