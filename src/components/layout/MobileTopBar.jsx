@@ -87,6 +87,7 @@ export default function MobileTopBar({
           { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt, badge: cuponVencidas },
           { to: "/polizas/renovaciones", label: "Renovaciones", icon: FaSyncAlt, badge: renovacionesPendientes },
           { to: "/polizas/bajas", label: "Bajas", icon: FaBan, badge: bajasPendientes },
+          { to: "/polizas/verificacion", label: "Verificación", icon: FaShieldAlt },
           { to: "/siniestros", label: "Siniestros", icon: FaCarCrash },
         ]
       },

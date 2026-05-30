@@ -101,6 +101,7 @@ export default function Sidebar({
           { to: "/polizas/renovaciones",label: "Renovaciones",icon: "refresh", badge: renovacionesPendientes, tone: "amber" },
           { to: "/cuponeras",          label: "Cuponeras",    icon: "receipt", badge: cuponVencidas },
           { to: "/polizas/bajas",      label: "Bajas",        icon: "ban",     badge: bajasPendientes, tone: "red" },
+          { to: "/polizas/verificacion", label: "Verificación", icon: "shield" },
         ]
       },
       {

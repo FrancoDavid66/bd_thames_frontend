@@ -3,29 +3,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import CompetenciaAPI from "../../api/competencia";
 import toast from "react-hot-toast";
 
-const MIS_PRECIOS_KEY = "competencia.misPrecios";
-
-function loadMisPrecios() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(MIS_PRECIOS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveMisPrecios(list) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(MIS_PRECIOS_KEY, JSON.stringify(list || []));
-  } catch {
-    // noop
-  }
-}
-
+/* ============================ STATS ============================ */
 function computeStats(ubicaciones) {
   const rows = Array.isArray(ubicaciones) ? ubicaciones : [];
   const totalRegistros = rows.length;
@@ -46,45 +24,32 @@ function computeStats(ubicaciones) {
     if (row.nombre) nombresSet.add(row.nombre);
 
     const precio =
-      row.precio !== null && row.precio !== undefined
-        ? Number(row.precio)
-        : null;
+      row.precio !== null && row.precio !== undefined ? Number(row.precio) : null;
     const cobertura = row.cobertura || "";
     const compania = row.compania || "";
     const ciudad = row.ciudad || "";
 
-    if (!isNaN(precio) && precio != null) {
+    if (precio != null && !isNaN(precio)) {
       sumaPrecio += precio;
       countPrecio += 1;
       if (minPrecio === null || precio < minPrecio) minPrecio = precio;
       if (maxPrecio === null || precio > maxPrecio) maxPrecio = precio;
 
       if (cobertura) {
-        if (!preciosCobertura[cobertura]) {
-          preciosCobertura[cobertura] = { sum: 0, count: 0 };
-        }
+        if (!preciosCobertura[cobertura]) preciosCobertura[cobertura] = { sum: 0, count: 0 };
         preciosCobertura[cobertura].sum += precio;
         preciosCobertura[cobertura].count += 1;
       }
-
       if (compania) {
-        if (!preciosCompania[compania]) {
-          preciosCompania[compania] = { sum: 0, count: 0 };
-        }
+        if (!preciosCompania[compania]) preciosCompania[compania] = { sum: 0, count: 0 };
         preciosCompania[compania].sum += precio;
         preciosCompania[compania].count += 1;
       }
     }
 
-    if (cobertura) {
-      porCobertura[cobertura] = (porCobertura[cobertura] || 0) + 1;
-    }
-    if (compania) {
-      porCompania[compania] = (porCompania[compania] || 0) + 1;
-    }
-    if (ciudad) {
-      porCiudad[ciudad] = (porCiudad[ciudad] || 0) + 1;
-    }
+    if (cobertura) porCobertura[cobertura] = (porCobertura[cobertura] || 0) + 1;
+    if (compania) porCompania[compania] = (porCompania[compania] || 0) + 1;
+    if (ciudad) porCiudad[ciudad] = (porCiudad[ciudad] || 0) + 1;
   }
 
   const promedioPrecio = countPrecio > 0 ? sumaPrecio / countPrecio : null;
@@ -92,17 +57,12 @@ function computeStats(ubicaciones) {
   const promedioPorCobertura = {};
   for (const key of Object.keys(preciosCobertura)) {
     const info = preciosCobertura[key];
-    if (info.count > 0) {
-      promedioPorCobertura[key] = info.sum / info.count;
-    }
+    if (info.count > 0) promedioPorCobertura[key] = info.sum / info.count;
   }
-
   const promedioPorCompania = {};
   for (const key of Object.keys(preciosCompania)) {
     const info = preciosCompania[key];
-    if (info.count > 0) {
-      promedioPorCompania[key] = info.sum / info.count;
-    }
+    if (info.count > 0) promedioPorCompania[key] = info.sum / info.count;
   }
 
   return {
@@ -119,7 +79,16 @@ function computeStats(ubicaciones) {
   };
 }
 
-// Cargar todo: ubicaciones + competidores
+const safeNum = (v) => {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+};
+
+const asArray = (res) =>
+  Array.isArray(res?.data) ? res.data : res?.data?.results || [];
+
+/* ====================== DATOS PRINCIPALES ====================== */
 export const fetchCompetenciaData = createAsyncThunk(
   "competencia/fetchCompetenciaData",
   async (_, { rejectWithValue }) => {
@@ -128,99 +97,54 @@ export const fetchCompetenciaData = createAsyncThunk(
         CompetenciaAPI.fetchUbicaciones(),
         CompetenciaAPI.fetchCompetidores(),
       ]);
-
-      const ubicaciones = Array.isArray(ubicRes.data)
-        ? ubicRes.data
-        : ubicRes.data?.results || [];
-
-      const competidores = Array.isArray(compRes.data)
-        ? compRes.data
-        : compRes.data?.results || [];
-
-      return {
-        ubicaciones,
-        competidores,
-      };
+      return { ubicaciones: asArray(ubicRes), competidores: asArray(compRes) };
     } catch (err) {
-      console.error("Error fetchCompetenciaData", err);
-      return rejectWithValue(
-        err.response?.data || { detail: "Error cargando datos" }
-      );
+      return rejectWithValue(err.response?.data || { detail: "Error cargando datos" });
     }
   }
 );
 
-// Crear registro (nombre + precio + compañía + cobertura + redes + ubicación)
+/* Crear un registro = (asegura competidor) + crea ubicación */
 export const createRegistro = createAsyncThunk(
   "competencia/createRegistro",
   async (payload, { getState, rejectWithValue }) => {
     try {
-      const {
-        nombre,
-        redes,
-        precio,
-        compania,
-        cobertura,
-        direccion,
-        ciudad,
-        url_maps,
-      } = payload;
+      const { nombre, redes, precio, compania, cobertura, direccion, ciudad, url_maps } =
+        payload;
 
       const nombreTrim = (nombre || "").trim();
-      if (!nombreTrim) {
-        throw new Error("El nombre es obligatorio");
-      }
+      if (!nombreTrim) throw new Error("El nombre es obligatorio");
 
-      const sliceState = getState().competencia || {};
-      const listaCompetidores = Array.isArray(sliceState.competidores)
-        ? sliceState.competidores
-        : [];
-
-      let competidor = listaCompetidores.find(
+      const lista = getState().competencia?.competidores || [];
+      let competidor = lista.find(
         (c) => (c.nombre || "").toLowerCase() === nombreTrim.toLowerCase()
       );
 
-      // Si no existe el competidor, lo creamos
       if (!competidor) {
-        const resNuevo = await CompetenciaAPI.crearCompetidor({
+        const res = await CompetenciaAPI.crearCompetidor({
           nombre: nombreTrim,
           redes: redes || "",
           activo: true,
         });
-        competidor = resNuevo.data;
-      } else if (redes && redes !== competidor.redes) {
-        // Si cambia "redes", actualizamos el competidor
+        competidor = res.data;
+      } else if (redes != null && redes !== competidor.redes) {
         await CompetenciaAPI.actualizarCompetidor(competidor.id, {
           ...competidor,
           redes,
         });
       }
 
-      // Normalizamos precio: si no se puede parsear, mandamos null
-      let safePrecio = null;
-      if (precio !== "" && precio !== null && precio !== undefined) {
-        const n = Number(precio);
-        safePrecio = isNaN(n) ? null : n;
-      }
-
-      // El backend calcula lat/long desde url_maps
-      const ubicacionPayload = {
+      const res = await CompetenciaAPI.crearUbicacion({
         competidor: competidor.id,
-        precio: safePrecio,
+        precio: safeNum(precio),
         compania: compania || "",
         cobertura: cobertura || "",
         direccion: direccion || "",
         ciudad: ciudad || "",
         url_maps: url_maps || "",
-      };
-
-      const resUbic = await CompetenciaAPI.crearUbicacion(ubicacionPayload);
-      return { ubicacion: resUbic.data, competidor };
+      });
+      return { ubicacion: res.data, competidor };
     } catch (err) {
-      console.error("Error createRegistro", err);
-      if (err.response?.data) {
-        console.error("Detalle 400 backend:", err.response.data);
-      }
       return rejectWithValue(
         err.response?.data || { detail: err.message || "Error al crear" }
       );
@@ -228,78 +152,53 @@ export const createRegistro = createAsyncThunk(
   }
 );
 
-// Actualizar registro
+/* Actualizar un registro (una fila de la tabla) */
 export const updateRegistro = createAsyncThunk(
   "competencia/updateRegistro",
   async ({ id, original, data }, { rejectWithValue }) => {
     try {
-      const {
-        nombre,
-        redes,
-        precio,
-        compania,
-        cobertura,
-        direccion,
-        ciudad,
-        url_maps,
-      } = data;
+      const { nombre, redes, precio, compania, cobertura, direccion, ciudad, url_maps } =
+        data;
 
       const nombreTrim = (nombre || "").trim();
-      if (!nombreTrim) {
-        throw new Error("El nombre es obligatorio");
-      }
+      if (!nombreTrim) throw new Error("El nombre es obligatorio");
 
-      let competidor = original?.competidor_obj || null;
+      // 🛠️ FIX: antes intentaba leer original.competidor_obj / competidor_detalle
+      // (que el backend NUNCA manda), por eso editar redes/nombre no guardaba nada.
+      // El id del competidor SÍ viene en la fila como `original.competidor`.
+      const competidorId = original?.competidor;
+      const nombreCambio = nombreTrim !== (original?.nombre || "");
+      const redesCambio = (redes || "") !== (original?.redes || "");
 
-      // Si vino el objeto original con más info, lo usamos
-      if (!competidor && original?.competidor_detalle) {
-        competidor = original.competidor_detalle;
-      }
-
-      // Si no, no tocamos el competidor (solo actualizamos ubicación)
-      if (competidor && redes && redes !== competidor.redes) {
-        await CompetenciaAPI.actualizarCompetidor(competidor.id, {
-          ...competidor,
-          redes,
+      if (competidorId && (nombreCambio || redesCambio)) {
+        await CompetenciaAPI.actualizarCompetidor(competidorId, {
+          nombre: nombreTrim,
+          redes: redes || "",
+          activo: true,
         });
       }
 
-      let safePrecio = null;
-      if (precio !== "" && precio !== null && precio !== undefined) {
-        const n = Number(precio);
-        safePrecio = isNaN(n) ? null : n;
-      }
-
-      const ubicacionPayload = {
-        competidor: original?.competidor,
-        precio: safePrecio,
+      const res = await CompetenciaAPI.actualizarUbicacion(id, {
+        competidor: competidorId,
+        precio: safeNum(precio),
         compania: compania || "",
         cobertura: cobertura || "",
         direccion: direccion || "",
         ciudad: ciudad || "",
         url_maps: url_maps || "",
-      };
+      });
 
-      const resUbic = await CompetenciaAPI.actualizarUbicacion(
-        id,
-        ubicacionPayload
-      );
-      return resUbic.data;
+      // El backend re-aplana nombre/redes en la respuesta de la ubicación,
+      // pero por las dudas los forzamos para que la tabla se vea al instante.
+      return { ...res.data, nombre: nombreTrim, redes: redes || "" };
     } catch (err) {
-      console.error("Error updateRegistro", err);
-      if (err.response?.data) {
-        console.error("Detalle 400 backend:", err.response.data);
-      }
       return rejectWithValue(
-        err.response?.data || {
-          detail: err.message || "Error al actualizar",
-        }
+        err.response?.data || { detail: err.message || "Error al actualizar" }
       );
     }
   }
 );
 
-// Eliminar registro
 export const deleteRegistro = createAsyncThunk(
   "competencia/deleteRegistro",
   async (id, { rejectWithValue }) => {
@@ -307,111 +206,89 @@ export const deleteRegistro = createAsyncThunk(
       await CompetenciaAPI.eliminarUbicacion(id);
       return id;
     } catch (err) {
-      console.error("Error deleteRegistro", err);
-      return rejectWithValue(
-        err.response?.data || { detail: "Error al eliminar" }
-      );
+      return rejectWithValue(err.response?.data || { detail: "Error al eliminar" });
     }
   }
 );
 
-// ==== Mis precios propios (solo front, con localStorage) ====
+/* ================= MIS PRECIOS (ahora vía backend) ================= */
+export const fetchMisPrecios = createAsyncThunk(
+  "competencia/fetchMisPrecios",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await CompetenciaAPI.fetchMisPrecios();
+      return asArray(res);
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { detail: "Error cargando precios" });
+    }
+  }
+);
+
 export const crearMiPrecio = createAsyncThunk(
   "competencia/crearMiPrecio",
-  async (payload, { getState }) => {
-    const state = getState().competencia || {};
-    const current = Array.isArray(state.misPrecios) ? state.misPrecios : [];
-
-    const nextId =
-      current.reduce(
-        (max, item) =>
-          typeof item?.id === "number" && item.id > max ? item.id : max,
-        0
-      ) + 1;
-
-    const nuevo = {
-      id: nextId,
-      cobertura: (payload.cobertura || "").trim(),
-      compania: (payload.compania || "").trim(),
-      ciudad: (payload.ciudad || "").trim(),
-      precio:
-        payload.precio === "" || payload.precio == null
-          ? null
-          : Number(payload.precio),
-      notas: (payload.notas || "").trim(),
-      activo: payload.activo !== false,
-    };
-
-    const updated = [...current, nuevo];
-    saveMisPrecios(updated);
-    return updated;
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await CompetenciaAPI.crearMiPrecio({
+        cobertura: (payload.cobertura || "").trim(),
+        compania: (payload.compania || "").trim(),
+        ciudad: (payload.ciudad || "").trim(),
+        precio: safeNum(payload.precio),
+        notas: (payload.notas || "").trim(),
+        activo: payload.activo !== false,
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { detail: "Error al crear precio" });
+    }
   }
 );
 
 export const actualizarMiPrecio = createAsyncThunk(
   "competencia/actualizarMiPrecio",
-  async ({ id, data }, { getState, rejectWithValue }) => {
-    const state = getState().competencia || {};
-    const current = Array.isArray(state.misPrecios) ? state.misPrecios : [];
-
-    if (!current.some((item) => item.id === id)) {
-      return rejectWithValue({ detail: "Precio propio no encontrado" });
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await CompetenciaAPI.actualizarMiPrecio(id, {
+        cobertura: (data.cobertura || "").trim(),
+        compania: (data.compania || "").trim(),
+        ciudad: (data.ciudad || "").trim(),
+        precio: safeNum(data.precio),
+        notas: (data.notas || "").trim(),
+        activo: data.activo !== false,
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { detail: "Error al actualizar precio" });
     }
-
-    const updated = current.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            ...data,
-            precio:
-              data.precio === "" || data.precio == null
-                ? null
-                : Number(data.precio),
-          }
-        : item
-    );
-
-    saveMisPrecios(updated);
-    return updated;
   }
 );
 
 export const eliminarMiPrecio = createAsyncThunk(
   "competencia/eliminarMiPrecio",
-  async (id, { getState }) => {
-    const state = getState().competencia || {};
-    const current = Array.isArray(state.misPrecios) ? state.misPrecios : [];
-    const updated = current.filter((item) => item.id !== id);
-    saveMisPrecios(updated);
-    return updated;
+  async (id, { rejectWithValue }) => {
+    try {
+      await CompetenciaAPI.eliminarMiPrecio(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { detail: "Error al eliminar precio" });
+    }
   }
 );
 
+/* ============================ SLICE ============================ */
 const competenciaSlice = createSlice({
   name: "competencia",
   initialState: {
     ubicaciones: [],
     competidores: [],
-    misPrecios: loadMisPrecios(),
+    misPrecios: [],
     loading: false,
     saving: false,
     error: null,
-    stats: {
-      totalRegistros: 0,
-      totalCompetidores: 0,
-      promedioPrecio: null,
-      minPrecio: null,
-      maxPrecio: null,
-      porCobertura: {},
-      porCompania: {},
-      porCiudad: {},
-      promedioPorCobertura: {},
-      promedioPorCompania: {},
-    },
+    stats: computeStats([]),
   },
   reducers: {},
   extraReducers: (builder) => {
-    // Fetch
+    // Fetch principal
     builder
       .addCase(fetchCompetenciaData.pending, (state) => {
         state.loading = true;
@@ -419,136 +296,95 @@ const competenciaSlice = createSlice({
       })
       .addCase(fetchCompetenciaData.fulfilled, (state, action) => {
         state.loading = false;
-        const ubicaciones = Array.isArray(action.payload.ubicaciones)
-          ? action.payload.ubicaciones
-          : action.payload.ubicaciones?.results || [];
-
-        const competidores = Array.isArray(action.payload.competidores)
-          ? action.payload.competidores
-          : action.payload.competidores?.results || [];
-
-        state.ubicaciones = ubicaciones;
-        state.competidores = competidores;
+        state.ubicaciones = action.payload.ubicaciones || [];
+        state.competidores = action.payload.competidores || [];
         state.stats = computeStats(state.ubicaciones);
       })
       .addCase(fetchCompetenciaData.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        toast.error("No se pudieron cargar los datos de competencia");
+        toast.error(action.payload?.detail || "Error cargando competencia");
       });
 
     // Crear
     builder
       .addCase(createRegistro.pending, (state) => {
         state.saving = true;
-        state.error = null;
       })
       .addCase(createRegistro.fulfilled, (state, action) => {
         state.saving = false;
         const { ubicacion, competidor } = action.payload;
-
-        if (!Array.isArray(state.ubicaciones)) state.ubicaciones = [];
-        state.ubicaciones.push(ubicacion);
-
-        if (!Array.isArray(state.competidores)) state.competidores = [];
-        const exists = state.competidores.some(
-          (c) => c.id === competidor.id
-        );
-        if (!exists) {
+        if (ubicacion) state.ubicaciones.unshift(ubicacion);
+        if (competidor && !state.competidores.some((c) => c.id === competidor.id)) {
           state.competidores.push(competidor);
         }
-
         state.stats = computeStats(state.ubicaciones);
-        toast.success("Registro creado");
       })
       .addCase(createRegistro.rejected, (state, action) => {
         state.saving = false;
         state.error = action.payload;
-
-        const msgBackend =
-          typeof action.payload === "object" && action.payload !== null
-            ? JSON.stringify(action.payload)
-            : "";
-        console.error("Error crear registro (backend):", msgBackend);
-
-        const detail =
-          (action.payload && action.payload.detail) ||
-          "Error al crear registro de competencia";
-        toast.error(detail);
+        toast.error(action.payload?.detail || "Error al crear registro");
       });
 
     // Actualizar
     builder
       .addCase(updateRegistro.pending, (state) => {
         state.saving = true;
-        state.error = null;
       })
       .addCase(updateRegistro.fulfilled, (state, action) => {
         state.saving = false;
-        const updated = action.payload;
-
-        if (!Array.isArray(state.ubicaciones)) state.ubicaciones = [];
-        const idx = state.ubicaciones.findIndex((u) => u.id === updated.id);
-        if (idx !== -1) {
-          state.ubicaciones[idx] = updated;
-        }
-
+        const idx = state.ubicaciones.findIndex((u) => u.id === action.payload.id);
+        if (idx >= 0) state.ubicaciones[idx] = { ...state.ubicaciones[idx], ...action.payload };
         state.stats = computeStats(state.ubicaciones);
-        toast.success("Registro actualizado");
       })
       .addCase(updateRegistro.rejected, (state, action) => {
         state.saving = false;
         state.error = action.payload;
-        const msgBackend =
-          typeof action.payload === "object" && action.payload !== null
-            ? JSON.stringify(action.payload)
-            : "";
-        console.error("Error actualizar registro (backend):", msgBackend);
-        toast.error(
-          action.payload?.detail || "Error al actualizar registro de competencia"
-        );
+        toast.error(action.payload?.detail || "Error al actualizar registro");
       });
 
     // Eliminar
     builder
       .addCase(deleteRegistro.pending, (state) => {
         state.saving = true;
-        state.error = null;
       })
       .addCase(deleteRegistro.fulfilled, (state, action) => {
         state.saving = false;
-        const id = action.payload;
-
-        if (!Array.isArray(state.ubicaciones)) state.ubicaciones = [];
-        state.ubicaciones = state.ubicaciones.filter((u) => u.id !== id);
-
+        state.ubicaciones = state.ubicaciones.filter((u) => u.id !== action.payload);
         state.stats = computeStats(state.ubicaciones);
         toast.success("Registro eliminado");
       })
       .addCase(deleteRegistro.rejected, (state, action) => {
         state.saving = false;
         state.error = action.payload;
-        toast.error(
-          action.payload?.detail || "Error al eliminar registro de competencia"
-        );
+        toast.error(action.payload?.detail || "Error al eliminar registro");
       });
 
-    // Mis precios (solo front)
+    // Mis precios
     builder
+      .addCase(fetchMisPrecios.fulfilled, (state, action) => {
+        state.misPrecios = action.payload || [];
+      })
       .addCase(crearMiPrecio.fulfilled, (state, action) => {
-        state.misPrecios = Array.isArray(action.payload)
-          ? action.payload
-          : [];
+        state.misPrecios.unshift(action.payload);
+        toast.success("Precio guardado");
+      })
+      .addCase(crearMiPrecio.rejected, (state, action) => {
+        toast.error(action.payload?.detail || "Error al guardar precio");
       })
       .addCase(actualizarMiPrecio.fulfilled, (state, action) => {
-        if (Array.isArray(action.payload)) {
-          state.misPrecios = action.payload;
-        }
+        const idx = state.misPrecios.findIndex((p) => p.id === action.payload.id);
+        if (idx >= 0) state.misPrecios[idx] = action.payload;
+        toast.success("Precio actualizado");
+      })
+      .addCase(actualizarMiPrecio.rejected, (state, action) => {
+        toast.error(action.payload?.detail || "Error al actualizar precio");
       })
       .addCase(eliminarMiPrecio.fulfilled, (state, action) => {
-        if (Array.isArray(action.payload)) {
-          state.misPrecios = action.payload;
-        }
+        state.misPrecios = state.misPrecios.filter((p) => p.id !== action.payload);
+      })
+      .addCase(eliminarMiPrecio.rejected, (state, action) => {
+        toast.error(action.payload?.detail || "Error al eliminar precio");
       });
   },
 });

@@ -18,6 +18,9 @@ import RenovacionesPolizasPanel from "../components/estadisticas/RenovacionesPol
 
 import CalidadDatosPanel from "../components/estadisticas/CalidadDatosPanel";
 import DuplicadosPolizasPanel from "../components/estadisticas/DuplicadosPolizasPanel";
+import DuplicadosClientesPanel from "../components/estadisticas/DuplicadosClientesPanel";
+import AuditoriaMontosPanel from "../components/estadisticas/AuditoriaMontosPanel";
+import PagosDuplicadosPanel from "../components/estadisticas/PagosDuplicadosPanel";
 import ContabilidadPanel from "../components/estadisticas/ContabilidadPanel";
 import EfectividadMensajesPanel from "../components/estadisticas/EfectividadMensajesPanel";
 
@@ -426,6 +429,7 @@ export default function EstadisticasPage() {
           <TabButton active={tab === "asegurados"} onClick={() => setTab("asegurados")}>Asegurados</TabButton>
           <TabButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")}>Contabilidad</TabButton>
           <TabButton active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>Cobranzas</TabButton>
+          <TabButton active={tab === "auditoria"} onClick={() => setTab("auditoria")}>Auditoría</TabButton>
         </div>
 
         <AnimatePresence mode="wait">
@@ -453,6 +457,7 @@ export default function EstadisticasPage() {
 
           {tab === "duplicados" && (
             <motion.div key="duplicados" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+              <DuplicadosClientesPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
               <DuplicadosPolizasPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
             </motion.div>
           )}
@@ -486,6 +491,13 @@ export default function EstadisticasPage() {
                 hasta={hasta} 
                 getOficinaNombre={getOficinaNombre} 
               />
+            </motion.div>
+          )}
+
+          {tab === "auditoria" && (
+            <motion.div key="auditoria" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+              <AuditoriaMontosPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
+              <PagosDuplicadosPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,37 +1,48 @@
 // src/api/competencia.js
-import axios from "axios";
+// 🔒 FIX: usamos la instancia de axios autenticada (inyecta el token y maneja el 401)
+// en lugar de un axios "pelado" sin token.
+import api from "../services/api";
 
-const base = import.meta.env.VITE_API_URL || "/api/";
-const API_BASE = base.endsWith("/") ? base : `${base}/`;
-
-const http = axios.create({
-  baseURL: `${API_BASE}competencia/`,
-});
+const P = "competencia/";
 
 const CompetenciaAPI = {
-  // 👇 Ubicaciones (cada fila de la tabla)
+  // ── Ubicaciones (cada fila de la tabla) ───────────────────────────
   fetchUbicaciones() {
-    return http.get("competidores-ubicaciones/");
+    return api.get(`${P}competidores-ubicaciones/`);
   },
   crearUbicacion(data) {
-    return http.post("competidores-ubicaciones/", data);
+    return api.post(`${P}competidores-ubicaciones/`, data);
   },
   actualizarUbicacion(id, data) {
-    return http.put(`competidores-ubicaciones/${id}/`, data);
+    return api.put(`${P}competidores-ubicaciones/${id}/`, data);
   },
   eliminarUbicacion(id) {
-    return http.delete(`competidores-ubicaciones/${id}/`);
+    return api.delete(`${P}competidores-ubicaciones/${id}/`);
   },
 
-  // 👇 Competidores (solo para manejar el campo "nombre" y "redes")
+  // ── Competidores (nombre + redes) ─────────────────────────────────
   fetchCompetidores() {
-    return http.get("competidores/");
+    return api.get(`${P}competidores/`);
   },
   crearCompetidor(data) {
-    return http.post("competidores/", data);
+    return api.post(`${P}competidores/`, data);
   },
   actualizarCompetidor(id, data) {
-    return http.put(`competidores/${id}/`, data);
+    return api.put(`${P}competidores/${id}/`, data);
+  },
+
+  // ── Mis precios de referencia (ahora persisten en el backend) ─────
+  fetchMisPrecios() {
+    return api.get(`${P}mis-precios/`);
+  },
+  crearMiPrecio(data) {
+    return api.post(`${P}mis-precios/`, data);
+  },
+  actualizarMiPrecio(id, data) {
+    return api.put(`${P}mis-precios/${id}/`, data);
+  },
+  eliminarMiPrecio(id) {
+    return api.delete(`${P}mis-precios/${id}/`);
   },
 };
 

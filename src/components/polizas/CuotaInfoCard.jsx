@@ -134,24 +134,37 @@ function buildFraseEstado(cuota, estado) {
 /**
  * Construye la "frase humana" para la cobertura.
  */
-function buildFraseCobertura(cobertura, estado) {
-  // ── SIN COBERTURA (cuota impaga vencida) ──
+function buildFraseCobertura(cobertura, estado, cuota) {
+  // ── SIN COBERTURA: SOLO si la cuota está impaga Y YA VENCIÓ ──
   if (cobertura.tipo === "sin_cobertura") {
+    // Si todavía NO venció (por vencer / vence hoy), la cobertura sigue activa
+    // hasta su vencimiento. NO está "sin cobertura" todavía.
+    if (estado === ESTADO_CUOTA.POR_VENCER || estado === ESTADO_CUOTA.VENCE_HOY) {
+      return {
+        titulo: `Hasta el ${fmtFecha(cuota?.fecha_vencimiento)}`,
+        subtitulo: estado === ESTADO_CUOTA.VENCE_HOY
+          ? "Cubierta hasta hoy (vence)"
+          : "Cubierta hasta su vencimiento",
+        tono: estado === ESTADO_CUOTA.VENCE_HOY ? "warning" : "success",
+      };
+    }
+
+    // Impaga Y vencida → ahora sí, sin cobertura real
     const diasSinCobertura = cobertura.desde
       ? dayjs().startOf("day").diff(cobertura.desde, "day")
       : null;
 
     let subtitulo;
     if (diasSinCobertura == null || diasSinCobertura < 0) {
-      subtitulo = "Sin cobertura desde su vencimiento";
+      subtitulo = `Desde el ${fmtFecha(cobertura.desde)}`;
     } else if (diasSinCobertura === 0) {
-      subtitulo = "Sin cobertura desde hoy";
+      subtitulo = `Desde hoy (${fmtFecha(cobertura.desde)})`;
     } else {
-      subtitulo = `Sin cobertura hace ${diasSinCobertura} día${diasSinCobertura === 1 ? "" : "s"}`;
+      subtitulo = `Desde el ${fmtFecha(cobertura.desde)} · hace ${diasSinCobertura} día${diasSinCobertura === 1 ? "" : "s"}`;
     }
 
     return {
-      titulo: `Cortada el ${fmtFecha(cobertura.desde)}`,
+      titulo: "Sin cobertura",
       subtitulo,
       tono: "danger",
     };
@@ -169,8 +182,11 @@ function buildFraseCobertura(cobertura, estado) {
   // ── PAGADA EN TÉRMINO (cobertura normal) ──
   // Si la cuota está pagada → ya cubrió ese mes (pasado)
   if (estado === ESTADO_CUOTA.PAGADA) {
+    const d = cobertura.desde;
+    const h = cobertura.hasta;
+    const mismaFecha = d && h && dayjs(d).isSame(dayjs(h), "day");
     return {
-      titulo: `${fmtFecha(cobertura.desde)} → ${fmtFecha(cobertura.hasta)}`,
+      titulo: (!d || mismaFecha) ? `Hasta el ${fmtFecha(h)}` : `${fmtFecha(d)} → ${fmtFecha(h)}`,
       subtitulo: "Cubrió este período",
       tono: "success",
     };
@@ -296,7 +312,7 @@ export default function CuotaInfoCard({
   );
 
   const fraseEstado = useMemo(() => buildFraseEstado(cuota, estado), [cuota, estado]);
-  const fraseCobertura = useMemo(() => buildFraseCobertura(cobertura, estado), [cobertura, estado]);
+  const fraseCobertura = useMemo(() => buildFraseCobertura(cobertura, estado, cuota), [cobertura, estado, cuota]);
 
   const IconEstado = getIcon("estado", fraseEstado.tono);
   const IconCobertura = getIcon("cobertura", fraseCobertura.tono);
@@ -320,18 +336,18 @@ export default function CuotaInfoCard({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <InfoBlock
-          tono={fraseEstado.tono}
-          Icon={IconEstado}
-          label="Vencimiento"
-          titulo={fraseEstado.titulo}
-          subtitulo={fraseEstado.subtitulo}
-        />
-        <InfoBlock
           tono={fraseCobertura.tono}
           Icon={IconCobertura}
           label="Cobertura"
           titulo={fraseCobertura.titulo}
           subtitulo={fraseCobertura.subtitulo}
+        />
+        <InfoBlock
+          tono={fraseEstado.tono}
+          Icon={IconEstado}
+          label="Vencimiento"
+          titulo={fraseEstado.titulo}
+          subtitulo={fraseEstado.subtitulo}
         />
       </div>
     );
@@ -352,23 +368,83 @@ export default function CuotaInfoCard({
           )}
         </div>
 
-        {/* ── Bloque 2: Info de estado + cobertura (grid de 2 columnas) ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 md:px-4">
-          <InfoBlock
-            tono={fraseEstado.tono}
-            Icon={IconEstado}
-            label="Vencimiento"
-            titulo={fraseEstado.titulo}
-            subtitulo={fraseEstado.subtitulo}
-          />
-          <InfoBlock
-            tono={fraseCobertura.tono}
-            Icon={IconCobertura}
-            label="Cobertura"
-            titulo={fraseCobertura.titulo}
-            subtitulo={fraseCobertura.subtitulo}
-          />
-        </div>
+        {/* ── Bloque 2: Fecha de pago → período de cobertura → Vencimiento ── */}
+        {(() => {
+          const fechaPago = cuota?.pago_registrado_en || cuota?.fecha_pago;
+          const pagada = !!cuota?.pagado;
+
+          // Tono del box de vencimiento según el estado de la cuota
+          // Verde = pagada · Naranja = vence hoy · Rojo = vencida impaga · Gris = pendiente sin vencer
+          const vtoStyles = pagada
+            ? TONO_STYLES.success
+            : estado === ESTADO_CUOTA.VENCIDA
+            ? TONO_STYLES.danger
+            : estado === ESTADO_CUOTA.VENCE_HOY
+            ? TONO_STYLES.warning
+            : TONO_STYLES.neutral;
+
+          const pagoStyles = pagada ? TONO_STYLES.success : TONO_STYLES.neutral;
+
+          // Renglón sutil debajo de la fecha de vencimiento
+          const diasVto = diasHastaVencimiento(cuota);
+          let vtoSubtitulo = null;
+          let vtoSubAlerta = false;
+          if (pagada) {
+            vtoSubtitulo = "Cubierta";
+          } else if (estado === ESTADO_CUOTA.VENCIDA) {
+            const d = diasVto != null ? Math.abs(diasVto) : null;
+            vtoSubtitulo = d != null ? `Venció hace ${d} día${d === 1 ? "" : "s"}` : "Vencida";
+            vtoSubAlerta = true;
+          } else if (estado === ESTADO_CUOTA.VENCE_HOY) {
+            vtoSubtitulo = "Vence hoy";
+          } else if (estado === ESTADO_CUOTA.POR_VENCER) {
+            vtoSubtitulo = diasVto === 1 ? "Vence mañana" : `Vence en ${diasVto} días`;
+          }
+
+          return (
+            <div className="flex items-stretch gap-2 flex-1 md:px-4">
+              {/* Box: Fecha de pago */}
+              <div className={`flex-1 rounded-lg border ${pagoStyles.bg} ${pagoStyles.border} p-2.5`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <HiCheck className={`${pagoStyles.iconColor} text-sm`} />
+                  <div className={`text-[10px] uppercase tracking-wide font-bold ${pagoStyles.subtitle}`}>
+                    Fecha de pago
+                  </div>
+                </div>
+                <div className={`text-base font-bold ${pagoStyles.title}`}>
+                  {pagada && fechaPago ? fmtFecha(fechaPago) : "Sin pagar"}
+                </div>
+              </div>
+
+              {/* Flecha central: período de cobertura */}
+              <div className="flex flex-col items-center justify-center shrink-0 px-1">
+                <div className="text-[9px] uppercase tracking-wide font-bold text-neutral-400 text-center leading-tight mb-0.5">
+                  Período de<br />cobertura
+                </div>
+                <div className="text-2xl text-neutral-500 leading-none">→</div>
+              </div>
+
+              {/* Box: Vencimiento */}
+              <div className={`flex-1 rounded-lg border ${vtoStyles.bg} ${vtoStyles.border} p-2.5`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <HiCalendar className={`${vtoStyles.iconColor} text-sm`} />
+                  <div className={`text-[10px] uppercase tracking-wide font-bold ${vtoStyles.subtitle}`}>
+                    Fin de cobertura / Vence
+                  </div>
+                </div>
+                <div className={`text-base font-bold ${vtoStyles.title}`}>
+                  {fmtFecha(cuota?.fecha_vencimiento)}
+                </div>
+                {vtoSubtitulo && (
+                  <div className={`text-[11px] ${vtoStyles.subtitle} mt-0.5 flex items-center gap-1`}>
+                    {vtoSubAlerta && <HiExclamation className="text-xs shrink-0" />}
+                    {vtoSubtitulo}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Bloque 3: Acción ── */}
         {showAction && (

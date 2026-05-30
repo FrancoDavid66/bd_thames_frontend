@@ -1110,26 +1110,6 @@ const CuotaRow = memo(
     if (isPolicyCancelada && !cuota.pagado) extraClasses = "opacity-60";
     else if (isPolicyVencida && !cuota.pagado) extraClasses = "border-rose-900/50";
 
-    // Estilos por tono para los dos bloques
-    const stEstado = TONO_STYLES[fraseEstado?.tono || "neutral"];
-    const stCob = TONO_STYLES[fraseCobertura?.tono || "neutral"];
-
-    // Iconos según contexto
-    const IconEstado = cuota?.pagado
-      ? HiCheck
-      : (fraseEstado?.tono === "danger" ? HiExclamation : HiCalendar);
-    const IconCob = fraseCobertura?.tono === "danger" || fraseCobertura?.tono === "danger-soft"
-      ? HiShieldExclamation
-      : HiShieldCheck;
-
-    // Labels en lenguaje simple
-    const labelEstado = cuota?.pagado ? "Cuándo pagó" : "Tiene que pagar el";
-    const labelEstadoVencida = "Tenía que pagar el";
-    const labelEstadoFinal = state === "overdue" ? labelEstadoVencida : labelEstado;
-    const labelCobertura = fraseCobertura?.tono === "danger" || fraseCobertura?.tono === "danger-soft"
-      ? "Auto sin protección"
-      : "Auto protegido";
-
     // Botón de acción con texto simple
     const textoBtnPagar = isPolicyVencida ? "Cobrar y reactivar el seguro" : "Cobrar esta cuota";
 
@@ -1173,70 +1153,104 @@ const CuotaRow = memo(
               </div>
             </div>
 
-            {/* ═══ 🎯 OPCIÓN A: Cobertura (IZQUIERDA) + Vencimiento/Pago (DERECHA) ═══ */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-
-              {/* Bloque 1: COBERTURA — "Auto protegido" / "Auto sin protección" */}
-              <div
-                className={`rounded-lg border ${stCob.bg} ${stCob.border} p-2.5`}
-                title={fraseCobertura?.tooltip || ""}
-              >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <IconCob className={`${stCob.iconColor} text-sm`} />
-                  <div className={`text-[10px] uppercase tracking-wide font-bold ${stCob.label}`}>
-                    {labelCobertura}
-                  </div>
-                  {fraseCobertura?.tooltip && (
-                    <HiQuestionMarkCircle
-                      className={`${stCob.iconColor} opacity-60 text-xs ml-auto cursor-help`}
-                      title={fraseCobertura.tooltip}
-                    />
-                  )}
+            {/* ═══ Fecha de alta de la póliza — centrada y destacada ═══ */}
+            {altaTxt && (
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2">
+                  <HiCalendar className="text-sky-400 text-base shrink-0" />
+                  <span className="text-[11px] uppercase tracking-wide text-sky-300/80">Póliza dada de alta el</span>
+                  <span className="text-base font-bold text-white">{altaTxt}</span>
                 </div>
-                <div className={`text-base font-bold ${stCob.title}`}>{fraseCobertura?.titulo || "—"}</div>
-                {fraseCobertura?.subtitulo && (
-                  <div className={`text-[11px] ${stCob.subtitle} mt-0.5`}>{fraseCobertura.subtitulo}</div>
-                )}
               </div>
+            )}
 
-              {/* Bloque 2: ESTADO — "Cuándo pagó" / "Tiene que pagar el" / "Tenía que pagar el" */}
-              <div
-                className={`rounded-lg border ${stEstado.bg} ${stEstado.border} p-2.5`}
-                title={fraseEstado?.tooltip || ""}
-              >
-                <div className="flex items-center justify-between gap-1.5 mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <IconEstado className={`${stEstado.iconColor} text-sm`} />
-                    <div className={`text-[10px] uppercase tracking-wide font-bold ${stEstado.label}`}>
-                      {labelEstadoFinal}
+            {/* ═══ Fecha de pago → período de cobertura → Vence (mismo formato que Cuotas) ═══ */}
+            {(() => {
+              const fechaPago = cuota?.pago_registrado_en || cuota?.fecha_pago;
+              const pagada = !!cuota?.pagado;
+
+              // Verde = pagada · Naranja = vence hoy · Rojo = vencida impaga · Gris = pendiente sin vencer
+              const vtoStyles = pagada
+                ? TONO_STYLES.success
+                : state === "overdue"
+                ? TONO_STYLES.danger
+                : dias === 0
+                ? TONO_STYLES.warning
+                : TONO_STYLES.neutral;
+
+              const pagoStyles = pagada ? TONO_STYLES.success : TONO_STYLES.neutral;
+
+              // Renglón sutil debajo de la fecha de vencimiento
+              let vtoSubtitulo = null;
+              let vtoSubAlerta = false;
+              if (pagada) {
+                vtoSubtitulo = "Cubierta";
+              } else if (state === "overdue") {
+                const d = dias != null ? Math.abs(dias) : null;
+                vtoSubtitulo = d != null ? `Venció hace ${d} día${d === 1 ? "" : "s"}` : "Vencida";
+                vtoSubAlerta = true;
+              } else if (dias === 0) {
+                vtoSubtitulo = "Vence hoy";
+              } else if (dias != null && dias > 0) {
+                vtoSubtitulo = dias === 1 ? "Vence mañana" : `Vence en ${dias} días`;
+              }
+
+              return (
+                <div className="flex items-stretch gap-2">
+                  {/* Box: Fecha de pago */}
+                  <div className={`flex-1 rounded-lg border ${pagoStyles.bg} ${pagoStyles.border} p-2.5`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <HiCheck className={`${pagoStyles.iconColor} text-sm`} />
+                      <div className={`text-[10px] uppercase tracking-wide font-bold ${pagoStyles.subtitle}`}>
+                        Fecha de pago
+                      </div>
+                    </div>
+                    <div className={`text-base font-bold ${pagoStyles.title}`}>
+                      {pagada && fechaPago ? fmtFecha(fechaPago) : "Sin pagar"}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {fraseEstado?.tooltip && (
-                      <HiQuestionMarkCircle
-                        className={`${stEstado.iconColor} opacity-60 text-xs cursor-help`}
-                        title={fraseEstado.tooltip}
-                      />
-                    )}
-                    {!cuota?.pagado && (
-                      <button
-                        type="button"
-                        onClick={() => abrirModalFecha(cuota)}
-                        className="text-slate-500 hover:text-slate-300 transition-colors"
-                        title="Cambiar fecha de vencimiento"
-                      >
-                        <HiPencil className="w-3 h-3" />
-                      </button>
+
+                  {/* Flecha central: período de cobertura */}
+                  <div className="flex flex-col items-center justify-center shrink-0 px-1">
+                    <div className="text-[9px] uppercase tracking-wide font-bold text-neutral-400 text-center leading-tight mb-0.5">
+                      Período de<br />cobertura
+                    </div>
+                    <div className="text-2xl text-neutral-500 leading-none">→</div>
+                  </div>
+
+                  {/* Box: Fin de cobertura / Vence */}
+                  <div className={`flex-1 rounded-lg border ${vtoStyles.bg} ${vtoStyles.border} p-2.5`}>
+                    <div className="flex items-center justify-between gap-1.5 mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <HiCalendar className={`${vtoStyles.iconColor} text-sm`} />
+                        <div className={`text-[10px] uppercase tracking-wide font-bold ${vtoStyles.subtitle}`}>
+                          Fin de cobertura / Vence
+                        </div>
+                      </div>
+                      {!cuota?.pagado && (
+                        <button
+                          type="button"
+                          onClick={() => abrirModalFecha(cuota)}
+                          className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                          title="Cambiar fecha de vencimiento"
+                        >
+                          <HiPencil className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className={`text-base font-bold ${vtoStyles.title}`}>
+                      {fmtFecha(cuota?.fecha_vencimiento)}
+                    </div>
+                    {vtoSubtitulo && (
+                      <div className={`text-[11px] ${vtoStyles.subtitle} mt-0.5 flex items-center gap-1`}>
+                        {vtoSubAlerta && <HiExclamation className="text-xs shrink-0" />}
+                        {vtoSubtitulo}
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className={`text-base font-bold ${stEstado.title}`}>{fraseEstado?.titulo || "—"}</div>
-                {fraseEstado?.subtitulo && (
-                  <div className={`text-[11px] ${stEstado.subtitle} mt-0.5`}>{fraseEstado.subtitulo}</div>
-                )}
-              </div>
-
-            </div>
+              );
+            })()}
 
             {/* ═══ ACCIÓN PRINCIPAL ═══ */}
             <div className="flex items-center gap-2 w-full">

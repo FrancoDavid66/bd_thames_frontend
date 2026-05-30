@@ -37,6 +37,7 @@ import RenovacionesPage from "./pages/RenovacionesPage";
 import VencimientosPage from "./pages/VencimientosPage";
 import BajasPage from "./pages/BajasPage";
 import RecaudacionPage from "./pages/RecaudacionPage";
+import VerificacionCompaniaPage from "./pages/VerificacionCompaniaPage";
 
 // 🚀 NUEVA APP: SERVICIOS Y GASTOS FIJOS
 import ServiciosPage from "./pages/ServiciosPage";
@@ -462,6 +463,7 @@ function App() {
                 <Route path="/polizas" element={<PolizasPage />} />
                 <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
                 <Route path="/polizas/bajas" element={<BajasPage />} />
+                <Route path="/polizas/verificacion" element={<VerificacionCompaniaPage />} />
                 <Route path="/polizas/:id" element={<PolizaDetails />} />
                 <Route path="/vencimientos" element={<VencimientosPage />} />
                 <Route path="/pagos" element={<PagosPage />} />

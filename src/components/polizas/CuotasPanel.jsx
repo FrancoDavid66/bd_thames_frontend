@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { pagarCuota } from "../../store/slices/polizasSlice";
 
 // 🎯 ÚNICA fuente de verdad para toda la lógica de cuotas
-import { resumenCuotas } from "../../utils/cuotas";
+import { resumenCuotas, getProximaCuota } from "../../utils/cuotas";
 
 // 🎯 Componente reutilizable para mostrar una cuota
 import CuotaInfoCard from "./CuotaInfoCard";
@@ -26,6 +26,9 @@ export default function CuotasPanel({ poliza, polizaId }) {
 
   // ─── Resumen agregado (delegado al utils unificado) ─────────────────
   const resumen = useMemo(() => resumenCuotas(rows), [rows]);
+
+  // ─── Próxima cuota a pagar (la que se usa para recordatorios) ───────
+  const proximaCuota = useMemo(() => getProximaCuota(rows), [rows]);
 
   const handleMarcarPagada = async (cuota) => {
     if (!cuota?.id || cuota.pagado) return;
@@ -61,6 +64,49 @@ export default function CuotasPanel({ poliza, polizaId }) {
           <div className="text-[11px] uppercase tracking-wide text-white/60">Sección operativa</div>
           <h3 className="text-lg sm:text-xl font-semibold text-white">Gestión de Cuotas</h3>
         </div>
+      </div>
+
+      {/* 🚀 Fechas clave de la póliza — alta + próximo pago, lado a lado */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Fecha de alta */}
+        {poliza?.fecha_emision ? (
+          <div className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5">
+            <span className="text-sky-300 text-lg shrink-0">📅</span>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-sky-300/80">Póliza dada de alta el</span>
+              <span className="text-sm font-bold text-white">
+                {dayjs(poliza.fecha_emision).format("DD/MM/YYYY")}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5">
+            <span className="text-amber-300 text-lg shrink-0">⚠️</span>
+            <span className="text-xs font-medium text-amber-200">
+              Sin fecha de alta cargada. Cargala con EDITAR para que las fechas se calculen bien.
+            </span>
+          </div>
+        )}
+
+        {/* Próximo pago (usado para recordatorios) */}
+        {proximaCuota?.fecha_vencimiento ? (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5">
+            <span className="text-emerald-300 text-lg shrink-0">🔔</span>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-emerald-300/80">Vence (cuota #{proximaCuota.cuota_nro})</span>
+              <span className="text-sm font-bold text-white">
+                {dayjs(proximaCuota.fecha_vencimiento).format("DD/MM/YYYY")}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5">
+            <span className="text-neutral-400 text-lg shrink-0">✅</span>
+            <span className="text-xs font-medium text-neutral-300">
+              No hay cuotas pendientes de pago.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Resumen numérico */}
