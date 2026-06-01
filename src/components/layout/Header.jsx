@@ -1,6 +1,6 @@
 // src/components/layout/Header.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
-import { HiMenu, HiX, HiBell } from "react-icons/hi";
+import { HiMenu, HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp } from "react-icons/hi";
 import { FaPowerOff } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -12,6 +12,12 @@ import { fetchResumen, selectSolicitudesResumen }                   from "../../
 import { fetchCuponerasCounters }                                    from "../../store/slices/cuponesRoboSlice";
 import { fetchRenovacionesGlobalResumen, selectRenovacionesGlobalResumen } from "../../store/slices/renovacionesSlice";
 import { fetchBajasGlobalCounters, selectBajasGlobalCounters }      from "../../store/slices/bajasSlice";
+
+// 🚀 Caja rápida: refresco de datos + modales ya existentes
+import { fetchIngresos } from "../../store/slices/ingresosSlice";
+import { fetchEgresos } from "../../store/slices/egresosSlice";
+import IngresoCreateModal from "../balanzes/IngresoCreateModal";
+import EgresoCreateModal from "../balanzes/EgresoCreateModal";
 
 // 🚀 Banner de atención (pagos pendientes de Micaela)
 import AtencionBanner from "./AtencionBanner";
@@ -112,6 +118,10 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
 
   const [isLoggingOut, setIsLoggingOut]           = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // 🚀 Estado de los modales de Caja Rápida
+  const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
+  const [modalEgresoAbierto, setModalEgresoAbierto]   = useState(false);
 
   const isAdmin       = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const isVendedor    = user?.perfil?.rol === "VENDEDOR";
@@ -225,6 +235,17 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
 
   const closeNotif = useCallback(() => setShowNotifications(false), []);
 
+  // 🚀 Al cerrar cada modal, refrescamos para mantener el tablero al día
+  const cerrarIngreso = () => {
+    setModalIngresoAbierto(false);
+    dispatch(fetchIngresos());
+  };
+
+  const cerrarEgreso = () => {
+    setModalEgresoAbierto(false);
+    dispatch(fetchEgresos());
+  };
+
   // ── Render ───────────────────────────────────────────────────
   return (
     <>
@@ -312,8 +333,28 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
             </span>
           </div>
 
-          {/* Derecha: campana + usuario + logout */}
+          {/* Derecha: caja rápida + campana + usuario + logout */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+
+            {/* 🚀 Caja rápida: Ingreso / Egreso */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setModalIngresoAbierto(true)}
+                title="Cargar Ingreso"
+                className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors focus:outline-none"
+              >
+                <HiArrowCircleDown className="text-xl" />
+                <span className="hidden sm:inline text-sm font-semibold">Ingreso</span>
+              </button>
+              <button
+                onClick={() => setModalEgresoAbierto(true)}
+                title="Cargar Egreso"
+                className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors focus:outline-none"
+              >
+                <HiArrowCircleUp className="text-xl" />
+                <span className="hidden sm:inline text-sm font-semibold">Egreso</span>
+              </button>
+            </div>
 
             {/* Campana — oculta para vendedores */}
             {!isVendedor && (
@@ -374,6 +415,10 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
           </div>
         </div>
       </header>
+
+      {/* 🚀 Modales de Caja Rápida (los mismos que en Balances) */}
+      <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={cerrarIngreso} />
+      <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={cerrarEgreso} />
     </>
   );
 }

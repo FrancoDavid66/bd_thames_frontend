@@ -11,8 +11,11 @@ import { useAuth } from "../context/AuthContext";
 
 import Card from "../components/comunes/Card";
 import BalanceChart from "../components/balanzes/BalanceChart";
-// 🚀 NUEVO: acceso rápido para cargar ingreso/egreso
-import QuickMovimiento from "../components/balanzes/QuickMovimiento";
+
+// 🚀 Modales ya existentes para cargar ingreso / egreso
+import IngresoCreateModal from "../components/balanzes/IngresoCreateModal";
+import EgresoCreateModal from "../components/balanzes/EgresoCreateModal";
+
 import {
   HiChartBar,
   HiCash,
@@ -21,6 +24,8 @@ import {
   HiSparkles,
   HiTrendingUp,
   HiPlusSm,
+  HiArrowCircleDown,
+  HiArrowCircleUp,
 } from "react-icons/hi";
 
 import { fetchIngresos } from "../store/slices/ingresosSlice";
@@ -71,6 +76,10 @@ const HomePage = () => {
     return FRASES_MOTIVADORAS[randomIndex];
   });
 
+  // 🚀 Estado de los modales de Caja Rápida
+  const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
+  const [modalEgresoAbierto, setModalEgresoAbierto] = useState(false);
+
   // ---- STORE ----
   const ingresos = useSelector((state) => state.ingresos?.list || []);
   const egresos = useSelector((state) => state.egresos?.list || []);
@@ -100,6 +109,17 @@ const HomePage = () => {
       })
     );
   }, [dispatch]);
+
+  // 🚀 Al cerrar cada modal, refrescamos para que el tablero quede al día
+  const cerrarIngreso = () => {
+    setModalIngresoAbierto(false);
+    dispatch(fetchIngresos());
+  };
+
+  const cerrarEgreso = () => {
+    setModalEgresoAbierto(false);
+    dispatch(fetchEgresos());
+  };
 
   // Cargar contadores
   useEffect(() => {
@@ -168,10 +188,10 @@ const HomePage = () => {
     visible: (i = 0) => ({
       opacity: 1,
       y: 0,
-      transition: { 
-        duration: 0.5, 
+      transition: {
+        duration: 0.5,
         delay: 0.1 + i * 0.1,
-        ease: "easeOut"
+        ease: "easeOut",
       },
     }),
   };
@@ -188,26 +208,26 @@ const HomePage = () => {
         className="pointer-events-none absolute inset-0 overflow-hidden"
         aria-hidden="true"
       >
-        <motion.div 
+        <motion.div
           className="absolute -top-32 -left-10 h-96 w-96 rounded-full bg-blue-500/10 dark:bg-blue-500/5 blur-3xl"
-          animate={{ 
+          animate={{
             scale: [1, 1.2, 1],
-            opacity: [0.5, 0.8, 0.5]
+            opacity: [0.5, 0.8, 0.5],
           }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
-        <motion.div 
+        <motion.div
           className="absolute -bottom-32 -right-10 h-96 w-96 rounded-full bg-emerald-500/10 dark:bg-emerald-500/5 blur-3xl"
-          animate={{ 
+          animate={{
             scale: [1, 1.5, 1],
-            opacity: [0.3, 0.6, 0.3]
+            opacity: [0.3, 0.6, 0.3],
           }}
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
       <div className="relative mx-auto flex max-w-6xl flex-col gap-6 z-10">
-        
+
         {/* HEADER / BIENVENIDA */}
         <motion.div
           variants={cardVariants}
@@ -249,7 +269,7 @@ const HomePage = () => {
 
         {/* TARJETAS RESUMEN */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          
+
           {/* Primas cobradas */}
           <motion.div
             variants={cardVariants}
@@ -365,7 +385,7 @@ const HomePage = () => {
 
         {/* GRID PRINCIPAL: DASHBOARD + LATERAL */}
         <div className="grid gap-4 lg:grid-cols-3">
-          
+
           {/* Gráfico de balances */}
           <motion.div
             className="lg:col-span-2 col-span-3"
@@ -379,7 +399,7 @@ const HomePage = () => {
 
           {/* Lateral derecho: Tareas y Accesos */}
           <div className="flex flex-col gap-4">
-            
+
             {/* Tareas Pendientes */}
             <motion.div
               variants={cardVariants}
@@ -427,6 +447,31 @@ const HomePage = () => {
                   </h2>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
+
+                  {/* 🚀 NUEVO: Cargar Ingreso */}
+                  <motion.button
+                    type="button"
+                    onClick={() => setModalIngresoAbierto(true)}
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <HiArrowCircleDown className="h-6 w-6 opacity-90" />
+                    <span className="text-xs font-semibold">Cargar Ingreso</span>
+                  </motion.button>
+
+                  {/* 🚀 NUEVO: Cargar Egreso */}
+                  <motion.button
+                    type="button"
+                    onClick={() => setModalEgresoAbierto(true)}
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-rose-600 dark:bg-rose-600/90 p-3 text-white shadow-md shadow-rose-600/20 transition hover:bg-rose-500"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <HiArrowCircleUp className="h-6 w-6 opacity-90" />
+                    <span className="text-xs font-semibold">Cargar Egreso</span>
+                  </motion.button>
+
                   <motion.button
                     type="button"
                     className="flex flex-col items-center justify-center gap-2 rounded-xl bg-blue-600 dark:bg-blue-600/90 p-3 text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-500"
@@ -436,7 +481,7 @@ const HomePage = () => {
                     <HiPlusSm className="h-6 w-6 opacity-80" />
                     <span className="text-xs font-semibold">Nueva Póliza</span>
                   </motion.button>
-                  
+
                   <motion.button
                     type="button"
                     className="flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -446,7 +491,7 @@ const HomePage = () => {
                     <HiUsers className="h-5 w-5 opacity-70" />
                     <span className="text-xs font-semibold">Nuevo Cliente</span>
                   </motion.button>
-                  
+
                   <motion.button
                     type="button"
                     className="flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
@@ -456,7 +501,7 @@ const HomePage = () => {
                     <HiCash className="h-5 w-5 opacity-80" />
                     <span className="text-xs font-semibold">Ir a Pagos</span>
                   </motion.button>
-                  
+
                   <motion.button
                     type="button"
                     className="flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -469,13 +514,14 @@ const HomePage = () => {
                 </div>
               </Card>
             </motion.div>
-            
+
           </div>
         </div>
       </div>
 
-      {/* 🚀 Botón flotante para cargar ingreso/egreso */}
-      <QuickMovimiento />
+      {/* 🚀 Modales de Caja Rápida (los mismos que en Balances) */}
+      <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={cerrarIngreso} />
+      <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={cerrarEgreso} />
     </motion.div>
   );
 };
