@@ -1,6 +1,7 @@
 // src/pages/HomePage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import axios from "axios";
@@ -17,13 +18,14 @@ import IngresoCreateModal from "../components/balanzes/IngresoCreateModal";
 import EgresoCreateModal from "../components/balanzes/EgresoCreateModal";
 
 import {
-  HiChartBar,
   HiCash,
   HiUsers,
   HiShieldCheck,
   HiSparkles,
   HiTrendingUp,
+  HiTrendingDown,
   HiPlusSm,
+  HiRefresh,
   HiArrowCircleDown,
   HiArrowCircleUp,
 } from "react-icons/hi";
@@ -33,8 +35,14 @@ import { fetchEgresos } from "../store/slices/egresosSlice";
 import {
   fetchPolizasKpis,
   selectPolizasKpis,
+  selectKpisPorEstado,
 } from "../store/slices/polizasSlice";
 import { fetchClientes } from "../store/slices/clientesSlice";
+// 🚀 Resumen de renovaciones (mismo que usa la campana del header)
+import {
+  fetchRenovacionesGlobalResumen,
+  selectRenovacionesGlobalResumen,
+} from "../store/slices/renovacionesSlice";
 
 dayjs.locale("es");
 
@@ -62,6 +70,7 @@ const FRASES_MOTIVADORAS = [
 
 const HomePage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { user } = useAuth(); // Extraemos el usuario para el saludo
 
   const todayLabel = new Date().toLocaleDateString("es-AR", {
@@ -83,7 +92,18 @@ const HomePage = () => {
   // ---- STORE ----
   const ingresos = useSelector((state) => state.ingresos?.list || []);
   const egresos = useSelector((state) => state.egresos?.list || []);
+
+  // 🚀 KPIs de pólizas: por_estado.activa es el conteo REAL de activas
   const polizasKpis = useSelector(selectPolizasKpis);
+  const kpisPorEstado = useSelector(selectKpisPorEstado);
+
+  // 🚀 Resumen de renovaciones (buckets por vencimiento)
+  const renovResumen = useSelector(selectRenovacionesGlobalResumen) || {};
+  const renovBuckets = renovResumen?.buckets || {};
+  const renovHoy = Number(renovBuckets.vence_hoy || 0);
+  const renovProximas = Number(renovBuckets.proximos_3 || 0); // incluye hoy + 3 días
+  const renovVencidas =
+    Number(renovBuckets.vencidas_3 || 0) + Number(renovBuckets.vencidas_4_mas || 0);
 
   const {
     clientes: clientesList = [],
@@ -102,6 +122,7 @@ const HomePage = () => {
     dispatch(fetchIngresos());
     dispatch(fetchEgresos());
     dispatch(fetchPolizasKpis());
+    dispatch(fetchRenovacionesGlobalResumen({}));
     dispatch(
       fetchClientes({
         page: 1,
@@ -178,7 +199,10 @@ const HomePage = () => {
   );
 
   const balanceMes = totalIngresosMes - totalEgresosMes;
-  const polizasActivas = polizasKpis?.total ?? 0;
+
+  // 🚀 FIX: pólizas activas = conteo real de estado "activa" (no el total de todas)
+  const polizasActivas = kpisPorEstado?.activa ?? polizasKpis?.activas_al_dia ?? 0;
+
   const totalTareasSolicitudes =
     (solCounters.pendiente_alta || 0) + (solCounters.pendiente_envio || 0);
 
@@ -268,9 +292,9 @@ const HomePage = () => {
         </motion.div>
 
         {/* TARJETAS RESUMEN */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 
-          {/* Primas cobradas */}
+          {/* Ingresos del mes */}
           <motion.div
             variants={cardVariants}
             initial="hidden"
@@ -282,28 +306,84 @@ const HomePage = () => {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Primas cobradas
+                    Ingresos del mes
                   </span>
                   <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 rounded-lg">
                     <HiCash className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                 </div>
-                <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-50">
+                <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
                   $ {formatMoney(totalIngresosMes)}
                 </p>
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Ingreso total del mes actual
+                  Total cobrado este mes
                 </p>
               </div>
             </Card>
           </motion.div>
 
-          {/* Pólizas activas */}
+          {/* Egresos del mes */}
           <motion.div
             variants={cardVariants}
             initial="hidden"
             animate="visible"
             custom={2}
+            whileHover={{ scale: 1.02, y: -4 }}
+          >
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Egresos del mes
+                  </span>
+                  <div className="p-2 bg-rose-100 dark:bg-rose-500/20 rounded-lg">
+                    <HiTrendingDown className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  </div>
+                </div>
+                <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">
+                  $ {formatMoney(totalEgresosMes)}
+                </p>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Total gastado este mes
+                </p>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Balance del mes */}
+          <motion.div
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            custom={3}
+            whileHover={{ scale: 1.02, y: -4 }}
+          >
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Balance Neto
+                  </span>
+                  <div className="p-2 bg-teal-100 dark:bg-teal-500/20 rounded-lg">
+                    <HiTrendingUp className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                  </div>
+                </div>
+                <p className={`text-2xl font-extrabold ${balanceMes >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-red-600 dark:text-red-400'}`}>
+                  $ {formatMoney(balanceMes)}
+                </p>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Ingresos − Egresos del mes
+                </p>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Pólizas activas (FIX) */}
+          <motion.div
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            custom={4}
             whileHover={{ scale: 1.02, y: -4 }}
           >
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
@@ -320,7 +400,7 @@ const HomePage = () => {
                   {polizasActivas}
                 </p>
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Cartera vigente asegurada
+                  Solo en estado "activa"
                 </p>
               </div>
             </Card>
@@ -331,7 +411,7 @@ const HomePage = () => {
             variants={cardVariants}
             initial="hidden"
             animate="visible"
-            custom={3}
+            custom={5}
             whileHover={{ scale: 1.02, y: -4 }}
           >
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
@@ -354,30 +434,47 @@ const HomePage = () => {
             </Card>
           </motion.div>
 
-          {/* Balance del mes */}
+          {/* Renovaciones por vencer */}
           <motion.div
             variants={cardVariants}
             initial="hidden"
             animate="visible"
-            custom={4}
+            custom={6}
             whileHover={{ scale: 1.02, y: -4 }}
           >
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
+            <Card
+              onClick={() => navigate("/polizas/renovaciones")}
+              className="cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300"
+            >
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Balance Neto
+                    Renovaciones
                   </span>
-                  <div className="p-2 bg-teal-100 dark:bg-teal-500/20 rounded-lg">
-                    <HiTrendingUp className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                  <div className="p-2 bg-amber-100 dark:bg-amber-500/20 rounded-lg">
+                    <HiRefresh className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                   </div>
                 </div>
-                <p className={`text-2xl font-extrabold ${balanceMes >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-red-600 dark:text-red-400'}`}>
-                  $ {formatMoney(balanceMes)}
-                </p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Ingresos vs Egresos del mes
-                </p>
+                <div className="flex items-end gap-4">
+                  <div>
+                    <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 leading-none">
+                      {renovHoy}
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Vencen hoy</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-extrabold text-slate-700 dark:text-slate-200 leading-none">
+                      {renovProximas}
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Próximas</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-extrabold text-rose-600 dark:text-rose-400 leading-none">
+                      {renovVencidas}
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Vencidas</p>
+                  </div>
+                </div>
               </div>
             </Card>
           </motion.div>
@@ -392,7 +489,7 @@ const HomePage = () => {
             variants={cardVariants}
             initial="hidden"
             animate="visible"
-            custom={5}
+            custom={7}
           >
             <BalanceChart ingresos={ingresos} egresos={egresos} />
           </motion.div>
@@ -405,7 +502,7 @@ const HomePage = () => {
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              custom={6}
+              custom={8}
             >
               <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -417,13 +514,19 @@ const HomePage = () => {
                   </span>
                 </div>
                 <ul className="mt-4 space-y-3 text-sm">
-                  <li className="group flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <li
+                    onClick={() => navigate("/solicitudes")}
+                    className="cursor-pointer group flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
                     <span className="font-medium text-slate-600 dark:text-slate-300">Alta en compañía</span>
                     <span className="text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2 py-1 rounded-md">
                       {solCounters.pendiente_alta}
                     </span>
                   </li>
-                  <li className="group flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <li
+                    onClick={() => navigate("/solicitudes")}
+                    className="cursor-pointer group flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
                     <span className="font-medium text-slate-600 dark:text-slate-300">Envío de póliza</span>
                     <span className="text-xs font-bold text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded-md">
                       {solCounters.pendiente_envio}
@@ -438,7 +541,7 @@ const HomePage = () => {
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              custom={7}
+              custom={9}
             >
               <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -448,11 +551,11 @@ const HomePage = () => {
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
 
-                  {/* 🚀 NUEVO: Cargar Ingreso */}
+                  {/* Cargar Ingreso */}
                   <motion.button
                     type="button"
                     onClick={() => setModalIngresoAbierto(true)}
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -460,11 +563,11 @@ const HomePage = () => {
                     <span className="text-xs font-semibold">Cargar Ingreso</span>
                   </motion.button>
 
-                  {/* 🚀 NUEVO: Cargar Egreso */}
+                  {/* Cargar Egreso */}
                   <motion.button
                     type="button"
                     onClick={() => setModalEgresoAbierto(true)}
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-rose-600 dark:bg-rose-600/90 p-3 text-white shadow-md shadow-rose-600/20 transition hover:bg-rose-500"
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-rose-600 dark:bg-rose-600/90 p-3 text-white shadow-md shadow-rose-600/20 transition hover:bg-rose-500"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -472,9 +575,11 @@ const HomePage = () => {
                     <span className="text-xs font-semibold">Cargar Egreso</span>
                   </motion.button>
 
+                  {/* Nueva Póliza → flujo de alta (Solicitudes) */}
                   <motion.button
                     type="button"
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-blue-600 dark:bg-blue-600/90 p-3 text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-500"
+                    onClick={() => navigate("/solicitudes")}
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-blue-600 dark:bg-blue-600/90 p-3 text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-500"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -482,9 +587,11 @@ const HomePage = () => {
                     <span className="text-xs font-semibold">Nueva Póliza</span>
                   </motion.button>
 
+                  {/* Nuevo Cliente */}
                   <motion.button
                     type="button"
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
+                    onClick={() => navigate("/clientes")}
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -492,9 +599,11 @@ const HomePage = () => {
                     <span className="text-xs font-semibold">Nuevo Cliente</span>
                   </motion.button>
 
+                  {/* Ir a Pagos */}
                   <motion.button
                     type="button"
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
+                    onClick={() => navigate("/pagos")}
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -502,9 +611,11 @@ const HomePage = () => {
                     <span className="text-xs font-semibold">Ir a Pagos</span>
                   </motion.button>
 
+                  {/* Ver Pólizas */}
                   <motion.button
                     type="button"
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
+                    onClick={() => navigate("/polizas")}
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
