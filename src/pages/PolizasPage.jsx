@@ -1,4 +1,4 @@
-/* src/pages/PolizasPage.jsx — Lista de pólizas (rediseño slate+indigo) */
+/* src/pages/PolizasPage.jsx — Lista de pólizas (rediseño slate+indig o) */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { batch, useDispatch, useSelector } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
