@@ -1,5 +1,5 @@
 // src/components/servicios/ServiciosCrudModal.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
@@ -421,6 +421,26 @@ function ListaCategorias({ categorias, onNueva, onEditar, onEliminar }) {
 // ════════════════════════════════════════════════════════════
 // FORM SERVICIO
 // ════════════════════════════════════════════════════════════
+// 🚀 Monto con separador de miles (es-AR): 20000 -> "20.000"
+const montoToDisplay = (raw) => {
+  if (raw === "" || raw == null) return "";
+  const [i, d] = String(raw).split(".");
+  const f = (i || "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return d != null ? `${f},${d}` : f;
+};
+const montoFromInput = (t) => {
+  const c = String(t).replace(/[^\d,]/g, "");
+  const [i, ...r] = c.split(",");
+  const d = r.length ? r.join("").slice(0, 2) : null;
+  return d != null ? `${i}.${d}` : i;
+};
+
+const PASOS_SERVICIO = [
+  { n: 1, label: "Servicio" },
+  { n: 2, label: "Monto" },
+  { n: 3, label: "Sucursal" },
+];
+
 function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrACategorias }) {
   const dispatch = useDispatch();
   const esEdit = !!servicio;
@@ -430,20 +450,41 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
     [categorias]
   );
 
+  const [step, setStep] = useState(1);
   const [nombre, setNombre] = useState(servicio?.nombre || "");
   const [proveedor, setProveedor] = useState(servicio?.proveedor || "");
   const [categoria, setCategoria] = useState(servicio?.categoria || "");
   const [diaVencimiento, setDiaVencimiento] = useState(servicio?.dia_vencimiento || 10);
-  const [montoEstimado, setMontoEstimado] = useState(servicio?.monto_estimado || "");
+  const [montoEstimado, setMontoEstimado] = useState(
+    servicio?.monto_estimado != null ? String(servicio.monto_estimado) : ""
+  );
   const [oficinaId, setOficinaId] = useState(servicio?.oficina || "");
   const [activo, setActivo] = useState(servicio?.activo ?? true);
   const [guardando, setGuardando] = useState(false);
 
+  const validarPaso = (s) => {
+    if (s === 1) {
+      if (!nombre.trim()) { toast.error("Ingresá un nombre"); return false; }
+      if (!categoria.trim()) { toast.error("Elegí una categoría"); return false; }
+    }
+    if (s === 2) {
+      if (!diaVencimiento || diaVencimiento < 1 || diaVencimiento > 31) {
+        toast.error("Día inválido (1-31)"); return false;
+      }
+    }
+    return true;
+  };
+
+  const siguiente = () => { if (validarPaso(step)) setStep((v) => Math.min(3, v + 1)); };
+  const atras = () => setStep((v) => Math.max(1, v - 1));
+
+  const oficinaNombre = oficinas.find((o) => String(o.id) === String(oficinaId))?.nombre;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nombre.trim()) return toast.error("Ingresá un nombre");
-    if (!categoria.trim()) return toast.error("Elegí una categoría");
-    if (!diaVencimiento || diaVencimiento < 1 || diaVencimiento > 31) return toast.error("Día inválido");
+    if (step < 3) { siguiente(); return; }
+    if (!validarPaso(1)) { setStep(1); return; }
+    if (!validarPaso(2)) { setStep(2); return; }
 
     const data = {
       nombre: nombre.trim(),
@@ -488,140 +529,144 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
 
   return (
     <form onSubmit={handleSubmit} className="p-5 space-y-4">
-      <Field label="Nombre del servicio" required>
-        <input
-          type="text"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Ej: Luz, Internet, Alquiler"
-          className={inputCls}
-          autoFocus
-        />
-      </Field>
-
-      <Field label="Proveedor">
-        <input
-          type="text"
-          value={proveedor}
-          onChange={(e) => setProveedor(e.target.value)}
-          placeholder="Ej: Edenor S.A."
-          className={inputCls}
-        />
-      </Field>
-
-      <Field label="Categoría" required>
-        {categoriasActivas.length > 0 ? (
-          <select
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">Seleccionar categoría...</option>
-            {categoriasActivas.map((c) => (
-              <option key={c.id} value={c.nombre}>{c.nombre}</option>
-            ))}
-          </select>
-        ) : (
-          <>
-            <input
-              type="text"
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-              placeholder="Sin categorías cargadas..."
-              className={inputCls}
-            />
-            <button
-              type="button"
-              onClick={onIrACategorias}
-              className="text-[11px] text-sky-500 hover:underline mt-1 inline-flex items-center gap-1"
-            >
-              💡 Crear categorías para reutilizar
-            </button>
-          </>
-        )}
-      </Field>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Día de vencimiento" required>
-          <input
-            type="number"
-            min={1}
-            max={31}
-            value={diaVencimiento}
-            onChange={(e) => setDiaVencimiento(e.target.value)}
-            className={`${inputCls} text-center font-bold text-lg`}
-          />
-        </Field>
-        <Field label="Monto estimado">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">$</span>
-            <input
-              type="number"
-              value={montoEstimado}
-              onChange={(e) => setMontoEstimado(e.target.value)}
-              placeholder="0"
-              className={`${inputCls} pl-7`}
-            />
-          </div>
-        </Field>
+      {/* Stepper */}
+      <div className="flex items-center gap-2">
+        {PASOS_SERVICIO.map((p, i) => (
+          <Fragment key={p.n}>
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= p.n ? "bg-sky-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-400"}`}>
+                {p.n}
+              </div>
+              <span className={`text-xs font-medium hidden sm:inline ${step >= p.n ? "text-slate-900 dark:text-slate-100" : "text-slate-400"}`}>{p.label}</span>
+            </div>
+            {i < PASOS_SERVICIO.length - 1 && (
+              <div className={`flex-1 h-0.5 rounded ${step > p.n ? "bg-sky-500" : "bg-slate-200 dark:bg-slate-700"}`} />
+            )}
+          </Fragment>
+        ))}
       </div>
 
-      <p className="text-[11px] text-slate-500 dark:text-slate-400 -mt-2 italic">
-        Te avisamos 3 días antes del vencimiento ✨
-      </p>
+      {/* ── PASO 1: Qué servicio ── */}
+      {step === 1 && (
+        <div className="space-y-4">
+          <Field label="Nombre del servicio" required>
+            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Luz, Internet, Alquiler" className={inputCls} autoFocus />
+          </Field>
 
-      {oficinas.length > 0 && (
-        <Field label="Sucursal">
-          <select
-            value={oficinaId}
-            onChange={(e) => setOficinaId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">Sin asignar</option>
-            {oficinas.map((o) => (
-              <option key={o.id} value={o.id}>{o.nombre}</option>
-            ))}
-          </select>
-        </Field>
+          <Field label="Proveedor">
+            <input type="text" value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Ej: Edenor S.A." className={inputCls} />
+          </Field>
+
+          <Field label="Categoría" required>
+            {categoriasActivas.length > 0 ? (
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={inputCls}>
+                <option value="">Seleccionar categoría...</option>
+                {categoriasActivas.map((c) => (
+                  <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input type="text" value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Sin categorías cargadas..." className={inputCls} />
+                <button type="button" onClick={onIrACategorias} className="text-[11px] text-sky-500 hover:underline mt-1 inline-flex items-center gap-1">
+                  💡 Crear categorías para reutilizar
+                </button>
+              </>
+            )}
+          </Field>
+        </div>
       )}
 
-      <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
-        <div>
-          <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">Servicio activo</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {activo ? "Se generan pagos cada mes" : "No se generan pagos"}
+      {/* ── PASO 2: Cuánto y cuándo ── */}
+      {step === 2 && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Día de vencimiento" required>
+              <input type="number" min={1} max={31} value={diaVencimiento} onChange={(e) => setDiaVencimiento(e.target.value)} className={`${inputCls} text-center font-bold text-lg`} />
+            </Field>
+            <Field label="Monto estimado">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">$</span>
+                <input type="text" inputMode="decimal" value={montoToDisplay(montoEstimado)} onChange={(e) => setMontoEstimado(montoFromInput(e.target.value))} placeholder="0" className={`${inputCls} pl-7`} />
+              </div>
+            </Field>
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+            Te avisamos 3 días antes del vencimiento ✨
           </p>
         </div>
-        <input
-          type="checkbox"
-          checked={activo}
-          onChange={(e) => setActivo(e.target.checked)}
-          className="w-5 h-5 accent-sky-500"
-        />
-      </label>
+      )}
 
-      <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={guardando}
-          className="flex-1 h-10 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {guardando ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              <HiCheck className="w-4 h-4" />
-              {esEdit ? "Guardar" : "Crear"}
-            </>
+      {/* ── PASO 3: Sucursal y confirmar ── */}
+      {step === 3 && (
+        <div className="space-y-4">
+          {oficinas.length > 0 && (
+            <Field label="Sucursal">
+              <select value={oficinaId} onChange={(e) => setOficinaId(e.target.value)} className={inputCls}>
+                <option value="">Sin asignar</option>
+                {oficinas.map((o) => (
+                  <option key={o.id} value={o.id}>{o.nombre}</option>
+                ))}
+              </select>
+            </Field>
           )}
-        </button>
+
+          {!oficinaId && (
+            <div className="rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+              ⚠️ Sin sucursal, el gasto no va a sumar en la caja de ninguna oficina.
+            </div>
+          )}
+
+          <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <div>
+              <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">Servicio activo</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {activo ? "Se generan pagos cada mes" : "No se generan pagos"}
+              </p>
+            </div>
+            <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} className="w-5 h-5 accent-sky-500" />
+          </label>
+
+          {/* Resumen */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 text-sm space-y-1.5">
+            <p className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Resumen</p>
+            <div className="flex justify-between"><span className="text-slate-500">Servicio</span><span className="font-semibold text-slate-800 dark:text-slate-100">{nombre || "—"}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Categoría</span><span className="text-slate-800 dark:text-slate-100">{categoria || "—"}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Vence</span><span className="text-slate-800 dark:text-slate-100">Día {diaVencimiento}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Monto estimado</span><span className="text-slate-800 dark:text-slate-100">$ {montoToDisplay(montoEstimado) || "0"}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Sucursal</span><span className="text-slate-800 dark:text-slate-100">{oficinaNombre || "Sin asignar"}</span></div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex gap-2 pt-1">
+        {step === 1 ? (
+          <button type="button" onClick={onCancel} className="flex-1 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition">
+            Cancelar
+          </button>
+        ) : (
+          <button type="button" onClick={atras} className="flex-1 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition">
+            ← Atrás
+          </button>
+        )}
+
+        {step < 3 ? (
+          <button type="button" onClick={siguiente} className="flex-1 h-10 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-sm transition">
+            Siguiente →
+          </button>
+        ) : (
+          <button type="submit" disabled={guardando} className="flex-1 h-10 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-sm transition disabled:opacity-50 flex items-center justify-center gap-2">
+            {guardando ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <HiCheck className="w-4 h-4" />
+                {esEdit ? "Guardar" : "Crear"}
+              </>
+            )}
+          </button>
+        )}
       </div>
     </form>
   );

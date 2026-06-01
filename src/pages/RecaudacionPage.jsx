@@ -21,6 +21,11 @@ import {
 import { uploadToCloudinary } from "../utils/cloudinary";
 import api from "../services/api";
 
+// 🚀 Ranking de cumplimiento de cierres por oficina
+import RankingCierres from "../components/recaudacion/RankingCierres";
+// 🚀 NUEVO: panel de quién cerró / no cerró en un día
+import EstadoCierresDia from "../components/recaudacion/EstadoCierresDia";
+
 import EjemploDineroImg from "../assets/ejemplo_dinero.jpg";
 
 /* ─── helpers ───────────────────────────────────────────────── */
@@ -505,6 +510,12 @@ function AdminView() {
 
   return (
     <div className="space-y-4">
+      {/* 🚀 Quién cerró / no cerró en un día */}
+      <EstadoCierresDia />
+
+      {/* 🚀 Ranking de cumplimiento por sucursal (histórico mensual) */}
+      <RankingCierres isAdmin={true} />
+
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
         <div className="flex gap-2 flex-wrap flex-1">

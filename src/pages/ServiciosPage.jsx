@@ -463,9 +463,15 @@ function Fila({ pago, index, onClick, pagado }) {
       exit={{ opacity: 0 }}
       transition={{ delay: index * 0.02 }}
       onClick={onClick}
-      className="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition group"
+      className={`border-b border-slate-100 dark:border-slate-800/60 cursor-pointer transition group ${
+        pagado
+          ? "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          : vencido
+            ? "bg-rose-50/70 dark:bg-rose-900/10 hover:bg-rose-100/70 dark:hover:bg-rose-900/20"
+            : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+      }`}
     >
-      <td className="px-4 py-3">
+      <td className={`px-4 py-3 ${pagado ? "" : vencido ? "border-l-4 border-rose-600" : "border-l-4 border-rose-400"}`}>
         <div className="flex items-center gap-3 min-w-0">
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
             <Icon className="w-5 h-5" />
@@ -509,10 +515,10 @@ function Fila({ pago, index, onClick, pagado }) {
       <td className="px-4 py-3 text-right">
         <button
           onClick={(e) => { e.stopPropagation(); onClick(); }}
-          className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition opacity-0 group-hover:opacity-100 ${
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${
             pagado
-              ? "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
-              : "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30"
+              ? "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
+              : "bg-sky-500 hover:bg-sky-600 text-white shadow-sm"
           }`}
         >
           {pagado ? "Ver" : "Pagar"}

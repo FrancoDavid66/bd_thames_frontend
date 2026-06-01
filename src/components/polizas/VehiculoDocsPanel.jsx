@@ -15,7 +15,7 @@ import toast from "react-hot-toast";
 
 // 🚀 IMPORTACIONES DE SEGURIDAD
 import { useAuth } from "../../context/AuthContext";
-import api from "../../services/api"; 
+import api from "../../services/api";
 import { PolizasAPI } from "../../api/polizas";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 
@@ -139,7 +139,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
   const uploaderFileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN';
+  const isWebAdmin = user?.perfil?.rol === "ADMIN";
 
   const title = useMemo(() => {
     if (!poliza) return `Póliza #${polizaId}`;
@@ -168,7 +168,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
       const docsArr = Array.isArray(docsRes.data) ? docsRes.data : docsRes.data?.results || [];
       const fotosArr = Array.isArray(fotosRes.data) ? fotosRes.data : fotosRes.data?.results || [];
       const { fotos: f, documentos: d } = consolidate(fotosArr, docsArr);
-      
+
       setPoliza(pRes.data || null); setFotos(f); setDocumentos(d);
     } catch (err) { toast.error("Error al cargar archivos"); } finally { setLoading(false); }
   }
@@ -212,7 +212,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
       toast.success("Archivo subido con éxito");
       setUploaderOpen(false);
       fetchVehiculoDocs();
-    } catch(e) { toast.error("Error al subir archivo"); } finally { setUploading(false); }
+    } catch (e) { toast.error("Error al subir archivo"); } finally { setUploading(false); }
   };
 
   const removePhoto = async (item) => {
@@ -226,100 +226,122 @@ export default function VehiculoDocsPanel({ polizaId }) {
     } catch (err) { toast.error("Error al eliminar."); }
   };
 
+  /* ===================== Render ===================== */
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[.05] p-3 text-white">
-      {/* Header General */}
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="text-slate-100">
+      {/* Header */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="text-sm text-white/70">Vehículo & Documentos</div>
-          <div className="truncate font-semibold">{title}</div>
-          {poliza?.cobertura && (
-            <div className="mt-0.5 text-xs text-white/60">
-              Cobertura: <b>{String(poliza.cobertura).replace(/_/g, " ")}</b>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Vehículo & documentos</div>
+          <div className="truncate text-base font-semibold text-white">{title}</div>
+          {poliza?.cobertura ? (
+            <div className="mt-0.5 text-xs text-slate-400">
+              Cobertura: <b className="text-slate-200">{String(poliza.cobertura).replace(/_/g, " ")}</b>
             </div>
-          )}
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => openUploader("FOTO")} disabled={uploading} className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-400/20 px-3 py-2 text-sm hover:bg-emerald-400/30 disabled:opacity-50">
+          <button
+            onClick={() => openUploader("FOTO")}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-50"
+          >
             <HiUpload /> Agregar foto
           </button>
-          <button onClick={() => fetchVehiculoDocs()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm hover:bg-white/20 disabled:opacity-50">
+          <button
+            onClick={() => fetchVehiculoDocs()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+          >
             <HiRefresh className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-3">
-        {/* Galería (AHORA 100% DINÁMICA) */}
-        <section className="rounded-xl border border-white/10 bg-white/[.04] p-3">
-          <header className="mb-2 flex items-center gap-2 text-white/85">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10"><HiPhotograph className="text-lg" /></span>
-            <h3 className="font-medium">Galería del vehículo</h3>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* ===== Galería ===== */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+          <header className="mb-3 flex items-center gap-2 text-slate-200">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300">
+              <HiPhotograph className="text-lg" />
+            </span>
+            <h3 className="text-sm font-semibold">Galería del vehículo</h3>
           </header>
 
           <AnimatePresence initial={false}>
             {loading ? (
-              <motion.div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {Array.from({ length: 3 }).map((_, i) => <div key={i} className="aspect-video rounded-lg bg-white/10 animate-pulse" />)}
+              <motion.div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="aspect-video animate-pulse rounded-lg bg-slate-800" />
+                ))}
               </motion.div>
             ) : (
-              <motion.div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {/* Dibuja solo lo que existe */}
+              <motion.div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                 {fotos.map((item) => (
-                  <figure key={item.url} className="relative rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                  <figure key={item.url} className="group relative overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
                     <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
                       <img src={item.url} alt={item.label} className="aspect-video w-full object-cover" loading="lazy" />
                     </a>
-                    <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/50 via-black/0 to-black/0 opacity-0 hover:opacity-100 transition">
-                      <figcaption className="px-2 py-1 text-xs"><span className="inline-block max-w-[10rem] truncate" title={item.label}>{item.label}</span></figcaption>
-                      <div className="p-1 flex items-center gap-1">
-                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-white/10 hover:bg-white/20"><HiExternalLink /></a>
-                        {isWebAdmin && <button onClick={() => removePhoto(item)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"><HiTrash /></button>}
+                    <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/70 via-black/0 to-black/0 opacity-0 transition group-hover:opacity-100">
+                      <figcaption className="px-2 py-1 text-xs text-white">
+                        <span className="inline-block max-w-[10rem] truncate" title={item.label}>{item.label}</span>
+                      </figcaption>
+                      <div className="flex items-center gap-1 p-1">
+                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-[11px] hover:bg-white/20"><HiExternalLink /></a>
+                        {isWebAdmin ? (
+                          <button onClick={() => removePhoto(item)} className="inline-flex items-center rounded bg-rose-500/20 px-1.5 py-0.5 text-[11px] text-rose-300 hover:bg-rose-500/30"><HiTrash /></button>
+                        ) : null}
                       </div>
                     </div>
                   </figure>
                 ))}
-                
-                {/* Botón dinámico al final de la grilla */}
-                <button onClick={() => openUploader("FOTO")} className="aspect-video rounded-lg border border-dashed border-white/15 bg-white/[.03] flex flex-col items-center justify-center text-xs text-white/40 hover:border-white/30 hover:text-white/70">
-                  <HiPlus className="mb-1 text-lg" /> Agregar Foto
+
+                <button
+                  onClick={() => openUploader("FOTO")}
+                  className="flex aspect-video flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-900/40 text-xs text-slate-500 transition hover:border-indigo-500/50 hover:text-indigo-300"
+                >
+                  <HiPlus className="mb-1 text-lg" /> Agregar foto
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
         </section>
 
-        {/* Documentos Legales */}
-        <section className="rounded-xl border border-white/10 bg-white/[.04] p-3">
-          <header className="mb-2 flex items-center justify-between text-white/85">
+        {/* ===== Documentos ===== */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+          <header className="mb-3 flex items-center justify-between text-slate-200">
             <div className="flex items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10"><HiDocumentText className="text-lg" /></span>
-              <h3 className="font-medium">Documentos</h3>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300">
+                <HiDocumentText className="text-lg" />
+              </span>
+              <h3 className="text-sm font-semibold">Documentos</h3>
             </div>
-            <button onClick={() => openUploader("DOC")} className="inline-flex items-center gap-1 text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded">
-              <HiPlus /> Agregar Documento
+            <button onClick={() => openUploader("DOC")} className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700">
+              <HiPlus /> Agregar
             </button>
           </header>
 
           <AnimatePresence initial={false}>
             {loading ? (
-              <motion.ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {Array.from({ length: 2 }).map((_, i) => <li key={i} className="rounded-lg bg-white/10 h-16 animate-pulse" />)}
+              <motion.ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, i) => <li key={i} className="h-16 animate-pulse rounded-lg bg-slate-800" />)}
               </motion.ul>
             ) : documentos.length ? (
               <motion.div className="space-y-3">
                 {docsAgrupados.imgDocs.length > 0 && (
                   <div>
-                    <div className="mb-1 text-xs text-white/60">Imágenes</div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Imágenes</div>
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {docsAgrupados.imgDocs.map((d) => (
-                        <figure key={d.url} className="rounded-lg overflow-hidden border border-white/10 bg-black/20">
-                          <a href={d.url} target="_blank" rel="noopener noreferrer" className="block"><img src={d.url} alt={d.label} className="aspect-video w-full object-cover transition hover:opacity-95" loading="lazy" /></a>
-                          <figcaption className="flex items-center justify-between px-2 py-1 text-xs">
+                        <figure key={d.url} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
+                          <a href={d.url} target="_blank" rel="noopener noreferrer" className="block">
+                            <img src={d.url} alt={d.label} className="aspect-video w-full object-cover transition hover:opacity-90" loading="lazy" />
+                          </a>
+                          <figcaption className="flex items-center justify-between px-2 py-1 text-xs text-slate-300">
                             <span className="truncate" title={d.label}>{d.label}</span>
                             <div className="flex gap-1">
-                              <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] bg-white/10 hover:bg-white/20"><HiExternalLink /></a>
-                              {isWebAdmin && <button onClick={() => removePhoto(d)} className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"><HiTrash /></button>}
+                              <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-[11px] hover:bg-white/20"><HiExternalLink /></a>
+                              {isWebAdmin ? <button onClick={() => removePhoto(d)} className="inline-flex items-center rounded bg-rose-500/20 px-1.5 py-0.5 text-[11px] text-rose-300 hover:bg-rose-500/30"><HiTrash /></button> : null}
                             </div>
                           </figcaption>
                         </figure>
@@ -329,14 +351,14 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 )}
                 {docsAgrupados.pdfDocs.length > 0 && (
                   <div>
-                    <div className="mb-1 text-xs text-white/60">PDFs</div>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">PDFs</div>
+                    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {docsAgrupados.pdfDocs.map((d) => (
-                        <li key={d.url} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-                          <span className="truncate text-xs" title={d.label}>{d.label}</span>
+                        <li key={d.url} className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
+                          <span className="truncate text-xs text-slate-200" title={d.label}>{d.label}</span>
                           <div className="flex gap-1">
-                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] bg-white/10 hover:bg-white/20"><HiExternalLink /></a>
-                            {isWebAdmin && <button onClick={() => removePhoto(d)} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] bg-rose-500/20 hover:bg-rose-500/30"><HiTrash /></button>}
+                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-[11px] hover:bg-white/20"><HiExternalLink /></a>
+                            {isWebAdmin ? <button onClick={() => removePhoto(d)} className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300 hover:bg-rose-500/30"><HiTrash /></button> : null}
                           </div>
                         </li>
                       ))}
@@ -345,28 +367,34 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 )}
               </motion.div>
             ) : (
-              <motion.div className="text-sm text-white/60">No hay documentos cargados.</motion.div>
+              <motion.div className="rounded-lg border border-dashed border-slate-800 py-8 text-center text-sm text-slate-500">
+                No hay documentos cargados.
+              </motion.div>
             )}
           </AnimatePresence>
         </section>
       </div>
 
-      {/* Modal Subida Dinámico */}
+      {/* ===== Modal de subida ===== */}
       <AnimatePresence>
         {uploaderOpen && (
-          <motion.div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 backdrop-blur-sm p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="w-full max-w-md rounded-2xl border border-white/10 bg-gray-900 p-6 shadow-2xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
-              <div className="flex justify-between mb-5">
-                <h4 className="text-white font-bold uppercase tracking-tight">Subir {uploaderMode === "FOTO" ? "Foto" : "Documento"}</h4>
-                <button onClick={() => setUploaderOpen(false)}><HiX className="text-white/40 text-xl hover:text-white" /></button>
+          <motion.div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+              <div className="mb-5 flex justify-between">
+                <h4 className="font-bold uppercase tracking-tight text-white">
+                  Subir {uploaderMode === "FOTO" ? "foto" : "documento"}
+                </h4>
+                <button onClick={() => setUploaderOpen(false)}><HiX className="text-xl text-slate-500 hover:text-white" /></button>
               </div>
               <div className="grid gap-4">
                 <label className="block">
-                  <span className="block text-[10px] font-black uppercase text-gray-500 mb-1.5 ml-1">Etiqueta / Tipo</span>
+                  <span className="mb-1.5 ml-1 block text-[10px] font-bold uppercase text-slate-500">Etiqueta / Tipo</span>
                   <input
-                    list="tags-sug" value={uploaderTag} onChange={e => setUploaderTag(e.target.value)}
+                    list="tags-sug"
+                    value={uploaderTag}
+                    onChange={(e) => setUploaderTag(e.target.value)}
                     placeholder={uploaderMode === "FOTO" ? "Ej: FRENTE, MOTOR..." : "Ej: CONTRATO, VTV..."}
-                    className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 ring-amber-500/50 uppercase"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm font-bold uppercase text-white outline-none focus:ring-2 focus:ring-indigo-500/50"
                   />
                   <datalist id="tags-sug">
                     {uploaderMode === "FOTO" ? (
@@ -376,18 +404,20 @@ export default function VehiculoDocsPanel({ polizaId }) {
                     )}
                   </datalist>
                 </label>
-                <label className="block group">
-                  <span className="block text-[10px] font-black uppercase text-gray-500 mb-1.5 ml-1 group-hover:text-gray-300 transition-colors">Seleccionar Archivo</span>
+                <label className="group block">
+                  <span className="mb-1.5 ml-1 block text-[10px] font-bold uppercase text-slate-500 transition-colors group-hover:text-slate-300">Seleccionar archivo</span>
                   <input
-                    ref={uploaderFileRef} type="file" accept={uploaderMode === "FOTO" ? "image/*" : "image/*,.pdf"}
+                    ref={uploaderFileRef}
+                    type="file"
+                    accept={uploaderMode === "FOTO" ? "image/*" : "image/*,.pdf"}
                     onChange={(e) => setUploaderFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-white/40 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-white/20 transition-all cursor-pointer"
+                    className="w-full cursor-pointer text-xs text-slate-400 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-2.5 file:text-[10px] file:font-black file:uppercase file:text-white hover:file:bg-slate-700"
                   />
                 </label>
               </div>
               <div className="mt-8 flex gap-3">
-                <button onClick={() => setUploaderOpen(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-bold text-white uppercase transition-all">Cancelar</button>
-                <button onClick={doUpload} disabled={uploading} className="flex-1 bg-amber-500 text-gray-900 font-black uppercase text-xs rounded-xl shadow-lg shadow-amber-900/40 hover:bg-amber-400 active:scale-95 transition-all disabled:opacity-50">
+                <button onClick={() => setUploaderOpen(false)} className="flex-1 rounded-xl border border-slate-700 py-3 text-xs font-bold uppercase text-slate-300 transition hover:bg-slate-800">Cancelar</button>
+                <button onClick={doUpload} disabled={uploading} className="flex-1 rounded-xl bg-indigo-500 py-3 text-xs font-black uppercase text-white shadow-lg shadow-indigo-900/30 transition hover:bg-indigo-400 active:scale-95 disabled:opacity-50">
                   {uploading ? "Subiendo..." : "Subir"}
                 </button>
               </div>

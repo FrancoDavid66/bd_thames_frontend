@@ -11,6 +11,8 @@ import { useAuth } from "../context/AuthContext";
 
 import Card from "../components/comunes/Card";
 import BalanceChart from "../components/balanzes/BalanceChart";
+// 🚀 NUEVO: acceso rápido para cargar ingreso/egreso
+import QuickMovimiento from "../components/balanzes/QuickMovimiento";
 import {
   HiChartBar,
   HiCash,
@@ -471,6 +473,9 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+
+      {/* 🚀 Botón flotante para cargar ingreso/egreso */}
+      <QuickMovimiento />
     </motion.div>
   );
 };

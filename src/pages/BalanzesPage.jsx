@@ -41,39 +41,60 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 2,
   });
 
-/* 🚀 KPI card OPTIMIZADO */
+/* 🚀 KPI card OPTIMIZADO — más legible: etiqueta tenue, número grande y claro */
 function KpiCard({ title, value, variant = "blue" }) {
   const variants = {
-    green: "bg-gradient-to-br from-emerald-600/70 via-emerald-600/40  to-emerald-500/60 border border-emerald-400/40 text-white",
-    red: "bg-gradient-to-br from-rose-600/70 via-rose-600/40 to-rose-500/60 border border-rose-400/40 text-white",
-    blue: "bg-gradient-to-br from-sky-600/70 via-sky-600/40 to-sky-500/60 border border-sky-400/40 text-white",
-    amber: "bg-gradient-to-br from-amber-600/70 via-amber-600/40 to-amber-500/60 border border-amber-400/40 text-white", 
+    green: "from-emerald-500/15 to-emerald-500/[0.04] border-emerald-500/30",
+    red: "from-rose-500/15 to-rose-500/[0.04] border-rose-500/30",
+    blue: "from-sky-500/15 to-sky-500/[0.04] border-sky-500/30",
+    amber: "from-amber-500/15 to-amber-500/[0.04] border-amber-500/30",
   };
   return (
-    <div className={`${variants[variant]} px-3 py-3 sm:px-4 sm:py-4 rounded-2xl shadow-sm transition-all duration-300 min-w-0 flex flex-col justify-center`}>
-      <h3 className="text-[10px] sm:text-xs uppercase tracking-wide opacity-90 truncate" title={title}>
+    <div className={`bg-gradient-to-br ${variants[variant]} border px-4 py-3 rounded-2xl shadow-sm min-w-0 flex flex-col justify-center`}>
+      <h3 className="text-[10px] sm:text-[11px] uppercase tracking-wider text-zinc-400 truncate" title={title}>
         {title}
       </h3>
-      <p className="text-lg sm:text-xl lg:text-2xl font-black mt-1 tracking-tight">
+      <p className="text-lg sm:text-2xl font-black mt-1 tracking-tight text-zinc-50 truncate">
         ${fmtMoney(value)}
       </p>
     </div>
   );
 }
 
-/* 🚀 COMPONENTE FILA DE KPIs (Para el Admin) */
+/* 🚀 FILA DE KPIs (Admin) — reorganizada en 2 bloques con aire para no amontonar */
 const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
-  <div className={`p-4 rounded-2xl border space-y-3 shadow-sm ${highlight ? "bg-zinc-900/50 border-zinc-700" : "bg-zinc-950/40 border-zinc-800/60"}`}>
-    <h2 className={`text-sm font-bold tracking-wider uppercase flex items-center gap-2 ${highlight ? "text-sky-400" : "text-emerald-400"}`}>
-      {highlight ? "🌍 " : "🏢 "} {title}
-    </h2>
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-      <KpiCard title={`Ingresos Tot. ${suffix}`} value={metrics.tIn} variant="green" />
-      <KpiCard title={`Efectivo ${suffix}`} value={metrics.tInEfe} variant="green" />
-      <KpiCard title={`Transferencia ${suffix}`} value={metrics.tInTransf} variant="green" />
-      <KpiCard title={`Egresos Tot. ${suffix}`} value={metrics.tEg} variant="red" />
-      <KpiCard title={`Neto ${suffix}`} value={metrics.tBal} variant="blue" />
-      <KpiCard title={`Caja Chica ${suffix}`} value={metrics.tCajaChica} variant="amber" />
+  <div className={`rounded-2xl border shadow-sm overflow-hidden ${highlight ? "border-sky-500/40 bg-sky-500/[0.04]" : "border-zinc-800 bg-zinc-950/40"}`}>
+    {/* Encabezado de la sucursal: el (Día/Mes) se muestra UNA sola vez acá */}
+    <div className={`flex items-center gap-2 px-4 py-3 border-b ${highlight ? "border-sky-500/30" : "border-zinc-800/80"}`}>
+      <span className="text-base shrink-0">{highlight ? "🌍" : "🏢"}</span>
+      <h2 className={`text-sm font-bold tracking-wide truncate ${highlight ? "text-sky-300" : "text-zinc-200"}`}>
+        {title}
+      </h2>
+      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-zinc-500 shrink-0">
+        {suffix}
+      </span>
+    </div>
+
+    <div className="p-4 space-y-4">
+      {/* Bloque 1: Ingresos */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80 mb-2">Ingresos</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <KpiCard title="Total" value={metrics.tIn} variant="green" />
+          <KpiCard title="Efectivo" value={metrics.tInEfe} variant="green" />
+          <KpiCard title="Transferencia" value={metrics.tInTransf} variant="green" />
+        </div>
+      </div>
+
+      {/* Bloque 2: Egresos y resultado */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Egresos y resultado</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <KpiCard title="Egresos" value={metrics.tEg} variant="red" />
+          <KpiCard title="Neto" value={metrics.tBal} variant="blue" />
+          <KpiCard title="Caja Chica" value={metrics.tCajaChica} variant="amber" />
+        </div>
+      </div>
     </div>
   </div>
 );
@@ -334,6 +355,24 @@ const BalancesPage = () => {
         </div>
       </div>
 
+      {/* 🚀 Acceso rápido: cargar ingreso/egreso (siempre visible) */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-5">
+        <button
+          type="button"
+          onClick={() => setModalIngresoAbierto(true)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-sm"
+        >
+          <FaPlus /> Nuevo ingreso
+        </button>
+        <button
+          type="button"
+          onClick={() => setModalEgresoAbierto(true)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white bg-rose-600 hover:bg-rose-500 transition shadow-sm"
+        >
+          <FaPlus /> Nuevo egreso
+        </button>
+      </div>
+
       {/* Tabs principales */}
       <div className="mt-2 mb-5 border-b border-zinc-800 flex flex-wrap justify-between items-end gap-y-2">
         <div className="flex flex-wrap gap-2 pb-1">
@@ -395,7 +434,7 @@ const BalancesPage = () => {
 
           {/* 🚀 TARJETAS KPI (Diferenciadas por ROL) */}
           {isWebAdmin ? (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {oficinaSeleccionada === "ALL" ? (
                 <>
                   <KpiRowGroup 
@@ -640,7 +679,9 @@ const BalancesPage = () => {
               <BalanceExportPanel
                 ingresos={ingresosMensuales}
                 egresos={egresosMensuales}
-                fileName={`Balance_${dayjs().format("YYYY-MM")}.xlsx`}
+                mes={dayjs(fecha).format("YYYY-MM")}
+                oficina={isWebAdmin ? oficinaSeleccionada : userOficina}
+                fileName={`Reporte_Mensual_${dayjs(fecha).format("YYYY-MM")}.xlsx`}
                 className="w-full"
               />
             </div>

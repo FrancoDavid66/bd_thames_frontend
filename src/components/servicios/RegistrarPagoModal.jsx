@@ -1,5 +1,5 @@
 // src/components/servicios/RegistrarPagoModal.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,6 +22,29 @@ import {
 import { fetchMediosCobro } from "../../store/slices/pagosSlice";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 
+// 🚀 Monto con separador de miles (es-AR): 20000 -> "20.000"
+const montoToDisplay = (raw) => {
+  if (raw === "" || raw == null) return "";
+  const [i, d] = String(raw).split(".");
+  const f = (i || "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return d != null ? `${f},${d}` : f;
+};
+const montoFromInput = (t) => {
+  const c = String(t).replace(/[^\d,]/g, "");
+  const [i, ...r] = c.split(",");
+  const d = r.length ? r.join("").slice(0, 2) : null;
+  return d != null ? `${i}.${d}` : i;
+};
+
+const PASOS = [
+  { n: 1, label: "Monto" },
+  { n: 2, label: "Pago" },
+  { n: 3, label: "Comprobante" },
+];
+
+const labelForma = (v) =>
+  v === "EFECTIVO" ? "Efectivo" : v === "TRANSFERENCIA" ? "Transferencia" : "Mercado Pago";
+
 export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
   const dispatch = useDispatch();
   const mediosCobro = useSelector((s) => s.pagos.mediosCobro || []);
@@ -29,6 +52,7 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
 
   const yaPagado = pago?.estado === "PAGADO";
 
+  const [step, setStep] = useState(1);
   const [monto, setMonto] = useState(yaPagado ? pago.monto_real : pago?.servicio_monto_estimado || "");
   const [fecha, setFecha] = useState(yaPagado ? pago.fecha_pago : dayjs().format("YYYY-MM-DD"));
   const [formaPago, setFormaPago] = useState(yaPagado ? pago.forma_pago : "TRANSFERENCIA");
@@ -38,14 +62,11 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
   const [observaciones, setObservaciones] = useState(yaPagado ? pago.observaciones || "" : "");
   const [subiendo, setSubiendo] = useState(false);
 
-  // 🚀 FIX: pedimos billeteras filtradas por oficina como STRING (MedioCobro.oficina es CharField)
-  // y si no hay oficina, traemos todas las activas
+  // 🚀 Billeteras filtradas por oficina (string) o todas si no hay oficina
   useEffect(() => {
     if (pago?.oficina) {
-      // Convertimos a string porque el modelo lo guarda así
       dispatch(fetchMediosCobro({ oficina: String(pago.oficina), activo: true }));
     } else {
-      // Si el servicio no tiene oficina, traemos todas las activas
       dispatch(fetchMediosCobro({ activo: true }));
     }
   }, [dispatch, pago?.oficina]);
@@ -57,11 +78,28 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
     setComprobanteUrl(URL.createObjectURL(file));
   };
 
+  // ── Validación por paso ──
+  const validarPaso = (s) => {
+    if (s === 1) {
+      if (!monto || Number(monto) <= 0) { toast.error("Ingresá un monto válido"); return false; }
+      if (!fecha) { toast.error("Falta la fecha"); return false; }
+    }
+    if (s === 2) {
+      if (formaPago !== "EFECTIVO" && !medioCobroId) { toast.error("Seleccioná la cuenta"); return false; }
+    }
+    if (s === 3) {
+      if (!comprobanteFile && !comprobanteUrl) { toast.error("Subí el comprobante"); return false; }
+    }
+    return true;
+  };
+
+  const siguiente = () => { if (validarPaso(step)) setStep((v) => Math.min(3, v + 1)); };
+  const atras = () => setStep((v) => Math.max(1, v - 1));
+
   const handleSubmit = async () => {
-    if (!monto || Number(monto) <= 0) return toast.error("Ingresá un monto válido");
-    if (!fecha) return toast.error("Falta la fecha");
-    if (formaPago !== "EFECTIVO" && !medioCobroId) return toast.error("Seleccioná la cuenta");
-    if (!comprobanteFile && !comprobanteUrl) return toast.error("Subí el comprobante");
+    if (!validarPaso(1)) { setStep(1); return; }
+    if (!validarPaso(2)) { setStep(2); return; }
+    if (!validarPaso(3)) { setStep(3); return; }
 
     try {
       setSubiendo(true);
@@ -104,6 +142,12 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
   const fmt = (n) => `$${Number(n || 0).toLocaleString("es-AR")}`;
   const inputCls = "w-full px-3 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-sky-400 focus:outline-none text-sm text-slate-900 dark:text-slate-100 disabled:opacity-60 transition";
 
+  const cuentaLabel = (() => {
+    const m = mediosCobro.find((x) => String(x.id) === String(medioCobroId));
+    if (!m) return null;
+    return m.etiqueta || m.titular_nombre || m.valor || `Cuenta ${m.id}`;
+  })();
+
   return (
     <AnimatePresence>
       <motion.div
@@ -144,157 +188,219 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
             </button>
           </div>
 
-          {/* FORM */}
+          {/* BODY */}
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-            {yaPagado && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50">
-                <HiCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-                  Pagado el {dayjs(pago.fecha_pago).format("DD/MM/YYYY")}
-                </p>
-              </div>
-            )}
-
-            <Field label="Monto" icon={<HiOutlineCash className="w-3.5 h-3.5" />}>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">$</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
-                  disabled={yaPagado}
-                  placeholder="0"
-                  className="w-full pl-9 pr-3 h-12 text-xl font-bold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-sky-400 focus:outline-none text-slate-900 dark:text-slate-100 disabled:opacity-60 transition"
-                />
-              </div>
-              {monto > 0 && (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
-                  {fmt(monto)}
-                </p>
-              )}
-            </Field>
-
-            <Field label="Fecha del pago" icon={<HiOutlineCalendar className="w-3.5 h-3.5" />}>
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                disabled={yaPagado}
-                className={inputCls}
-              />
-            </Field>
-
-            <Field label="Forma de pago" icon={<HiOutlineCreditCard className="w-3.5 h-3.5" />}>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { v: "EFECTIVO", label: "Efectivo" },
-                  { v: "TRANSFERENCIA", label: "Transfer." },
-                  { v: "MERCADOPAGO", label: "MP" },
-                ].map((opt) => (
-                  <button
-                    key={opt.v}
-                    type="button"
-                    disabled={yaPagado}
-                    onClick={() => setFormaPago(opt.v)}
-                    className={`h-10 rounded-lg text-xs font-semibold transition ${
-                      formaPago === opt.v
-                        ? "bg-sky-500 text-white"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                    } ${yaPagado ? "opacity-60 cursor-not-allowed" : ""}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            {formaPago !== "EFECTIVO" && !yaPagado && (
-              <Field label="Cuenta">
-                <select
-                  value={medioCobroId}
-                  onChange={(e) => setMedioCobroId(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">Seleccionar billetera...</option>
-                  {mediosCobro.map((m) => {
-                    const label = m.etiqueta || m.titular_nombre || m.valor || `Cuenta ${m.id}`;
-                    const tipo = m.proveedor_display || m.proveedor || "";
-                    return (
-                      <option key={m.id} value={m.id}>
-                        {label}{tipo ? ` (${tipo})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-                {mediosCobro.length === 0 && (
-                  <p className="text-xs text-amber-500 mt-1">
-                    ⚠️ No hay billeteras configuradas. Cargá una desde Configuración de Pagos.
+            {yaPagado ? (
+              /* ════════ YA PAGADO: vista de detalle (igual que antes) ════════ */
+              <>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50">
+                  <HiCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                    Pagado el {dayjs(pago.fecha_pago).format("DD/MM/YYYY")}
                   </p>
-                )}
-              </Field>
-            )}
-
-            <Field
-              label={<>Comprobante {!yaPagado && <span className="text-rose-500">*</span>}</>}
-              icon={<HiOutlineReceiptTax className="w-3.5 h-3.5" />}
-            >
-              {comprobanteUrl ? (
-                <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                  {comprobanteFile?.type === "application/pdf" || comprobanteUrl?.endsWith?.(".pdf") ? (
-                    <a
-                      href={comprobanteUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block p-6 text-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                    >
-                      <HiOutlineDocumentText className="w-8 h-8 mx-auto text-slate-400 mb-1" />
-                      <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Ver PDF</p>
-                    </a>
-                  ) : (
-                    <img src={comprobanteUrl} alt="" className="w-full h-36 object-cover" />
-                  )}
-                  {!yaPagado && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setComprobanteFile(null);
-                        setComprobanteUrl(null);
-                      }}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500 hover:bg-rose-400 flex items-center justify-center text-white transition"
-                    >
-                      <HiX className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
-              ) : (
-                <label className="block cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={handleFile}
-                    className="hidden"
-                  />
-                  <div className="rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 px-4 py-6 text-center transition">
-                    <HiOutlineCloudUpload className="w-8 h-8 mx-auto text-slate-400 mb-1.5" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subir comprobante</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Foto o PDF</p>
-                  </div>
-                </label>
-              )}
-            </Field>
 
-            <Field label="Notas (opcional)">
-              <textarea
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                disabled={yaPagado}
-                rows={2}
-                placeholder="..."
-                className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-sky-400 focus:outline-none disabled:opacity-60 resize-none text-sm text-slate-900 dark:text-slate-100 transition"
-              />
-            </Field>
+                <Field label="Monto" icon={<HiOutlineCash className="w-3.5 h-3.5" />}>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">$</span>
+                    <input type="text" value={montoToDisplay(monto)} disabled className="w-full pl-9 pr-3 h-12 text-xl font-bold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-60" />
+                  </div>
+                </Field>
+
+                <Field label="Fecha del pago" icon={<HiOutlineCalendar className="w-3.5 h-3.5" />}>
+                  <input type="date" value={fecha} disabled className={inputCls} />
+                </Field>
+
+                <Field label="Forma de pago" icon={<HiOutlineCreditCard className="w-3.5 h-3.5" />}>
+                  <div className="h-10 flex items-center px-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    {labelForma(formaPago)}
+                  </div>
+                </Field>
+
+                <Field label="Comprobante" icon={<HiOutlineReceiptTax className="w-3.5 h-3.5" />}>
+                  {comprobanteUrl ? (
+                    <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                      {comprobanteUrl?.endsWith?.(".pdf") ? (
+                        <a href={comprobanteUrl} target="_blank" rel="noreferrer" className="block p-6 text-center hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                          <HiOutlineDocumentText className="w-8 h-8 mx-auto text-slate-400 mb-1" />
+                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Ver PDF</p>
+                        </a>
+                      ) : (
+                        <img src={comprobanteUrl} alt="" className="w-full h-36 object-cover" />
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">Sin comprobante</p>
+                  )}
+                </Field>
+
+                {observaciones && (
+                  <Field label="Notas">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">{observaciones}</p>
+                  </Field>
+                )}
+              </>
+            ) : (
+              /* ════════ NO PAGADO: WIZARD ════════ */
+              <>
+                {/* Stepper */}
+                <div className="flex items-center gap-2">
+                  {PASOS.map((p, i) => (
+                    <Fragment key={p.n}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= p.n ? "bg-sky-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-400"}`}>
+                          {p.n}
+                        </div>
+                        <span className={`text-xs font-medium hidden sm:inline ${step >= p.n ? "text-slate-900 dark:text-slate-100" : "text-slate-400"}`}>{p.label}</span>
+                      </div>
+                      {i < PASOS.length - 1 && (
+                        <div className={`flex-1 h-0.5 rounded ${step > p.n ? "bg-sky-500" : "bg-slate-200 dark:bg-slate-700"}`} />
+                      )}
+                    </Fragment>
+                  ))}
+                </div>
+
+                {/* PASO 1: Monto + Fecha */}
+                {step === 1 && (
+                  <div className="space-y-4">
+                    <Field label="Monto" icon={<HiOutlineCash className="w-3.5 h-3.5" />}>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={montoToDisplay(monto)}
+                          onChange={(e) => setMonto(montoFromInput(e.target.value))}
+                          placeholder="0"
+                          autoFocus
+                          className="w-full pl-9 pr-3 h-12 text-xl font-bold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-sky-400 focus:outline-none text-slate-900 dark:text-slate-100 transition"
+                        />
+                      </div>
+                    </Field>
+
+                    <Field label="Fecha del pago" icon={<HiOutlineCalendar className="w-3.5 h-3.5" />}>
+                      <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
+                    </Field>
+                  </div>
+                )}
+
+                {/* PASO 2: Forma de pago + Cuenta */}
+                {step === 2 && (
+                  <div className="space-y-4">
+                    <Field label="Forma de pago" icon={<HiOutlineCreditCard className="w-3.5 h-3.5" />}>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { v: "EFECTIVO", label: "Efectivo" },
+                          { v: "TRANSFERENCIA", label: "Transfer." },
+                          { v: "MERCADOPAGO", label: "MP" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.v}
+                            type="button"
+                            onClick={() => setFormaPago(opt.v)}
+                            className={`h-10 rounded-lg text-xs font-semibold transition ${
+                              formaPago === opt.v
+                                ? "bg-sky-500 text-white"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+
+                    {formaPago !== "EFECTIVO" && (
+                      <Field label="Cuenta">
+                        <select value={medioCobroId} onChange={(e) => setMedioCobroId(e.target.value)} className={inputCls}>
+                          <option value="">Seleccionar billetera...</option>
+                          {mediosCobro.map((m) => {
+                            const label = m.etiqueta || m.titular_nombre || m.valor || `Cuenta ${m.id}`;
+                            const tipo = m.proveedor_display || m.proveedor || "";
+                            return (
+                              <option key={m.id} value={m.id}>
+                                {label}{tipo ? ` (${tipo})` : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {mediosCobro.length === 0 && (
+                          <p className="text-xs text-amber-500 mt-1">
+                            ⚠️ No hay billeteras configuradas. Cargá una desde Configuración de Pagos.
+                          </p>
+                        )}
+                      </Field>
+                    )}
+
+                    {formaPago === "EFECTIVO" && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                        Pago en efectivo: no hace falta seleccionar cuenta.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* PASO 3: Comprobante + Notas + Resumen */}
+                {step === 3 && (
+                  <div className="space-y-4">
+                    <Field
+                      label={<>Comprobante <span className="text-rose-500">*</span></>}
+                      icon={<HiOutlineReceiptTax className="w-3.5 h-3.5" />}
+                    >
+                      {comprobanteUrl ? (
+                        <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                          {comprobanteFile?.type === "application/pdf" || comprobanteUrl?.endsWith?.(".pdf") ? (
+                            <a href={comprobanteUrl} target="_blank" rel="noreferrer" className="block p-6 text-center hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                              <HiOutlineDocumentText className="w-8 h-8 mx-auto text-slate-400 mb-1" />
+                              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Ver PDF</p>
+                            </a>
+                          ) : (
+                            <img src={comprobanteUrl} alt="" className="w-full h-36 object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => { setComprobanteFile(null); setComprobanteUrl(null); }}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500 hover:bg-rose-400 flex items-center justify-center text-white transition"
+                          >
+                            <HiX className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="block cursor-pointer">
+                          <input type="file" accept="image/*,application/pdf" onChange={handleFile} className="hidden" />
+                          <div className="rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 px-4 py-6 text-center transition">
+                            <HiOutlineCloudUpload className="w-8 h-8 mx-auto text-slate-400 mb-1.5" />
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subir comprobante</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Foto o PDF</p>
+                          </div>
+                        </label>
+                      )}
+                    </Field>
+
+                    <Field label="Notas (opcional)">
+                      <textarea
+                        value={observaciones}
+                        onChange={(e) => setObservaciones(e.target.value)}
+                        rows={2}
+                        placeholder="..."
+                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-sky-400 focus:outline-none resize-none text-sm text-slate-900 dark:text-slate-100 transition"
+                      />
+                    </Field>
+
+                    {/* Resumen */}
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 text-sm space-y-1.5">
+                      <p className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Resumen</p>
+                      <div className="flex justify-between"><span className="text-slate-500">Monto</span><span className="font-bold text-slate-800 dark:text-slate-100">{fmt(monto)}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Fecha</span><span className="text-slate-800 dark:text-slate-100">{dayjs(fecha).format("DD/MM/YYYY")}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Forma de pago</span><span className="text-slate-800 dark:text-slate-100">{labelForma(formaPago)}</span></div>
+                      {formaPago !== "EFECTIVO" && (
+                        <div className="flex justify-between"><span className="text-slate-500">Cuenta</span><span className="text-slate-800 dark:text-slate-100">{cuentaLabel || "—"}</span></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* FOOTER */}
@@ -309,24 +415,42 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
                 Deshacer pago
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting || subiendo}
-                className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-400 font-bold text-white text-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {subiendo || submitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {subiendo ? "Subiendo..." : "Registrando..."}
-                  </>
+              <div className="flex gap-2">
+                {step === 1 ? (
+                  <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition">
+                    Cancelar
+                  </button>
                 ) : (
-                  <>
-                    <HiCheck className="w-4 h-4" />
-                    Confirmar pago
-                  </>
+                  <button type="button" onClick={atras} className="flex-1 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition">
+                    ← Atrás
+                  </button>
                 )}
-              </button>
+
+                {step < 3 ? (
+                  <button type="button" onClick={siguiente} className="flex-1 h-11 rounded-xl bg-sky-500 hover:bg-sky-400 font-bold text-white text-sm transition">
+                    Siguiente →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={submitting || subiendo}
+                    className="flex-1 h-11 rounded-xl bg-sky-500 hover:bg-sky-400 font-bold text-white text-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {subiendo || submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        {subiendo ? "Subiendo..." : "Registrando..."}
+                      </>
+                    ) : (
+                      <>
+                        <HiCheck className="w-4 h-4" />
+                        Confirmar pago
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </motion.div>

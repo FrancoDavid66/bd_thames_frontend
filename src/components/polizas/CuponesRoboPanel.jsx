@@ -26,8 +26,7 @@ import {
 import { uploadToCloudinary } from "../../utils/cloudinary";
 import CuponRoboModal from "./CuponRoboModal";
 
-const shell =
-  "rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md shadow-xl shadow-black/20";
+const shell = "rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm shadow-xl shadow-black/20";
 
 const badgeByEstado = {
   PENDIENTE: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
@@ -46,8 +45,8 @@ const labelByEstado = {
 export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesProp }) {
   const { user } = useAuth();
   const dispatch = useDispatch();
-  
-  const isAdmin = user?.rol === 'ADMIN' || user?.perfil?.rol === 'ADMIN';
+
+  const isAdmin = user?.rol === "ADMIN" || user?.perfil?.rol === "ADMIN";
 
   const finalPolizaId = poliza?.id || polizaId;
   const cuotas = poliza?.cuotas || [];
@@ -57,20 +56,18 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
   const [isModalOpen, setIsModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
-  // 🚀 ESTADO MODAL: Agregamos 'isConfirming' para el paso de doble validación
-  const [montoModal, setMontoModal] = useState({ 
-    isOpen: false, 
-    file: null, 
-    cuponId: null, 
+  // 🚀 ESTADO MODAL: 'isConfirming' para el paso de doble validación
+  const [montoModal, setMontoModal] = useState({
+    isOpen: false,
+    file: null,
+    cuponId: null,
     editMode: false,
-    isConfirming: false 
+    isConfirming: false,
   });
   const [montoValue, setMontoValue] = useState("");
   const [costoCompaniaValue, setCostoCompaniaValue] = useState("");
 
-  const { byPoliza, loadingByPoliza, updatingById } = useSelector(
-    (s) => s.cuponesRobo || {}
-  );
+  const { byPoliza, loadingByPoliza, updatingById } = useSelector((s) => s.cuponesRobo || {});
 
   useEffect(() => {
     if (!finalPolizaId) return;
@@ -79,11 +76,8 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
   const loading = !!loadingByPoliza?.[finalPolizaId];
   const cuponesState = byPoliza?.[finalPolizaId];
-  
-  const cupones = useMemo(
-    () => cuponesState || cuponesProp || [],
-    [cuponesState, cuponesProp]
-  );
+
+  const cupones = useMemo(() => cuponesState || cuponesProp || [], [cuponesState, cuponesProp]);
 
   const handleClickUpload = (cupon) => {
     setUploadTarget(cupon);
@@ -95,7 +89,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
   const handleEditMonto = (cupon) => {
     setMontoValue(cupon.monto !== null ? String(cupon.monto) : "");
-    setCostoCompaniaValue(""); // en edición de monto no requerimos costo compañía
+    setCostoCompaniaValue("");
     setMontoModal({ isOpen: true, file: null, cuponId: cupon.id, editMode: true, isConfirming: false });
   };
 
@@ -105,48 +99,44 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
     const cuponId = uploadTarget.id;
     const defaultMonto = uploadTarget.monto ? String(uploadTarget.monto) : "";
-    
+
     setMontoValue(defaultMonto);
-    setCostoCompaniaValue(""); // siempre limpiamos el costo al abrir
+    setCostoCompaniaValue("");
     setMontoModal({ isOpen: true, file, cuponId, editMode: false, isConfirming: false });
     setUploadTarget(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // 🚀 PASO 1: Validamos el número y pasamos a la pantalla de confirmación
+  // 🚀 PASO 1: validar el número y pasar a confirmación
   const handleInitiateConfirm = () => {
     const normalized = montoValue.replace(",", ".").trim();
     if (!normalized) {
       toast.error("Debes ingresar un monto.");
       return;
     }
-
     const parsed = Number(normalized);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error("Monto inválido. Ingresá un número mayor a cero.");
       return;
     }
-
-    // Activamos la vista de confirmación
-    setMontoModal(prev => ({ ...prev, isConfirming: true }));
+    setMontoModal((prev) => ({ ...prev, isConfirming: true }));
   };
 
-  // 🚀 PASO 2: Realizamos la subida y guardado
+  // 🚀 PASO 2: subir y guardar
   const executeConfirmMonto = async () => {
     const { file, cuponId, editMode } = montoModal;
     if (!cuponId) return;
 
     const parsed = Number(montoValue.replace(",", ".").trim());
-    // costo_compania solo aplica cuando es un pago nuevo (no edición de monto)
     const costoCompaniaParsed = !editMode
       ? Number((costoCompaniaValue || "0").replace(",", ".").trim()) || 0
       : 0;
 
     try {
       setUploadingById((prev) => ({ ...prev, [cuponId]: true }));
-      
-      let secure_url = undefined;
-      let public_id = undefined;
+
+      let secure_url;
+      let public_id;
 
       if (file) {
         const uploadRes = await uploadToCloudinary(file, "rc-admin/cupones-robo");
@@ -159,7 +149,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
         polizaId: finalPolizaId,
         estado: "PAGADA",
         monto: parsed,
-        costo_compania: costoCompaniaParsed, // ✅ ahora siempre se manda al backend
+        costo_compania: costoCompaniaParsed,
       };
 
       if (secure_url) {
@@ -168,11 +158,10 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
       }
 
       await dispatch(actualizarEstadoCuponRobo(payload)).unwrap();
-      
+
       toast.success(editMode ? "Monto corregido correctamente." : "Pago de cupón registrado correctamente.");
       setMontoModal({ isOpen: false, file: null, cuponId: null, editMode: false, isConfirming: false });
       setCostoCompaniaValue("");
-      
     } catch (error) {
       console.error(error);
       toast.error("Ocurrió un error al procesar la solicitud.");
@@ -187,7 +176,6 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
   const isModalUploading = montoModal.cuponId ? !!uploadingById[montoModal.cuponId] : false;
 
-  // Cerramos limpiando todos los estados
   const closeModal = () => {
     if (isModalUploading) return;
     setMontoModal({ isOpen: false, file: null, cuponId: null, editMode: false, isConfirming: false });
@@ -196,60 +184,55 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
   return (
     <div className={shell}>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
+      {/* Header */}
+      <div className="flex flex-col items-start justify-between gap-3 border-b border-slate-800 px-4 py-3 sm:flex-row sm:items-center">
         <div className="flex items-start gap-2">
-          <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-primary-500/20 text-primary-300 shrink-0">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
             <HiShieldCheck className="h-4 w-4" />
           </div>
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-neutral-50">
-                Cuponeras de robo
-              </h3>
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase border border-emerald-500/20">
-                {user?.perfil?.oficina_nombre || 'Local'}
+              <h3 className="text-sm font-semibold text-slate-50">Cuponeras de robo</h3>
+              <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-400 border border-emerald-500/20">
+                {user?.perfil?.oficina_nombre || "Local"}
               </span>
             </div>
-            <p className="text-[11px] leading-snug text-neutral-400 max-w-md">
-              Gestiona los cupones correspondientes a las cuotas de la compañía.
+            <p className="max-w-md text-[11px] leading-snug text-slate-400">
+              Gestioná los cupones correspondientes a las cuotas de la compañía.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 transition-colors"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-400 sm:w-auto"
           >
-            <HiPlus className="mr-1 h-3 w-3" />
-            Vincular Cupón
+            <HiPlus className="mr-1 h-3 w-3" /> Vincular cupón
           </button>
           <button
             type="button"
             onClick={() => finalPolizaId && dispatch(fetchCuponesRobo(finalPolizaId))}
-            className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/10"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-700 sm:w-auto"
           >
-            <HiRefresh className="mr-1 h-3 w-3" />
-            Refrescar
+            <HiRefresh className="mr-1 h-3 w-3" /> Refrescar
           </button>
         </div>
       </div>
 
-      <div className="px-4 py-3 space-y-3">
+      <div className="space-y-3 px-4 py-3">
         {loading && (
-          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/70 px-3 py-2 text-[11px] text-neutral-300">
-            <span className="h-3 w-3 animate-spin rounded-full border border-neutral-600 border-t-transparent" />
+          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-[11px] text-slate-300">
+            <span className="h-3 w-3 animate-spin rounded-full border border-slate-600 border-t-transparent" />
             Cargando cupones vinculados a las cuotas...
           </div>
         )}
 
         {!loading && cupones.length === 0 && (
-          <div className="flex items-start gap-2 rounded-xl border border-dashed border-white/15 bg-neutral-950/60 px-3 py-3 text-[11px] text-neutral-400">
-            <HiClock className="mt-0.5 h-4 w-4 text-neutral-500" />
-            <span>
-              Todavía no hay cupones de robo para esta póliza. Se generan en base a las cuotas de la compañía.
-            </span>
+          <div className="flex items-start gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-3 py-3 text-[11px] text-slate-400">
+            <HiClock className="mt-0.5 h-4 w-4 text-slate-500" />
+            <span>Todavía no hay cupones de robo para esta póliza. Se generan en base a las cuotas de la compañía.</span>
           </div>
         )}
 
@@ -265,15 +248,20 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                 const tieneVto = !!cupon.fecha_vencimiento;
                 const isVencida = !isPagada && tieneVto && dayjs(cupon.fecha_vencimiento).isBefore(hoy, "day");
                 const visualEstado = isPagada ? "PAGADA" : isVencida ? "VENCIDA" : "AL_DIA";
-                const badgeClass = badgeByEstado[visualEstado] || "bg-neutral-700/40 text-neutral-100 border border-neutral-600/40";
-                
+                const badgeClass = badgeByEstado[visualEstado] || "bg-slate-700/40 text-slate-100 border border-slate-600/40";
+
                 const updating = !!updatingById?.[cupon.id];
                 const uploading = !!uploadingById?.[cupon.id];
                 const tienePagoMeta = !!cupon.fecha_pago || !!cupon.medio_cobro || !!cupon.foto_url || cupon.monto != null;
-                const cardTone = visualEstado === "PAGADA" ? "border-emerald-500/40 bg-emerald-950/40" : visualEstado === "VENCIDA" ? "border-rose-500/40 bg-rose-950/40" : "border-amber-500/40 bg-amber-950/40";
+                const cardTone =
+                  visualEstado === "PAGADA"
+                    ? "border-emerald-500/40 bg-emerald-950/30"
+                    : visualEstado === "VENCIDA"
+                    ? "border-rose-500/40 bg-rose-950/30"
+                    : "border-amber-500/40 bg-amber-950/30";
 
-                const cuotaAsociada = cuotas.find(c => dayjs(c.fecha_vencimiento).isSame(dayjs(cupon.fecha_vencimiento), 'month'));
-                const tituloCupon = cuotaAsociada ? `Cupón de Cuota #${cuotaAsociada.cuota_nro}` : `Cupón de Robo`;
+                const cuotaAsociada = cuotas.find((c) => dayjs(c.fecha_vencimiento).isSame(dayjs(cupon.fecha_vencimiento), "month"));
+                const tituloCupon = cuotaAsociada ? `Cupón de cuota #${cuotaAsociada.cuota_nro}` : "Cupón de robo";
 
                 return (
                   <motion.div
@@ -283,9 +271,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                   >
                     <div className="flex flex-1 flex-col gap-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-bold text-neutral-50 uppercase tracking-tight">
-                          {tituloCupon}
-                        </span>
+                        <span className="text-sm font-bold uppercase tracking-tight text-slate-50">{tituloCupon}</span>
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${badgeClass}`}>
                           {visualEstado === "PAGADA" && <HiBadgeCheck className="h-3 w-3" />}
                           {visualEstado === "AL_DIA" && <HiClock className="h-3 w-3" />}
@@ -294,14 +280,14 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-neutral-200">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-200">
                         {cupon.periodo_desde && cupon.periodo_hasta && (
-                          <span className="rounded-full bg-white/5 px-2 py-0.5 border border-white/10">
+                          <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2 py-0.5">
                             Período: {dayjs(cupon.periodo_desde).format("MM/YYYY")}
                           </span>
                         )}
                         {cupon.fecha_vencimiento && (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-neutral-100">
+                          <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-100">
                             Vence: {dayjs(cupon.fecha_vencimiento).format("DD/MM/YYYY")}
                           </span>
                         )}
@@ -326,13 +312,13 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                             <img src={cupon.foto_url} alt="Cupón de robo" className="h-28 w-full object-cover sm:h-32 md:h-36" />
                           </div>
                         ) : (
-                          <div className="flex h-28 w-full items-center justify-center rounded-xl border border-dashed border-white/15 bg-neutral-950/70 text-[11px] text-neutral-500 sm:h-32 md:h-36">
+                          <div className="flex h-28 w-full items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-950/70 text-[11px] text-slate-500 sm:h-32 md:h-36">
                             Sin comprobante adjunto
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+                      <div className="flex w-full flex-wrap items-center justify-end gap-2">
                         {visualEstado === "PAGADA" ? (
                           <>
                             {isAdmin && (
@@ -340,19 +326,19 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                                 type="button"
                                 onClick={() => handleEditMonto(cupon)}
                                 disabled={uploading || updating}
-                                className="inline-flex flex-1 sm:flex-none items-center justify-center gap-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1.5 text-[10px] font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-60 uppercase"
+                                className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/20 px-3 py-1.5 text-[10px] font-bold uppercase text-amber-300 transition-colors hover:bg-amber-500/30 disabled:opacity-60 sm:flex-none"
                               >
-                                <HiPencil className="h-3 w-3" /> Corregir Monto
+                                <HiPencil className="h-3 w-3" /> Corregir monto
                               </button>
                             )}
                             <button
                               type="button"
                               onClick={() => handleClickUpload(cupon)}
                               disabled={uploading || updating}
-                              className="inline-flex flex-1 sm:flex-none items-center justify-center gap-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 text-[10px] font-bold hover:bg-emerald-500/30 transition-colors disabled:opacity-60 uppercase"
+                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-3 py-1.5 text-[10px] font-bold uppercase text-emerald-400 transition-colors hover:bg-emerald-500/30 disabled:opacity-60 sm:flex-none"
                             >
                               {uploading || updating ? <span className="h-3 w-3 animate-spin rounded-full border border-emerald-400 border-t-transparent" /> : <HiPhotograph className="h-3 w-3" />}
-                              Cambiar Foto
+                              Cambiar foto
                             </button>
                           </>
                         ) : (
@@ -360,7 +346,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                             type="button"
                             onClick={() => handleClickUpload(cupon)}
                             disabled={uploading || updating}
-                            className="inline-flex w-full sm:w-auto items-center justify-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                           >
                             {uploading || updating ? <span className="h-3 w-3 animate-spin rounded-full border border-neutral-900 border-t-transparent" /> : <HiPhotograph className="h-3 w-3" />}
                             <span>Subir comprobante y marcar pagado</span>
@@ -369,7 +355,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                       </div>
 
                       {cupon.foto_url && (
-                        <a href={cupon.foto_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-sky-300 hover:text-sky-200 mt-0.5">
+                        <a href={cupon.foto_url} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-sky-300 hover:text-sky-200">
                           <HiPhotograph className="h-3 w-3" /> Ver completo
                         </a>
                       )}
@@ -382,164 +368,123 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
       </div>
 
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-      
+
       <CuponRoboModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} poliza={poliza} />
 
+      {/* Modal de monto (2 pasos) */}
       <AnimatePresence>
         {montoModal.isOpen && (
           <motion.div
-            className="fixed inset-0 z-[150] flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 pt-24"
+            className="fixed inset-0 z-[150] flex items-start justify-center bg-black/70 p-4 pt-24 backdrop-blur-sm"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
             <motion.div
-              className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-neutral-950/95 p-5 sm:p-6 shadow-2xl overflow-hidden"
-              initial={{ scale: 0.9, opacity: 0, y: -20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl sm:p-6"
+              initial={{ scale: 0.9, opacity: 0, y: -20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: -20 }}
             >
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={isModalUploading}
-                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-neutral-400 hover:bg-white/10 transition-colors disabled:opacity-50"
+                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-800/60 text-slate-400 transition-colors hover:bg-slate-700 disabled:opacity-50"
               >
                 <HiX className="h-4 w-4" />
               </button>
 
               <div className="mb-5 flex items-center gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${montoModal.isConfirming ? 'bg-amber-500/20 text-amber-400 border-amber-500/20' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20'}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${montoModal.isConfirming ? "border-amber-500/20 bg-amber-500/20 text-amber-400" : "border-emerald-500/20 bg-emerald-500/20 text-emerald-400"}`}>
                   {montoModal.isConfirming ? <HiExclamationCircle className="h-5 w-5" /> : <HiCurrencyDollar className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-neutral-50 uppercase tracking-tight">
-                    {montoModal.isConfirming ? "Confirmación" : (montoModal.editMode ? "Corregir Monto" : "Monto del Seguro")}
+                  <h2 className="text-sm font-bold uppercase tracking-tight text-slate-50">
+                    {montoModal.isConfirming ? "Confirmación" : montoModal.editMode ? "Corregir monto" : "Monto del seguro"}
                   </h2>
-                  <p className="text-[10px] text-neutral-400 font-medium">
-                    {montoModal.isConfirming ? "Verifica antes de continuar." : "Ingresa el egreso hacia la compañía."}
+                  <p className="text-[10px] font-medium text-slate-400">
+                    {montoModal.isConfirming ? "Verificá antes de continuar." : "Ingresá el egreso hacia la compañía."}
                   </p>
                 </div>
               </div>
 
-              {/* 🚀 CONDICIONAL: Muestra formulario o pantalla de confirmación */}
               {!montoModal.isConfirming ? (
                 <div className="space-y-4">
-                  {/* Monto cobrado al cliente */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1.5 font-medium">
-                      Monto cobrado al cliente
-                    </label>
-                    <div className={`flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-3 focus-within:ring-2 ring-emerald-500/40 transition-all ${isModalUploading ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                      <span className="text-neutral-500 font-bold">$</span>
+                    <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-slate-500">Monto cobrado al cliente</label>
+                    <div className={`flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-3 transition-all focus-within:ring-2 focus-within:ring-emerald-500/40 ${isModalUploading ? "cursor-not-allowed opacity-60" : ""}`}>
+                      <span className="font-bold text-slate-500">$</span>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00"
-                        className="flex-1 bg-transparent text-sm font-bold text-neutral-50 outline-none w-full"
+                        className="w-full flex-1 bg-transparent text-sm font-bold text-slate-50 outline-none"
                         value={montoValue}
                         onChange={(e) => setMontoValue(e.target.value)}
                         autoFocus
                         disabled={isModalUploading}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !isModalUploading) handleInitiateConfirm();
-                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !isModalUploading) handleInitiateConfirm(); }}
                       />
                     </div>
                   </div>
 
-                  {/* Costo compañía — solo en pago nuevo, no en edición de monto */}
                   {!montoModal.editMode && (
                     <div>
-                      <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1.5 font-medium">
+                      <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-slate-500">
                         Costo de la compañía
-                        <span className="ml-1 text-neutral-600 normal-case">(para calcular comisión)</span>
+                        <span className="ml-1 normal-case text-slate-600">(para calcular comisión)</span>
                       </label>
-                      <div className={`flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-3 focus-within:ring-2 ring-sky-500/40 transition-all ${isModalUploading ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                        <span className="text-neutral-500 font-bold">$</span>
+                      <div className={`flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-3 transition-all focus-within:ring-2 focus-within:ring-sky-500/40 ${isModalUploading ? "cursor-not-allowed opacity-60" : ""}`}>
+                        <span className="font-bold text-slate-500">$</span>
                         <input
                           type="number"
                           step="0.01"
                           placeholder="0.00"
-                          className="flex-1 bg-transparent text-sm font-bold text-neutral-50 outline-none w-full"
+                          className="w-full flex-1 bg-transparent text-sm font-bold text-slate-50 outline-none"
                           value={costoCompaniaValue}
                           onChange={(e) => setCostoCompaniaValue(e.target.value)}
                           disabled={isModalUploading}
                         />
                       </div>
-                      {/* Ganancia en vivo */}
-                      {montoValue && costoCompaniaValue && (
-                        (() => {
-                          const cobrado = Number(montoValue) || 0;
-                          const costo   = Number(costoCompaniaValue) || 0;
-                          const ganancia = cobrado - costo;
-                          return (
-                            <p className={`mt-1.5 text-xs font-mono ${ganancia > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              Ganancia: $ {ganancia.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                            </p>
-                          );
-                        })()
-                      )}
+                      {montoValue && costoCompaniaValue && (() => {
+                        const ganancia = (Number(montoValue) || 0) - (Number(costoCompaniaValue) || 0);
+                        return (
+                          <p className={`mt-1.5 font-mono text-xs ${ganancia > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                            Ganancia: $ {ganancia.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
 
                   <div className="flex justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={closeModal}
-                      disabled={isModalUploading}
-                      className="px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-neutral-400 hover:bg-white/5 transition-all uppercase disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleInitiateConfirm}
-                      disabled={isModalUploading}
-                      className="px-6 py-2.5 rounded-xl bg-emerald-500 text-xs font-black text-neutral-950 hover:bg-emerald-400 shadow-lg shadow-emerald-900/20 active:scale-95 transition-all uppercase disabled:opacity-60 flex items-center gap-2"
-                    >
-                      Siguiente
-                    </button>
+                    <button type="button" onClick={closeModal} disabled={isModalUploading} className="rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-bold uppercase text-slate-400 transition-all hover:bg-slate-800 disabled:opacity-50">Cancelar</button>
+                    <button type="button" onClick={handleInitiateConfirm} disabled={isModalUploading} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black uppercase text-neutral-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-60">Siguiente</button>
                   </div>
                 </div>
               ) : (
-                <motion.div 
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }}
-                  className="space-y-4"
-                >
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-neutral-400">Cobrado al cliente</span>
-                      <strong className="text-emerald-400 font-mono">$ {Number(montoValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+                  <div className="space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-400">Cobrado al cliente</span>
+                      <strong className="font-mono text-emerald-400">$ {Number(montoValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
                     </div>
                     {!montoModal.editMode && costoCompaniaValue && (
                       <>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-neutral-400">Costo compañía</span>
-                          <strong className="text-rose-400 font-mono">$ {Number(costoCompaniaValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-400">Costo compañía</span>
+                          <strong className="font-mono text-rose-400">$ {Number(costoCompaniaValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
                         </div>
-                        <div className="flex justify-between items-center text-sm border-t border-white/10 pt-2">
-                          <span className="text-neutral-300 font-medium">Ganancia</span>
-                          <strong className="text-sky-400 font-mono">$ {(Number(montoValue || 0) - Number(costoCompaniaValue || 0)).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
+                        <div className="flex items-center justify-between border-t border-slate-700 pt-2 text-sm">
+                          <span className="font-medium text-slate-300">Ganancia</span>
+                          <strong className="font-mono text-sky-400">$ {(Number(montoValue || 0) - Number(costoCompaniaValue || 0)).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong>
                         </div>
                       </>
                     )}
                   </div>
 
-                  <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setMontoModal(prev => ({ ...prev, isConfirming: false }))}
-                      disabled={isModalUploading}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-neutral-400 hover:bg-white/5 transition-all uppercase disabled:opacity-50"
-                    >
-                      No, corregir
-                    </button>
-                    <button
-                      type="button"
-                      onClick={executeConfirmMonto}
-                      disabled={isModalUploading}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 text-xs font-black text-neutral-950 hover:bg-emerald-400 shadow-lg shadow-emerald-900/20 active:scale-95 transition-all uppercase disabled:opacity-60 flex items-center justify-center gap-2"
-                    >
+                  <div className="flex flex-col justify-end gap-2 pt-2 sm:flex-row">
+                    <button type="button" onClick={() => setMontoModal((prev) => ({ ...prev, isConfirming: false }))} disabled={isModalUploading} className="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-bold uppercase text-slate-400 transition-all hover:bg-slate-800 disabled:opacity-50 sm:w-auto">No, corregir</button>
+                    <button type="button" onClick={executeConfirmMonto} disabled={isModalUploading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black uppercase text-neutral-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-60 sm:w-auto">
                       {isModalUploading ? (
                         <>
                           <span className="h-3 w-3 animate-spin rounded-full border-2 border-neutral-950 border-t-transparent" />
@@ -547,7 +492,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                         </>
                       ) : (
                         <>
-                          <HiCheckCircle className="w-4 h-4" />
+                          <HiCheckCircle className="h-4 w-4" />
                           {montoModal.editMode ? "Sí, guardar" : "Sí, confirmar pago"}
                         </>
                       )}
@@ -555,7 +500,6 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                   </div>
                 </motion.div>
               )}
-
             </motion.div>
           </motion.div>
         )}
