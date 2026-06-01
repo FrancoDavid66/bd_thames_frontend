@@ -6,28 +6,30 @@ import {
   HiUserGroup, HiShieldExclamation, HiExclamationCircle,
   HiRefresh, HiSearch, HiChevronLeft, HiChevronRight,
   HiDownload, HiArrowRight, HiPhone, HiMail, HiIdentification,
-  HiCake, HiHome, HiLocationMarker, HiPhotograph,
+  HiCake, HiHome, HiLocationMarker, HiPhotograph, HiClipboardList,
 } from "react-icons/hi";
 
 const token = () => localStorage.getItem("access_token") || localStorage.getItem("token") || "";
 const authH = () => (token() ? { Authorization: `Bearer ${token()}` } : {});
 
+const vacio = (v) => v === null || v === undefined || String(v).trim() === "";
+
 /* ──────────────────────────────────────────────────────────────
    CAMPOS DEL CLIENTE QUE AUDITAMOS.
-   - key       → coincide con la clave del resumen del backend (sin_<key>)
-   - filtro    → query param que filtra la lista (sin_<key>=1)
-   - getter    → cómo leer el valor real del cliente para mostrarlo / marcar "Falta"
+   - key     → coincide con la clave del resumen del backend (sin_<key>)
+   - short   → etiqueta corta para los chips de "Qué le falta"
+   - getter  → cómo leer el valor real del cliente
    Si mañana agregás "partido", lo sumás acá y al backend, nada más.
    ────────────────────────────────────────────────────────────── */
 const CAMPOS_CLIENTE = [
-  { key: "telefono",         label: "Sin teléfono",       icon: HiPhone,          color: "text-rose-400",    bg: "bg-rose-500/8 border-rose-500/20",     getter: (c) => c.telefono },
-  { key: "email",            label: "Sin email",          icon: HiMail,           color: "text-pink-400",    bg: "bg-pink-500/8 border-pink-500/20",     getter: (c) => c.email },
-  { key: "dni",              label: "Sin DNI/CUIT",       icon: HiIdentification, color: "text-fuchsia-400", bg: "bg-fuchsia-500/8 border-fuchsia-500/20", getter: (c) => c.dni_cuit_cuil },
-  { key: "fecha_nacimiento", label: "Sin fecha de nac.",  icon: HiCake,           color: "text-violet-400",  bg: "bg-violet-500/8 border-violet-500/20", getter: (c) => c.fecha_nacimiento },
-  { key: "direccion",        label: "Sin dirección",      icon: HiHome,           color: "text-indigo-400",  bg: "bg-indigo-500/8 border-indigo-500/20", getter: (c) => c.direccion },
-  { key: "localidad",        label: "Sin localidad",      icon: HiLocationMarker, color: "text-sky-400",     bg: "bg-sky-500/8 border-sky-500/20",       getter: (c) => c.localidad },
-  { key: "dni_frente",       label: "Sin DNI frente",     icon: HiPhotograph,     color: "text-amber-400",   bg: "bg-amber-500/8 border-amber-500/20",   getter: (c) => c.archivo_dni_frente || c.archivo_dni },
-  { key: "dni_dorso",        label: "Sin DNI dorso",      icon: HiPhotograph,     color: "text-orange-400",  bg: "bg-orange-500/8 border-orange-500/20", getter: (c) => c.archivo_dni_dorso },
+  { key: "telefono",         label: "Sin teléfono",      short: "teléfono",   icon: HiPhone,          color: "text-rose-400",    bg: "bg-rose-500/8 border-rose-500/20",       getter: (c) => c.telefono },
+  { key: "email",            label: "Sin email",         short: "email",      icon: HiMail,           color: "text-pink-400",    bg: "bg-pink-500/8 border-pink-500/20",       getter: (c) => c.email },
+  { key: "dni",              label: "Sin DNI/CUIT",      short: "DNI",        icon: HiIdentification, color: "text-fuchsia-400", bg: "bg-fuchsia-500/8 border-fuchsia-500/20", getter: (c) => c.dni_cuit_cuil },
+  { key: "fecha_nacimiento", label: "Sin fecha de nac.", short: "fecha nac.", icon: HiCake,           color: "text-violet-400",  bg: "bg-violet-500/8 border-violet-500/20",   getter: (c) => c.fecha_nacimiento },
+  { key: "direccion",        label: "Sin dirección",     short: "dirección",  icon: HiHome,           color: "text-indigo-400",  bg: "bg-indigo-500/8 border-indigo-500/20",   getter: (c) => c.direccion },
+  { key: "localidad",        label: "Sin localidad",     short: "localidad",  icon: HiLocationMarker, color: "text-sky-400",     bg: "bg-sky-500/8 border-sky-500/20",         getter: (c) => c.localidad },
+  { key: "dni_frente",       label: "Sin DNI frente",    short: "DNI frente", icon: HiPhotograph,     color: "text-amber-400",   bg: "bg-amber-500/8 border-amber-500/20",     getter: (c) => c.archivo_dni_frente || c.archivo_dni },
+  { key: "dni_dorso",        label: "Sin DNI dorso",     short: "DNI dorso",  icon: HiPhotograph,     color: "text-orange-400",  bg: "bg-orange-500/8 border-orange-500/20",   getter: (c) => c.archivo_dni_dorso },
 ];
 
 // KPIs de pólizas (vienen del endpoint de estadísticas, no se pueden clickear)
@@ -37,7 +39,13 @@ const CAMPOS_POLIZA = [
   { key: "sin_compania", label: "Pólizas sin compañía", icon: HiExclamationCircle, color: "text-slate-400",  bg: "bg-slate-700/30 border-slate-700" },
 ];
 
-const labelPorKey = (key) => CAMPOS_CLIENTE.find((c) => c.key === key)?.label || "Datos faltantes";
+const labelPorKey = (key) =>
+  key === "incompleto"
+    ? "Incompletos (les falta algo)"
+    : CAMPOS_CLIENTE.find((c) => c.key === key)?.label || "Datos faltantes";
+
+// Devuelve la lista de campos que le faltan a un cliente (los buchonea todos)
+const faltantesDe = (c) => CAMPOS_CLIENTE.filter((campo) => vacio(campo.getter(c)));
 
 export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, anio, mes }) {
   const navigate = useNavigate();
@@ -45,8 +53,8 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
   const [kpis, setKpis] = useState({});
   const [loadingKpis, setLoadingKpis] = useState(false);
 
-  // Campo de cliente que se está mostrando en la tabla de abajo
-  const [campoActivo, setCampoActivo] = useState("telefono");
+  // Campo que se muestra en la tabla: una key de CAMPOS_CLIENTE o "incompleto"
+  const [campoActivo, setCampoActivo] = useState("incompleto");
 
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
@@ -60,13 +68,11 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
   const fetchKpis = async () => {
     setLoadingKpis(true);
     try {
-      // Clientes: resumen con todos los datos faltantes
       const qs = new URLSearchParams();
       if (oficina) qs.set("oficina", oficina);
       const r1 = await fetch(`${apiBase}clientes/calidad/resumen/?${qs}`, { headers: authH() });
       const d1 = r1.ok ? await r1.json() : {};
 
-      // Pólizas: sumamos por oficina
       const p = new URLSearchParams({ anio, mes });
       if (oficina) p.set("oficina", oficina);
       const r2 = await fetch(`${apiBase}estadisticas/polizas/por-oficina/?${p}`, { headers: authH() });
@@ -93,11 +99,10 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
   const fetchList = async () => {
     setLoadingList(true);
     try {
-      const qs = new URLSearchParams({
-        [`sin_${campoActivo}`]: "1",
-        page: String(page),
-        page_size: String(pageSize),
-      });
+      const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      // "incompleto" usa su propio filtro (OR de todo); el resto usa sin_<campo>
+      if (campoActivo === "incompleto") qs.set("incompleto", "1");
+      else qs.set(`sin_${campoActivo}`, "1");
       if (search.trim()) qs.set("search", search.trim());
       if (oficina) qs.set("oficina", oficina);
       const r = await fetch(`${apiBase}clientes/?${qs}`, { headers: authH() });
@@ -115,11 +120,32 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
   useEffect(() => { setPage(1); }, [oficina, search, campoActivo]);
   useEffect(() => { fetchList(); }, [oficina, page, search, campoActivo]);
 
+  // 🔄 AUTO-REFRESCO: cuando volvés a esta pestaña/ventana (p. ej. tras editar
+  // un cliente), vuelve a leer la base y actualiza KPIs + listado solo.
+  useEffect(() => {
+    const refrescar = () => {
+      if (document.visibilityState === "visible") {
+        fetchKpis();
+        fetchList();
+      }
+    };
+    window.addEventListener("focus", refrescar);
+    document.addEventListener("visibilitychange", refrescar);
+    return () => {
+      window.removeEventListener("focus", refrescar);
+      document.removeEventListener("visibilitychange", refrescar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oficina, anio, mes, page, search, campoActivo]);
+
   const downloadCsv = () => {
-    const h = ["ID", "Apellido", "Nombre", "DNI", "Teléfono", "Email", "Fecha Nac.", "Dirección", "Localidad"];
+    const h = ["ID", "Apellido", "Nombre", "DNI", "Teléfono", "Email", "Fecha Nac.", "Dirección", "Localidad", "Le falta"];
     const rows = items.map((c) =>
-      [c.id, c.apellido, c.nombre, c.dni_cuit_cuil, c.telefono, c.email, c.fecha_nacimiento, c.direccion, c.localidad]
-        .map((v) => `"${String(v ?? "")}"`)
+      [
+        c.id, c.apellido, c.nombre, c.dni_cuit_cuil, c.telefono, c.email,
+        c.fecha_nacimiento, c.direccion, c.localidad,
+        faltantesDe(c).map((f) => f.short).join(" / "),
+      ].map((v) => `"${String(v ?? "")}"`)
     );
     const csv = [h.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const a = document.createElement("a");
@@ -128,14 +154,10 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
     a.click();
   };
 
-  // Celda que muestra el valor o "Falta" en rojo si está vacío
-  const Celda = ({ value, campoKey }) => {
-    const vacio = value === null || value === undefined || String(value).trim() === "";
-    if (vacio) {
-      return <span className="text-rose-400/70 font-medium">Falta</span>;
-    }
-    return <span className="text-slate-400">{value}</span>;
-  };
+  const Celda = ({ value }) =>
+    vacio(value)
+      ? <span className="text-rose-400/70 font-medium">Falta</span>
+      : <span className="text-slate-400">{value}</span>;
 
   return (
     <div className="space-y-5">
@@ -156,10 +178,36 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
         </button>
       </div>
 
+      {/* Tarjeta destacada: INCOMPLETOS (les falta algo) */}
+      <motion.button
+        type="button"
+        onClick={() => setCampoActivo("incompleto")}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`w-full text-left rounded-2xl border p-4 transition-all bg-rose-500/8 border-rose-500/25 ${
+          campoActivo === "incompleto" ? "ring-2 ring-rose-500/50" : "hover:brightness-110"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <HiClipboardList className="text-rose-400 text-base shrink-0" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                Clientes incompletos
+              </div>
+              <div className="text-[10px] text-slate-500">Les falta al menos un dato</div>
+            </div>
+          </div>
+          <div className={`text-3xl font-light tabular-nums ${loadingKpis ? "text-slate-700" : "text-rose-400"}`}>
+            {loadingKpis ? "—" : Number(kpis.incompletos || 0).toLocaleString("es-AR")}
+          </div>
+        </div>
+      </motion.button>
+
       {/* KPIs de CLIENTE (clickeables) */}
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600 mb-2 ml-0.5">
-          Datos faltantes del cliente — tocá una tarjeta para ver el listado
+          Por dato puntual — tocá una tarjeta para filtrar el listado
         </p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {CAMPOS_CLIENTE.map((k, i) => {
@@ -260,43 +308,63 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
                 <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-600">Email</th>
                 <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-600">F. Nac.</th>
                 <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-600">Localidad</th>
+                <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-600">Qué le falta</th>
                 <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-600"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40">
               {loadingList ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-600">Cargando...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-600">Cargando...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-600">
-                  {search ? "Sin resultados para esa búsqueda." : `¡Todo en orden! No hay clientes con "${labelPorKey(campoActivo).toLowerCase()}".`}
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-600">
+                  {search ? "Sin resultados para esa búsqueda." : "¡Todo en orden! No hay clientes para este filtro."}
                 </td></tr>
-              ) : items.map((c) => (
-                <motion.tr
-                  key={c.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="hover:bg-slate-800/25 transition-colors group"
-                >
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-slate-200">
-                      {`${c.apellido || ""} ${c.nombre || ""}`.trim() || "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 tabular-nums"><Celda value={c.dni_cuit_cuil} campoKey="dni" /></td>
-                  <td className="px-4 py-3"><Celda value={c.telefono} campoKey="telefono" /></td>
-                  <td className="px-4 py-3"><Celda value={c.email} campoKey="email" /></td>
-                  <td className="px-4 py-3 tabular-nums"><Celda value={c.fecha_nacimiento} campoKey="fecha_nacimiento" /></td>
-                  <td className="px-4 py-3"><Celda value={c.localidad} campoKey="localidad" /></td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => navigate(`/clientes/${c.id}`)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 text-[10px] font-medium"
-                    >
-                      Ver perfil <HiArrowRight className="text-xs" />
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
+              ) : items.map((c) => {
+                const faltan = faltantesDe(c);
+                return (
+                  <motion.tr
+                    key={c.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="hover:bg-slate-800/25 transition-colors group align-top"
+                  >
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-slate-200">
+                        {`${c.apellido || ""} ${c.nombre || ""}`.trim() || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums"><Celda value={c.dni_cuit_cuil} /></td>
+                    <td className="px-4 py-3"><Celda value={c.telefono} /></td>
+                    <td className="px-4 py-3"><Celda value={c.email} /></td>
+                    <td className="px-4 py-3 tabular-nums"><Celda value={c.fecha_nacimiento} /></td>
+                    <td className="px-4 py-3"><Celda value={c.localidad} /></td>
+                    <td className="px-4 py-3">
+                      {faltan.length === 0 ? (
+                        <span className="text-emerald-400/80 font-medium text-[11px]">Completo ✓</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1 max-w-[260px]">
+                          {faltan.map((f) => (
+                            <span
+                              key={f.key}
+                              className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${f.bg} ${f.color}`}
+                            >
+                              {f.short}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => navigate(`/clientes/${c.id}`)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 text-[10px] font-medium"
+                      >
+                        Ver perfil <HiArrowRight className="text-xs" />
+                      </button>
+                    </td>
+                  </motion.tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
