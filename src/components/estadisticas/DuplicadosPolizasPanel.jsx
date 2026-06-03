@@ -33,7 +33,9 @@ const CRITERIOS = [
   { value: "numero_poliza_compania", label: "N° póliza + compañía" },
   { value: "numero_poliza",          label: "N° póliza" },
   { value: "patente_activa",         label: "Patente (activas)" },
+  { value: "patente",                label: "Patente (todas)" },
   { value: "cliente_patente_activa", label: "Cliente + patente (activas)" },
+  { value: "cliente_patente",        label: "Cliente + patente (todas)" },
 ];
 
 export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNombre }) {
