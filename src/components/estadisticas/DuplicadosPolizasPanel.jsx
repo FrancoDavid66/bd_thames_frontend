@@ -47,6 +47,9 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
   const [pageSize,  setPageSize]  = useState(10);
   const [resumen,   setResumen]   = useState(null);
   const [grupos,    setGrupos]    = useState([]);
+  const [resolverItems, setResolverItems] = useState(null); // pólizas del grupo a resolver
+  const [resolverActiva, setResolverActiva] = useState(null); // id que queda activa
+  const [resolviendo, setResolviendo] = useState(false);
   const [count,     setCount]     = useState(0);
   const [totalPgs,  setTotalPgs]  = useState(1);
   const [loadRes,   setLoadRes]   = useState(false);
@@ -153,6 +156,47 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
   };
 
   useEffect(() => { fetchResumen(); }, [oficina]);
+
+  // Abrir modal de "Resolver": elige por defecto la de vencimiento más lejano (la vigente real)
+  const abrirResolver = (items) => {
+    const activas = (items || []).filter(it => String(it.estado) === "activa");
+    const base = activas.length ? activas : (items || []);
+    const fecha = (it) => {
+      const d = it?.fecha_vencimiento ? new Date(it.fecha_vencimiento) : null;
+      return d && !isNaN(d) ? d.getTime() : -Infinity;
+    };
+    let def = base[0];
+    base.forEach(it => { if (fecha(it) > fecha(def) || (fecha(it) === fecha(def) && Number(it.id) > Number(def?.id || 0))) def = it; });
+    setResolverItems(items || []);
+    setResolverActiva(def?.id ?? null);
+  };
+
+  const ejecutarResolver = async () => {
+    if (resolviendo || !resolverActiva || !resolverItems) return;
+    const vencer = resolverItems.map(it => it.id).filter(id => id !== resolverActiva);
+    if (!vencer.length) { setResolverItems(null); return; }
+    setResolviendo(true); setError("");
+    try {
+      const res = await fetch(`${apiBase}polizas/resolver-duplicado/`, {
+        method: "POST",
+        headers: { ...authH(), "Content-Type": "application/json" },
+        body: JSON.stringify({ activa_id: resolverActiva, vencer_ids: vencer }),
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); msg = j?.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      setResolverItems(null);
+      setResolverActiva(null);
+      fetchResumen();
+      fetchListado();
+    } catch (e) {
+      setError(`No se pudo resolver: ${e.message || "error"}`);
+    } finally {
+      setResolviendo(false);
+    }
+  };
   useEffect(() => { fetchListado(); }, [oficina, por, page, pageSize, perGroup]);
 
   const resCards = useMemo(() => {
@@ -266,10 +310,18 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
                     <div className="text-sm font-semibold text-rose-400">{keyStr || "—"}</div>
                     <div className="text-[10px] text-slate-600 mt-0.5">{Number(g?.count || items.length || 0)} pólizas</div>
                   </div>
-                  <button onClick={() => copyText(keyStr)}
-                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors text-[10px]">
-                    <HiOutlineClipboardCopy className="text-xs" /> Copiar
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {items.filter(it => String(it.estado) === "activa").length > 1 && (
+                      <button onClick={() => abrirResolver(items)}
+                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-amber-500 bg-amber-500/90 text-slate-950 font-bold hover:bg-amber-400 transition-colors text-[10px]">
+                        Resolver
+                      </button>
+                    )}
+                    <button onClick={() => copyText(keyStr)}
+                      className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors text-[10px]">
+                      <HiOutlineClipboardCopy className="text-xs" /> Copiar
+                    </button>
+                  </div>
                 </div>
 
                 {/* Mini tabla del grupo */}
@@ -338,6 +390,56 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
           </div>
         )}
       </div>
+
+      {/* ── Modal: Resolver doble cobertura activa ── */}
+      {resolverItems && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => !resolviendo && setResolverItems(null)}>
+          <div className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-800">
+              <h3 className="text-base font-semibold text-slate-100">Resolver duplicado</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Elegí la póliza que queda <b className="text-emerald-400">activa</b>. Las demás pasan a <b className="text-slate-300">vencida</b> (no se borran).</p>
+            </div>
+
+            <div className="px-5 py-4 space-y-2 max-h-[50vh] overflow-y-auto">
+              {resolverItems.map(it => {
+                const sel = it.id === resolverActiva;
+                return (
+                  <label key={it.id}
+                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${sel ? "border-emerald-500/50 bg-emerald-500/10" : "border-slate-800 bg-slate-900/50 hover:border-slate-700"}`}>
+                    <input type="radio" name="activa" checked={sel} onChange={() => setResolverActiva(it.id)} className="mt-1 accent-emerald-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-200 font-medium">#{it.id}{it.numero_poliza ? ` · ${it.numero_poliza}` : ""}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {it.compania ? `${it.compania} · ` : ""}
+                        {it.fecha_emision ? `emisión ${it.fecha_emision}` : ""}
+                        {it.fecha_vencimiento ? ` · vence ${it.fecha_vencimiento}` : ""}
+                      </div>
+                      <div className="text-[10px] mt-0.5">
+                        <span className={it.estado === "activa" ? "text-emerald-400" : "text-slate-500"}>estado actual: {it.estado || "—"}</span>
+                        {sel && <span className="ml-2 text-emerald-400 font-semibold">→ queda ACTIVA</span>}
+                        {!sel && <span className="ml-2 text-rose-400">→ pasa a vencida</span>}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-800 flex items-center justify-end gap-2">
+              <button onClick={() => setResolverItems(null)} disabled={resolviendo}
+                className="h-9 px-4 rounded-lg border border-slate-700 text-slate-300 text-sm hover:bg-slate-900 disabled:opacity-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={ejecutarResolver} disabled={resolviendo || !resolverActiva}
+                className="h-9 px-4 rounded-lg bg-amber-500 text-slate-950 text-sm font-bold hover:bg-amber-400 disabled:opacity-50 transition-colors">
+                {resolviendo ? "Aplicando…" : "Resolver ahora"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
