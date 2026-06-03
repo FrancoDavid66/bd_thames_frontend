@@ -353,6 +353,7 @@ export default function EstadisticasPage() {
   const apiBase = useMemo(() => getApiBase(), []);
 
   const [tab, setTab] = useState(() => localStorage.getItem("estadisticas.tab") || "general");
+  const [dupSub, setDupSub] = useState(() => localStorage.getItem("estadisticas.dupSub") || "clientes");
   useEffect(() => { localStorage.setItem("estadisticas.tab", tab); }, [tab]);
 
   const hoy = useMemo(() => new Date(), []);
@@ -457,8 +458,20 @@ export default function EstadisticasPage() {
 
           {tab === "duplicados" && (
             <motion.div key="duplicados" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
-              <DuplicadosClientesPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
-              <DuplicadosPolizasPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
+              {/* Sub-solapas: Clientes / Pólizas */}
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-2">
+                <TabButton active={dupSub === "clientes"} onClick={() => { setDupSub("clientes"); localStorage.setItem("estadisticas.dupSub", "clientes"); }}>
+                  Clientes duplicados
+                </TabButton>
+                <TabButton active={dupSub === "polizas"} onClick={() => { setDupSub("polizas"); localStorage.setItem("estadisticas.dupSub", "polizas"); }}>
+                  Pólizas duplicadas
+                </TabButton>
+              </div>
+
+              {dupSub === "clientes"
+                ? <DuplicadosClientesPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
+                : <DuplicadosPolizasPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
+              }
             </motion.div>
           )}
 

@@ -55,6 +55,9 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [fusionGrupo, setFusionGrupo] = useState(null);   // grupo abierto en el modal
+  const [principalSel, setPrincipalSel] = useState(null); // id del cliente que QUEDA
+  const [fusionando, setFusionando] = useState(false);
 
   const modosParam = useMemo(() => modos.join(","), [modos]);
 
@@ -141,6 +144,41 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
       setError("No se pudo generar la descarga.");
     } finally {
       setDownloading(false);
+    }
+  };
+
+  // Abrir el modal de fusión para un grupo (preselecciona el cliente de menor ID)
+  const abrirFusion = (g) => {
+    const clientes = Array.isArray(g?.clientes) ? g.clientes : [];
+    if (clientes.length < 2) return;
+    const idMenor = clientes.map(c => Number(c?.id)).filter(Boolean).sort((a, b) => a - b)[0];
+    setPrincipalSel(idMenor || clientes[0]?.id || null);
+    setFusionGrupo(g);
+  };
+
+  // Ejecutar la fusión: el principal queda, el resto se mueve hacia él y se borra
+  const ejecutarFusion = async () => {
+    if (!fusionGrupo || !principalSel || fusionando) return;
+    setFusionando(true); setError("");
+    try {
+      const clientes = Array.isArray(fusionGrupo?.clientes) ? fusionGrupo.clientes : [];
+      const duplicados_ids = clientes.map(c => Number(c?.id)).filter(id => id && id !== Number(principalSel));
+      const res = await fetch(`${apiBase}clientes/fusionar/`, {
+        method: "POST",
+        headers: { ...authH(), "Content-Type": "application/json" },
+        body: JSON.stringify({ principal_id: Number(principalSel), duplicados_ids }),
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); msg = j?.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      setFusionGrupo(null); setPrincipalSel(null);
+      await fetchData(); // refrescar lista
+    } catch (e) {
+      setError(`No se pudo fusionar: ${e.message || "error"}`);
+    } finally {
+      setFusionando(false);
     }
   };
 
@@ -261,10 +299,19 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
                   <HiOutlineClipboardCopy className="text-sm" />
                 </button>
               </div>
-              <span className="text-[11px] font-bold text-amber-300 shrink-0">
-                {g?.count} registros
-                {g?.truncated ? " (+)" : ""}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[11px] font-bold text-amber-300">
+                  {g?.count} registros
+                  {g?.truncated ? " (+)" : ""}
+                </span>
+                <button
+                  onClick={() => abrirFusion(g)}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-sky-600 bg-sky-600/90 text-white text-[11px] font-semibold hover:bg-sky-500 transition-colors"
+                  title="Fusionar estos clientes en uno solo"
+                >
+                  Fusionar
+                </button>
+              </div>
             </div>
 
             {/* Clientes del grupo */}
@@ -302,6 +349,76 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
           </motion.div>
         ))}
       </div>
+
+      {/* ── Modal de fusión ── */}
+      {fusionGrupo && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => !fusionando && setFusionGrupo(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800">
+              <h3 className="text-base font-semibold text-slate-100">Fusionar clientes</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Elegí la ficha que se queda. Las demás se mueven hacia ella (pólizas incluidas) y se borran.
+              </p>
+            </div>
+
+            <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-800/60">
+              {(Array.isArray(fusionGrupo?.clientes) ? fusionGrupo.clientes : []).map((c) => {
+                const nombre = [c?.apellido, c?.nombre].filter(Boolean).join(", ") || "Sin nombre";
+                const elegido = Number(principalSel) === Number(c?.id);
+                return (
+                  <label
+                    key={c?.id}
+                    className={`flex items-start gap-3 px-5 py-3 cursor-pointer transition-colors ${elegido ? "bg-sky-500/10" : "hover:bg-slate-900/60"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="principal"
+                      className="mt-1 accent-sky-500"
+                      checked={elegido}
+                      onChange={() => setPrincipalSel(Number(c?.id))}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-100">
+                        {nombre}
+                        <span className="ml-2 text-[10px] font-mono text-slate-500">#{c?.id}</span>
+                        {elegido && <span className="ml-2 text-[10px] font-bold text-sky-400">QUEDA</span>}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3 mt-0.5 font-mono">
+                        {c?.dni_cuit_cuil && <span>DNI {c.dni_cuit_cuil}</span>}
+                        {c?.telefono && <span>Tel {c.telefono}</span>}
+                        {c?.email && <span className="truncate max-w-[180px]">{c.email}</span>}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-800 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setFusionGrupo(null)}
+                disabled={fusionando}
+                className="h-9 px-4 rounded-lg border border-slate-700 text-slate-300 text-sm hover:bg-slate-900 disabled:opacity-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={ejecutarFusion}
+                disabled={fusionando || !principalSel}
+                className="h-9 px-4 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 disabled:opacity-50 transition-colors"
+              >
+                {fusionando ? "Fusionando…" : "Fusionar y borrar duplicados"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
