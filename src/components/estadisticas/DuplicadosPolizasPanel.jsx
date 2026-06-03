@@ -399,7 +399,7 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
             onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-slate-800">
               <h3 className="text-base font-semibold text-slate-100">Resolver duplicado</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Elegí la póliza que queda <b className="text-emerald-400">activa</b>. Las demás pasan a <b className="text-slate-300">vencida</b> (no se borran).</p>
+              <p className="text-xs text-slate-500 mt-0.5">Elegí la póliza que queda <b className="text-emerald-400">activa</b>. Las demás pasan a <b className="text-slate-300">finalizada</b> (no se borran).</p>
             </div>
 
             <div className="px-5 py-4 space-y-2 max-h-[50vh] overflow-y-auto">
@@ -419,7 +419,7 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
                       <div className="text-[10px] mt-0.5">
                         <span className={it.estado === "activa" ? "text-emerald-400" : "text-slate-500"}>estado actual: {it.estado || "—"}</span>
                         {sel && <span className="ml-2 text-emerald-400 font-semibold">→ queda ACTIVA</span>}
-                        {!sel && <span className="ml-2 text-rose-400">→ pasa a vencida</span>}
+                        {!sel && <span className="ml-2 text-rose-400">→ pasa a finalizada</span>}
                       </div>
                     </div>
                   </label>
