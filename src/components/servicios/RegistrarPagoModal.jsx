@@ -11,8 +11,10 @@ import {
   HiOutlineCreditCard,
   HiOutlineCash,
   HiOutlineReceiptTax,
+  HiOutlineEye,
+  HiOutlineDownload,
 } from "react-icons/hi";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import dayjs from "dayjs";
 
 import {
@@ -53,7 +55,9 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
   const yaPagado = pago?.estado === "PAGADO";
 
   const [step, setStep] = useState(1);
-  const [monto, setMonto] = useState(yaPagado ? pago.monto_real : pago?.servicio_monto_estimado || "");
+  // El monto se carga al momento de pagar (estos gastos suelen variar mes a mes),
+  // por eso NO se pre-carga con el estimado del servicio.
+  const [monto, setMonto] = useState(yaPagado ? pago.monto_real : "");
   const [fecha, setFecha] = useState(yaPagado ? pago.fecha_pago : dayjs().format("YYYY-MM-DD"));
   const [formaPago, setFormaPago] = useState(yaPagado ? pago.forma_pago : "TRANSFERENCIA");
   const [medioCobroId, setMedioCobroId] = useState(yaPagado ? pago.medio_cobro : "");
@@ -93,20 +97,44 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
     return true;
   };
 
-  const siguiente = () => { if (validarPaso(step)) setStep((v) => Math.min(3, v + 1)); };
+  const siguiente = () => setStep((v) => Math.min(3, v + 1));
   const atras = () => setStep((v) => Math.max(1, v - 1));
 
   const handleSubmit = async () => {
-    if (!validarPaso(1)) { setStep(1); return; }
-    if (!validarPaso(2)) { setStep(2); return; }
-    if (!validarPaso(3)) { setStep(3); return; }
+    // Validar TODO junto y avisar de una sola vez lo que falte
+    const faltan = [];
+    if (!monto || Number(monto) <= 0) faltan.push("el monto");
+    if (!fecha) faltan.push("la fecha");
+    if (formaPago !== "EFECTIVO" && !medioCobroId) faltan.push("la cuenta / billetera");
+    // El comprobante es OPCIONAL: si lo subís se guarda, si no, se paga igual.
+
+    if (faltan.length > 0) {
+      toast.error(`Te falta completar: ${faltan.join(" \u00b7 ")}`);
+      // Llevar al primer paso donde falta algo
+      if (!monto || Number(monto) <= 0 || !fecha) setStep(1);
+      else if (formaPago !== "EFECTIVO" && !medioCobroId) setStep(2);
+      else setStep(3);
+      return;
+    }
 
     try {
       setSubiendo(true);
-      const url = comprobanteFile
-        ? await uploadToCloudinary(comprobanteFile, "rc-admin/servicios/comprobantes")
-        : comprobanteUrl;
+      // Resolver la URL del comprobante:
+      // - si hay archivo nuevo → se sube a Cloudinary (devuelve https://…)
+      // - si ya había una URL guardada (pago previo) y es http(s) → se reutiliza
+      // - cualquier otra cosa (blob:, vacío, null) NO es una URL válida
+      let url = null;
+      if (comprobanteFile) {
+        const subida = await uploadToCloudinary(comprobanteFile, "rc-admin/servicios/comprobantes");
+        // uploadToCloudinary devuelve un objeto { secure_url, public_id, ... }
+        // → hay que tomar el link de adentro, no el objeto entero.
+        url = subida?.secure_url || subida?.url || null;
+      } else if (typeof comprobanteUrl === "string" && /^https?:\/\//i.test(comprobanteUrl)) {
+        url = comprobanteUrl;
+      }
       setSubiendo(false);
+
+      const esUrlValida = typeof url === "string" && /^https?:\/\//i.test(url);
 
       await dispatch(registrarPagoServicio({
         id: pago.id,
@@ -114,8 +142,9 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
         fecha,
         forma_pago: formaPago,
         medio_cobro_id: formaPago === "EFECTIVO" ? null : Number(medioCobroId),
-        comprobante_url: url,
         observaciones,
+        // Solo se envía si es una URL real (https://…); si no, se omite y el backend no rebota
+        ...(esUrlValida ? { comprobante_url: url } : {}),
       })).unwrap();
 
       toast.success(`✅ ${pago.servicio_nombre} pagado`);
@@ -219,15 +248,35 @@ export default function RegistrarPagoModal({ pago, onClose, onSuccess }) {
 
                 <Field label="Comprobante" icon={<HiOutlineReceiptTax className="w-3.5 h-3.5" />}>
                   {comprobanteUrl ? (
-                    <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                      {comprobanteUrl?.endsWith?.(".pdf") ? (
-                        <a href={comprobanteUrl} target="_blank" rel="noreferrer" className="block p-6 text-center hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                          <HiOutlineDocumentText className="w-8 h-8 mx-auto text-slate-400 mb-1" />
-                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Ver PDF</p>
+                    <div className="space-y-2">
+                      <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900">
+                        {comprobanteUrl.toLowerCase().endsWith(".pdf") ? (
+                          <a href={comprobanteUrl} target="_blank" rel="noreferrer" className="block p-6 text-center hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+                            <HiOutlineDocumentText className="w-8 h-8 mx-auto text-slate-400 mb-1" />
+                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Abrir PDF</p>
+                          </a>
+                        ) : (
+                          <a href={comprobanteUrl} target="_blank" rel="noreferrer" title="Ver en grande">
+                            <img src={comprobanteUrl} alt="Comprobante" className="w-full max-h-64 object-contain hover:opacity-90 transition" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={comprobanteUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                          <HiOutlineEye className="w-4 h-4" /> Ver en grande
                         </a>
-                      ) : (
-                        <img src={comprobanteUrl} alt="" className="w-full h-36 object-cover" />
-                      )}
+                        <a
+                          href={comprobanteUrl.includes("/upload/") ? comprobanteUrl.replace("/upload/", "/upload/fl_attachment/") : comprobanteUrl}
+                          className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold transition"
+                        >
+                          <HiOutlineDownload className="w-4 h-4" /> Descargar
+                        </a>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-xs text-slate-500">Sin comprobante</p>
