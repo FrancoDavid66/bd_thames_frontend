@@ -708,21 +708,21 @@ const BalancesPage = () => {
       {/* ── Tab: Historial de Pagos ── */}
       {activeTab === "historial" && (
         <section className="mt-2">
-          <HistorialPagosPanel oficinasAdmin={oficinasAdmin} />
+          <HistorialPagosPanel oficinasAdmin={oficinasAdmin} oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina} />
         </section>
       )}
 
       {/* ── Tab: Historial de Ingresos ── */}
       {activeTab === "hist_ingresos" && (
         <section className="mt-2">
-          <HistorialIngresosPanel oficinasAdmin={oficinasAdmin} />
+          <HistorialIngresosPanel oficinasAdmin={oficinasAdmin} oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina} />
         </section>
       )}
 
       {/* ── Tab: Historial de Egresos ── */}
       {activeTab === "hist_egresos" && (
         <section className="mt-2">
-          <HistorialEgresosPanel oficinasAdmin={oficinasAdmin} />
+          <HistorialEgresosPanel oficinasAdmin={oficinasAdmin} oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina} />
         </section>
       )}
 

@@ -31,6 +31,22 @@ const limpiarObs = (obs = "") =>
     .replace(/^\||\|$/, "")
     .trim();
 
+// 🚀 Extrae los datos de transferencia + patente de un ingreso.
+// La patente viene del backend (campo "patente"); si no, se intenta leer
+// del número de póliza embebido en la descripción ("... - Póliza 12345").
+const datosTransf = (i = {}) => {
+  const obs = i?.observaciones ?? "";
+  const cuitMatch = String(obs).match(/CUIT:\s*([^\s|]+)/);
+  const opMatch = String(obs).match(/Op:\s*([^\s|]+)/);
+  return {
+    patente: String(i?.patente || "").trim().toUpperCase() || "—",
+    enviadoPor: i?.pagado_por || "—",
+    cuit: i?.cuit_remitente || (cuitMatch ? cuitMatch[1] : "") || "—",
+    billetera: i?.billetera || "—",
+    operacion: i?.nro_operacion || (opMatch ? opMatch[1] : "") || "—",
+  };
+};
+
 // Escapa texto para el HTML del PDF
 const esc = (s) =>
   String(s ?? "")
@@ -202,17 +218,18 @@ export function exportToExcel({ ingresos = [], egresos = [], polizas = [], fileN
   // ────────────────────────────────────────────────────────────────
   // HOJA 2 — DETALLE INGRESOS (tabla filtrable)
   // ────────────────────────────────────────────────────────────────
-  const ingHeaders = ["Sucursal", "Fecha y Hora", "Descripción", "Enviado por", "CUIT/CUIL remitente", "Cuenta destino", "N° Operación", "Forma de pago", "Categoría", "Monto", "Cargado por", "Observaciones"];
+  const ingHeaders = ["Sucursal", "Fecha y Hora", "Patente", "Enviado por", "CUIT/CUIL remitente", "Cuenta destino", "N° Operación", "Forma de pago", "Categoría", "Monto", "Cargado por", "Observaciones"];
   const ingRows = ingresos.map((i) => {
     const obs = i?.observaciones ?? "";
     const cuitMatch = obs.match(/CUIT:\s*([^\s|]+)/);
     const opMatch = obs.match(/Op:\s*([^\s|]+)/);
     const cuit = i?.cuit_remitente || (cuitMatch ? cuitMatch[1] : "") || "—";
     const op = i?.nro_operacion || (opMatch ? opMatch[1] : "") || "—";
+    const patente = String(i?.patente || "").trim().toUpperCase() || "—";
     return [
       i?.oficina_nombre || "—",
       fmtDateTime(i),
-      i?.descripcion || "—",
+      patente,
       i?.pagado_por || "—",
       cuit,
       i?.billetera || "—",
@@ -314,16 +331,19 @@ function buildPrintableHTML({ ingresos = [], egresos = [] }) {
     rows.map(([k, d]) => `<tr><td>${esc(k)}</td><td class="num">${fmtAR(d.monto)}</td><td class="num">${d.cant}</td></tr>`).join("");
 
   const ingDetalle = ingresos
-    .map(
-      (i) => `<tr>
+    .map((i) => {
+      const d = datosTransf(i);
+      return `<tr>
         <td>${esc(i?.oficina_nombre || "—")}</td>
         <td>${esc(fmtDateTime(i))}</td>
-        <td>${esc(i?.descripcion || "—")}</td>
+        <td>${esc(d.patente)}</td>
+        <td>${esc(d.enviadoPor)}</td>
+        <td>${esc(d.billetera)}</td>
+        <td>${esc(d.operacion)}</td>
         <td>${esc((i?.forma_pago || "efectivo").toUpperCase())}</td>
-        <td>${esc(i?.categoria || "—")}</td>
         <td class="num">${fmtAR(toNumber(i?.monto))}</td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join("");
 
   const egDetalle = egresos
@@ -389,10 +409,10 @@ function buildPrintableHTML({ ingresos = [], egresos = [] }) {
   <tbody>${filaResumenTabla(categorias) || `<tr><td colspan="3" class="muted">Sin datos</td></tr>`}</tbody></table>
 
   <h2>Detalle de ingresos</h2>
-  <table><thead><tr><th>Sucursal</th><th>Fecha y hora</th><th>Descripción</th><th>Forma de pago</th><th>Categoría</th><th class="num">Monto</th></tr></thead>
+  <table><thead><tr><th>Sucursal</th><th>Fecha y hora</th><th>Patente</th><th>Enviado por</th><th>Cuenta destino</th><th>N° Operación</th><th>Forma de pago</th><th class="num">Monto</th></tr></thead>
   <tbody>
-    ${ingDetalle || `<tr><td colspan="6" class="muted">Sin ingresos</td></tr>`}
-    <tr class="total"><td colspan="5" class="num">TOTAL INGRESOS</td><td class="num">${fmtAR(totalIn)}</td></tr>
+    ${ingDetalle || `<tr><td colspan="8" class="muted">Sin ingresos</td></tr>`}
+    <tr class="total"><td colspan="7" class="num">TOTAL INGRESOS</td><td class="num">${fmtAR(totalIn)}</td></tr>
   </tbody></table>
 
   <h2>Detalle de egresos</h2>

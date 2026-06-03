@@ -12,6 +12,7 @@ import {
   HiArrowRight,
   HiExclamationCircle,
 } from "react-icons/hi";
+import * as XLSX from "xlsx";
 
 const safeStr = (v) => String(v ?? "").trim();
 
@@ -53,6 +54,7 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
   const [totalGrupos, setTotalGrupos] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   const modosParam = useMemo(() => modos.join(","), [modos]);
 
@@ -91,6 +93,57 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
     }
   };
 
+  // 🚀 Descarga TODOS los clientes duplicados (una fila por cliente).
+  const descargarTodo = async () => {
+    if (downloading) return;
+    setDownloading(true); setError("");
+    try {
+      const qs = new URLSearchParams();
+      qs.set("modos", modosParam);
+      qs.set("max_groups", "100000");
+      qs.set("max_items", "100000");
+      if (oficina) qs.set("oficina", oficina);
+
+      const url = `${apiBase}estadisticas/duplicados/clientes/?${qs.toString()}`;
+      const res = await fetch(url, { headers: authH() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const gs = Array.isArray(data?.grupos) ? data.grupos : [];
+
+      const modoLabel = { dni: "Mismo DNI", telefono: "Mismo teléfono", email: "Mismo email" };
+      const filas = [];
+      gs.forEach(g => {
+        const clientes = Array.isArray(g?.clientes) ? g.clientes : [];
+        clientes.forEach(c => {
+          filas.push({
+            "Criterio": modoLabel[g?.modo] || (g?.modo || ""),
+            "Clave duplicada": safeStr(g?.key) || "—",
+            "ID Cliente": c?.id ?? "",
+            "Apellido": c?.apellido || "",
+            "Nombre": c?.nombre || "",
+            "DNI/CUIT": c?.dni_cuit_cuil || "",
+            "Teléfono": c?.telefono || "",
+            "Email": c?.email || "",
+            "Estado": c?.estado || "",
+          });
+        });
+      });
+
+      if (filas.length === 0) { setError("No hay clientes duplicados para descargar."); return; }
+
+      const ws = XLSX.utils.json_to_sheet(filas);
+      ws["!cols"] = [{ wch: 16 }, { wch: 24 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 26 }, { wch: 12 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Clientes duplicados");
+      const hoy = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Duplicados_Clientes_${hoy}.xlsx`);
+    } catch {
+      setError("No se pudo generar la descarga.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,14 +164,23 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
             Clientes repetidos que comparten DNI, teléfono o email — deberían ser uno solo con varias pólizas
           </p>
         </div>
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors"
-          title="Actualizar"
-        >
-          <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={descargarTodo}
+            disabled={downloading || loading}
+            className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg border border-emerald-600 bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors"
+          >
+            {downloading ? "Descargando…" : "Descargar todo"}
+          </button>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors"
+            title="Actualizar"
+          >
+            <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       </div>
 
       {/* Selección de criterios */}

@@ -172,7 +172,7 @@ export default function ImagenesDocsStep({
       className="space-y-4"
     >
       <motion.div
-        className="rounded-2xl border bg-white/[.03] p-4 shadow-xl backdrop-blur-md from-sky-400/20 to-sky-500/20 text-sky-400 border-sky-500/30"
+        className="rounded-3xl border border-sky-500/30 bg-gradient-to-br from-sky-500/10 to-sky-500/[0.03] p-4 sm:p-5 shadow-xl"
         variants={sectionVariants} initial="initial" animate="animate"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -205,7 +205,7 @@ export default function ImagenesDocsStep({
         )}
       </motion.div>
 
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[.02] p-4 shadow-inner">
+      <fieldset className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 sm:p-5 shadow-xl">
         <legend className="px-2 text-white/40 text-[10px] uppercase font-black tracking-widest flex items-center gap-2">
           <HiDocumentText className="text-lg text-sky-400" /> Papeles del Vehículo
         </legend>
@@ -236,7 +236,7 @@ export default function ImagenesDocsStep({
         )}
       </fieldset>
 
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[.02] p-4 shadow-inner">
+      <fieldset className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 sm:p-5 shadow-xl">
         <legend className="px-2 text-white/40 text-[10px] uppercase font-black tracking-widest flex items-center gap-2">
           <HiPhotograph className="text-lg text-rose-400" /> Inspección Fotográfica
         </legend>
@@ -291,7 +291,7 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
   const filled = Boolean(value?.url);
   const isPdf = String(value?.mime || "").includes("pdf") || /\.pdf$/i.test(value?.url || "");
   return (
-    <motion.div className={`rounded-xl border p-3 transition-all duration-300 ${filled ? 'bg-sky-500/10 border-sky-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}`} variants={cardVariants} initial="initial" animate="animate" whileHover="hover" whileTap="tap">
+    <motion.div className={`rounded-2xl border p-3.5 transition-all duration-300 ${filled ? 'bg-sky-500/10 border-sky-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}`} variants={cardVariants} initial="initial" animate="animate" whileHover="hover" whileTap="tap">
       <div className="flex items-center justify-between gap-2 mb-3">
         <span className="text-white/80 text-[10px] font-black uppercase tracking-tight truncate">{label} {required && <span className="text-rose-400">*</span>}</span>
         {filled && <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-black uppercase"><HiCheckCircle /> OK</span>}
@@ -304,7 +304,7 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
       ) : (
         <label className="cursor-pointer block">
           <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onPick} />
-          <div className="aspect-video rounded-lg border border-dashed border-white/10 bg-white/5 hover:bg-white/10 transition-all flex flex-col items-center justify-center text-white/30 gap-1 hover:text-white/60"><HiDocumentText className="text-2xl" /><span className="text-[10px] font-black uppercase tracking-widest">Adjuntar Papel</span></div>
+          <div className="aspect-video min-h-[110px] rounded-xl border border-dashed border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.98] transition-all flex flex-col items-center justify-center text-white/30 gap-1.5 hover:text-white/60"><HiDocumentText className="text-2xl" /><span className="text-[10px] font-black uppercase tracking-widest">Adjuntar Papel</span></div>
         </label>
       )}
     </motion.div>
@@ -314,7 +314,7 @@ function DocSlotCard({ label, value, required, onPick, onRemove }) {
 function FotoSlotCard({ label, value, required, onPick, onRemove }) {
   const filled = Boolean(value?.url);
   return (
-    <motion.div className={`rounded-xl border p-3 transition-all duration-300 ${filled ? 'bg-rose-500/10 border-rose-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}`} variants={cardVariants} initial="initial" animate="animate" whileHover="hover" whileTap="tap">
+    <motion.div className={`rounded-2xl border p-3.5 transition-all duration-300 ${filled ? 'bg-rose-500/10 border-rose-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}`} variants={cardVariants} initial="initial" animate="animate" whileHover="hover" whileTap="tap">
       <div className="flex items-center justify-between gap-2 mb-3">
         <span className="text-white/80 text-[10px] font-black uppercase tracking-tight truncate">{label} {required && <span className="text-rose-400">*</span>}</span>
         {filled && <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-black uppercase"><HiCheckCircle /> OK</span>}
@@ -327,7 +327,7 @@ function FotoSlotCard({ label, value, required, onPick, onRemove }) {
       ) : (
         <label className="cursor-pointer block">
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onPick} />
-          <div className="aspect-video rounded-lg border border-dashed border-white/10 bg-white/5 hover:bg-white/10 transition-all flex flex-col items-center justify-center text-white/30 gap-1 hover:text-white/60"><HiPhotograph className="text-2xl" /><span className="text-[10px] font-black uppercase tracking-widest">Tomar Foto</span></div>
+          <div className="aspect-video min-h-[110px] rounded-xl border border-dashed border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.98] transition-all flex flex-col items-center justify-center text-white/30 gap-1.5 hover:text-white/60"><HiPhotograph className="text-2xl" /><span className="text-[10px] font-black uppercase tracking-widest">Tomar Foto</span></div>
         </label>
       )}
     </motion.div>

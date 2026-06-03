@@ -360,7 +360,7 @@ function generarPDF({ items, oficinasMap, desde, hasta, oficinaLabel, formaPago,
 }
 
 
-export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
+export default function HistorialPagosPanel({ oficinasAdmin = [], oficinaProp }) {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
@@ -380,6 +380,13 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
   const [exporting,  setExporting]  = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [oficinas,    setOficinas]    = useState([]);
+
+  // 🚀 Sucursal controlada desde la página (selector global de arriba).
+  useEffect(() => {
+    if (oficinaProp !== undefined && oficinaProp !== null && oficinaProp !== "") {
+      setOficina(String(oficinaProp));
+    }
+  }, [oficinaProp]);
 
   // Cargar oficinas dinámicamente
   useEffect(() => {
@@ -634,7 +641,7 @@ export default function HistorialPagosPanel({ oficinasAdmin = [] }) {
           </div>
 
           {/* Oficina (solo admin) */}
-          {isWebAdmin && (
+          {isWebAdmin && oficinaProp === undefined && (
             <div className="flex items-center gap-1.5 bg-slate-950/40 border border-slate-700/40 rounded-xl px-3 py-2">
               <HiOfficeBuilding className="w-4 h-4 text-slate-500 shrink-0" />
               <select value={oficina} onChange={(e) => setOficina(e.target.value)}

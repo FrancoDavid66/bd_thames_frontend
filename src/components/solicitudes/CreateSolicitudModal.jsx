@@ -10,6 +10,7 @@ import {
   HiShieldCheck,
   HiUser,
   HiDocumentText,
+  HiIdentification,
   HiSparkles,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
@@ -18,9 +19,10 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 import { solicitudesApi } from "../../services/solicitudes.js";
+import api from "../../services/api";
 import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
 
-import ResponsableManagerModal from "./modalcreate/ResponsableManagerModal";
+import ResponsableManagerModal from "./modalcreate/ResponsableManagerModal"; // (ya no se usa como popup; queda por compatibilidad)
 import ClienteStep from "./modalcreate/ClienteStep";
 import PolizaStep from "./modalcreate/PolizaStep";
 import ImagenesDocsStep from "./modalcreate/ImagenesDocsStep";
@@ -113,18 +115,45 @@ export default function CreateSolicitudModal({
   // Arranca abierto si NO viene cliente precargado y no se pidió saltearlo
   const [verifyOpen, setVerifyOpen] = useState(!initialClienteId && !skipVerificarGate);
 
-  const [step, setStep] = useState(1);
-  const [askResponsable, setAskResponsable] = useState(true);
-  const [responsableId, setResponsableId] = useState("");
+  // El wizard arranca en paso 1 (Asignación). Si ya viene responsable, salta a Cliente (paso 2).
+  const [step, setStep] = useState(skipResponsableGate && initialResponsableId ? 2 : 1);
+  const [responsableId, setResponsableId] = useState(initialResponsableId ? String(initialResponsableId) : "");
 
+  // Listas para el paso de Asignación
+  const [oficinasList, setOficinasList] = useState(Array.isArray(oficinas) ? oficinas : []);
+  const [empleados, setEmpleados] = useState([]);
+  const [empleadosLoading, setEmpleadosLoading] = useState(false);
+
+  // Trae oficinas si es admin y no llegaron por props
   useEffect(() => {
-    if (skipResponsableGate && initialResponsableId) {
-      setResponsableId(String(initialResponsableId));
-      setAskResponsable(false);
-    } else {
-      setAskResponsable(true);
-    }
-  }, [skipResponsableGate, initialResponsableId]);
+    if (!isWebAdmin) return;
+    if (Array.isArray(oficinas) && oficinas.length) { setOficinasList(oficinas); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await api.get("/usuarios/oficinas/");
+        const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        if (alive) setOficinasList(arr);
+      } catch { /* noop */ }
+    })();
+    return () => { alive = false; };
+  }, [isWebAdmin, oficinas]);
+
+  // Trae responsables (empleados activos)
+  useEffect(() => {
+    let alive = true;
+    setEmpleadosLoading(true);
+    (async () => {
+      try {
+        const emps = await solicitudesApi.empleadosActivos();
+        let arr = Array.isArray(emps) ? emps : emps?.results || [];
+        arr = arr.filter((e) => e?.activo !== false);
+        if (alive) setEmpleados(arr);
+      } catch { if (alive) setEmpleados([]); }
+      finally { if (alive) setEmpleadosLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const [clienteModo, setClienteModo] = useState(initialClienteId ? "existente" : "nuevo");
   const [clienteId, setClienteId] = useState(initialClienteId ? String(initialClienteId) : "");
@@ -136,6 +165,8 @@ export default function CreateSolicitudModal({
     dni_cuit_cuil: "",
     direccion: "",
     localidad: "",
+    partido: "",
+    fecha_nacimiento: "",
   });
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
 
@@ -273,42 +304,103 @@ export default function CreateSolicitudModal({
   const paso1Errors = useMemo(() => {
     const e = {};
     if (clienteModo === "existente") {
-      if (!String(clienteId).trim()) e.clienteId = "ID requerido";
+      if (!String(clienteId).trim()) e.clienteId = "ID de cliente";
       return e;
     }
-    if (!cliente.nombre.trim()) e.nombre = "Requerido";
-    if (!cliente.apellido.trim()) e.apellido = "Requerido";
-    if (!cliente.telefono.trim()) e.telefono = "Requerido";
+    if (!cliente.nombre.trim()) e.nombre = "Nombre";
+    if (!cliente.apellido.trim()) e.apellido = "Apellido";
+    if (!cliente.telefono.trim()) e.telefono = "Teléfono";
+    if (!(cliente.dni_cuit_cuil || "").trim()) e.dni_cuit_cuil = "DNI / CUIT";
+    if (!(cliente.fecha_nacimiento || "").trim()) e.fecha_nacimiento = "Fecha de nacimiento";
+    if (!(cliente.partido || "").trim()) e.partido = "Partido";
+    if (!(cliente.localidad || "").trim()) e.localidad = "Localidad";
     return e;
   }, [clienteModo, cliente, clienteId]);
 
-  const paso2Errors = useMemo(() => {
+  // Fotos del asegurado: obligatorias solo cuando el cliente es NUEVO
+  const fotosClienteErrors = useMemo(() => {
+    const e = {};
+    if (clienteModo === "existente") return e;
+    if (!dniSlots?.DNI_FRENTE?.url) e.dni_frente = "Foto DNI (frente)";
+    if (!dniSlots?.DNI_DORSO?.url) e.dni_dorso = "Foto DNI (dorso)";
+    return e;
+  }, [clienteModo, dniSlots]);
+
+  const companiaErrors = useMemo(() => {
     const e = {};
     if (polizaModo === "existente") {
-      if (!String(polizaId).trim()) e.polizaId = "ID requerido";
+      if (!String(polizaId).trim()) e.polizaId = "ID de póliza";
       return e;
     }
-    if (!poliza.compania.trim()) e.compania = "Requerido";
-    if (!poliza.cobertura.trim()) e.cobertura = "Requerido";
-    if (!poliza.oficina.trim()) e.oficina = "Requerido";
-    if (!poliza.patente.trim()) e.patente = "Requerido";
-    if (!poliza.marca.trim()) e.marca = "Requerido";
-    if (!poliza.modelo.trim()) e.modelo = "Requerido";
-    if (!String(poliza.anio).trim()) e.anio = "Requerido";
-    if (!poliza.primer_vencimiento) e.primer_vencimiento = "Requerido";
+    if (!(poliza.compania || "").trim()) e.compania = "Compañía";
+    if (!(poliza.cobertura || "").trim()) e.cobertura = "Cobertura";
+    if (!(poliza.oficina || "").trim()) e.oficina = "Sucursal";
     return e;
   }, [polizaModo, poliza, polizaId]);
 
+  const autoErrors = useMemo(() => {
+    const e = {};
+    if (polizaModo === "existente") return e;
+    if (!(poliza.patente || "").trim()) e.patente = "Patente";
+    if (!(poliza.marca || "").trim()) e.marca = "Marca";
+    if (!(poliza.modelo || "").trim()) e.modelo = "Modelo";
+    if (!String(poliza.anio || "").trim()) e.anio = "Año";
+    return e;
+  }, [polizaModo, poliza]);
+
+  const fechasErrors = useMemo(() => {
+    const e = {};
+    if (polizaModo === "existente") return e;
+    if (!poliza.primer_vencimiento) e.primer_vencimiento = "Primer vencimiento";
+    return e;
+  }, [polizaModo, poliza]);
+
+  // Arma el mensaje "Falta: A, B y C" a partir de los errores
+  const listaFaltantes = (errs) => {
+    const labels = Object.values(errs);
+    if (labels.length === 0) return "";
+    if (labels.length === 1) return `Falta: ${labels[0]}`;
+    const last = labels[labels.length - 1];
+    return `Faltan: ${labels.slice(0, -1).join(", ")} y ${last}`;
+  };
+
   const responsableOk = Boolean(String(responsableId).trim());
-  const canNext1 = Object.keys(paso1Errors).length === 0;
-  const canNext2 = Object.keys(paso2Errors).length === 0;
-  const canSubmit = responsableOk && canNext1 && canNext2 && !saving;
+  const oficinaOk = isWebAdmin ? Boolean(String(poliza.oficina || "").trim()) : true;
+  const canStepAsignacion = responsableOk && oficinaOk;          // paso 1
+  const datosClienteOk = Object.keys(paso1Errors).length === 0;  // paso 2
+  const fotosClienteOk = Object.keys(fotosClienteErrors).length === 0; // paso 3
+  const companiaOk = Object.keys(companiaErrors).length === 0;   // paso 4
+  const autoOk = Object.keys(autoErrors).length === 0;           // paso 5
+  const fechasOk = Object.keys(fechasErrors).length === 0;       // paso 6
+  const polizaOk = companiaOk && autoOk && fechasOk;
+  const canSubmit = responsableOk && oficinaOk && datosClienteOk && fotosClienteOk && polizaOk && !saving;
+
+  // Responsables visibles: admin → solo los de la oficina elegida; empleado → todos los suyos
+  const empleadosVisibles = useMemo(() => {
+    if (!isWebAdmin) return empleados;
+    const ofi = String(poliza.oficina || "");
+    if (!ofi) return [];
+    return empleados.filter(
+      (e) => String(e?.oficina ?? "") === ofi || String(e?.oficina_id ?? "") === ofi
+    );
+  }, [empleados, isWebAdmin, poliza.oficina]);
+
+  // Admin elige sucursal en el paso 1 (al cambiarla, resetea el responsable)
+  const elegirOficina = (oficinaId) => {
+    const id = String(oficinaId || "").trim();
+    if (!id) return;
+    setPoliza((p) => ({ ...p, oficina: id }));
+    setResponsableId("");
+  };
 
   const goToStep = (target) => {
     if (target === step) return;
-    if (askResponsable) return toast.error("Elegí el responsable antes de continuar.");
-    if (target >= 2 && !canNext1) return toast.error("Completá los datos del cliente");
-    if (target >= 3 && !canNext2) return toast.error("Revisá los datos de la póliza");
+    if (target >= 2 && !canStepAsignacion) return toast.error(isWebAdmin ? "Elegí sucursal y responsable" : "Elegí el responsable");
+    if (target >= 3 && !datosClienteOk) return toast.error(listaFaltantes(paso1Errors));
+    if (target >= 4 && !fotosClienteOk) return toast.error(listaFaltantes(fotosClienteErrors));
+    if (target >= 5 && !companiaOk) return toast.error(listaFaltantes(companiaErrors));
+    if (target >= 6 && !autoOk) return toast.error(listaFaltantes(autoErrors));
+    if (target >= 7 && !fechasOk) return toast.error(listaFaltantes(fechasErrors));
     setStep(target);
   };
 
@@ -399,6 +491,8 @@ export default function CreateSolicitudModal({
           dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(),
           direccion: (cliente.direccion || "").trim(),
           localidad: (cliente.localidad || "").trim(),
+          partido: (cliente.partido || "").trim(),
+          fecha_nacimiento: (cliente.fecha_nacimiento || "").trim() || null,
         };
       }
 
@@ -418,6 +512,11 @@ export default function CreateSolicitudModal({
           modelo: poliza.modelo.trim(),
           anio: Number(poliza.anio),
           tipo: poliza.tipo || "Auto",
+          numero_motor: (poliza.numero_motor || "").trim(),
+          numero_chasis: (poliza.numero_chasis || "").trim(),
+          combustible: (poliza.combustible || "").trim(),
+          carroceria: (poliza.carroceria || "").trim(),
+          observaciones: (poliza.observaciones || "").trim(),
           precio_cuota: 0,
           cantidad_cuotas_override: poliza.cantidad_cuotas_override
             ? Number(poliza.cantidad_cuotas_override)
@@ -515,7 +614,7 @@ export default function CreateSolicitudModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] overscroll-contain touch-pan-y">
+    <div className="fixed inset-0 z-[90] flex items-stretch sm:items-center justify-center overscroll-contain touch-pan-y">
       <div
         className={`absolute inset-0 ${
           saving ? "cursor-wait" : "cursor-pointer"
@@ -523,58 +622,14 @@ export default function CreateSolicitudModal({
         onClick={() => !saving && onClose?.()}
       />
 
-      {isWebAdmin && askResponsable && !poliza.oficina && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0b0f19]/90 backdrop-blur-sm p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#0f0c28] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <span className="p-2 rounded-xl bg-sky-500/20 text-sky-400">
-                <HiShieldCheck className="w-6 h-6" />
-              </span>
-              <div>
-                <h3 className="text-base font-bold text-white leading-tight">Modo Administrador</h3>
-                <p className="text-xs text-white/50">¿Para qué sucursal es esta solicitud?</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {oficinas.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPoliza((p) => ({ ...p, oficina: String(o.id) }))}
-                  className="px-4 py-3.5 rounded-xl bg-white/5 hover:bg-sky-500/20 hover:border-sky-500/30 border border-transparent text-white font-semibold text-sm transition-all flex items-center justify-between group"
-                >
-                  {o.nombre}
-                  <HiChevronRight className="text-white/20 group-hover:text-sky-400 transition-colors" />
-                </button>
-              ))}
-              {oficinas.length === 0 && (
-                <p className="text-xs text-center text-white/40 italic py-4">
-                  No hay sucursales cargadas en el sistema.
-                </p>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              className="mt-6 w-full px-4 py-3 rounded-xl bg-white/5 text-white/50 hover:text-white/90 hover:bg-white/10 text-xs font-bold uppercase tracking-widest transition-all"
-            >
-              Cancelar creación
-            </button>
-          </motion.div>
-        </div>
-      )}
-
       <motion.div
         variants={modalVariants}
         initial="initial"
         animate="animate"
         exit="exit"
-        className="relative w-full max-w-5xl h-[95vh] sm:h-auto mx-auto mt-[2.5vh] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden bg-[#0b0f1e]"
+        className="relative w-full sm:max-w-5xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:mx-auto sm:rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden bg-[#0b0f1e]"
       >
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-[#0f0c28]/80 backdrop-blur px-4 py-3 flex items-center justify-between">
+        <div className="shrink-0 border-b border-white/10 bg-[#0f0c28]/80 backdrop-blur px-4 py-3 flex items-center justify-between">
           <h3 className="text-white font-bold flex items-center gap-2 text-lg">
             <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
               <HiSparkles />
@@ -586,11 +641,7 @@ export default function CreateSolicitudModal({
 
             {isWebAdmin && poliza.oficina && (
               <button
-                onClick={() => {
-                  setPoliza((p) => ({ ...p, oficina: "" }));
-                  setResponsableId("");
-                  setAskResponsable(true);
-                }}
+                onClick={() => setStep(1)}
                 className="text-[9px] uppercase font-black bg-sky-500/20 text-sky-400 px-2 py-1 rounded ml-1 hover:bg-sky-500/40 transition-colors"
               >
                 Cambiar Sucursal
@@ -606,46 +657,99 @@ export default function CreateSolicitudModal({
           </button>
         </div>
 
-        <div className="px-4 py-3 bg-white/5 border-b border-white/10 overflow-x-auto no-scrollbar">
+        <div className="shrink-0 px-4 py-3 bg-white/5 border-b border-white/10 overflow-x-auto no-scrollbar">
           <div className="flex gap-2 min-w-max">
             <StepBadge
               active={step === 1}
               done={step > 1}
               icon={<HiUser />}
-              label="Cliente"
+              label="Asignación"
               onClick={() => goToStep(1)}
-              color="from-emerald-400/20 to-emerald-500/20"
+              color="from-violet-400/20 to-indigo-500/20"
             />
             <StepBadge
               active={step === 2}
               done={step > 2}
-              icon={<HiShieldCheck />}
-              label="Póliza"
+              icon={<HiUser />}
+              label="Datos asegurado"
               onClick={() => goToStep(2)}
-              color="from-sky-400/20 to-sky-500/20"
+              color="from-emerald-400/20 to-emerald-500/20"
             />
             <StepBadge
               active={step === 3}
               done={step > 3}
-              icon={<HiPhotograph />}
-              label="Imágenes"
+              icon={<HiIdentification />}
+              label="Fotos asegurado"
               onClick={() => goToStep(3)}
-              color="from-rose-400/20 to-rose-500/20"
+              color="from-teal-400/20 to-teal-500/20"
             />
             <StepBadge
               active={step === 4}
+              done={step > 4}
+              icon={<HiShieldCheck />}
+              label="Compañía"
+              onClick={() => goToStep(4)}
+              color="from-sky-400/20 to-sky-500/20"
+            />
+            <StepBadge
+              active={step === 5}
+              done={step > 5}
+              icon={<HiShieldCheck />}
+              label="Datos del auto"
+              onClick={() => goToStep(5)}
+              color="from-cyan-400/20 to-cyan-500/20"
+            />
+            <StepBadge
+              active={step === 6}
+              done={step > 6}
+              icon={<HiShieldCheck />}
+              label="Fechas"
+              onClick={() => goToStep(6)}
+              color="from-indigo-400/20 to-indigo-500/20"
+            />
+            <StepBadge
+              active={step === 7}
+              done={step > 7}
+              icon={<HiPhotograph />}
+              label="Fotos vehículo"
+              onClick={() => goToStep(7)}
+              color="from-rose-400/20 to-rose-500/20"
+            />
+            <StepBadge
+              active={step === 8}
               done={false}
               icon={<HiDocumentText />}
               label="Resumen"
-              onClick={() => goToStep(4)}
+              onClick={() => goToStep(8)}
               color="from-amber-400/20 to-amber-500/20"
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-hide">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-hide">
           <AnimatePresence mode="wait">
             {step === 1 && (
+              <motion.div
+                key="s0"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <AsignacionStep
+                  isWebAdmin={isWebAdmin}
+                  oficinasList={oficinasList}
+                  oficinaSel={poliza.oficina}
+                  onElegirOficina={elegirOficina}
+                  userOficinaNombre={user?.perfil?.oficina_nombre || "Mi sucursal"}
+                  empleados={empleadosVisibles}
+                  empleadosLoading={empleadosLoading}
+                  responsableId={responsableId}
+                  onElegirResponsable={(id) => setResponsableId(String(id))}
+                />
+              </motion.div>
+            )}
+            {step === 2 && (
               <motion.div
                 key="s1"
                 variants={stepVariants}
@@ -654,6 +758,7 @@ export default function CreateSolicitudModal({
                 exit="exit"
               >
                 <ClienteStep
+                  section="datos"
                   clienteModo={clienteModo}
                   setClienteModo={setClienteModo}
                   clienteId={clienteId}
@@ -667,7 +772,30 @@ export default function CreateSolicitudModal({
                 />
               </motion.div>
             )}
-            {step === 2 && (
+            {step === 3 && (
+              <motion.div
+                key="s1b"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <ClienteStep
+                  section="fotos"
+                  clienteModo={clienteModo}
+                  setClienteModo={setClienteModo}
+                  clienteId={clienteId}
+                  setClienteId={setClienteId}
+                  cliente={cliente}
+                  setCliente={setCliente}
+                  dniSlots={dniSlots}
+                  setDniSlots={setDniSlots}
+                  TIPO_DNI_SLOTS={TIPO_DNI_SLOTS}
+                  onUploadDNI={onUploadDNI}
+                />
+              </motion.div>
+            )}
+            {step === 4 && (
               <motion.div
                 key="s2"
                 variants={stepVariants}
@@ -676,6 +804,61 @@ export default function CreateSolicitudModal({
                 exit="exit"
               >
                 <PolizaStep
+                  section="compania"
+                  polizaModo={polizaModo}
+                  setPolizaModo={setPolizaModo}
+                  polizaId={polizaId}
+                  setPolizaId={setPolizaId}
+                  poliza={poliza}
+                  setPoliza={setPoliza}
+                  sinNumero={sinNumero}
+                  setSinNumero={setSinNumero}
+                  companias={companias}
+                  coberturas={coberturas}
+                  oficinas={oficinas}
+                  setTocoCantidadCuotas={setTocoCantidadCuotas}
+                  cuotasPreview={cuotasPreview}
+                  isWebAdmin={isWebAdmin}
+                />
+              </motion.div>
+            )}
+            {step === 5 && (
+              <motion.div
+                key="s2b"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <PolizaStep
+                  section="auto"
+                  polizaModo={polizaModo}
+                  setPolizaModo={setPolizaModo}
+                  polizaId={polizaId}
+                  setPolizaId={setPolizaId}
+                  poliza={poliza}
+                  setPoliza={setPoliza}
+                  sinNumero={sinNumero}
+                  setSinNumero={setSinNumero}
+                  companias={companias}
+                  coberturas={coberturas}
+                  oficinas={oficinas}
+                  setTocoCantidadCuotas={setTocoCantidadCuotas}
+                  cuotasPreview={cuotasPreview}
+                  isWebAdmin={isWebAdmin}
+                />
+              </motion.div>
+            )}
+            {step === 6 && (
+              <motion.div
+                key="s2c"
+                variants={stepVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <PolizaStep
+                  section="fechas"
                   polizaModo={polizaModo}
                   setPolizaModo={setPolizaModo}
                   polizaId={polizaId}
@@ -694,7 +877,7 @@ export default function CreateSolicitudModal({
               </motion.div>
             )}
 
-            {step === 3 && (
+            {step === 7 && (
               <motion.div
                 key="s3"
                 variants={stepVariants}
@@ -715,7 +898,7 @@ export default function CreateSolicitudModal({
               </motion.div>
             )}
 
-            {step === 4 && (
+            {step === 8 && (
               <motion.div
                 key="s4"
                 variants={stepVariants}
@@ -725,7 +908,7 @@ export default function CreateSolicitudModal({
               >
                 <SolicitudStep
                   responsableNombre={responsableId ? `#${responsableId}` : ""}
-                  onCambiarResponsable={() => setAskResponsable(true)}
+                  onCambiarResponsable={() => setStep(1)}
                   solicitud={solicitud}
                   setSolicitud={setSolicitud}
                 />
@@ -734,27 +917,27 @@ export default function CreateSolicitudModal({
           </AnimatePresence>
         </div>
 
-        <div className="sticky bottom-0 z-30 border-t border-white/10 bg-[#0f0c28]/95 backdrop-blur p-4 flex justify-between gap-3">
+        <div className="shrink-0 border-t border-white/10 bg-[#0f0c28]/95 backdrop-blur p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-white/5 text-white/70 hover:bg-white/10 font-bold uppercase text-xs transition-all"
+            className="hidden sm:inline-flex px-6 py-2.5 rounded-2xl bg-white/5 text-white/70 hover:bg-white/10 font-bold uppercase text-xs transition-all"
           >
             Cancelar
           </button>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             {step > 1 && (
               <button
                 onClick={() => setStep((s) => s - 1)}
-                className="px-6 py-2.5 rounded-xl bg-white/10 text-white font-bold uppercase text-xs transition-all flex items-center gap-2"
+                className="flex-1 sm:flex-none px-5 py-3 sm:py-2.5 rounded-2xl bg-white/10 text-white font-bold uppercase text-xs transition-all flex items-center justify-center gap-2 active:scale-95"
               >
                 <HiChevronLeft /> Atrás
               </button>
             )}
-            {step < 4 ? (
+            {step < 8 ? (
               <button
                 onClick={() => goToStep(step + 1)}
-                className="px-8 py-2.5 rounded-xl bg-sky-600 text-white font-bold uppercase text-xs shadow-lg shadow-sky-900/40 transition-all flex items-center gap-2"
+                className="flex-1 sm:flex-none px-8 py-3 sm:py-2.5 rounded-2xl bg-sky-600 text-white font-bold uppercase text-xs shadow-lg shadow-sky-900/40 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
                 Siguiente <HiChevronRight />
               </button>
@@ -762,27 +945,72 @@ export default function CreateSolicitudModal({
               <button
                 onClick={onSubmit}
                 disabled={!canSubmit}
-                className="px-10 py-2.5 rounded-xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg shadow-emerald-900/40 transition-all active:scale-95 disabled:opacity-50"
+                className="flex-1 sm:flex-none px-8 sm:px-10 py-3 sm:py-2.5 rounded-2xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg shadow-emerald-900/40 transition-all active:scale-95 disabled:opacity-50"
               >
-                {saving ? "Procesando..." : "Finalizar Solicitud"}
+                {saving ? "Procesando..." : "Finalizar"}
               </button>
             )}
           </div>
         </div>
-
-        {(!isWebAdmin || poliza.oficina) && (
-          <ResponsableManagerModal
-            open={askResponsable}
-            oficinaId={poliza.oficina}
-            onCancel={() => setAskResponsable(false)}
-            onSelected={({ responsableId: selId }) => {
-              setResponsableId(String(selId));
-              setAskResponsable(false);
-              toast.success("Responsable asignado");
-            }}
-          />
-        )}
       </motion.div>
+    </div>
+  );
+}
+
+function AsignacionStep({
+  isWebAdmin, oficinasList, oficinaSel, onElegirOficina, userOficinaNombre,
+  empleados, empleadosLoading, responsableId, onElegirResponsable,
+}) {
+  return (
+    <div className="space-y-5">
+      {/* Sucursal */}
+      <fieldset className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6 shadow-xl">
+        <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">Sucursal</legend>
+        {isWebAdmin ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+            {oficinasList.length === 0 ? (
+              <p className="text-white/40 text-xs italic">Cargando sucursales...</p>
+            ) : oficinasList.map((o) => {
+              const sel = String(oficinaSel) === String(o.id);
+              return (
+                <button key={o.id} type="button" onClick={() => onElegirOficina(o.id)}
+                  className={`text-left px-4 py-3 rounded-xl border font-bold text-sm transition-all ${sel ? "bg-sky-500/20 border-sky-500/50 text-white" : "bg-white/5 border-white/10 text-white/70 hover:border-sky-500/30"}`}>
+                  {o.nombre || `Oficina ${o.id}`}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold">
+            <HiShieldCheck /> {userOficinaNombre}
+          </div>
+        )}
+      </fieldset>
+
+      {/* Responsable */}
+      <fieldset className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6 shadow-xl">
+        <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">Responsable</legend>
+        {isWebAdmin && !oficinaSel ? (
+          <p className="text-white/40 text-xs italic mt-2">Elegí primero la sucursal para ver sus responsables.</p>
+        ) : empleadosLoading ? (
+          <p className="text-white/40 text-xs italic mt-2 animate-pulse">Cargando responsables...</p>
+        ) : empleados.length === 0 ? (
+          <p className="text-white/40 text-xs italic mt-2">No hay responsables activos en esta sucursal.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+            {empleados.map((e) => {
+              const sel = String(responsableId) === String(e.id);
+              return (
+                <button key={e.id} type="button" onClick={() => onElegirResponsable(e.id)}
+                  className={`flex items-center gap-2 text-left px-4 py-3 rounded-xl border font-bold text-sm transition-all ${sel ? "bg-violet-500/25 border-violet-500/50 text-white" : "bg-white/5 border-white/10 text-white/80 hover:border-violet-500/40"}`}>
+                  {sel ? <HiCheckCircle className="text-violet-300 shrink-0" /> : <HiUser className="text-white/40 shrink-0" />}
+                  <span className="truncate">{e.nombre}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </fieldset>
     </div>
   );
 }
@@ -791,20 +1019,24 @@ function StepBadge({ active, done, icon, label, onClick, color }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 border transition-all duration-300 min-w-[150px] ${
+      className={`flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2.5 border transition-all duration-300 ${
         active
-          ? `border-white/30 bg-gradient-to-br ${color} text-white shadow-lg`
+          ? `border-white/25 bg-gradient-to-br ${color} text-white shadow-lg`
           : "border-white/5 bg-white/5 text-white/40 hover:bg-white/10"
       }`}
+      title={label}
     >
       <span
-        className={`h-6 w-6 rounded-lg flex items-center justify-center ${
+        className={`h-7 w-7 rounded-xl flex items-center justify-center shrink-0 ${
           active ? "bg-white/20" : "bg-white/5"
         }`}
       >
         {done ? <HiCheckCircle className="text-emerald-400" /> : icon}
       </span>
-      <span className="text-[11px] font-bold uppercase tracking-tight">{label}</span>
+      {/* En celular solo se ve la etiqueta del paso activo; en desktop todas */}
+      <span className={`text-[11px] font-bold uppercase tracking-tight whitespace-nowrap ${active ? "inline" : "hidden sm:inline"}`}>
+        {label}
+      </span>
     </button>
   );
 }

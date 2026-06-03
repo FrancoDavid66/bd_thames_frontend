@@ -25,6 +25,15 @@ const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"].map(
   (x) => ({ id: x, nombre: x })
 );
 
+// 🚀 Opciones para los datos técnicos del vehículo
+const COMBUSTIBLES = ["Nafta", "Diésel", "GNC", "Nafta/GNC", "Eléctrico", "Híbrido"].map(
+  (x) => ({ id: x, nombre: x })
+);
+const CARROCERIAS = [
+  "Sedán", "Hatchback", "SUV", "Pick-up", "Familiar / Rural",
+  "Coupé", "Furgón", "Utilitario", "Moto", "Otro",
+].map((x) => ({ id: x, nombre: x }));
+
 function ymdLocal(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -64,9 +73,13 @@ export default function PolizaStep({
   oficinas = [],
   setTocoCantidadCuotas,
   variants,
+  section = "all", // "all" | "compania" | "auto" | "fechas"
 }) {
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+  const showCompania = section === "all" || section === "compania";
+  const showAuto = section === "all" || section === "auto";
+  const showFechas = section === "all" || section === "fechas";
 
   const opcionesOficina = useMemo(() => {
     if (isWebAdmin && oficinas.length > 0) return oficinas;
@@ -189,11 +202,15 @@ export default function PolizaStep({
       className="space-y-3"
     >
       <motion.fieldset
-        className="rounded-2xl border border-white/10 bg-white/[.06] p-3 sm:p-4 shadow-inner"
+        className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 sm:p-6 shadow-xl"
         variants={sectionVariants} initial="initial" animate="animate"
       >
-        <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">Información de Póliza</legend>
+        <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">
+          {showCompania ? "Compañía y cobertura" : showAuto ? "Datos del vehículo" : "Fechas y vencimientos"}
+        </legend>
 
+        {showCompania && (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
           
           <SelectCreatable
@@ -238,8 +255,12 @@ export default function PolizaStep({
           </ul>
           {requisitos.note && <p className="mt-2 text-white/40 text-[11px] italic font-medium">{requisitos.note}</p>}
         </motion.div>
+        </>
+        )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+        {showAuto && (
+        <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
           <Input
             label="Patente"
             value={poliza?.patente || ""}
@@ -272,6 +293,54 @@ export default function PolizaStep({
             inputMode="numeric"
             placeholder="2024"
           />
+        </div>
+
+        {/* 🚀 Datos técnicos del vehículo */}
+        <div className="mt-4 pt-3 border-t border-white/10">
+          <span className="px-1 text-white/50 text-[10px] uppercase font-bold tracking-widest">
+            Datos técnicos del vehículo
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+            <Input
+              label="Número de motor"
+              value={poliza?.numero_motor || ""}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, numero_motor: v.toUpperCase() }))}
+              autoCapitalize="characters"
+              placeholder="Ej: ABC123456"
+            />
+            <Input
+              label="Número de chasis"
+              value={poliza?.numero_chasis || ""}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, numero_chasis: v.toUpperCase() }))}
+              autoCapitalize="characters"
+              placeholder="Ej: 8AP12345..."
+            />
+            <Select
+              label="Combustible"
+              value={poliza?.combustible || ""}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, combustible: v }))}
+              options={COMBUSTIBLES}
+            />
+            <Select
+              label="Carrocería"
+              value={poliza?.carroceria || ""}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, carroceria: v }))}
+              options={CARROCERIAS}
+            />
+            <Textarea
+              className="sm:col-span-2"
+              label="Observaciones (opcional)"
+              value={poliza?.observaciones || ""}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, observaciones: v }))}
+              placeholder="Detalles adicionales del vehículo..."
+            />
+          </div>
+        </div>
+        </>
+        )}
+
+        {showFechas && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
           <Input
             label="Fecha de emisión"
             type="date"
@@ -291,6 +360,7 @@ export default function PolizaStep({
             inputMode="numeric"
           />
         </div>
+        )}
       </motion.fieldset>
     </motion.div>
   );
@@ -303,37 +373,55 @@ function Input({ label, value, onChange, type = "text", placeholder = "", helper
       className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
       variants={inputVariants} initial="initial" animate="animate" whileHover="hover" whileTap="tap"
     >
-      <span className="text-white/60 font-bold uppercase text-[10px] tracking-widest ml-1">{label}</span>
+      <span className="text-white/55 font-bold uppercase text-[10px] tracking-[0.15em] ml-1">{label}</span>
       <input
         type={type} value={value} placeholder={placeholder} inputMode={inputMode} autoComplete={autoComplete} autoCapitalize={autoCapitalize} pattern={pattern}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 outline-none focus:ring-2 ring-sky-500/40 text-white placeholder:text-white/20 transition-all font-medium"
+        className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3.5 text-base outline-none focus:ring-2 ring-sky-500/40 focus:border-sky-500/30 text-white placeholder:text-white/20 transition-all"
       />
       {helper && <span className="mt-1 block text-[10px] text-white/40 font-medium italic">{helper}</span>}
     </motion.label>
   );
 }
 
+function Textarea({ label, value, onChange, placeholder = "", className = "" }) {
+  return (
+    <motion.label
+      className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
+      variants={inputVariants} initial="initial" animate="animate"
+    >
+      <span className="text-white/55 font-bold uppercase text-[10px] tracking-[0.15em] ml-1">{label}</span>
+      <textarea
+        rows={2}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3.5 text-base outline-none focus:ring-2 ring-sky-500/40 focus:border-sky-500/30 text-white placeholder:text-white/20 transition-all resize-none"
+      />
+    </motion.label>
+  );
+}
+
 function Select({ label, value, onChange, options = [], className = "", disabled = false, helper = "" }) {
-  const normalized = Array.isArray(options) ? options.map((op) => typeof op === "string" ? { id: op, nombre: op } : op) : [];
+  const normalized = (Array.isArray(options) ? options : []).filter(Boolean).map((op) => typeof op === "string" ? { id: op, nombre: op } : op);
   return (
     <motion.label
       className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
       variants={inputVariants} initial="initial" animate="animate" whileHover={!disabled ? "hover" : ""} whileTap={!disabled ? "tap" : ""}
     >
-      <span className="text-white/60 font-bold uppercase text-[10px] tracking-widest ml-1">{label}</span>
+      <span className="text-white/55 font-bold uppercase text-[10px] tracking-[0.15em] ml-1">{label}</span>
       <div className="relative group">
         <select
           value={value || ""} disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={`cursor-pointer w-full rounded-xl border border-white/10 px-4 py-2.5 pr-9 outline-none transition-all font-medium appearance-none ${
-            disabled ? 'bg-black/40 text-white/30 cursor-not-allowed opacity-70' : 'bg-white/5 text-white focus:ring-2 ring-violet-500/40'
+          className={`cursor-pointer w-full rounded-2xl border border-white/10 px-4 py-3.5 pr-10 text-base outline-none transition-all appearance-none ${
+            disabled ? 'bg-black/40 text-white/30 cursor-not-allowed opacity-70' : 'bg-black/30 text-white focus:ring-2 ring-violet-500/40 focus:border-violet-500/30'
           }`}
         >
           <option value="">— Seleccionar —</option>
           {normalized.map((op) => (
-            <option key={op.id} value={op.id} className="bg-[#0f1324] text-white">
-              {op.nombre || op.id}
+            <option key={op?.id} value={op?.id} className="bg-[#0f1324] text-white">
+              {op?.nombre || op?.id}
             </option>
           ))}
         </select>
@@ -352,10 +440,10 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
 
   const mergedOptions = useMemo(() => {
     const combined = [...options, ...localOptions];
-    const normalized = combined.map((op) => typeof op === "string" ? { id: op, nombre: op } : op);
+    const normalized = (Array.isArray(combined) ? combined : []).filter(Boolean).map((op) => typeof op === "string" ? { id: op, nombre: op } : op);
     const seen = new Set();
     return normalized.filter(op => {
-      const key = String(op.nombre).trim().toUpperCase();
+      const key = String(op?.nombre || "").trim().toUpperCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -451,8 +539,8 @@ function SelectCreatable({ label, value, onChange, options = [], isWebAdmin, end
           >
             <option value="">— Seleccionar —</option>
             {mergedOptions.map((op) => (
-              <option key={op.id} value={op.nombre || op.id} className="bg-[#0f1324] text-white">
-                {op.nombre || op.id}
+              <option key={op?.id} value={op?.nombre || op?.id} className="bg-[#0f1324] text-white">
+                {op?.nombre || op?.id}
               </option>
             ))}
           </select>

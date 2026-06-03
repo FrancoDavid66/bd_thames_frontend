@@ -20,6 +20,10 @@ import SolicitudStep from "./modalcreate/SolicitudStep";
 /* === Email (centralizado, sin correo hardcodeado) === */
 import { sendAdminNuevaSolicitud } from "../../services/notifications/email.js";
 
+/* === Seguridad / datos del usuario y oficinas === */
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
+
 // Definimos variants inline para animaciones profesionales
 const modalVariants = {
   initial: { opacity: 0, scale: 0.95 },
@@ -152,6 +156,11 @@ export default function CreateSolicitudModal({
 }) {
   const [step, setStep] = useState(1);
 
+  // ======= Usuario / rol =======
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+  const userOficinaId = String(user?.perfil?.oficina?.id || user?.perfil?.oficina || "");
+
   // ======= Gate Responsable =======
   const [askResponsable, setAskResponsable] = useState(true);
   const [responsableId, setResponsableId] = useState("");
@@ -165,12 +174,18 @@ export default function CreateSolicitudModal({
     }
   },[skipResponsableGate, initialResponsableId]);
 
+  // ======= Gate Oficina =======
+  // Admin: elige la oficina ANTES que el responsable.
+  // Empleado: usa su propia oficina (no se muestra el paso).
+  const [askOficina, setAskOficina] = useState(false);
+  const [oficinasList, setOficinasList] = useState([]);
+
   // Paso 1: Cliente
   const [clienteModo, setClienteModo] = useState("nuevo");
   const [clienteId, setClienteId] = useState("");
   const [cliente, setCliente] = useState({
     nombre:"", apellido:"", telefono:"", email:"",
-    dni_cuit_cuil:"", direccion:"", localidad:"",
+    dni_cuit_cuil:"", direccion:"", localidad:"", partido:"", fecha_nacimiento:"",
   });
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE:null, DNI_DORSO:null });
 
@@ -186,6 +201,42 @@ export default function CreateSolicitudModal({
   });
   const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
+
+  // Empleado: fija su propia oficina y NO muestra el paso de oficina.
+  // Admin: si todavía no eligió oficina, abre el paso de oficina primero.
+  useEffect(()=>{
+    if (!isWebAdmin) {
+      if (userOficinaId) setPoliza(s=>({ ...s, oficina: userOficinaId }));
+      setAskOficina(false);
+      return;
+    }
+    setAskOficina(prev => prev || !poliza.oficina);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[isWebAdmin, userOficinaId]);
+
+  // Admin: trae el listado de oficinas para elegir.
+  useEffect(()=>{
+    if (!isWebAdmin) return;
+    let alive = true;
+    (async ()=>{
+      try {
+        const res = await api.get("/usuarios/oficinas/");
+        const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        if (alive) setOficinasList(arr);
+      } catch { /* noop */ }
+    })();
+    return ()=>{ alive = false; };
+  },[isWebAdmin]);
+
+  // Confirma la oficina elegida por el admin y cierra el paso.
+  const elegirOficina = (oficinaId)=>{
+    const id = String(oficinaId || "").trim();
+    if (!id) return toast.error("Elegí una sucursal");
+    setPoliza(s=>({ ...s, oficina: id }));
+    setAskOficina(false);
+    const nom = oficinasList.find(o=>String(o.id)===id)?.nombre || "";
+    toast.success(nom ? `Sucursal: ${nom}` : "Sucursal asignada");
+  };
 
   useEffect(()=>{
     if(!poliza.fecha_emision) return;
@@ -247,6 +298,10 @@ export default function CreateSolicitudModal({
     if(!cliente.nombre.trim()) e.nombre="Requerido";
     if(!cliente.apellido.trim()) e.apellido="Requerido";
     if(!cliente.telefono.trim()) e.telefono="Requerido";
+    if(!(cliente.dni_cuit_cuil||"").trim()) e.dni_cuit_cuil="Requerido";
+    if(!(cliente.fecha_nacimiento||"").trim()) e.fecha_nacimiento="Requerido";
+    if(!(cliente.partido||"").trim()) e.partido="Requerido";
+    if(!(cliente.localidad||"").trim()) e.localidad="Requerido";
     return e;
   },[clienteModo, cliente, clienteId]);
 
@@ -330,6 +385,8 @@ export default function CreateSolicitudModal({
           dni_cuit_cuil: (cliente.dni_cuit_cuil||"").trim(),
           direccion: (cliente.direccion||"").trim(),
           localidad: (cliente.localidad||"").trim(),
+          partido: (cliente.partido||"").trim(),
+          fecha_nacimiento: (cliente.fecha_nacimiento||"").trim() || null,
         };
       }
 
@@ -354,6 +411,11 @@ export default function CreateSolicitudModal({
           modelo: poliza.modelo.trim(),
           anio: Number(poliza.anio),
           tipo: poliza.tipo || "Auto",
+          numero_motor: (poliza.numero_motor||"").trim(),
+          numero_chasis: (poliza.numero_chasis||"").trim(),
+          combustible: (poliza.combustible||"").trim(),
+          carroceria: (poliza.carroceria||"").trim(),
+          observaciones: (poliza.observaciones||"").trim(),
           precio_cuota: poliza.generar_cuotas_ahora ? Number(poliza.precio_cuota) : undefined,
           cantidad_cuotas_override: poliza.cantidad_cuotas_override ? Number(poliza.cantidad_cuotas_override) : undefined,
           primer_vencimiento: poliza.primer_vencimiento,
@@ -372,6 +434,12 @@ export default function CreateSolicitudModal({
         motivo: "ALTA_POLIZA",
         tipoSeguro: solicitud.tipoSeguro || "ROBO",
       };
+
+      // 🚀 Oficina elegida (admin) o la propia (empleado) → la usa el backend
+      // para asignar Cliente y Póliza a la sucursal correcta.
+      if (poliza.oficina && !Number.isNaN(Number(poliza.oficina))) {
+        payload.oficina = Number(poliza.oficina);
+      }
 
       // ===== FOTOS DEL VEHÍCULO → bloque "fotos" (solo keys válidas)
       const _FOTO_SLOTS = FOTO_SLOTS; // ya filtrados por regla
@@ -755,7 +823,7 @@ export default function CreateSolicitudModal({
         </div>
 
         <ResponsableManagerModal
-          open={askResponsable}
+          open={askResponsable && !askOficina}
           onCancel={onClose}
           onSelected={({ responsableId: selId })=>{
             setResponsableId(String(selId));
@@ -763,6 +831,58 @@ export default function CreateSolicitudModal({
             toast.success("Responsable asignado");
           }}
         />
+
+        {/* 🏢 Paso de Oficina (solo Admin, antes del responsable) */}
+        <AnimatePresence>
+          {askOficina && (
+            <motion.div
+              className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            >
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0f1e] shadow-2xl overflow-hidden"
+              >
+                <div className="px-6 py-4 border-b border-white/5 bg-[#0f0c28]/90">
+                  <h3 className="text-white font-black text-lg uppercase tracking-tighter">Elegí la sucursal</h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-0.5">
+                    Primero seleccioná la oficina de la solicitud
+                  </p>
+                </div>
+                <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
+                  {oficinasList.length === 0 ? (
+                    <div className="p-8 text-center text-white/30 text-xs font-bold uppercase tracking-widest animate-pulse">
+                      Cargando sucursales...
+                    </div>
+                  ) : (
+                    oficinasList.map((o)=>(
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={()=>elegirOficina(o.id)}
+                        className="w-full text-left px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-sky-500/15 hover:border-sky-500/40 transition-all"
+                      >
+                        {o.nombre || `Oficina ${o.id}`}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="px-6 py-3 border-t border-white/5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

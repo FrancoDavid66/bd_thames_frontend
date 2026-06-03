@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { HiOutlineClipboardCopy, HiRefresh, HiChevronLeft, HiChevronRight, HiArrowRight, HiExclamationCircle } from "react-icons/hi";
+import * as XLSX from "xlsx";
 
 const clamp   = (n, a, b) => Math.max(a, Math.min(b, n));
 const safeStr = (v) => String(v ?? "").trim();
@@ -49,6 +50,7 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
   const [loadRes,   setLoadRes]   = useState(false);
   const [loadList,  setLoadList]  = useState(false);
   const [error,     setError]     = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => { setPage(1); }, [oficina, por, pageSize]);
 
@@ -86,6 +88,68 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
     finally   { setLoadList(false); }
   };
 
+  // 🚀 Descarga TODOS los grupos del criterio elegido (recorre todas las páginas).
+  const descargarTodo = async () => {
+    if (downloading) return;
+    setDownloading(true); setError("");
+    try {
+      const PAGE = 200;
+      let pageN = 1, total = Infinity;
+      const filas = [];
+      const criterioLabel = CRITERIOS.find(c => c.value === por)?.label || por;
+      const ofiName = (v) => { try { return getOficinaNombre ? (getOficinaNombre(v) || "") : (v ?? ""); } catch { return v ?? ""; } };
+
+      while ((pageN - 1) * PAGE < total) {
+        const qs = new URLSearchParams({ por, page: String(pageN), page_size: String(PAGE), per_group: "200" });
+        if (oficina) qs.set("oficina", oficina);
+        const s = `polizas/duplicadas/?${qs}`;
+        const d = await fetchFirstOk([`${apiBase}${s}`, `${apiBase}polizas/${s}`]);
+        const raw = Array.isArray(d?.results) ? d.results : [];
+        total = Number(d?.count_groups ?? d?.count ?? raw.length) || raw.length;
+
+        raw.forEach(g => {
+          const items = Array.isArray(g?.items) ? g.items : Array.isArray(g?.rows) ? g.rows : [];
+          let keyStr = typeof g?.key === "string" ? g.key : "";
+          if (g?.key && typeof g.key === "object" && !Array.isArray(g.key))
+            keyStr = Object.entries(g.key).map(([k, v]) => `${k}: ${v ?? ""}`).join(" · ");
+          items.forEach(it => {
+            filas.push({
+              "Criterio": criterioLabel,
+              "Clave duplicada": keyStr || "—",
+              "ID Póliza": it?.id ?? "",
+              "N° Póliza": it?.numero_poliza || "",
+              "Compañía": it?.compania || "",
+              "Patente": it?.patente || "",
+              "Estado": it?.estado || "",
+              "Cliente": it?.cliente?.nombre || "",
+              "DNI/CUIT": it?.cliente?.dni_cuit_cuil || "",
+              "Oficina": ofiName(it?.oficina),
+              "Emisión": it?.fecha_emision || "",
+              "Vencimiento": it?.fecha_vencimiento || "",
+            });
+          });
+        });
+
+        if (raw.length === 0) break;
+        pageN++;
+        if (pageN > 200) break; // tope de seguridad
+      }
+
+      if (filas.length === 0) { setError("No hay duplicados para descargar con este criterio."); return; }
+
+      const ws = XLSX.utils.json_to_sheet(filas);
+      ws["!cols"] = [{ wch: 24 }, { wch: 28 }, { wch: 10 }, { wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 26 }, { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Duplicados");
+      const hoy = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Duplicados_Polizas_${por}_${hoy}.xlsx`);
+    } catch {
+      setError("No se pudo generar la descarga.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   useEffect(() => { fetchResumen(); }, [oficina]);
   useEffect(() => { fetchListado(); }, [oficina, por, page, pageSize, perGroup]);
 
@@ -114,6 +178,10 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
           >
             {CRITERIOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
+          <button onClick={descargarTodo} disabled={downloading || loadList}
+            className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg border border-emerald-600 bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors">
+            {downloading ? "Descargando…" : "Descargar todo"}
+          </button>
           <button onClick={() => { fetchResumen(); fetchListado(); }} disabled={loadRes || loadList}
             className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors">
             <HiRefresh className={`text-sm ${(loadRes || loadList) ? "animate-spin" : ""}`} />

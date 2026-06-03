@@ -77,7 +77,7 @@ function buildFilenameSuffix({ desde, hasta, oficinaLabel, formaPago, q }) {
 }
 
 
-export default function HistorialIngresosPanel({ oficinasAdmin = [] }) {
+export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp }) {
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const userOficina = String(user?.perfil?.oficina?.codigo || user?.perfil?.oficina?.id || "");
@@ -102,6 +102,14 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [] }) {
   const [next,  setNext]    = useState(null);
   const [prev,  setPrev]    = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // 🚀 Sucursal controlada desde la página (selector global de arriba).
+  // Si el padre manda 'oficinaProp', este panel la obedece y oculta su propio selector.
+  useEffect(() => {
+    if (oficinaProp !== undefined && oficinaProp !== null && oficinaProp !== "") {
+      setOficina(String(oficinaProp));
+    }
+  }, [oficinaProp]);
 
   // Oficinas (solo admin)
   useEffect(() => {
@@ -169,6 +177,26 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [] }) {
   const handleSearch = (e) => {
     e?.preventDefault?.();
     setQ(qInput.trim()); setPage(1);
+  };
+
+  // ── Accesos rápidos de fecha (Hoy / Mes-Año) ──────────────────────
+  const MESES_NOMBRES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const _anioBaseRapido = dayjs().year();
+  const ANIOS_RAPIDOS = Array.from({ length: 6 }, (_, k) => _anioBaseRapido + 1 - k);
+  const _fechaRef  = dayjs(desde).isValid() ? dayjs(desde) : dayjs();
+  const mesActivo  = _fechaRef.month();
+  const anioActivo = _fechaRef.year();
+  const esHoyRapido = desde === hasta && desde === dayjs().format("YYYY-MM-DD");
+
+  const aplicarHoy = () => {
+    const h = dayjs().format("YYYY-MM-DD");
+    setDesde(h); setHasta(h); setPage(1);
+  };
+  const aplicarMesAnio = (year, monthIdx) => {
+    const base = dayjs().year(year).month(monthIdx);
+    setDesde(base.startOf("month").format("YYYY-MM-DD"));
+    setHasta(base.endOf("month").format("YYYY-MM-DD"));
+    setPage(1);
   };
 
   const handleExport = async () => {
@@ -308,6 +336,42 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [] }) {
             </button>
           </div>
         </div>
+        {/* ── Accesos rápidos: Hoy / Mes-Año ── */}
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <button
+            type="button"
+            onClick={aplicarHoy}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+              esHoyRapido
+                ? "bg-sky-600 border-sky-500 text-white"
+                : "bg-slate-950/40 border-slate-700/40 text-slate-300 hover:bg-slate-800/60"
+            }`}
+          >
+            <HiCalendar className="w-4 h-4" /> Hoy
+          </button>
+
+          <div className="flex items-center gap-1.5 bg-slate-950/40 border border-slate-700/40 rounded-xl px-3 py-2">
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 shrink-0">Mes</span>
+            <select
+              value={mesActivo}
+              onChange={(e) => aplicarMesAnio(anioActivo, Number(e.target.value))}
+              className="bg-transparent text-sm text-slate-300 outline-none"
+            >
+              {MESES_NOMBRES.map((nombre, idx) => (
+                <option key={idx} value={idx} className="bg-slate-900">{nombre}</option>
+              ))}
+            </select>
+            <select
+              value={anioActivo}
+              onChange={(e) => aplicarMesAnio(Number(e.target.value), mesActivo)}
+              className="bg-transparent text-sm text-slate-300 outline-none"
+            >
+              {ANIOS_RAPIDOS.map((y) => (
+                <option key={y} value={y} className="bg-slate-900">{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 bg-slate-950/40 border border-slate-700/40 rounded-xl px-3 py-2">
@@ -327,7 +391,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [] }) {
             </select>
           </div>
 
-          {isWebAdmin && (
+          {isWebAdmin && oficinaProp === undefined && (
             <div className="flex items-center gap-1.5 bg-slate-950/40 border border-slate-700/40 rounded-xl px-3 py-2">
               <HiOfficeBuilding className="w-4 h-4 text-slate-500 shrink-0" />
               <select value={oficina} onChange={(e) => setOficina(e.target.value)}
