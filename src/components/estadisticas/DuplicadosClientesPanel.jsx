@@ -58,6 +58,8 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
   const [fusionGrupo, setFusionGrupo] = useState(null);   // grupo abierto en el modal
   const [principalSel, setPrincipalSel] = useState(null); // id del cliente que QUEDA
   const [fusionando, setFusionando] = useState(false);
+  const [masivaSim, setMasivaSim] = useState(null);     // resultado de la simulación
+  const [masivaLoading, setMasivaLoading] = useState(false);
 
   const modosParam = useMemo(() => modos.join(","), [modos]);
 
@@ -182,6 +184,54 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
     }
   };
 
+  // Paso 1: SIMULAR la fusión masiva por DNI (no toca nada, solo informa)
+  const simularMasivaDNI = async () => {
+    if (masivaLoading) return;
+    setMasivaLoading(true); setError("");
+    try {
+      const res = await fetch(`${apiBase}clientes/fusionar-dni/`, {
+        method: "POST",
+        headers: { ...authH(), "Content-Type": "application/json" },
+        body: JSON.stringify({ simular: true, ...(oficina ? { oficina } : {}) }),
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); msg = j?.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      const data = await res.json();
+      setMasivaSim(data); // abre el modal de confirmación
+    } catch (e) {
+      setError(`No se pudo simular: ${e.message || "error"}`);
+    } finally {
+      setMasivaLoading(false);
+    }
+  };
+
+  // Paso 2: EJECUTAR la fusión masiva por DNI de verdad
+  const ejecutarMasivaDNI = async () => {
+    if (masivaLoading) return;
+    setMasivaLoading(true); setError("");
+    try {
+      const res = await fetch(`${apiBase}clientes/fusionar-dni/`, {
+        method: "POST",
+        headers: { ...authH(), "Content-Type": "application/json" },
+        body: JSON.stringify({ simular: false, ...(oficina ? { oficina } : {}) }),
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); msg = j?.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      setMasivaSim(null);
+      await fetchData(); // refrescar
+    } catch (e) {
+      setError(`No se pudo fusionar: ${e.message || "error"}`);
+    } finally {
+      setMasivaLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,6 +253,14 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={simularMasivaDNI}
+            disabled={masivaLoading || loading}
+            className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg border border-amber-500 bg-amber-500/90 text-slate-950 text-xs font-bold hover:bg-amber-400 disabled:opacity-50 transition-colors"
+            title="Fusionar automáticamente todos los clientes con el mismo DNI"
+          >
+            {masivaLoading ? "Procesando…" : "Auto por DNI"}
+          </button>
           <button
             onClick={descargarTodo}
             disabled={downloading || loading}
@@ -414,6 +472,63 @@ export default function DuplicadosClientesPanel({ apiBase, oficina, getOficinaNo
                 className="h-9 px-4 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 disabled:opacity-50 transition-colors"
               >
                 {fusionando ? "Fusionando…" : "Fusionar y borrar duplicados"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: confirmación de fusión masiva por DNI ── */}
+      {masivaSim && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => !masivaLoading && setMasivaSim(null)}
+        >
+          <div
+            className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800">
+              <h3 className="text-base font-semibold text-slate-100">Fusión automática por DNI</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Esto es una simulación. Todavía no se tocó nada.</p>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                  <div className="text-2xl font-bold text-sky-300">{Number(masivaSim?.grupos || 0).toLocaleString("es-AR")}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">grupos a fusionar</div>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                  <div className="text-2xl font-bold text-emerald-300">{Number(masivaSim?.se_conservan || 0).toLocaleString("es-AR")}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">fichas que quedan</div>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                  <div className="text-2xl font-bold text-rose-300">{Number(masivaSim?.se_borrarian || 0).toLocaleString("es-AR")}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">copias a borrar</div>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Se juntan los clientes con el mismo DNI. En cada grupo queda la ficha más antigua y
+                las pólizas/pagos de las copias se mueven hacia ella. No se pierde historial.
+                {Number(masivaSim?.grupos || 0) === 0 && " — No hay nada para fusionar."}
+              </p>
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-800 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setMasivaSim(null)}
+                disabled={masivaLoading}
+                className="h-9 px-4 rounded-lg border border-slate-700 text-slate-300 text-sm hover:bg-slate-900 disabled:opacity-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={ejecutarMasivaDNI}
+                disabled={masivaLoading || Number(masivaSim?.grupos || 0) === 0}
+                className="h-9 px-4 rounded-lg bg-amber-500 text-slate-950 text-sm font-bold hover:bg-amber-400 disabled:opacity-50 transition-colors"
+              >
+                {masivaLoading ? "Fusionando…" : "Sí, fusionar ahora"}
               </button>
             </div>
           </div>
