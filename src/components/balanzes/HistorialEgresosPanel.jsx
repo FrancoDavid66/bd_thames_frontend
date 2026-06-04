@@ -1,13 +1,9 @@
-/* src/components/balanzes/HistorialIngresosPanel.jsx
-   Historial completo de INGRESOS de caja por oficina.
-   Admin ve todas las oficinas. Empleado solo ve la suya.
+/* src/components/balanzes/HistorialEgresosPanel.jsx
+   Historial completo de EGRESOS de caja por oficina.
 
    ✅ DESCARGAS:
-   - EXCEL → generado en BACKEND con openpyxl. Tabla REAL de Excel
-     (objeto Table, con flechitas de filtro/ordenamiento nativas en cada header).
-   - PDF → generado en BACKEND con reportlab (header verde, total general).
-   - Filename refleja los filtros (rango + oficina + medio + búsqueda).
-   - Errores visibles por toast.
+   - EXCEL → backend con openpyxl + tabla real
+   - PDF   → backend con reportlab (header rojo)
 */
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,7 +11,7 @@ import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import {
   HiSearch, HiX, HiDownload, HiRefresh, HiChevronLeft, HiChevronRight,
-  HiCash, HiCreditCard, HiOfficeBuilding, HiCalendar, HiFilter,
+  HiCash, HiCreditCard, HiOfficeBuilding, HiCalendar, HiFilter, HiTrendingDown,
 } from "react-icons/hi";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
@@ -38,7 +34,7 @@ const fmtDate = (d) => d ? dayjs(d).format("DD/MM/YYYY") : "—";
 function FormaPagoBadge({ forma }) {
   const f = (forma || "EFECTIVO").toUpperCase();
   if (f === "EFECTIVO")
-    return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-900/40 border border-emerald-700/50 text-emerald-400">💵 Efectivo</span>;
+    return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-900/40 border border-rose-700/50 text-rose-400">💵 Efectivo</span>;
   if (f === "TRANSFERENCIA")
     return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-900/40 border border-sky-700/50 text-sky-400">🏦 Transf.</span>;
   if (f === "TARJETA")
@@ -77,12 +73,12 @@ function buildFilenameSuffix({ desde, hasta, oficinaLabel, formaPago, q }) {
 }
 
 
-export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp }) {
+export default function HistorialEgresosPanel({ oficinasAdmin = [], oficinaProp }) {
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const userOficina = String(user?.perfil?.oficina?.codigo || user?.perfil?.oficina?.id || "");
 
-  const hoy   = dayjs().format("YYYY-MM-DD");
+  const hoy    = dayjs().format("YYYY-MM-DD");
   const hace30 = dayjs().subtract(30, "day").format("YYYY-MM-DD");
 
   const [oficina,    setOficina]    = useState(isWebAdmin ? "ALL" : userOficina);
@@ -96,7 +92,6 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
   const [exportFormat, setExportFormat] = useState("excel");
   const [oficinas,    setOficinas]    = useState([]);
 
-  // Estado de la lista
   const [items, setItems]   = useState([]);
   const [count, setCount]   = useState(0);
   const [next,  setNext]    = useState(null);
@@ -111,7 +106,6 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
     }
   }, [oficinaProp]);
 
-  // Oficinas (solo admin)
   useEffect(() => {
     if (!isWebAdmin) return;
     if (oficinasAdmin && oficinasAdmin.length > 0) {
@@ -140,7 +134,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
   const cargar = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const res = await api.get("ingresos/historial/", {
+      const res = await api.get("egresos/historial/", {
         params: {
           oficina: oficina !== "ALL" ? oficina : undefined,
           desde, hasta,
@@ -159,12 +153,12 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
       setNext(data.next || null);
       setPrev(data.previous || null);
     } catch (err) {
-      console.error("[HistorialIngresosPanel] Error al cargar:", err);
+      console.error("[HistorialEgresosPanel] Error al cargar:", err);
       const status = err?.response?.status;
       if (status === 401 || status === 403) {
         toast.error("Tu sesión expiró. Volvé a iniciar sesión.");
       } else {
-        toast.error("No se pudieron cargar los ingresos.");
+        toast.error("No se pudieron cargar los egresos.");
       }
       setItems([]); setCount(0); setNext(null); setPrev(null);
     } finally {
@@ -212,7 +206,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
       oficina === "ALL" ? "" : (oficinasMap[String(oficina)] || String(oficina));
 
     try {
-      const res = await api.get("ingresos/historial/", {
+      const res = await api.get("egresos/historial/", {
         params: {
           oficina: oficina !== "ALL" ? oficina : undefined,
           desde, hasta,
@@ -244,7 +238,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
         q: q || "",
       });
       const ext = fmtOut === "pdf" ? "pdf" : "xlsx";
-      const filename = `Historial_Ingresos_${suffix}.${ext}`;
+      const filename = `Historial_Egresos_${suffix}.${ext}`;
 
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
@@ -258,7 +252,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
       toast.dismiss(toastId);
       toast.success(`${fmtOut === "pdf" ? "PDF" : "Excel"} generado`, { duration: 3500 });
     } catch (err) {
-      console.error("[HistorialIngresosPanel] Error al exportar:", err);
+      console.error("[HistorialEgresosPanel] Error al exportar:", err);
       toast.dismiss(toastId);
 
       const status = err?.response?.status;
@@ -305,7 +299,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
             <input
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
-              placeholder="Buscar por descripción, pagador, categoría, cuenta…"
+              placeholder="Buscar por descripción o categoría…"
               className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-600 outline-none min-w-0"
             />
             {qInput && (
@@ -330,7 +324,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
               <option value="pdf">PDF</option>
             </select>
             <button onClick={handleExport} disabled={exporting || loading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors">
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-700 hover:bg-rose-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors">
               <HiDownload className={`w-4 h-4 ${exporting ? "animate-bounce" : ""}`} />
               {exporting ? "Descargando…" : exportFormat === "pdf" ? "Descargar PDF" : "Descargar Excel"}
             </button>
@@ -402,7 +396,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
           )}
 
           <div className="ml-auto text-xs text-slate-500">
-            {count > 0 ? `${count.toLocaleString("es-AR")} ingresos encontrados` : ""}
+            {count > 0 ? `${count.toLocaleString("es-AR")} egresos encontrados` : ""}
           </div>
         </div>
       </div>
@@ -410,9 +404,9 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total período",      value: fmtMoney(kpis.total),    color: "text-emerald-400", icon: HiCash },
-          { label: "Efectivo",           value: fmtMoney(kpis.efectivo), color: "text-emerald-300", icon: HiCash },
-          { label: "Transferencia",      value: fmtMoney(kpis.transf),   color: "text-sky-400",     icon: HiCreditCard },
+          { label: "Total período",      value: fmtMoney(kpis.total),    color: "text-rose-400",  icon: HiTrendingDown },
+          { label: "Efectivo",           value: fmtMoney(kpis.efectivo), color: "text-rose-300",  icon: HiCash },
+          { label: "Transferencia",      value: fmtMoney(kpis.transf),   color: "text-sky-400",   icon: HiCreditCard },
           { label: "Cantidad",           value: kpis.cantidad.toLocaleString("es-AR"), color: "text-slate-200", icon: HiFilter },
         ].map(({ label, value, color, icon: Icon }) => (
           <div key={label} className="bg-slate-900/50 border border-slate-800/60 rounded-xl px-4 py-3">
@@ -429,34 +423,30 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
       <div className="bg-slate-900/50 border border-slate-800/60 rounded-2xl overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <span className="w-8 h-8 rounded-full border-2 border-emerald-400/40 border-t-emerald-400 animate-spin" />
+            <span className="w-8 h-8 rounded-full border-2 border-rose-400/40 border-t-rose-400 animate-spin" />
           </div>
         ) : items.length === 0 ? (
           <div className="py-16 text-center text-slate-500 text-sm">
-            Sin ingresos para los filtros aplicados.
+            Sin egresos para los filtros aplicados.
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className={`grid gap-2 px-4 py-3 bg-slate-950/60 border-b border-slate-800/60 text-[10px] uppercase tracking-wider text-slate-500 font-semibold ${isWebAdmin ? "grid-cols-[0.8fr_1.6fr_1fr_0.8fr_1.2fr_1fr_0.8fr_0.8fr]" : "grid-cols-[0.8fr_1.6fr_1fr_0.8fr_1.2fr_1fr_0.8fr]"}`}>
+            <div className={`grid gap-2 px-4 py-3 bg-slate-950/60 border-b border-slate-800/60 text-[10px] uppercase tracking-wider text-slate-500 font-semibold ${isWebAdmin ? "grid-cols-[0.9fr_2.2fr_1.2fr_0.9fr_0.9fr_0.9fr]" : "grid-cols-[0.9fr_2.2fr_1.2fr_0.9fr_0.9fr]"}`}>
               <div>Fecha</div>
               <div>Descripción</div>
               <div>Categoría</div>
               <div>Forma</div>
-              <div>Pagado por / Cuenta</div>
-              <div>Cta. destino</div>
               {isWebAdmin && <div>Oficina</div>}
               <div className="text-right">Monto</div>
             </div>
 
-            {/* Rows */}
             <div className="divide-y divide-slate-800/40">
               <AnimatePresence>
                 {items.map((item, idx) => (
                   <motion.div key={item.id || idx}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                    className={`grid gap-2 px-4 py-3 hover:bg-slate-800/30 transition-colors text-sm ${isWebAdmin ? "grid-cols-[0.8fr_1.6fr_1fr_0.8fr_1.2fr_1fr_0.8fr_0.8fr]" : "grid-cols-[0.8fr_1.6fr_1fr_0.8fr_1.2fr_1fr_0.8fr]"}`}>
+                    className={`grid gap-2 px-4 py-3 hover:bg-slate-800/30 transition-colors text-sm ${isWebAdmin ? "grid-cols-[0.9fr_2.2fr_1.2fr_0.9fr_0.9fr_0.9fr]" : "grid-cols-[0.9fr_2.2fr_1.2fr_0.9fr_0.9fr]"}`}>
 
                     <div className="flex flex-col justify-center">
                       <span className="text-slate-300 font-medium">{fmtDate(item.fecha)}</span>
@@ -466,6 +456,11 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
                       <span className="text-slate-200 font-medium truncate" title={item.descripcion || "—"}>
                         {item.descripcion || "—"}
                       </span>
+                      {item.observaciones && (
+                        <span className="text-[10px] text-slate-500 truncate" title={item.observaciones}>
+                          {item.observaciones}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center min-w-0">
@@ -478,23 +473,6 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
                       <FormaPagoBadge forma={item.forma_pago} />
                     </div>
 
-                    <div className="flex flex-col justify-center min-w-0">
-                      <span className="text-slate-300 truncate text-[12px]" title={item.pagado_por || "—"}>
-                        {item.pagado_por || "—"}
-                      </span>
-                      {item.cuit_remitente && (
-                        <span className="text-[10px] text-slate-500">CUIT: {item.cuit_remitente}</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center min-w-0">
-                      {item.billetera ? (
-                        <span className="text-xs font-bold text-indigo-300 truncate bg-indigo-950/40 border border-indigo-800/40 px-1.5 py-0.5 rounded-md" title={item.billetera}>
-                          → {item.billetera}
-                        </span>
-                      ) : <span className="text-slate-600 text-xs">—</span>}
-                    </div>
-
                     {isWebAdmin && (
                       <div className="flex items-center">
                         <OficinaLabel oficinaNombre={item.oficina_nombre} />
@@ -502,7 +480,7 @@ export default function HistorialIngresosPanel({ oficinasAdmin = [], oficinaProp
                     )}
 
                     <div className="flex items-center justify-end">
-                      <span className="font-bold tabular-nums text-emerald-400">{fmtMoney(item.monto)}</span>
+                      <span className="font-bold tabular-nums text-rose-400">{fmtMoney(item.monto)}</span>
                     </div>
                   </motion.div>
                 ))}
