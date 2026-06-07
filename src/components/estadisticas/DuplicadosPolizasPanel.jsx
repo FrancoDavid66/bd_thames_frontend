@@ -332,13 +332,14 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
                         <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Póliza</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Cliente</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Patente</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Oficina</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Estado</th>
                         <th className="px-3 py-2 text-right"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/40">
                       {items.length === 0 ? (
-                        <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-600 text-[10px]">Sin ítems. Aumentá "por grupo".</td></tr>
+                        <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-600 text-[10px]">Sin ítems. Aumentá "por grupo".</td></tr>
                       ) : items.map(it => (
                         <tr key={it.id} className="hover:bg-slate-800/20 transition-colors group">
                           <td className="px-3 py-2.5">
@@ -352,6 +353,7 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
                             {it?.cliente?.dni_cuit_cuil && <div className="text-[10px] text-slate-600">{it.cliente.dni_cuit_cuil}</div>}
                           </td>
                           <td className="px-3 py-2.5 text-slate-400">{it.patente || "—"}</td>
+                          <td className="px-3 py-2.5 text-slate-400">{getOficinaNombre ? (getOficinaNombre(it.oficina) || "—") : (it.oficina ?? "—")}</td>
                           <td className="px-3 py-2.5">
                             <span className={`text-[10px] font-medium ${it.estado === "activa" ? "text-emerald-400" : "text-slate-500"}`}>
                               {it.estado || "—"}
