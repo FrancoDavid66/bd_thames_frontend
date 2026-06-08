@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import {
   HiSearch, HiX, HiExclamation, HiPlus, HiShieldCheck,
   HiShieldExclamation, HiBan, HiCheckCircle,
-  HiOutlineChevronRight, HiExclamationCircle,
+  HiOutlineChevronRight, HiExclamationCircle, HiRefresh,
 } from "react-icons/hi";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
@@ -14,6 +14,7 @@ import {
   fetchBuscarClientePorDni, fetchCuotasPorPoliza,
   fetchCuotasBuscar, pushRecienteDni, clearBuscarCliente,
 } from "../../store/slices/pagosSlice";
+import { renovarPoliza } from "../../store/slices/polizasSlice";
 import { useAuth } from "../../context/AuthContext";
 
 const onlyDigits       = (s) => String(s || "").replace(/\D+/g, "");
@@ -223,6 +224,11 @@ export default function PagosSearch({ onBuscar }) {
 
   const [query,        setQuery]        = useState("");
   const [alertaPoliza, setAlertaPoliza] = useState(null);
+  const [renovarTarget, setRenovarTarget] = useState(null);
+  const [renovando,     setRenovando]     = useState(false);
+
+  const hoyISO = useMemo(() => dayjs().format("YYYY-MM-DD"), []);
+  const hoyTxt = useMemo(() => dayjs().format("DD/MM/YYYY"), []);
 
   const { buscarClienteData, buscarClienteStatus, cuotasPolizaStatus, cuotasBuscarStatus, recientesDni }
     = useSelector((s) => s.pagos || {});
@@ -260,6 +266,38 @@ export default function PagosSearch({ onBuscar }) {
     if (!items.length) toast("No hay cuotas para esa póliza.");
     setAlertaPoliza(null);
   }, [dispatch, onBuscar]);
+
+  // ── Renovación rápida ────────────────────────────────────────────────
+  const abrirRenovar = useCallback((p) => setRenovarTarget(p), []);
+
+  const confirmarRenovar = useCallback(async () => {
+    const target = renovarTarget;
+    if (!target) return;
+    const oldId = String(target?.poliza_id ?? "");
+    if (!oldId) { toast.error("No se pudo identificar la póliza."); return; }
+    setRenovando(true);
+    try {
+      const res = await dispatch(renovarPoliza({
+        id: oldId,
+        nuevaFecha: hoyISO,            // alta = hoy
+        mantenerDiaVencimiento: true, // las cuotas conservan el día histórico
+      })).unwrap();
+      const nuevaId = res?.response?.id || res?.id || res?.response?.poliza_id || null;
+      const dni = onlyDigits(cliente?.dni || query);
+      setRenovarTarget(null);
+      toast.success("Póliza renovada. Cargá el monto y cobrá.");
+      if (nuevaId) {
+        await traerCuotas(String(nuevaId), dni);
+      } else if (dni) {
+        await dispatch(fetchBuscarClientePorDni({ dni }));
+      }
+    } catch (err) {
+      const msg = err?.detail || err?.message || err?.error;
+      toast.error(typeof msg === "string" && msg ? msg : "No se pudo renovar.");
+    } finally {
+      setRenovando(false);
+    }
+  }, [renovarTarget, dispatch, hoyISO, traerCuotas, cliente, query]);
 
   const buscarPorDni = useCallback(async (dniRaw) => {
     const d = onlyDigits(dniRaw);
@@ -393,9 +431,11 @@ export default function PagosSearch({ onBuscar }) {
                 const styles = STATUS_STYLES[st.color] || STATUS_STYLES.slate;
                 const Icon   = st.icon;
                 const needsAlert = ["vencida", "baja_reciente", "cancelada"].includes(st.type);
+                const puedeRenovar = st.type === "finalizada";
 
                 return (
-                  <motion.button key={pid || idx} type="button"
+                  <div key={pid || idx} className="flex flex-col gap-2">
+                  <motion.button type="button"
                     initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: idx * 0.04 }}
                     onClick={() => handleCardClick(p)}
@@ -423,6 +463,13 @@ export default function PagosSearch({ onBuscar }) {
                       </div>
                     </div>
                   </motion.button>
+                  {puedeRenovar && (
+                    <button type="button" onClick={() => abrirRenovar(p)}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold py-2.5 transition-colors">
+                      <HiRefresh className="w-4 h-4" /> Renovar · alta hoy {hoyTxt}
+                    </button>
+                  )}
+                  </div>
                 );
               })}
             </div>
@@ -430,6 +477,73 @@ export default function PagosSearch({ onBuscar }) {
             {polizas.length === 0 && (
               <p className="text-sm text-slate-500 px-1">No hay pólizas para este cliente.</p>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal confirmación de renovación rápida */}
+      <AnimatePresence>
+        {renovarTarget && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              onClick={() => !renovando && setRenovarTarget(null)} />
+            <motion.div
+              initial={{ scale: 0.96, y: 16, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.96, y: 16, opacity: 0 }}
+              className="relative z-10 w-full max-w-md rounded-2xl border border-emerald-700/50 bg-slate-900 shadow-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <HiRefresh className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-lg font-bold text-white">Renovar póliza</div>
+                  <div className="text-xs text-slate-400 font-mono truncate">
+                    {renovarTarget?.patente || "—"} · {renovarTarget?.compania || "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-4 space-y-2.5 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Compañía</span>
+                  <span className="font-semibold text-white text-right">{renovarTarget?.compania || "—"} <span className="text-slate-500 font-normal">(la misma)</span></span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Alta (arranca)</span>
+                  <span className="font-semibold text-white">{hoyTxt}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Vencimiento</span>
+                  <span className="font-semibold text-white text-right">se mantiene el día de siempre</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Fotos y documentos</span>
+                  <span className="font-semibold text-emerald-400 text-right">se mueven a la nueva</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Póliza actual</span>
+                  <span className="font-semibold text-white text-right">pasa a finalizada</span>
+                </div>
+                <p className="text-xs text-slate-500 pt-1">
+                  Después vas a poder cargar el monto de cada cuota y cobrar.
+                </p>
+              </div>
+
+              <div className="px-5 pb-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+                <button type="button" onClick={() => setRenovarTarget(null)} disabled={renovando}
+                  className="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm text-slate-200 transition-colors disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button type="button" onClick={confirmarRenovar} disabled={renovando}
+                  className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 text-sm font-bold text-white transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2">
+                  {renovando
+                    ? <><span className="w-4 h-4 rounded-full border-2 border-white/50 border-t-transparent animate-spin" /> Renovando…</>
+                    : <><HiRefresh className="w-4 h-4" /> Confirmar renovación</>}
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

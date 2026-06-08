@@ -421,11 +421,16 @@ export const updatePoliza = createAsyncThunk(
 
 export const renovarPoliza = createAsyncThunk(
   "polizas/renovarPoliza",
-  async ({ id, nuevoPrecio, nuevoNumero }, { rejectWithValue, signal }) => {
+  async ({ id, nuevoPrecio, nuevoNumero, nuevaFecha, mantenerDiaVencimiento }, { rejectWithValue, signal }) => {
     try {
+      const body = { nuevo_precio: nuevoPrecio, nuevo_numero: nuevoNumero };
+      // Solo se mandan si vienen (los usa la renovación rápida de Pagos).
+      // El módulo de Renovaciones llama sin estos y funciona igual que antes.
+      if (nuevaFecha) body.nueva_fecha = nuevaFecha;                 // alta = fecha elegida (hoy)
+      if (mantenerDiaVencimiento) body.mantener_dia_vencimiento = true; // cuotas en el día histórico
       const res = await api.post(
         `polizas/${id}/renovar/`,
-        { nuevo_precio: nuevoPrecio, nuevo_numero: nuevoNumero },
+        body,
         { signal }
       );
       return { id, response: res.data };
