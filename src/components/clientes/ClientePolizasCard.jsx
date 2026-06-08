@@ -1,5 +1,6 @@
 // src/components/clientes/ClientePolizasCard.jsx
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { 
   HiCollection, 
   HiPlus, 
@@ -147,14 +148,12 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
 
                     {/* Acción / Footer de la tarjeta */}
                     <div className="pt-3 border-t border-white/5 mt-auto">
-                      <a
-                        href={`/polizas/${p.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link
+                        to={`/polizas/${p.id}`}
                         className="w-full h-10 rounded-xl cursor-pointer bg-white/5 text-white/80 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all border border-white/10 flex items-center justify-center gap-2"
                       >
                         Ver Detalle de Póliza <HiArrowRight />
-                      </a>
+                      </Link>
                     </div>
                   </motion.li>
                 );
