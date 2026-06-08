@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import {
   HiUser, HiShieldCheck, HiExclamation, HiLockClosed,
   HiDocumentDownload, HiTruck, HiChevronRight, HiClipboardList,
+  HiClipboard, HiClipboardCheck,
 } from "react-icons/hi";
 
 import { useAuth } from "../../context/AuthContext";
@@ -69,6 +70,49 @@ function StatTile({ label, value, hint, tone = "slate" }) {
       <div className={labelCls}>{label}</div>
       <div className={`mt-1 text-lg font-bold tabular-nums ${t.text}`}>{value}</div>
       {hint ? <div className="mt-0.5 text-[11px] text-slate-500">{hint}</div> : null}
+    </div>
+  );
+}
+
+/* ===================== Celda copiable (datos del vehículo) ===================== */
+function CopiableField({ label, value, mono = false, pre = false, className = "" }) {
+  const [copied, setCopied] = useState(false);
+  const isEmpty = !value || value === "—";
+
+  const copiar = async () => {
+    if (isEmpty) return;
+    try {
+      await navigator.clipboard.writeText(String(value));
+      setCopied(true);
+      toast.success(`${label} copiado`);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  };
+
+  return (
+    <div className={`relative rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 ${className}`}>
+      <div className={labelCls}>{label}</div>
+      <div
+        className={`text-sm font-medium text-white pr-8 ${mono ? "font-mono break-all" : ""} ${pre ? "whitespace-pre-wrap" : ""}`}
+      >
+        {value}
+      </div>
+      {!isEmpty ? (
+        <button
+          type="button"
+          onClick={copiar}
+          title={`Copiar ${label}`}
+          className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-700 bg-slate-800/60 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white active:scale-90"
+        >
+          {copied ? (
+            <HiClipboardCheck className="h-3.5 w-3.5 text-emerald-400" />
+          ) : (
+            <HiClipboard className="h-3.5 w-3.5" />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -269,42 +313,20 @@ export default function PolizaResumenSection({ poliza, polizaId, onOpenCuotas, o
           </div>
           <div className="text-base font-semibold text-white">{marca} {modelo}</div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>Patente</div>
-              <div className="font-mono text-sm font-medium text-white">{patente}</div>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>Año</div>
-              <div className="text-sm font-medium text-white">{anio}</div>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>Tipo</div>
-              <div className="text-sm font-medium text-white">{tipoVehiculo}</div>
-            </div>
+            <CopiableField label="Marca" value={marca} />
+            <CopiableField label="Modelo" value={modelo} />
+            <CopiableField label="Patente" value={patente} mono />
+            <CopiableField label="Año" value={anio} />
+            <CopiableField label="Tipo" value={tipoVehiculo} />
 
             {/* 🚀 Datos técnicos (cargados en la solicitud) */}
-            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>Combustible</div>
-              <div className="text-sm font-medium text-white">{combustible}</div>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>Carrocería</div>
-              <div className="text-sm font-medium text-white">{carroceria}</div>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>N° de Chasis</div>
-              <div className="font-mono text-sm font-medium text-white break-all">{numeroChasis}</div>
-            </div>
-            <div className="col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-              <div className={labelCls}>N° de Motor</div>
-              <div className="font-mono text-sm font-medium text-white break-all">{numeroMotor}</div>
-            </div>
+            <CopiableField label="Combustible" value={combustible} />
+            <CopiableField label="Carrocería" value={carroceria} />
+            <CopiableField label="N° de Chasis" value={numeroChasis} mono className="col-span-2" />
+            <CopiableField label="N° de Motor" value={numeroMotor} mono className="col-span-2" />
 
             {observaciones ? (
-              <div className="col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
-                <div className={labelCls}>Observaciones</div>
-                <div className="text-sm font-medium text-white whitespace-pre-wrap">{observaciones}</div>
-              </div>
+              <CopiableField label="Observaciones" value={observaciones} pre className="col-span-2" />
             ) : null}
           </div>
         </Card>
