@@ -18,6 +18,7 @@ import RenovacionesPolizasPanel from "../components/estadisticas/RenovacionesPol
 
 import CalidadDatosPanel from "../components/estadisticas/CalidadDatosPanel";
 import DuplicadosPolizasPanel from "../components/estadisticas/DuplicadosPolizasPanel";
+import ControlFechasPanel from "../components/estadisticas/ControlFechasPanel";
 import DuplicadosClientesPanel from "../components/estadisticas/DuplicadosClientesPanel";
 import AuditoriaMontosPanel from "../components/estadisticas/AuditoriaMontosPanel";
 import PagosDuplicadosPanel from "../components/estadisticas/PagosDuplicadosPanel";
@@ -427,6 +428,7 @@ export default function EstadisticasPage() {
           <TabButton active={tab === "general"} onClick={() => setTab("general")}>General</TabButton>
           <TabButton active={tab === "calidad"} onClick={() => setTab("calidad")}>Calidad de datos</TabButton>
           <TabButton active={tab === "duplicados"} onClick={() => setTab("duplicados")}>Duplicados</TabButton>
+          <TabButton active={tab === "fechas"} onClick={() => setTab("fechas")}>Control de Fechas</TabButton>
           <TabButton active={tab === "asegurados"} onClick={() => setTab("asegurados")}>Asegurados</TabButton>
           <TabButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")}>Contabilidad</TabButton>
           <TabButton active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>Cobranzas</TabButton>
@@ -472,6 +474,12 @@ export default function EstadisticasPage() {
                 ? <DuplicadosClientesPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
                 : <DuplicadosPolizasPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
               }
+            </motion.div>
+          )}
+
+          {tab === "fechas" && (
+            <motion.div key="fechas" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+              <ControlFechasPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
             </motion.div>
           )}
 

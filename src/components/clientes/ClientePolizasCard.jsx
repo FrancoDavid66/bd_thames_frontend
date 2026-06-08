@@ -1,5 +1,4 @@
 // src/components/clientes/ClientePolizasCard.jsx
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   HiCollection, 
@@ -10,11 +9,16 @@ import {
 } from "react-icons/hi";
 
 const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
-  const navigate = useNavigate();
+  // 🚀 Ordenamos: la póliza MÁS NUEVA primero. Criterio: fecha de emisión más reciente;
+  // si dos comparten fecha, gana la de mayor ID (la que se creó después).
+  const polizas = [...(cliente?.polizas || [])].sort((a, b) => {
+    const fa = a?.fecha_emision ? new Date(a.fecha_emision).getTime() : 0;
+    const fb = b?.fecha_emision ? new Date(b.fecha_emision).getTime() : 0;
+    if (fb !== fa) return fb - fa;
+    return (Number(b?.id) || 0) - (Number(a?.id) || 0);
+  });
 
-  const polizas = cliente?.polizas || [];
   const handleCrear = () => onCrearPoliza?.();
-  const goDetalle = (id) => navigate(`/polizas/${id}`);
 
   const fmt = (v) => (v === 0 || v ? String(v) : "—");
   const upper = (v) => (v ? String(v).toUpperCase() : "—");
@@ -71,8 +75,9 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
             </div>
           ) : (
             <ul className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {polizas.map((p) => {
+              {polizas.map((p, idx) => {
                 const titulo = `${fmt(p.compania)} · ${fmt(p.numero_poliza || "S/N")}`;
+                const esMasReciente = idx === 0 && polizas.length > 1;
                 const estado = p.estado && typeof p.estado === "string" ? p.estado.toLowerCase() : p.estado;
 
                 const estadoClass = estado === "activa"
@@ -103,9 +108,16 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
                           </p>
                         )}
                       </div>
-                      <span className={`shrink-0 inline-flex items-center rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${estadoClass}`}>
-                        {fmt(p.estado)}
-                      </span>
+                      <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        {esMasReciente && (
+                          <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                            Más reciente
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${estadoClass}`}>
+                          {fmt(p.estado)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Datos del vehículo (Grid responsiva) */}
@@ -135,13 +147,14 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
 
                     {/* Acción / Footer de la tarjeta */}
                     <div className="pt-3 border-t border-white/5 mt-auto">
-                      <button
-                        type="button"
-                        onClick={() => goDetalle(p.id)}
+                      <a
+                        href={`/polizas/${p.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="w-full h-10 rounded-xl cursor-pointer bg-white/5 text-white/80 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all border border-white/10 flex items-center justify-center gap-2"
                       >
                         Ver Detalle de Póliza <HiArrowRight />
-                      </button>
+                      </a>
                     </div>
                   </motion.li>
                 );

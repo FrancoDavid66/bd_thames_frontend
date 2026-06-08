@@ -345,7 +345,9 @@ export default function PolizaStep({
             label="Fecha de emisión"
             type="date"
             value={poliza?.fecha_emision || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, fecha_emision: v }))}
+            onChange={() => {}}
+            disabled={true}
+            helper="Fijada automáticamente en la fecha de hoy"
           />
           <Input
             label="Primer vencimiento"
@@ -367,19 +369,24 @@ export default function PolizaStep({
 }
 
 /* ===================== UI bits ===================== */
-function Input({ label, value, onChange, type = "text", placeholder = "", helper = "", className = "", inputMode, autoComplete, autoCapitalize, pattern }) {
+function Input({ label, value, onChange, type = "text", placeholder = "", helper = "", className = "", inputMode, autoComplete, autoCapitalize, pattern, disabled = false }) {
   return (
     <motion.label
       className={`text-xs sm:text-sm ${className} flex flex-col gap-1.5`}
-      variants={inputVariants} initial="initial" animate="animate" whileHover="hover" whileTap="tap"
+      variants={inputVariants} initial="initial" animate="animate" whileHover={!disabled ? "hover" : ""} whileTap={!disabled ? "tap" : ""}
     >
       <span className="text-white/55 font-bold uppercase text-[10px] tracking-[0.15em] ml-1">{label}</span>
       <input
         type={type} value={value} placeholder={placeholder} inputMode={inputMode} autoComplete={autoComplete} autoCapitalize={autoCapitalize} pattern={pattern}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3.5 text-base outline-none focus:ring-2 ring-sky-500/40 focus:border-sky-500/30 text-white placeholder:text-white/20 transition-all"
+        className={`w-full rounded-2xl border px-4 py-3.5 text-base outline-none transition-all ${
+          disabled
+            ? "bg-black/40 border-white/10 text-white/40 cursor-not-allowed opacity-70"
+            : "bg-black/30 border-white/10 text-white placeholder:text-white/20 focus:ring-2 ring-sky-500/40 focus:border-sky-500/30"
+        }`}
       />
-      {helper && <span className="mt-1 block text-[10px] text-white/40 font-medium italic">{helper}</span>}
+      {helper && <span className={`mt-1 block text-[10px] font-medium italic ${disabled ? "text-emerald-400/60" : "text-white/40"}`}>{helper}</span>}
     </motion.label>
   );
 }
