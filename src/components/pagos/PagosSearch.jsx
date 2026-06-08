@@ -317,30 +317,27 @@ export default function PagosSearch({ onBuscar }) {
         )}
       </AnimatePresence>
 
-      {/* BUSCADOR HERO */}
-      <div className="relative group">
-        <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary-500/20 via-emerald-500/10 to-primary-500/20 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 blur-sm pointer-events-none" />
-        <form onSubmit={handleSubmit}
-          className="relative flex items-center gap-3 bg-slate-950/80 border border-slate-700/60 group-focus-within:border-primary-500/40 rounded-2xl px-5 py-4 transition-all duration-200">
-          {busy
-            ? <span className="w-6 h-6 rounded-full border-2 border-primary-400/60 border-t-transparent animate-spin shrink-0" />
-            : <HiSearch className="w-6 h-6 text-slate-500 group-focus-within:text-primary-400 transition-colors shrink-0" />}
-          <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Escape") limpiar(); }}
-            placeholder="DNI o patente del cliente…"
-            className="flex-1 bg-transparent text-lg text-slate-100 placeholder:text-slate-600 outline-none min-w-0" />
-          {query && (
-            <button type="button" onClick={limpiar}
-              className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-600 hover:text-slate-300 transition-colors shrink-0">
-              <HiX className="w-5 h-5" />
-            </button>
-          )}
-          <button type="submit" disabled={busy || !query}
-            className="shrink-0 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-40 text-white text-sm font-semibold transition-colors">
-            Buscar
+      {/* BUSCADOR */}
+      <form onSubmit={handleSubmit}
+        className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 focus-within:border-primary-500/50 rounded-2xl px-5 py-4 transition-colors duration-200">
+        {busy
+          ? <span className="w-6 h-6 rounded-full border-2 border-primary-400/60 border-t-transparent animate-spin shrink-0" />
+          : <HiSearch className="w-6 h-6 text-slate-500 shrink-0" />}
+        <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") limpiar(); }}
+          placeholder="Buscar por DNI o patente…"
+          className="flex-1 bg-transparent text-lg text-slate-100 placeholder:text-slate-500 outline-none min-w-0" />
+        {query && (
+          <button type="button" onClick={limpiar}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors shrink-0">
+            <HiX className="w-5 h-5" />
           </button>
-        </form>
-      </div>
+        )}
+        <button type="submit" disabled={busy || !query}
+          className="shrink-0 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors">
+          Buscar
+        </button>
+      </form>
 
       {/* Recientes */}
       <AnimatePresence>
@@ -399,36 +396,30 @@ export default function PagosSearch({ onBuscar }) {
 
                 return (
                   <motion.button key={pid || idx} type="button"
-                    initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: idx * 0.04 }}
                     onClick={() => handleCardClick(p)}
-                    className={`w-full text-left rounded-2xl border p-4 transition-all duration-150 bg-slate-900/50 hover:bg-slate-800/50 cursor-pointer ${styles.ring}`}>
+                    className={`group/card w-full text-left rounded-2xl border p-4 transition-colors duration-150 bg-slate-900/40 hover:bg-slate-800/50 cursor-pointer ${styles.ring}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-sm font-bold text-white tracking-widest bg-slate-800/80 border border-slate-700/40 px-2.5 py-0.5 rounded-lg">
+                          <span className="font-mono text-sm font-bold text-white tracking-widest bg-slate-800 px-2.5 py-1 rounded-lg">
                             {p?.patente || "—"}
                           </span>
-                          <span className="text-sm text-slate-400 truncate">{p?.compania || "—"}</span>
+                          <span className="text-sm text-slate-300 truncate">{p?.compania || "—"}</span>
                         </div>
-                        {p?.modelo && <div className="text-xs text-slate-500 mt-1.5 truncate">{p.modelo}</div>}
-                        <div className="flex items-center gap-2 mt-2.5">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`} />
-                          <span className={`text-[11px] font-semibold ${styles.badge.split(" ").find(c => c.startsWith("text-"))}`}>
-                            {st.label}
+                        {p?.modelo && <div className="text-xs text-slate-500 mt-2 truncate">{p.modelo}</div>}
+                        <div className="mt-3">
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${styles.badge}`}>
+                            <Icon className="w-3.5 h-3.5" />{st.label}
                           </span>
-                          {needsAlert && (
-                            <span className="text-[10px] text-slate-600 flex items-center gap-0.5">
-                              <HiExclamationCircle className="w-3 h-3" /> Ver detalle
-                            </span>
-                          )}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${styles.badge}`}>
-                          <Icon className="w-3 h-3" />{st.label}
-                        </span>
-                        <HiOutlineChevronRight className="w-4 h-4 text-slate-600" />
+                      <div className="flex flex-col items-end justify-between gap-2 shrink-0 self-stretch">
+                        {needsAlert
+                          ? <span className="inline-flex items-center gap-1 text-[10px] text-slate-500"><HiExclamationCircle className="w-3.5 h-3.5" /> Ver detalle</span>
+                          : <span className="text-[10px] text-slate-600">Ver cuotas</span>}
+                        <HiOutlineChevronRight className="w-5 h-5 text-slate-600 group-hover/card:text-slate-400 transition-colors" />
                       </div>
                     </div>
                   </motion.button>

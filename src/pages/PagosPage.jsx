@@ -1059,7 +1059,7 @@ const PagosPage = () => {
                   onClick={() => setShowRecordatoriosModal(true)}
                   whileHover={{ scale: 1.06 }}
                   whileTap={{ scale: 0.96 }}
-                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-slate-900 shadow-[0_0_32px_rgba(37,211,102,0.9)] cursor-pointer border border-emerald-200/80"
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-slate-900 shadow-sm cursor-pointer border border-emerald-200/80"
                   style={{ backgroundColor: "#25D366" }}
                 >
                   <HiSpeakerphone className="text-base sm:text-lg" />
@@ -1072,7 +1072,7 @@ const PagosPage = () => {
                   onClick={() => setShowReporteModal(true)}
                   whileHover={{ scale: 1.06 }}
                   whileTap={{ scale: 0.96 }}
-                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] cursor-pointer border border-sky-500/50 bg-sky-600 hover:bg-sky-500 transition-colors"
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-sm cursor-pointer border border-sky-500/50 bg-sky-600 hover:bg-sky-500 transition-colors"
                 >
                   <HiChartBar className="text-base sm:text-lg" />
                   <span className="hidden sm:inline">Efectividad</span>
@@ -1084,7 +1084,7 @@ const PagosPage = () => {
                   onClick={() => setShowContactosModal(true)}
                   whileHover={{ scale: 1.06 }}
                   whileTap={{ scale: 0.96 }}
-                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] cursor-pointer border border-violet-500/50 bg-violet-600 hover:bg-violet-500 transition-colors"
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-sm cursor-pointer border border-violet-500/50 bg-violet-600 hover:bg-violet-500 transition-colors"
                   title="Descargar listado de clientes para contactar manualmente"
                 >
                   <HiDownload className="text-base sm:text-lg" />
@@ -1103,7 +1103,7 @@ const PagosPage = () => {
               onClick={() => handleChangeTab("pagos")}
               className={`flex-1 sm:flex-none relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 tab === "pagos"
-                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                  ? "bg-emerald-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-100"
               }`}
             >
@@ -1115,7 +1115,7 @@ const PagosPage = () => {
               onClick={() => handleChangeTab("historial_pagos")}
               className={`flex-1 sm:flex-none relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 tab === "historial_pagos"
-                  ? "bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20"
+                  ? "bg-sky-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-100"
               }`}
             >

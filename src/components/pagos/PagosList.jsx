@@ -1257,10 +1257,10 @@ const CuotaRow = memo(
               {!cuota?.pagado ? (
                 <button
                   onClick={() => abrirPagar(cuota)}
-                  className={`w-full h-10 px-4 rounded-lg border transition-colors inline-flex items-center justify-center gap-2 font-semibold text-sm ${
+                  className={`w-full h-11 px-4 rounded-lg border transition-colors inline-flex items-center justify-center gap-2 font-semibold text-sm ${
                     isPolicyVencida
-                      ? "bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 border-amber-800"
-                      : "bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 border-emerald-800"
+                      ? "bg-amber-500 hover:bg-amber-400 text-white border-amber-400 shadow-sm shadow-amber-500/20"
+                      : "bg-emerald-500 hover:bg-emerald-400 text-white border-emerald-400 shadow-sm shadow-emerald-500/20"
                   }`}
                 >
                   <HiCash className="w-4 h-4" />
