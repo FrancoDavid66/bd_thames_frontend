@@ -292,8 +292,17 @@ export default function PagosSearch({ onBuscar }) {
         await dispatch(fetchBuscarClientePorDni({ dni }));
       }
     } catch (err) {
-      const msg = err?.detail || err?.message || err?.error;
-      toast.error(typeof msg === "string" && msg ? msg : "No se pudo renovar.");
+      // El backend devuelve errores estructurados: { error, message, detail }
+      const be = err?.raw || err?.response?.data || err?.data || (typeof err === "object" ? err : null);
+      const code = be?.error;
+      if (code === "POLIZA_YA_RENOVADA") {
+        toast.error("Esta póliza ya fue renovada. Buscá la póliza nueva para cobrarla.");
+      } else if (code === "POLIZA_FINALIZADA") {
+        toast.error(be?.message || "La póliza ya está finalizada.");
+      } else {
+        const msg = be?.detail || be?.message || (typeof err === "string" ? err : "");
+        toast.error(msg || "No se pudo renovar.");
+      }
     } finally {
       setRenovando(false);
     }
