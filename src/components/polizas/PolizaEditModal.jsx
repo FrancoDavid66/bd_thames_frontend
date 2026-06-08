@@ -1,17 +1,12 @@
 // src/components/polizas/PolizaEditModal.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiX, HiDocumentText } from "react-icons/hi";
 import toast from "react-hot-toast";
 
-import { usePolizaForm } from "../../hooks/polizas/usePolizaForm";
-import { formatearYEnviarPoliza } from "../../utils/polizas/formUtils";
-
-// 🚀 IMPORTAMOS REDUX DIRECTAMENTE PARA HACER EL BYPASS
 import { useDispatch } from "react-redux";
 import { updatePoliza } from "../../store/slices/polizasSlice";
 
-// 🚀 IMPORTACIONES DE SEGURIDAD Y API
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import { PolizasAPI } from "../../api/polizas";
@@ -19,78 +14,167 @@ import { PolizasAPI } from "../../api/polizas";
 const modalVariants = {
   initial: { opacity: 0, scale: 0.9, y: -20 },
   animate: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", damping: 25, stiffness: 300 } },
-  exit: { opacity: 0, scale: 0.95, y: 10, transition: { duration: 0.2, ease: "easeInOut" } }
+  exit: { opacity: 0, scale: 0.95, y: 10, transition: { duration: 0.2, ease: "easeInOut" } },
 };
+
+const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
+
+// Campos que se muestran en el formulario (en orden)
+const CAMPOS = [
+  "compania",
+  "numero_poliza",
+  "cobertura",
+  "oficina",
+  "patente",
+  "marca",
+  "modelo",
+  "anio",
+  "tipo",
+];
+
+const LABELS = {
+  compania: "Compañía",
+  numero_poliza: "Número de póliza",
+  cobertura: "Cobertura",
+  oficina: "Oficina",
+  patente: "Patente",
+  marca: "Marca",
+  modelo: "Modelo",
+  anio: "Año",
+  tipo: "Tipo",
+};
+
+const capitalizar = (v) =>
+  typeof v === "string" && v.length ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : v;
 
 const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
   const { user } = useAuth();
-  const dispatch = useDispatch(); // 🚀 Iniciamos el dispatch de Redux
-  
-  const {
-    formData,
-    handleChange,
-    modo,
-  } = usePolizaForm({
-    poliza,
-    onSuccess,
-    onClose,
-  });
+  const dispatch = useDispatch();
+
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
   const [companias, setCompanias] = useState([]);
   const [coberturas, setCoberturas] = useState([]);
   const [oficinas, setOficinas] = useState([]);
-  const [saving, setSaving] = useState(false); // Estado de carga local
+  const [saving, setSaving] = useState(false);
 
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+  // 🚀 Estado propio del formulario (sin hooks externos que se pisen)
+  const [formData, setFormData] = useState({});
 
+  // Cargar formulario cuando llega la póliza
   useEffect(() => {
-    if (isOpen) {
-      api.get("companias/").then(res => {
-        const arr = Array.isArray(res.data) ? res.data : (res.data?.results || []);
-        setCompanias(arr.filter(c => c.activa).map(c => c.nombre));
-      }).catch(console.warn);
-      
-      api.get("coberturas/").then(res => {
-        const arr = Array.isArray(res.data) ? res.data : (res.data?.results || []);
-        setCoberturas(arr.filter(c => c.activa).map(c => c.nombre));
-      }).catch(console.warn);
+    if (poliza) {
+      setFormData({
+        compania: poliza.compania || "",
+        numero_poliza: poliza.numero_poliza || "",
+        cobertura: poliza.cobertura || "",
+        oficina: poliza.oficina ?? "",
+        patente: poliza.patente || "",
+        marca: poliza.marca || "",
+        modelo: poliza.modelo || "",
+        anio: poliza.anio ?? "",
+        tipo: poliza.tipo || "Auto",
+      });
+    }
+  }, [poliza]);
 
-      if (isWebAdmin) {
-        PolizasAPI.listOficinas().then(res => {
-            setOficinas(Array.isArray(res) ? res : res.results || []);
-        }).catch(console.warn);
-      }
+  // Cargar catálogos al abrir
+  useEffect(() => {
+    if (!isOpen) return;
+
+    api
+      .get("companias/")
+      .then((res) => {
+        const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        setCompanias(arr.filter((c) => c.activa).map((c) => c.nombre));
+      })
+      .catch(console.warn);
+
+    api
+      .get("coberturas/")
+      .then((res) => {
+        const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        setCoberturas(arr.filter((c) => c.activa).map((c) => c.nombre));
+      })
+      .catch(console.warn);
+
+    if (isWebAdmin) {
+      PolizasAPI.listOficinas()
+        .then((res) => setOficinas(Array.isArray(res) ? res : res.results || []))
+        .catch(console.warn);
     }
   }, [isOpen, isWebAdmin]);
 
-  const tiposVehiculo = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
+  // 🛡️ Inyectamos SIEMPRE el valor actual como opción, aunque el catálogo venga vacío.
+  // Así el select nunca aparece en blanco ni pisa el dato real con "".
+  const opcionesCompania = useMemo(() => {
+    const set = new Set([poliza?.compania, ...companias].filter(Boolean));
+    return Array.from(set);
+  }, [companias, poliza?.compania]);
 
-  // 🚀 EL BYPASS DEFINITIVO
-  const handleSubmitModificado = async (e) => {
+  const opcionesCobertura = useMemo(() => {
+    const set = new Set([poliza?.cobertura, ...coberturas].filter(Boolean));
+    return Array.from(set);
+  }, [coberturas, poliza?.cobertura]);
+
+  const handleChange = (e) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!poliza?.id) return;
 
-    // 1. Creamos una función interceptora. 
-    // formUtils va a formatear los datos y nos los va a pasar por acá.
-    const submitReal = async (datosFormateados) => {
-      setSaving(true);
-      // 2. Le inyectamos el ID a la fuerza al payload formateado
-      const payload = { ...datosFormateados, id: poliza.id };
-      
-      try {
-        // 3. Despachamos la actualización directamente a Redux
-        await dispatch(updatePoliza(payload)).unwrap();
-        toast.success("Póliza actualizada exitosamente");
-        if (onSuccess) onSuccess();
-        if (onClose) onClose();
-      } catch (error) {
-        toast.error(error?.message || "Error al editar la póliza");
-      } finally {
-        setSaving(false);
-      }
+    // Validación mínima
+    const requeridos = ["compania", "cobertura", "patente", "marca", "modelo", "anio"];
+    const faltan = requeridos.filter((k) => !String(formData[k] ?? "").trim());
+    if (faltan.length) {
+      toast.error(`Faltan completar: ${faltan.map((k) => LABELS[k] || k).join(", ")}`);
+      return;
+    }
+
+    // 🚀 Payload limpio. PATCH parcial: solo mando lo editable.
+    // NO mando fechas ni campos derivados (eso rompía el guardado).
+    const numero = String(formData.numero_poliza || "").trim();
+    const payload = {
+      id: poliza.id,
+      compania: formData.compania,
+      cobertura: formData.cobertura,
+      patente: String(formData.patente || "").toUpperCase().trim(),
+      marca: String(formData.marca || "").trim(),
+      modelo: String(formData.modelo || "").trim(),
+      anio: formData.anio ? Number(formData.anio) : null,
+      tipo: capitalizar(formData.tipo) || "Auto",
+      numero_poliza: numero || null,
     };
 
-    // Le decimos a formUtils: "Formateá los datos y mandáselos a mi 'submitReal' en vez de al hook original"
-    formatearYEnviarPoliza(formData, submitReal, e);
+    // Si no hay número, marcamos sin_numero
+    if (!numero) payload.sin_numero = true;
+
+    // Oficina: solo si sos admin y la cambiaste (evita pisar con un id que no matchea)
+    if (isWebAdmin && formData.oficina && String(formData.oficina) !== String(poliza.oficina ?? "")) {
+      payload.oficina = formData.oficina;
+    }
+
+    setSaving(true);
+    try {
+      await dispatch(updatePoliza(payload)).unwrap();
+      toast.success("Póliza actualizada correctamente");
+      onSuccess?.();
+      onClose?.();
+    } catch (err) {
+      // Mostramos el error del backend si vino con shape { campo: ['msg'] }
+      const apiErr = err?.response?.data || err;
+      if (apiErr && typeof apiErr === "object" && !Array.isArray(apiErr)) {
+        const firstKey = Object.keys(apiErr)[0];
+        const firstVal = Array.isArray(apiErr[firstKey]) ? apiErr[firstKey][0] : apiErr[firstKey];
+        toast.error(firstKey ? `${firstKey}: ${firstVal}` : "Error al editar la póliza");
+      } else {
+        toast.error(typeof apiErr === "string" ? apiErr : "Error al editar la póliza");
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!isOpen || !poliza) return null;
@@ -113,17 +197,17 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
           {/* Header */}
           <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#010409]/80 backdrop-blur">
             <div className="flex items-center gap-3">
-                 <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0 shadow-inner">
-                    <HiDocumentText className="text-xl" />
-                 </div>
-                 <div>
-                    <h2 className="text-base sm:text-xl font-black text-white uppercase tracking-widest leading-none mb-1.5">
-                      Editar Póliza
-                    </h2>
-                    <p className="text-[10px] font-bold text-amber-400/80 uppercase tracking-wider">
-                       ID Sistema: {poliza.id}
-                    </p>
-                 </div>
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0 shadow-inner">
+                <HiDocumentText className="text-xl" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-xl font-black text-white uppercase tracking-widest leading-none mb-1.5">
+                  Editar Póliza
+                </h2>
+                <p className="text-[10px] font-bold text-amber-400/80 uppercase tracking-wider">
+                  ID Sistema: {poliza.id}
+                </p>
+              </div>
             </div>
             <button
               type="button"
@@ -136,68 +220,74 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-6 bg-black/10">
-            <form
-              onSubmit={handleSubmitModificado}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5"
-            >
-              {[
-                "compania",
-                "numero_poliza",
-                "cobertura",
-                "oficina",
-                "patente",
-                "marca",
-                "modelo",
-                "anio",
-                "tipo",
-                "primer_pago", // 🚀 Eliminado precio_cuota
-              ].map((key) => {
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+              {CAMPOS.map((key) => {
                 const isOficinaField = key === "oficina";
-                const isPrimerPago = key === "primer_pago";
-                const isDisabled = (isOficinaField && !isWebAdmin) || (isPrimerPago && modo === "edit");
+                const isDisabled = isOficinaField && !isWebAdmin;
+                const esSelect = ["compania", "oficina", "cobertura", "tipo"].includes(key);
 
                 return (
                   <div key={key} className="flex flex-col gap-1.5">
                     <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-                      {key.replace("_", " ")}
-                      {isOficinaField && !isWebAdmin && <span className="ml-2 text-amber-500">(Solo Admin)</span>}
+                      {LABELS[key] || key.replace("_", " ")}
+                      {isOficinaField && !isWebAdmin && (
+                        <span className="ml-2 text-amber-500">(Solo Admin)</span>
+                      )}
                     </label>
 
-                    {["compania", "oficina", "cobertura", "tipo"].includes(key) ? (
+                    {esSelect ? (
                       <div className="relative group">
-                          <select
-                            name={key}
-                            value={formData[key] || ""}
-                            onChange={handleChange}
-                            disabled={isDisabled}
-                            className={`cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 pr-9 outline-none transition-all font-medium appearance-none ${
-                              isDisabled ? 'bg-black/40 text-white/30 cursor-not-allowed opacity-70' : 'bg-black/40 text-white focus:ring-2 ring-emerald-500/40 hover:bg-white/5'
-                            }`}
-                          >
-                            <option value="" className="bg-[#0f1324]">— Seleccionar —</option>
-                            {key === "oficina" ? (
-                              oficinas.map((opt) => (
-                                <option key={opt.id} value={opt.id} className="bg-[#0f1324]">{opt.nombre}</option>
-                              ))
-                            ) : (
-                              (key === "compania" ? companias : key === "cobertura" ? coberturas : tiposVehiculo).map((opt) => (
-                                <option key={opt} value={opt} className="bg-[#0f1324]">{opt}</option>
-                              ))
-                            )}
-                          </select>
-                          {!isDisabled && <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors">▾</span>}
+                        <select
+                          name={key}
+                          value={formData[key] ?? ""}
+                          onChange={handleChange}
+                          disabled={isDisabled}
+                          className={`cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 pr-9 outline-none transition-all font-medium appearance-none ${
+                            isDisabled
+                              ? "bg-black/40 text-white/30 cursor-not-allowed opacity-70"
+                              : "bg-black/40 text-white focus:ring-2 ring-emerald-500/40 hover:bg-white/5"
+                          }`}
+                        >
+                          <option value="" className="bg-[#0f1324]">
+                            — Seleccionar —
+                          </option>
+
+                          {key === "oficina" ? (
+                            oficinas.map((opt) => (
+                              <option key={opt.id} value={opt.id} className="bg-[#0f1324]">
+                                {opt.nombre}
+                              </option>
+                            ))
+                          ) : (
+                            (key === "compania"
+                              ? opcionesCompania
+                              : key === "cobertura"
+                              ? opcionesCobertura
+                              : TIPOS_VEHICULO
+                            ).map((opt) => (
+                              <option key={opt} value={opt} className="bg-[#0f1324]">
+                                {opt}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        {!isDisabled && (
+                          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors">
+                            ▾
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <input
-                        type={key.includes("fecha") || key === "primer_pago" ? "date" : "text"}
+                        type={key === "anio" ? "text" : "text"}
+                        inputMode={key === "anio" ? "numeric" : undefined}
                         name={key}
-                        value={formData[key] || ""}
+                        value={formData[key] ?? ""}
                         onChange={handleChange}
-                        disabled={isDisabled}
-                        className={`cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-medium ${
-                          isDisabled ? 'bg-black/40 text-white/30 cursor-not-allowed opacity-70' : 'bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-emerald-500/40 hover:bg-white/5'
-                        }`}
-                        placeholder={key.includes("fecha") ? "DD-MM-YYYY" : ""}
+                        className="cursor-text w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-medium bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-emerald-500/40 hover:bg-white/5"
+                        placeholder={
+                          key === "patente" ? "ABC 123" : key === "anio" ? "2024" : ""
+                        }
                       />
                     )}
                   </div>
@@ -219,7 +309,11 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
                   disabled={saving}
                   className="cursor-pointer h-11 px-8 rounded-xl bg-emerald-600 text-white text-xs uppercase font-black hover:bg-emerald-500 shadow-lg shadow-emerald-900/30 active:scale-95 transition-all tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {saving ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : "Guardar Cambios"}
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Guardar Cambios"
+                  )}
                 </button>
               </div>
             </form>
