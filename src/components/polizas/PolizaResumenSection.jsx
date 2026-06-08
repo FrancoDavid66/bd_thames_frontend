@@ -180,6 +180,13 @@ export default function PolizaResumenSection({ poliza, polizaId, onOpenCuotas, o
   const anio = safe(poliza?.anio);
   const tipoVehiculo = safe(poliza?.tipo, "Auto");
 
+  /* ---- Datos técnicos del vehículo (cargados en la solicitud) ---- */
+  const combustible = safe(poliza?.combustible);
+  const carroceria = safe(poliza?.carroceria);
+  const numeroChasis = safe(upper(poliza?.numero_chasis));
+  const numeroMotor = safe(upper(poliza?.numero_motor));
+  const observaciones = pick(poliza?.observaciones);
+
   /* ---- Documento ---- */
   const docRaw = poliza?.documento_url || poliza?.archivo_poliza || poliza?.documento || poliza?.pdf_url || null;
   const documentoPoliza = typeof docRaw === "string" ? docRaw : docRaw?.url || null;
@@ -270,10 +277,35 @@ export default function PolizaResumenSection({ poliza, polizaId, onOpenCuotas, o
               <div className={labelCls}>Año</div>
               <div className="text-sm font-medium text-white">{anio}</div>
             </div>
-            <div className="col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
               <div className={labelCls}>Tipo</div>
               <div className="text-sm font-medium text-white">{tipoVehiculo}</div>
             </div>
+
+            {/* 🚀 Datos técnicos (cargados en la solicitud) */}
+            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+              <div className={labelCls}>Combustible</div>
+              <div className="text-sm font-medium text-white">{combustible}</div>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+              <div className={labelCls}>Carrocería</div>
+              <div className="text-sm font-medium text-white">{carroceria}</div>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+              <div className={labelCls}>N° de Chasis</div>
+              <div className="font-mono text-sm font-medium text-white break-all">{numeroChasis}</div>
+            </div>
+            <div className="col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+              <div className={labelCls}>N° de Motor</div>
+              <div className="font-mono text-sm font-medium text-white break-all">{numeroMotor}</div>
+            </div>
+
+            {observaciones ? (
+              <div className="col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+                <div className={labelCls}>Observaciones</div>
+                <div className="text-sm font-medium text-white whitespace-pre-wrap">{observaciones}</div>
+              </div>
+            ) : null}
           </div>
         </Card>
 
