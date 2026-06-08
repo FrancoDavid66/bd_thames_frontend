@@ -205,7 +205,7 @@ export default function RenovacionModal({
             </div>
 
             <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">Nueva fecha (primer pago)</label>
+              <label className="text-xs font-semibold text-white/90">Inicio de vigencia (alta)</label>
               <input
                 type="date"
                 value={nuevaFecha}
@@ -213,7 +213,7 @@ export default function RenovacionModal({
                 className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
               />
               <div className="text-xs text-white/60">
-                Por defecto: el mismo día que vence la última cuota de la póliza actual.
+                Es el día que <strong className="text-white/80">arranca la cobertura</strong>. Por defecto, el día que vence la última cuota de la póliza actual (así no queda hueco). La <strong className="text-white/80">1ª cuota vence un mes después</strong>.
               </div>
             </div>
 

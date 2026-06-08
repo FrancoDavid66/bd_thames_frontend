@@ -168,6 +168,23 @@ function UserView({ user }) {
     const sucursal   = balanceDia.scope?.oficina_nombre || "Sucursal";
     const ahora      = dayjs().format("DD/MM/YYYY HH:mm:ss");
 
+    // 🚀 Detalle de ingresos EN EFECTIVO (nombre, monto, hora) para el ticket
+    const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const detalleEfe = Array.isArray(balanceDia.ingresos?.detalle_efectivo)
+      ? balanceDia.ingresos.detalle_efectivo
+      : [];
+    const MAX_NOMBRE = 22;
+    const filasEfe = detalleEfe.map((it) => {
+      const hora = it?.hora || "--:--";
+      let nombre = (it?.pagado_por || "—").toUpperCase();
+      if (nombre.length > MAX_NOMBRE) nombre = nombre.slice(0, MAX_NOMBRE - 1) + "…";
+      const monto = fmtNum(it?.monto || 0);
+      return `<div style="margin-top:7px">
+        <div style="font-size:12px">${esc(hora)} ${esc(nombre)}</div>
+        <div style="text-align:right;font-weight:bold;font-size:13px">$ ${monto}</div>
+      </div>`;
+    }).join("");
+
     const html = `<!DOCTYPE html><html><head><title>Ticket Cierre</title>
     <style>
       @page{margin:0}
@@ -187,9 +204,23 @@ function UserView({ user }) {
     <div style="font-size:12px;margin-top:10px">RESPONSABLE:</div>
     <div class="b" style="font-size:18px;margin-top:4px">${empleadoNombre}</div></div>
     <div class="hr"></div>
+    <div class="c b" style="font-size:13px">INGRESOS EN EFECTIVO</div>
+    <div style="border-bottom:1px solid #000;margin:8px 0"></div>
+    ${filasEfe || '<div class="c" style="font-size:12px">Sin ingresos en efectivo</div>'}
+    <div style="border-bottom:1px solid #000;margin:8px 0"></div>
+    <div class="hr"></div>
     <div class="row b"><span>Ingresos Efe:</span><span>$${ingEfe}</span></div>
     <div class="row b"><span>Egresos Efe:</span><span>-$${egEfe}</span></div>
     <div class="row" style="font-size:12px;margin-top:8px"><span>Operaciones:</span><span>${cantOp}</span></div>
+    <div class="hr"></div>
+    <div style="margin-top:4px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center">
+        <span style="display:inline-block;width:26px;height:26px;border:2px solid #000"></span>
+        <span class="b" style="font-size:13px">CONTADO Y CONTROLADO</span>
+      </div>
+      <div style="margin-top:24px;font-size:12px">Contó: <span style="display:inline-block;border-bottom:1px solid #000;width:165px"></span></div>
+      <div style="margin-top:20px;font-size:12px">Firma: <span style="display:inline-block;border-bottom:1px solid #000;width:165px"></span></div>
+    </div>
     <div class="hr"></div>
     <div class="c" style="font-size:12px">
       <div>CTA: ${(user?.username || "").toUpperCase()}</div>
