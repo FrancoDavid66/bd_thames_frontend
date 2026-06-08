@@ -342,6 +342,13 @@ const PolizaCreateModal = ({ isOpen, onClose, onSuccess, clienteId }) => {
         primer_pago: poliza.primer_vencimiento,
 
         dias_a_vencer: Number(poliza.dias_a_vencer) || 30,
+
+        // 🚀 Datos técnicos del vehículo (cargados en el formulario)
+        combustible: (poliza.combustible || "").trim(),
+        numero_chasis: (poliza.numero_chasis || "").trim().toUpperCase(),
+        numero_motor: (poliza.numero_motor || "").trim().toUpperCase(),
+        carroceria: (poliza.carroceria || "").trim(),
+        observaciones: (poliza.observaciones || "").trim(),
       };
 
       // FOTOS
