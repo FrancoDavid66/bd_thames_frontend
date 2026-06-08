@@ -374,6 +374,27 @@ export const fetchRenovaciones = createAsyncThunk(
   }
 );
 
+// 🆕 Pólizas que recién finalizaron (≤3 días) y todavía no se renovaron.
+// El módulo de Renovaciones normal las esconde; estas se muestran aparte.
+export const fetchRenovacionesRecientes = createAsyncThunk(
+  "renovaciones/fetchRenovacionesRecientes",
+  async (params = {}, { rejectWithValue }) => {
+    const query = buildRenovacionesQuery(stripForce(params));
+    try {
+      const { data } = await api.get(`polizas/renovaciones/recientes/${query}`);
+      const normalized = normalizeRenovacionesResponse(data);
+      return { normalized };
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al cargar recién vencidas";
+      return rejectWithValue({ message: msg, raw: err?.response?.data });
+    }
+  }
+);
+
 export const fetchRenovacionesResumen = createAsyncThunk(
   "renovaciones/fetchRenovacionesResumen",
   async (params = {}, { rejectWithValue, getState }) => {
@@ -538,6 +559,11 @@ const initialState = {
   oficinasError: null,
   oficinasCache: null,
 
+  // 🆕 Recién finalizadas (≤3 días) sin renovar
+  recientes: [],
+  recientesStatus: "idle",
+  recientesError: null,
+
   actionStatusById: {},
   lastActionResult: null,
 };
@@ -685,6 +711,22 @@ const renovacionesSlice = createSlice({
       .addCase(fetchRenovaciones.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload?.message || "Error al cargar renovaciones";
+      })
+
+      // ---------- RECIÉN FINALIZADAS (≤3 días) ----------
+      .addCase(fetchRenovacionesRecientes.pending, (state) => {
+        state.recientesStatus = "loading";
+        state.recientesError = null;
+      })
+      .addCase(fetchRenovacionesRecientes.fulfilled, (state, action) => {
+        state.recientesStatus = "succeeded";
+        state.recientesError = null;
+        state.recientes = action.payload?.normalized?.items || [];
+      })
+      .addCase(fetchRenovacionesRecientes.rejected, (state, action) => {
+        state.recientesStatus = "failed";
+        state.recientesError = action.payload?.message || "Error al cargar recién vencidas";
+        state.recientes = [];
       })
 
       // ---------- RESUMEN ----------
