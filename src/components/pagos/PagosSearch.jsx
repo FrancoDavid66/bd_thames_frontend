@@ -229,6 +229,9 @@ export default function PagosSearch({ onBuscar }) {
 
   const hoyISO = useMemo(() => dayjs().format("YYYY-MM-DD"), []);
   const hoyTxt = useMemo(() => dayjs().format("DD/MM/YYYY"), []);
+  // La cobertura arranca SIEMPRE el día siguiente al pago.
+  const coberturaISO = useMemo(() => dayjs().add(1, "day").format("YYYY-MM-DD"), []);
+  const coberturaTxt = useMemo(() => dayjs().add(1, "day").format("DD/MM/YYYY"), []);
 
   const { buscarClienteData, buscarClienteStatus, cuotasPolizaStatus, cuotasBuscarStatus, recientesDni }
     = useSelector((s) => s.pagos || {});
@@ -279,7 +282,7 @@ export default function PagosSearch({ onBuscar }) {
     try {
       const res = await dispatch(renovarPoliza({
         id: oldId,
-        nuevaFecha: hoyISO,            // alta = hoy
+        nuevaFecha: coberturaISO,     // cobertura arranca mañana (día siguiente al pago)
         mantenerDiaVencimiento: true, // las cuotas conservan el día histórico
       })).unwrap();
       const nuevaId = res?.response?.id || res?.id || res?.response?.poliza_id || null;
@@ -306,7 +309,7 @@ export default function PagosSearch({ onBuscar }) {
     } finally {
       setRenovando(false);
     }
-  }, [renovarTarget, dispatch, hoyISO, traerCuotas, cliente, query]);
+  }, [renovarTarget, dispatch, coberturaISO, traerCuotas, cliente, query]);
 
   const buscarPorDni = useCallback(async (dniRaw) => {
     const d = onlyDigits(dniRaw);
@@ -440,7 +443,11 @@ export default function PagosSearch({ onBuscar }) {
                 const styles = STATUS_STYLES[st.color] || STATUS_STYLES.slate;
                 const Icon   = st.icon;
                 const needsAlert = ["vencida", "baja_reciente", "cancelada"].includes(st.type);
-                const puedeRenovar = st.type === "finalizada";
+                // Renovable: finalizada, sin renovación previa, y que haya finalizado
+                // hace 3 días o menos (tolerancia acordada). Más atraso = póliza nueva.
+                const diasDesdeFin = p?.fecha_fin ? dayjs().diff(dayjs(p.fecha_fin), "day") : null;
+                const dentroDeTolerancia = diasDesdeFin !== null && diasDesdeFin >= 0 && diasDesdeFin <= 3;
+                const puedeRenovar = st.type === "finalizada" && !p?.tiene_renovacion && dentroDeTolerancia;
 
                 return (
                   <div key={pid || idx} className="flex flex-col gap-2">
@@ -475,7 +482,7 @@ export default function PagosSearch({ onBuscar }) {
                   {puedeRenovar && (
                     <button type="button" onClick={() => abrirRenovar(p)}
                       className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold py-2.5 transition-colors">
-                      <HiRefresh className="w-4 h-4" /> Renovar · alta hoy {hoyTxt}
+                      <HiRefresh className="w-4 h-4" /> Renovar
                     </button>
                   )}
                   </div>
@@ -520,8 +527,12 @@ export default function PagosSearch({ onBuscar }) {
                   <span className="font-semibold text-white text-right">{renovarTarget?.compania || "—"} <span className="text-slate-500 font-normal">(la misma)</span></span>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <span className="text-slate-400">Alta (arranca)</span>
-                  <span className="font-semibold text-white">{hoyTxt}</span>
+                  <span className="text-slate-400">Pago</span>
+                  <span className="font-semibold text-white">hoy {hoyTxt}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Cobertura desde</span>
+                  <span className="font-semibold text-emerald-400">{coberturaTxt}</span>
                 </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-slate-400">Vencimiento</span>
