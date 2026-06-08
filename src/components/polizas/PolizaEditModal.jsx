@@ -19,6 +19,11 @@ const modalVariants = {
 
 const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
 const COMBUSTIBLES = ["Nafta", "Diésel", "GNC", "Nafta/GNC", "Eléctrico", "Híbrido"];
+// 🚀 Mismas opciones que el modal de solicitud (PolizaStep)
+const CARROCERIAS = [
+  "Sedán", "Hatchback", "SUV", "Pick-up", "Familiar / Rural",
+  "Coupé", "Furgón", "Utilitario", "Moto", "Otro",
+];
 
 // Datos generales de la póliza (en orden)
 const CAMPOS = [
@@ -132,6 +137,11 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
     const set = new Set([poliza?.combustible, ...COMBUSTIBLES].filter(Boolean));
     return Array.from(set);
   }, [poliza?.combustible]);
+
+  const opcionesCarroceria = useMemo(() => {
+    const set = new Set([poliza?.carroceria, ...CARROCERIAS].filter(Boolean));
+    return Array.from(set);
+  }, [poliza?.carroceria]);
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -356,14 +366,26 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
                     <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
                       {LABELS.carroceria}
                     </label>
-                    <input
-                      type="text"
-                      name="carroceria"
-                      value={formData.carroceria ?? ""}
-                      onChange={handleChange}
-                      className="cursor-text w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-medium bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-sky-500/40 hover:bg-white/5"
-                      placeholder="Sedán, Pick-up, SUV…"
-                    />
+                    <div className="relative group">
+                      <select
+                        name="carroceria"
+                        value={formData.carroceria ?? ""}
+                        onChange={handleChange}
+                        className="cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 pr-9 outline-none transition-all font-medium appearance-none bg-black/40 text-white focus:ring-2 ring-sky-500/40 hover:bg-white/5"
+                      >
+                        <option value="" className="bg-[#0f1324]">
+                          — Seleccionar —
+                        </option>
+                        {opcionesCarroceria.map((opt) => (
+                          <option key={opt} value={opt} className="bg-[#0f1324]">
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors">
+                        ▾
+                      </span>
+                    </div>
                   </div>
 
                   {/* N° de Chasis */}
