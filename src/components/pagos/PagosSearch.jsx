@@ -329,7 +329,17 @@ export default function PagosSearch({ onBuscar }) {
     const items = Array.isArray(res?.items) ? res.items : [];
     onBuscar?.(items, res?.meta || { count: items.length, next: null, previous: null }, q);
     if (!items.length) { toast("No hay cuotas para esa patente."); return; }
-    const dni = onlyDigits(items[0]?.poliza?.cliente?.dni_cuit_cuil || items[0]?.cliente?.dni_cuit_cuil || items[0]?.dni_cuit_cuil || "");
+    const c0 = items[0] || {};
+    const dni = onlyDigits(
+      c0?.poliza?.cliente?.dni_cuit_cuil ||
+      c0?.cliente?.dni_cuit_cuil ||
+      c0?.cliente?.dni ||
+      c0?.cliente_dni_cuit_cuil ||
+      c0?.cliente_dni ||
+      c0?.dni_cuit_cuil ||
+      c0?.dni ||
+      ""
+    );
     if (dni) { try { await dispatch(fetchBuscarClientePorDni({ dni })).unwrap(); } catch {} }
   }, [dispatch, onBuscar]);
 
