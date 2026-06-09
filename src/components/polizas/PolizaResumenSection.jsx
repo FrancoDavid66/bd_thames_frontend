@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import {
   HiUser, HiShieldCheck, HiExclamation, HiLockClosed,
   HiDocumentDownload, HiTruck, HiChevronRight, HiClipboardList,
-  HiClipboard, HiClipboardCheck,
+  HiClipboard, HiClipboardCheck, HiXCircle,
 } from "react-icons/hi";
 
 import { useAuth } from "../../context/AuthContext";
@@ -194,6 +194,66 @@ function StatusStrip({ estadoInicial, polizaId }) {
   );
 }
 
+/* ===================== Banner "No va a renovar" ===================== */
+const MOTIVO_NO_RENUEVA = {
+  CAMBIO_COMPANIA: { label: "Cambió de compañía", emoji: "🏢" },
+  VENDIO_AUTO:     { label: "Vendió el auto",     emoji: "🚗" },
+  NO_QUIERE:       { label: "No quiere seguir",   emoji: "🙅" },
+  NO_CONTESTA:     { label: "No contesta",        emoji: "📵" },
+  NO_PAGO:         { label: "No pagó",            emoji: "💸" },
+  OTRO:            { label: "Otro motivo",        emoji: "❓" },
+};
+
+function fmtFechaHora(v) {
+  if (!v) return "";
+  try {
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return "";
+    const p2 = (n) => String(n).padStart(2, "0");
+    return `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)} a las ${p2(d.getHours())}:${p2(d.getMinutes())} hs`;
+  } catch {
+    return "";
+  }
+}
+
+function NoRenuevaBanner({ poliza }) {
+  if (!poliza?.renovacion_descartada) return null;
+
+  const m = MOTIVO_NO_RENUEVA[poliza.renovacion_descartada_motivo] || {
+    label: poliza.renovacion_descartada_motivo || "Sin especificar",
+    emoji: "❓",
+  };
+  const cuando = fmtFechaHora(poliza.renovacion_descartada_en);
+  const detalle = poliza.renovacion_descartada_detalle || "";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4"
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 text-xl">
+          {m.emoji}
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <HiXCircle className="h-4 w-4 text-rose-400" />
+            <h3 className="text-sm font-bold text-rose-200">Este cliente NO va a renovar</h3>
+          </div>
+          <p className="mt-1 text-sm text-rose-100/90">
+            Motivo: <span className="font-semibold">{m.emoji} {m.label}</span>
+            {cuando ? <> · marcado el <span className="font-semibold">{cuando}</span></> : null}
+          </p>
+          {detalle ? (
+            <p className="mt-1 text-xs text-rose-200/70">Nota: {detalle}</p>
+          ) : null}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 /* ===================== Componente principal ===================== */
 export default function PolizaResumenSection({ poliza, polizaId, onOpenCuotas, onEditVehiculo }) {
   /* ---- Cuotas (vía utils, fuente única) ---- */
@@ -241,6 +301,7 @@ export default function PolizaResumenSection({ poliza, polizaId, onOpenCuotas, o
   return (
     <motion.div initial="hidden" animate="visible">
       <StatusStrip estadoInicial={poliza?.estado} polizaId={polizaId} />
+      <NoRenuevaBanner poliza={poliza} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ====== PAGO DE CUOTAS ====== */}

@@ -32,6 +32,24 @@ const MOTIVO_LABEL = {
   OTRO: "Otro",
 };
 
+const MOTIVO_EMOJI = {
+  CAMBIO_COMPANIA: "🏢",
+  VENDIO_AUTO: "🚗",
+  NO_QUIERE: "🙅",
+  NO_CONTESTA: "📵",
+  NO_PAGO: "💸",
+  OTRO: "❓",
+};
+
+function formatFechaHora(v) {
+  if (!v) return "";
+  try {
+    return dayjs(v).format("DD/MM/YY HH:mm");
+  } catch {
+    return "";
+  }
+}
+
 function getVencimiento(p) {
   return (
     p?.ultima_cuota_vencimiento ||
@@ -386,7 +404,9 @@ function RenovacionRow({
   const descartada = !!p?.renovacion_descartada;
   const motivo = p?.renovacion_descartada_motivo;
   const motivoLabel = MOTIVO_LABEL[motivo] || motivo || "";
+  const motivoEmoji = MOTIVO_EMOJI[motivo] || "";
   const detalle = p?.renovacion_descartada_detalle || "";
+  const descartadaEn = formatFechaHora(p?.renovacion_descartada_en);
 
   // 🎉 Wrappers — feedback sutil de luz al renovar (sin papelitos)
   const [renovandoFlash, setRenovandoFlash] = useState(false);
@@ -512,9 +532,14 @@ function RenovacionRow({
               <HiXCircle /> No renueva
             </span>
             {motivoLabel && (
-              <span className="text-[10px] text-rose-300/70" title={detalle}>
-                {motivoLabel}
+              <span className="text-[10px] text-rose-300/80" title={detalle}>
+                {motivoEmoji ? `${motivoEmoji} ` : ""}{motivoLabel}
                 {detalle ? ` · ${detalle.slice(0, 40)}${detalle.length > 40 ? "…" : ""}` : ""}
+              </span>
+            )}
+            {descartadaEn && (
+              <span className="inline-flex items-center gap-1 text-[9px] text-rose-300/55">
+                <HiClock className="text-[10px]" /> {descartadaEn} hs
               </span>
             )}
           </motion.div>
