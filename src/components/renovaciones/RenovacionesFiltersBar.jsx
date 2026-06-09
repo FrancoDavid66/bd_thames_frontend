@@ -1,10 +1,10 @@
 // src/components/renovaciones/RenovacionesFiltersBar.jsx
 //
-// Versión compacta: buscador arriba (full width), sucursal + checkbox en 1 sola fila.
-// Sin labels gigantes, sin bloques duplicados.
+// Buscador (full width) + selector de sucursal (solo admin).
+// Sin botón de "solo pendientes": la lista siempre trae todo.
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { HiSearch, HiX, HiCheck, HiOfficeBuilding } from "react-icons/hi";
+import { HiSearch, HiX, HiOfficeBuilding } from "react-icons/hi";
 
 const DEBOUNCE_MS = 250;
 
@@ -14,8 +14,6 @@ export default function RenovacionesFiltersBar({
   setSearch,
   oficina,
   setOficina,
-  soloPendientes,
-  setSoloPendientes,
   oficinasOptions = [],
   isWebAdmin,
   totalCount = 0,
@@ -113,49 +111,30 @@ export default function RenovacionesFiltersBar({
         </div>
       )}
 
-      {/* ============ SUCURSAL + SOLO PENDIENTES (1 sola fila) ============ */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        {/* Oficina (solo admin) */}
-        {isWebAdmin && (
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <HiOfficeBuilding className="text-white/40" />
-            </div>
-            <select
-              value={String(oficina || "")}
-              onChange={(e) => setOficina(String(e.target.value || ""))}
-              disabled={loading}
-              aria-label="Filtrar por sucursal"
-              className="w-full bg-white/[0.04] border border-white/10 text-white text-sm rounded-xl pl-9 pr-3 py-2 outline-none focus:border-sky-400/40 focus:bg-white/[0.06] transition-colors appearance-none cursor-pointer disabled:opacity-50"
-            >
-              <option value="" className="bg-slate-900 text-white">
-                Todas las sucursales
-              </option>
-              {(Array.isArray(oficinasOptions) ? oficinasOptions : []).map((o) => (
-                <option key={o.value} value={o.value} className="bg-slate-900 text-white">
-                  {o.label}
-                </option>
-              ))}
-            </select>
+      {/* ============ SUCURSAL (solo admin) ============ */}
+      {isWebAdmin && (
+        <div className="relative">
+          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+            <HiOfficeBuilding className="text-white/40" />
           </div>
-        )}
-
-        {/* Solo pendientes (compacto) */}
-        <button
-          type="button"
-          onClick={() => setSoloPendientes(!soloPendientes)}
-          disabled={loading}
-          aria-pressed={soloPendientes}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold py-2 px-4 transition-all disabled:opacity-50 whitespace-nowrap ${
-            soloPendientes
-              ? "bg-emerald-500/15 border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/25"
-              : "bg-white/[0.04] border-white/10 text-white/55 hover:bg-white/10"
-          } ${!isWebAdmin ? "w-full" : ""}`}
-        >
-          {soloPendientes ? <HiCheck /> : <HiX className="opacity-50" />}
-          Solo pendientes de pago
-        </button>
-      </div>
+          <select
+            value={String(oficina || "")}
+            onChange={(e) => setOficina(String(e.target.value || ""))}
+            disabled={loading}
+            aria-label="Filtrar por sucursal"
+            className="w-full bg-white/[0.04] border border-white/10 text-white text-sm rounded-xl pl-9 pr-3 py-2 outline-none focus:border-sky-400/40 focus:bg-white/[0.06] transition-colors appearance-none cursor-pointer disabled:opacity-50"
+          >
+            <option value="" className="bg-slate-900 text-white">
+              Todas las sucursales
+            </option>
+            {(Array.isArray(oficinasOptions) ? oficinasOptions : []).map((o) => (
+              <option key={o.value} value={o.value} className="bg-slate-900 text-white">
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }

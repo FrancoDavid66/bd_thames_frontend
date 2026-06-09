@@ -121,13 +121,21 @@ function isVencidaSinGestion(p) {
   return dv >= DIAS_SIN_GESTION_LIMITE;
 }
 
-// Clasifica cada póliza en UNO de los 4 filtros. Orden de prioridad fijo
-// para que nunca caiga en dos a la vez.
+// Clasifica cada póliza en UNO de los 3 filtros, o null si no se muestra.
+// Orden de prioridad fijo.
 function clasificarTab(p) {
-  if (isRenovada(p)) return "renovadas";
-  if (isMarcadaNoRenueva(p) || isVencidaSinGestion(p)) return "sin_renovar";
-  if (diasParaVencer(p) === 0) return "renovar_hoy";
-  return "por_renovar";
+  // Las que marqué "no renueva" no se muestran en ningún lado.
+  if (isMarcadaNoRenueva(p)) return null;
+  // Las que ya renové tampoco (esta pantalla es solo lo que falta hacer).
+  if (isRenovada(p)) return null;
+
+  const d = diasParaVencer(p);
+  if (d == null) return null;
+
+  if (d < 0) return "vencidas";       // se me pasó renovarla
+  if (d === 0) return "renovar_hoy";  // vence hoy
+  if (d <= 3) return "en_3_dias";     // vence dentro de los próximos 3 días
+  return null;                         // vence más adelante → no la muestro todavía
 }
 
 /* =========================================================
@@ -204,30 +212,22 @@ function ResumenInline({ tab, kpis }) {
       white: "text-white",
       amber: "text-amber-300",
       rose: "text-rose-300",
-      emerald: "text-emerald-300",
-      sky: "text-sky-300",
     };
     return <span className={cx("font-bold tabular-nums", map[tone])}>{children}</span>;
   };
 
-  if (tab === "renovadas") {
+  if (tab === "vencidas") {
     return (
       <span className="text-xs text-white/55">
-        <N tone="sky">{kpis.total}</N> renovadas · <N tone="emerald">{kpis.pago1ra}</N> pagaron 1ª · <N tone="rose">{kpis.enMora}</N> en mora
+        <N tone="rose">{kpis.total}</N> sin renovar · <N tone="amber">{kpis.masDe30}</N> hace 30+ días
       </span>
     );
   }
-  if (tab === "sin_renovar") {
-    return (
-      <span className="text-xs text-white/55">
-        <N>{kpis.total}</N> sin renovar · <N tone="rose">{kpis.manuales}</N> marcadas a mano · <N tone="amber">{kpis.masDe60}</N> +60 días
-      </span>
-    );
-  }
-  // renovar_hoy / por_renovar
+
+  const label = tab === "renovar_hoy" ? "para renovar hoy" : "para los próximos 3 días";
   return (
     <span className="text-xs text-white/55">
-      <N>{kpis.total}</N> total · <N tone="amber">{kpis.urgentes}</N> urgentes ≤3d · <N tone="rose">{kpis.vencidas}</N> vencidas
+      <N>{kpis.total}</N> {label}
     </span>
   );
 }
@@ -270,13 +270,16 @@ function normalizeOficinaOption(x) {
  * Componente principal
  * ========================================================= */
 
-const TABS_VALIDAS = ["renovar_hoy", "por_renovar", "renovadas", "sin_renovar"];
+const TABS_VALIDAS = ["renovar_hoy", "en_3_dias", "vencidas"];
 
 // Mapeo de nombres viejos → nuevos (para no romper el localStorage de quien ya usó la app)
 const TAB_LEGACY_MAP = {
-  pendientes: "por_renovar",
-  en_seguimiento: "por_renovar",
-  no_renovaron: "sin_renovar",
+  pendientes: "renovar_hoy",
+  en_seguimiento: "renovar_hoy",
+  por_renovar: "en_3_dias",
+  no_renovaron: "vencidas",
+  sin_renovar: "vencidas",
+  renovadas: "renovar_hoy",
 };
 
 export default function RenovacionesPage() {
@@ -317,7 +320,6 @@ export default function RenovacionesPage() {
 
   const [search, setSearch] = useState("");
   const [bucket, setBucket] = useState("");
-  const [soloPendientes, setSoloPendientes] = useState(true);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -378,8 +380,6 @@ export default function RenovacionesPage() {
                              Filtramos en frontend a las que entran en la regla.
   ============================================================== */
 
-  const includeRenovadas = tab === "renovadas" || tab === "sin_renovar";
-
   const load = useCallback(
     async (opts = {}) => {
       const ofi =
@@ -389,17 +389,18 @@ export default function RenovacionesPage() {
           ? opts.oficina
           : oficina;
 
+      // Traemos TODA la ventana de una sola vez (sin depender del tab ni de la
+      // página). Así los contadores de los tabs y las filas mostradas salen
+      // siempre del mismo conjunto y nunca quedan desfasados.
       const payload = {
         dias: 30,
-        solo_pendientes: soloPendientes,
+        solo_pendientes: false,
         search: (search || "").trim(),
         ordering: "vto_referencia",
         oficina: ofi || undefined,
-        bucket: bucket || undefined,
-        page,
-        page_size: pageSize,
-        tab, // 🆕 (informativo; el backend puede ignorarlo por ahora)
-        include_renovadas: includeRenovadas ? 1 : undefined,
+        page: 1,
+        page_size: 500,
+        include_renovadas: 1, // siempre, para ver también las vencidas viejas
         ...opts,
       };
 
@@ -407,19 +408,7 @@ export default function RenovacionesPage() {
         await dispatch(fetchRenovaciones(payload)).unwrap();
       } catch {}
     },
-    [
-      soloPendientes,
-      search,
-      oficina,
-      bucket,
-      page,
-      pageSize,
-      dispatch,
-      isWebAdmin,
-      user,
-      tab,
-      includeRenovadas,
-    ]
+    [search, oficina, dispatch, isWebAdmin, user]
   );
 
   const loadResumen = useCallback(
@@ -433,7 +422,7 @@ export default function RenovacionesPage() {
 
       const payload = {
         dias: 30,
-        solo_pendientes: soloPendientes,
+        solo_pendientes: false,
         search: (search || "").trim(),
         oficina: ofi || undefined,
         ...opts,
@@ -446,14 +435,14 @@ export default function RenovacionesPage() {
           dispatch(
             fetchRenovacionesGlobalResumen({
               dias: 30,
-              solo_pendientes: soloPendientes,
+              solo_pendientes: false,
               search: (search || "").trim(),
             })
           );
         }
       } catch {}
     },
-    [soloPendientes, search, oficina, dispatch, isWebAdmin, user]
+    [search, oficina, dispatch, isWebAdmin, user]
   );
 
   useEffect(() => {
@@ -484,10 +473,10 @@ export default function RenovacionesPage() {
 
   /* ============ CONTADORES PARA TABS Y KPIs ============ */
   const tabCounts = useMemo(() => {
-    const acc = { renovar_hoy: 0, por_renovar: 0, renovadas: 0, sin_renovar: 0 };
+    const acc = { renovar_hoy: 0, en_3_dias: 0, vencidas: 0 };
     for (const p of itemsRaw) {
       const t = clasificarTab(p);
-      if (acc[t] != null) acc[t] += 1;
+      if (t && acc[t] != null) acc[t] += 1;
     }
     return acc;
   }, [itemsRaw]);
@@ -495,35 +484,25 @@ export default function RenovacionesPage() {
   // KPIs específicos del tab activo
   const kpis = useMemo(() => {
     const total = itemsForTab.length;
-
-    if (tab === "renovadas") {
-      const pago1ra = itemsForTab.filter((x) => x?.primera_cuota_pagada === true).length;
-      const enMora = itemsForTab.filter((x) => x?.estado_pago_renovacion === "mora").length;
-      return { total, pago1ra, enMora };
+    if (tab === "vencidas") {
+      const masDe30 = itemsForTab.filter((p) => diasVencidaDe(p) >= 30).length;
+      return { total, masDe30 };
     }
-
-    if (tab === "sin_renovar") {
-      const manuales = itemsForTab.filter(isMarcadaNoRenueva).length;
-      const masDe60 = itemsForTab.filter((p) => diasVencidaDe(p) >= 60).length;
-      return { total, manuales, masDe60 };
-    }
-
-    // renovar_hoy / por_renovar
-    const urgentes = itemsForTab.filter((x) => {
-      const d = diasParaVencer(x);
-      return d != null && Number(d) <= 3;
-    }).length;
-    const vencidas = itemsForTab.filter((x) => diasVencidaDe(x) > 0).length;
-    return { total, urgentes, vencidas };
+    return { total };
   }, [tab, itemsForTab]);
 
-  const totalCount = Number(count || 0);
-  const receivedCount = itemsForTab.length;
-  // ⚠️ Mientras el backend no implemente tabs, totalPages se basa en `count`
-  // que viene del endpoint (NO del filtro local). Por eso forzamos al menos 1.
+  const totalCount = itemsForTab.length;
   const totalPages =
     pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   const safePage = Math.min(Math.max(1, page), totalPages);
+
+  // Página visible (paginamos en frontend sobre el filtro del tab)
+  const itemsPaginados = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return itemsForTab.slice(start, start + pageSize);
+  }, [itemsForTab, safePage, pageSize]);
+
+  const receivedCount = itemsPaginados.length;
 
   useEffect(() => {
     if (page !== safePage) setPage(safePage);
@@ -531,14 +510,12 @@ export default function RenovacionesPage() {
 
   const applyFilters = () => {
     setPage(1);
-    load({ force: true, page: 1 });
+    load({ force: true });
     loadResumen({ force: true });
   };
 
   const canPrev = safePage > 1;
-  const canNext = totalCount
-    ? safePage < totalPages
-    : receivedCount === pageSize;
+  const canNext = safePage < totalPages;
 
   /* ============ Handlers de "No renueva" ============ */
   const openNoRenuevaModal = useCallback((item) => {
@@ -653,8 +630,6 @@ export default function RenovacionesPage() {
         setSearch={setSearch}
         oficina={oficina}
         setOficina={setOficina}
-        soloPendientes={soloPendientes}
-        setSoloPendientes={setSoloPendientes}
         oficinasOptions={oficinasOptions}
         isWebAdmin={isWebAdmin}
         totalCount={totalCount}
@@ -681,17 +656,17 @@ export default function RenovacionesPage() {
         <ResumenInline tab={tab} kpis={kpis} />
         <ProgresoDelDia
           hechasHoy={hechasHoy}
-          pendientesTotales={tabCounts?.por_renovar || 0}
+          pendientesTotales={tabCounts?.renovar_hoy || 0}
         />
       </div>
 
       {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/65">
-          {tab === "renovadas" || tab === "sin_renovar" ? (
+          {tab === "vencidas" ? (
             <span>
               Mostrando <span className="text-white font-semibold">{receivedCount}</span>{" "}
-              {tab === "renovadas" ? "renovadas" : "sin renovar"} de{" "}
+              sin renovar de{" "}
               <span className="text-white font-semibold">{totalCount}</span> pólizas en pantalla
             </span>
           ) : (
@@ -741,7 +716,7 @@ export default function RenovacionesPage() {
 
       {/* ============ TABLA ============ */}
       <Renovacionestable
-        items={itemsForTab}
+        items={itemsPaginados}
         oficinasOptions={oficinasOptions}
         loading={loading}
         submitting={submitting}

@@ -1,9 +1,9 @@
 // src/components/renovaciones/RenovacionesTabs.jsx
 //
-// Filtros principales (4): Renovar hoy / Por renovar / Renovadas / Sin renovar
-// Versión simple: pills con ícono + contador. Sin animaciones ni glow.
+// Filtros principales (3): Renovar hoy / En 3 días / Vencidas
+// Versión simple: pills con ícono + contador. Sin animaciones.
 
-import { HiClock, HiClipboardCheck, HiCheckCircle, HiXCircle } from "react-icons/hi";
+import { HiClock, HiClipboardCheck, HiExclamationCircle } from "react-icons/hi";
 
 const cx = (...a) => a.filter(Boolean).join(" ");
 
@@ -16,24 +16,17 @@ const TABS = [
     tone: "amber",
   },
   {
-    id: "por_renovar",
-    label: "Por renovar",
+    id: "en_3_dias",
+    label: "En 3 días",
     icon: HiClipboardCheck,
-    desc: "Próximas a vencer, sin apuro",
+    desc: "Vencen dentro de los próximos 3 días",
     tone: "sky",
   },
   {
-    id: "renovadas",
-    label: "Renovadas",
-    icon: HiCheckCircle,
-    desc: "Ya tienen versión nueva emitida",
-    tone: "emerald",
-  },
-  {
-    id: "sin_renovar",
-    label: "Sin renovar",
-    icon: HiXCircle,
-    desc: "No renovaron (a mano o vencidas hace 30+ días)",
+    id: "vencidas",
+    label: "Vencidas",
+    icon: HiExclamationCircle,
+    desc: "Se te pasó renovarlas",
     tone: "rose",
   },
 ];
@@ -44,8 +37,6 @@ function toneActive(tone) {
       return "border-amber-400/50 bg-amber-500/15 text-amber-100";
     case "sky":
       return "border-sky-400/50 bg-sky-500/15 text-sky-100";
-    case "emerald":
-      return "border-emerald-400/50 bg-emerald-500/15 text-emerald-100";
     case "rose":
       return "border-rose-400/50 bg-rose-500/15 text-rose-100";
     default:
@@ -56,7 +47,7 @@ function toneActive(tone) {
 export default function RenovacionesTabs({
   activeTab = "renovar_hoy",
   onChange,
-  counts = { renovar_hoy: 0, por_renovar: 0, renovadas: 0, sin_renovar: 0 },
+  counts = { renovar_hoy: 0, en_3_dias: 0, vencidas: 0 },
 }) {
   return (
     <div className="flex flex-wrap gap-2">

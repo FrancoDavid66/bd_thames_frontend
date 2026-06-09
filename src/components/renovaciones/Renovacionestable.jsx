@@ -251,9 +251,8 @@ export default function Renovacionestable({
   if (!items || items.length === 0) {
     const empty = {
       renovar_hoy: { icon: "🎉", text: "No hay pólizas que venzan hoy." },
-      por_renovar: { icon: "🎉", text: "Ninguna póliza próxima a vencer." },
-      renovadas: { icon: "✅", text: "Todavía no se renovó ninguna póliza en este filtro." },
-      sin_renovar: { icon: "💤", text: "No hay clientes sin renovar." },
+      en_3_dias: { icon: "🎉", text: "Nada vence en los próximos 3 días." },
+      vencidas: { icon: "✅", text: "No tenés pólizas sin renovar." },
     }[tab] || { icon: "—", text: "Sin resultados." };
 
     return (
