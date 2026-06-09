@@ -599,14 +599,16 @@ export default function RenovacionesPage() {
   /* ============ Contadores para los chips del rediseño ============ */
   const chipCounts = useMemo(() => {
     const b = resumen?.buckets || {};
+    const total =
+      Number(resumen?.pendientes_ventana) || Number(b.todas) || 0;
     return {
-      todas: Number(b.todas) || 0,
+      todas: total,
       hoy: Number(b.vence_hoy) || 0,
       tresdias:
         (Number(b.vence_en_1) || 0) +
         (Number(b.vence_en_2) || 0) +
         (Number(b.vence_en_3) || 0),
-      vencidas: (Number(b.vencidas) || 0) + (Number(b.vencidas_3) || 0),
+      vencidas: (Number(b.vencidas_3) || 0) + (Number(b.vencidas_4_mas) || 0),
     };
   }, [resumen]);
 
@@ -755,21 +757,6 @@ export default function RenovacionesPage() {
         counts={chipCounts}
         loading={loading}
       />
-
-      {/* ============ Aviso cuando no hay datos ============ */}
-      {!loading && !error && Number(chipCounts?.todas || 0) === 0 && (
-        <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center">
-          <div className="text-3xl mb-1">🗂️</div>
-          <p className="text-sm font-semibold text-white/80">
-            No hay pólizas para renovar en los próximos 30 días.
-          </p>
-          <p className="mt-1 text-xs text-white/50">
-            {isWebAdmin
-              ? "Probá cambiar de sucursal en el selector de arriba, o tocá Actualizar."
-              : "Cuando se acerque algún vencimiento van a aparecer acá. Tocá Actualizar para refrescar."}
-          </p>
-        </div>
-      )}
 
       {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
