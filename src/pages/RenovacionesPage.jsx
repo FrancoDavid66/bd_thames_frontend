@@ -129,6 +129,11 @@ function clasificarTab(p) {
   // Las que ya renové tampoco (esta pantalla es solo lo que falta hacer).
   if (isRenovada(p)) return null;
 
+  // Si ya tiene una renovación, o quedó finalizada/cancelada, se va de la tabla.
+  if (p?.tiene_renovacion) return null;
+  const estado = String(p?.estado || "").toLowerCase();
+  if (estado === "finalizada" || estado === "cancelada") return null;
+
   const d = diasParaVencer(p);
   if (d == null) return null;
 
@@ -768,11 +773,12 @@ export default function RenovacionesPage() {
             setSelected(null);
             setRenovarError(null);
 
+            // Abrimos la póliza nueva en otra pestaña, sin salir de Renovaciones.
             if (nuevaId) {
-              navigate(`/polizas/${nuevaId}`);
-              return;
+              window.open(`/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
             }
 
+            // Recargamos para que la póliza renovada desaparezca de la tabla.
             await load({ force: true });
             await loadResumen({ force: true });
           } catch (e) {
