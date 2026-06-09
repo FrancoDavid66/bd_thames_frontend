@@ -24,7 +24,6 @@ import {
 
 import {
   fetchRenovaciones,
-  fetchRenovacionesRecientes,
   renovarPoliza,
   marcarNoRenueva,
   desmarcarNoRenueva,
@@ -44,9 +43,10 @@ import {
 
 import RenovacionModal from "../components/renovaciones/RenovacionModal";
 import RenovacionesFiltersBar from "../components/renovaciones/RenovacionesFiltersBar";
-import RenovacionesBucketsBar from "../components/renovaciones/RenovacionesBucketsBar";
+import RenovacionesTabs from "../components/renovaciones/RenovacionesTabs";
 import Renovacionestable from "../components/renovaciones/Renovacionestable";
 import DescartarRenovacionModal from "../components/renovaciones/DescartarRenovacionModal";
+import ProgresoDelDia from "../components/renovaciones/ProgresoDelDia";
 import PolizaYaRenovadaModal from "../components/renovaciones/PolizaYaRenovadaModal";
 import { useRenovacionesProgreso } from "../hooks/useRenovacionesProgreso";
 import { useAuth } from "../context/AuthContext";
@@ -85,6 +85,20 @@ function isRenovada(p) {
   return !!p?.es_renovacion || !!p?.poliza_origen || !!p?.poliza_origen_id;
 }
 
+// Días para que venza la póliza. Negativo = ya vencida, 0 = vence hoy, positivo = futuro.
+// Prioriza el campo del backend; si falta, lo calcula desde la fecha de vencimiento.
+function diasParaVencer(p) {
+  const d = p?.dias_para_vencer_poliza;
+  if (d != null && d !== "") return Number(d);
+  const v = getVencimiento(p);
+  if (!v) return null;
+  try {
+    return dayjs(v).startOf("day").diff(dayjs().startOf("day"), "day");
+  } catch {
+    return null;
+  }
+}
+
 function isMarcadaNoRenueva(p) {
   // 🚀 Campo nuevo del backend (renovacion_descartada). Mantenemos legacy por si quedó algo viejo.
   return !!(
@@ -105,6 +119,15 @@ function isVencidaSinGestion(p) {
   if (isMarcadaNoRenueva(p)) return false;
   const dv = diasVencidaDe(p);
   return dv >= DIAS_SIN_GESTION_LIMITE;
+}
+
+// Clasifica cada póliza en UNO de los 4 filtros. Orden de prioridad fijo
+// para que nunca caiga en dos a la vez.
+function clasificarTab(p) {
+  if (isRenovada(p)) return "renovadas";
+  if (isMarcadaNoRenueva(p) || isVencidaSinGestion(p)) return "sin_renovar";
+  if (diasParaVencer(p) === 0) return "renovar_hoy";
+  return "por_renovar";
 }
 
 /* =========================================================
@@ -172,8 +195,42 @@ function KpiCard({ label, value, tone = "neutral", hint }) {
 }
 
 /* =========================================================
- * Normalización de oficinas
+ * Resumen en una línea (reemplaza la card de KPIs)
  * ========================================================= */
+
+function ResumenInline({ tab, kpis }) {
+  const N = ({ children, tone = "white" }) => {
+    const map = {
+      white: "text-white",
+      amber: "text-amber-300",
+      rose: "text-rose-300",
+      emerald: "text-emerald-300",
+      sky: "text-sky-300",
+    };
+    return <span className={cx("font-bold tabular-nums", map[tone])}>{children}</span>;
+  };
+
+  if (tab === "renovadas") {
+    return (
+      <span className="text-xs text-white/55">
+        <N tone="sky">{kpis.total}</N> renovadas · <N tone="emerald">{kpis.pago1ra}</N> pagaron 1ª · <N tone="rose">{kpis.enMora}</N> en mora
+      </span>
+    );
+  }
+  if (tab === "sin_renovar") {
+    return (
+      <span className="text-xs text-white/55">
+        <N>{kpis.total}</N> sin renovar · <N tone="rose">{kpis.manuales}</N> marcadas a mano · <N tone="amber">{kpis.masDe60}</N> +60 días
+      </span>
+    );
+  }
+  // renovar_hoy / por_renovar
+  return (
+    <span className="text-xs text-white/55">
+      <N>{kpis.total}</N> total · <N tone="amber">{kpis.urgentes}</N> urgentes ≤3d · <N tone="rose">{kpis.vencidas}</N> vencidas
+    </span>
+  );
+}
 
 function normalizeOficinaOption(x) {
   if (x == null) return null;
@@ -213,7 +270,14 @@ function normalizeOficinaOption(x) {
  * Componente principal
  * ========================================================= */
 
-const TABS_VALIDAS = ["pendientes", "en_seguimiento", "renovadas", "no_renovaron"];
+const TABS_VALIDAS = ["renovar_hoy", "por_renovar", "renovadas", "sin_renovar"];
+
+// Mapeo de nombres viejos → nuevos (para no romper el localStorage de quien ya usó la app)
+const TAB_LEGACY_MAP = {
+  pendientes: "por_renovar",
+  en_seguimiento: "por_renovar",
+  no_renovaron: "sin_renovar",
+};
 
 export default function RenovacionesPage() {
   dayjs.locale("es");
@@ -228,15 +292,16 @@ export default function RenovacionesPage() {
   const error = useSelector(selectRenovacionesError);
   const count = useSelector(selectRenovacionesCount);
 
-  // 🆕 Recién finalizadas (≤3 días) sin renovar
-  const recientes = useSelector((s) => s.renovaciones?.recientes) || [];
-
   const oficinas = useSelector(selectRenovacionesOficinas);
   const resumen = useSelector(selectRenovacionesResumen);
   const globalResumen = useSelector(selectRenovacionesGlobalResumen) || {};
 
-  // 🆕 Vista fija en "pendientes" (la app se simplificó: solo lista + buscador)
-  const [tab, setTab] = useState("pendientes");
+  // 🆕 Tab activo (persistido en localStorage)
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem("renovaciones.tab");
+    const normalized = TAB_LEGACY_MAP[saved] || saved;
+    return TABS_VALIDAS.includes(normalized) ? normalized : "renovar_hoy";
+  });
 
   useEffect(() => {
     localStorage.setItem("renovaciones.tab", tab);
@@ -301,14 +366,6 @@ export default function RenovacionesPage() {
     return out;
   }, [oficinas]);
 
-  // 🆕 Admin sin sucursal elegida → autoseleccionamos la primera disponible.
-  // (Sin sucursal, el admin no tiene "scope" y el backend devuelve 0 en todo.)
-  useEffect(() => {
-    if (isWebAdmin && !oficina && oficinasOptions.length > 0) {
-      setOficina(oficinasOptions[0].value);
-    }
-  }, [isWebAdmin, oficina, oficinasOptions]);
-
   /* ============ CARGA DE DATOS según TAB ============
      Estrategia:
      - tab=pendientes      → endpoint normal (oculta ya renovadas por default).
@@ -321,7 +378,7 @@ export default function RenovacionesPage() {
                              Filtramos en frontend a las que entran en la regla.
   ============================================================== */
 
-  const includeRenovadas = tab === "renovadas" || tab === "no_renovaron";
+  const includeRenovadas = tab === "renovadas" || tab === "sin_renovar";
 
   const load = useCallback(
     async (opts = {}) => {
@@ -349,9 +406,6 @@ export default function RenovacionesPage() {
       try {
         await dispatch(fetchRenovaciones(payload)).unwrap();
       } catch {}
-
-      // 🆕 Cargar en paralelo las recién finalizadas (≤3 días) sin renovar
-      dispatch(fetchRenovacionesRecientes({ oficina: ofi || undefined }));
     },
     [
       soloPendientes,
@@ -403,7 +457,7 @@ export default function RenovacionesPage() {
   );
 
   useEffect(() => {
-    load({ force: true });
+    load();
   }, [load]);
   useEffect(() => {
     loadResumen();
@@ -416,133 +470,51 @@ export default function RenovacionesPage() {
     }
   }, [oficina, isWebAdmin]);
 
-  // Cuando cambia el tab o el filtro (chip), volvemos a página 1
+  // Cuando cambia el tab, volvemos a página 1
   useEffect(() => {
     setPage(1);
-  }, [tab, bucket]);
+  }, [tab]);
 
   /* ============ FILTRADO EN FRONTEND POR TAB ============ */
   const itemsRaw = Array.isArray(items) ? items : [];
 
   const itemsForTab = useMemo(() => {
-    if (tab === "pendientes") {
-      // Quitamos las que ya están renovadas, marcadas como no renueva, o en seguimiento
-      return itemsRaw.filter(
-        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p) && !isVerificada(p)
-      );
-    }
-    if (tab === "en_seguimiento") {
-      // Las que el operador está laburando (verificadas pero sin decidir aún)
-      return itemsRaw.filter(
-        (p) => isVerificada(p) && !isRenovada(p) && !isMarcadaNoRenueva(p)
-      );
-    }
-    if (tab === "renovadas") {
-      return itemsRaw.filter(isRenovada);
-    }
-    if (tab === "no_renovaron") {
-      return itemsRaw.filter(
-        (p) => isMarcadaNoRenueva(p) || isVencidaSinGestion(p)
-      );
-    }
-    return itemsRaw;
+    return itemsRaw.filter((p) => clasificarTab(p) === tab);
   }, [itemsRaw, tab]);
 
   /* ============ CONTADORES PARA TABS Y KPIs ============ */
   const tabCounts = useMemo(() => {
-    return {
-      pendientes: itemsRaw.filter(
-        (p) => !isRenovada(p) && !isMarcadaNoRenueva(p) && !isVerificada(p)
-      ).length,
-      en_seguimiento: itemsRaw.filter(
-        (p) => isVerificada(p) && !isRenovada(p) && !isMarcadaNoRenueva(p)
-      ).length,
-      renovadas: itemsRaw.filter(isRenovada).length,
-      no_renovaron: itemsRaw.filter(
-        (p) => isMarcadaNoRenueva(p) || isVencidaSinGestion(p)
-      ).length,
-    };
+    const acc = { renovar_hoy: 0, por_renovar: 0, renovadas: 0, sin_renovar: 0 };
+    for (const p of itemsRaw) {
+      const t = clasificarTab(p);
+      if (acc[t] != null) acc[t] += 1;
+    }
+    return acc;
   }, [itemsRaw]);
 
   // KPIs específicos del tab activo
   const kpis = useMemo(() => {
-    if (tab === "pendientes") {
-      const urgentes = itemsForTab.filter((x) => {
-        const d = x?.dias_para_vencer_poliza;
-        return d != null && Number(d) <= 3;
-      }).length;
-      const venceHoy = itemsForTab.filter((x) => {
-        const d = x?.dias_para_vencer_poliza;
-        return d != null && Number(d) === 0;
-      }).length;
-      const vencidas = itemsForTab.filter((x) => diasVencidaDe(x) > 0).length;
-      return {
-        total: itemsForTab.length,
-        urgentes,
-        venceHoy,
-        vencidas,
-      };
-    }
-
-    if (tab === "en_seguimiento") {
-      // Mismos KPIs que pendientes (son pólizas en gestión activa)
-      const urgentes = itemsForTab.filter((x) => {
-        const d = x?.dias_para_vencer_poliza;
-        return d != null && Number(d) <= 3;
-      }).length;
-      const venceHoy = itemsForTab.filter((x) => {
-        const d = x?.dias_para_vencer_poliza;
-        return d != null && Number(d) === 0;
-      }).length;
-      const vencidas = itemsForTab.filter((x) => diasVencidaDe(x) > 0).length;
-      return {
-        total: itemsForTab.length,
-        urgentes,
-        venceHoy,
-        vencidas,
-      };
-    }
+    const total = itemsForTab.length;
 
     if (tab === "renovadas") {
-      const pago1ra = itemsForTab.filter(
-        (x) => x?.primera_cuota_pagada === true
-      ).length;
-      const noPago1ra = itemsForTab.filter(
-        (x) => x?.primera_cuota_pagada === false
-      ).length;
-      const enMora = itemsForTab.filter(
-        (x) => x?.estado_pago_renovacion === "mora"
-      ).length;
-      const alDia = itemsForTab.filter(
-        (x) => x?.estado_pago_renovacion === "al_dia"
-      ).length;
-      const pagadasTotal = itemsForTab.filter(
-        (x) => x?.estado_pago_renovacion === "pagada_total"
-      ).length;
-      return {
-        total: itemsForTab.length,
-        pago1ra,
-        noPago1ra,
-        enMora,
-        alDia,
-        pagadasTotal,
-      };
+      const pago1ra = itemsForTab.filter((x) => x?.primera_cuota_pagada === true).length;
+      const enMora = itemsForTab.filter((x) => x?.estado_pago_renovacion === "mora").length;
+      return { total, pago1ra, enMora };
     }
 
-    if (tab === "no_renovaron") {
+    if (tab === "sin_renovar") {
       const manuales = itemsForTab.filter(isMarcadaNoRenueva).length;
-      const automaticas = itemsForTab.filter(
-        (p) => !isMarcadaNoRenueva(p) && isVencidaSinGestion(p)
-      ).length;
       const masDe60 = itemsForTab.filter((p) => diasVencidaDe(p) >= 60).length;
-      return {
-        total: itemsForTab.length,
-        manuales,
-        automaticas,
-        masDe60,
-      };
+      return { total, manuales, masDe60 };
     }
-    return {};
+
+    // renovar_hoy / por_renovar
+    const urgentes = itemsForTab.filter((x) => {
+      const d = diasParaVencer(x);
+      return d != null && Number(d) <= 3;
+    }).length;
+    const vencidas = itemsForTab.filter((x) => diasVencidaDe(x) > 0).length;
+    return { total, urgentes, vencidas };
   }, [tab, itemsForTab]);
 
   const totalCount = Number(count || 0);
@@ -567,50 +539,6 @@ export default function RenovacionesPage() {
   const canNext = totalCount
     ? safePage < totalPages
     : receivedCount === pageSize;
-
-  /* ============ Quick buttons — 3 burbujas: Todas / Próximas / Vencidas ============ */
-  // Mantenemos los IDs originales del backend para no romper el filtro server-side.
-  // - "" → Todas
-  // - "proximos_3" → Próximas (incluye hoy + próximos días hábiles)
-  // - "vencidas" → Vencidas (todas las vencidas, antiguas + recientes)
-  const quickButtons = useMemo(() => {
-    const b = resumen?.buckets || {};
-    // Sumamos counts agrupados para reflejar la consolidación
-    const proximas = (Number(b.proximos_3) || 0) + (Number(b.vence_hoy) || 0);
-    const vencidas = (Number(b.vencidas) || 0) + (Number(b.vencidas_3) || 0);
-    return [
-      { id: "", label: "Todas", count: b.todas, tone: "neutral" },
-      { id: "proximos_3", label: "Próximas", count: proximas, tone: "blue" },
-      { id: "vencidas", label: "Vencidas", count: vencidas, tone: "red" },
-    ];
-  }, [resumen]);
-
-  const globalQuickButtons = useMemo(() => {
-    const b = globalResumen?.buckets || {};
-    const proximas = (Number(b.proximos_3) || 0) + (Number(b.vence_hoy) || 0);
-    const vencidas = (Number(b.vencidas) || 0) + (Number(b.vencidas_3) || 0);
-    return [
-      { id: "", label: "Todas", count: b.todas, tone: "neutral" },
-      { id: "proximos_3", label: "Próximas", count: proximas, tone: "blue" },
-      { id: "vencidas", label: "Vencidas", count: vencidas, tone: "red" },
-    ];
-  }, [globalResumen]);
-
-  /* ============ Contadores para los chips del rediseño ============ */
-  const chipCounts = useMemo(() => {
-    const b = resumen?.buckets || {};
-    const total =
-      Number(resumen?.pendientes_ventana) || Number(b.todas) || 0;
-    return {
-      todas: total,
-      hoy: Number(b.vence_hoy) || 0,
-      tresdias:
-        (Number(b.vence_en_1) || 0) +
-        (Number(b.vence_en_2) || 0) +
-        (Number(b.vence_en_3) || 0),
-      vencidas: (Number(b.vencidas_3) || 0) + (Number(b.vencidas_4_mas) || 0),
-    };
-  }, [resumen]);
 
   /* ============ Handlers de "No renueva" ============ */
   const openNoRenuevaModal = useCallback((item) => {
@@ -690,78 +618,77 @@ export default function RenovacionesPage() {
    * ========================================================= */
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-lg">
-        {/* ============ Header ============ */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
-              <HiClipboardCheck className="text-emerald-400" />
-              Renovaciones
-            </h1>
-            <p className="mt-1 text-sm text-white/60">
-              Gestioná las pólizas próximas a vencer, las renovadas y las que no se renovarán.
-              {!isWebAdmin && (
-                <span className="text-sky-400 ml-2 font-bold uppercase tracking-widest text-[10px]">
-                  ({user?.perfil?.oficina_nombre || "Tu Sucursal"})
-                </span>
-              )}
+      {/* ============ Header (limpio, sin mega-card) ============ */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+            <HiClipboardCheck className="text-emerald-400" />
+            Renovaciones
+          </h1>
+          {!isWebAdmin && (
+            <p className="mt-0.5 text-xs font-bold uppercase tracking-widest text-sky-400">
+              {user?.perfil?.oficina_nombre || "Tu Sucursal"}
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 transition-colors"
-              onClick={() => {
-                load({ force: true });
-                loadResumen({ force: true });
-              }}
-              disabled={loading}
-              type="button"
-            >
-              <HiRefresh className={loading ? "animate-spin" : ""} />
-              Actualizar
-            </button>
-          </div>
+          )}
         </div>
 
-        <RenovacionesFiltersBar
-          minimal
-          loading={loading}
-          search={search}
-          setSearch={setSearch}
-          oficina={oficina}
-          setOficina={setOficina}
-          soloPendientes={soloPendientes}
-          setSoloPendientes={setSoloPendientes}
-          bucket={bucket}
-          setBucket={setBucket}
-          oficinasOptions={oficinasOptions}
-          resumenBuckets={resumen?.buckets}
-          onApply={applyFilters}
-          isWebAdmin={isWebAdmin}
-          totalCount={totalCount}
-        />
-
-        {!!error && (
-          <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-200 flex items-center gap-2">
-            <HiExclamation className="text-lg" />
-            No se pudieron cargar las pólizas. Intenta actualizar.
-          </div>
-        )}
+        <button
+          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+          onClick={() => {
+            load({ force: true });
+            loadResumen({ force: true });
+          }}
+          disabled={loading}
+          type="button"
+        >
+          <HiRefresh className={loading ? "animate-spin" : ""} />
+          Actualizar
+        </button>
       </div>
 
-      {/* ============ FILTROS RÁPIDOS (chips) ============ */}
-      <RenovacionesBucketsBar
-        activeBucket={bucket}
-        onSelectBucket={setBucket}
-        counts={chipCounts}
+      {/* ============ Buscador + sucursal ============ */}
+      <RenovacionesFiltersBar
         loading={loading}
+        search={search}
+        setSearch={setSearch}
+        oficina={oficina}
+        setOficina={setOficina}
+        soloPendientes={soloPendientes}
+        setSoloPendientes={setSoloPendientes}
+        oficinasOptions={oficinasOptions}
+        isWebAdmin={isWebAdmin}
+        totalCount={totalCount}
       />
+
+      {/* ============ Filtros (tabs) ============ */}
+      <div className="mt-3">
+        <RenovacionesTabs
+          activeTab={tab}
+          onChange={setTab}
+          counts={tabCounts}
+        />
+      </div>
+
+      {!!error && (
+        <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-200 flex items-center gap-2">
+          <HiExclamation className="text-lg" />
+          No se pudieron cargar las pólizas. Intenta actualizar.
+        </div>
+      )}
+
+      {/* ============ Resumen en línea + progreso del día ============ */}
+      <div className="mt-4 mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <ResumenInline tab={tab} kpis={kpis} />
+        <ProgresoDelDia
+          hechasHoy={hechasHoy}
+          pendientesTotales={tabCounts?.por_renovar || 0}
+        />
+      </div>
 
       {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/65">
-          {tab !== "pendientes" ? (
+          {tab === "renovadas" || tab === "sin_renovar" ? (
             <span>
               Mostrando <span className="text-white font-semibold">{receivedCount}</span>{" "}
               {tab === "renovadas" ? "renovadas" : "sin renovar"} de{" "}
