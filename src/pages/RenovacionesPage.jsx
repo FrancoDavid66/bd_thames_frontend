@@ -929,7 +929,7 @@ export default function RenovacionesPage() {
         }}
       />
 
-      {/* ============ Modal "Marcar no renueva" ============ */}
+      {/* ============ Modal "Marcar no renu eva" ============ */}
       <DescartarRenovacionModal
         open={noRenuevaModal.open}
         item={noRenuevaModal.item}
