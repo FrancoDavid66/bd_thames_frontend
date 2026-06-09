@@ -43,6 +43,9 @@ const STATUS = {
   REALIZADA: "REALIZADA",
 };
 
+// Grupo que junta ENVIADA + REALIZADA bajo un solo concepto: "Dadas de baja"
+const GRUPO_DADAS = "DADAS";
+
 const LS = {
   oficina: "scope.bajas.oficina",
 };
@@ -68,6 +71,22 @@ function formatDateTime(isoString) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Badge de estado usado en el modal de historial.
+function StatusBadge({ status }) {
+  const s = String(status || "");
+  const map = {
+    PENDIENTE_ENVIO: { label: "Pendiente", clase: "border-rose-500/40 text-rose-300 bg-rose-500/10" },
+    ENVIADA: { label: "Enviada", clase: "border-amber-500/40 text-amber-300 bg-amber-500/10" },
+    REALIZADA: { label: "Realizada", clase: "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" },
+  };
+  const c = map[s] || { label: s || "—", clase: "border-white/20 text-white/60 bg-white/5" };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide border ${c.clase}`}>
+      {c.label}
+    </span>
+  );
 }
 
 export default function BajasPage() {
@@ -147,15 +166,15 @@ export default function BajasPage() {
       dispatch(
         fetchBajas({
           params: {
-            page: String(pg),
-            page_size: String(ps),
+            page: "1",
+            page_size: "500",
             oficina: ofi,
             search: q,
             dias,
             include_finalizadas: "0",
-            include_canceladas: "1", 
+            include_canceladas: "1",
             compania: cia || "",
-            baja_estado: tab && tab !== "TODAS" ? tab : "",
+            baja_estado: "", // traemos todo; agrupamos Pendientes / Dadas de baja en el front
           },
           force: !!opts.force,
         })
@@ -212,11 +231,20 @@ export default function BajasPage() {
     return data;
   }, [items, sortConfig]);
 
-  const filtered = enriched.filter(
-    (x) => (activeTab === "TODAS" || x._bajaStatus === activeTab) && (compania === "" || x.compania === compania)
-  );
+  const esDada = (s) => s === STATUS.ENVIADA || s === STATUS.REALIZADA;
 
-  const totalPages = Math.ceil(totalItemsCount / pageSize) || 1;
+  const filtered = enriched.filter((x) => {
+    const enTab =
+      activeTab === STATUS.ENVIAR
+        ? x._bajaStatus === STATUS.ENVIAR
+        : esDada(x._bajaStatus);
+    return enTab && (compania === "" || x.compania === compania);
+  });
+
+  const totalFiltered = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const itemsPaginados = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -323,6 +351,10 @@ export default function BajasPage() {
     if (type === "EXCEL") {
       await generateAndDownloadExcel(rowsToExport);
       setSelectedIds(new Set());
+    } else if (type === "DAR_BAJA") {
+      // Un solo paso: baja el Excel para la compañía y marca como ENVIADA (guarda la fecha).
+      await generateAndDownloadExcel(rowsToExport);
+      await updateBajaStatus(safeIds, "ENVIADA");
     } else {
       await updateBajaStatus(safeIds, type);
       if (includeExcel) await generateAndDownloadExcel(rowsToExport);
@@ -334,6 +366,7 @@ export default function BajasPage() {
   const closeConfirmModal = () => { setConfirmModal({ isOpen: false, type: "", ids: [] }); setIncludeExcel(false); };
 
   const MODAL_CONFIG = {
+    DAR_BAJA: { title: "Dar de baja", desc: "Se descarga el Excel con las pólizas seleccionadas para mandar a la compañía, y quedan registradas como ENVIADAS con la fecha de hoy.", btnText: "Dar de baja y descargar", btnColor: "bg-rose-500 hover:bg-rose-400", icon: <HiPaperAirplane />, iconBg: "bg-rose-500/20 text-rose-400" },
     EXCEL: { title: "Confirmar Descarga", desc: "Generar Excel profesional con las pólizas seleccionadas.", btnText: "Descargar Excel", btnColor: "bg-emerald-500 hover:bg-emerald-400", icon: <HiDownload />, iconBg: "bg-emerald-500/20 text-emerald-400" },
     ENVIADA: { title: "Marcar Enviadas", desc: "¿Mover estas pólizas a la pestaña de 'Enviadas'?", btnText: "Sí, Marcar", btnColor: "bg-amber-500 hover:bg-amber-400", icon: <HiPaperAirplane />, iconBg: "bg-amber-500/20 text-amber-400" },
     REALIZADA: { title: "Marcar Realizadas", desc: "¿Confirmas que la compañía ya procesó definitivamente la baja?", btnText: "Sí, Realizada", btnColor: "bg-sky-500 hover:bg-sky-400", icon: <HiCheckCircle />, iconBg: "bg-sky-500/20 text-sky-400" },
@@ -341,54 +374,30 @@ export default function BajasPage() {
 
   const activeModalConfig = MODAL_CONFIG[confirmModal.type] || MODAL_CONFIG.EXCEL;
 
-  // 🚀 REUTILIZABLE: Dibujador de Fila de KPIs
+  // Dos tarjetas que funcionan como filtro: Pendientes / Dadas de baja
   const renderKpiRow = (kpisData, title, isGlobal = false) => (
     <div className="mb-6">
-      {title && <h3 className="text-[11px] font-black text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-2">{title}</h3>}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {title && <h3 className="text-[11px] font-bold text-sky-400/80 uppercase tracking-[0.2em] mb-3 ml-1">{title}</h3>}
+      <div className="grid grid-cols-2 gap-4">
         {[
-          { id: STATUS.ENVIAR, label: "Pendientes", val: kpisData?.pendiente_envio || 0, col: "from-rose-500/25 to-rose-900/5", text: "text-rose-400", border: "border-rose-500/30" },
-          { id: STATUS.ENVIADA, label: "Enviadas", val: kpisData?.enviada || 0, col: "from-amber-500/25 to-amber-900/5", text: "text-amber-400", border: "border-amber-500/30" },
-          { id: STATUS.REALIZADA, label: "Realizadas", val: kpisData?.realizada || 0, col: "from-emerald-500/25 to-emerald-900/5", text: "text-emerald-400", border: "border-emerald-500/30" },
-          { id: "TODAS", label: "Universo", val: kpisData?.total || 0, col: "from-slate-500/25 to-slate-900/5", text: "text-slate-100", border: "border-slate-500/30" },
+          { id: STATUS.ENVIAR, label: "Pendientes", val: kpisData?.pendiente_envio || 0, text: "text-rose-400", activeCls: "bg-rose-500/10 border-rose-500/30" },
+          { id: GRUPO_DADAS, label: "Dadas de baja", val: (kpisData?.enviada || 0) + (kpisData?.realizada || 0), text: "text-emerald-400", activeCls: "bg-emerald-500/10 border-emerald-500/30" },
         ].map((t) => {
-          // Si estamos dibujando la fila global, no mostramos el estado Activo visual porque la tabla de abajo responde a la sucursal
-          const isActive = !isGlobal && activeTab === t.id; 
-          const isDownloadingThis = downloadingTab === t.id;
-
+          const isActive = !isGlobal && activeTab === t.id;
           return (
             <button
               key={t.id}
-              onClick={() => { 
-                if(!isGlobal) {
-                  setActiveTab(t.id); setPage(1); setSelectedIds(new Set()); loadTableData({ force: true, overrides: { activeTab: t.id, page: 1 } }); 
-                }
+              onClick={() => {
+                if (!isGlobal) { setActiveTab(t.id); setPage(1); setSelectedIds(new Set()); }
               }}
-              className={`relative overflow-hidden p-6 rounded-[2rem] border transition-all duration-300 group text-left ${
-                isActive ? `bg-gradient-to-br ${t.col} ${t.border} scale-[1.03] shadow-2xl ring-2 ring-white/5` : "bg-slate-900/40 border-white/5 opacity-70 hover:opacity-100"
-              } ${isGlobal ? "cursor-default hover:scale-100" : ""}`}
+              className={`p-5 rounded-2xl border text-left transition-all ${
+                isActive ? t.activeCls : "bg-slate-900/40 border-white/5 opacity-70 hover:opacity-100"
+              } ${isGlobal ? "cursor-default" : ""}`}
             >
-              {/* 🚀 BOTÓN DE DESCARGA INCORPORADO EN LA TARJETA */}
-              <div 
-                onClick={(e) => handleDownloadExcelFromBackend(e, t.id, isGlobal)}
-                className={`absolute top-4 right-4 p-2 rounded-xl border bg-white/5 backdrop-blur-md transition-all cursor-pointer z-20 
-                  ${isDownloadingThis ? "border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/40 hover:text-white hover:bg-white/10 hover:border-white/30 hover:scale-110"}`}
-                title={`Descargar Excel: ${t.label}`}
-              >
-                 {isDownloadingThis ? (
-                    <div className="w-5 h-5 border-2 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin" />
-                 ) : (
-                    <HiDownload className="text-xl" />
-                 )}
-              </div>
-
-              <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 mb-2">{t.label}</div>
-              <div className={`text-4xl font-black ${t.text} drop-shadow-sm`}>{t.val}</div>
-              {isActive && (
-                  <div className="absolute -bottom-2 -right-2 p-4 bg-white/5 rounded-full blur-2xl opacity-50 group-hover:scale-150 transition-transform duration-700" />
-              )}
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-1">{t.label}</div>
+              <div className={`text-3xl font-black ${t.text}`}>{t.val}</div>
             </button>
-          )
+          );
         })}
       </div>
     </div>
@@ -429,45 +438,28 @@ export default function BajasPage() {
 
       <div className="bg-slate-900/40 backdrop-blur-2xl p-6 rounded-[3rem] border border-white/10 shadow-inner space-y-6">
         
-        <div className="flex flex-col lg:flex-row gap-5 items-center justify-between border-b border-white/5 pb-6">
-          <div className="flex items-center gap-3">
-             <div className="flex -space-x-2">
-                {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-8 w-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center">
-                        <div className="h-2 w-2 rounded-full bg-sky-400" />
-                    </div>
-                ))}
-             </div>
-             <div className="text-xs font-black text-sky-400 tracking-tighter bg-sky-400/10 px-4 py-2 rounded-full border border-sky-400/20">
-                {selectedIds.size} SELECCIONADAS
-             </div>
+        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between border-b border-white/5 pb-6">
+          <div className="text-xs font-bold text-sky-300 bg-sky-400/10 px-4 py-2 rounded-full border border-sky-400/20">
+            {selectedIds.size} seleccionada{selectedIds.size === 1 ? "" : "s"}
           </div>
-          
+
           <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-center">
-            {/* Este botón viejo lo podemos dejar o sacar, pero ya no hace falta porque están los íconos arriba */}
+            <button
+              disabled={!selectedIds.size}
+              onClick={() => openConfirmModal("DAR_BAJA", Array.from(selectedIds))}
+              className="px-7 py-3 bg-rose-600 text-white text-sm font-black uppercase tracking-wide rounded-2xl border border-rose-400/40 shadow-lg shadow-rose-500/30 hover:bg-rose-500 hover:shadow-rose-500/50 disabled:bg-rose-500/15 disabled:text-rose-300/40 disabled:shadow-none disabled:border-rose-500/20 transition-all flex items-center gap-2"
+            >
+              <HiPaperAirplane className="text-lg" /> Dar de baja ({selectedIds.size})
+            </button>
             <button
               disabled={!selectedIds.size}
               onClick={() => openConfirmModal("EXCEL", Array.from(selectedIds))}
-              className="px-5 py-2.5 bg-emerald-500/10 text-emerald-400 text-xs font-black rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/20 disabled:opacity-20 transition flex items-center gap-2"
+              className="px-5 py-2.5 bg-white/5 text-white/70 text-xs font-bold rounded-2xl border border-white/10 hover:bg-white/10 disabled:opacity-20 transition flex items-center gap-2"
             >
-              <HiDownload className="text-lg" /> Exportar Selección
-            </button>
-            <button
-              disabled={!selectedIds.size}
-              onClick={() => openConfirmModal("ENVIADA", Array.from(selectedIds))}
-              className="px-5 py-2.5 bg-amber-500/10 text-amber-400 text-xs font-black rounded-2xl border border-amber-500/20 hover:bg-amber-500/20 disabled:opacity-20 transition"
-            >
-              Marcar Enviadas
-            </button>
-            <button
-              disabled={!selectedIds.size}
-              onClick={() => openConfirmModal("REALIZADA", Array.from(selectedIds))}
-              className="px-5 py-2.5 bg-sky-500/10 text-sky-400 text-xs font-black rounded-2xl border border-sky-500/20 hover:bg-sky-500/20 disabled:opacity-20 transition"
-            >
-              Marcar Realizadas
+              <HiDownload className="text-lg" /> Solo Excel
             </button>
             {selectedIds.size > 0 && (
-                <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 text-slate-500 hover:text-white text-xs font-bold uppercase transition-colors">Limpiar</button>
+              <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 text-slate-500 hover:text-white text-xs font-bold uppercase transition-colors">Limpiar</button>
             )}
           </div>
         </div>
@@ -530,7 +522,7 @@ export default function BajasPage() {
 
         <div className="relative min-h-[400px]">
           <BajasTable
-            items={filtered}
+            items={itemsPaginados}
             selectedIds={selectedIds}
             sortConfig={sortConfig}
             onSort={handleSort}
@@ -551,7 +543,7 @@ export default function BajasPage() {
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Mostrar</span>
             <select
               value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); loadTableData({ force: true, overrides: { pageSize: Number(e.target.value), page: 1 } }); }}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
               className="bg-transparent text-white text-sm font-black outline-none cursor-pointer hover:text-sky-400 transition-colors"
             >
               {[15, 30, 50, 100].map(n => <option key={n} value={n} className="bg-slate-900">{n} filas</option>)}
@@ -561,12 +553,8 @@ export default function BajasPage() {
           <div className="flex items-center gap-4 group">
             {/* 🚀 BOTÓN PREVIOUS ARREGLADO */}
             <button
-              disabled={page === 1}
-              onClick={() => { 
-                const np = page - 1; 
-                setPage(np); 
-                loadTableData({ force: true, overrides: { page: np } }); 
-              }}
+              disabled={safePage === 1}
+              onClick={() => setPage(Math.max(1, safePage - 1))}
               className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl cursor-pointer disabled:cursor-not-allowed"
             >
               <HiChevronLeft size={22} />
@@ -575,18 +563,14 @@ export default function BajasPage() {
             <div className="flex flex-col items-center min-w-[100px]">
                 <span className="text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest text-center">Pagina</span>
                 <div className="text-xl font-black text-white bg-white/5 px-6 py-1 rounded-xl border border-white/10">
-                    {page} <span className="text-slate-600 mx-1">/</span> {totalPages}
+                    {safePage} <span className="text-slate-600 mx-1">/</span> {totalPages}
                 </div>
             </div>
             
             {/* 🚀 BOTÓN NEXT ARREGLADO */}
             <button
-              disabled={page >= totalPages}
-              onClick={() => { 
-                const np = page + 1; 
-                setPage(np); 
-                loadTableData({ force: true, overrides: { page: np } }); 
-              }}
+              disabled={safePage >= totalPages}
+              onClick={() => setPage(Math.min(totalPages, safePage + 1))}
               className="p-4 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-sky-500/10 hover:border-sky-500/40 disabled:opacity-20 text-white transition-all shadow-xl cursor-pointer disabled:cursor-not-allowed"
             >
               <HiChevronRight size={22} />
@@ -667,7 +651,7 @@ export default function BajasPage() {
               </div>
               <div className="p-8 space-y-6">
                 <p className="text-base text-slate-400 leading-relaxed font-semibold">{activeModalConfig.desc}</p>
-                {confirmModal.type !== "EXCEL" && (
+                {(confirmModal.type === "ENVIADA" || confirmModal.type === "REALIZADA") && (
                   <label className="flex items-center gap-5 p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-3xl cursor-pointer hover:bg-emerald-500/10 transition-all group">
                     <input type="checkbox" checked={includeExcel} onChange={(e) => setIncludeExcel(e.target.checked)} className="w-6 h-6 accent-emerald-500 rounded-xl cursor-pointer" />
                     <span className="text-[13px] text-emerald-100 font-black uppercase tracking-tight group-hover:text-emerald-400 transition-colors">Generar reporte Excel simultáneamente</span>
