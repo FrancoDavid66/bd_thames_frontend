@@ -126,7 +126,7 @@ const DesktopRow = memo(function DesktopRow({ poliza, zebra, isWebAdmin }) {
   return (
     <tr className={`transition-colors ${zebra} hover:bg-slate-800/40 ${esVerificacion ? "ring-1 ring-inset ring-orange-500/30" : ""}`}>
       <td className="border-b border-slate-800/60 p-3">
-        <Link to={`/polizas/${poliza.id}`} className="block text-sm font-bold text-indigo-400 hover:text-indigo-300">
+        <Link to={`/polizas/${poliza.id}`} target="_blank" rel="noopener noreferrer" className="block text-sm font-bold text-indigo-400 hover:text-indigo-300">
           {poliza.numero_poliza || "-"}
         </Link>
         <div className="text-[10px] font-bold uppercase text-slate-500">{poliza.compania || "S/C"}</div>
