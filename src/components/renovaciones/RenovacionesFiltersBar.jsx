@@ -115,7 +115,9 @@ export default function RenovacionesFiltersBar({
       )}
 
       {/* ============ SUCURSAL + SOLO PENDIENTES (1 sola fila) ============ */}
-      {!minimal && (
+      {/* En modo minimal seguimos mostrando la sucursal SOLO para admin
+          (sin ella, un admin no tiene scope y no ve datos). */}
+      {(!minimal || isWebAdmin) && (
       <div className="flex flex-col sm:flex-row gap-2">
         {/* Oficina (solo admin) */}
         {isWebAdmin && (
@@ -142,7 +144,8 @@ export default function RenovacionesFiltersBar({
           </div>
         )}
 
-        {/* Solo pendientes (compacto) */}
+        {/* Solo pendientes (compacto) — oculto en modo minimal */}
+        {!minimal && (
         <button
           type="button"
           onClick={() => setSoloPendientes(!soloPendientes)}
@@ -157,6 +160,7 @@ export default function RenovacionesFiltersBar({
           {soloPendientes ? <HiCheck /> : <HiX className="opacity-50" />}
           Solo pendientes de pago
         </button>
+        )}
       </div>
       )}
     </div>
