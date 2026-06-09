@@ -237,11 +237,8 @@ export default function RenovacionesPage() {
   const resumen = useSelector(selectRenovacionesResumen);
   const globalResumen = useSelector(selectRenovacionesGlobalResumen) || {};
 
-  // 🆕 Tab activo (persistido en localStorage)
-  const [tab, setTab] = useState(() => {
-    const saved = localStorage.getItem("renovaciones.tab");
-    return TABS_VALIDAS.includes(saved) ? saved : "pendientes";
-  });
+  // 🆕 Vista fija en "pendientes" (la app se simplificó: solo lista + buscador)
+  const [tab, setTab] = useState("pendientes");
 
   useEffect(() => {
     localStorage.setItem("renovaciones.tab", tab);
@@ -706,6 +703,7 @@ export default function RenovacionesPage() {
         </div>
 
         <RenovacionesFiltersBar
+          minimal
           loading={loading}
           search={search}
           setSearch={setSearch}
@@ -721,47 +719,6 @@ export default function RenovacionesPage() {
           isWebAdmin={isWebAdmin}
           totalCount={totalCount}
         />
-
-        {/* ============ TABS principales ============ */}
-        <div className="mt-4">
-          <RenovacionesTabs
-            activeTab={tab}
-            onChange={setTab}
-            counts={tabCounts}
-          />
-        </div>
-
-        {/* ============ 🎮 Barra de progreso del día ============ */}
-        <div className="mt-3">
-          <ProgresoDelDia
-            hechasHoy={hechasHoy}
-            pendientesTotales={tabCounts?.pendientes || 0}
-            renovadasHoy={renovadasHoy}
-            verificadasHoy={verificadasHoy}
-            descartadasHoy={descartadasHoy}
-          />
-        </div>
-
-        {/* ============ Buckets de vencimiento (1 sola fila) ============ */}
-        {/* Si es admin y filtra por una sucursal, mostramos un toggle entre globales y sucursal */}
-        <div className="mt-3">
-          <RenovacionesBucketsBar
-            quickButtons={
-              isWebAdmin && !oficina
-                ? globalQuickButtons
-                : quickButtons
-            }
-            activeBucket={bucket}
-            onSelectBucket={setBucket}
-          />
-          {isWebAdmin && (
-            <div className="mt-1.5 text-[10px] text-white/35 ml-1">
-              {oficina
-                ? "Mostrando métricas de la sucursal seleccionada"
-                : "Mostrando métricas globales (toda la empresa)"}
-            </div>
-          )}
-        </div>
 
         {!!error && (
           <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-200 flex items-center gap-2">

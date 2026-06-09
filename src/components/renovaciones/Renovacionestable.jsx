@@ -69,6 +69,37 @@ function formatVto(v) {
   }
 }
 
+// Estado real de la póliza según su vencimiento (lo que importa para renovar)
+function getEstadoVencimiento(p) {
+  const v = getVencimiento(p);
+  if (!v) return null;
+  let d;
+  try {
+    d = dayjs(v).startOf("day").diff(dayjs().startOf("day"), "day");
+  } catch {
+    return null;
+  }
+  if (d > 3) return { label: `Vence en ${d} días`, tone: "sky" };
+  if (d > 1) return { label: `Vence en ${d} días`, tone: "amber" };
+  if (d === 1) return { label: "Vence mañana", tone: "amber" };
+  if (d === 0) return { label: "Vence hoy", tone: "amber" };
+  const abs = Math.abs(d);
+  return { label: abs === 1 ? "Vencida hace 1 día" : `Vencida hace ${abs} días`, tone: "rose" };
+}
+
+function vtoToneClass(tone) {
+  switch (tone) {
+    case "rose":
+      return "bg-rose-500/15 border-rose-400/40 text-rose-200";
+    case "amber":
+      return "bg-amber-500/15 border-amber-400/40 text-amber-200";
+    case "sky":
+      return "bg-sky-500/15 border-sky-400/40 text-sky-200";
+    default:
+      return "bg-white/5 border-white/15 text-white/60";
+  }
+}
+
 function getNombreCompleto(cliente) {
   if (!cliente) return "—";
   const ap = cliente.apellido || "";
@@ -407,6 +438,7 @@ function RenovacionRow({
   const motivoEmoji = MOTIVO_EMOJI[motivo] || "";
   const detalle = p?.renovacion_descartada_detalle || "";
   const descartadaEn = formatFechaHora(p?.renovacion_descartada_en);
+  const estadoVto = getEstadoVencimiento(p);
 
   // 🎉 Wrappers — feedback sutil de luz al renovar (sin papelitos)
   const [renovandoFlash, setRenovandoFlash] = useState(false);
@@ -543,16 +575,26 @@ function RenovacionRow({
               </span>
             )}
           </motion.div>
-        ) : verificada ? (
-          <motion.span
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[10px] font-bold px-2 py-0.5"
-          >
-            <HiClock /> En seguimiento
-          </motion.span>
         ) : (
-          <span className="text-[10px] text-white/30">—</span>
+          <div className="flex flex-col gap-1">
+            {estadoVto ? (
+              <span
+                className={cx(
+                  "inline-flex items-center gap-1 rounded-full border text-[10px] font-bold px-2 py-0.5 w-fit",
+                  vtoToneClass(estadoVto.tone)
+                )}
+              >
+                {estadoVto.label}
+              </span>
+            ) : (
+              <span className="text-[10px] text-white/30">Sin fecha</span>
+            )}
+            {verificada && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[10px] font-bold px-2 py-0.5 w-fit">
+                <HiClock /> En seguimiento
+              </span>
+            )}
+          </div>
         )}
       </td>
 

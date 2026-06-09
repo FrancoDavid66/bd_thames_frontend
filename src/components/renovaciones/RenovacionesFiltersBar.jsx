@@ -19,6 +19,7 @@ export default function RenovacionesFiltersBar({
   oficinasOptions = [],
   isWebAdmin,
   totalCount = 0,
+  minimal = false,
 }) {
   /* ============ BUSCADOR LOCAL CON DEBOUNCE ============ */
   const [localSearch, setLocalSearch] = useState(search || "");
@@ -114,6 +115,7 @@ export default function RenovacionesFiltersBar({
       )}
 
       {/* ============ SUCURSAL + SOLO PENDIENTES (1 sola fila) ============ */}
+      {!minimal && (
       <div className="flex flex-col sm:flex-row gap-2">
         {/* Oficina (solo admin) */}
         {isWebAdmin && (
@@ -156,6 +158,7 @@ export default function RenovacionesFiltersBar({
           Solo pendientes de pago
         </button>
       </div>
+      )}
     </div>
   );
 }
