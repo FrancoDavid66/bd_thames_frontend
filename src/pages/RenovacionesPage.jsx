@@ -403,7 +403,7 @@ export default function RenovacionesPage() {
   );
 
   useEffect(() => {
-    load();
+    load({ force: true });
   }, [load]);
   useEffect(() => {
     loadResumen();
@@ -416,10 +416,10 @@ export default function RenovacionesPage() {
     }
   }, [oficina, isWebAdmin]);
 
-  // Cuando cambia el tab, volvemos a página 1
+  // Cuando cambia el tab o el filtro (chip), volvemos a página 1
   useEffect(() => {
     setPage(1);
-  }, [tab]);
+  }, [tab, bucket]);
 
   /* ============ FILTRADO EN FRONTEND POR TAB ============ */
   const itemsRaw = Array.isArray(items) ? items : [];
@@ -929,7 +929,7 @@ export default function RenovacionesPage() {
         }}
       />
 
-      {/* ============ Modal "Marcar no renu eva" ============ */}
+      {/* ============ Modal "Marcar no renueva" ============ */}
       <DescartarRenovacionModal
         open={noRenuevaModal.open}
         item={noRenuevaModal.item}
