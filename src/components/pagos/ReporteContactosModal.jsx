@@ -181,6 +181,14 @@ export default function ReporteContactosModal({
                     <span className="text-sm text-slate-200">{label}</span>
                   </div>
                 ))}
+
+                {/* 🆕 Marca de renovaciones */}
+                <div className="flex items-center gap-3 px-3 py-2 rounded-xl border bg-violet-500/10 border-violet-500/30">
+                  <span className="font-bold text-violet-300 text-[10px] w-10 text-center">RENOV</span>
+                  <span className="text-sm text-slate-200">
+                    Las primeras cuotas de pólizas renovadas salen marcadas en violeta.
+                  </span>
+                </div>
               </div>
             </div>
 
