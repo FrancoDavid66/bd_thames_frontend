@@ -117,16 +117,37 @@ const HomePage = () => {
 
   const totalClientes = clientesCount || clientesList.length || 0;
 
-  // 🆕 Totales REALES del mes (paginado completo, sin el tope de 500 que truncaba).
-  //    Recorre TODAS las páginas del mes y suma; así el número coincide con el detalle descargable.
+  // 🆕 Totales REALES del mes. Primero intenta el endpoint del backend
+  //    (que suma TODO en el servidor y nunca se trunca). Si no está disponible,
+  //    cae a paginar en el front como respaldo.
   const [totalesMes, setTotalesMes] = useState({ ingresos: 0, egresos: 0, cargando: true });
 
   const cargarTotalesMes = useCallback(async () => {
     const token = localStorage.getItem("access_token");
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const mes   = dayjs().format("YYYY-MM");
     const desde = dayjs().startOf("month").format("YYYY-MM-DD");
     const hasta = dayjs().endOf("month").format("YYYY-MM-DD");
 
+    setTotalesMes((p) => ({ ...p, cargando: true }));
+
+    // 1) Camino ideal: el backend suma todo el mes (no se trunca jamás)
+    try {
+      const res = await axios.get(`${API_BASE}balance-mensual/`, { params: { mes }, headers });
+      const t = res.data?.totales;
+      if (t && (t.ingresos !== undefined || t.egresos !== undefined)) {
+        setTotalesMes({
+          ingresos: Number(t.ingresos || 0),
+          egresos: Number(t.egresos || 0),
+          cargando: false,
+        });
+        return;
+      }
+    } catch {
+      // si el endpoint aún no está deployado, seguimos con el respaldo de abajo
+    }
+
+    // 2) Respaldo: paginar en el front hasta el final
     const sumarTodo = async (recurso) => {
       let page = 1, total = 0, hayMas = true;
       while (hayMas) {
@@ -147,7 +168,6 @@ const HomePage = () => {
     };
 
     try {
-      setTotalesMes((p) => ({ ...p, cargando: true }));
       const [ti, te] = await Promise.all([sumarTodo("ingresos"), sumarTodo("egresos")]);
       setTotalesMes({ ingresos: ti, egresos: te, cargando: false });
     } catch {
