@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -117,6 +117,44 @@ const HomePage = () => {
 
   const totalClientes = clientesCount || clientesList.length || 0;
 
+  // 🆕 Totales REALES del mes (paginado completo, sin el tope de 500 que truncaba).
+  //    Recorre TODAS las páginas del mes y suma; así el número coincide con el detalle descargable.
+  const [totalesMes, setTotalesMes] = useState({ ingresos: 0, egresos: 0, cargando: true });
+
+  const cargarTotalesMes = useCallback(async () => {
+    const token = localStorage.getItem("access_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const desde = dayjs().startOf("month").format("YYYY-MM-DD");
+    const hasta = dayjs().endOf("month").format("YYYY-MM-DD");
+
+    const sumarTodo = async (recurso) => {
+      let page = 1, total = 0, hayMas = true;
+      while (hayMas) {
+        const res = await axios.get(`${API_BASE}${recurso}/`, {
+          params: { page, page_size: 500, fecha__gte: desde, fecha__lte: hasta },
+          headers,
+        });
+        const data = res.data || {};
+        const items = Array.isArray(data.results)
+          ? data.results
+          : (Array.isArray(data) ? data : []);
+        total += items.reduce((s, it) => s + Number(it.monto || 0), 0);
+        if (data.next) page += 1;
+        else hayMas = false;
+        if (page > 300) hayMas = false; // tope de seguridad anti-loop
+      }
+      return total;
+    };
+
+    try {
+      setTotalesMes((p) => ({ ...p, cargando: true }));
+      const [ti, te] = await Promise.all([sumarTodo("ingresos"), sumarTodo("egresos")]);
+      setTotalesMes({ ingresos: ti, egresos: te, cargando: false });
+    } catch {
+      setTotalesMes((p) => ({ ...p, cargando: false }));
+    }
+  }, []);
+
   // Cargar datos
   useEffect(() => {
     dispatch(fetchIngresos());
@@ -129,17 +167,20 @@ const HomePage = () => {
         page_size: 1,
       })
     );
-  }, [dispatch]);
+    cargarTotalesMes();
+  }, [dispatch, cargarTotalesMes]);
 
   // 🚀 Al cerrar cada modal, refrescamos para que el tablero quede al día
   const cerrarIngreso = () => {
     setModalIngresoAbierto(false);
     dispatch(fetchIngresos());
+    cargarTotalesMes();
   };
 
   const cerrarEgreso = () => {
     setModalEgresoAbierto(false);
     dispatch(fetchEgresos());
+    cargarTotalesMes();
   };
 
   // Cargar contadores
@@ -171,33 +212,9 @@ const HomePage = () => {
   const currentYear = dayjs().year();
   const currentMonth = dayjs().month();
 
-  // ---- CÁLCULOS DEL MES ----
-  const totalIngresosMes = useMemo(
-    () =>
-      ingresos.reduce((sum, ing) => {
-        const fecha = dayjs(ing.fecha);
-        if (!fecha.isValid()) return sum;
-        if (fecha.year() === currentYear && fecha.month() === currentMonth) {
-          return sum + Number(ing.monto || 0);
-        }
-        return sum;
-      }, 0),
-    [ingresos, currentYear, currentMonth]
-  );
-
-  const totalEgresosMes = useMemo(
-    () =>
-      egresos.reduce((sum, eg) => {
-        const fecha = dayjs(eg.fecha);
-        if (!fecha.isValid()) return sum;
-        if (fecha.year() === currentYear && fecha.month() === currentMonth) {
-          return sum + Number(eg.monto || 0);
-        }
-        return sum;
-      }, 0),
-    [egresos, currentYear, currentMonth]
-  );
-
+  // ---- CÁLCULOS DEL MES (totales reales del backend, sin el tope de 500) ----
+  const totalIngresosMes = totalesMes.ingresos;
+  const totalEgresosMes = totalesMes.egresos;
   const balanceMes = totalIngresosMes - totalEgresosMes;
 
   // 🚀 FIX: pólizas activas = conteo real de estado "activa" (no el total de todas)
