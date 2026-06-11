@@ -508,6 +508,10 @@ function AdminView() {
   const [page,          setPage]          = useState(1);
   const PAGE_SIZE = 12;
 
+  // 🆕 Efectivo esperado de cierre por sucursal (lo trae el balance diario)
+  const [esperado,        setEsperado]        = useState(null);
+  const [loadingEsperado, setLoadingEsperado] = useState(false);
+
   // Cargar oficinas dinámicamente
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -527,6 +531,25 @@ function AdminView() {
     dispatch(fetchRecaudaciones(params));
     setPage(1);
   }, [dispatch, filtroFecha, filtroOficina]);
+
+  // 🆕 Trae el efectivo esperado por sucursal (balance del día = efectivo entrado − salido).
+  // Pedimos SIEMPRE todas las sucursales (sin filtro de oficina) para verlas de un vistazo.
+  useEffect(() => {
+    let cancel = false;
+    const load = async () => {
+      setLoadingEsperado(true);
+      try {
+        const res = await api.get("balance-diario/", { params: { fecha: filtroFecha } });
+        if (!cancel) setEsperado(res.data);
+      } catch {
+        if (!cancel) setEsperado(null);
+      } finally {
+        if (!cancel) setLoadingEsperado(false);
+      }
+    };
+    load();
+    return () => { cancel = true; };
+  }, [filtroFecha]);
 
   const refresh = () => {
     const params = {};
@@ -575,6 +598,49 @@ function AdminView() {
           <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           {loading ? "Cargando..." : "Actualizar"}
         </button>
+      </div>
+
+      {/* 🆕 Efectivo esperado para el cierre, por sucursal */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <HiCurrencyDollar className="w-5 h-5 text-emerald-400" />
+          <h3 className="text-sm font-semibold text-slate-100">
+            Efectivo esperado para el cierre
+          </h3>
+        </div>
+        <p className="text-[11px] text-slate-500 mb-3">
+          Efectivo que entró menos el que salió el {fmtDate(filtroFecha)}. No incluye el saldo arrastrado de días anteriores.
+        </p>
+
+        {loadingEsperado ? (
+          <div className="text-xs text-slate-500">Calculando…</div>
+        ) : (esperado?.por_oficina?.length || esperado?.sin_oficina) ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {(esperado?.por_oficina || []).map((o) => (
+              <div
+                key={o.scope?.oficina ?? o.scope?.oficina_nombre}
+                className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"
+              >
+                <div className="text-[11px] text-slate-400 truncate" title={o.scope?.oficina_nombre}>
+                  {o.scope?.oficina_nombre || "—"}
+                </div>
+                <div className="text-lg font-bold text-emerald-400">
+                  $ {fmtNum(o.totales?.saldo_caja_chica || 0)}
+                </div>
+              </div>
+            ))}
+            {esperado?.sin_oficina && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                <div className="text-[11px] text-slate-400 truncate">Sin sucursal</div>
+                <div className="text-lg font-bold text-slate-400">
+                  $ {fmtNum(esperado.sin_oficina.totales?.saldo_caja_chica || 0)}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs text-slate-500">Sin movimientos de efectivo para esa fecha.</div>
+        )}
       </div>
 
       {/* Conteo */}
