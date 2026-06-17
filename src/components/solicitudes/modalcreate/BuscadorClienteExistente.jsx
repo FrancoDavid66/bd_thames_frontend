@@ -318,4 +318,4 @@ function estimarEstadoPoliza(p) {
     ...p,
     al_dia: alDia,
   };
-}
+}C

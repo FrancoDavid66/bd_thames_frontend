@@ -272,14 +272,16 @@ const FacturaCuotaPDF = ({
   const esPrimeraCuota = String(cuotaNro) === "1";
   const pagoFueraDeTermino = !esPrimeraCuota && isPagoAtrasado(cuota);
 
-  const fechaMostrada = new Date(baseDate.getTime());
-  
+  // 📅 Fecha de cobertura = día siguiente al pago (solo aplica a 1ª cuota o pago atrasado)
+  const fechaCobertura = new Date(baseDate.getTime());
   if (esPrimeraCuota || pagoFueraDeTermino) {
-    fechaMostrada.setDate(fechaMostrada.getDate() + 1);
+    fechaCobertura.setDate(fechaCobertura.getDate() + 1);
   }
 
-  const fechaHoraOperacion = fmtDateTimeHM(fechaMostrada); 
-  const fechaSoloDiaTxt = fmtDateOnly(fechaMostrada);      
+  // 🚀 FIX: la "Fecha de Pago" de arriba muestra la fecha REAL del pago (baseDate, sin +1).
+  // El +1 queda SOLO para la fecha de cobertura del aviso legal (fechaCobertura).
+  const fechaHoraOperacion = fmtDateTimeHM(baseDate);
+  const fechaSoloDiaTxt = fmtDateOnly(fechaCobertura);
   const vencimientoActualTxt = fmtDateOnly(cuota.fecha_vencimiento);
 
   return (
