@@ -8,6 +8,7 @@ import {
   FaDatabase, FaSyncAlt, FaTimes, FaBan, FaCashRegister, FaClock,
   FaFileInvoiceDollar, FaCarCrash, FaTruckMoving, FaShieldAlt,
   FaReceipt, // 🚀 NUEVO ÍCONO PARA SERVICIOS FIJOS
+  FaClipboardCheck, // 🆕 ÍCONO PARA TAREAS DEL DÍA
 } from "react-icons/fa";
 
 import { useAuth } from "../../context/AuthContext";
@@ -83,6 +84,7 @@ export default function MobileTopBar({
         title: "Gestión de Pólizas",
         color: "text-blue-300",
         items: [
+          { to: "/tareas", label: "Tareas del día", icon: FaClipboardCheck },
           { to: "/vencimientos", label: "Vencimientos", icon: FaClock },
           { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt, badge: cuponVencidas },
           { to: "/polizas/renovaciones", label: "Renovaciones", icon: FaSyncAlt, badge: renovacionesPendientes },

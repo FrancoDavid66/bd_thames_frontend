@@ -50,6 +50,9 @@ import CotizacionesPage from "./pages/CotizacionesPage";
 // 🚀 NUEVA APP: PANEL DE ADMINISTRADOR
 import AdminPage from "./pages/AdminPage";
 
+// 🆕 NUEVA APP: TAREAS DEL DÍA
+import TareasPage from "./pages/TareasPage";
+
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
 function App() {
@@ -458,6 +461,10 @@ function App() {
             <AnimatePresence mode="wait">
               <Routes>
                 <Route path="/" element={<HomePage />} />
+
+                {/* 🆕 PANEL DE TAREAS DEL DÍA */}
+                <Route path="/tareas" element={<TareasPage />} />
+
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/clientes/:id" element={<ClienteProfilePage />} />
                 <Route path="/polizas" element={<PolizasPage />} />

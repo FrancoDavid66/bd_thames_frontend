@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiHome, HiUsers, HiDocumentText, HiCurrencyDollar, HiDatabase,
-  HiChartBar, HiMap, HiClipboardList, HiSpeakerphone,
+  HiChartBar, HiMap, HiClipboardList, HiClipboardCheck, HiSpeakerphone,
   HiChevronDown, HiRefresh,
   HiClock, HiBan, HiTruck, HiCash, HiReceiptTax,
   HiShieldCheck, HiX, HiCog,
@@ -22,6 +22,7 @@ const ICON_MAP = {
   chart:       HiChartBar,
   map:         HiMap,
   clipboard:   HiClipboardList,
+  tasks:       HiClipboardCheck,
   speaker:     HiSpeakerphone,
   refresh:     HiRefresh,
   clock:       HiClock,
@@ -87,6 +88,7 @@ export default function Sidebar({
         title: "Principal", flat: true,
         items: [
           { to: "/",           label: "Inicio",           icon: "home" },
+          { to: "/tareas",     label: "Tareas del día",   icon: "tasks" },
           { to: "/solicitudes",label: "Solicitudes",       icon: "clipboard", badge: solTotal },
           { to: "/clientes",   label: "Clientes",          icon: "users" },
           { to: "/siniestros", label: "Siniestros",        icon: "doc" },

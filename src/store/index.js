@@ -45,6 +45,9 @@ import solicitudesReducer from "./slices/solicitudesSlice";
 // 🚀 NUEVO: Servicios y Gastos Fijos
 import serviciosReducer from "./slices/serviciosSlice";
 
+// 🆕 NUEVO: Tareas del día
+import tareasReducer from "./slices/tareasSlice";
+
 export const store = configureStore({
   reducer: {
     clientes: clientesReducer,
@@ -88,6 +91,9 @@ export const store = configureStore({
 
     // 🚀 NUEVO: Servicios y Gastos Fijos
     servicios: serviciosReducer,
+
+    // 🆕 NUEVO: Tareas del día
+    tareas: tareasReducer,
   },
 });
 
