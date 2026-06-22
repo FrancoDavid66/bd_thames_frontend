@@ -1054,6 +1054,10 @@ const PagosPage = () => {
                   <span>Medios de cobro</span>
                 </motion.button>
 
+                {/* 🚫 BOTÓN DE RECORDATORIOS MANUAL DESACTIVADO —
+                    Los recordatorios ahora se envían SOLOS todos los días a las 9:00
+                    (cron Railway: enviar_recordatorios_cuotas). Para reactivar el envío
+                    manual, descomentá este bloque.
                 <motion.button
                   type="button"
                   onClick={() => setShowRecordatoriosModal(true)}
@@ -1065,6 +1069,7 @@ const PagosPage = () => {
                   <HiSpeakerphone className="text-base sm:text-lg" />
                   <span>{sendingRecordatorios ? "Enviando..." : "Recordatorios"}</span>
                 </motion.button>
+                */}
 
                 {/* 🚀 BOTÓN NUEVO DE MÉTRICAS */}
                 <motion.button
