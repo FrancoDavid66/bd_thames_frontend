@@ -35,7 +35,7 @@ export default function TareasPage() {
   const [subirPoliza, setSubirPoliza] = useState(null);
 
   useEffect(() => { dispatch(fetchTareasDia()); }, [dispatch]);
-  useEffect(() => { if (data) setBaseTotal((p) => Math.max(p, total)); }, [data, total]);
+  useEffect(() => { if (data) setBaseTotal((p) => Math.max(p, (data.subir_poliza || []).length)); }, [data]);
 
   const total = (data?.subir_poliza || []).length;
   const hechas = Math.max(0, baseTotal - total);
