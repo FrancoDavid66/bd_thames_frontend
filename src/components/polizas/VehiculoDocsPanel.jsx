@@ -66,6 +66,28 @@ const isPdf = (mime = "", url = "") => {
 
 const toKey = (item = {}) => canonicalKey(String(item.key ?? item.tipo ?? item.nombre ?? "").trim());
 
+// 🆕 Miniatura de la 1ra página de un PDF de Cloudinary (image/upload).
+//    Inserta la transformación pg_1 + tamaño y cambia .pdf → .jpg.
+//    Devuelve "" si la URL no es transformable (ahí usamos el ícono de respaldo).
+const thumbPdf = (url = "") => {
+  if (!url || !/\/image\/upload\//.test(url)) return "";
+  let u = url.replace("/image/upload/", "/image/upload/pg_1,w_180,h_240,c_fit,q_auto,f_jpg/");
+  u = u.replace(/\.pdf($|\?)/i, ".jpg$1");
+  return u;
+};
+
+// 🆕 Nombre legible del archivo: usa el nombre guardado; si no, lo deriva de la URL.
+const nombreArchivo = (d = {}) => {
+  const n = String(d?.nombre || "").trim();
+  if (n) return n;
+  try {
+    const last = decodeURIComponent(String(d?.url || "").split("/").pop().split("?")[0]);
+    return last || "documento.pdf";
+  } catch {
+    return "documento.pdf";
+  }
+};
+
 function normalizeFotos(arr = []) {
   const out = [];
   for (const it of arr) {
@@ -90,7 +112,7 @@ function normalizeDocs(arr = []) {
     const key = toKey(it) || "DOCUMENTO";
     const url = it?.url || it?.secure_url || "";
     if (!url) continue;
-    out.push({ id: it?.id, key, label: toLabel(key), url, public_id: it?.public_id || "", mime: it?.mime || "" });
+    out.push({ id: it?.id, key, label: toLabel(key), url, public_id: it?.public_id || "", mime: it?.mime || "", nombre: it?.nombre || "" });
   }
   return out.filter((x, i, self) => i === self.findIndex((t) => t.url === x.url));
 }
@@ -124,12 +146,35 @@ function consolidate(rawFotos = [], rawDocs = []) {
   return { fotos: dedup(fotos), documentos: dedup(documentos) };
 }
 
+// 🆕 Miniatura de PDF con ícono de respaldo si la imagen no carga.
+function PdfThumb({ url, alt }) {
+  const [err, setErr] = useState(false);
+  const src = thumbPdf(url);
+  if (err || !src) {
+    return (
+      <span className="grid h-14 w-11 shrink-0 place-items-center rounded bg-rose-500/10">
+        <HiDocumentText className="text-lg text-rose-300" />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt || "PDF"}
+      loading="lazy"
+      onError={() => setErr(true)}
+      className="h-14 w-11 shrink-0 rounded border border-slate-700 bg-white object-cover"
+    />
+  );
+}
+
 export default function VehiculoDocsPanel({ polizaId }) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [poliza, setPoliza] = useState(null);
   const [fotos, setFotos] = useState([]);
   const [documentos, setDocumentos] = useState([]);
+  const [previewDoc, setPreviewDoc] = useState(null); // 🆕 PDF a previsualizar
 
   // Modal Dinámico
   const [uploaderOpen, setUploaderOpen] = useState(false);
@@ -260,12 +305,12 @@ export default function VehiculoDocsPanel({ polizaId }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ===== Galería ===== */}
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+        <section className="rounded-2xl border border-white/[0.06] bg-[#121829] p-3">
           <header className="mb-3 flex items-center gap-2 text-slate-200">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300">
               <HiPhotograph className="text-lg" />
             </span>
-            <h3 className="text-sm font-semibold">Galería del vehículo</h3>
+            <h3 className="text-sm font-semibold">Fotos</h3>
           </header>
 
           <AnimatePresence initial={false}>
@@ -278,7 +323,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
             ) : (
               <motion.div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                 {fotos.map((item) => (
-                  <figure key={item.url} className="group relative overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
+                  <figure key={item.url} className="group relative overflow-hidden rounded-lg border border-white/[0.06] bg-slate-900">
                     <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
                       <img src={item.url} alt={item.label} className="aspect-video w-full object-cover" loading="lazy" />
                     </a>
@@ -308,7 +353,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
         </section>
 
         {/* ===== Documentos ===== */}
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+        <section className="rounded-2xl border border-white/[0.06] bg-[#121829] p-3">
           <header className="mb-3 flex items-center justify-between text-slate-200">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300">
@@ -333,7 +378,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Imágenes</div>
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {docsAgrupados.imgDocs.map((d) => (
-                        <figure key={d.url} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
+                        <figure key={d.url} className="overflow-hidden rounded-lg border border-white/[0.06] bg-slate-900">
                           <a href={d.url} target="_blank" rel="noopener noreferrer" className="block">
                             <img src={d.url} alt={d.label} className="aspect-video w-full object-cover transition hover:opacity-90" loading="lazy" />
                           </a>
@@ -354,10 +399,16 @@ export default function VehiculoDocsPanel({ polizaId }) {
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">PDFs</div>
                     <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {docsAgrupados.pdfDocs.map((d) => (
-                        <li key={d.url} className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
-                          <span className="truncate text-xs text-slate-200" title={d.label}>{d.label}</span>
-                          <div className="flex gap-1">
-                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-[11px] hover:bg-white/20"><HiExternalLink /></a>
+                        <li key={d.url} className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-[#121829] px-3 py-2">
+                          <button type="button" onClick={() => setPreviewDoc(d)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" title="Previsualizar">
+                            <PdfThumb url={d.url} alt={d.label} />
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-semibold text-slate-100" title={d.label}>{d.label}</span>
+                              <span className="block truncate text-[11px] text-slate-400" title={nombreArchivo(d)}>{nombreArchivo(d)}</span>
+                            </span>
+                          </button>
+                          <div className="flex shrink-0 gap-1">
+                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-[11px] hover:bg-white/20" title="Abrir en pestaña nueva"><HiExternalLink /></a>
                             {isWebAdmin ? <button onClick={() => removePhoto(d)} className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300 hover:bg-rose-500/30"><HiTrash /></button> : null}
                           </div>
                         </li>
@@ -367,7 +418,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 )}
               </motion.div>
             ) : (
-              <motion.div className="rounded-lg border border-dashed border-slate-800 py-8 text-center text-sm text-slate-500">
+              <motion.div className="rounded-lg border border-dashed border-white/[0.06] py-8 text-center text-sm text-slate-500">
                 No hay documentos cargados.
               </motion.div>
             )}
@@ -375,11 +426,36 @@ export default function VehiculoDocsPanel({ polizaId }) {
         </section>
       </div>
 
+      {/* ===== Modal de previsualización de PDF ===== */}
+      <AnimatePresence>
+        {previewDoc && (
+          <motion.div
+            className="fixed inset-0 z-[130] flex flex-col bg-black/85 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setPreviewDoc(null)}
+          >
+            <div className="flex items-center justify-between gap-2 p-3 text-white" onClick={(e) => e.stopPropagation()}>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{previewDoc.label}</p>
+                <p className="truncate text-[11px] text-white/60">{nombreArchivo(previewDoc)}</p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <a href={previewDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs hover:bg-white/20"><HiExternalLink /> Abrir</a>
+                <button onClick={() => setPreviewDoc(null)} className="rounded-lg bg-white/10 p-2 hover:bg-white/20"><HiX /></button>
+              </div>
+            </div>
+            <div className="flex-1 bg-black/40" onClick={(e) => e.stopPropagation()}>
+              <iframe title={nombreArchivo(previewDoc)} src={`${previewDoc.url}#view=FitH&toolbar=1`} className="h-full w-full" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ===== Modal de subida ===== */}
       <AnimatePresence>
         {uploaderOpen && (
           <motion.div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+            <motion.div className="w-full max-w-md rounded-2xl border border-white/[0.06] bg-[#121829] p-6 shadow-2xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
               <div className="mb-5 flex justify-between">
                 <h4 className="font-bold uppercase tracking-tight text-white">
                   Subir {uploaderMode === "FOTO" ? "foto" : "documento"}

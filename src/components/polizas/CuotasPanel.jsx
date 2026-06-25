@@ -3,18 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
+import { HiCheckCircle, HiClock } from "react-icons/hi";
 
 import { pagarCuota } from "../../store/slices/polizasSlice";
+import { resumenCuotas } from "../../utils/cuotas";
 
-// 🎯 ÚNICA fuente de verdad para toda la lógica de cuotas
-import { resumenCuotas, getProximaCuota } from "../../utils/cuotas";
+const CARD = "rounded-2xl border border-white/[0.06] bg-[#121829]";
 
-// 🎯 Componente reutilizable para mostrar una cuota
-import CuotaInfoCard from "./CuotaInfoCard";
-
-
-/* ===================== Panel principal ===================== */
-export default function CuotasPanel({ poliza, polizaId }) {
+export default function CuotasPanel({ poliza }) {
   const dispatch = useDispatch();
 
   const [rows, setRows] = useState(Array.isArray(poliza?.cuotas) ? poliza.cuotas : []);
@@ -23,12 +19,8 @@ export default function CuotasPanel({ poliza, polizaId }) {
   }, [poliza?.cuotas]);
 
   const [busyIds, setBusyIds] = useState({});
-
-  // ─── Resumen agregado (delegado al utils unificado) ─────────────────
   const resumen = useMemo(() => resumenCuotas(rows), [rows]);
-
-  // ─── Próxima cuota a pagar (la que se usa para recordatorios) ───────
-  const proximaCuota = useMemo(() => getProximaCuota(rows), [rows]);
+  const progreso = resumen.total ? Math.round((resumen.pagadas / resumen.total) * 100) : 0;
 
   const handleMarcarPagada = async (cuota) => {
     if (!cuota?.id || cuota.pagado) return;
@@ -55,99 +47,82 @@ export default function CuotasPanel({ poliza, polizaId }) {
     }
   };
 
+  const fmtMonto = (m) => {
+    const n = Number(m || 0);
+    if (!n) return null;
+    return `$ ${n.toLocaleString("es-AR")}`;
+  };
+
   return (
-    <div className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-950/90 p-4 sm:p-5 shadow-lg shadow-black/40">
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-white/60">Sección operativa</div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white">Gestión de Cuotas</h3>
+    <div className="space-y-4">
+      {/* Progreso */}
+      <div>
+        <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+          <span>{resumen.pagadas} de {resumen.total} pagadas</span>
+          <span>{progreso}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progreso}%` }} />
         </div>
       </div>
 
-      {/* 🚀 Fechas clave de la póliza — alta + próximo pago, lado a lado */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Fecha de alta */}
-        {poliza?.fecha_emision ? (
-          <div className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5">
-            <span className="text-sky-300 text-lg shrink-0">📅</span>
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-sky-300/80">Póliza dada de alta el</span>
-              <span className="text-sm font-bold text-white">
-                {dayjs(poliza.fecha_emision).format("DD/MM/YYYY")}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5">
-            <span className="text-amber-300 text-lg shrink-0">⚠️</span>
-            <span className="text-xs font-medium text-amber-200">
-              Sin fecha de alta cargada. Cargala con EDITAR para que las fechas se calculen bien.
-            </span>
-          </div>
-        )}
-
-        {/* Próximo pago (usado para recordatorios) */}
-        {proximaCuota?.fecha_vencimiento ? (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5">
-            <span className="text-emerald-300 text-lg shrink-0">🔔</span>
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-emerald-300/80">Vence (cuota #{proximaCuota.cuota_nro})</span>
-              <span className="text-sm font-bold text-white">
-                {dayjs(proximaCuota.fecha_vencimiento).format("DD/MM/YYYY")}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5">
-            <span className="text-neutral-400 text-lg shrink-0">✅</span>
-            <span className="text-xs font-medium text-neutral-300">
-              No hay cuotas pendientes de pago.
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Resumen numérico */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
-          <div className="text-[11px] text-neutral-400">Total Cuotas</div>
-          <div className="text-xl font-semibold text-white">{resumen.total}</div>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className={`${CARD} p-3 text-center`}>
+          <div className="text-lg font-semibold text-emerald-400">{resumen.pagadas}</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">Pagadas</div>
         </div>
-        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
-          <div className="text-[11px] text-neutral-400">Pagadas</div>
-          <div className="text-xl font-semibold text-emerald-400">{resumen.pagadas}</div>
+        <div className={`${CARD} p-3 text-center`}>
+          <div className="text-lg font-semibold text-amber-400">{resumen.pendientes}</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">Pendientes</div>
         </div>
-        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
-          <div className="text-[11px] text-neutral-400">Pendientes</div>
-          <div className="text-xl font-semibold text-amber-300">{resumen.pendientes}</div>
-        </div>
-        <div className="rounded-xl bg-neutral-900/90 border border-neutral-800 p-3">
-          <div className="text-[11px] text-neutral-400">Vencidas</div>
-          <div className="text-xl font-semibold text-red-400">{resumen.vencidas}</div>
+        <div className={`${CARD} p-3 text-center`}>
+          <div className="text-lg font-semibold text-rose-400">{resumen.vencidas}</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">Vencidas</div>
         </div>
       </div>
 
-      {/* Lista de cuotas — cada una usa el componente reutilizable */}
-      <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-950/70 divide-y divide-neutral-800">
-        {rows.map((cuota, idx) => (
-          <CuotaInfoCard
-            key={cuota.id}
-            cuota={cuota}
-            todasLasCuotas={rows}
-            idx={idx}
-            polizaFechaEmision={poliza?.fecha_emision}
-            onMarcarPagada={handleMarcarPagada}
-            busy={!!busyIds[cuota.id]}
-            variant="full"
-          />
-        ))}
-
-        {rows.length === 0 && (
-          <div className="p-8 text-center text-neutral-500 text-sm">
+      {/* Lista de cuotas */}
+      <div className={`${CARD} overflow-hidden`}>
+        {rows.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">
             Esta póliza no tiene cuotas registradas.
           </div>
+        ) : (
+          rows.map((c) => {
+            const monto = fmtMonto(c.monto);
+            return (
+              <div key={c.id} className="flex items-center justify-between gap-3 border-b border-white/5 px-3.5 py-3 last:border-0">
+                <div className="flex min-w-0 items-center gap-3">
+                  {c.pagado ? (
+                    <HiCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
+                  ) : (
+                    <HiClock className="h-5 w-5 shrink-0 text-amber-400" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium text-slate-100">
+                      Cuota {c.cuota_nro}{monto ? <span className="ml-1.5 text-slate-500">· {monto}</span> : null}
+                    </div>
+                    <div className={`text-[11px] ${c.pagado ? "text-emerald-400" : "text-amber-400"}`}>
+                      {c.pagado
+                        ? `Pagada${c.fecha_pago ? " · " + dayjs(c.fecha_pago).format("DD/MM/YYYY") : ""}`
+                        : `Vence ${c.fecha_vencimiento ? dayjs(c.fecha_vencimiento).format("DD/MM/YYYY") : "—"}`}
+                    </div>
+                  </div>
+                </div>
+
+                {!c.pagado ? (
+                  <button
+                    onClick={() => handleMarcarPagada(c)}
+                    disabled={!!busyIds[c.id]}
+                    className="shrink-0 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-400 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                  >
+                    {busyIds[c.id] ? "..." : "Marcar pagada"}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

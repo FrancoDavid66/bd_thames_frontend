@@ -26,7 +26,7 @@ import {
 import { uploadToCloudinary } from "../../utils/cloudinary";
 import CuponRoboModal from "./CuponRoboModal";
 
-const shell = "rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm shadow-xl shadow-black/20";
+const shell = "rounded-2xl border border-white/[0.06] bg-[#121829] backdrop-blur-sm shadow-xl shadow-black/20";
 
 const badgeByEstado = {
   PENDIENTE: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
@@ -185,22 +185,14 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
   return (
     <div className={shell}>
       {/* Header */}
-      <div className="flex flex-col items-start justify-between gap-3 border-b border-slate-800 px-4 py-3 sm:flex-row sm:items-center">
-        <div className="flex items-start gap-2">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
-            <HiShieldCheck className="h-4 w-4" />
-          </div>
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-50">Cuponeras de robo</h3>
-              <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-400 border border-emerald-500/20">
-                {user?.perfil?.oficina_nombre || "Local"}
-              </span>
-            </div>
-            <p className="max-w-md text-[11px] leading-snug text-slate-400">
-              Gestioná los cupones correspondientes a las cuotas de la compañía.
-            </p>
-          </div>
+      <div className="flex flex-col items-start justify-between gap-3 border-b border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-400 border border-emerald-500/20">
+            {user?.perfil?.oficina_nombre || "Local"}
+          </span>
+          <p className="text-[11px] leading-snug text-slate-400">
+            Cupones de las cuotas de la compañía.
+          </p>
         </div>
 
         <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -223,7 +215,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
       <div className="space-y-3 px-4 py-3">
         {loading && (
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-[11px] text-slate-300">
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-slate-950/70 px-3 py-2 text-[11px] text-slate-300">
             <span className="h-3 w-3 animate-spin rounded-full border border-slate-600 border-t-transparent" />
             Cargando cupones vinculados a las cuotas...
           </div>
@@ -346,9 +338,9 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
                             type="button"
                             onClick={() => handleClickUpload(cupon)}
                             disabled={uploading || updating}
-                            className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                            className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                           >
-                            {uploading || updating ? <span className="h-3 w-3 animate-spin rounded-full border border-neutral-900 border-t-transparent" /> : <HiPhotograph className="h-3 w-3" />}
+                            {uploading || updating ? <span className="h-3 w-3 animate-spin rounded-full border border-slate-900 border-t-transparent" /> : <HiPhotograph className="h-3 w-3" />}
                             <span>Subir comprobante y marcar pagado</span>
                           </button>
                         )}
@@ -379,7 +371,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
             <motion.div
-              className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl sm:p-6"
+              className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/[0.06] bg-[#121829] p-5 shadow-2xl sm:p-6"
               initial={{ scale: 0.9, opacity: 0, y: -20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: -20 }}
@@ -458,7 +450,7 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
                   <div className="flex justify-end gap-2 pt-2">
                     <button type="button" onClick={closeModal} disabled={isModalUploading} className="rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-bold uppercase text-slate-400 transition-all hover:bg-slate-800 disabled:opacity-50">Cancelar</button>
-                    <button type="button" onClick={handleInitiateConfirm} disabled={isModalUploading} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black uppercase text-neutral-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-60">Siguiente</button>
+                    <button type="button" onClick={handleInitiateConfirm} disabled={isModalUploading} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black uppercase text-slate-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-60">Siguiente</button>
                   </div>
                 </div>
               ) : (
@@ -484,10 +476,10 @@ export default function CuponesRoboPanel({ poliza, polizaId, cupones: cuponesPro
 
                   <div className="flex flex-col justify-end gap-2 pt-2 sm:flex-row">
                     <button type="button" onClick={() => setMontoModal((prev) => ({ ...prev, isConfirming: false }))} disabled={isModalUploading} className="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-bold uppercase text-slate-400 transition-all hover:bg-slate-800 disabled:opacity-50 sm:w-auto">No, corregir</button>
-                    <button type="button" onClick={executeConfirmMonto} disabled={isModalUploading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black uppercase text-neutral-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-60 sm:w-auto">
+                    <button type="button" onClick={executeConfirmMonto} disabled={isModalUploading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black uppercase text-slate-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-60 sm:w-auto">
                       {isModalUploading ? (
                         <>
-                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-neutral-950 border-t-transparent" />
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-950 border-t-transparent" />
                           {montoModal.editMode ? "Guardando..." : "Enviando..."}
                         </>
                       ) : (

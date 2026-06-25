@@ -8,6 +8,7 @@ import {
   HiFilter, HiExclamationCircle,
 } from "react-icons/hi";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { actualizarEstadoCuponRobo } from "../store/slices/cuponesRoboSlice";
@@ -46,7 +47,9 @@ const fmtPeriodo = (c) => {
 };
 
 function getVisual(c) {
-  if ((c?.estado || "").toUpperCase() === "PAGADA") return "PAGADA";
+  const _est = (c?.estado || "").toUpperCase();
+  if (_est === "PAGADA") return "PAGADA";
+  if (_est === "REPORTADO") return "REPORTADO";
   const hoy = dayjs().startOf("day");
   if (!c?.fecha_vencimiento) return "AL_DIA";
   const vto  = dayjs(c.fecha_vencimiento);
@@ -117,6 +120,7 @@ function buildPages(current, total) {
 /* ─── badge config ─────────────────────────────────────────── */
 const BADGE = {
   PAGADA:     { cls: "bg-emerald-950/50 text-emerald-400 border-emerald-800", label: "Pagada"     },
+  REPORTADO:  { cls: "bg-sky-950/50 text-sky-400 border-sky-800",             label: "Reportado"  },
   AL_DIA:     { cls: "bg-slate-800 text-slate-400 border-slate-700",          label: "Al día"     },
   POR_VENCER: { cls: "bg-amber-950/50 text-amber-400 border-amber-800",       label: "Por vencer" },
   PENDIENTE:  { cls: "bg-slate-800 text-slate-400 border-slate-700",          label: "Pendiente"  },
@@ -199,33 +203,12 @@ function UrgencyCard({ cupon, onPagar }) {
   );
 }
 
-/* ─── PagoModal ────────────────────────────────────────────── */
+/* ─── PagoModal (confirmar pago — el cliente paga directo) ─── */
 function PagoModal({ cupon, onClose, onConfirm, procesando }) {
-  const fileInputRef = useRef(null);
-  const [step, setStep]               = useState(1);
-  const [montoPago, setMontoPago]     = useState(
-    cupon?.monto ? String(cupon.monto).replace(".", ",") : ""
-  );
-  const [montoCompania, setMontoCompania] = useState("");
-  const [foto, setFoto]               = useState(null);
-
-  const parseMonto = (v) => {
-    const s = String(v || "").replace(/\./g, "").replace(",", ".");
-    const n = parseFloat(s);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const fmtInput = (v) => {
-    const s     = String(v || "").replace(/[^0-9,]/g, "");
-    const parts = s.split(",");
-    const int   = parts[0] ? new Intl.NumberFormat("es-AR").format(Number(parts[0])) : "";
-    return int + (parts.length > 1 ? "," + parts[1].slice(0, 2) : "");
-  };
-
-  const cobrado  = parseMonto(montoPago);
-  const costo    = parseMonto(montoCompania);
-  const ganancia = cobrado - costo;
-  const canNext  = cobrado > 0 && !!foto;
+  const monto = cupon?.monto ? Number(cupon.monto) : 0;
+  const fmtM = (v) =>
+    "$" + Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const reportado = (cupon?.estado || "").toUpperCase() === "REPORTADO";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -234,7 +217,7 @@ function PagoModal({ cupon, onClose, onConfirm, procesando }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Registrar pago</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Confirmar pago</h3>
             <p className="text-xs text-slate-500 mt-0.5 font-mono flex items-center gap-1.5 flex-wrap">
               {cupon?.asegurado_nombre} · {cupon?.poliza_patente}
               {cupon?.poliza_oficina_nombre && (
@@ -253,151 +236,47 @@ function PagoModal({ cupon, onClose, onConfirm, procesando }) {
           </button>
         </div>
 
-        {step === 1 ? (
-          <div className="p-5 space-y-4">
-            {/* Monto cobrado al cliente */}
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
-                Monto cobrado al cliente
-              </label>
-              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 focus-within:border-slate-500 transition-colors">
-                <span className="text-slate-600 text-sm">$</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  autoFocus
-                  value={montoPago}
-                  onChange={(e) => setMontoPago(fmtInput(e.target.value))}
-                  placeholder="0,00"
-                  className="flex-1 bg-transparent text-sm font-mono text-slate-100 outline-none"
-                  disabled={procesando}
-                />
-              </div>
+        <div className="p-5 space-y-4">
+          {reportado && (
+            <div className="rounded-lg border border-sky-800 bg-sky-950/30 px-4 py-2.5 text-xs text-sky-300">
+              El cliente avisó que ya pagó este cupón.
             </div>
+          )}
 
-            {/* Costo compañía */}
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
-                Costo de la compañía
-                <span className="ml-1 normal-case text-slate-600">(para calcular comisión)</span>
-              </label>
-              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 focus-within:border-slate-500 transition-colors">
-                <span className="text-slate-600 text-sm">$</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={montoCompania}
-                  onChange={(e) => setMontoCompania(fmtInput(e.target.value))}
-                  placeholder="0,00"
-                  className="flex-1 bg-transparent text-sm font-mono text-slate-100 outline-none"
-                  disabled={procesando}
-                />
-              </div>
-              {cobrado > 0 && costo > 0 && (
-                <p className={`mt-1.5 text-xs font-mono ${ganancia >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  Ganancia: {fmt(ganancia)}
-                </p>
-              )}
-            </div>
-
-            {/* Foto comprobante */}
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
-                Comprobante
-                <span className="ml-2 text-rose-400">obligatorio</span>
-              </label>
-              <div
-                onClick={() => !procesando && fileInputRef.current?.click()}
-                className={`h-20 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
-                  foto
-                    ? "border-emerald-800 bg-emerald-950/30"
-                    : "border-slate-700 bg-slate-950 hover:bg-slate-800/50"
-                }`}
-              >
-                <HiPhotograph className={`w-5 h-5 ${foto ? "text-emerald-400" : "text-slate-600"}`} />
-                <span className="text-xs text-slate-500 text-center px-2 truncate max-w-full">
-                  {foto ? foto.name : "Hacer clic para seleccionar foto"}
-                </span>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setFoto(e.target.files?.[0] || null)}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                onClick={onClose}
-                disabled={procesando}
-                className="h-9 px-4 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => setStep(2)}
-                disabled={!canNext || procesando}
-                className="h-9 px-4 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Siguiente
-              </button>
-            </div>
+          <div className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 flex justify-between items-center">
+            <span className="text-slate-500 text-sm">Importe del cupón</span>
+            <span className="font-mono font-semibold text-slate-100 text-lg">{fmtM(monto)}</span>
           </div>
-        ) : (
-          <div className="p-5 space-y-4">
-            {/* Pantalla de confirmación */}
-            <div className="rounded-lg border border-slate-800 bg-slate-950 divide-y divide-slate-800">
-              <div className="flex justify-between px-4 py-2.5 text-sm">
-                <span className="text-slate-500">Cobrado al cliente</span>
-                <span className="font-mono font-medium text-emerald-400">{fmt(cobrado)}</span>
-              </div>
-              {costo > 0 && (
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Confirmá solo cuando hayas verificado el pago con la compañía. Tu comisión se registra
+            automáticamente como ingreso.
+          </p>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              onClick={onClose}
+              disabled={procesando}
+              className="h-9 px-4 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => onConfirm()}
+              disabled={procesando}
+              className="h-9 px-5 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white text-sm font-medium disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+            >
+              {procesando ? (
                 <>
-                  <div className="flex justify-between px-4 py-2.5 text-sm">
-                    <span className="text-slate-500">Costo compañía</span>
-                    <span className="font-mono text-slate-300">{fmt(costo)}</span>
-                  </div>
-                  <div className="flex justify-between px-4 py-2.5 text-sm">
-                    <span className="text-slate-400 font-medium">Ganancia</span>
-                    <span className={`font-mono font-semibold ${ganancia >= 0 ? "text-sky-400" : "text-rose-400"}`}>
-                      {fmt(ganancia)}
-                    </span>
-                  </div>
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-white/50 border-t-transparent animate-spin" />
+                  Guardando...
                 </>
+              ) : (
+                <>Confirmar pago</>
               )}
-              <div className="flex justify-between px-4 py-2.5 text-xs">
-                <span className="text-slate-500">Foto adjunta</span>
-                <span className="text-slate-400 truncate max-w-[160px]">{foto?.name}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setStep(1)}
-                disabled={procesando}
-                className="h-9 px-4 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors"
-              >
-                Corregir
-              </button>
-              <button
-                onClick={() => onConfirm({ cobrado, costo, foto })}
-                disabled={procesando}
-                className="h-9 px-5 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white text-sm font-medium disabled:opacity-50 transition-colors inline-flex items-center gap-2"
-              >
-                {procesando ? (
-                  <>
-                    <span className="w-3.5 h-3.5 rounded-full border-2 border-white/50 border-t-transparent animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>Confirmar pago</>
-                )}
-              </button>
-            </div>
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -409,7 +288,7 @@ export default function CuponerasPage() {
 
   const [cupones, setCupones]   = useState([]);
   const [count, setCount]       = useState(0);
-  const [counters, setCounters] = useState({ total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
+  const [counters, setCounters] = useState({ total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0, reportados: 0 });
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const [lastLoadedAt, setLastLoadedAt] = useState(null);
@@ -423,6 +302,10 @@ export default function CuponerasPage() {
 
   const [pagoModal, setPagoModal]           = useState(null);
   const [procesandoPago, setProcesandoPago] = useState(false);
+
+  // 🆕 Tarjetas colapsables (toggle por póliza)
+  const [abiertas, setAbiertas] = useState({});
+  const toggleCard = (id) => setAbiertas((p) => ({ ...p, [id]: !p[id] }));
 
   /* cargar opciones de compañías */
   useEffect(() => {
@@ -442,8 +325,9 @@ export default function CuponerasPage() {
     setLoading(true);
     setError("");
     try {
-      const params = { solo_ultimo: 1, page: p, page_size: ps };
-      if (sc && sc !== "ALL") params.scope = sc;
+      // 🆕 Vista por tarjetas: traemos TODOS los cupones (no solo el último)
+      // y agrupamos por póliza en el front. El scope se filtra del lado del cliente.
+      const params = { solo_ultimo: 0, page: 1, page_size: 500 };
       if (term.trim())         params.search   = term.trim();
       if (cmp.trim())          params.compania = cmp.trim();
       const res  = await http.get("polizas/cupones-robo/dashboard/", { params });
@@ -476,11 +360,11 @@ export default function CuponerasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, compania]);
 
-  /* page / pageSize / scope */
+  /* page / pageSize (el scope ya NO recarga: filtra local) */
   useEffect(() => {
     loadDashboard(search, compania, { page, pageSize, scope });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, scope]);
+  }, [page, pageSize]);
 
   const refreshAll = () => loadDashboard(search, compania, { page, pageSize, scope });
 
@@ -494,33 +378,62 @@ export default function CuponerasPage() {
   const vencidasCount  = useMemo(() => cupones.filter((c) => getVisual(c) === "VENCIDA").length,    [cupones]);
   const porVencerCount = useMemo(() => cupones.filter((c) => getVisual(c) === "POR_VENCER").length, [cupones]);
 
+  /* 🆕 Agrupar cupones por póliza para mostrarlos en tarjetas */
+  const polizasAgrupadas = useMemo(() => {
+    const map = new Map();
+    for (const c of cupones) {
+      const key = c.poliza ?? `s/p-${c.id}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          polizaId:  c.poliza,
+          numero:    c.poliza_numero,
+          patente:   c.poliza_patente || "—",
+          asegurado: c.asegurado_nombre || "—",
+          compania:  c.poliza_compania || "",
+          oficina:   c.poliza_oficina_nombre || "",
+          vehiculo:  c.poliza_modelo || "Vehículo",
+          cupones:   [],
+        });
+      }
+      map.get(key).cupones.push(c);
+    }
+    let grupos = Array.from(map.values());
+    grupos.forEach((g) =>
+      g.cupones.sort((a, b) =>
+        String(a.fecha_vencimiento || "").localeCompare(String(b.fecha_vencimiento || ""))
+      )
+    );
+    const SCOPE_VISUAL = { PENDIENTE: "PENDIENTE", VENCIDA: "VENCIDA", POR_VENCER_7: "POR_VENCER", REPORTADO: "REPORTADO" };
+    if (scope && scope !== "ALL") {
+      const v = SCOPE_VISUAL[scope];
+      grupos = grupos.filter((g) => g.cupones.some((c) => getVisual(c) === v));
+    }
+    return grupos;
+  }, [cupones, scope]);
+
   /* paginación */
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / (pageSize || 25))), [count, pageSize]);
   const pages      = useMemo(() => buildPages(page, totalPages), [page, totalPages]);
 
-  /* confirmar pago */
-  const handleConfirmPago = async ({ cobrado, costo, foto }) => {
+  /* confirmar pago — el cliente paga directo; solo marcamos PAGADA.
+     El backend calcula y registra nuestra comisión como ingreso. */
+  const handleConfirmPago = async () => {
     if (!pagoModal) return;
     setProcesandoPago(true);
     try {
-      const { secure_url, public_id } = await uploadToCloudinary(foto, "rc-admin/cupones-robo");
       await dispatch(
         actualizarEstadoCuponRobo({
-          id:           pagoModal.id,
-          polizaId:     pagoModal.poliza,
-          estado:       "PAGADA",
-          monto:        cobrado,
-          costo_compania: costo,
-          foto_url:     secure_url,
-          foto_public_id: public_id,
+          id:       pagoModal.id,
+          polizaId: pagoModal.poliza,
+          estado:   "PAGADA",
         })
       ).unwrap();
-      toast.success("Pago registrado correctamente.");
+      toast.success("Pago confirmado.");
       setPagoModal(null);
       refreshAll();
     } catch (err) {
       console.error(err);
-      toast.error("No se pudo registrar el pago. Intentá de nuevo.");
+      toast.error("No se pudo confirmar el pago. Intentá de nuevo.");
     } finally {
       setProcesandoPago(false);
     }
@@ -566,9 +479,10 @@ export default function CuponerasPage() {
       </div>
 
       {/* ── KPIs ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
           { label: "Total global",    value: counters.total,        sc: "ALL",           color: "text-slate-200" },
+          { label: "Reportados",      value: counters.reportados,   sc: "REPORTADO",     color: "text-sky-400"   },
           { label: "Pendientes",      value: counters.pendientes,   sc: "PENDIENTE",     color: "text-slate-200" },
           { label: "Por vencer (7d)", value: counters.por_vencer_7, sc: "POR_VENCER_7",  color: "text-amber-400" },
           { label: "Vencidas",        value: counters.vencidas,     sc: "VENCIDA",       color: "text-rose-400"  },
@@ -590,42 +504,6 @@ export default function CuponerasPage() {
       </div>
 
       {/* ── Zona urgencias ──────────────────────────────────── */}
-      {urgentes.length > 0 && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <HiExclamationCircle className="w-4 h-4 text-rose-400" />
-              <span className="text-sm font-medium text-slate-200">Requieren atención</span>
-              <div className="flex items-center gap-1.5 ml-1">
-                {vencidasCount > 0 && (
-                  <span className="text-[10px] font-mono border border-rose-800 bg-rose-950/40 text-rose-400 rounded px-1.5 py-0.5">
-                    {vencidasCount} vencidas
-                  </span>
-                )}
-                {porVencerCount > 0 && (
-                  <span className="text-[10px] font-mono border border-amber-800 bg-amber-950/30 text-amber-400 rounded px-1.5 py-0.5">
-                    {porVencerCount} esta semana
-                  </span>
-                )}
-              </div>
-            </div>
-            <span className="text-[11px] text-slate-600">{urgentes.length} total</span>
-          </div>
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {urgentes.map((c) => (
-              <UrgencyCard key={c.id} cupon={c} onPagar={setPagoModal} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {urgentes.length === 0 && !loading && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/30 px-4 py-3 flex items-center gap-2 text-sm text-slate-500">
-          <HiBadgeCheck className="w-4 h-4 text-emerald-500" />
-          Todo al día — no hay cupones vencidos ni por vencer esta semana.
-        </div>
-      )}
-
       {/* ── Tabla ───────────────────────────────────────────── */}
       <div className="rounded-lg border border-slate-800 bg-slate-900/50">
 
@@ -697,187 +575,140 @@ export default function CuponerasPage() {
           </div>
         )}
 
-        {/* Tabla */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="border-b border-slate-800">
-              <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
-                {["Póliza", "Compañía", "Oficina", "Patente", "Asegurado", "Período", "Vencimiento", "Estado", "Acciones"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {!loading && cupones.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-600 text-sm">
-                    {error ? "Error al cargar datos." : "No hay resultados para los filtros aplicados."}
-                  </td>
-                </tr>
-              )}
-
-              {cupones.map((c) => {
-                const visual   = getVisual(c);
-                const badge    = BADGE[visual] || BADGE.PENDIENTE;
-                const dias     = getDiasRestantes(c);
-                const phone    = resolvePhone(c);
-                const isPagada = visual === "PAGADA";
-
-                return (
-                  <tr
-                    key={c.id}
-                    className={`hover:bg-slate-800/30 transition-colors ${
-                      visual === "VENCIDA"    ? "bg-rose-950/10"  :
-                      visual === "POR_VENCER" ? "bg-amber-950/5"  : ""
-                    }`}
-                  >
-                    {/* Póliza */}
-                    <td className="px-4 py-3">
-                      {c.poliza ? (
-                        <Link
-                          to={`/polizas/${c.poliza}`}
-                          className="text-sky-400 hover:text-sky-300 text-xs font-mono hover:underline underline-offset-2"
-                        >
-                          {c.poliza_numero || `#${c.poliza}`}
-                        </Link>
-                      ) : (
-                        <span className="text-slate-600 text-xs">—</span>
-                      )}
-                    </td>
-
-                    {/* Compañía */}
-                    <td className="px-4 py-3 text-xs text-slate-400">
-                      {c.poliza_compania || "—"}
-                    </td>
-
-                    {/* Oficina — solo visible cuando el backend lo incluye (admin) */}
-                    <td className="px-4 py-3">
-                      {c.poliza_oficina_nombre ? (
-                        <span className="text-[10px] font-mono border border-slate-700 text-slate-500 rounded px-1.5 py-0.5">
-                          {c.poliza_oficina_nombre}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-700">—</span>
-                      )}
-                    </td>
-
-                    {/* Patente */}
-                    <td className="px-4 py-3 text-xs font-mono font-medium text-slate-200">
-                      {c.poliza_patente || "—"}
-                    </td>
-
-                    {/* Asegurado */}
-                    <td className="px-4 py-3 text-xs text-slate-300">
-                      {c.asegurado_nombre || "—"}
-                    </td>
-
-                    {/* Período */}
-                    <td className="px-4 py-3 text-xs font-mono text-slate-400">
-                      {fmtPeriodo(c)}
-                    </td>
-
-                    {/* Vencimiento + días */}
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-mono ${
-                        visual === "VENCIDA"    ? "text-rose-400"  :
-                        visual === "POR_VENCER" ? "text-amber-400" : "text-slate-400"
-                      }`}>
-                        {fmtDate(c.fecha_vencimiento)}
-                        {dias !== null && !isPagada && (
-                          <span className="ml-1 text-[10px] opacity-60">
-                            ({dias < 0 ? `${Math.abs(dias)}d` : `en ${dias}d`})
-                          </span>
-                        )}
-                      </span>
-                    </td>
-
-                    {/* Estado */}
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] border font-medium ${badge.cls}`}>
-                        {badge.label}
-                      </span>
-                    </td>
-
-                    {/* Acciones */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {!isPagada && (
-                          <button
-                            onClick={() => setPagoModal(c)}
-                            className="h-7 px-2.5 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors inline-flex items-center gap-1"
-                          >
-                            <HiCurrencyDollar className="w-3.5 h-3.5" />
-                            Pagar
-                          </button>
-                        )}
-                        {phone ? (
-                          <a
-                            href={buildWaUrl(phone, c)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="h-7 px-2.5 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors inline-flex items-center gap-1"
-                          >
-                            <HiChatAlt2 className="w-3.5 h-3.5" />
-                            WPP
-                          </a>
-                        ) : (
-                          <span className="h-7 px-2.5 rounded-md border border-slate-800 text-slate-700 text-xs inline-flex items-center gap-1 cursor-not-allowed">
-                            <HiChatAlt2 className="w-3.5 h-3.5" />
-                            Sin tel.
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paginación */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800">
-            <span className="text-[11px] text-slate-600">
-              Página {page} de {totalPages}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((p) => p - 1)}
-                className="h-7 w-7 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 transition-colors inline-flex items-center justify-center"
-              >
-                <HiChevronLeft className="w-4 h-4" />
-              </button>
-
-              {pages.map((p, i) =>
-                p === "…" ? (
-                  <span key={`e${i}`} className="w-7 text-center text-slate-600 text-xs">…</span>
-                ) : (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className={`h-7 w-7 rounded-md border text-xs transition-colors ${
-                      p === page
-                        ? "border-slate-500 bg-slate-700 text-slate-100"
-                        : "border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-400"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                )
-              )}
-
-              <button
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage((p) => p + 1)}
-                className="h-7 w-7 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 transition-colors inline-flex items-center justify-center"
-              >
-                <HiChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        {/* 🆕 Tarjetas por póliza (colapsables) */}
+        {!loading && polizasAgrupadas.length === 0 && (
+          <div className="px-4 py-10 text-center text-slate-600 text-sm">
+            {error ? "Error al cargar datos." : "No hay cupones para los filtros aplicados."}
           </div>
         )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {polizasAgrupadas.map((grupo) => {
+            const total      = grupo.cupones.length;
+            const pagados    = grupo.cupones.filter((c) => getVisual(c) === "PAGADA").length;
+            const pct        = total > 0 ? Math.round((pagados / total) * 100) : 0;
+            const phone      = resolvePhone(grupo.cupones[0]);
+            const abierta    = !!abiertas[grupo.polizaId];
+            const reportados = grupo.cupones.filter((c) => getVisual(c) === "REPORTADO").length;
+            const vencidos   = grupo.cupones.filter((c) => getVisual(c) === "VENCIDA").length;
+            return (
+              <div key={grupo.polizaId} className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden self-start">
+                {/* Header — toggle */}
+                <button
+                  type="button"
+                  onClick={() => toggleCard(grupo.polizaId)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-800/40 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-100 truncate">{grupo.asegurado}</p>
+                      <p className="text-xs text-slate-500 font-mono truncate">{grupo.vehiculo} · {grupo.patente}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{grupo.compania || "—"}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {grupo.oficina && (
+                        <span className="text-[10px] font-mono border border-slate-700 text-slate-500 rounded px-1.5 py-0.5">
+                          {grupo.oficina}
+                        </span>
+                      )}
+                      <HiChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${abierta ? "rotate-90" : ""}`} />
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium shrink-0">{pagados} de {total} pagados</span>
+                  </div>
+
+                  {(reportados > 0 || vencidos > 0) && (
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      {reportados > 0 && (
+                        <span className="text-[10px] font-medium border border-sky-800 bg-sky-950/30 text-sky-400 rounded px-1.5 py-0.5">
+                          {reportados} reportado{reportados > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {vencidos > 0 && (
+                        <span className="text-[10px] font-medium border border-rose-800 bg-rose-950/30 text-rose-400 rounded px-1.5 py-0.5">
+                          {vencidos} vencido{vencidos > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </button>
+
+                {/* Cupones — colapsable */}
+                <AnimatePresence initial={false}>
+                  {abierta && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden border-t border-slate-800"
+                    >
+                      <div className="p-3 space-y-2">
+                        {grupo.cupones.map((c) => {
+                          const visual      = getVisual(c);
+                          const badge       = BADGE[visual] || BADGE.PENDIENTE;
+                          const isPagada    = visual === "PAGADA";
+                          const esReportado = visual === "REPORTADO";
+                          return (
+                            <div key={c.id} className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 ${
+                              esReportado            ? "border-sky-800 bg-sky-950/20"  :
+                              visual === "VENCIDA"   ? "border-rose-900/60 bg-rose-950/10" :
+                              "border-slate-800"
+                            }`}>
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-slate-300">Vence {fmtDate(c.fecha_vencimiento)}</p>
+                                <p className="text-sm font-mono font-semibold text-slate-100">{fmt(Number(c.monto || 0))}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] border font-medium ${badge.cls}`}>
+                                  {badge.label}
+                                </span>
+                                {!isPagada && (
+                                  <button
+                                    onClick={() => setPagoModal(c)}
+                                    className="h-7 px-2.5 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                                  >
+                                    {esReportado ? "Confirmar" : "Pagar"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        <div className="flex gap-2 pt-1">
+                          {grupo.polizaId && (
+                            <Link
+                              to={`/polizas/${grupo.polizaId}`}
+                              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                            >
+                              Ver ficha
+                            </Link>
+                          )}
+                          {phone && (
+                            <a
+                              href={buildWaUrl(phone, grupo.cupones[0])}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                            >
+                              <HiChatAlt2 className="w-3.5 h-3.5" /> WhatsApp
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Modal de pago ──────────────────────────────────── */}

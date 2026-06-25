@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
-  HiPaperAirplane, HiDocumentText, HiUser, HiIdentification, HiCamera, HiCheckCircle,
+  HiPaperAirplane, HiDocumentText, HiUser, HiIdentification, HiCamera, HiCheckCircle, HiCloudUpload,
 } from "react-icons/hi";
 
 import { fetchTareasDia, marcarPolizaEnviada } from "../store/slices/tareasSlice";
@@ -15,18 +15,11 @@ import CompletarDatoClienteModal from "../components/tareas/CompletarDatoCliente
 import SubirFotosDniModal from "../components/tareas/SubirFotosDniModal";
 import CompletarDatosPolizaModal from "../components/tareas/CompletarDatosPolizaModal";
 import SubirFotosVehiculoModal from "../components/tareas/SubirFotosVehiculoModal";
+import SubirPolizaSistemaModal from "../components/tareas/SubirPolizaSistemaModal";
 
 const SECCIONES = [
-  { key: "enviar_poliza", titulo: "Enviar póliza al cliente", icon: HiPaperAirplane, tipo: "enviar",
-    c: { icon: "text-indigo-400", chip: "bg-indigo-500/15", badge: "bg-indigo-500/20 text-indigo-300", btn: "border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10" } },
-  { key: "datos_poliza", titulo: "Completar datos de la póliza", icon: HiDocumentText, tipo: "poliza-datos", accion: "Completar",
-    c: { icon: "text-amber-400", chip: "bg-amber-500/15", badge: "bg-amber-500/20 text-amber-300", btn: "border-amber-500/40 text-amber-300 hover:bg-amber-500/10" } },
-  { key: "datos_cliente", titulo: "Completar datos del cliente", icon: HiUser, tipo: "cliente-datos", accion: "Completar",
-    c: { icon: "text-sky-400", chip: "bg-sky-500/15", badge: "bg-sky-500/20 text-sky-300", btn: "border-sky-500/40 text-sky-300 hover:bg-sky-500/10" } },
-  { key: "fotos_dni", titulo: "Subir fotos de DNI", icon: HiIdentification, tipo: "cliente-fotos", accion: "Subir",
-    c: { icon: "text-fuchsia-400", chip: "bg-fuchsia-500/15", badge: "bg-fuchsia-500/20 text-fuchsia-300", btn: "border-fuchsia-500/40 text-fuchsia-300 hover:bg-fuchsia-500/10" } },
-  { key: "fotos_poliza", titulo: "Subir fotos de la póliza", icon: HiCamera, tipo: "poliza-fotos", accion: "Subir",
-    c: { icon: "text-emerald-400", chip: "bg-emerald-500/15", badge: "bg-emerald-500/20 text-emerald-300", btn: "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" } },
+  { key: "subir_poliza", titulo: "Subir póliza a sistema", icon: HiCloudUpload, tipo: "subir-poliza-sistema", accion: "Subir",
+    c: { icon: "text-violet-400", chip: "bg-violet-500/15", badge: "bg-violet-500/20 text-violet-300", btn: "border-violet-500/40 text-violet-300 hover:bg-violet-500/10" } },
 ];
 
 export default function TareasPage() {
@@ -39,11 +32,12 @@ export default function TareasPage() {
   const [fotosCliente, setFotosCliente] = useState(null);
   const [datosPoliza, setDatosPoliza] = useState(null);
   const [fotosPoliza, setFotosPoliza] = useState(null);
+  const [subirPoliza, setSubirPoliza] = useState(null);
 
   useEffect(() => { dispatch(fetchTareasDia()); }, [dispatch]);
-  useEffect(() => { if (data) setBaseTotal((p) => Math.max(p, data.total || 0)); }, [data]);
+  useEffect(() => { if (data) setBaseTotal((p) => Math.max(p, total)); }, [data, total]);
 
-  const total = data?.total || 0;
+  const total = (data?.subir_poliza || []).length;
   const hechas = Math.max(0, baseTotal - total);
   const pct = baseTotal > 0 ? Math.round((hechas / baseTotal) * 100) : 0;
 
@@ -58,10 +52,11 @@ export default function TareasPage() {
     else if (seccion.tipo === "cliente-fotos") setFotosCliente(item);
     else if (seccion.tipo === "poliza-datos") setDatosPoliza(item);
     else if (seccion.tipo === "poliza-fotos") setFotosPoliza(item);
+    else if (seccion.tipo === "subir-poliza-sistema") setSubirPoliza(item);
   };
 
   const onCompletado = () => {
-    setDatoCliente(null); setFotosCliente(null); setDatosPoliza(null); setFotosPoliza(null);
+    setDatoCliente(null); setFotosCliente(null); setDatosPoliza(null); setFotosPoliza(null); setSubirPoliza(null);
     dispatch(fetchTareasDia());
   };
 
@@ -130,6 +125,7 @@ export default function TareasPage() {
       <SubirFotosDniModal isOpen={!!fotosCliente} item={fotosCliente} onClose={() => setFotosCliente(null)} onSaved={onCompletado} />
       <CompletarDatosPolizaModal isOpen={!!datosPoliza} item={datosPoliza} onClose={() => setDatosPoliza(null)} onSaved={onCompletado} />
       <SubirFotosVehiculoModal isOpen={!!fotosPoliza} item={fotosPoliza} onClose={() => setFotosPoliza(null)} onSaved={onCompletado} />
+      <SubirPolizaSistemaModal isOpen={!!subirPoliza} item={subirPoliza} onClose={() => setSubirPoliza(null)} onSaved={onCompletado} />
     </div>
   );
 }

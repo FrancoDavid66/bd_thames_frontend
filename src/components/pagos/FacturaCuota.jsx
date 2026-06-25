@@ -72,7 +72,7 @@ const calcularRehabilitacionStr = (fechaPago) => {
     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
 
-export default function FacturaCuota({ cliente, poliza, cuota }) {
+export default function FacturaCuota({ cliente, poliza, cuota, ocultarNumeroPoliza = false }) {
   if (!cliente || !poliza || !cuota) return null;
 
   const cuotaNroStr = String(safe(cuota.cuota_nro));
@@ -152,12 +152,14 @@ export default function FacturaCuota({ cliente, poliza, cuota }) {
               <h2 className="font-medium text-slate-800">Datos de la Póliza / Vehículo</h2>
             </div>
             <ul className="text-sm space-y-1">
-              <li>
-                <span className="text-slate-500">Póliza Nº:</span>{" "}
-                <span className="font-medium text-slate-800">
-                  {safe(poliza.numero_poliza)}
-                </span>
-              </li>
+              {!ocultarNumeroPoliza && (
+                <li>
+                  <span className="text-slate-500">Póliza Nº:</span>{" "}
+                  <span className="font-medium text-slate-800">
+                    {safe(poliza.numero_poliza)}
+                  </span>
+                </li>
+              )}
               <li>
                 <span className="text-slate-500">Compañía:</span>{" "}
                 <span className="font-medium text-slate-800">{safe(poliza.compania)}</span>

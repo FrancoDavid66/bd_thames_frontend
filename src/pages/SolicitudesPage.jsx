@@ -7,7 +7,9 @@ import {
   HiShieldCheck, 
   HiBadgeCheck, 
   HiChevronDown,
-  HiCollection
+  HiCollection,
+  HiSearch,
+  HiLightningBolt
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
@@ -19,6 +21,7 @@ import { fetchAdminCompanias, fetchAdminCoberturas } from "../store/slices/admin
 
 import SolicitudesList from "../components/solicitudes/SolicitudesList";
 import CreateSolicitudModal from "../components/solicitudes/CreateSolicitudModal";
+import SubidaRapidaModal from "../components/solicitudes/SubidaRapidaModal";
 import { solicitudesApi } from "../services/solicitudes.js";
 
 import PageTransition from "../ux/motion/PageTransition.jsx";
@@ -70,6 +73,8 @@ export default function SolicitudesPage() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [subidaRapida, setSubidaRapida] = useState(false); // 🆕 modal lector PDF
+  const [datosPdf, setDatosPdf] = useState(null);            // 🆕 datos extraídos
 
   // searchParams debe declararse ANTES de usarse
   const [searchParams, setSearchParams] = useSearchParams();
@@ -263,18 +268,6 @@ export default function SolicitudesPage() {
     } catch (e) { toast.error("Error al terminar"); }
   }, []);
 
-  const toggleTarea = useCallback(async (s, key, done) => {
-    const prevT = getTareas(s);
-    const nextTareas = { ...prevT, [key]: done };
-    setItems((prev) => prev.map((x) => (x.id === s.id ? { ...x, tareas: nextTareas } : x)));
-    try {
-      await solicitudesApi.marcarTarea(s.id, key, done);
-      if (nextTareas.alta_compania && nextTareas.enviar_poliza && s?.estado !== "TERMINADA") await terminar(s);
-    } catch (e) {
-      setItems((prev) => prev.map((x) => (x.id === s.id ? { ...x, tareas: prevT } : x)));
-      toast.error("Error al guardar tarea");
-    }
-  }, [terminar]);
 
   const openCreate = useCallback(() => {
     setCreating(true);
@@ -285,78 +278,86 @@ export default function SolicitudesPage() {
       <section className="min-h-0 bg-[#0b0f19] text-white flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="sticky top-0 z-20 border-b border-white/10 bg-[#0b0f19]/90 backdrop-blur">
-            <div className="px-3 sm:px-4 lg:px-6">
-              <div className="flex items-center justify-between py-3">
+            <div className="px-3 sm:px-4 lg:px-6 pt-3">
+
+              {/* Fila 1: título + cargar */}
+              <div className="flex items-center justify-between gap-2">
                 <motion.div className="flex items-center gap-3 min-w-0" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
                   <span className="p-2 rounded-xl bg-white/10 border border-white/10 shrink-0">
                     <HiShieldCheck className="w-5 h-5 text-emerald-400" />
                   </span>
                   <div className="min-w-0">
                     <h1 className="text-base sm:text-lg font-semibold text-white truncate">Solicitudes</h1>
-                    <p className="text-[10px] text-emerald-400/80 font-bold uppercase tracking-widest">
-                       Sucursal: {user?.perfil?.oficina_nombre || 'Local'}
+                    <p className="text-[10px] text-emerald-400/80 font-bold uppercase tracking-widest truncate">
+                      Sucursal: {user?.perfil?.oficina_nombre || "Local"}
                     </p>
                   </div>
                 </motion.div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <motion.button
-                    onClick={() => cargar({ silent: false, force: true })}
-                    disabled={loading || refreshing}
-                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-2xl text-[#0b0f1e] font-bold bg-gradient-to-br from-sky-200 to-cyan-200 border border-cyan-200/60 shadow-lg disabled:opacity-60"
-                    variants={pressable} initial="initial" whileHover="hover" whileTap="tap"
-                  >
-                    <HiRefresh className={(loading || refreshing) ? "animate-spin" : ""} />
-                    <span className="text-xs uppercase tracking-tighter hidden sm:inline">{loading || refreshing ? "Sincronizando..." : "Cargar"}</span>
-                  </motion.button>
-
-                  <motion.button
-                    onClick={openCreate}
-                    className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-black font-black uppercase text-[11px] tracking-widest bg-amber-400 border border-amber-300 shadow-xl"
-                    initial="initial" whileHover="hover" whileTap="tap" variants={pressable}
-                  >
-                    <HiPlus className="text-lg" /> Nueva solicitud
-                  </motion.button>
-
-                  <button className="sm:hidden p-2 rounded-xl bg-white/10" onClick={() => setToolbarOpen(!toolbarOpen)}><HiChevronDown /></button>
-                </div>
+                <motion.button
+                  onClick={() => cargar({ silent: false, force: true })}
+                  disabled={loading || refreshing}
+                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-2xl text-[#0b0f1e] font-bold bg-gradient-to-br from-sky-200 to-cyan-200 border border-cyan-200/60 shadow-lg disabled:opacity-60 shrink-0"
+                  variants={pressable} initial="initial" whileHover="hover" whileTap="tap"
+                >
+                  <HiRefresh className={(loading || refreshing) ? "animate-spin" : ""} />
+                  <span className="text-xs uppercase tracking-tighter hidden sm:inline">{loading || refreshing ? "..." : "Cargar"}</span>
+                </motion.button>
               </div>
 
-              {/* Tabs */}
-              <div className="pb-3">
-                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 flex overflow-x-auto no-scrollbar">
-                   {[
-                      { id: "proceso", label: "En proceso" },
-                      { id: "pendiente_alta", label: `Alta (${counts.alta})` },
-                      { id: "pendiente_envio", label: `Envío (${counts.envio})` },
-                      { id: "terminadas", label: "Terminadas" },
-                    ].map((t) => (
-                      <button
-                        key={t.id} onClick={() => cambiarTab(t.id)}
-                        className={`shrink-0 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${
-                          tab === t.id ? "bg-white/20 text-white shadow-inner" : "bg-white/5 text-white/30 hover:text-white/60"
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+              {/* Fila 2: botones de acción grandes */}
+              <div className="grid grid-cols-2 gap-2.5 mt-3">
+                <motion.button
+                  onClick={() => setSubidaRapida(true)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-white font-black uppercase text-[11px] tracking-widest bg-sky-500 border border-sky-400 shadow-xl"
+                  initial="initial" whileHover="hover" whileTap="tap" variants={pressable}
+                >
+                  <HiLightningBolt className="text-lg" /> Subida rápida
+                </motion.button>
+                <motion.button
+                  onClick={openCreate}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-black font-black uppercase text-[11px] tracking-widest bg-amber-400 border border-amber-300 shadow-xl"
+                  initial="initial" whileHover="hover" whileTap="tap" variants={pressable}
+                >
+                  <HiPlus className="text-lg" /> Nueva
+                </motion.button>
+              </div>
+
+              {/* Tabs: solo proceso / terminadas */}
+              <div className="pt-3 pb-3">
+                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 flex">
+                  {[
+                    { id: "proceso", label: `En proceso (${counts.activas})` },
+                    { id: "terminadas", label: `Terminadas (${counts.terminadas})` },
+                  ].map((t) => (
+                    <button
+                      key={t.id} onClick={() => cambiarTab(t.id)}
+                      className={`flex-1 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all ${
+                        tab === t.id ? "bg-white/20 text-white shadow-inner" : "bg-white/5 text-white/30 hover:text-white/60"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
 
             {/* Filtros */}
-            <div className={`${toolbarOpen ? "block" : "hidden"} sm:block pb-4 px-3 sm:px-4 lg:px-6`}>
+            <div className="pb-4 px-3 sm:px-4 lg:px-6">
               <div className="flex flex-col lg:flex-row gap-2">
-                <input
-                  value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar cliente, DNI, patente..."
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white text-sm outline-none focus:ring-2 ring-emerald-500/30 placeholder-white/20"
-                  disabled={!hasLoaded}
-                />
+                <div className="relative flex-1">
+                  <HiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
+                  <input
+                    value={search} onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar cliente, DNI, patente..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white text-sm outline-none focus:ring-2 ring-sky-500/30 placeholder-white/20"
+                    disabled={!hasLoaded}
+                  />
+                </div>
                 <select
                   value={oficinaFilter} onChange={(e) => setOficinaFilter(e.target.value)}
                   disabled={!hasLoaded || !isWebAdmin}
-                  className={`px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-sm text-white outline-none focus:ring-2 ring-emerald-500/30 ${!isWebAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  className={`px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-sm text-white outline-none focus:ring-2 ring-sky-500/30 ${!isWebAdmin ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                 >
                   {isWebAdmin && <option value="TODAS" className="bg-[#0b0f19]">Todas las oficinas</option>}
                   {oficinasConfig.map((of) => <option key={of.id} value={of.id} className="bg-[#0b0f19]">{of.nombre}</option>)}
@@ -367,12 +368,6 @@ export default function SolicitudesPage() {
 
           {/* Listado */}
           <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 lg:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+120px)] scrollbar-hide relative">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-               <Kpi label="Activas" value={counts.activas} color="text-sky-400" />
-               <Kpi label="Terminadas" value={counts.terminadas} color="text-emerald-400" icon={<HiBadgeCheck />} />
-               <Kpi label="Total Onboarding" value={counts.total} color="text-white/60" />
-            </div>
-
             {!hasLoaded && !loading ? (
               <div className="mt-12 grid place-items-center text-center">
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-12 shadow-2xl backdrop-blur-md max-w-md">
@@ -385,32 +380,37 @@ export default function SolicitudesPage() {
               <SolicitudesList
                 items={filtrados} loading={loading} refreshing={refreshing}
                 onEliminar={eliminar} onRefrescar={() => cargar({ silent: true })}
-                onTerminar={terminar} onToggleTarea={toggleTarea}
+                onTerminar={terminar}
               />
             )}
 
-            {/* 🚀 BOTÓN FLOTANTE (FAB) SÓLO PARA MÓVILES */}
+            {/* FAB móvil: subida rápida */}
             <motion.button
-              onClick={openCreate}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.9 }}
-              className="md:hidden fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400 text-slate-900 shadow-[0_4px_20px_rgba(251,191,36,0.6)] border border-amber-300"
+              onClick={() => setSubidaRapida(true)}
+              initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }}
+              className="md:hidden fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_4px_20px_rgba(14,165,233,0.6)] border border-sky-400"
             >
-              <HiPlus className="h-7 w-7" />
+              <HiLightningBolt className="h-7 w-7" />
             </motion.button>
           </div>
         </div>
 
         {/* MODALES */}
+        {subidaRapida && (
+          <SubidaRapidaModal
+            onClose={() => setSubidaRapida(false)}
+            onContinuar={(datos) => { setDatosPdf(datos); setSubidaRapida(false); setCreating(true); }}
+          />
+        )}
         {creating && (
           <CreateSolicitudModal
-            onClose={() => setCreating(false)}
-            onCreated={() => { setCreating(false); if (hasLoaded) cargar({ silent: true, force: true }); }}
+            onClose={() => { setCreating(false); setDatosPdf(null); }}
+            onCreated={() => { setCreating(false); setDatosPdf(null); if (hasLoaded) cargar({ silent: true, force: true }); }}
             companias={companias}
             coberturas={coberturas}
             oficinas={oficinasConfig}
+            initialDatosPdf={datosPdf}
             initialClienteId={paramClienteId}
             initialPatente={paramPatente}
             initialCompania={paramCompania}

@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { HiUser, HiShieldCheck, HiExclamationCircle } from 'react-icons/hi';
+import { HiUser, HiShieldCheck, HiExclamationCircle, HiExternalLink } from 'react-icons/hi';
 
 import { useAuth } from '../context/AuthContext';
 import { fetchClienteById, fetchClientes, updateCliente, deleteCliente } from '../store/slices/clientesSlice';
@@ -43,6 +43,47 @@ const ClienteProfilePage = () => {
   const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
   const [modalCrearPolizaAbierto, setModalCrearPolizaAbierto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [cargandoPortal, setCargandoPortal] = useState(false);
+
+  // 🚀 Abrir el Portal del Asegurado de este cliente (lo que ve el cliente) en otra pestaña.
+  //    Pide el token al backend (lo crea si no existe) y abre el link.
+  const handleVerPortal = async () => {
+    if (!id || cargandoPortal) return;
+    try {
+      setCargandoPortal(true);
+
+      // Base de la API (misma lógica que el resto del front)
+      const API_ROOT = String(import.meta.env.VITE_API_URL || "")
+        .trim().replace(/\/+$/, "").replace(/\/api$/i, "");
+      const url = `${API_ROOT}/api/clientes/${id}/portal-link/`;
+
+      const token = localStorage.getItem('access_token')
+        || localStorage.getItem('token')
+        || localStorage.getItem('jwt');
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          ...(token && token !== "undefined" && token !== "null"
+            ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const path = data?.portal_path || (data?.token ? `/#/portal/${data.token}` : "");
+      if (!path) throw new Error("Sin token");
+
+      const full = `${window.location.origin}${path}`;
+      window.open(full, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      toast.error("No se pudo abrir el portal del cliente.");
+    } finally {
+      setCargandoPortal(false);
+    }
+  };
 
   // 🚀 MAGIA: Estado para inyectar la póliza al instante
   const [polizasNuevas, setPolizasNuevas] = useState([]);
@@ -190,6 +231,16 @@ const ClienteProfilePage = () => {
           </div>
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={handleVerPortal}
+              disabled={cargandoPortal}
+              title="Abrir el portal que ve el cliente (otra pestaña)"
+              className="w-full sm:w-auto h-12 sm:h-10 inline-flex justify-center items-center gap-2 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-500/20 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <HiExternalLink className="text-base" />
+              {cargandoPortal ? "Abriendo..." : "Ver portal"}
+            </button>
             <div className="w-full sm:w-auto" onClick={() => setModalEditarAbierto(true)}>
                <BotonEditarCliente className="w-full h-12 sm:h-10 flex justify-center" />
             </div>

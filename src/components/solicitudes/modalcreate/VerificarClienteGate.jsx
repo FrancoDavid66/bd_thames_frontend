@@ -1,5 +1,5 @@
 // src/components/solicitudes/modalcreate/VerificarClienteGate.jsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
@@ -66,7 +66,7 @@ function Field({ label, icon: Icon, value, onChange, placeholder, onEnter, disab
  *  - onConfirmNuevo({ cliente_id }): cliente_id es opcional (CLIENTE_OTRO_AUTO lo trae)
  *  - onCancel(): cierra todo
  */
-export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel }) {
+export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel, initialDni = "", initialPatente = "", autoVerificar = false }) {
   const [dni, setDni] = useState("");
   const [patente, setPatente] = useState("");
   const [searching, setSearching] = useState(false);
@@ -75,18 +75,18 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel })
 
   useEffect(() => {
     if (open) {
-      setDni("");
-      setPatente("");
+      setDni(initialDni || "");
+      setPatente(initialPatente || "");
       setSearching(false);
       setResultado(null);
       setShowMatchModal(false);
     }
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ===== Búsqueda unificada (DNI y/o Patente) ===== */
-  const verificar = useCallback(async () => {
-    const d = onlyDigits(dni);
-    const p = normalizePatente(patente);
+  const verificar = useCallback(async (dOverride, pOverride) => {
+    const d = onlyDigits(typeof dOverride === "string" ? dOverride : dni);
+    const p = normalizePatente(typeof pOverride === "string" ? pOverride : patente);
 
     if (!d && !p) {
       toast.error("Ingresá un DNI o una patente para verificar.");
@@ -126,6 +126,16 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel })
       setSearching(false);
     }
   }, [dni, patente]);
+
+  // Auto-verificación al abrir (subida rápida): usa el DNI/patente del PDF
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (!open) { autoRanRef.current = false; return; }
+    if (autoVerificar && !autoRanRef.current && (initialDni || initialPatente)) {
+      autoRanRef.current = true;
+      verificar(initialDni || "", initialPatente || "");
+    }
+  }, [open, autoVerificar, initialDni, initialPatente, verificar]);
 
   /* ===== El usuario decide continuar al alta ===== */
   const handleContinuar = (clienteIdParaVincular = null) => {
@@ -203,7 +213,7 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel })
                 value={dni}
                 onChange={setDni}
                 placeholder="Ej: 30123456"
-                onEnter={verificar}
+                onEnter={() => verificar()}
                 disabled={searching}
                 autoFocus
               />
@@ -215,7 +225,7 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel })
                 value={patente}
                 onChange={(v) => setPatente(v.toUpperCase())}
                 placeholder="Ej: AB123CD"
-                onEnter={verificar}
+                onEnter={() => verificar()}
                 disabled={searching}
               />
 
@@ -226,7 +236,7 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel })
               {/* Botón principal de verificación */}
               <button
                 type="button"
-                onClick={verificar}
+                onClick={() => verificar()}
                 disabled={(!dni && !patente) || searching}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-amber-900/40 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >

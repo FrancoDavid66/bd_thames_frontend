@@ -53,6 +53,10 @@ import AdminPage from "./pages/AdminPage";
 // 🆕 NUEVA APP: TAREAS DEL DÍA
 import TareasPage from "./pages/TareasPage";
 
+// 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
+import CuponPublicoPage from "./pages/CuponPublicoPage";
+import PortalAseguradoPage from "./pages/PortalAseguradoPage";
+
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
 function App() {
@@ -355,6 +359,26 @@ function App() {
   // ========================================================
   // EARLY RETURNS
   // ========================================================
+
+  // 🆕 RUTA PÚBLICA (sin login): el cliente confirma sus cupones de robo.
+  // Va ANTES de los checks de loading/user para que /cupon/<token> sea accesible
+  // aunque no haya sesión iniciada.
+  if (location.pathname.startsWith("/cupon/")) {
+    return (
+      <Routes>
+        <Route path="/cupon/:token" element={<CuponPublicoPage />} />
+      </Routes>
+    );
+  }
+
+  // 🆕 PORTAL DEL ASEGURADO (sin login): el cliente entra por link de WhatsApp.
+  if (location.pathname.startsWith("/portal/")) {
+    return (
+      <Routes>
+        <Route path="/portal/:token" element={<PortalAseguradoPage />} />
+      </Routes>
+    );
+  }
 
   if (loading) {
     return (

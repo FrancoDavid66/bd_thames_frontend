@@ -24,6 +24,8 @@ import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
 
 import ResponsableManagerModal from "./modalcreate/ResponsableManagerModal"; // (ya no se usa como popup; queda por compatibilidad)
 import ClienteStep from "./modalcreate/ClienteStep";
+import LectorPdfButton from "./modalcreate/LectorPdfButton";
+import RevisionRapidaStep from "./modalcreate/RevisionRapidaStep";
 import PolizaStep from "./modalcreate/PolizaStep";
 import ImagenesDocsStep from "./modalcreate/ImagenesDocsStep";
 import SolicitudStep from "./modalcreate/SolicitudStep";
@@ -93,6 +95,34 @@ function normalizaTelefonoAR(raw) {
   return d;
 }
 
+// 🆕 Mapea el "tipo" de vehículo del PDF a una carrocería del catálogo
+function tipoACarroceria(tipo) {
+  const t = String(tipo || "").toUpperCase();
+  if (!t) return "";
+  if (t.includes("PICK")) return "Pick-up";
+  if (t.includes("SEDAN") || t.includes("SEDÁN")) return "Sedán";
+  if (t.includes("FURGON") || t.includes("FURGÓN")) return "Furgón";
+  if (t.includes("SUV") || t.includes("JEEP")) return "SUV";
+  if (t.includes("COUPE") || t.includes("COUPÉ")) return "Coupé";
+  if (t.includes("HATCH")) return "Hatchback";
+  if (t.includes("RURAL") || t.includes("FAMILIAR")) return "Familiar / Rural";
+  if (t.includes("MOTO")) return "Moto";
+  if (t.includes("UTILITARIO")) return "Utilitario";
+  return "";
+}
+
+// 🆕 Regla de negocio: si la póliza es de NRE, la cobertura SIEMPRE es "A"
+// (solo operamos A con NRE). Cualquier otra compañía se elige a mano del catálogo.
+function coberturaPorDefecto(companiaPdf, catalogo = []) {
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (norm(companiaPdf) !== "nre") return ""; // otras compañías → a mano
+  // Buscamos "A" en el catálogo (preferimos la de NRE) para usar el nombre exacto
+  const a =
+    (catalogo || []).find((c) => norm(c.nombre) === "a" && norm(c.compania_nombre) === "nre") ||
+    (catalogo || []).find((c) => norm(c.nombre) === "a");
+  return a ? a.nombre : "A";
+}
+
 export default function CreateSolicitudModal({
   onClose,
   companias = [],
@@ -107,6 +137,7 @@ export default function CreateSolicitudModal({
   initialTipoSeguro = "ROBO",
   // 🚀 Prop opcional: si querés saltear el gate (ej. cuando ya viene cliente precargado)
   skipVerificarGate = false,
+  initialDatosPdf = null,
 }) {
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
@@ -116,7 +147,12 @@ export default function CreateSolicitudModal({
   const [verifyOpen, setVerifyOpen] = useState(!initialClienteId && !skipVerificarGate);
 
   // El wizard arranca en paso 1 (Asignación). Si ya viene responsable, salta a Cliente (paso 2).
-  const [step, setStep] = useState(skipResponsableGate && initialResponsableId ? 2 : 1);
+  // 🆕 Fase 1: alta exprés desde PDF (revisión → fotos DNI → fotos auto → resumen)
+  const modoRapido = !!initialDatosPdf;
+  const SECUENCIA_RAPIDA = [0];
+  const [step, setStep] = useState(
+    initialDatosPdf ? 0 : (skipResponsableGate && initialResponsableId ? 2 : 1)
+  );
   const [responsableId, setResponsableId] = useState(initialResponsableId ? String(initialResponsableId) : "");
 
   // Listas para el paso de Asignación
@@ -157,45 +193,58 @@ export default function CreateSolicitudModal({
 
   const [clienteModo, setClienteModo] = useState(initialClienteId ? "existente" : "nuevo");
   const [clienteId, setClienteId] = useState(initialClienteId ? String(initialClienteId) : "");
-  const [cliente, setCliente] = useState({
-    nombre: "",
-    apellido: "",
-    telefono: "",
-    email: "",
-    dni_cuit_cuil: "",
-    direccion: "",
-    localidad: "",
-    partido: "",
-    fecha_nacimiento: "",
+  const [cliente, setCliente] = useState(() => {
+    const c = initialDatosPdf?.cliente || {};
+    return {
+      nombre: c.nombre || "",
+      apellido: c.apellido || "",
+      telefono: "", // 🆕 siempre a mano (el del PDF suele estar desactualizado)
+      email: "",
+      dni_cuit_cuil: c.dni || "",
+      direccion: c.direccion || "",
+      localidad: c.localidad || "",
+      partido: "",
+      fecha_nacimiento: "",
+    };
   });
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
 
   const [polizaModo, setPolizaModo] = useState("nueva");
   const [polizaId, setPolizaId] = useState("");
-  const [poliza, setPoliza] = useState({
-    compania: initialCompania || "",
-    numero_poliza: "",
-    cobertura: "",
-    oficina: "",
-    patente: initialPatente || "",
-    marca: "",
-    modelo: "",
-    anio: "",
-    tipo: "Auto",
-    precio_cuota: "",
-    cantidad_cuotas_override: "",
-    primer_vencimiento: "",
-    fecha_emision: ymdLocal(new Date()),
-    dias_a_vencer: 30,
-    generar_cuotas_ahora: true,
+  const [poliza, setPoliza] = useState(() => {
+    const v = initialDatosPdf?.vehiculo || {};
+    const pol = initialDatosPdf?.poliza || {};
+    const cupones = initialDatosPdf?.cupones || [];
+    const partes = String(v.marca_modelo || "").trim().split(/\s+/).filter(Boolean);
+    return {
+      compania: pol.compania || initialCompania || "",
+      numero_poliza: pol.numero || "",
+      cobertura: coberturaPorDefecto(pol.compania, coberturas), // 🆕 NRE → "A" automático; resto vacío (a mano)
+      oficina: "",
+      patente: v.patente || initialPatente || "",
+      marca: partes[0] || "",
+      modelo: partes.slice(1).join(" ") || "",
+      anio: v.anio ? String(v.anio) : "",
+      numero_motor: v.motor || "",
+      numero_chasis: v.chasis || "",
+      carroceria: tipoACarroceria(v.tipo) || "",
+      tipo: "Auto",
+      precio_cuota: cupones[0]?.importe != null ? String(cupones[0].importe) : "",
+      cantidad_cuotas_override: cupones.length ? String(cupones.length) : "",
+      primer_vencimiento: cupones[0]?.vencimiento || "",
+      fecha_emision: ymdLocal(new Date()),
+      dias_a_vencer: 30,
+      generar_cuotas_ahora: true,
+    };
   });
 
   const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
 
   useEffect(() => {
-    if (!isWebAdmin && user?.perfil?.oficina) {
-      setPoliza((prev) => ({ ...prev, oficina: String(user.perfil.oficina) }));
+    // 🆕 Auto-asignar la oficina del usuario SIEMPRE (admin o no). Lo único manual es el responsable.
+    if (user?.perfil?.oficina) {
+      setPoliza((prev) => ({ ...prev, oficina: prev.oficina || String(user.perfil.oficina) }));
     }
   }, [isWebAdmin, user]);
 
@@ -203,6 +252,13 @@ export default function CreateSolicitudModal({
     if (!poliza.fecha_emision) return;
     setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
   }, [poliza.fecha_emision]);
+
+  // 🆕 Si las coberturas llegan después (async) y es NRE, preseleccionamos "A"
+  useEffect(() => {
+    if (!modoRapido || poliza.cobertura) return;
+    const m = coberturaPorDefecto(poliza.compania, coberturas);
+    if (m) setPoliza((s) => ({ ...s, cobertura: m }));
+  }, [coberturas]);
 
   const coberturaObj = useMemo(() => {
     if (!poliza.cobertura) return null;
@@ -373,7 +429,9 @@ export default function CreateSolicitudModal({
   const autoOk = Object.keys(autoErrors).length === 0;           // paso 5
   const fechasOk = Object.keys(fechasErrors).length === 0;       // paso 6
   const polizaOk = companiaOk && autoOk && fechasOk;
-  const canSubmit = responsableOk && oficinaOk && datosClienteOk && fotosClienteOk && polizaOk && !saving;
+  const canSubmit = modoRapido
+    ? (responsableOk && oficinaOk && !saving)
+    : (responsableOk && oficinaOk && datosClienteOk && fotosClienteOk && polizaOk && !saving);
 
   // Responsables visibles: admin → solo los de la oficina elegida; empleado → todos los suyos
   const empleadosVisibles = useMemo(() => {
@@ -404,7 +462,63 @@ export default function CreateSolicitudModal({
     setStep(target);
   };
 
+  // 🆕 Navegación del modo rápido (salta los datos ya cargados del PDF)
+  const stepSiguiente = () => {
+    if (modoRapido) {
+      const i = SECUENCIA_RAPIDA.indexOf(step);
+      const next = SECUENCIA_RAPIDA[i + 1];
+      if (next != null) setStep(next);
+    } else {
+      goToStep(step + 1);
+    }
+  };
+  const stepAtras = () => {
+    if (modoRapido) {
+      const i = SECUENCIA_RAPIDA.indexOf(step);
+      const prev = SECUENCIA_RAPIDA[i - 1];
+      if (prev != null) setStep(prev);
+    } else {
+      setStep((sx) => sx - 1);
+    }
+  };
+  const esPrimerStep = modoRapido ? step === SECUENCIA_RAPIDA[0] : step <= 1;
+  const esUltimoStep = step === 8;
+
   // 🚀 Handlers del gate de verificación previa
+  // 🆕 Autocompletar el formulario con lo que extrae el lector de PDF
+  const handlePdfExtraido = (datos) => {
+    const c = datos?.cliente || {};
+    const v = datos?.vehiculo || {};
+    const pol = datos?.poliza || {};
+    const cupones = datos?.cupones || [];
+
+    setCliente((prev) => ({
+      ...prev,
+      nombre: c.nombre || prev.nombre,
+      dni_cuit_cuil: c.dni || prev.dni_cuit_cuil,
+    }));
+
+    const partes = String(v.marca_modelo || "").trim().split(/\s+/);
+    const marca = partes.length ? partes[0] : "";
+    const modelo = partes.length > 1 ? partes.slice(1).join(" ") : "";
+
+    setPoliza((prev) => ({
+      ...prev,
+      numero_poliza: pol.numero || prev.numero_poliza,
+      compania: pol.compania || prev.compania,
+      patente: v.patente || prev.patente,
+      marca: marca || prev.marca,
+      modelo: modelo || prev.modelo,
+      anio: v.anio ? String(v.anio) : prev.anio,
+      numero_motor: v.motor || prev.numero_motor,
+      numero_chasis: v.chasis || prev.numero_chasis,
+      carroceria: tipoACarroceria(v.tipo) || prev.carroceria,
+      primer_vencimiento: cupones[0]?.vencimiento || prev.primer_vencimiento,
+      precio_cuota: cupones[0]?.importe != null ? String(cupones[0].importe) : prev.precio_cuota,
+      cantidad_cuotas_override: cupones.length ? String(cupones.length) : prev.cantidad_cuotas_override,
+    }));
+  };
+
   const handleVerifyConfirmedNuevo = ({ cliente_id } = {}) => {
     setVerifyOpen(false);
     // Si nos pasaron un cliente_id (CLIENTE_OTRO_AUTO o PATENTE_BAJA),
@@ -504,6 +618,8 @@ export default function CreateSolicitudModal({
       } else {
         payload.poliza = {
           modo: "nueva",
+          // 🆕 número detectado del PDF (o cargado a mano). Si marcan "sin número", va vacío y el backend genera uno.
+          numero_poliza: sinNumero ? "" : (poliza.numero_poliza || "").trim(),
           compania: finalCompania.trim(),
           cobertura: finalCobertura.trim(),
           oficina: poliza.oficina ? Number(poliza.oficina) : null,
@@ -561,6 +677,18 @@ export default function CreateSolicitudModal({
         };
       });
 
+      // 🆕 documentos del PDF subido en la carga rápida (póliza / cupones / certificado)
+      (initialDatosPdf?.documentos || []).forEach((d, i) => {
+        if (!d?.url) return;
+        const key = `${d.tipo || "POLIZA_PDF"}${i ? "_" + i : ""}`;
+        payload.documentos[key] = {
+          url: d.url,
+          public_id: d.public_id || "",
+          mime: d.mime || "application/pdf",
+          nombre: d.nombre || "documento.pdf",
+        };
+      });
+
       const raw = await solicitudesApi.crearCompleto(payload);
       toast.success("Solicitud creada con éxito");
 
@@ -607,6 +735,9 @@ export default function CreateSolicitudModal({
     return (
       <VerificarClienteGate
         open={verifyOpen}
+        initialDni={modoRapido ? (initialDatosPdf?.cliente?.dni || "") : ""}
+        initialPatente={modoRapido ? (initialDatosPdf?.vehiculo?.patente || "") : ""}
+        autoVerificar={modoRapido}
         onConfirmNuevo={handleVerifyConfirmedNuevo}
         onCancel={handleVerifyCancel}
       />
@@ -657,6 +788,7 @@ export default function CreateSolicitudModal({
           </button>
         </div>
 
+        {!modoRapido && (
         <div className="shrink-0 px-4 py-3 bg-white/5 border-b border-white/10 overflow-x-auto no-scrollbar">
           <div className="flex gap-2 min-w-max">
             <StepBadge
@@ -725,9 +857,27 @@ export default function CreateSolicitudModal({
             />
           </div>
         </div>
+        )}
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-hide">
           <AnimatePresence mode="wait">
+            {step === 0 && (
+              <motion.div key="rev" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
+                <RevisionRapidaStep
+                  cliente={cliente}
+                  setCliente={setCliente}
+                  poliza={poliza}
+                  setPoliza={setPoliza}
+                  coberturas={coberturas}
+                  companias={companias}
+                  empleados={empleadosVisibles}
+                  empleadosLoading={empleadosLoading}
+                  responsableId={responsableId}
+                  onElegirResponsable={(id) => setResponsableId(String(id))}
+                  onTerminar={onSubmit}
+                />
+              </motion.div>
+            )}
             {step === 1 && (
               <motion.div
                 key="s0"
@@ -757,6 +907,7 @@ export default function CreateSolicitudModal({
                 animate="visible"
                 exit="exit"
               >
+                <LectorPdfButton onExtraido={handlePdfExtraido} />
                 <ClienteStep
                   section="datos"
                   clienteModo={clienteModo}
@@ -917,6 +1068,7 @@ export default function CreateSolicitudModal({
           </AnimatePresence>
         </div>
 
+        {!(modoRapido && step === 0) && (
         <div className="shrink-0 border-t border-white/10 bg-[#0f0c28]/95 backdrop-blur p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
           <button
             onClick={onClose}
@@ -926,17 +1078,17 @@ export default function CreateSolicitudModal({
             Cancelar
           </button>
           <div className="flex gap-2 w-full sm:w-auto">
-            {step > 1 && (
+            {!esPrimerStep && (
               <button
-                onClick={() => setStep((s) => s - 1)}
+                onClick={stepAtras}
                 className="flex-1 sm:flex-none px-5 py-3 sm:py-2.5 rounded-2xl bg-white/10 text-white font-bold uppercase text-xs transition-all flex items-center justify-center gap-2 active:scale-95"
               >
                 <HiChevronLeft /> Atrás
               </button>
             )}
-            {step < 8 ? (
+            {!esUltimoStep ? (
               <button
-                onClick={() => goToStep(step + 1)}
+                onClick={stepSiguiente}
                 className="flex-1 sm:flex-none px-8 py-3 sm:py-2.5 rounded-2xl bg-sky-600 text-white font-bold uppercase text-xs shadow-lg shadow-sky-900/40 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
                 Siguiente <HiChevronRight />
@@ -952,6 +1104,7 @@ export default function CreateSolicitudModal({
             )}
           </div>
         </div>
+        )}
       </motion.div>
     </div>
   );
@@ -961,19 +1114,24 @@ function AsignacionStep({
   isWebAdmin, oficinasList, oficinaSel, onElegirOficina, userOficinaNombre,
   empleados, empleadosLoading, responsableId, onElegirResponsable,
 }) {
+  const [cambiarOfi, setCambiarOfi] = useState(false);
+  const ofiNombre = isWebAdmin
+    ? (oficinasList.find((o) => String(o.id) === String(oficinaSel))?.nombre || "Elegí una sucursal")
+    : userOficinaNombre;
+  const mostrarSelectorOfi = isWebAdmin && (cambiarOfi || !oficinaSel);
   return (
     <div className="space-y-5">
-      {/* Sucursal */}
+      {/* Sucursal — auto-asignada; admin puede cambiarla */}
       <fieldset className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6 shadow-xl">
         <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">Sucursal</legend>
-        {isWebAdmin ? (
+        {mostrarSelectorOfi ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
             {oficinasList.length === 0 ? (
               <p className="text-white/40 text-xs italic">Cargando sucursales...</p>
             ) : oficinasList.map((o) => {
               const sel = String(oficinaSel) === String(o.id);
               return (
-                <button key={o.id} type="button" onClick={() => onElegirOficina(o.id)}
+                <button key={o.id} type="button" onClick={() => { onElegirOficina(o.id); setCambiarOfi(false); }}
                   className={`text-left px-4 py-3 rounded-xl border font-bold text-sm transition-all ${sel ? "bg-sky-500/20 border-sky-500/50 text-white" : "bg-white/5 border-white/10 text-white/70 hover:border-sky-500/30"}`}>
                   {o.nombre || `Oficina ${o.id}`}
                 </button>
@@ -981,8 +1139,16 @@ function AsignacionStep({
             })}
           </div>
         ) : (
-          <div className="mt-2 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold">
-            <HiShieldCheck /> {userOficinaNombre}
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold">
+              <HiShieldCheck /> {ofiNombre}
+            </div>
+            {isWebAdmin && (
+              <button type="button" onClick={() => setCambiarOfi(true)}
+                className="text-[11px] text-sky-300 hover:text-sky-200 underline underline-offset-2">
+                Cambiar
+              </button>
+            )}
           </div>
         )}
       </fieldset>
