@@ -18,8 +18,18 @@ import SubirFotosVehiculoModal from "../components/tareas/SubirFotosVehiculoModa
 import SubirPolizaSistemaModal from "../components/tareas/SubirPolizaSistemaModal";
 
 const SECCIONES = [
+  // RENOVADAS de hoy → subir la póliza nueva al sistema
   { key: "subir_poliza", titulo: "Subir póliza a sistema", icon: HiCloudUpload, tipo: "subir-poliza-sistema", accion: "Subir",
     c: { icon: "text-violet-400", chip: "bg-violet-500/15", badge: "bg-violet-500/20 text-violet-300", btn: "border-violet-500/40 text-violet-300 hover:bg-violet-500/10" } },
+  // ALTAS de hoy a las que les faltan datos
+  { key: "datos_poliza", titulo: "Completar datos de la póliza", icon: HiDocumentText, tipo: "poliza-datos", accion: "Completar",
+    c: { icon: "text-amber-400", chip: "bg-amber-500/15", badge: "bg-amber-500/20 text-amber-300", btn: "border-amber-500/40 text-amber-300 hover:bg-amber-500/10" } },
+  { key: "datos_cliente", titulo: "Completar datos del cliente", icon: HiUser, tipo: "cliente-datos", accion: "Completar",
+    c: { icon: "text-sky-400", chip: "bg-sky-500/15", badge: "bg-sky-500/20 text-sky-300", btn: "border-sky-500/40 text-sky-300 hover:bg-sky-500/10" } },
+  { key: "fotos_dni", titulo: "Subir fotos de DNI", icon: HiIdentification, tipo: "cliente-fotos", accion: "Subir",
+    c: { icon: "text-fuchsia-400", chip: "bg-fuchsia-500/15", badge: "bg-fuchsia-500/20 text-fuchsia-300", btn: "border-fuchsia-500/40 text-fuchsia-300 hover:bg-fuchsia-500/10" } },
+  { key: "fotos_poliza", titulo: "Subir fotos de la póliza", icon: HiCamera, tipo: "poliza-fotos", accion: "Subir",
+    c: { icon: "text-emerald-400", chip: "bg-emerald-500/15", badge: "bg-emerald-500/20 text-emerald-300", btn: "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" } },
 ];
 
 export default function TareasPage() {
@@ -35,9 +45,14 @@ export default function TareasPage() {
   const [subirPoliza, setSubirPoliza] = useState(null);
 
   useEffect(() => { dispatch(fetchTareasDia()); }, [dispatch]);
-  useEffect(() => { if (data) setBaseTotal((p) => Math.max(p, (data.subir_poliza || []).length)); }, [data]);
+  useEffect(() => {
+    if (data) {
+      const t = SECCIONES.reduce((a, sec) => a + ((data[sec.key] || []).length), 0);
+      setBaseTotal((p) => Math.max(p, t));
+    }
+  }, [data]);
 
-  const total = (data?.subir_poliza || []).length;
+  const total = SECCIONES.reduce((acc, sec) => acc + ((data?.[sec.key] || []).length), 0);
   const hechas = Math.max(0, baseTotal - total);
   const pct = baseTotal > 0 ? Math.round((hechas / baseTotal) * 100) : 0;
 

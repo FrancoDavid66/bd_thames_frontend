@@ -257,7 +257,6 @@ export default function PortalAseguradoPage() {
                       {p.patente ? <span className="font-mono uppercase text-slate-300">{p.patente}</span> : null}
                       {p.patente ? " · " : ""}{p.compania} · Cobertura {p.cobertura}
                     </div>
-                    {p.numero_poliza ? <div className="text-[11px] text-slate-500">Póliza #{p.numero_poliza}</div> : null}
                   </div>
                 </div>
 
@@ -280,7 +279,35 @@ export default function PortalAseguradoPage() {
                       ))}
                     </div>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="border-b border-white/5 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <HiDocumentText className="h-4 w-4 text-indigo-400" />
+                      <span className="text-[13px] font-semibold text-slate-200">Papeles</span>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.06] bg-[#0f1422] p-3.5">
+                      <div className="flex items-center gap-2 text-amber-300">
+                        <HiClock className="h-4 w-4" />
+                        <span className="text-[13px] font-semibold">Papeles en proceso de carga</span>
+                      </div>
+                      <p className="mt-1.5 text-[12px] leading-snug text-slate-400">
+                        Estamos cargando los papeles de esta póliza. Si los necesitás ahora, escribinos.
+                      </p>
+                      {p.oficina_whatsapp ? (
+                        <a
+                          href={`https://wa.me/${p.oficina_whatsapp}?text=${encodeURIComponent(
+                            `Hola, soy ${cliente?.nombre_completo || cliente?.nombre || ""}. Necesito los papeles de mi póliza del auto ${p.patente || ""}. ¿Me los pueden enviar? Gracias.`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2 text-[12px] font-bold text-white transition hover:bg-emerald-400"
+                        >
+                          Pedir mis papeles
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
 
                 {/* Cuponeras de robo (lo importante para cobranza) */}
                 {cupones.length > 0 ? (

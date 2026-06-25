@@ -19,6 +19,11 @@ const SLOTS = [
 ];
 
 /* ── normalizadores para comparar ── */
+const fmtFecha = (iso) => {
+  if (!iso) return "";
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : String(iso);
+};
 const normPat = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const normDni = (v) => String(v || "").replace(/\D/g, "");
 const normNom = (v) =>
@@ -107,6 +112,8 @@ export default function SubirPolizaSistemaModal({ isOpen, item, onClose, onSaved
           _dni: datos?.cliente?.dni || "",
           _nombre: datos?.cliente?.nombre || "",
           _apellido: datos?.cliente?.apellido || "",
+          _vig_desde: datos?.poliza?.vigencia_desde || "",
+          _vig_hasta: datos?.poliza?.vigencia_hasta || "",
         };
       } catch {
         toast("No se pudieron leer los datos del PDF, pero se guardan los papeles.", { icon: "⚠️" });
@@ -126,6 +133,13 @@ export default function SubirPolizaSistemaModal({ isOpen, item, onClose, onSaved
       const nomPdf = `${datosOut._apellido} ${datosOut._nombre}`.trim();
       if (nomPdf && item.cliente && item.cliente !== "—" && !nombreCoincide(nomPdf, item.cliente)) {
         incs.push({ campo: "nombre", label: "Titular", valorPdf: nomPdf, valorPol: item.cliente, correccion: { nombre: datosOut._nombre, apellido: datosOut._apellido } });
+      }
+
+      // Vigencia vieja: si el papel ya venció, probablemente es el de la póliza anterior.
+      // Se avisa PRIMERO (lo más importante a chequear en una renovación).
+      const hoyStr = new Date().toISOString().slice(0, 10);
+      if (datosOut._vig_hasta && datosOut._vig_hasta < hoyStr) {
+        incs.unshift({ campo: "vigencia", label: "Vigencia", valorPdf: datosOut._vig_hasta, vieja: true });
       }
 
       if (incs.length) {
@@ -226,6 +240,33 @@ export default function SubirPolizaSistemaModal({ isOpen, item, onClose, onSaved
                 <button onClick={() => onSaved?.()} className="mt-4 w-full h-12 rounded-xl bg-emerald-500 text-black font-bold text-sm hover:bg-emerald-400">Listo</button>
               </div>
             ) : incActual ? (
+              incActual.campo === "vigencia" ? (
+                <div className="p-6">
+                  <div className="flex flex-col items-center text-center gap-2 mb-4">
+                    <div className="h-14 w-14 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <HiExclamation className="text-3xl" />
+                    </div>
+                    <div className="text-lg font-bold text-white">¿Es el papel correcto?</div>
+                    <div className="text-[11px] text-white/40">{idxInc + 1} de {inconsistencias.length}</div>
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 mb-4">
+                    <p className="text-[13px] leading-snug text-amber-100">
+                      La vigencia de este papel termina el <b>{fmtFecha(incActual.valorPdf)}</b>, una fecha que ya pasó.
+                      Puede ser el papel de la <b>póliza anterior</b>, no el de la renovación nueva.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button onClick={() => resolver(false)} className="w-full h-11 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-200 font-bold text-sm hover:bg-sky-500/25">
+                      Está bien, continuar
+                    </button>
+                    <button onClick={onClose} className="w-full h-11 rounded-xl bg-white/5 border border-white/10 text-white/60 font-bold text-sm hover:bg-white/10">
+                      Cancelar, es el papel viejo
+                    </button>
+                  </div>
+                </div>
+              ) : (
               <div className="p-6">
                 <div className="flex flex-col items-center text-center gap-2 mb-4">
                   <div className="h-14 w-14 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
@@ -258,6 +299,7 @@ export default function SubirPolizaSistemaModal({ isOpen, item, onClose, onSaved
                   </button>
                 </div>
               </div>
+              )
             ) : (
               <>
                 <div className="p-5 space-y-3">
