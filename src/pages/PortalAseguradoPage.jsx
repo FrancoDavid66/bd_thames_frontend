@@ -36,14 +36,29 @@ function fmt(d) {
   return d ? dayjs(d).format("DD/MM/YYYY") : "—";
 }
 
-// Nombre legible según el tipo del documento (con heurística por nombre de archivo)
+// Nombre legible del documento. Prioriza el TIPO (dato confiable); el nombre del
+// archivo se usa solo como respaldo, y ahí Mercosur/cuponera/certificado se chequean
+// ANTES que "póliza" (porque muchos archivos llevan "poliza" en el nombre).
 function nombreLindoDoc(tipo, nombre) {
-  const t = String(tipo || "").toUpperCase();
+  const t = String(tipo || "").toUpperCase().trim();
   const n = String(nombre || "").toLowerCase();
-  if (t.startsWith("POLIZA") || n.includes("poliza") || n.includes("prp")) return "Póliza";
-  if (t.startsWith("CUPONERA") || n.includes("cupon")) return "Cuponera de robo";
-  if (t.startsWith("CERTIFICADO") || n.includes("cert")) return "Certificado";
+
+  // 1) Por tipo (lo que confiamos)
+  if (t.startsWith("MERCO")) return "Tarjeta Mercosur";
+  if (t.startsWith("CUPON")) return "Cuponera de robo";
+  if (t.startsWith("CERT")) return "Certificado";
+  if (t.startsWith("DNI")) return "DNI";
+  if (t.startsWith("POLIZA") || t === "PRP" || t.startsWith("FRENTE") || t.startsWith("PROPUESTA"))
+    return "Póliza";
+
+  // 2) Respaldo por nombre de archivo (Mercosur/cuponera/cert ANTES que póliza)
   if (n.includes("merco")) return "Tarjeta Mercosur";
+  if (n.includes("cupon")) return "Cuponera de robo";
+  if (n.includes("cert")) return "Certificado";
+  if (n.includes("poliza") || n.includes("prp") || n.includes("propuesta") || n.includes("frente"))
+    return "Póliza";
+
+  // 3) Último recurso
   if (t && t !== "OTRO") return t.charAt(0) + t.slice(1).toLowerCase();
   return "Documento";
 }
