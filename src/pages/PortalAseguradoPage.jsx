@@ -345,6 +345,17 @@ export default function PortalAseguradoPage() {
                     <p className="mt-2 text-[11px] leading-snug text-slate-500">
                       Cuando toques "Ya pagué", lo verificamos y te confirmamos. No hace falta que subas nada.
                     </p>
+                    <div className="mt-3 rounded-xl border border-sky-500/20 bg-sky-500/[0.07] p-3">
+                      <div className="flex items-center gap-2 text-sky-300">
+                        <HiCash className="h-4 w-4" />
+                        <span className="text-[12px] font-semibold">Cómo pagar tus cuotas</span>
+                      </div>
+                      <p className="mt-1 text-[12px] leading-snug text-slate-300">
+                        Podés abonar en <span className="font-semibold text-slate-100">Rapipago</span>,{" "}
+                        <span className="font-semibold text-slate-100">Pago Fácil</span> o{" "}
+                        <span className="font-semibold text-slate-100">Mercado Pago</span> usando los datos de tu cuponera.
+                      </p>
+                    </div>
                   </div>
                 ) : null}
 
