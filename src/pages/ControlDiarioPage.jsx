@@ -147,7 +147,7 @@ export default function ControlDiarioPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-5">
-      <div className="mx-auto max-w-lg">
+      <div className="mx-auto max-w-lg lg:max-w-7xl">
         <div className="mb-3 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-white">Control diario</h1>
           <button onClick={() => { setLoading(true); cargar(); }} className="rounded-full border border-white/10 bg-slate-900 p-2 text-slate-400 hover:text-white">
@@ -176,7 +176,7 @@ export default function ControlDiarioPage() {
                 No hay tareas fijas cargadas todavía.
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
                 {oficinas.map((ofi) => (
                   <div key={ofi.oficina_id} className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
                     <div className="flex items-center justify-between px-4 py-3">
