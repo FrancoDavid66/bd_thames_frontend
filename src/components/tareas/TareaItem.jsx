@@ -3,18 +3,29 @@ import { motion } from "framer-motion";
 import { HiCheck, HiChevronRight } from "react-icons/hi";
 
 export default function TareaItem({ item, seccion, marcando, onMarcarEnviada, onAccion }) {
+  // Patente (se muestra como badge al lado del nombre, para ubicar rápido)
+  const pat = (item.patente_real || item.patente || "").trim();
+  const patente = pat && pat !== "—" ? pat : "";
+
   const sub =
     seccion.tipo === "enviar"
-      ? `${item.patente}${item.vehiculo ? ` · ${item.vehiculo}` : ""}${item.compania ? ` · ${item.compania}` : ""}`
+      ? [item.vehiculo, item.compania].filter(Boolean).join(" · ")
       : seccion.key === "fotos_poliza"
-      ? `${item.patente}${item.vehiculo ? ` · ${item.vehiculo}` : ""}`
-      : item.detalle || item.patente || "";
+      ? item.vehiculo || ""
+      : item.detalle || "";
 
   return (
     <motion.div layout exit={{ opacity: 0, x: 12 }} className="flex items-center gap-3 px-4 py-3">
       <div className="min-w-0">
-        <div className="text-sm text-slate-200 truncate">{item.cliente}</div>
-        <div className="text-xs text-slate-500 truncate">{sub}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-200 truncate">{item.cliente}</span>
+          {patente ? (
+            <span className="shrink-0 rounded-md bg-slate-700/50 px-1.5 py-0.5 text-[11px] font-mono font-bold tracking-wide text-slate-200">
+              {patente}
+            </span>
+          ) : null}
+        </div>
+        {sub ? <div className="text-xs text-slate-500 truncate">{sub}</div> : null}
       </div>
 
       <div className="ml-auto shrink-0">
