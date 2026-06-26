@@ -1,1216 +1,372 @@
-// src/components/solicitudes/CreateSolicitudModal.jsx
-import { useEffect, useMemo, useState } from "react";
+/* src/components/tareas/SubirPolizaSistemaModal.jsx */
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  HiX,
-  HiPhotograph,
-  HiChevronRight,
-  HiChevronLeft,
-  HiCheckCircle,
-  HiShieldCheck,
-  HiUser,
-  HiDocumentText,
-  HiIdentification,
-  HiSparkles,
-} from "react-icons/hi";
 import toast from "react-hot-toast";
-
-// 🚀 IMPORTACIONES DE SEGURIDAD Y SERVICIOS
-import { useAuth } from "../../context/AuthContext";
+import {
+  HiDocumentText, HiX, HiUpload, HiCheckCircle, HiSparkles, HiExclamation, HiInformationCircle,
+} from "react-icons/hi";
 import { uploadToCloudinary } from "../../utils/cloudinary";
-import { solicitudesApi } from "../../services/solicitudes.js";
 import api from "../../services/api";
-import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
 
-import ResponsableManagerModal from "./modalcreate/ResponsableManagerModal"; // (ya no se usa como popup; queda por compatibilidad)
-import ClienteStep from "./modalcreate/ClienteStep";
-import LectorPdfButton from "./modalcreate/LectorPdfButton";
-import RevisionRapidaStep from "./modalcreate/RevisionRapidaStep";
-import PolizaStep from "./modalcreate/PolizaStep";
-import ImagenesDocsStep from "./modalcreate/ImagenesDocsStep";
-import SolicitudStep from "./modalcreate/SolicitudStep";
-// 🚀 NUEVO: Gate de verificación previa (búsqueda global de cliente/auto)
-import VerificarClienteGate from "./modalcreate/VerificarClienteGate";
+/* ⚠️ AJUSTÁ ESTA RUTA si tu lector de PDF está en otra URL.
+   Es el endpoint del LectorPdfView (el que usa la subida rápida). */
+const LECTOR_PDF_ENDPOINT = "polizas/lector-pdf/";
 
-const modalVariants = {
-  initial: { opacity: 0, scale: 0.95 },
-  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
-};
-
-const stepVariants = {
-  hidden: { opacity: 0, x: 50 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-  exit: { opacity: 0, x: -50, transition: { duration: 0.3 } },
-};
-
-const MAX_FOTOS_RAW = import.meta.env.VITE_MAX_FOTOS;
-const MAX_FOTOS = MAX_FOTOS_RAW === "0" || MAX_FOTOS_RAW === 0 ? 0 : Number(MAX_FOTOS_RAW || 12);
-const TIPO_DNI_SLOTS = [
-  { key: "DNI_FRENTE", label: "DNI frente" },
-  { key: "DNI_DORSO", label: "DNI dorso" },
+const SLOTS = [
+  { key: "POLIZA", label: "Póliza / frente" },
+  { key: "MERCOSUR", label: "Mercosur" },
+  { key: "CUPONERA", label: "Cuponera (si es con robo)" },
 ];
 
-function ymdLocal(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+/* ── normalizadores para comparar ── */
+const fmtFecha = (iso) => {
+  if (!iso) return "";
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : String(iso);
+};
+const normPat = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normDni = (v) => String(v || "").replace(/\D/g, "");
+const normNom = (v) =>
+  String(v || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+
+/* Dos nombres "coinciden" si comparten al menos una palabra de 3+ letras */
+function nombreCoincide(a, b) {
+  const pa = normNom(a).split(" ").filter((w) => w.length >= 3);
+  const pb = normNom(b).split(" ").filter((w) => w.length >= 3);
+  if (!pa.length || !pb.length) return true;
+  return pa.some((w) => pb.includes(w));
 }
 
-function parseYMDLocal(s) {
-  const [y, m, d] = String(s || "").split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d, 12, 0, 0, 0);
-}
-
-function lastDayOfMonth(y, m0) {
-  return new Date(y, m0 + 1, 0).getDate();
-}
-
-function addMonthsLocal(ymd, months) {
-  const base = parseYMDLocal(ymd);
-  if (!base) return "";
-  const y = base.getFullYear(),
-    m0 = base.getMonth(),
-    d = base.getDate();
-  const tMon = m0 + months,
-    y2 = y + Math.floor(tMon / 12),
-    m2 = ((tMon % 12) + 12) % 12;
-  const maxDay = lastDayOfMonth(y2, m2),
-    day2 = Math.min(d, maxDay);
-  return ymdLocal(new Date(y2, m2, day2, 12, 0, 0, 0));
-}
-
-const guessMime = (name = "") =>
-  name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg";
-
-function normalizaTelefonoAR(raw) {
-  if (!raw) return "";
-  let d = String(raw).replace(/\D/g, "");
-  if (d.startsWith("549")) d = d.slice(3);
-  else if (d.startsWith("54")) d = d.slice(2);
-  if (d.startsWith("0")) d = d.slice(1);
-  if (d.startsWith("15") && d.length >= 10) d = d.slice(2);
-  return d;
-}
-
-// 🆕 Mapea el "tipo" de vehículo del PDF a una carrocería del catálogo
-function tipoACarroceria(tipo) {
-  const t = String(tipo || "").toUpperCase();
-  if (!t) return "";
-  if (t.includes("PICK")) return "Pick-up";
-  if (t.includes("SEDAN") || t.includes("SEDÁN")) return "Sedán";
-  if (t.includes("FURGON") || t.includes("FURGÓN")) return "Furgón";
-  if (t.includes("SUV") || t.includes("JEEP")) return "SUV";
-  if (t.includes("COUPE") || t.includes("COUPÉ")) return "Coupé";
-  if (t.includes("HATCH")) return "Hatchback";
-  if (t.includes("RURAL") || t.includes("FAMILIAR")) return "Familiar / Rural";
-  if (t.includes("MOTO")) return "Moto";
-  if (t.includes("UTILITARIO")) return "Utilitario";
-  return "";
-}
-
-// 🆕 Regla de negocio: si la póliza es de NRE, la cobertura SIEMPRE es "A"
-// (solo operamos A con NRE). Cualquier otra compañía se elige a mano del catálogo.
-function coberturaPorDefecto(companiaPdf, catalogo = []) {
-  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-  if (norm(companiaPdf) !== "nre") return ""; // otras compañías → a mano
-  // Buscamos "A" en el catálogo (preferimos la de NRE) para usar el nombre exacto
-  const a =
-    (catalogo || []).find((c) => norm(c.nombre) === "a" && norm(c.compania_nombre) === "nre") ||
-    (catalogo || []).find((c) => norm(c.nombre) === "a");
-  return a ? a.nombre : "A";
-}
-
-export default function CreateSolicitudModal({
-  onClose,
-  companias = [],
-  coberturas = [],
-  oficinas = [],
-  initialClienteId = "",
-  initialPatente = "",
-  initialCompania = "",
-  onCreated,
-  skipResponsableGate = false,
-  initialResponsableId = "",
-  initialTipoSeguro = "ROBO",
-  // 🚀 Prop opcional: si querés saltear el gate (ej. cuando ya viene cliente precargado)
-  skipVerificarGate = false,
-  initialDatosPdf = null,
-}) {
-  const { user } = useAuth();
-  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
-
-  // 🚀 Estado del gate de verificación previa
-  // Arranca abierto si NO viene cliente precargado y no se pidió saltearlo
-  const [verifyOpen, setVerifyOpen] = useState(!initialClienteId && !skipVerificarGate);
-
-  // El wizard arranca en paso 1 (Asignación). Si ya viene responsable, salta a Cliente (paso 2).
-  // 🆕 Fase 1: alta exprés desde PDF (revisión → fotos DNI → fotos auto → resumen)
-  const modoRapido = !!initialDatosPdf;
-  const SECUENCIA_RAPIDA = [0];
-  const [step, setStep] = useState(
-    initialDatosPdf ? 0 : (skipResponsableGate && initialResponsableId ? 2 : 1)
+function SlotPdf({ slot, archivo, onPick }) {
+  const ref = useRef(null);
+  return (
+    <div className="rounded-2xl bg-black/40 border border-white/5 p-4 flex items-center gap-3">
+      <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+        <HiDocumentText className="text-xl" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-bold text-white">{slot.label}</div>
+        <div className="text-[11px] text-white/40 truncate">{archivo ? archivo.name : "Sin archivo"}</div>
+      </div>
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        className={`h-10 px-4 rounded-xl inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all ${
+          archivo ? "bg-white/5 text-white border border-white/10 hover:bg-white/10" : "bg-indigo-500 text-white hover:bg-indigo-400"
+        }`}
+      >
+        <HiUpload className="text-sm" /> {archivo ? "Cambiar" : "Elegir"}
+      </button>
+      <input ref={ref} type="file" accept="application/pdf" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ""; }} />
+    </div>
   );
-  const [responsableId, setResponsableId] = useState(initialResponsableId ? String(initialResponsableId) : "");
+}
 
-  // Listas para el paso de Asignación
-  const [oficinasList, setOficinasList] = useState(Array.isArray(oficinas) ? oficinas : []);
-  const [empleados, setEmpleados] = useState([]);
-  const [empleadosLoading, setEmpleadosLoading] = useState(false);
-
-  // Trae oficinas si es admin y no llegaron por props
-  useEffect(() => {
-    if (!isWebAdmin) return;
-    if (Array.isArray(oficinas) && oficinas.length) { setOficinasList(oficinas); return; }
-    let alive = true;
-    (async () => {
-      try {
-        const res = await api.get("/usuarios/oficinas/");
-        const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-        if (alive) setOficinasList(arr);
-      } catch { /* noop */ }
-    })();
-    return () => { alive = false; };
-  }, [isWebAdmin, oficinas]);
-
-  // Trae responsables (empleados activos)
-  useEffect(() => {
-    let alive = true;
-    setEmpleadosLoading(true);
-    (async () => {
-      try {
-        const emps = await solicitudesApi.empleadosActivos();
-        let arr = Array.isArray(emps) ? emps : emps?.results || [];
-        arr = arr.filter((e) => e?.activo !== false);
-        if (alive) setEmpleados(arr);
-      } catch { if (alive) setEmpleados([]); }
-      finally { if (alive) setEmpleadosLoading(false); }
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  const [clienteModo, setClienteModo] = useState(initialClienteId ? "existente" : "nuevo");
-  const [clienteId, setClienteId] = useState(initialClienteId ? String(initialClienteId) : "");
-  const [cliente, setCliente] = useState(() => {
-    const c = initialDatosPdf?.cliente || {};
-    return {
-      nombre: c.nombre || "",
-      apellido: c.apellido || "",
-      telefono: "", // 🆕 siempre a mano (el del PDF suele estar desactualizado)
-      email: "",
-      dni_cuit_cuil: c.dni || "",
-      direccion: c.direccion || "",
-      localidad: c.localidad || "",
-      partido: "",
-      fecha_nacimiento: "",
-    };
-  });
-  const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
-
-  const [polizaModo, setPolizaModo] = useState("nueva");
-  const [polizaId, setPolizaId] = useState("");
-  const [poliza, setPoliza] = useState(() => {
-    const v = initialDatosPdf?.vehiculo || {};
-    const pol = initialDatosPdf?.poliza || {};
-    const cupones = initialDatosPdf?.cupones || [];
-    const partes = String(v.marca_modelo || "").trim().split(/\s+/).filter(Boolean);
-    return {
-      compania: pol.compania || initialCompania || "",
-      numero_poliza: pol.numero || "",
-      cobertura: coberturaPorDefecto(pol.compania, coberturas), // 🆕 NRE → "A" automático; resto vacío (a mano)
-      oficina: "",
-      patente: v.patente || initialPatente || "",
-      marca: partes[0] || "",
-      modelo: partes.slice(1).join(" ") || "",
-      anio: v.anio ? String(v.anio) : "",
-      numero_motor: v.motor || "",
-      numero_chasis: v.chasis || "",
-      carroceria: tipoACarroceria(v.tipo) || "",
-      tipo: "Auto",
-      precio_cuota: cupones[0]?.importe != null ? String(cupones[0].importe) : "",
-      cantidad_cuotas_override: cupones.length ? String(cupones.length) : "",
-      primer_vencimiento: cupones[0]?.vencimiento || "",
-      fecha_emision: ymdLocal(new Date()),
-      dias_a_vencer: 30,
-      generar_cuotas_ahora: true,
-    };
-  });
-
-  const [sinNumero, setSinNumero] = useState(false);
-  const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
-  // 🎟️ Cupones leídos de la cuponera del PDF (AMCA, La Equidad…). Se mandan al
-  //    crear para que las cuotas tomen las fechas EXACTAS (no 6 mensuales).
-  const [cuponesPdf, setCuponesPdf] = useState(() => initialDatosPdf?.cupones || []);
-
-  useEffect(() => {
-    // 🆕 Auto-asignar la oficina del usuario SIEMPRE (admin o no). Lo único manual es el responsable.
-    if (user?.perfil?.oficina) {
-      setPoliza((prev) => ({ ...prev, oficina: prev.oficina || String(user.perfil.oficina) }));
-    }
-  }, [isWebAdmin, user]);
-
-  useEffect(() => {
-    if (!poliza.fecha_emision) return;
-    setPoliza((s) => ({ ...s, primer_vencimiento: addMonthsLocal(poliza.fecha_emision, 1) }));
-  }, [poliza.fecha_emision]);
-
-  // 🆕 Si las coberturas llegan después (async) y es NRE, preseleccionamos "A"
-  useEffect(() => {
-    if (!modoRapido || poliza.cobertura) return;
-    const m = coberturaPorDefecto(poliza.compania, coberturas);
-    if (m) setPoliza((s) => ({ ...s, cobertura: m }));
-  }, [coberturas]);
-
-  const coberturaObj = useMemo(() => {
-    if (!poliza.cobertura) return null;
-    const selectedKey = String(poliza.cobertura).trim().toLowerCase();
-    const found = coberturas.find((c) => {
-      return (
-        String(c.id).trim().toLowerCase() === selectedKey ||
-        String(c.nombre).trim().toLowerCase() === selectedKey
-      );
-    });
-    if (found) {
-      let fotos = found.fotos_requeridas;
-      if (typeof fotos === "string") {
-        try {
-          fotos = JSON.parse(fotos);
-        } catch (e) {
-          fotos = fotos.split(",").map((s) => s.trim()).filter(Boolean);
-        }
-      }
-      if (!Array.isArray(fotos)) fotos = [];
-
-      let docs = found.documentos_requeridos || found.documentos_requeridas;
-      if (typeof docs === "string") {
-        try {
-          docs = JSON.parse(docs);
-        } catch (e) {
-          docs = docs.split(",").map((s) => s.trim()).filter(Boolean);
-        }
-      }
-      if (!Array.isArray(docs)) docs = [];
-
-      return { ...found, fotos_requeridas: fotos, documentos_requeridos: docs };
-    }
-    return null;
-  }, [poliza.cobertura, coberturas]);
-
-  useEffect(() => {
-    if (tocoCantidadCuotas) return;
-    if (coberturaObj && coberturaObj.cuotas_a_generar) {
-      setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(coberturaObj.cuotas_a_generar) }));
-    } else {
-      setPoliza((s) => ({ ...s, cantidad_cuotas_override: "6" }));
-    }
-  }, [coberturaObj, tocoCantidadCuotas]);
-
-  const cuotasPreview = useMemo(() => {
-    const count = Number(poliza.cantidad_cuotas_override || 6);
-    const first = poliza.primer_vencimiento;
-    if (!first || !count || count < 1) return [];
-    return Array.from({ length: count }, (_, i) => ({
-      nro: i + 1,
-      fecha: addMonthsLocal(first, i),
-      monto: 0,
-    }));
-  }, [poliza.cantidad_cuotas_override, poliza.primer_vencimiento]);
-
-  const [solicitud, setSolicitud] = useState({
-    prioridad: "NORMAL",
-    observaciones: "",
-    tipoSeguro: initialTipoSeguro,
-  });
-
-  const [fotoSlots, setFotoSlots] = useState({});
-  const [docSlots, setDocSlots] = useState({});
+export default function SubirPolizaSistemaModal({ isOpen, item, onClose, onSaved }) {
+  const [files, setFiles] = useState({ POLIZA: null, MERCOSUR: null, CUPONERA: null });
   const [saving, setSaving] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [fechaInicial, setFechaInicial] = useState("");
+
+  // flujo de inconsistencias
+  const [inconsistencias, setInconsistencias] = useState([]);
+  const [idxInc, setIdxInc] = useState(0);
+  const [correcciones, setCorrecciones] = useState({});
+  const [datosLeidos, setDatosLeidos] = useState(null);
 
   useEffect(() => {
-    if (
-      !coberturaObj ||
-      !Array.isArray(coberturaObj.fotos_requeridas) ||
-      coberturaObj.fotos_requeridas.length === 0
-    ) {
-      setFotoSlots({});
-    } else {
-      const nextFotoKeys = new Set(coberturaObj.fotos_requeridas);
-      setFotoSlots((prev) => {
-        const out = {};
-        for (const k of nextFotoKeys) out[k] = prev?.[k] || null;
-        return out;
-      });
+    if (isOpen) {
+      setFiles({ POLIZA: null, MERCOSUR: null, CUPONERA: null });
+      setResultado(null); setFechaInicial("");
+      setInconsistencias([]); setIdxInc(0); setCorrecciones({}); setDatosLeidos(null);
     }
+  }, [isOpen]);
 
-    if (
-      !coberturaObj ||
-      !Array.isArray(coberturaObj.documentos_requeridos) ||
-      coberturaObj.documentos_requeridos.length === 0
-    ) {
-      setDocSlots({});
-    } else {
-      const nextDocKeys = new Set(coberturaObj.documentos_requeridos);
-      setDocSlots((prev) => {
-        const out = {};
-        for (const k of nextDocKeys) out[k] = prev?.[k] || null;
-        return out;
-      });
-    }
-  }, [coberturaObj]);
-
-  const paso1Errors = useMemo(() => {
-    const e = {};
-    if (clienteModo === "existente") {
-      if (!String(clienteId).trim()) e.clienteId = "ID de cliente";
-      return e;
-    }
-    if (!cliente.nombre.trim()) e.nombre = "Nombre";
-    if (!cliente.apellido.trim()) e.apellido = "Apellido";
-    if (!cliente.telefono.trim()) e.telefono = "Teléfono";
-    if (!(cliente.dni_cuit_cuil || "").trim()) e.dni_cuit_cuil = "DNI / CUIT";
-    if (!(cliente.fecha_nacimiento || "").trim()) e.fecha_nacimiento = "Fecha de nacimiento";
-    if (!(cliente.partido || "").trim()) e.partido = "Partido";
-    if (!(cliente.localidad || "").trim()) e.localidad = "Localidad";
-    return e;
-  }, [clienteModo, cliente, clienteId]);
-
-  // Fotos del asegurado: obligatorias solo cuando el cliente es NUEVO
-  const fotosClienteErrors = useMemo(() => {
-    const e = {};
-    if (clienteModo === "existente") return e;
-    if (!dniSlots?.DNI_FRENTE?.url) e.dni_frente = "Foto DNI (frente)";
-    if (!dniSlots?.DNI_DORSO?.url) e.dni_dorso = "Foto DNI (dorso)";
-    return e;
-  }, [clienteModo, dniSlots]);
-
-  const companiaErrors = useMemo(() => {
-    const e = {};
-    if (polizaModo === "existente") {
-      if (!String(polizaId).trim()) e.polizaId = "ID de póliza";
-      return e;
-    }
-    if (!(poliza.compania || "").trim()) e.compania = "Compañía";
-    if (!(poliza.cobertura || "").trim()) e.cobertura = "Cobertura";
-    if (!(poliza.oficina || "").trim()) e.oficina = "Sucursal";
-    return e;
-  }, [polizaModo, poliza, polizaId]);
-
-  const autoErrors = useMemo(() => {
-    const e = {};
-    if (polizaModo === "existente") return e;
-    if (!(poliza.patente || "").trim()) e.patente = "Patente";
-    if (!(poliza.marca || "").trim()) e.marca = "Marca";
-    if (!(poliza.modelo || "").trim()) e.modelo = "Modelo";
-    if (!String(poliza.anio || "").trim()) e.anio = "Año";
-    return e;
-  }, [polizaModo, poliza]);
-
-  const fechasErrors = useMemo(() => {
-    const e = {};
-    if (polizaModo === "existente") return e;
-    if (!poliza.primer_vencimiento) e.primer_vencimiento = "Primer vencimiento";
-    return e;
-  }, [polizaModo, poliza]);
-
-  // Arma el mensaje "Falta: A, B y C" a partir de los errores
-  const listaFaltantes = (errs) => {
-    const labels = Object.values(errs);
-    if (labels.length === 0) return "";
-    if (labels.length === 1) return `Falta: ${labels[0]}`;
-    const last = labels[labels.length - 1];
-    return `Faltan: ${labels.slice(0, -1).join(", ")} y ${last}`;
+  const pick = (key, file) => {
+    if ((file.type || "").toLowerCase() !== "application/pdf") { toast.error("Tiene que ser un PDF"); return; }
+    setFiles((s) => ({ ...s, [key]: file }));
   };
 
-  const responsableOk = Boolean(String(responsableId).trim());
-  const oficinaOk = isWebAdmin ? Boolean(String(poliza.oficina || "").trim()) : true;
-  const canStepAsignacion = responsableOk && oficinaOk;          // paso 1
-  const datosClienteOk = Object.keys(paso1Errors).length === 0;  // paso 2
-  const fotosClienteOk = Object.keys(fotosClienteErrors).length === 0; // paso 3
-  const companiaOk = Object.keys(companiaErrors).length === 0;   // paso 4
-  const autoOk = Object.keys(autoErrors).length === 0;           // paso 5
-  const fechasOk = Object.keys(fechasErrors).length === 0;       // paso 6
-  const polizaOk = companiaOk && autoOk && fechasOk;
-  const canSubmit = modoRapido
-    ? (responsableOk && oficinaOk && !saving)
-    : (responsableOk && oficinaOk && datosClienteOk && fotosClienteOk && polizaOk && !saving);
+  const seleccionados = () =>
+    SLOTS.map((s) => ({ tipo: s.key, file: files[s.key] })).filter((x) => x.file);
 
-  // Responsables visibles: admin → TODOS (sin importar la oficina); empleado → los suyos
-  const empleadosVisibles = useMemo(() => {
-    // El admin puede asignar cualquier responsable de cualquier sucursal.
-    // El empleado ve los que le devuelve el backend (los de su oficina).
-    return empleados;
-  }, [empleados]);
+  /* Lee el PDF, calcula inconsistencias y decide si frenar o guardar */
+  const analizar = async () => {
+    const archivos = seleccionados();
+    if (!archivos.length) { toast.error("Subí al menos un papel"); return; }
 
-  // Admin elige sucursal en el paso 1 (al cambiarla, resetea el responsable)
-  const elegirOficina = (oficinaId) => {
-    const id = String(oficinaId || "").trim();
-    if (!id) return;
-    setPoliza((p) => ({ ...p, oficina: id }));
-    setResponsableId("");
-  };
-
-  const goToStep = (target) => {
-    if (target === step) return;
-    if (target >= 2 && !canStepAsignacion) return toast.error(isWebAdmin ? "Elegí sucursal y responsable" : "Elegí el responsable");
-    if (target >= 3 && !datosClienteOk) return toast.error(listaFaltantes(paso1Errors));
-    if (target >= 4 && !fotosClienteOk) return toast.error(listaFaltantes(fotosClienteErrors));
-    if (target >= 5 && !companiaOk) return toast.error(listaFaltantes(companiaErrors));
-    if (target >= 6 && !autoOk) return toast.error(listaFaltantes(autoErrors));
-    if (target >= 7 && !fechasOk) return toast.error(listaFaltantes(fechasErrors));
-    setStep(target);
-  };
-
-  // 🆕 Navegación del modo rápido (salta los datos ya cargados del PDF)
-  const stepSiguiente = () => {
-    if (modoRapido) {
-      const i = SECUENCIA_RAPIDA.indexOf(step);
-      const next = SECUENCIA_RAPIDA[i + 1];
-      if (next != null) setStep(next);
-    } else {
-      goToStep(step + 1);
-    }
-  };
-  const stepAtras = () => {
-    if (modoRapido) {
-      const i = SECUENCIA_RAPIDA.indexOf(step);
-      const prev = SECUENCIA_RAPIDA[i - 1];
-      if (prev != null) setStep(prev);
-    } else {
-      setStep((sx) => sx - 1);
-    }
-  };
-  const esPrimerStep = modoRapido ? step === SECUENCIA_RAPIDA[0] : step <= 1;
-  const esUltimoStep = step === 8;
-
-  // 🚀 Handlers del gate de verificación previa
-  // 🆕 Autocompletar el formulario con lo que extrae el lector de PDF
-  const handlePdfExtraido = (datos) => {
-    const c = datos?.cliente || {};
-    const v = datos?.vehiculo || {};
-    const pol = datos?.poliza || {};
-    const cupones = datos?.cupones || [];
-    setCuponesPdf(cupones);
-
-    setCliente((prev) => ({
-      ...prev,
-      nombre: c.nombre || prev.nombre,
-      dni_cuit_cuil: c.dni || prev.dni_cuit_cuil,
-    }));
-
-    const partes = String(v.marca_modelo || "").trim().split(/\s+/);
-    const marca = partes.length ? partes[0] : "";
-    const modelo = partes.length > 1 ? partes.slice(1).join(" ") : "";
-
-    setPoliza((prev) => ({
-      ...prev,
-      numero_poliza: pol.numero || prev.numero_poliza,
-      compania: pol.compania || prev.compania,
-      patente: v.patente || prev.patente,
-      marca: marca || prev.marca,
-      modelo: modelo || prev.modelo,
-      anio: v.anio ? String(v.anio) : prev.anio,
-      numero_motor: v.motor || prev.numero_motor,
-      numero_chasis: v.chasis || prev.numero_chasis,
-      carroceria: tipoACarroceria(v.tipo) || prev.carroceria,
-      primer_vencimiento: cupones[0]?.vencimiento || prev.primer_vencimiento,
-      precio_cuota: cupones[0]?.importe != null ? String(cupones[0].importe) : prev.precio_cuota,
-      cantidad_cuotas_override: cupones.length ? String(cupones.length) : prev.cantidad_cuotas_override,
-    }));
-  };
-
-  const handleVerifyConfirmedNuevo = ({ cliente_id } = {}) => {
-    setVerifyOpen(false);
-    // Si nos pasaron un cliente_id (CLIENTE_OTRO_AUTO o PATENTE_BAJA),
-    // autocompletamos el step 1 en modo "existente" para no duplicar el cliente.
-    if (cliente_id) {
-      setClienteModo("existente");
-      setClienteId(String(cliente_id));
-      toast.success("Cliente vinculado. Solo falta cargar los datos del auto.");
-    }
-  };
-
-  const handleVerifyCancel = () => {
-    setVerifyOpen(false);
-    onClose?.();
-  };
-
-  async function handleUploadToSlot(file, folder, setter) {
-    if (!file) return;
-    const _mime =
-      file.type || (file.name?.toLowerCase?.().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
-    try {
-      const up = await uploadToCloudinary(file, { folder });
-      setter({ file, url: up.secure_url, public_id: up.public_id, mime: _mime });
-      toast.success("Subido");
-    } catch {
-      toast.error("No se pudo subir el archivo");
-    }
-  }
-
-  const onUploadDNI = (file, key) =>
-    handleUploadToSlot(file, "de-thames/clientes/dni", (val) =>
-      setDniSlots((s) => ({ ...s, [key]: val }))
-    );
-  const onUploadFotoVehiculo = (file, key) =>
-    handleUploadToSlot(file, "de-thames/solicitudes/fotos", (val) =>
-      setFotoSlots((s) => ({ ...s, [key]: val }))
-    );
-  const onUploadDocVehiculo = (file, key) =>
-    handleUploadToSlot(file, "de-thames/solicitudes/docs", (val) =>
-      setDocSlots((s) => ({ ...s, [key]: val }))
-    );
-
-  const onSubmit = async () => {
-    if (!canSubmit) return;
     setSaving(true);
     try {
-      const ciaObj = companias.find(
-        (c) =>
-          String(c.id) === String(poliza.compania) || String(c.nombre) === String(poliza.compania)
-      );
-      const finalCompania = ciaObj ? ciaObj.nombre : poliza.compania;
-
-      const cobObj = coberturas.find(
-        (c) =>
-          String(c.id) === String(poliza.cobertura) ||
-          String(c.nombre) === String(poliza.cobertura)
-      );
-      const finalCobertura = cobObj ? cobObj.nombre : poliza.cobertura;
-
-      const payload = {
-        cliente: {},
-        poliza: {},
-        solicitud: {},
-        fotos: {},
-        documentos: {},
-        cliente_fotos: {},
-        oficina: poliza.oficina ? Number(poliza.oficina) : null,
-      };
-
-      const dniFrUrl = dniSlots.DNI_FRENTE?.url || null;
-      const dniFrPid = dniSlots.DNI_FRENTE?.public_id || "";
-      const dniDoUrl = dniSlots.DNI_DORSO?.url || null;
-      const dniDoPid = dniSlots.DNI_DORSO?.public_id || "";
-
-      if (clienteModo === "existente") {
-        payload.cliente = { modo: "existente", id: Number(clienteId) };
-      } else {
-        payload.cliente = {
-          modo: "nuevo",
-          nombre: cliente.nombre.trim(),
-          apellido: cliente.apellido.trim(),
-          telefono: normalizaTelefonoAR(cliente.telefono),
-          email: cliente.email || null,
-          dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(),
-          direccion: (cliente.direccion || "").trim(),
-          localidad: (cliente.localidad || "").trim(),
-          partido: (cliente.partido || "").trim(),
-          fecha_nacimiento: (cliente.fecha_nacimiento || "").trim() || null,
-        };
-      }
-
-      if (dniFrUrl) payload.cliente_fotos.DNI_FRENTE = { url: dniFrUrl, public_id: dniFrPid };
-      if (dniDoUrl) payload.cliente_fotos.DNI_DORSO = { url: dniDoUrl, public_id: dniDoPid };
-
-      if (polizaModo === "existente") {
-        payload.poliza = { modo: "existente", id: Number(polizaId) };
-      } else {
-        payload.poliza = {
-          modo: "nueva",
-          // 🆕 número detectado del PDF (o cargado a mano). Si marcan "sin número", va vacío y el backend genera uno.
-          numero_poliza: sinNumero ? "" : (poliza.numero_poliza || "").trim(),
-          compania: finalCompania.trim(),
-          cobertura: finalCobertura.trim(),
-          oficina: poliza.oficina ? Number(poliza.oficina) : null,
-          patente: poliza.patente.trim().toUpperCase(),
-          marca: poliza.marca.trim(),
-          modelo: poliza.modelo.trim(),
-          anio: Number(poliza.anio),
-          tipo: poliza.tipo || "Auto",
-          numero_motor: (poliza.numero_motor || "").trim(),
-          numero_chasis: (poliza.numero_chasis || "").trim(),
-          combustible: (poliza.combustible || "").trim(),
-          carroceria: (poliza.carroceria || "").trim(),
-          observaciones: (poliza.observaciones || "").trim(),
-          precio_cuota: 0,
-          cantidad_cuotas_override: poliza.cantidad_cuotas_override
-            ? Number(poliza.cantidad_cuotas_override)
-            : undefined,
-          primer_vencimiento: poliza.primer_vencimiento,
-          fecha_emision: poliza.fecha_emision || ymdLocal(new Date()),
-          dias_a_vencer: Number(poliza.dias_a_vencer) || 30,
-          generar_cuotas_ahora: !!poliza.generar_cuotas_ahora,
-          regenerar_cuotas: false,
-          // 🎟️ Cuponera del PDF: si vino, el backend usa estas fechas exactas
-          //    (cantidad + vencimientos reales) en vez de 6 cuotas mensuales.
-          cupones: (cuponesPdf || []).map((c) => ({
-            numero: c.numero,
-            vencimiento: c.vencimiento,
-            importe: c.importe,
-          })),
-        };
-      }
-
-      payload.solicitud = {
-        responsable_empleado: Number(responsableId),
-        responsable: "",
-        prioridad: solicitud.prioridad || "NORMAL",
-        observaciones: (solicitud.observaciones || "").trim(),
-        motivo: "ALTA_POLIZA",
-        tipoSeguro: solicitud.tipoSeguro || "ROBO",
-        cobertura_solicitada: finalCobertura.trim(),
-        compania_preferida: finalCompania.trim(),
-      };
-
-      Object.entries(docSlots || {}).forEach(([key, s]) => {
-        if (!s?.url) return;
-        payload.documentos[key] = {
-          url: s.url,
-          public_id: s.public_id,
-          mime: s.mime || guessMime(s?.file?.name || ""),
-          nombre: key,
-        };
-      });
-
-      Object.entries(fotoSlots || {}).forEach(([key, s]) => {
-        if (!s?.url) return;
-        const sendKey = key === "TUBO_GNC" ? "EQUIPO_GNC" : key;
-        payload.documentos[sendKey] = {
-          url: s.url,
-          public_id: s.public_id,
-          mime: guessMime(),
-          nombre: sendKey,
-        };
-      });
-
-      // 🆕 documentos del PDF subido en la carga rápida (póliza / cupones / certificado)
-      (initialDatosPdf?.documentos || []).forEach((d, i) => {
-        if (!d?.url) return;
-        const key = `${d.tipo || "POLIZA_PDF"}${i ? "_" + i : ""}`;
-        payload.documentos[key] = {
-          url: d.url,
-          public_id: d.public_id || "",
-          mime: d.mime || "application/pdf",
-          nombre: d.nombre || "documento.pdf",
-        };
-      });
-
-      const raw = await solicitudesApi.crearCompleto(payload);
-      toast.success("Solicitud creada con éxito");
-
+      let datosOut = { numero: "", compania: "", cupones: [], _patente: "", _dni: "", _nombre: "", _apellido: "" };
       try {
-        await sendAdminNuevaSolicitud({
-          aviso: "Nueva solicitud creada",
-          fecha_hora: new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }),
-          cliente_nombre_apellido: `${cliente.nombre} ${cliente.apellido}`.trim(),
-          cliente_dni: cliente.dni_cuit_cuil,
-          auto_marca: poliza.marca,
-          auto_modelo: poliza.modelo,
-          auto_anio: poliza.anio,
-          poliza_cobertura: finalCobertura.trim(),
-          poliza_compania: finalCompania.trim(),
-        });
-      } catch (err) {
-        console.warn("Email alert falló", err);
+        const fd = new FormData();
+        archivos.forEach((x) => fd.append("archivos", x.file));
+        const lectura = await api.post(LECTOR_PDF_ENDPOINT, fd, { headers: { "Content-Type": "multipart/form-data" } });
+        const datos = lectura?.data?.datos || {};
+        datosOut = {
+          numero: datos?.poliza?.numero || "",
+          compania: datos?.poliza?.compania || "",
+          cupones: datos?.cupones || [],
+          _patente: datos?.vehiculo?.patente || "",
+          _dni: datos?.cliente?.dni || "",
+          _nombre: datos?.cliente?.nombre || "",
+          _apellido: datos?.cliente?.apellido || "",
+          _vig_desde: datos?.poliza?.vigencia_desde || "",
+          _vig_hasta: datos?.poliza?.vigencia_hasta || "",
+        };
+      } catch {
+        toast("No se pudieron leer los datos del PDF, pero se guardan los papeles.", { icon: "⚠️" });
+        await guardarFinal(datosOut, {});
+        return;
       }
 
-      if (onCreated) onCreated(raw);
-      onClose();
+      // comparar lo que NO debería cambiar
+      const patPol = item.patente_real || (item.patente !== "—" ? item.patente : "");
+      const incs = [];
+      if (datosOut._patente && patPol && normPat(datosOut._patente) !== normPat(patPol)) {
+        incs.push({ campo: "patente", label: "Patente", valorPdf: datosOut._patente, valorPol: patPol, correccion: { patente: datosOut._patente } });
+      }
+      if (datosOut._dni && item.cliente_dni && normDni(datosOut._dni) !== normDni(item.cliente_dni)) {
+        incs.push({ campo: "dni", label: "DNI", valorPdf: datosOut._dni, valorPol: item.cliente_dni, correccion: { dni: datosOut._dni } });
+      }
+      const nomPdf = `${datosOut._apellido} ${datosOut._nombre}`.trim();
+      if (nomPdf && item.cliente && item.cliente !== "—" && !nombreCoincide(nomPdf, item.cliente)) {
+        incs.push({ campo: "nombre", label: "Titular", valorPdf: nomPdf, valorPol: item.cliente, correccion: { nombre: datosOut._nombre, apellido: datosOut._apellido } });
+      }
+
+      // Vigencia vieja: si el papel ya venció, probablemente es el de la póliza anterior.
+      // Se avisa PRIMERO (lo más importante a chequear en una renovación).
+      const hoyStr = new Date().toISOString().slice(0, 10);
+      if (datosOut._vig_hasta && datosOut._vig_hasta < hoyStr) {
+        incs.unshift({ campo: "vigencia", label: "Vigencia", valorPdf: datosOut._vig_hasta, vieja: true });
+      }
+
+      if (incs.length) {
+        setDatosLeidos(datosOut);
+        setInconsistencias(incs);
+        setIdxInc(0);
+        setCorrecciones({});
+        setSaving(false); // pausamos para que el usuario decida
+      } else {
+        await guardarFinal(datosOut, {});
+      }
     } catch (e) {
-      toast.error(e?.message || "Error al crear la solicitud");
+      toast.error(e?.message || "No se pudo procesar");
+      setSaving(false);
+    }
+  };
+
+  /* El usuario resuelve la inconsistencia actual */
+  const resolver = (usarPdf) => {
+    const inc = inconsistencias[idxInc];
+    const nuevas = usarPdf ? { ...correcciones, ...inc.correccion } : correcciones;
+    setCorrecciones(nuevas);
+    if (idxInc + 1 < inconsistencias.length) {
+      setIdxInc(idxInc + 1);
+    } else {
+      setInconsistencias([]);
+      setSaving(true);
+      guardarFinal(datosLeidos, nuevas);
+    }
+  };
+
+  /* Sube los PDFs y manda todo al backend */
+  const guardarFinal = async (datos, corr) => {
+    try {
+      const archivos = seleccionados();
+      const documentos = [];
+      for (const x of archivos) {
+        const { secure_url, public_id } = await uploadToCloudinary(x.file, "de-thames/polizas/documentos");
+        if (!secure_url) throw new Error("Sin URL de Cloudinary");
+        documentos.push({ tipo: x.tipo, url: secure_url, public_id: public_id || "", nombre: x.file.name, mime: x.file.type });
+      }
+      const datosOut = { numero: datos.numero, compania: datos.compania, cupones: datos.cupones };
+      const body = { poliza_id: item.poliza_id, documentos, datos: datosOut, correcciones: corr || {} };
+      if (!files.CUPONERA && fechaInicial) body.fecha_inicial_cuotas = fechaInicial;
+      const res = await api.post("tareas/subir-papeles-sistema/", body);
+      setResultado(res?.data?.resumen || { documentos_guardados: documentos.length, autocompletado: [], cupones_actualizados: 0 });
+      toast.success("Papeles cargados ✅");
+    } catch (e) {
+      toast.error(e?.message || "No se pudo cargar");
     } finally {
       setSaving(false);
     }
   };
 
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => (document.body.style.overflow = prev);
-  }, []);
-
-  const selectedOficinaObj = oficinas.find((o) => String(o.id) === String(poliza.oficina));
-  const headerOficinaName = isWebAdmin
-    ? selectedOficinaObj
-      ? selectedOficinaObj.nombre
-      : "SELECCIONANDO SUCURSAL..."
-    : user?.perfil?.oficina_nombre || "Local";
-
-  // 🚀 Si el gate de verificación está abierto, mostramos SOLO el gate
-  if (verifyOpen) {
-    return (
-      <VerificarClienteGate
-        open={verifyOpen}
-        initialDni={modoRapido ? (initialDatosPdf?.cliente?.dni || "") : ""}
-        initialPatente={modoRapido ? (initialDatosPdf?.vehiculo?.patente || "") : ""}
-        autoVerificar={modoRapido}
-        onConfirmNuevo={handleVerifyConfirmedNuevo}
-        onCancel={handleVerifyCancel}
-      />
-    );
-  }
+  const incActual = inconsistencias[idxInc] || null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-stretch sm:items-center justify-center overscroll-contain touch-pan-y">
-      <div
-        className={`absolute inset-0 ${
-          saving ? "cursor-wait" : "cursor-pointer"
-        } bg-black/70 backdrop-blur-sm`}
-        onClick={() => !saving && onClose?.()}
-      />
-
-      <motion.div
-        variants={modalVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className="relative w-full sm:max-w-5xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:mx-auto sm:rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden bg-[#0b0f1e]"
-      >
-        <div className="shrink-0 border-b border-white/10 bg-[#0f0c28]/80 backdrop-blur px-4 py-3 flex items-center justify-between">
-          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
-            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-              <HiSparkles />
-            </span>
-            Crear Solicitud
-            <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded ml-2 text-white/50">
-              {headerOficinaName}
-            </span>
-
-            {isWebAdmin && poliza.oficina && (
-              <button
-                onClick={() => setStep(1)}
-                className="text-[9px] uppercase font-black bg-sky-500/20 text-sky-400 px-2 py-1 rounded ml-1 hover:bg-sky-500/40 transition-colors"
-              >
-                Cambiar Sucursal
-              </button>
-            )}
-          </h3>
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="p-2 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all"
-          >
-            <HiX />
-          </button>
-        </div>
-
-        {!modoRapido && (
-        <div className="shrink-0 px-4 py-3 bg-white/5 border-b border-white/10 overflow-x-auto no-scrollbar">
-          <div className="flex gap-2 min-w-max">
-            <StepBadge
-              active={step === 1}
-              done={step > 1}
-              icon={<HiUser />}
-              label="Asignación"
-              onClick={() => goToStep(1)}
-              color="from-violet-400/20 to-indigo-500/20"
-            />
-            <StepBadge
-              active={step === 2}
-              done={step > 2}
-              icon={<HiUser />}
-              label="Datos asegurado"
-              onClick={() => goToStep(2)}
-              color="from-emerald-400/20 to-emerald-500/20"
-            />
-            <StepBadge
-              active={step === 3}
-              done={step > 3}
-              icon={<HiIdentification />}
-              label="Fotos asegurado"
-              onClick={() => goToStep(3)}
-              color="from-teal-400/20 to-teal-500/20"
-            />
-            <StepBadge
-              active={step === 4}
-              done={step > 4}
-              icon={<HiShieldCheck />}
-              label="Compañía"
-              onClick={() => goToStep(4)}
-              color="from-sky-400/20 to-sky-500/20"
-            />
-            <StepBadge
-              active={step === 5}
-              done={step > 5}
-              icon={<HiShieldCheck />}
-              label="Datos del auto"
-              onClick={() => goToStep(5)}
-              color="from-cyan-400/20 to-cyan-500/20"
-            />
-            <StepBadge
-              active={step === 6}
-              done={step > 6}
-              icon={<HiShieldCheck />}
-              label="Fechas"
-              onClick={() => goToStep(6)}
-              color="from-indigo-400/20 to-indigo-500/20"
-            />
-            <StepBadge
-              active={step === 7}
-              done={step > 7}
-              icon={<HiPhotograph />}
-              label="Fotos vehículo"
-              onClick={() => goToStep(7)}
-              color="from-rose-400/20 to-rose-500/20"
-            />
-            <StepBadge
-              active={step === 8}
-              done={false}
-              icon={<HiDocumentText />}
-              label="Resumen"
-              onClick={() => goToStep(8)}
-              color="from-amber-400/20 to-amber-500/20"
-            />
-          </div>
-        </div>
-        )}
-
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-hide">
-          <AnimatePresence mode="wait">
-            {step === 0 && (
-              <motion.div key="rev" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
-                <RevisionRapidaStep
-                  cliente={cliente}
-                  setCliente={setCliente}
-                  poliza={poliza}
-                  setPoliza={setPoliza}
-                  coberturas={coberturas}
-                  companias={companias}
-                  empleados={empleadosVisibles}
-                  empleadosLoading={empleadosLoading}
-                  responsableId={responsableId}
-                  onElegirResponsable={(id) => setResponsableId(String(id))}
-                  onTerminar={onSubmit}
-                />
-              </motion.div>
-            )}
-            {step === 1 && (
-              <motion.div
-                key="s0"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <AsignacionStep
-                  isWebAdmin={isWebAdmin}
-                  oficinasList={oficinasList}
-                  oficinaSel={poliza.oficina}
-                  onElegirOficina={elegirOficina}
-                  userOficinaNombre={user?.perfil?.oficina_nombre || "Mi sucursal"}
-                  empleados={empleadosVisibles}
-                  empleadosLoading={empleadosLoading}
-                  responsableId={responsableId}
-                  onElegirResponsable={(id) => setResponsableId(String(id))}
-                />
-              </motion.div>
-            )}
-            {step === 2 && (
-              <motion.div
-                key="s1"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <LectorPdfButton onExtraido={handlePdfExtraido} />
-                <ClienteStep
-                  section="datos"
-                  clienteModo={clienteModo}
-                  setClienteModo={setClienteModo}
-                  clienteId={clienteId}
-                  setClienteId={setClienteId}
-                  cliente={cliente}
-                  setCliente={setCliente}
-                  dniSlots={dniSlots}
-                  setDniSlots={setDniSlots}
-                  TIPO_DNI_SLOTS={TIPO_DNI_SLOTS}
-                  onUploadDNI={onUploadDNI}
-                />
-              </motion.div>
-            )}
-            {step === 3 && (
-              <motion.div
-                key="s1b"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <ClienteStep
-                  section="fotos"
-                  clienteModo={clienteModo}
-                  setClienteModo={setClienteModo}
-                  clienteId={clienteId}
-                  setClienteId={setClienteId}
-                  cliente={cliente}
-                  setCliente={setCliente}
-                  dniSlots={dniSlots}
-                  setDniSlots={setDniSlots}
-                  TIPO_DNI_SLOTS={TIPO_DNI_SLOTS}
-                  onUploadDNI={onUploadDNI}
-                />
-              </motion.div>
-            )}
-            {step === 4 && (
-              <motion.div
-                key="s2"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <PolizaStep
-                  section="compania"
-                  polizaModo={polizaModo}
-                  setPolizaModo={setPolizaModo}
-                  polizaId={polizaId}
-                  setPolizaId={setPolizaId}
-                  poliza={poliza}
-                  setPoliza={setPoliza}
-                  sinNumero={sinNumero}
-                  setSinNumero={setSinNumero}
-                  companias={companias}
-                  coberturas={coberturas}
-                  oficinas={oficinas}
-                  setTocoCantidadCuotas={setTocoCantidadCuotas}
-                  cuotasPreview={cuotasPreview}
-                  isWebAdmin={isWebAdmin}
-                />
-              </motion.div>
-            )}
-            {step === 5 && (
-              <motion.div
-                key="s2b"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <PolizaStep
-                  section="auto"
-                  polizaModo={polizaModo}
-                  setPolizaModo={setPolizaModo}
-                  polizaId={polizaId}
-                  setPolizaId={setPolizaId}
-                  poliza={poliza}
-                  setPoliza={setPoliza}
-                  sinNumero={sinNumero}
-                  setSinNumero={setSinNumero}
-                  companias={companias}
-                  coberturas={coberturas}
-                  oficinas={oficinas}
-                  setTocoCantidadCuotas={setTocoCantidadCuotas}
-                  cuotasPreview={cuotasPreview}
-                  isWebAdmin={isWebAdmin}
-                />
-              </motion.div>
-            )}
-            {step === 6 && (
-              <motion.div
-                key="s2c"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <PolizaStep
-                  section="fechas"
-                  polizaModo={polizaModo}
-                  setPolizaModo={setPolizaModo}
-                  polizaId={polizaId}
-                  setPolizaId={setPolizaId}
-                  poliza={poliza}
-                  setPoliza={setPoliza}
-                  sinNumero={sinNumero}
-                  setSinNumero={setSinNumero}
-                  companias={companias}
-                  coberturas={coberturas}
-                  oficinas={oficinas}
-                  setTocoCantidadCuotas={setTocoCantidadCuotas}
-                  cuotasPreview={cuotasPreview}
-                  isWebAdmin={isWebAdmin}
-                />
-              </motion.div>
-            )}
-
-            {step === 7 && (
-              <motion.div
-                key="s3"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <ImagenesDocsStep
-                  MAX_FOTOS={MAX_FOTOS}
-                  coberturaSeleccionada={coberturaObj}
-                  fotoSlots={fotoSlots}
-                  setFotoSlots={setFotoSlots}
-                  docSlots={docSlots}
-                  setDocSlots={setDocSlots}
-                  onUploadFotoVehiculo={onUploadFotoVehiculo}
-                  onUploadDocVehiculo={onUploadDocVehiculo}
-                />
-              </motion.div>
-            )}
-
-            {step === 8 && (
-              <motion.div
-                key="s4"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <SolicitudStep
-                  responsableNombre={responsableId ? `#${responsableId}` : ""}
-                  onCambiarResponsable={() => setStep(1)}
-                  solicitud={solicitud}
-                  setSolicitud={setSolicitud}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {!(modoRapido && step === 0) && (
-        <div className="shrink-0 border-t border-white/10 bg-[#0f0c28]/95 backdrop-blur p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="hidden sm:inline-flex px-6 py-2.5 rounded-2xl bg-white/5 text-white/70 hover:bg-white/10 font-bold uppercase text-xs transition-all"
-          >
-            Cancelar
-          </button>
-          <div className="flex gap-2 w-full sm:w-auto">
-            {!esPrimerStep && (
-              <button
-                onClick={stepAtras}
-                className="flex-1 sm:flex-none px-5 py-3 sm:py-2.5 rounded-2xl bg-white/10 text-white font-bold uppercase text-xs transition-all flex items-center justify-center gap-2 active:scale-95"
-              >
-                <HiChevronLeft /> Atrás
-              </button>
-            )}
-            {!esUltimoStep ? (
-              <button
-                onClick={stepSiguiente}
-                className="flex-1 sm:flex-none px-8 py-3 sm:py-2.5 rounded-2xl bg-sky-600 text-white font-bold uppercase text-xs shadow-lg shadow-sky-900/40 transition-all flex items-center justify-center gap-2 active:scale-95"
-              >
-                Siguiente <HiChevronRight />
-              </button>
-            ) : (
-              <button
-                onClick={onSubmit}
-                disabled={!canSubmit}
-                className="flex-1 sm:flex-none px-8 sm:px-10 py-3 sm:py-2.5 rounded-2xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg shadow-emerald-900/40 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {saving ? "Procesando..." : "Finalizar"}
-              </button>
-            )}
-          </div>
-        </div>
-        )}
-      </motion.div>
-    </div>
-  );
-}
-
-function AsignacionStep({
-  isWebAdmin, oficinasList, oficinaSel, onElegirOficina, userOficinaNombre,
-  empleados, empleadosLoading, responsableId, onElegirResponsable,
-}) {
-  const [cambiarOfi, setCambiarOfi] = useState(false);
-  const ofiNombre = isWebAdmin
-    ? (oficinasList.find((o) => String(o.id) === String(oficinaSel))?.nombre || "Elegí una sucursal")
-    : userOficinaNombre;
-  const mostrarSelectorOfi = isWebAdmin && (cambiarOfi || !oficinaSel);
-  return (
-    <div className="space-y-5">
-      {/* Sucursal — auto-asignada; admin puede cambiarla */}
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6 shadow-xl">
-        <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">Sucursal</legend>
-        {mostrarSelectorOfi ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
-            {oficinasList.length === 0 ? (
-              <p className="text-white/40 text-xs italic">Cargando sucursales...</p>
-            ) : oficinasList.map((o) => {
-              const sel = String(oficinaSel) === String(o.id);
-              return (
-                <button key={o.id} type="button" onClick={() => { onElegirOficina(o.id); setCambiarOfi(false); }}
-                  className={`text-left px-4 py-3 rounded-xl border font-bold text-sm transition-all ${sel ? "bg-sky-500/20 border-sky-500/50 text-white" : "bg-white/5 border-white/10 text-white/70 hover:border-sky-500/30"}`}>
-                  {o.nombre || `Oficina ${o.id}`}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold">
-              <HiShieldCheck /> {ofiNombre}
+    <AnimatePresence>
+      {isOpen && item && (
+        <motion.div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+          <motion.div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-[#0b0f1e] border border-white/10 shadow-2xl overflow-hidden"
+            initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                  <HiDocumentText className="text-xl" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Subir póliza a sistema</h2>
+                  <p className="text-[11px] text-white/40">{item.cliente} · {item.patente}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 rounded-lg bg-white/5 text-white/40 hover:text-white"><HiX className="text-xl" /></button>
             </div>
-            {isWebAdmin && (
-              <button type="button" onClick={() => setCambiarOfi(true)}
-                className="text-[11px] text-sky-300 hover:text-sky-200 underline underline-offset-2">
-                Cambiar
-              </button>
+
+            {resultado ? (
+              <div className="p-6">
+                <div className="flex flex-col items-center text-center gap-3 py-4">
+                  <div className="h-14 w-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <HiCheckCircle className="text-3xl" />
+                  </div>
+                  <div className="text-lg font-bold text-white">¡Papeles cargados!</div>
+                  <div className="text-sm text-white/60 space-y-1">
+                    <div>{resultado.documentos_guardados} archivo(s) guardado(s).</div>
+                    {resultado.autocompletado?.length > 0 && (
+                      <div className="inline-flex items-center gap-1 text-indigo-300"><HiSparkles /> {resultado.autocompletado.join(", ")}.</div>
+                    )}
+                    {resultado.cupones_actualizados > 0 && (
+                      <div className="text-amber-300">{resultado.cupones_actualizados} cupón(es) de robo actualizado(s).</div>
+                    )}
+                    {resultado.cuotas_actualizadas > 0 && (
+                      <div className="text-sky-300">{resultado.cuotas_actualizadas} cuota(s) reprogramada(s).</div>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => onSaved?.()} className="mt-4 w-full h-12 rounded-xl bg-emerald-500 text-black font-bold text-sm hover:bg-emerald-400">Listo</button>
+              </div>
+            ) : incActual ? (
+              incActual.campo === "vigencia" ? (
+                <div className="p-6">
+                  <div className="flex flex-col items-center text-center gap-2 mb-4">
+                    <div className="h-14 w-14 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <HiExclamation className="text-3xl" />
+                    </div>
+                    <div className="text-lg font-bold text-white">¿Es el papel correcto?</div>
+                    <div className="text-[11px] text-white/40">{idxInc + 1} de {inconsistencias.length}</div>
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 mb-4">
+                    <p className="text-[13px] leading-snug text-amber-100">
+                      La vigencia de este papel termina el <b>{fmtFecha(incActual.valorPdf)}</b>, una fecha que ya pasó.
+                      Puede ser el papel de la <b>póliza anterior</b>, no el de la renovación nueva.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button onClick={() => resolver(false)} className="w-full h-11 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-200 font-bold text-sm hover:bg-sky-500/25">
+                      Está bien, continuar
+                    </button>
+                    <button onClick={onClose} className="w-full h-11 rounded-xl bg-white/5 border border-white/10 text-white/60 font-bold text-sm hover:bg-white/10">
+                      Cancelar, es el papel viejo
+                    </button>
+                  </div>
+                </div>
+              ) : (
+              <div className="p-6">
+                <div className="flex flex-col items-center text-center gap-2 mb-4">
+                  <div className="h-14 w-14 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                    <HiExclamation className="text-3xl" />
+                  </div>
+                  <div className="text-lg font-bold text-white">El dato no coincide</div>
+                  <div className="text-[11px] text-white/40">{idxInc + 1} de {inconsistencias.length}</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/30 divide-y divide-white/5 mb-4">
+                  <div className="px-4 py-3">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1">{incActual.label} en el PDF</div>
+                    <div className="text-sm font-bold text-rose-300">{incActual.valorPdf}</div>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1">{incActual.label} en la póliza</div>
+                    <div className="text-sm font-bold text-sky-300">{incActual.valorPol}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <button onClick={() => resolver(false)} className="w-full h-11 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-200 font-bold text-sm hover:bg-sky-500/25">
+                    Dejar la de la póliza
+                  </button>
+                  <button onClick={() => resolver(true)} className="w-full h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 font-bold text-sm hover:bg-amber-500/25">
+                    Usar la del PDF
+                  </button>
+                  <button onClick={onClose} className="w-full h-11 rounded-xl bg-white/5 border border-white/10 text-white/60 font-bold text-sm hover:bg-white/10">
+                    Cancelar, me equivoqué de papel
+                  </button>
+                </div>
+              </div>
+              )
+            ) : (
+              <>
+                <div className="p-5 space-y-3">
+                  {/* 📋 Cartel: qué subir según la compañía de la póliza */}
+                  {(() => {
+                    const comp = String(item?.compania || "").toUpperCase();
+                    let titulo, detalle, cls;
+                    if (comp.includes("NRE")) {
+                      titulo = "Subí solo el Mercosur";
+                      detalle = "Para NRE alcanza con la tarjeta Mercosur (cobertura A).";
+                      cls = "border-sky-500/30 bg-sky-500/10 text-sky-200";
+                    } else if (comp.includes("AMCA") || comp.includes("ANTARTIDA") || comp.includes("ANTÁRTIDA")) {
+                      titulo = "Subí la Propuesta completa";
+                      detalle = "Para AMCA subí la propuesta entera (trae la cuponera con las cuotas).";
+                      cls = "border-amber-500/30 bg-amber-500/10 text-amber-200";
+                    } else if (comp) {
+                      titulo = `Papeles de ${item.compania}`;
+                      detalle = "Subí la póliza/propuesta y, si tiene, la cuponera.";
+                      cls = "border-white/10 bg-white/5 text-white/70";
+                    } else {
+                      return null;
+                    }
+                    return (
+                      <div className={`rounded-2xl border p-3 flex items-start gap-2.5 ${cls}`}>
+                        <HiInformationCircle className="shrink-0 mt-0.5 text-lg" />
+                        <div>
+                          <div className="text-[13px] font-bold">{titulo}</div>
+                          <div className="text-[11px] opacity-80">{detalle}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {SLOTS.map((s) => (
+                    <SlotPdf key={s.key} slot={s} archivo={files[s.key]} onPick={(f) => pick(s.key, f)} />
+                  ))}
+                  {!files.CUPONERA && (
+                    <div className="rounded-2xl bg-black/40 border border-white/5 p-4">
+                      <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest">
+                        Fecha de la 1ª cuota (sin cuponera)
+                      </label>
+                      <input
+                        type="date"
+                        value={fechaInicial}
+                        onChange={(e) => setFechaInicial(e.target.value)}
+                        className="mt-2 h-12 w-full rounded-xl bg-black/40 border border-white/10 px-4 text-sm font-bold text-white [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      />
+                      <p className="mt-1.5 text-[11px] text-white/40">Las demás cuotas se calculan +1 mes cada una.</p>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-white/40 leading-snug pt-1">
+                    La app lee los PDFs y completa sola número y compañía. Si la patente, el DNI o el titular no coinciden, te avisa antes de guardar.
+                  </p>
+                </div>
+
+                <div className="px-6 py-5 border-t border-white/5 flex justify-end gap-3">
+                  <button onClick={onClose} disabled={saving}
+                    className="px-6 py-2.5 rounded-xl bg-white/5 text-white/60 font-bold text-sm hover:bg-white/10 disabled:opacity-50">Cancelar</button>
+                  <button onClick={analizar} disabled={saving}
+                    className="px-6 py-2.5 rounded-xl bg-indigo-500 text-white font-bold text-sm hover:bg-indigo-400 disabled:opacity-50 inline-flex items-center gap-2">
+                    {saving ? (<><div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Procesando…</>) : (<><HiUpload /> Subir y leer</>)}
+                  </button>
+                </div>
+              </>
             )}
-          </div>
-        )}
-      </fieldset>
-
-      {/* Responsable */}
-      <fieldset className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6 shadow-xl">
-        <legend className="px-2 text-white/50 text-[10px] uppercase font-bold tracking-widest">Responsable</legend>
-        {isWebAdmin && !oficinaSel ? (
-          <p className="text-white/40 text-xs italic mt-2">Elegí primero la sucursal para ver sus responsables.</p>
-        ) : empleadosLoading ? (
-          <p className="text-white/40 text-xs italic mt-2 animate-pulse">Cargando responsables...</p>
-        ) : empleados.length === 0 ? (
-          <p className="text-white/40 text-xs italic mt-2">No hay responsables activos en esta sucursal.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
-            {empleados.map((e) => {
-              const sel = String(responsableId) === String(e.id);
-              return (
-                <button key={e.id} type="button" onClick={() => onElegirResponsable(e.id)}
-                  className={`flex items-center gap-2 text-left px-4 py-3 rounded-xl border font-bold text-sm transition-all ${sel ? "bg-violet-500/25 border-violet-500/50 text-white" : "bg-white/5 border-white/10 text-white/80 hover:border-violet-500/40"}`}>
-                  {sel ? <HiCheckCircle className="text-violet-300 shrink-0" /> : <HiUser className="text-white/40 shrink-0" />}
-                  <span className="truncate">{e.nombre}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </fieldset>
-    </div>
-  );
-}
-
-function StepBadge({ active, done, icon, label, onClick, color }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2.5 border transition-all duration-300 ${
-        active
-          ? `border-white/25 bg-gradient-to-br ${color} text-white shadow-lg`
-          : "border-white/5 bg-white/5 text-white/40 hover:bg-white/10"
-      }`}
-      title={label}
-    >
-      <span
-        className={`h-7 w-7 rounded-xl flex items-center justify-center shrink-0 ${
-          active ? "bg-white/20" : "bg-white/5"
-        }`}
-      >
-        {done ? <HiCheckCircle className="text-emerald-400" /> : icon}
-      </span>
-      {/* En celular solo se ve la etiqueta del paso activo; en desktop todas */}
-      <span className={`text-[11px] font-bold uppercase tracking-tight whitespace-nowrap ${active ? "inline" : "hidden sm:inline"}`}>
-        {label}
-      </span>
-    </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
