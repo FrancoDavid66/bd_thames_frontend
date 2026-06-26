@@ -9,6 +9,8 @@ import {
   FaFileInvoiceDollar, FaCarCrash, FaTruckMoving, FaShieldAlt,
   FaReceipt, // 🚀 NUEVO ÍCONO PARA SERVICIOS FIJOS
   FaClipboardCheck, // 🆕 ÍCONO PARA TAREAS DEL DÍA
+  FaCamera, // 🆕 ÍCONO PARA CONTROL DIARIO
+  FaStar,   // 🆕 ÍCONO PARA RANKING
 } from "react-icons/fa";
 
 import { useAuth } from "../../context/AuthContext";
@@ -85,6 +87,8 @@ export default function MobileTopBar({
         color: "text-blue-300",
         items: [
           { to: "/tareas", label: "Tareas del día", icon: FaClipboardCheck },
+          { to: "/control-diario", label: "Control diario", icon: FaCamera },
+          { to: "/ranking", label: "Ranking", icon: FaStar },
           { to: "/vencimientos", label: "Vencimientos", icon: FaClock },
           { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt, badge: cuponVencidas },
           { to: "/polizas/renovaciones", label: "Renovaciones", icon: FaSyncAlt, badge: renovacionesPendientes },

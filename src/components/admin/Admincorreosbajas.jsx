@@ -76,8 +76,15 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
   const validate = () => {
     const e = {};
     if (!form.compania.trim())              e.compania    = "Seleccioná una compañía";
-    if (!form.email.trim())                 e.email       = "Requerido";
-    if (!/\S+@\S+\.\S+/.test(form.email))  e.email       = "Email inválido";
+    if (!form.email.trim()) {
+      e.email = "Requerido";
+    } else {
+      // Acepta uno o varios emails separados por coma / punto y coma
+      const lista = form.email.split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
+      const invalido = lista.find((x) => !/\S+@\S+\.\S+/.test(x));
+      if (lista.length === 0) e.email = "Requerido";
+      else if (invalido) e.email = `Email inválido: ${invalido}`;
+    }
     if (!form.dias_gracia || form.dias_gracia < 1) e.dias_gracia = "Mínimo 1 día";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -165,18 +172,18 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
           {/* Email */}
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
-              Correo de bajas
+              Correo(s) de bajas
             </label>
             <input
-              type="email"
+              type="text"
               value={form.email}
               onChange={(e) => set("email", e.target.value)}
-              placeholder="bajas@compania.com.ar"
+              placeholder="bajas@compania.com.ar, mesa@compania.com.ar"
               className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5 text-sm placeholder:text-slate-600 focus:border-rose-500/50 focus:outline-none transition-colors font-mono"
             />
             {errors.email && <p className="text-xs text-rose-400 mt-1">{errors.email}</p>}
             <p className="text-xs text-slate-600 mt-1">
-              A este correo se mandarán las solicitudes de baja cuando haya mora.
+              A estos correos se mandarán las solicitudes de baja cuando haya mora. Podés poner varios separados por coma.
             </p>
           </div>
 

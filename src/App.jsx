@@ -52,6 +52,10 @@ import AdminPage from "./pages/AdminPage";
 
 // 🆕 NUEVA APP: TAREAS DEL DÍA
 import TareasPage from "./pages/TareasPage";
+// 🆕 NUEVA APP: CONTROL DIARIO (tareas fijas con foto)
+import ControlDiarioPage from "./pages/ControlDiarioPage";
+import RankingPage from "./pages/RankingPage";
+import CierreCajaReminder from "./components/recaudacion/CierreCajaReminder";
 
 // 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
 import CuponPublicoPage from "./pages/CuponPublicoPage";
@@ -489,6 +493,10 @@ function App() {
                 {/* 🆕 PANEL DE TAREAS DEL DÍA */}
                 <Route path="/tareas" element={<TareasPage />} />
 
+                {/* 🆕 CONTROL DIARIO (tareas fijas con foto) */}
+                <Route path="/control-diario" element={<ControlDiarioPage />} />
+                <Route path="/ranking" element={<RankingPage />} />
+
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/clientes/:id" element={<ClienteProfilePage />} />
                 <Route path="/polizas" element={<PolizasPage />} />
@@ -541,6 +549,8 @@ function App() {
             bajasPendientes={bajasPendientes}
             serviciosAlertas={serviciosAlertas}
           />
+
+          <CierreCajaReminder />
         </motion.div>
       </div>
     </>

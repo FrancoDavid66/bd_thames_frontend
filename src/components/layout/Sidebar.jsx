@@ -9,7 +9,7 @@ import {
   HiChevronDown, HiRefresh,
   HiClock, HiBan, HiTruck, HiCash, HiReceiptTax,
   HiShieldCheck, HiX, HiCog,
-  HiViewGrid
+  HiViewGrid, HiStar
 } from "react-icons/hi";
 import ThemeToggle from "./ThemeToggle";
 
@@ -22,6 +22,7 @@ const ICON_MAP = {
   chart:       HiChartBar,
   map:         HiMap,
   clipboard:   HiClipboardList,
+  star:        HiStar,
   tasks:       HiClipboardCheck,
   speaker:     HiSpeakerphone,
   refresh:     HiRefresh,
@@ -89,6 +90,8 @@ export default function Sidebar({
         items: [
           { to: "/",           label: "Inicio",           icon: "home" },
           { to: "/tareas",     label: "Tareas del día",   icon: "tasks" },
+          { to: "/control-diario", label: "Control diario",  icon: "clipboard" },
+          { to: "/ranking", label: "Ranking",  icon: "star" },
           { to: "/solicitudes",label: "Solicitudes",       icon: "clipboard", badge: solTotal },
           { to: "/clientes",   label: "Clientes",          icon: "users" },
           { to: "/siniestros", label: "Siniestros",        icon: "doc" },
