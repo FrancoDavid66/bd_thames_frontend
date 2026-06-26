@@ -271,9 +271,65 @@ export default function VehiculoDocsPanel({ polizaId }) {
     } catch (err) { toast.error("Error al eliminar."); }
   };
 
+  // 🔄 Reemplazar el archivo de un documento/foto (solo admin), manteniendo su tipo.
+  //    Ej: subir la propuesta correcta de AMCA o el Mercosur de NRE y pisar el viejo.
+  const replaceFileRef = useRef(null);
+  const [replaceTarget, setReplaceTarget] = useState(null);
+  const [replacing, setReplacing] = useState(false);
+
+  const pickReplace = (item) => {
+    if (!isWebAdmin) return toast.error("Solo los administradores pueden reemplazar archivos.");
+    setReplaceTarget(item);
+    if (replaceFileRef.current) {
+      replaceFileRef.current.value = "";
+      replaceFileRef.current.click();
+    }
+  };
+
+  const onReplaceFile = async (file) => {
+    if (!file || !replaceTarget) return;
+    const item = replaceTarget;
+    setReplacing(true);
+    try {
+      const folder = item.mime ? "rc-admin/polizas/documentos" : "rc-admin/polizas/fotos";
+      const up = await uploadToCloudinary(file, folder);
+      const url = up.secure_url || up.url;
+      const public_id = up.public_id || "";
+
+      if (item.mime) {
+        // Documento (PDF u otro): se mantiene el TIPO, solo cambia el archivo.
+        await api.patch(`/polizas/documentos/${item.id}/`, {
+          url, public_id,
+          nombre: file.name || item.nombre || "",
+          mime: file.type || item.mime || "application/octet-stream",
+        });
+      } else {
+        // Foto del vehículo
+        await api.patch(`/polizas/fotos/${item.id}/`, {
+          url, public_id, nombre: file.name || item.nombre || "",
+        });
+      }
+      toast.success("Archivo reemplazado ✅");
+      setReplaceTarget(null);
+      fetchVehiculoDocs();
+    } catch (e) {
+      toast.error("Error al reemplazar el archivo.");
+    } finally {
+      setReplacing(false);
+    }
+  };
+
   /* ===================== Render ===================== */
   return (
     <div className="text-slate-100">
+      {/* Input oculto para reemplazar un archivo (solo admin) */}
+      <input
+        ref={replaceFileRef}
+        type="file"
+        accept="application/pdf,image/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplaceFile(f); }}
+      />
       {/* Header */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -409,7 +465,8 @@ export default function VehiculoDocsPanel({ polizaId }) {
                           </button>
                           <div className="flex shrink-0 gap-1">
                             <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-[11px] hover:bg-white/20" title="Abrir en pestaña nueva"><HiExternalLink /></a>
-                            {isWebAdmin ? <button onClick={() => removePhoto(d)} className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300 hover:bg-rose-500/30"><HiTrash /></button> : null}
+                            {isWebAdmin ? <button onClick={() => pickReplace(d)} disabled={replacing} className="inline-flex items-center gap-1 rounded bg-sky-500/20 px-2 py-1 text-[11px] text-sky-300 hover:bg-sky-500/30 disabled:opacity-50" title="Reemplazar archivo"><HiRefresh className={replacing && replaceTarget?.id === d.id ? "animate-spin" : ""} /></button> : null}
+                            {isWebAdmin ? <button onClick={() => removePhoto(d)} className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300 hover:bg-rose-500/30" title="Eliminar"><HiTrash /></button> : null}
                           </div>
                         </li>
                       ))}

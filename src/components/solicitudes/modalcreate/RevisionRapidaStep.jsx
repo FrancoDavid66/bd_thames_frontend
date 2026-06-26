@@ -5,7 +5,7 @@
 // Si una sección no tiene nada que completar, se saltea sola.
 // Secuencia: [Asegurado faltante] → [Vehículo faltante] → [Responsable] → onTerminar()
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiUser, HiTruck, HiIdentification, HiCheckCircle,
@@ -86,6 +86,14 @@ export default function RevisionRapidaStep({
     arr.push("responsable");
     return arr;
   });
+
+  useEffect(() => {
+    console.log("%c[REVISION] qué muestra el wizard ▶", "color:#f59e0b;font-weight:bold", {
+      pantallas, faltan,
+      cliente_recibido: cliente, poliza_recibida: poliza,
+      responsables: (empleados || []).length,
+    });
+  }, []); // eslint-disable-line
 
   const [idx, setIdx] = useState(0);
   const actual = pantallas[idx];

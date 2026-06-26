@@ -8,6 +8,8 @@ import {
 } from "react-icons/hi";
 
 import { fetchTareasDia, marcarPolizaEnviada } from "../store/slices/tareasSlice";
+import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 import TareasHeader from "../components/tareas/TareasHeader";
 import TareaCard from "../components/tareas/TareaCard";
 import TareaItem from "../components/tareas/TareaItem";
@@ -36,6 +38,11 @@ export default function TareasPage() {
   const dispatch = useDispatch();
   const { data, loading, marcando } = useSelector((s) => s.tareas);
 
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+  const [oficinas, setOficinas] = useState([]);
+  const [oficinaSel, setOficinaSel] = useState(""); // "" = todas
+
   const [baseTotal, setBaseTotal] = useState(0);
   const [abierta, setAbierta] = useState(null); // key de la tarjeta abierta
   const [datoCliente, setDatoCliente] = useState(null);
@@ -44,7 +51,26 @@ export default function TareasPage() {
   const [fotosPoliza, setFotosPoliza] = useState(null);
   const [subirPoliza, setSubirPoliza] = useState(null);
 
-  useEffect(() => { dispatch(fetchTareasDia()); }, [dispatch]);
+  // Recarga al cambiar la oficina elegida (admin). "" = todas.
+  useEffect(() => {
+    dispatch(fetchTareasDia(oficinaSel ? { oficina: oficinaSel } : {}));
+  }, [dispatch, oficinaSel]);
+
+  // Cargar la lista de oficinas (solo admin, para el selector)
+  useEffect(() => {
+    if (!isWebAdmin) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await api.get("/usuarios/oficinas/");
+        const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        if (alive) setOficinas(arr);
+      } catch { if (alive) setOficinas([]); }
+    })();
+    return () => { alive = false; };
+  }, [isWebAdmin]);
+
+  const recargar = () => dispatch(fetchTareasDia(oficinaSel ? { oficina: oficinaSel } : {}));
   useEffect(() => {
     if (data) {
       const t = SECCIONES.reduce((a, sec) => a + ((data[sec.key] || []).length), 0);
@@ -72,7 +98,7 @@ export default function TareasPage() {
 
   const onCompletado = () => {
     setDatoCliente(null); setFotosCliente(null); setDatosPoliza(null); setFotosPoliza(null); setSubirPoliza(null);
-    dispatch(fetchTareasDia());
+    recargar();
   };
 
   const celebra = !loading && total === 0 && baseTotal > 0;
@@ -84,7 +110,30 @@ export default function TareasPage() {
     <div className="min-h-screen bg-slate-950 text-slate-200 px-4 py-6 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <TareasHeader total={total} hechas={hechas} pct={pct} oficina={data?.oficina} fecha={data?.fecha}
-          loading={loading} onRefresh={() => dispatch(fetchTareasDia())} />
+          loading={loading} onRefresh={recargar} />
+
+        {/* Selector de oficina (solo admin) */}
+        {isWebAdmin && (
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mt-2 scrollbar-hide">
+            <button
+              onClick={() => setOficinaSel("")}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                oficinaSel === "" ? "bg-indigo-500 border-indigo-400 text-white" : "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800"
+              }`}>
+              Todas
+            </button>
+            {oficinas.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => setOficinaSel(String(o.id))}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  String(oficinaSel) === String(o.id) ? "bg-indigo-500 border-indigo-400 text-white" : "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800"
+                }`}>
+                {o.nombre}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loading && !data && <div className="text-center py-16 text-slate-500 text-sm">Cargando tareas…</div>}
 
