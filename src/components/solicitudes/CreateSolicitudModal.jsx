@@ -240,6 +240,9 @@ export default function CreateSolicitudModal({
 
   const [sinNumero, setSinNumero] = useState(false);
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
+  // 🎟️ Cupones leídos de la cuponera del PDF (AMCA, La Equidad…). Se mandan al
+  //    crear para que las cuotas tomen las fechas EXACTAS (no 6 mensuales).
+  const [cuponesPdf, setCuponesPdf] = useState(() => initialDatosPdf?.cupones || []);
 
   useEffect(() => {
     // 🆕 Auto-asignar la oficina del usuario SIEMPRE (admin o no). Lo único manual es el responsable.
@@ -433,15 +436,12 @@ export default function CreateSolicitudModal({
     ? (responsableOk && oficinaOk && !saving)
     : (responsableOk && oficinaOk && datosClienteOk && fotosClienteOk && polizaOk && !saving);
 
-  // Responsables visibles: admin → solo los de la oficina elegida; empleado → todos los suyos
+  // Responsables visibles: admin → TODOS (sin importar la oficina); empleado → los suyos
   const empleadosVisibles = useMemo(() => {
-    if (!isWebAdmin) return empleados;
-    const ofi = String(poliza.oficina || "");
-    if (!ofi) return [];
-    return empleados.filter(
-      (e) => String(e?.oficina ?? "") === ofi || String(e?.oficina_id ?? "") === ofi
-    );
-  }, [empleados, isWebAdmin, poliza.oficina]);
+    // El admin puede asignar cualquier responsable de cualquier sucursal.
+    // El empleado ve los que le devuelve el backend (los de su oficina).
+    return empleados;
+  }, [empleados]);
 
   // Admin elige sucursal en el paso 1 (al cambiarla, resetea el responsable)
   const elegirOficina = (oficinaId) => {
@@ -491,6 +491,7 @@ export default function CreateSolicitudModal({
     const v = datos?.vehiculo || {};
     const pol = datos?.poliza || {};
     const cupones = datos?.cupones || [];
+    setCuponesPdf(cupones);
 
     setCliente((prev) => ({
       ...prev,
@@ -642,6 +643,13 @@ export default function CreateSolicitudModal({
           dias_a_vencer: Number(poliza.dias_a_vencer) || 30,
           generar_cuotas_ahora: !!poliza.generar_cuotas_ahora,
           regenerar_cuotas: false,
+          // 🎟️ Cuponera del PDF: si vino, el backend usa estas fechas exactas
+          //    (cantidad + vencimientos reales) en vez de 6 cuotas mensuales.
+          cupones: (cuponesPdf || []).map((c) => ({
+            numero: c.numero,
+            vencimiento: c.vencimiento,
+            importe: c.importe,
+          })),
         };
       }
 
