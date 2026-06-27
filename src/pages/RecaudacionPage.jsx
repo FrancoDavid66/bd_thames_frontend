@@ -25,6 +25,7 @@ import api from "../services/api";
 import RankingCierres from "../components/recaudacion/RankingCierres";
 // 🚀 NUEVO: panel de quién cerró / no cerró en un día
 import EstadoCierresDia from "../components/recaudacion/EstadoCierresDia";
+import AdminHorariosCierre from "../components/admin/AdminHorariosCierre";
 
 import EjemploDineroImg from "../assets/ejemplo_dinero.jpg";
 
@@ -564,6 +565,16 @@ function AdminView() {
 
   return (
     <div className="space-y-4">
+      {/* ⏰ Panel para configurar los horarios de cierre (mediodía/noche) por oficina */}
+      <details className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <summary className="cursor-pointer text-sm sm:text-base font-bold text-slate-100">
+          ⏰ Horarios de cierre de caja (por oficina)
+        </summary>
+        <div className="mt-3">
+          <AdminHorariosCierre />
+        </div>
+      </details>
+
       {/* 🚀 Quién cerró / no cerró en un día */}
       <EstadoCierresDia />
 
