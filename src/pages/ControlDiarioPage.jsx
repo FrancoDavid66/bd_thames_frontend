@@ -1,7 +1,7 @@
 /* src/pages/ControlDiarioPage.jsx
  *
  * Control diario (tareas recurrentes con foto).
- *   - Cada tarea es una tarjeta. Verde al alcanzar el mínimo de fotos.
+ *   - Cada tarea es una tarjeta. Verde al alcanzar el  mínimo de fotos.
  *   - Varias fotos por tarea (galería). Wizard de responsable en la 1ª foto.
  */
 import { useEffect, useRef, useState } from "react";
