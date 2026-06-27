@@ -67,13 +67,14 @@ export default function Sidebar({
       ]
     }];
 
-    // 🚀 Items base de Finanzas
+    // 💰 Finanzas: Pagos (operación diaria) + caja/contabilidad
     const finanzasItems = [
-      { to: "/recaudacion", label: "Recaudación", icon: "cash" },
-      { to: "/balanzes",    label: "Balances",    icon: "db" },
+      { to: "/pagos",       label: "Gestión de Pagos", icon: "cash" },
+      { to: "/recaudacion", label: "Recaudación",      icon: "cash" },
+      { to: "/balanzes",    label: "Balances",         icon: "db" },
     ];
 
-    // 🚀 Solo agregamos Servicios Fijos si es admin
+    // 🚀 Servicios Fijos solo para admin
     if (isAdmin) {
       finanzasItems.push({
         to: "/servicios",
@@ -85,52 +86,55 @@ export default function Sidebar({
     }
 
     return [
+      // 🏠 Lo de todos los días: inicio + tareas operativas + bandeja de solicitudes
       {
         title: "Principal", flat: true,
         items: [
-          { to: "/",           label: "Inicio",           icon: "home" },
-          { to: "/tareas",     label: "Tareas del día",   icon: "tasks" },
-          { to: "/control-diario", label: "Control diario",  icon: "clipboard" },
-          { to: "/ranking", label: "Ranking",  icon: "star" },
-          { to: "/solicitudes",label: "Solicitudes",       icon: "clipboard", badge: solTotal },
-          { to: "/clientes",   label: "Clientes",          icon: "users" },
-          { to: "/siniestros", label: "Siniestros",        icon: "doc" },
-          { to: "/pagos",      label: "Gestión de Pagos",  icon: "cash" },
+          { to: "/",               label: "Inicio",         icon: "home" },
+          { to: "/tareas",         label: "Tareas del día", icon: "tasks" },
+          { to: "/control-diario", label: "Control diario", icon: "clipboard" },
+          { to: "/ranking",        label: "Ranking",        icon: "star" },
+          { to: "/solicitudes",    label: "Solicitudes",    icon: "clipboard", badge: solTotal },
         ]
       },
+      // 📋 Cartera: clientes + pólizas + siniestros (todo el libro de negocio junto)
       {
-        title: "Pólizas", id: "polizas", icon: "doc",
+        title: "Cartera", id: "cartera", icon: "doc",
         items: [
-          { to: "/polizas",            label: "Listado",      icon: "doc" },
-          { to: "/vencimientos",       label: "Vencimientos", icon: "clock" },
-          { to: "/polizas/renovaciones",label: "Renovaciones",icon: "refresh", badge: renovacionesPendientes, tone: "amber" },
-          { to: "/cuponeras",          label: "Cuponeras",    icon: "receipt", badge: cuponVencidas },
-          { to: "/polizas/bajas",      label: "Bajas",        icon: "ban",     badge: bajasPendientes, tone: "red" },
-          { to: "/polizas/verificacion", label: "Verificación", icon: "shield" },
+          { to: "/clientes",             label: "Clientes",      icon: "users" },
+          { to: "/polizas",              label: "Pólizas",       icon: "doc" },
+          { to: "/vencimientos",         label: "Vencimientos",  icon: "clock" },
+          { to: "/polizas/renovaciones", label: "Renovaciones",  icon: "refresh", badge: renovacionesPendientes, tone: "amber" },
+          { to: "/cuponeras",            label: "Cuponeras",     icon: "receipt", badge: cuponVencidas },
+          { to: "/polizas/bajas",        label: "Bajas",         icon: "ban",     badge: bajasPendientes, tone: "red" },
+          { to: "/polizas/verificacion", label: "Verificación",  icon: "shield" },
+          { to: "/siniestros",           label: "Siniestros",    icon: "doc" },
         ]
       },
+      // 💰 Finanzas: todo lo que es plata en un solo lugar
       {
         title: "Finanzas", id: "finanzas", icon: "db",
         items: finanzasItems,
       },
+      // 🛡️ Gerencia (solo admin)
       ...(isAdmin ? [{
         title: "Gerencia", id: "admin", icon: "shield",
         items: [
-          { to: "/gruas",        label: "Grúas",        icon: "truck" },
-          { to: "/cotizaciones", label: "Cotizador",    icon: "receipt" },
-          { to: "/marketing",    label: "Campañas",     icon: "speaker" },
-          { to: "/estadisticas", label: "Estadísticas", icon: "chart" },
-          { to: "/competencia",  label: "Competencia",  icon: "chart" },
-          { to: "/geo",          label: "Mapa Geo",     icon: "map" },
-          { to: "/admin",        label: "Configuración",icon: "cog" },
+          { to: "/cotizaciones", label: "Cotizador",     icon: "receipt" },
+          { to: "/gruas",        label: "Grúas",         icon: "truck" },
+          { to: "/marketing",    label: "Campañas",      icon: "speaker" },
+          { to: "/estadisticas", label: "Estadísticas",  icon: "chart" },
+          { to: "/competencia",  label: "Competencia",   icon: "chart" },
+          { to: "/geo",          label: "Mapa Geo",      icon: "map" },
+          { to: "/admin",        label: "Configuración", icon: "cog" },
         ]
       }] : [])
     ];
   }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas]);
 
   const [open, setOpen] = useState({
-    polizas:  ["/polizas", "/vencimientos", "/cuponeras"].some(p => location.pathname.startsWith(p)),
-    finanzas: ["/recaudacion", "/balanzes", "/servicios"].some(p => location.pathname.startsWith(p)),
+    cartera:  true, // 📋 el libro de negocio abierto por defecto
+    finanzas: ["/pagos", "/recaudacion", "/balanzes", "/servicios"].some(p => location.pathname.startsWith(p)),
     admin:    ["/gruas", "/cotizaciones", "/marketing", "/estadisticas", "/competencia", "/geo", "/admin"].some(p => location.pathname.startsWith(p)),
   });
 
