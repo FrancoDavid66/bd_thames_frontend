@@ -234,7 +234,7 @@ export const fetchResumenPolizas = createAsyncThunk(
 
 export const fetchPolizasKpis = createAsyncThunk(
   "polizas/fetchKpis",
-  async ({ force = false } = {}, { getState, rejectWithValue, signal }) => {
+  async ({ force = false, oficina = null } = {}, { getState, rejectWithValue, signal }) => {
     try {
       abortPrev(kpisAbortCtrl);
       kpisAbortCtrl = new AbortController();
@@ -244,6 +244,9 @@ export const fetchPolizasKpis = createAsyncThunk(
         includePaging: false,
         includeOrdering: false,
       });
+
+      // 🚀 Override: en el Home, los usuarios NO-admin piden solo SU oficina.
+      if (oficina) params.oficina = oficina;
 
       const queryKey = makeQueryKey("polizas/kpis/", params);
 
@@ -266,7 +269,7 @@ export const fetchPolizasKpis = createAsyncThunk(
     }
   },
   {
-    condition: ({ force = false } = {}, { getState }) => {
+    condition: ({ force = false, oficina = null } = {}, { getState }) => {
       if (force) return true;
       const state = getState().polizas;
 
@@ -274,6 +277,7 @@ export const fetchPolizasKpis = createAsyncThunk(
         includePaging: false,
         includeOrdering: false,
       });
+      if (oficina) params.oficina = oficina;
       const queryKey = makeQueryKey("polizas/kpis/", params);
       if (state.inFlightKpisKey && state.inFlightKpisKey === queryKey) return false;
 

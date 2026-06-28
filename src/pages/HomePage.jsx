@@ -179,7 +179,6 @@ const HomePage = () => {
   useEffect(() => {
     dispatch(fetchIngresos());
     dispatch(fetchEgresos());
-    dispatch(fetchPolizasKpis());
     dispatch(fetchRenovacionesGlobalResumen({}));
     dispatch(
       fetchClientes({
@@ -189,6 +188,15 @@ const HomePage = () => {
     );
     cargarTotalesMes();
   }, [dispatch, cargarTotalesMes]);
+
+  // 🚀 KPI de pólizas separado: espera a tener el `user` para filtrar por oficina.
+  //    ADMIN → total global (sin filtro). Usuario normal → solo SU oficina.
+  useEffect(() => {
+    if (!user) return;
+    const esAdmin = (user?.perfil?.rol === "ADMIN") || (user?.rol === "ADMIN");
+    const miOficina = user?.perfil?.oficina?.id ?? user?.perfil?.oficina ?? null;
+    dispatch(fetchPolizasKpis(esAdmin ? {} : { oficina: miOficina }));
+  }, [dispatch, user]);
 
   // 🚀 Al cerrar cada modal, refrescamos para que el tablero quede al día
   const cerrarIngreso = () => {

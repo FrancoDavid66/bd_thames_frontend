@@ -64,6 +64,12 @@ export default function ModalFormaPago({
 
   const inputMontoRef = useRef(null);
 
+  // 🔒 Precio fijo NRE: si la póliza es de NRE y la cuota ya tiene precio (>0),
+  // el monto se muestra fijo (el de la cuota) y NO se puede editar. El admin lo
+  // corrige por otra vía. Para otras compañías o cuotas en $0, sigue editable.
+  const esNRE = /nre/i.test(String(polizaCompania || ""));
+  const montoFijo = esNRE && defaultMonto != null && Number(defaultMonto) > 0;
+
   /* ── Bloquear scroll ── */
   useEffect(() => {
     if (!isOpen) return;
@@ -84,11 +90,11 @@ export default function ModalFormaPago({
     setEnviadoPor(clienteNombreApellido ? String(clienteNombreApellido).trim() : "");
     setCuitRemitente("");
     setNroOperacion("");
-    setMonto("");
+    setMonto(montoFijo ? Number(defaultMonto).toLocaleString("es-AR") : "");
     setFechaPago(getLocalISODate());
     setObservaciones("");
     setSubmitting(false);
-  }, [isOpen, clienteNombreApellido]);
+  }, [isOpen, clienteNombreApellido, montoFijo, defaultMonto]);
 
   /* ── Medios normalizados ── */
   const medios = useMemo(() => {
@@ -519,27 +525,33 @@ export default function ModalFormaPago({
                           <div className="flex items-center gap-2">
                             <span className="text-pink-400 font-bold text-lg shrink-0">AR$</span>
                             <input ref={inputMontoRef} type="text" inputMode="decimal"
-                              value={monto} 
-                              onChange={e => {
+                              value={monto}
+                              readOnly={montoFijo}
+                              onChange={montoFijo ? undefined : (e => {
                                 // Solo permitir números, coma y punto
                                 const raw = e.target.value.replace(/[^\d.,]/g, "");
                                 setMonto(raw);
-                              }}
-                              onBlur={e => {
+                              })}
+                              onBlur={montoFijo ? undefined : (e => {
                                 // Al salir del campo, formatear con separador de miles
                                 const n = Number.parseFloat(String(monto).replace(/\./g, "").replace(",", "."));
                                 if (Number.isFinite(n) && n > 0) {
                                   setMonto(n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
                                 }
-                              }}
-                              onFocus={e => {
+                              })}
+                              onFocus={montoFijo ? undefined : (e => {
                                 // Al entrar al campo, mostrar número limpio para editar
                                 const n = Number.parseFloat(String(monto).replace(/\./g, "").replace(",", "."));
                                 if (Number.isFinite(n)) setMonto(String(n));
-                              }}
+                              })}
                               placeholder={defaultMonto ? Number(defaultMonto).toLocaleString("es-AR") : "0"}
-                              className="flex-1 bg-transparent text-3xl font-bold text-pink-200 placeholder:text-pink-900 outline-none border-b-2 border-pink-700/50 pb-1 focus:border-pink-500 transition-colors" />
+                              className={`flex-1 bg-transparent text-3xl font-bold text-pink-200 placeholder:text-pink-900 outline-none border-b-2 pb-1 transition-colors ${montoFijo ? "cursor-not-allowed border-pink-800/40" : "border-pink-700/50 focus:border-pink-500"}`} />
                           </div>
+                          {montoFijo && (
+                            <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-pink-300/80">
+                              🔒 Precio fijo de la lista. No se modifica.
+                            </p>
+                          )}
                         </div>
 
                         {/* Fecha y observaciones */}

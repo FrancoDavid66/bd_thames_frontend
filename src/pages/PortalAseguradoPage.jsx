@@ -36,6 +36,12 @@ function fmt(d) {
   return d ? dayjs(d).format("DD/MM/YYYY") : "—";
 }
 
+// Formatea pesos argentinos sin decimales: 35000 → "$35.000"
+function money(n) {
+  const v = Number(n || 0);
+  return "$" + v.toLocaleString("es-AR", { maximumFractionDigits: 0 });
+}
+
 // Nombre legible del documento. Prioriza el TIPO (dato confiable); el nombre del
 // archivo se usa solo como respaldo, y ahí Mercosur/cuponera/certificado se chequean
 // ANTES que "póliza" (porque muchos archivos llevan "poliza" en el nombre).
@@ -259,6 +265,55 @@ export default function PortalAseguradoPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Tu cuota hoy + lo que pagás al renovar (NRE) */}
+                {(p.precio_actual > 0 || p.renovacion) ? (
+                  <div className="border-b border-white/5 p-4">
+                    {p.precio_actual > 0 ? (
+                      <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0f1422] px-3.5 py-3">
+                        <div className="flex items-center gap-2">
+                          <HiCash className="h-4 w-4 text-indigo-400" />
+                          <span className="text-[13px] text-slate-300">Tu cuota</span>
+                        </div>
+                        <span className="text-[17px] font-bold text-slate-100">{money(p.precio_actual)}</span>
+                      </div>
+                    ) : null}
+
+                    {p.renovacion ? (
+                      <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3.5">
+                        <div className="flex items-center gap-2 text-amber-300">
+                          <HiClock className="h-4 w-4" />
+                          <span className="text-[12px] font-semibold">
+                            Al renovar (desde {fmt(p.renovacion.fecha)})
+                          </span>
+                        </div>
+
+                        {p.renovacion.con_oferta ? (
+                          <div className="mt-2.5 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[12px] text-slate-300">1ra cuota</span>
+                              <span className="text-[15px] font-bold text-emerald-400">{money(p.renovacion.primera_cuota)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[12px] text-slate-300">Resto de las cuotas</span>
+                              <span className="text-[15px] font-semibold text-slate-100">{money(p.renovacion.resto)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-2.5 flex items-center justify-between">
+                            <span className="text-[12px] text-slate-300">Todas las cuotas</span>
+                            <span className="text-[15px] font-bold text-slate-100">{money(p.renovacion.resto)}</span>
+                          </div>
+                        )}
+
+                        <p className="mt-2.5 text-[11px] leading-snug text-slate-400">
+                          Sabemos que está difícil. Por eso ajustamos el precio de a poco
+                          {p.renovacion.con_oferta ? " y la primera cuota te queda más baja" : ""}, para acompañarte y que sigas cubierto.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {/* Papeles */}
                 {docs.length > 0 ? (
