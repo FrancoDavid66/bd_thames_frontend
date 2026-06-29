@@ -246,6 +246,11 @@ export default function BajasPage() {
   const safePage = Math.min(Math.max(1, page), totalPages);
   const itemsPaginados = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
+  // Paginación: "Todas" = pageSize gigante → una sola página con todo.
+  const verTodas = pageSize >= 100000;
+  const desdeRow = totalFiltered === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const hastaRow = Math.min(safePage * pageSize, totalFiltered);
+
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
@@ -547,9 +552,17 @@ export default function BajasPage() {
               className="bg-transparent text-white text-sm font-black outline-none cursor-pointer hover:text-sky-400 transition-colors"
             >
               {[15, 30, 50, 100].map(n => <option key={n} value={n} className="bg-slate-900">{n} filas</option>)}
+              <option value={100000} className="bg-slate-900">Todas</option>
             </select>
+            <span className="w-px h-5 bg-white/10" />
+            <span className="text-[11px] font-bold text-slate-400">
+              {totalFiltered === 0
+                ? "Sin resultados"
+                : <>Mostrando <span className="text-white">{desdeRow}–{hastaRow}</span> de <span className="text-sky-400">{totalFiltered}</span></>}
+            </span>
           </div>
 
+          {!verTodas && (
           <div className="flex items-center gap-4 group">
             {/* 🚀 BOTÓN PREVIOUS ARREGLADO */}
             <button
@@ -576,6 +589,7 @@ export default function BajasPage() {
               <HiChevronRight size={22} />
             </button>
           </div>
+          )}
         </div>
       </div>
 
