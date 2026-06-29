@@ -91,7 +91,7 @@ export default function Sidebar({
         title: "Principal", flat: true,
         items: [
           { to: "/",               label: "Inicio",         icon: "home" },
-          { to: "/tareas",         label: "Tareas del día", icon: "tasks" },
+          { to: "/tareas",         label: "Tareas del día", icon: "tasks", highlight: true },
           { to: "/control-diario", label: "Control diario", icon: "clipboard" },
           { to: "/ranking",        label: "Ranking",        icon: "star" },
           { to: "/solicitudes",    label: "Solicitudes",    icon: "clipboard", badge: solTotal },
@@ -204,6 +204,25 @@ export default function Sidebar({
           </div>
         </div>
 
+        {/* 💸 Acceso rápido DESTACADO a Pagos — para cobrar al toque, sin abrir Finanzas */}
+        {!isVendedor && (
+          <div className="px-3 pt-3 shrink-0">
+            <NavLink
+              to="/pagos"
+              className="group flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-900/40 hover:from-emerald-400 hover:to-emerald-500 hover:shadow-emerald-500/40 transition-all active:scale-[0.98]"
+            >
+              <span className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/20 shrink-0">
+                <HiCurrencyDollar className="w-6 h-6" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-black leading-tight">Registrar pago</div>
+                <div className="text-[10px] font-bold text-emerald-50/80 uppercase tracking-widest leading-tight">Cobrar una cuota</div>
+              </div>
+              <HiChevronDown className="w-5 h-5 -rotate-90 opacity-80 group-hover:opacity-100 transition" />
+            </NavLink>
+          </div>
+        )}
+
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1 custom-scrollbar">
           {menuGroups.map((group, gi) => (
@@ -224,12 +243,14 @@ export default function Sidebar({
                           transition-all duration-150 mb-0.5
                           ${isActive
                             ? "bg-primary-600/20 text-primary-400 border border-primary-600/30 shadow-sm"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                            : item.highlight
+                              ? "text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 font-bold"
+                              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
                           }
                         `}>
                         {({ isActive }) => (
                           <>
-                            <Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-primary-400" : "text-slate-500 group-hover:text-slate-300"}`} />
+                            <Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-primary-400" : item.highlight ? "text-amber-400" : "text-slate-500 group-hover:text-slate-300"}`} />
                             <span className="flex-1 truncate">{item.label}</span>
                             <Badge value={item.badge} tone={item.tone} />
                           </>
