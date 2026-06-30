@@ -1,6 +1,6 @@
 // src/components/layout/Header.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
-import { HiMenu, HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp } from "react-icons/hi";
+import { HiMenu, HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp, HiCurrencyDollar } from "react-icons/hi";
 import { FaPowerOff } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -111,6 +111,95 @@ function NotificationsDropdown({ items, total, onClose }) {
   );
 }
 
+/* ─── PreciosModal (lista de precios NRE, hardcodeada) ─────── */
+const PRECIOS_LISTA = [
+  { tipo: "Auto",      base: "36.000", seg: "33.000", ter: "31.500" },
+  { tipo: "Moto",      base: "18.000", seg: "16.500", ter: "16.000" },
+  { tipo: "Camioneta", base: "41.000", seg: "37.500", ter: "36.000" },
+  { tipo: "Camión",    base: "75.000", seg: "69.000", ter: "66.000" },
+  { tipo: "Trailer",   base: "15.000", seg: "13.800", ter: "13.200" },
+];
+
+function PreciosModal({ onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.18 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+      >
+        {/* Encabezado */}
+        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-emerald-500">
+          <div className="flex items-center gap-2">
+            <HiCurrencyDollar className="w-5 h-5 text-white" />
+            <span className="text-base font-bold text-white">Lista de precios NRE</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+          >
+            <HiX className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tabla */}
+        <div className="p-5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Precios de NRE. Si el cliente <span className="font-semibold text-slate-700 dark:text-slate-200">ya tiene vehículos asegurados</span>, el 2do y el 3ro o más llevan <span className="font-semibold text-emerald-600 dark:text-emerald-400">oferta</span>:
+          </p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <th className="py-2 font-semibold">Vehículo</th>
+                <th className="py-2 font-semibold text-right">1er</th>
+                <th className="py-2 font-semibold text-right text-emerald-600 dark:text-emerald-400">2do 🏷️</th>
+                <th className="py-2 font-semibold text-right text-emerald-600 dark:text-emerald-400">3ro+ 🏷️</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {PRECIOS_LISTA.map((p) => (
+                <tr key={p.tipo}>
+                  <td className="py-2.5 font-medium text-slate-700 dark:text-slate-200">{p.tipo}</td>
+                  <td className="py-2.5 text-right font-bold text-slate-900 dark:text-white">${p.base}</td>
+                  <td className="py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${p.seg}</td>
+                  <td className="py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${p.ter}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* El Talita */}
+          <div className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">El Talita</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Auto: <span className="font-bold text-slate-900 dark:text-white">$25.000</span> (alta) / <span className="font-bold text-slate-900 dark:text-white">$30.000</span> (renovación). El resto, igual que arriba.
+            </p>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+            🏷️ La oferta del 2do/3ro se aplica sola al cargar la póliza, según los vehículos que ya tenga el cliente. Sin promo: todas las cuotas al mismo precio.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ─── Header ───────────────────────────────────────────────── */
 export default function Header({ sidebarOpen, toggleSidebar, verificacionCount = 0, siniestrosAbiertos = 0 }) {
   const dispatch = useDispatch();
@@ -122,6 +211,7 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
   // 🚀 Estado de los modales de Caja Rápida
   const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
   const [modalEgresoAbierto, setModalEgresoAbierto]   = useState(false);
+  const [modalPreciosAbierto, setModalPreciosAbierto] = useState(false);
 
   const isAdmin       = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const isVendedor    = user?.perfil?.rol === "VENDEDOR";
@@ -354,6 +444,14 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
                 <HiArrowCircleUp className="text-xl" />
                 <span className="hidden sm:inline text-sm font-semibold">Egreso</span>
               </button>
+              <button
+                onClick={() => setModalPreciosAbierto(true)}
+                title="Ver lista de precios"
+                className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors focus:outline-none"
+              >
+                <HiCurrencyDollar className="text-xl" />
+                <span className="hidden sm:inline text-sm font-semibold">Precios</span>
+              </button>
             </div>
 
             {/* Campana — oculta para vendedores */}
@@ -419,6 +517,13 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
       {/* 🚀 Modales de Caja Rápida (los mismos que en Balances) */}
       <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={cerrarIngreso} />
       <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={cerrarEgreso} />
+
+      {/* 💰 Modal de lista de precios */}
+      <AnimatePresence>
+        {modalPreciosAbierto && (
+          <PreciosModal onClose={() => setModalPreciosAbierto(false)} />
+        )}
+      </AnimatePresence>
     </>
   );
 }
