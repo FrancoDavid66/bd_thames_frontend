@@ -90,7 +90,7 @@ export default function ModalFormaPago({
     setEnviadoPor(clienteNombreApellido ? String(clienteNombreApellido).trim() : "");
     setCuitRemitente("");
     setNroOperacion("");
-    setMonto(montoFijo ? Number(defaultMonto).toLocaleString("es-AR") : "");
+    setMonto(Number(defaultMonto) > 0 ? Number(defaultMonto).toLocaleString("es-AR") : "");
     setFechaPago(getLocalISODate());
     setObservaciones("");
     setSubmitting(false);

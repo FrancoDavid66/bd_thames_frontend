@@ -525,4 +525,4 @@ export default function EstadisticasPage() {
       </div>
     </motion.div>
   );
-}
+}t
