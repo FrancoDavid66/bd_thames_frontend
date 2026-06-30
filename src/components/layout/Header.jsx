@@ -444,14 +444,25 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
                 <HiArrowCircleUp className="text-xl" />
                 <span className="hidden sm:inline text-sm font-semibold">Egreso</span>
               </button>
-              <button
+              <motion.button
                 onClick={() => setModalPreciosAbierto(true)}
                 title="Ver lista de precios"
-                className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors focus:outline-none"
+                className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-white font-semibold bg-gradient-to-r from-blue-600 to-emerald-500 focus:outline-none"
+                animate={{
+                  boxShadow: [
+                    "0 0 0 0 rgba(16,185,129,0.0)",
+                    "0 0 18px 3px rgba(16,185,129,0.6)",
+                    "0 0 0 0 rgba(16,185,129,0.0)",
+                  ],
+                  scale: [1, 1.05, 1],
+                }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
               >
                 <HiCurrencyDollar className="text-xl" />
-                <span className="hidden sm:inline text-sm font-semibold">Precios</span>
-              </button>
+                <span className="hidden sm:inline text-sm">Precios</span>
+              </motion.button>
             </div>
 
             {/* Campana — oculta para vendedores */}
