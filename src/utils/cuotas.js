@@ -98,34 +98,88 @@ export const ESTADO_CUOTA = {
 };
 
 /**
- * Devuelve el estado actual de una cuota según su fecha de vencimiento.
+ * 🎯 Fecha LÍMITE de pago de una cuota = cuándo hay que pagarla para no quedar descubierto.
+ *
+ * Las cuotas se pagan POR ADELANTADO: cada cuota cubre desde el vto de la cuota
+ * ANTERIOR hasta su propio vto. Por eso la fecha en que hay que PAGAR una cuota
+ * es el vto de la cuota anterior (fin de cobertura de la anterior), NO su vto propio.
+ *
+ *   - Cuota #1 (no hay anterior) → su propio vto.
+ *   - Cuota #N → vto de la cuota #(N-1).
+ *
+ * Prioridad de fuentes:
+ *   1) cuota.fecha_limite_pago (si el backend algún día la manda ya calculada)
+ *   2) vto de la cuota anterior (si se pasa el array de cuotas de la póliza)
+ *   3) vto propio de la cuota (fallback si no hay contexto)
+ *
+ * @param {object} cuota
+ * @param {Array} [todasLasCuotas] - cuotas de la póliza (se ordenan por cuota_nro)
+ * @returns {dayjs.Dayjs|null}
+ */
+export function fechaLimitePago(cuota, todasLasCuotas = null) {
+  // 1) Si el backend ya la mandó calculada por cuota, la usamos.
+  if (cuota?.fecha_limite_pago) {
+    const f = dayjs(cuota.fecha_limite_pago).startOf("day");
+    if (f.isValid()) return f;
+  }
+
+  const propioVto = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
+
+  // 2) Sin array de cuotas no podemos ver la anterior → usamos el vto propio.
+  if (!Array.isArray(todasLasCuotas) || todasLasCuotas.length === 0) return propioVto;
+
+  const ordenadas = [...todasLasCuotas].sort(
+    (a, b) => Number(a?.cuota_nro || 0) - Number(b?.cuota_nro || 0)
+  );
+  let i = ordenadas.findIndex((c) => c?.id != null && c?.id === cuota?.id);
+  if (i < 0) i = ordenadas.findIndex((c) => Number(c?.cuota_nro || 0) === Number(cuota?.cuota_nro || 0));
+
+  if (i > 0) {
+    const anterior = ordenadas[i - 1];
+    const vtoAnterior = anterior?.fecha_vencimiento
+      ? dayjs(anterior.fecha_vencimiento).startOf("day")
+      : null;
+    if (vtoAnterior) return vtoAnterior;
+  }
+  // Cuota #1 o no se encontró la anterior → vto propio.
+  return propioVto;
+}
+
+/**
+ * Devuelve el estado actual de una cuota según su FECHA LÍMITE DE PAGO
+ * (el vto de la cuota anterior; ver fechaLimitePago). NO usa el vto propio,
+ * porque eso marcaba la mora ~1 mes tarde.
+ *
+ * Pasá `todasLasCuotas` (las cuotas de la póliza) para que calcule bien.
+ * Sin ese array, cae al vto propio (comportamiento viejo, compatible).
  *
  *   - pagada: c.pagado === true
- *   - vencida: fecha_vencimiento < hoy
- *   - vence_hoy: fecha_vencimiento === hoy
- *   - por_vencer: fecha_vencimiento > hoy
- *   - pendiente: no tiene fecha_vencimiento válida
+ *   - vencida: fecha límite de pago < hoy
+ *   - vence_hoy: fecha límite de pago === hoy
+ *   - por_vencer: fecha límite de pago > hoy
+ *   - pendiente: no se pudo determinar una fecha válida
  */
-export function getEstadoCuota(cuota) {
+export function getEstadoCuota(cuota, todasLasCuotas = null) {
   if (!cuota) return ESTADO_CUOTA.PENDIENTE;
   if (cuota.pagado) return ESTADO_CUOTA.PAGADA;
 
-  const v = cuota.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
+  const v = fechaLimitePago(cuota, todasLasCuotas);
   if (!v || !v.isValid()) return ESTADO_CUOTA.PENDIENTE;
 
-  const diff = v.startOf("day").diff(today(), "day");
+  const diff = v.diff(today(), "day");
   if (diff < 0) return ESTADO_CUOTA.VENCIDA;
   if (diff === 0) return ESTADO_CUOTA.VENCE_HOY;
   return ESTADO_CUOTA.POR_VENCER;
 }
 
 /**
- * Días hasta el vencimiento (negativo si ya venció, 0 si vence hoy).
+ * Días hasta la FECHA LÍMITE DE PAGO (negativo si ya se pasó, 0 si es hoy).
+ * Pasá `todasLasCuotas` para que use la fecha correcta (vto de la anterior).
  */
-export function diasHastaVencimiento(cuota) {
-  const v = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento) : null;
+export function diasHastaVencimiento(cuota, todasLasCuotas = null) {
+  const v = fechaLimitePago(cuota, todasLasCuotas);
   if (!v || !v.isValid()) return null;
-  return v.startOf("day").diff(today(), "day");
+  return v.diff(today(), "day");
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -234,10 +288,10 @@ export function resumenCuotas(cuotas = []) {
   const pagadas = rows.filter((c) => c?.pagado).length;
   const pendientes = rows.filter((c) => !c?.pagado).length;
   const vencidas = rows.filter(
-    (c) => !c?.pagado && getEstadoCuota(c) === ESTADO_CUOTA.VENCIDA
+    (c) => !c?.pagado && getEstadoCuota(c, rows) === ESTADO_CUOTA.VENCIDA
   ).length;
   const venceHoy = rows.filter(
-    (c) => !c?.pagado && getEstadoCuota(c) === ESTADO_CUOTA.VENCE_HOY
+    (c) => !c?.pagado && getEstadoCuota(c, rows) === ESTADO_CUOTA.VENCE_HOY
   ).length;
   const montoTotal = rows.reduce((acc, c) => {
     const m = Number(c?.monto || c?.importe || 0);
@@ -298,11 +352,12 @@ export function getCuotaImpagaMasAntigua(cuotas = []) {
   const rows = Array.isArray(cuotas) ? cuotas : [];
   const hoy = today();
   const impagasVencidas = rows
-    .filter((c) => !c?.pagado && c?.fecha_vencimiento)
-    .filter((c) => dayjs(c.fecha_vencimiento).startOf("day").diff(hoy, "day") < 0)
-    .sort((a, b) => dayjs(a.fecha_vencimiento).valueOf() - dayjs(b.fecha_vencimiento).valueOf());
+    .filter((c) => !c?.pagado)
+    .map((c) => ({ c, lim: fechaLimitePago(c, rows) }))
+    .filter(({ lim }) => lim && lim.diff(hoy, "day") < 0)
+    .sort((a, b) => a.lim.valueOf() - b.lim.valueOf());
 
-  return impagasVencidas[0] || null;
+  return impagasVencidas[0]?.c || null;
 }
 
 /**
@@ -358,14 +413,16 @@ export function getDiasParaVencer(input) {
   }
   // Caso 2: viene una póliza con cuotas[] cargadas
   else if (Array.isArray(input?.cuotas) && input.cuotas.length > 0) {
-    // a) Primero buscamos la impaga MÁS ANTIGUA que ya venció
+    // a) Primero buscamos la impaga MÁS ANTIGUA cuya fecha LÍMITE de pago ya pasó.
     const masAntiguaVencida = getCuotaImpagaMasAntigua(input.cuotas);
     if (masAntiguaVencida) {
-      fechaRef = masAntiguaVencida.fecha_vencimiento;
+      const lim = fechaLimitePago(masAntiguaVencida, input.cuotas);
+      fechaRef = lim || masAntiguaVencida.fecha_vencimiento;
     } else {
-      // b) Si no hay impagas vencidas, tomamos la próxima a vencer
+      // b) Si no hay impagas vencidas, tomamos la próxima a vencer (por fecha límite de pago).
       const proxima = getProximaCuota(input.cuotas);
-      fechaRef = proxima?.fecha_vencimiento || null;
+      const lim = proxima ? fechaLimitePago(proxima, input.cuotas) : null;
+      fechaRef = lim || proxima?.fecha_vencimiento || null;
     }
   }
   // Caso 3: viene una póliza con campos planos del backend

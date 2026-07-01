@@ -3,12 +3,52 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
-import { HiCheckCircle, HiClock } from "react-icons/hi";
+import { HiCheckCircle, HiClock, HiExclamationCircle } from "react-icons/hi";
 
 import { pagarCuota } from "../../store/slices/polizasSlice";
-import { resumenCuotas } from "../../utils/cuotas";
 
 const CARD = "rounded-2xl border border-white/[0.06] bg-[#121829]";
+
+/* ═══════════════════════════════════════════════════════════════════
+   ESTADO REAL DE UNA CUOTA (según la FECHA DE PAGO, no el vto propio)
+   ───────────────────────────────────────────────────────────────────
+   Las cuotas se pagan POR ADELANTADO: cada cuota cubre desde el vto de la
+   cuota ANTERIOR hasta su propio vto. Por eso el cliente tiene que PAGAR una
+   cuota el día en que se le termina la cobertura de la anterior.
+
+     fechaPagoObjetivo(cuota) = vto de la cuota anterior
+     Cuota #1 (no hay anterior) = su propio vto
+
+   NOTA: es la misma regla que _fecha_pago_objetivo del backend. Está replicada
+   acá solo para este panel; lo ideal es centralizarla en src/utils/cuotas.js
+   (getEstadoCuota / resumenCuotas) para que aplique en TODA la app.
+   ═══════════════════════════════════════════════════════════════════ */
+function fechaPagoObjetivo(idx, lista) {
+  const actual = lista[idx];
+  if (idx > 0) {
+    const anterior = lista[idx - 1];
+    if (anterior?.fecha_vencimiento) return dayjs(anterior.fecha_vencimiento).startOf("day");
+  }
+  return actual?.fecha_vencimiento ? dayjs(actual.fecha_vencimiento).startOf("day") : null;
+}
+
+function estadoReal(idx, lista) {
+  const c = lista[idx];
+  if (c?.pagado) return "pagada";
+  const payby = fechaPagoObjetivo(idx, lista);
+  if (!payby || !payby.isValid()) return "pendiente";
+  const diff = payby.diff(dayjs().startOf("day"), "day");
+  if (diff < 0) return "vencida";
+  if (diff === 0) return "vence_hoy";
+  return "pendiente";
+}
+
+const ROW = {
+  pagada:    { icon: HiCheckCircle,       color: "text-emerald-400" },
+  vencida:   { icon: HiExclamationCircle, color: "text-rose-400" },
+  vence_hoy: { icon: HiClock,             color: "text-orange-400" },
+  pendiente: { icon: HiClock,             color: "text-amber-400" },
+};
 
 export default function CuotasPanel({ poliza }) {
   const dispatch = useDispatch();
@@ -19,7 +59,25 @@ export default function CuotasPanel({ poliza }) {
   }, [poliza?.cuotas]);
 
   const [busyIds, setBusyIds] = useState({});
-  const resumen = useMemo(() => resumenCuotas(rows), [rows]);
+
+  // Ordenamos por número de cuota para poder mirar la cuota anterior.
+  const cuotasOrdenadas = useMemo(
+    () => [...rows].sort((a, b) => Number(a?.cuota_nro || 0) - Number(b?.cuota_nro || 0)),
+    [rows]
+  );
+
+  // Resumen calculado con la FECHA DE PAGO real (no el vto propio de la cuota).
+  const resumen = useMemo(() => {
+    let pagadas = 0, pendientes = 0, vencidas = 0;
+    cuotasOrdenadas.forEach((_c, i) => {
+      const st = estadoReal(i, cuotasOrdenadas);
+      if (st === "pagada") pagadas += 1;
+      else if (st === "vencida") vencidas += 1;
+      else pendientes += 1; // pendiente + vence_hoy
+    });
+    return { total: cuotasOrdenadas.length, pagadas, pendientes, vencidas };
+  }, [cuotasOrdenadas]);
+
   const progreso = resumen.total ? Math.round((resumen.pagadas / resumen.total) * 100) : 0;
 
   const handleMarcarPagada = async (cuota) => {
@@ -52,6 +110,7 @@ export default function CuotasPanel({ poliza }) {
     if (!n) return null;
     return `$ ${n.toLocaleString("es-AR")}`;
   };
+  const fmtFecha = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "—");
 
   return (
     <div className="space-y-4">
@@ -84,30 +143,38 @@ export default function CuotasPanel({ poliza }) {
 
       {/* Lista de cuotas */}
       <div className={`${CARD} overflow-hidden`}>
-        {rows.length === 0 ? (
+        {cuotasOrdenadas.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-500">
             Esta póliza no tiene cuotas registradas.
           </div>
         ) : (
-          rows.map((c) => {
+          cuotasOrdenadas.map((c, i) => {
             const monto = fmtMonto(c.monto);
+            const st = estadoReal(i, cuotasOrdenadas);
+            const payby = fechaPagoObjetivo(i, cuotasOrdenadas);
+            const cfg = ROW[st] || ROW.pendiente;
+            const Icon = cfg.icon;
+
+            let sub;
+            if (st === "pagada") {
+              sub = `Pagada${c.fecha_pago ? " · " + fmtFecha(c.fecha_pago) : ""}`;
+            } else if (st === "vencida") {
+              sub = `Impaga · venció el ${fmtFecha(payby)}`;
+            } else if (st === "vence_hoy") {
+              sub = "Vence hoy · pagar hoy";
+            } else {
+              sub = `A pagar antes del ${fmtFecha(payby)}`;
+            }
+
             return (
               <div key={c.id} className="flex items-center justify-between gap-3 border-b border-white/5 px-3.5 py-3 last:border-0">
                 <div className="flex min-w-0 items-center gap-3">
-                  {c.pagado ? (
-                    <HiCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
-                  ) : (
-                    <HiClock className="h-5 w-5 shrink-0 text-amber-400" />
-                  )}
+                  <Icon className={`h-5 w-5 shrink-0 ${cfg.color}`} />
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium text-slate-100">
                       Cuota {c.cuota_nro}{monto ? <span className="ml-1.5 text-slate-500">· {monto}</span> : null}
                     </div>
-                    <div className={`text-[11px] ${c.pagado ? "text-emerald-400" : "text-amber-400"}`}>
-                      {c.pagado
-                        ? `Pagada${c.fecha_pago ? " · " + dayjs(c.fecha_pago).format("DD/MM/YYYY") : ""}`
-                        : `Vence ${c.fecha_vencimiento ? dayjs(c.fecha_vencimiento).format("DD/MM/YYYY") : "—"}`}
-                    </div>
+                    <div className={`text-[11px] ${cfg.color}`}>{sub}</div>
                   </div>
                 </div>
 
@@ -115,7 +182,11 @@ export default function CuotasPanel({ poliza }) {
                   <button
                     onClick={() => handleMarcarPagada(c)}
                     disabled={!!busyIds[c.id]}
-                    className="shrink-0 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-400 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition disabled:opacity-50 ${
+                      st === "vencida"
+                        ? "border-rose-500/25 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+                        : "border-emerald-500/25 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                    }`}
                   >
                     {busyIds[c.id] ? "..." : "Marcar pagada"}
                   </button>
