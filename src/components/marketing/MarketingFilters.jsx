@@ -104,6 +104,10 @@ export default function MarketingFilters({
   // 🚀 NUEVOS FILTROS DINÁMICOS
   const tiposVehiculo = toOptions(options.tipos);
   const coberturas = toOptions(options.coberturas);
+
+  // 🆕 Filtros geográficos del cliente
+  const localidades = toOptions(options.localidades);
+  const partidos = toOptions(options.partidos);
   
   const [oficinasReal, setOficinasReal] = useState([]);
 
@@ -171,14 +175,15 @@ export default function MarketingFilters({
               <option value="" className="text-black bg-white">Sin filtro de días</option>
               <option value="vencen_en" className="text-black bg-white">⏳ A Vencer en exactamente...</option>
               <option value="vencieron_hace" className="text-black bg-white">⏰ Vencieron hace exactamente...</option>
+              <option value="vencieron_hace_mas" className="text-black bg-white">🎯 Vencieron hace ... días o MÁS (reconquista)</option>
             </select>
           </Field>
 
-          <Field label="Cant. Días exactos">
+          <Field label={values.dias_condicion === "vencieron_hace_mas" ? "Días o más" : "Cant. Días exactos"}>
             <input
               type="number"
               min="0"
-              placeholder="Ej: 4"
+              placeholder={values.dias_condicion === "vencieron_hace_mas" ? "Ej: 30" : "Ej: 4"}
               disabled={!values.dias_condicion}
               value={values.dias_cantidad || ""}
               onChange={(e) => onChange("dias_cantidad", e.target.value)}
@@ -222,6 +227,27 @@ export default function MarketingFilters({
 
           <Field label="Compañías">
             <MultiSelect values={values.compania} options={companias} onChange={(newArr) => onChange("compania", newArr)} placeholder="Todas las compañías" addLabel="+ Agregar Cía" />
+          </Field>
+
+          {/* 🆕 FILTROS GEOGRÁFICOS (datos del cliente) */}
+          <Field label="Localidad">
+            <MultiSelect
+              values={values.localidad}
+              options={localidades}
+              onChange={(newArr) => onChange("localidad", newArr)}
+              placeholder="Todas las localidades"
+              addLabel="+ Agregar Localidad"
+            />
+          </Field>
+
+          <Field label="Partido / Zona">
+            <MultiSelect
+              values={values.partido}
+              options={partidos}
+              onChange={(newArr) => onChange("partido", newArr)}
+              placeholder="Todos los partidos"
+              addLabel="+ Agregar Partido"
+            />
           </Field>
         </div>
 
