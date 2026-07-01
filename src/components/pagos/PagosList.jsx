@@ -89,6 +89,7 @@ const PALETTE = {
 import {
   sumarDiasHabiles as utilSumarDiasHabiles,
   getEstadoCuota,
+  fechaLimitePago,
   getBadgeClasses,
   getBadgeLabel,
   calcCobertura,
@@ -114,14 +115,18 @@ const SHOW_FAST_TOGGLE_FROM = 60;
  * Construye {titulo (fecha grande), subtitulo (frase humana), tono} para una cuota.
  * Lenguaje SIMPLE para operadores nuevos sin experiencia en seguros.
  */
-function buildFraseEstado(cuota) {
+function buildFraseEstado(cuota, todasLasCuotas = []) {
   if (!cuota) return { titulo: "—", subtitulo: "Sin datos", tono: "neutral" };
 
   const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
   const fechaPagoReal = cuota?.pago_registrado_en || cuota?.fecha_pago;
   const fp = fechaPagoReal ? dayjs(fechaPagoReal).startOf("day") : null;
   const hoy = dayjs().startOf("day");
-  const estado = getEstadoCuota(cuota);
+  const estado = getEstadoCuota(cuota, todasLasCuotas);
+
+  // 🎯 Fecha LÍMITE de pago (vto de la cuota anterior). Es la que define la mora.
+  const limite = fechaLimitePago(cuota, todasLasCuotas);
+  const limiteTxt = fmtFecha(limite || cuota?.fecha_vencimiento);
 
   // ── PAGADA ──
   if (estado === ESTADO_CUOTA.PAGADA) {
@@ -152,20 +157,20 @@ function buildFraseEstado(cuota) {
 
   // ── VENCIDA ──
   if (estado === ESTADO_CUOTA.VENCIDA) {
-    const dias = fv ? fv.diff(hoy, "day") : null;
+    const dias = limite ? limite.diff(hoy, "day") : null;
     const abs = dias != null ? Math.abs(dias) : "?";
     return {
-      titulo: fmtFecha(cuota?.fecha_vencimiento),
+      titulo: limiteTxt,
       subtitulo: `Lleva ${abs} día${abs === 1 ? "" : "s"} sin pagar`,
       tono: "danger",
-      tooltip: `Esta cuota tendría que haberse pagado el ${fmtFecha(cuota?.fecha_vencimiento)}. Ya pasaron ${abs} día${abs === 1 ? "" : "s"} y todavía no se pagó.`,
+      tooltip: `Esta cuota tendría que haberse pagado el ${limiteTxt}. Ya pasaron ${abs} día${abs === 1 ? "" : "s"} y todavía no se pagó.`,
     };
   }
 
   // ── VENCE HOY ──
   if (estado === ESTADO_CUOTA.VENCE_HOY) {
     return {
-      titulo: fmtFecha(cuota?.fecha_vencimiento),
+      titulo: limiteTxt,
       subtitulo: "Tiene que pagar hoy",
       tono: "warning",
       tooltip: "Esta cuota vence hoy. Si el cliente no paga, mañana el auto queda sin cobertura.",
@@ -174,13 +179,13 @@ function buildFraseEstado(cuota) {
 
   // ── POR VENCER ──
   if (estado === ESTADO_CUOTA.POR_VENCER) {
-    const dias = fv ? fv.diff(hoy, "day") : null;
+    const dias = limite ? limite.diff(hoy, "day") : null;
     const subtitulo = dias === 1 ? "Le falta 1 día" : `Le faltan ${dias} días`;
     return {
-      titulo: fmtFecha(cuota?.fecha_vencimiento),
+      titulo: limiteTxt,
       subtitulo,
       tono: dias != null && dias <= 3 ? "warning" : "neutral",
-      tooltip: `La cuota vence el ${fmtFecha(cuota?.fecha_vencimiento)}. Si no se paga, el auto va a quedar sin cobertura desde esa fecha.`,
+      tooltip: `Hay que pagar esta cuota antes del ${limiteTxt}. Si no se paga, el auto va a quedar sin cobertura desde esa fecha.`,
     };
   }
 
@@ -637,25 +642,30 @@ export default function PagosList({
       const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
       const fechaPago = cuota?.pago_registrado_en || cuota?.fecha_pago;
       const fp = fechaPago ? dayjs(fechaPago).startOf("day") : null;
-      const dias = fv ? fv.diff(hoy, "day") : null;
+
+      // 🎯 Cuotas de la póliza (para cobertura y para la FECHA LÍMITE DE PAGO real)
+      const cuotasPoliza = Array.isArray(pol?.cuotas) ? pol.cuotas : [cuota];
+      const idxEnPoliza = cuotasPoliza.findIndex((c) => c?.id === cuota?.id);
+      const idxValido = idxEnPoliza >= 0 ? idxEnPoliza : 0;
+
+      // 🎯 Los días se miden contra la fecha de pago (vto de la cuota anterior),
+      //    NO contra el vto propio de la cuota (eso marcaba la mora ~1 mes tarde).
+      const limite = fechaLimitePago(cuota, cuotasPoliza);
+      const dias = limite ? limite.diff(hoy, "day") : null;
       const state = cuota?.pagado ? "paid" : dias !== null && dias < 0 ? "overdue" : "pending";
       const proximoVtoYmd = pickNextVencimientoFromIndex(cuota, getPolizaId(pol, cuota), polizaIndex);
 
       // 🎯 Cobertura calculada con el helper unificado (cuotas.js)
-      // Tomamos las cuotas de la póliza para que cobertura se calcule bien
-      const cuotasPoliza = Array.isArray(pol?.cuotas) ? pol.cuotas : [cuota];
-      const idxEnPoliza = cuotasPoliza.findIndex((c) => c?.id === cuota?.id);
-      const idxValido = idxEnPoliza >= 0 ? idxEnPoliza : 0;
       const cobertura = calcCobertura(cuota, cuotasPoliza, idxValido, pol?.fecha_emision);
 
       const pagoAtrasado = cuota?.pagado && fp && fv ? fp.isAfter(fv) : false;
       const sinCobertura = cobertura?.tipo === "sin_cobertura";
 
-      // ¿La cuota es FUTURA? (no venció todavía y no está pagada)
+      // ¿La cuota es FUTURA? (todavía no llegó su fecha de pago y no está pagada)
       const esCuotaFutura = !cuota?.pagado && dias !== null && dias > 0;
 
       // 🎯 Frases humanas amigables Opción A
-      const fraseEstado = buildFraseEstado(cuota);
+      const fraseEstado = buildFraseEstado(cuota, cuotasPoliza);
       const fraseCobertura = buildFraseCobertura(cobertura, cuota, esCuotaFutura);
 
       // Número de cuota legible: "Cuota X de Y" (si conocemos el total)
@@ -857,7 +867,7 @@ export default function PagosList({
                 const ultimaCuota = todasCuotas[todasCuotas.length - 1] || null;
                 const finPoliza = ultimaCuota?.fecha_vencimiento || pol?.fecha_vencimiento || pol?.fecha_vto_poliza || null;
 
-                const estadoActual = getEstadoCuota(c);
+                const estadoActual = getEstadoCuota(c, todasCuotas);
 
                 return (
                   <div className="space-y-4 text-xs sm:text-sm">
@@ -917,7 +927,7 @@ export default function PagosList({
                         {/* Lista de cuotas con conector */}
                         {todasCuotas.map((cu, i) => {
                           const esActual = cu?.id === c?.id;
-                          const estado = getEstadoCuota(cu);
+                          const estado = getEstadoCuota(cu, todasCuotas);
                           const cob = calcCobertura(cu, todasCuotas, i, pol?.fecha_emision);
                           const cuotaPagada = !!cu?.pagado;
                           const fechaPago = cu?.pago_registrado_en || cu?.fecha_pago;

@@ -55,8 +55,8 @@ import {
  * Esta es la clave de la Opción A: el dato grande es una FRASE,
  * la fecha es el dato chico de referencia.
  */
-function buildFraseEstado(cuota, estado) {
-  const dias = diasHastaVencimiento(cuota);
+function buildFraseEstado(cuota, estado, todasLasCuotas = []) {
+  const dias = diasHastaVencimiento(cuota, todasLasCuotas);
   const fechaPagoReal = cuota?.pago_registrado_en || cuota?.fecha_pago;
   const fv = cuota?.fecha_vencimiento ? dayjs(cuota.fecha_vencimiento).startOf("day") : null;
   const fp = fechaPagoReal ? dayjs(fechaPagoReal).startOf("day") : null;
@@ -305,13 +305,13 @@ export default function CuotaInfoCard({
   showAction = true,
 }) {
   // Cálculos delegados al utils unificado
-  const estado = useMemo(() => getEstadoCuota(cuota), [cuota]);
+  const estado = useMemo(() => getEstadoCuota(cuota, todasLasCuotas), [cuota, todasLasCuotas]);
   const cobertura = useMemo(
     () => calcCobertura(cuota, todasLasCuotas, idx, polizaFechaEmision),
     [cuota, todasLasCuotas, idx, polizaFechaEmision]
   );
 
-  const fraseEstado = useMemo(() => buildFraseEstado(cuota, estado), [cuota, estado]);
+  const fraseEstado = useMemo(() => buildFraseEstado(cuota, estado, todasLasCuotas), [cuota, estado, todasLasCuotas]);
   const fraseCobertura = useMemo(() => buildFraseCobertura(cobertura, estado, cuota), [cobertura, estado, cuota]);
 
   const IconEstado = getIcon("estado", fraseEstado.tono);
@@ -386,7 +386,7 @@ export default function CuotaInfoCard({
           const pagoStyles = pagada ? TONO_STYLES.success : TONO_STYLES.neutral;
 
           // Renglón sutil debajo de la fecha de vencimiento
-          const diasVto = diasHastaVencimiento(cuota);
+          const diasVto = diasHastaVencimiento(cuota, todasLasCuotas);
           let vtoSubtitulo = null;
           let vtoSubAlerta = false;
           if (pagada) {
