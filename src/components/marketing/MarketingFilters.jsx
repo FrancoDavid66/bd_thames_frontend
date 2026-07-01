@@ -176,20 +176,45 @@ export default function MarketingFilters({
               <option value="vencen_en" className="text-black bg-white">⏳ A Vencer en exactamente...</option>
               <option value="vencieron_hace" className="text-black bg-white">⏰ Vencieron hace exactamente...</option>
               <option value="vencieron_hace_mas" className="text-black bg-white">🎯 Vencieron hace ... días o MÁS (reconquista)</option>
+              <option value="vencieron_entre" className="text-black bg-white">📆 Vencieron hace ENTRE X y Y días (rango)</option>
             </select>
           </Field>
 
-          <Field label={values.dias_condicion === "vencieron_hace_mas" ? "Días o más" : "Cant. Días exactos"}>
-            <input
-              type="number"
-              min="0"
-              placeholder={values.dias_condicion === "vencieron_hace_mas" ? "Ej: 30" : "Ej: 4"}
-              disabled={!values.dias_condicion}
-              value={values.dias_cantidad || ""}
-              onChange={(e) => onChange("dias_cantidad", e.target.value)}
-              className="w-full h-12 rounded-xl bg-slate-950/50 border border-white/10 px-4 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/50 text-white text-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            />
-          </Field>
+          {values.dias_condicion === "vencieron_entre" ? (
+            <Field label="Rango de días vencidos">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="30"
+                  value={values.dias_desde || ""}
+                  onChange={(e) => onChange("dias_desde", e.target.value)}
+                  className="w-full h-12 rounded-xl bg-slate-950/50 border border-white/10 px-3 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/50 text-white text-sm text-center transition-all"
+                />
+                <span className="text-slate-500 text-xs font-bold shrink-0">a</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="40"
+                  value={values.dias_hasta || ""}
+                  onChange={(e) => onChange("dias_hasta", e.target.value)}
+                  className="w-full h-12 rounded-xl bg-slate-950/50 border border-white/10 px-3 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/50 text-white text-sm text-center transition-all"
+                />
+              </div>
+            </Field>
+          ) : (
+            <Field label={values.dias_condicion === "vencieron_hace_mas" ? "Días o más" : "Cant. Días exactos"}>
+              <input
+                type="number"
+                min="0"
+                placeholder={values.dias_condicion === "vencieron_hace_mas" ? "Ej: 30" : "Ej: 4"}
+                disabled={!values.dias_condicion}
+                value={values.dias_cantidad || ""}
+                onChange={(e) => onChange("dias_cantidad", e.target.value)}
+                className="w-full h-12 rounded-xl bg-slate-950/50 border border-white/10 px-4 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/50 text-white text-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              />
+            </Field>
+          )}
 
           {/* 🆕 FILTRO DE TIPO DE VEHÍCULO */}
           <Field label="Tipo de Vehículo">
