@@ -22,15 +22,15 @@ import { solicitudesApi } from "../../services/solicitudes.js";
 import api from "../../services/api";
 import { sendAdminNuevaSolicitud } from "../../services/notifications/email";
 
-import ResponsableManagerModal from "./modalcreate/ResponsableManagerModal"; // (ya no se usa como popup; queda por compatibilidad)
 import ClienteStep from "./modalcreate/ClienteStep";
 import LectorPdfButton from "./modalcreate/LectorPdfButton";
 import RevisionRapidaStep from "./modalcreate/RevisionRapidaStep";
 import PolizaStep from "./modalcreate/PolizaStep";
-import ImagenesDocsStep from "./modalcreate/ImagenesDocsStep";
 import SolicitudStep from "./modalcreate/SolicitudStep";
 // 🚀 NUEVO: Gate de verificación previa (búsqueda global de cliente/auto)
 import VerificarClienteGate from "./modalcreate/VerificarClienteGate";
+// 🆕 Post-alta: cobrar la 1ª cuota + comprobante
+import CobrarPrimeraCuotaModal from "./CobrarPrimeraCuotaModal";
 
 const modalVariants = {
   initial: { opacity: 0, scale: 0.95 },
@@ -108,6 +108,7 @@ function tipoACarroceria(tipo) {
   if (t.includes("RURAL") || t.includes("FAMILIAR")) return "Familiar / Rural";
   if (t.includes("MOTO")) return "Moto";
   if (t.includes("UTILITARIO")) return "Utilitario";
+  if (t.includes("AUTOMOVIL") || t.includes("AUTOMÓVIL") || t === "AUTO") return "Automóvil";
   return "";
 }
 
@@ -199,12 +200,9 @@ export default function CreateSolicitudModal({
       nombre: c.nombre || "",
       apellido: c.apellido || "",
       telefono: "", // 🆕 siempre a mano (el del PDF suele estar desactualizado)
-      email: "",
       dni_cuit_cuil: c.dni || "",
       direccion: c.direccion || "",
       localidad: c.localidad || "",
-      partido: "",
-      fecha_nacimiento: "",
     };
   });
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
@@ -231,7 +229,7 @@ export default function CreateSolicitudModal({
       tipo: "Auto",
       precio_cuota: cupones[0]?.importe != null ? String(cupones[0].importe) : "",
       cantidad_cuotas_override: cupones.length ? String(cupones.length) : "",
-      primer_vencimiento: cupones[0]?.vencimiento || "",
+      primer_vencimiento: "",
       fecha_emision: ymdLocal(new Date()),
       dias_a_vencer: 30,
       generar_cuotas_ahora: true,
@@ -242,7 +240,7 @@ export default function CreateSolicitudModal({
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
   // 🎟️ Cupones leídos de la cuponera del PDF (AMCA, La Equidad…). Se mandan al
   //    crear para que las cuotas tomen las fechas EXACTAS (no 6 mensuales).
-  const [cuponesPdf, setCuponesPdf] = useState(() => initialDatosPdf?.cupones || []);
+  const [cuponesPdf, setCuponesPdf] = useState([]);
 
   useEffect(() => {
     // 🆕 Auto-asignar la oficina del usuario SIEMPRE (admin o no). Lo único manual es el responsable.
@@ -328,6 +326,10 @@ export default function CreateSolicitudModal({
   const [docSlots, setDocSlots] = useState({});
   const [saving, setSaving] = useState(false);
 
+  // 🆕 Post-alta: flujo de cobro de la 1ª cuota
+  const [cobroPolizaId, setCobroPolizaId] = useState(null);
+  const [createdRaw, setCreatedRaw] = useState(null);
+
   useEffect(() => {
     if (
       !coberturaObj ||
@@ -370,8 +372,6 @@ export default function CreateSolicitudModal({
     if (!cliente.apellido.trim()) e.apellido = "Apellido";
     if (!cliente.telefono.trim()) e.telefono = "Teléfono";
     if (!(cliente.dni_cuit_cuil || "").trim()) e.dni_cuit_cuil = "DNI / CUIT";
-    if (!(cliente.fecha_nacimiento || "").trim()) e.fecha_nacimiento = "Fecha de nacimiento";
-    if (!(cliente.partido || "").trim()) e.partido = "Partido";
     if (!(cliente.localidad || "").trim()) e.localidad = "Localidad";
     return e;
   }, [clienteModo, cliente, clienteId]);
@@ -434,7 +434,7 @@ export default function CreateSolicitudModal({
   const polizaOk = companiaOk && autoOk && fechasOk;
   const canSubmit = modoRapido
     ? (responsableOk && oficinaOk && !saving)
-    : (responsableOk && oficinaOk && datosClienteOk && fotosClienteOk && polizaOk && !saving);
+    : (responsableOk && oficinaOk && datosClienteOk && polizaOk && !saving);
 
   // Responsables visibles: admin → TODOS (sin importar la oficina); empleado → los suyos
   const empleadosVisibles = useMemo(() => {
@@ -455,10 +455,9 @@ export default function CreateSolicitudModal({
     if (target === step) return;
     if (target >= 2 && !canStepAsignacion) return toast.error(isWebAdmin ? "Elegí sucursal y responsable" : "Elegí el responsable");
     if (target >= 3 && !datosClienteOk) return toast.error(listaFaltantes(paso1Errors));
-    if (target >= 4 && !fotosClienteOk) return toast.error(listaFaltantes(fotosClienteErrors));
-    if (target >= 5 && !companiaOk) return toast.error(listaFaltantes(companiaErrors));
-    if (target >= 6 && !autoOk) return toast.error(listaFaltantes(autoErrors));
-    if (target >= 7 && !fechasOk) return toast.error(listaFaltantes(fechasErrors));
+    if (target >= 4 && !companiaOk) return toast.error(listaFaltantes(companiaErrors));
+    if (target >= 5 && !autoOk) return toast.error(listaFaltantes(autoErrors));
+    if (target >= 6 && !fechasOk) return toast.error(listaFaltantes(fechasErrors));
     setStep(target);
   };
 
@@ -482,7 +481,7 @@ export default function CreateSolicitudModal({
     }
   };
   const esPrimerStep = modoRapido ? step === SECUENCIA_RAPIDA[0] : step <= 1;
-  const esUltimoStep = step === 8;
+  const esUltimoStep = step === 6;
 
   // 🚀 Handlers del gate de verificación previa
   // 🆕 Autocompletar el formulario con lo que extrae el lector de PDF
@@ -491,7 +490,7 @@ export default function CreateSolicitudModal({
     const v = datos?.vehiculo || {};
     const pol = datos?.poliza || {};
     const cupones = datos?.cupones || [];
-    setCuponesPdf(cupones);
+    setCuponesPdf([]);
 
     setCliente((prev) => ({
       ...prev,
@@ -514,7 +513,7 @@ export default function CreateSolicitudModal({
       numero_motor: v.motor || prev.numero_motor,
       numero_chasis: v.chasis || prev.numero_chasis,
       carroceria: tipoACarroceria(v.tipo) || prev.carroceria,
-      primer_vencimiento: cupones[0]?.vencimiento || prev.primer_vencimiento,
+      primer_vencimiento: prev.primer_vencimiento,
       precio_cuota: cupones[0]?.importe != null ? String(cupones[0].importe) : prev.precio_cuota,
       cantidad_cuotas_override: cupones.length ? String(cupones.length) : prev.cantidad_cuotas_override,
     }));
@@ -566,7 +565,7 @@ export default function CreateSolicitudModal({
     console.log("%c[ALTA] onSubmit ▶", "color:#0ea5e9;font-weight:bold", {
       canSubmit, modoRapido, responsableId, oficina: poliza.oficina,
       compania: poliza.compania, cobertura: poliza.cobertura,
-      telefono: cliente.telefono, fecha_nac: cliente.fecha_nacimiento,
+      telefono: cliente.telefono,
     });
     if (!canSubmit) {
       console.warn("[ALTA] ⛔ canSubmit=false → no se crea. Falta responsable u oficina (admin).");
@@ -611,12 +610,9 @@ export default function CreateSolicitudModal({
           nombre: cliente.nombre.trim(),
           apellido: cliente.apellido.trim(),
           telefono: normalizaTelefonoAR(cliente.telefono),
-          email: cliente.email || null,
           dni_cuit_cuil: (cliente.dni_cuit_cuil || "").trim(),
           direccion: (cliente.direccion || "").trim(),
           localidad: (cliente.localidad || "").trim(),
-          partido: (cliente.partido || "").trim(),
-          fecha_nacimiento: (cliente.fecha_nacimiento || "").trim() || null,
         };
       }
 
@@ -727,8 +723,16 @@ export default function CreateSolicitudModal({
         console.warn("Email alert falló", err);
       }
 
-      if (onCreated) onCreated(raw);
-      onClose();
+      // 🆕 En vez de cerrar, ofrecemos cobrar la 1ª cuota.
+      //    onCreated + onClose se ejecutan al terminar ese flujo (o si no hay póliza).
+      const nuevaPolizaId = raw?.poliza_id;
+      if (nuevaPolizaId) {
+        setCreatedRaw(raw);
+        setCobroPolizaId(nuevaPolizaId);
+      } else {
+        if (onCreated) onCreated(raw);
+        onClose();
+      }
     } catch (e) {
       console.error("%c[ALTA] ❌ ERROR al crear", "color:#ef4444;font-weight:bold", e);
       console.error("[ALTA] detalle del backend:", e?.response?.status, e?.response?.data);
@@ -768,6 +772,7 @@ export default function CreateSolicitudModal({
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[90] flex items-stretch sm:items-center justify-center overscroll-contain touch-pan-y">
       <div
         className={`absolute inset-0 ${
@@ -833,49 +838,33 @@ export default function CreateSolicitudModal({
             <StepBadge
               active={step === 3}
               done={step > 3}
-              icon={<HiIdentification />}
-              label="Fotos asegurado"
+              icon={<HiShieldCheck />}
+              label="Compañía"
               onClick={() => goToStep(3)}
-              color="from-teal-400/20 to-teal-500/20"
+              color="from-sky-400/20 to-sky-500/20"
             />
             <StepBadge
               active={step === 4}
               done={step > 4}
               icon={<HiShieldCheck />}
-              label="Compañía"
+              label="Datos del auto"
               onClick={() => goToStep(4)}
-              color="from-sky-400/20 to-sky-500/20"
+              color="from-cyan-400/20 to-cyan-500/20"
             />
             <StepBadge
               active={step === 5}
               done={step > 5}
               icon={<HiShieldCheck />}
-              label="Datos del auto"
-              onClick={() => goToStep(5)}
-              color="from-cyan-400/20 to-cyan-500/20"
-            />
-            <StepBadge
-              active={step === 6}
-              done={step > 6}
-              icon={<HiShieldCheck />}
               label="Fechas"
-              onClick={() => goToStep(6)}
+              onClick={() => goToStep(5)}
               color="from-indigo-400/20 to-indigo-500/20"
             />
             <StepBadge
-              active={step === 7}
-              done={step > 7}
-              icon={<HiPhotograph />}
-              label="Fotos vehículo"
-              onClick={() => goToStep(7)}
-              color="from-rose-400/20 to-rose-500/20"
-            />
-            <StepBadge
-              active={step === 8}
+              active={step === 6}
               done={false}
               icon={<HiDocumentText />}
               label="Resumen"
-              onClick={() => goToStep(8)}
+              onClick={() => goToStep(6)}
               color="from-amber-400/20 to-amber-500/20"
             />
           </div>
@@ -948,29 +937,6 @@ export default function CreateSolicitudModal({
             )}
             {step === 3 && (
               <motion.div
-                key="s1b"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <ClienteStep
-                  section="fotos"
-                  clienteModo={clienteModo}
-                  setClienteModo={setClienteModo}
-                  clienteId={clienteId}
-                  setClienteId={setClienteId}
-                  cliente={cliente}
-                  setCliente={setCliente}
-                  dniSlots={dniSlots}
-                  setDniSlots={setDniSlots}
-                  TIPO_DNI_SLOTS={TIPO_DNI_SLOTS}
-                  onUploadDNI={onUploadDNI}
-                />
-              </motion.div>
-            )}
-            {step === 4 && (
-              <motion.div
                 key="s2"
                 variants={stepVariants}
                 initial="hidden"
@@ -996,7 +962,7 @@ export default function CreateSolicitudModal({
                 />
               </motion.div>
             )}
-            {step === 5 && (
+            {step === 4 && (
               <motion.div
                 key="s2b"
                 variants={stepVariants}
@@ -1023,7 +989,7 @@ export default function CreateSolicitudModal({
                 />
               </motion.div>
             )}
-            {step === 6 && (
+            {step === 5 && (
               <motion.div
                 key="s2c"
                 variants={stepVariants}
@@ -1051,28 +1017,7 @@ export default function CreateSolicitudModal({
               </motion.div>
             )}
 
-            {step === 7 && (
-              <motion.div
-                key="s3"
-                variants={stepVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <ImagenesDocsStep
-                  MAX_FOTOS={MAX_FOTOS}
-                  coberturaSeleccionada={coberturaObj}
-                  fotoSlots={fotoSlots}
-                  setFotoSlots={setFotoSlots}
-                  docSlots={docSlots}
-                  setDocSlots={setDocSlots}
-                  onUploadFotoVehiculo={onUploadFotoVehiculo}
-                  onUploadDocVehiculo={onUploadDocVehiculo}
-                />
-              </motion.div>
-            )}
-
-            {step === 8 && (
+            {step === 6 && (
               <motion.div
                 key="s4"
                 variants={stepVariants}
@@ -1130,6 +1075,18 @@ export default function CreateSolicitudModal({
         )}
       </motion.div>
     </div>
+
+    {/* 🆕 Post-alta: cobrar la 1ª cuota + comprobante */}
+    <CobrarPrimeraCuotaModal
+      open={!!cobroPolizaId}
+      polizaId={cobroPolizaId}
+      onClose={() => {
+        setCobroPolizaId(null);
+        if (onCreated) onCreated(createdRaw);
+        onClose?.();
+      }}
+    />
+    </>
   );
 }
 

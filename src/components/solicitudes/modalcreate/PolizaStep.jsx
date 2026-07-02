@@ -65,6 +65,14 @@ function addMonthsLocal(ymd, months) {
   return ymdLocal(new Date(y2, m2, day2, 12, 0, 0, 0));
 }
 
+// ymd (YYYY-MM-DD) -> DD/MM/YYYY para mostrar lindo el preview de cuotas
+function fmtFechaCorta(ymd) {
+  if (!ymd) return "\u2014";
+  const p = String(ymd).split("-");
+  if (p.length !== 3) return String(ymd);
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
 export default function PolizaStep({
   poliza = {},
   setPoliza = () => {},
@@ -72,6 +80,7 @@ export default function PolizaStep({
   coberturas = [],
   oficinas = [],
   setTocoCantidadCuotas,
+  cuotasPreview = [],
   variants,
   section = "all", // "all" | "compania" | "auto" | "fechas"
 }) {
@@ -345,9 +354,8 @@ export default function PolizaStep({
             label="Fecha de emisión"
             type="date"
             value={poliza?.fecha_emision || ""}
-            onChange={() => {}}
-            disabled={true}
-            helper="Fijada automáticamente en la fecha de hoy"
+            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, fecha_emision: v }))}
+            helper="Arranca en hoy. Cambiala solo si la póliza empieza otro día."
           />
           <Input
             label="Primer vencimiento"
@@ -361,6 +369,28 @@ export default function PolizaStep({
             onChange={(v) => setPoliza((prev = {}) => ({ ...prev, dias_a_vencer: v.replace(/\D/g, "") }))}
             inputMode="numeric"
           />
+
+          {Array.isArray(cuotasPreview) && cuotasPreview.length > 0 && (
+            <div className="sm:col-span-2 mt-1 rounded-2xl border border-white/10 bg-black/20 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/55 font-bold uppercase text-[10px] tracking-[0.15em]">
+                  Cuotas que se van a generar
+                </span>
+                <span className="text-[10px] text-white/40">{cuotasPreview.length} cuotas</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {cuotasPreview.map((c) => (
+                  <div key={c.nro} className="flex items-center justify-between rounded-xl bg-black/30 border border-white/5 px-3 py-2">
+                    <span className="text-xs text-white/70">Cuota {c.nro}</span>
+                    <span className="text-xs font-semibold text-sky-300">{fmtFechaCorta(c.fecha)}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] italic text-white/40">
+                Vencimientos calculados desde el primer vencimiento. Si cambiás la fecha de emisión o la cantidad de cuotas, se recalculan solas.
+              </p>
+            </div>
+          )}
         </div>
         )}
       </motion.fieldset>

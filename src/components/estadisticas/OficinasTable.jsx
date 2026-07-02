@@ -43,9 +43,6 @@ export default function OficinasTable({
                   <th className="px-3 py-2 text-right font-semibold text-emerald-300">
                     Al día
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-amber-300">
-                    Con cuota vencida
-                  </th>
                   <th className="px-3 py-2 text-right font-semibold text-emerald-200">
                     Altas mes
                   </th>
@@ -135,12 +132,6 @@ export default function OficinasTable({
                       <td className="px-3 py-2 text-right align-top">
                         <span className="font-bold text-emerald-400">
                           {(o.activas_al_dia ?? o.polizas_activas ?? 0).toLocaleString("es-AR")}
-                        </span>
-                      </td>
-                      {/* Con cuota vencida — activas PERO con mora */}
-                      <td className="px-3 py-2 text-right align-top">
-                        <span className={(o.activas_en_mora ?? 0) > 0 ? "font-bold text-amber-400" : "text-slate-600"}>
-                          {(o.activas_en_mora ?? 0).toLocaleString("es-AR")}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right text-emerald-200 align-top">

@@ -12,8 +12,8 @@ import {
   HiChevronLeft, HiChevronRight, HiSparkles, HiOfficeBuilding, HiExclamationCircle,
 } from "react-icons/hi";
 
-const CARROCERIAS = ["Sedán", "Hatchback", "SUV", "Pick-up", "Familiar / Rural", "Coupé", "Furgón", "Utilitario", "Moto", "Otro"];
-const COMBUSTIBLES = ["Nafta", "Diésel", "GNC", "Nafta/GNC", "Eléctrico", "Híbrido"];
+const CARROCERIAS = ["Automóvil", "Sedán", "Hatchback", "SUV", "Pick-up", "Familiar / Rural", "Coupé", "Furgón", "Utilitario", "Moto", "Otro"];
+const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
 
 function Campo({ label, value, onChange, type = "text", placeholder = "" }) {
   return (
@@ -63,16 +63,12 @@ export default function RevisionRapidaStep({
   const [faltan] = useState(() => ({
     compania: !poliza.compania, // 🆕 si el PDF no la detectó, se elige a mano
     telefono: true, // 🆕 siempre a mano
-    email: !cliente.email,
-    fecha_nacimiento: !cliente.fecha_nacimiento,
-    partido: !cliente.partido,
     cobertura: !poliza.cobertura, // 🆕 solo se pide si el PDF no la trajo ya matcheada al catálogo
     // 🆕 Datos del vehículo (el lector no siempre los trae → hay que poder cargarlos a mano)
     marca: !poliza.marca,
     modelo: !poliza.modelo,
     anio: !poliza.anio,
     carroceria: !poliza.carroceria,
-    combustible: !poliza.combustible,
     numero_chasis: !poliza.numero_chasis,
     numero_motor: !poliza.numero_motor,
   }));
@@ -81,8 +77,8 @@ export default function RevisionRapidaStep({
   const [pantallas] = useState(() => {
     const arr = [];
     if (faltan.compania) arr.push("compania");
-    if (faltan.telefono || faltan.email || faltan.fecha_nacimiento || faltan.partido) arr.push("asegurado");
-    if (faltan.cobertura || faltan.marca || faltan.modelo || faltan.anio || faltan.carroceria || faltan.combustible || faltan.numero_chasis || faltan.numero_motor) arr.push("vehiculo");
+    if (faltan.telefono) arr.push("asegurado");
+    arr.push("vehiculo"); // 🆕 siempre: hay que confirmar el TIPO (define el precio)
     arr.push("responsable");
     return arr;
   });
@@ -199,21 +195,22 @@ export default function RevisionRapidaStep({
           {actual === "asegurado" && (
             <div className="space-y-4">
               {faltan.telefono && <Campo label="Teléfono (WhatsApp) *" value={cliente.telefono} onChange={(v) => setC("telefono", v)} type="tel" placeholder="Ej: 1133334444" />}
-              {faltan.email && <Campo label="Email" value={cliente.email} onChange={(v) => setC("email", v)} type="email" placeholder="opcional" />}
-              {faltan.fecha_nacimiento && <Campo label="Fecha de nacimiento" value={cliente.fecha_nacimiento} onChange={(v) => setC("fecha_nacimiento", v)} type="date" />}
-              {faltan.partido && <Campo label="Partido" value={cliente.partido} onChange={(v) => setC("partido", v)} placeholder="Ej: La Matanza" />}
             </div>
           )}
 
           {/* VEHÍCULO */}
           {actual === "vehiculo" && (
             <div className="space-y-4">
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 text-amber-200 text-xs flex items-start gap-2">
+                <HiExclamationCircle className="shrink-0 mt-0.5 text-base" />
+                <span>El <b>tipo</b> define el precio. Ojo: furgones y pick-ups que el Mercosur llama "Automóvil" se cobran como <b>Camioneta</b>.</span>
+              </div>
+              <CampoSelect label="Tipo (define el precio) *" value={poliza.tipo || "Auto"} onChange={(v) => setP("tipo", v)} options={TIPOS_VEHICULO} />
               {faltan.cobertura && <CampoSelect label="Cobertura *" value={poliza.cobertura} onChange={(v) => setP("cobertura", v)} options={coberturas.map((c) => c.nombre)} />}
               {faltan.marca && <Campo label="Marca *" value={poliza.marca} onChange={(v) => setP("marca", v)} placeholder="Ej: Toyota" />}
               {faltan.modelo && <Campo label="Modelo *" value={poliza.modelo} onChange={(v) => setP("modelo", v)} placeholder="Ej: Hilux" />}
               {faltan.anio && <Campo label="Año *" value={poliza.anio} onChange={(v) => setP("anio", v)} type="number" placeholder="Ej: 2020" />}
               {faltan.carroceria && <CampoSelect label="Carrocería" value={poliza.carroceria} onChange={(v) => setP("carroceria", v)} options={CARROCERIAS} />}
-              {faltan.combustible && <CampoSelect label="Combustible" value={poliza.combustible} onChange={(v) => setP("combustible", v)} options={COMBUSTIBLES} />}
               {faltan.numero_chasis && <Campo label="N° Chasis" value={poliza.numero_chasis} onChange={(v) => setP("numero_chasis", v)} placeholder="Opcional" />}
               {faltan.numero_motor && <Campo label="N° Motor" value={poliza.numero_motor} onChange={(v) => setP("numero_motor", v)} placeholder="Opcional" />}
             </div>

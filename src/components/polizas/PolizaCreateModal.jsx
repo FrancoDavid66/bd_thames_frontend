@@ -11,7 +11,6 @@ import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
 import PolizaStep from "../solicitudes/modalcreate/PolizaStep";
-import ImagenesDocsStep from "../solicitudes/modalcreate/ImagenesDocsStep";
 import { PolizasAPI } from "../../api/polizas";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 

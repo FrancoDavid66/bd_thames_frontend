@@ -231,8 +231,6 @@ export default function ClienteStep({
     if (!cliente?.apellido?.trim()) e.apellido = "Requerido";
     if (!cliente?.telefono?.trim()) e.telefono = "Requerido";
     if (!cliente?.dni_cuit_cuil?.trim()) e.dni_cuit_cuil = "Requerido";
-    if (!cliente?.fecha_nacimiento?.trim()) e.fecha_nacimiento = "Requerido";
-    if (!cliente?.partido?.trim()) e.partido = "Requerido";
     if (!cliente?.localidad?.trim()) e.localidad = "Requerido";
     return e;
   }, [clienteModo, clienteId, cliente]);
@@ -366,14 +364,6 @@ export default function ClienteStep({
               placeholder="1166709006"
             />
             <Input
-              label="Correo Electrónico"
-              type="email"
-              value={cliente?.email || ""}
-              onChange={(v) => setCliente((s) => ({ ...s, email: v }))}
-              autoComplete="email"
-              placeholder="ejemplo@correo.com"
-            />
-            <Input
               label="DNI / CUIT / CUIL"
               value={cliente?.dni_cuit_cuil || ""}
               onChange={(v) => setCliente((s) => ({ ...s, dni_cuit_cuil: v }))}
@@ -383,43 +373,13 @@ export default function ClienteStep({
               placeholder="Sin puntos ni guiones"
             />
             <Input
-              label="Fecha de nacimiento"
-              type="date"
-              value={cliente?.fecha_nacimiento || ""}
-              onChange={(v) => setCliente((s) => ({ ...s, fecha_nacimiento: v }))}
+              label="Localidad / Ciudad"
+              value={cliente?.localidad || ""}
+              onChange={(v) => setCliente((s) => ({ ...s, localidad: v }))}
               required
-              helper={errors.fecha_nacimiento ? "Campo obligatorio" : ""}
+              helper={errors.localidad ? "Campo obligatorio" : ""}
+              placeholder="Ej: Ramos Mejía"
             />
-            <Select
-              label="Partido"
-              value={cliente?.partido || ""}
-              onChange={onChangePartido}
-              options={PARTIDOS}
-              required
-              placeholder="— Elegí el partido —"
-              helper={errors.partido ? "Campo obligatorio" : "CABA o Provincia de Buenos Aires"}
-            />
-            {locError ? (
-              <Input
-                label="Localidad / Ciudad"
-                value={cliente?.localidad || ""}
-                onChange={(v) => setCliente((s) => ({ ...s, localidad: v }))}
-                required
-                helper={errors.localidad ? "Campo obligatorio" : "Escribila a mano"}
-                placeholder="Ej: Ramos Mejía"
-              />
-            ) : (
-              <Select
-                label="Localidad / Ciudad"
-                value={cliente?.localidad || ""}
-                onChange={(v) => setCliente((s) => ({ ...s, localidad: v }))}
-                options={locOptions}
-                required
-                disabled={!cliente.partido || locLoading}
-                placeholder={!cliente.partido ? "Elegí primero el partido" : (locLoading ? "Cargando..." : "— Elegí la localidad —")}
-                helper={errors.localidad ? "Campo obligatorio" : ""}
-              />
-            )}
             <Input
               className="sm:col-span-2"
               label="Dirección de Domicilio"
@@ -494,8 +454,6 @@ export function clienteStepHasErrors(modo, clienteId, cliente) {
   if (!cliente?.apellido?.trim()) e.apellido = "Requerido";
   if (!cliente?.telefono?.trim()) e.telefono = "Requerido";
   if (!cliente?.dni_cuit_cuil?.trim()) e.dni_cuit_cuil = "Requerido";
-  if (!cliente?.fecha_nacimiento?.trim()) e.fecha_nacimiento = "Requerido";
-  if (!cliente?.partido?.trim()) e.partido = "Requerido";
   if (!cliente?.localidad?.trim()) e.localidad = "Requerido";
   return e;
 }
