@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { HiPlus, HiCheck, HiX, HiShieldCheck } from "react-icons/hi";
+import { HiPlus, HiCheck, HiX, HiShieldCheck, HiCheckCircle } from "react-icons/hi";
 
 import { useAuth } from "../../../context/AuthContext";
 
@@ -90,6 +90,9 @@ export default function PolizaStep({
   const showAuto = section === "all" || section === "auto";
   const showFechas = section === "all" || section === "fechas";
 
+  // 🆕 NRE opera SOLO cobertura "A": lo usamos para autocompletarla.
+  const esNRE = String(poliza?.compania || "").trim().toUpperCase().includes("NRE");
+
   const opcionesOficina = useMemo(() => {
     if (isWebAdmin && oficinas.length > 0) return oficinas;
 
@@ -140,6 +143,37 @@ export default function PolizaStep({
       String(c.compania_nombre).trim().toLowerCase() === ciaSelected
     );
   }, [poliza?.compania, coberturas]);
+
+  // 🆕 NRE: cobertura SIEMPRE "A". La auto-seleccionamos de la lista ya filtrada
+  //    por compañía (aunque en el catálogo se llame "A - Resp. Civil"). Así el
+  //    operador no la elige a mano. La carrocería se deriva del tipo. Editables.
+  useEffect(() => {
+    if (!esNRE) return;
+    const norm = (s) => String(s || "").trim().toLowerCase();
+
+    // Cobertura: de la lista de NRE (ya filtrada). Preferimos la "A".
+    if (coberturasFiltradas.length) {
+      const nombres = coberturasFiltradas.map((c) => c.nombre);
+      const yaValida = poliza?.cobertura && nombres.includes(poliza.cobertura);
+      if (!yaValida) {
+        const esA = (n) => {
+          n = norm(n);
+          return n === "a" || n.startsWith("a ") || n.startsWith("a-") || n.startsWith("a (");
+        };
+        const aCat = coberturasFiltradas.find((c) => esA(c.nombre)) || coberturasFiltradas[0];
+        if (aCat && poliza?.cobertura !== aCat.nombre) {
+          setPoliza((prev = {}) => ({ ...prev, cobertura: aCat.nombre }));
+        }
+      }
+    }
+
+    // Carrocería (opcional): la derivamos del tipo si está vacía.
+    if (!poliza?.carroceria) {
+      const mapa = { camioneta: "Pick-up", moto: "Moto" };
+      const car = mapa[norm(poliza?.tipo)];
+      if (car) setPoliza((prev = {}) => ({ ...prev, carroceria: car }));
+    }
+  }, [esNRE, coberturasFiltradas, poliza?.tipo]); // eslint-disable-line
 
   const coberturaObj = useMemo(() => {
     if (!poliza?.cobertura) return null;
@@ -231,14 +265,40 @@ export default function PolizaStep({
             endpoint="/cotizaciones/companias/" 
           />
 
-          <SelectCreatable
-            label="Cobertura"
-            value={poliza?.cobertura || ""}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, cobertura: v }))}
-            options={coberturasFiltradas} 
-            isWebAdmin={isWebAdmin}
-            endpoint="/cotizaciones/coberturas/" 
-          />
+          {esNRE ? (
+            <>
+              {/* 🆕 NRE: cobertura FIJA "A" (no se elige a mano). */}
+              <div className="flex flex-col gap-1.5 text-xs sm:text-sm">
+                <span className="text-white/55 font-bold uppercase text-[10px] tracking-[0.15em] ml-1">Cobertura</span>
+                <div className="w-full rounded-xl border border-emerald-500/25 bg-black/40 px-4 py-2.5 text-white font-medium flex items-center gap-2">
+                  <HiCheckCircle className="text-emerald-400 shrink-0" />
+                  <span>{poliza?.cobertura || "A"} <span className="text-white/40">· NRE (fija)</span></span>
+                </div>
+              </div>
+              {/* 🆕 En NRE, acá van tipo (define el precio) y carrocería. */}
+              <Select
+                label="Tipo de vehículo"
+                value={poliza?.tipo || "Auto"}
+                onChange={(v) => setPoliza((prev = {}) => ({ ...prev, tipo: v }))}
+                options={TIPOS_VEHICULO}
+              />
+              <Select
+                label="Carrocería"
+                value={poliza?.carroceria || ""}
+                onChange={(v) => setPoliza((prev = {}) => ({ ...prev, carroceria: v }))}
+                options={CARROCERIAS}
+              />
+            </>
+          ) : (
+            <SelectCreatable
+              label="Cobertura"
+              value={poliza?.cobertura || ""}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, cobertura: v }))}
+              options={coberturasFiltradas}
+              isWebAdmin={isWebAdmin}
+              endpoint="/cotizaciones/coberturas/"
+            />
+          )}
 
           <Select
             label="Oficina"
@@ -277,12 +337,14 @@ export default function PolizaStep({
             autoCapitalize="characters"
             placeholder="ABC 123"
           />
-          <Select
-            label="Tipo de vehículo"
-            value={poliza?.tipo || "Auto"}
-            onChange={(v) => setPoliza((prev = {}) => ({ ...prev, tipo: v }))}
-            options={TIPOS_VEHICULO}
-          />
+          {!esNRE && (
+            <Select
+              label="Tipo de vehículo"
+              value={poliza?.tipo || "Auto"}
+              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, tipo: v }))}
+              options={TIPOS_VEHICULO}
+            />
+          )}
           <Input
             label="Marca"
             value={poliza?.marca || ""}
@@ -330,12 +392,14 @@ export default function PolizaStep({
               onChange={(v) => setPoliza((prev = {}) => ({ ...prev, combustible: v }))}
               options={COMBUSTIBLES}
             />
-            <Select
-              label="Carrocería"
-              value={poliza?.carroceria || ""}
-              onChange={(v) => setPoliza((prev = {}) => ({ ...prev, carroceria: v }))}
-              options={CARROCERIAS}
-            />
+            {!esNRE && (
+              <Select
+                label="Carrocería"
+                value={poliza?.carroceria || ""}
+                onChange={(v) => setPoliza((prev = {}) => ({ ...prev, carroceria: v }))}
+                options={CARROCERIAS}
+              />
+            )}
             <Textarea
               className="sm:col-span-2"
               label="Observaciones (opcional)"

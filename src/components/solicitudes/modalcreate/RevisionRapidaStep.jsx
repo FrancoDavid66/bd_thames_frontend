@@ -49,6 +49,7 @@ function CampoSelect({ label, value, onChange, options }) {
 
 export default function RevisionRapidaStep({
   cliente = {}, setCliente,
+  clienteModo = "nuevo",   // 🆕 si viene "existente" (cliente precargado), salteamos "asegurado"
   poliza = {}, setPoliza,
   coberturas = [],
   companias = [],
@@ -62,7 +63,7 @@ export default function RevisionRapidaStep({
   // Qué campos faltaban AL ABRIR (fijo, no cambia mientras completás)
   const [faltan] = useState(() => ({
     compania: !poliza.compania, // 🆕 si el PDF no la detectó, se elige a mano
-    telefono: true, // 🆕 siempre a mano
+    telefono: !cliente.telefono, // 🆕 solo si el PDF no trajo el teléfono
     cobertura: !poliza.cobertura, // 🆕 solo se pide si el PDF no la trajo ya matcheada al catálogo
     // 🆕 Datos del vehículo (el lector no siempre los trae → hay que poder cargarlos a mano)
     marca: !poliza.marca,
@@ -73,12 +74,32 @@ export default function RevisionRapidaStep({
     numero_motor: !poliza.numero_motor,
   }));
 
+  // 🆕 El TIPO solo define el precio en NRE. En compañías con cuponera (AMCA, etc.)
+  //    el precio viene del cupón → NO hace falta pedir el tipo.
+  // 🆕 NRE robusto: la compañía puede llegar como NOMBRE o como ID (según de dónde
+  //    se abra el alta). La resolvemos contra el catálogo y limpiamos puntos/espacios
+  //    ("N.R.E." → "NRE") para detectarla SIEMPRE.
+  const esNRE = (() => {
+    const raw = String(poliza.compania || "").trim();
+    if (!raw) return false;
+    const found = (companias || []).find(
+      (c) => String(c?.id) === raw || String(c?.nombre || "").trim().toLowerCase() === raw.toLowerCase()
+    );
+    const nombre = found?.nombre || raw;
+    return String(nombre).toUpperCase().replace(/[^A-Z]/g, "").includes("NRE");
+  })();
+
   // Armar la secuencia de pantallas según lo que falte (+ responsable siempre)
   const [pantallas] = useState(() => {
     const arr = [];
     if (faltan.compania) arr.push("compania");
-    if (faltan.telefono) arr.push("asegurado");
-    arr.push("vehiculo"); // 🆕 siempre: hay que confirmar el TIPO (define el precio)
+    // 🆕 Si el cliente ya está en el sistema (existente), NO le pedimos los datos de nuevo.
+    if (faltan.telefono && clienteModo !== "existente") arr.push("asegurado");
+    // 🆕 Vehículo: solo si es NRE (tipo) o falta algo REQUERIDO (cobertura/marca/modelo/año).
+    //    Carrocería, chasis y motor son opcionales → no fuerzan la pantalla.
+    const necesitaVehiculo =
+      esNRE || faltan.cobertura || faltan.marca || faltan.modelo || faltan.anio;
+    if (necesitaVehiculo) arr.push("vehiculo");
     arr.push("responsable");
     return arr;
   });
@@ -90,6 +111,41 @@ export default function RevisionRapidaStep({
       responsables: (empleados || []).length,
     });
   }, []); // eslint-disable-line
+
+  // 🆕 NRE: autocompletar cobertura y carrocería para que el operador NO las
+  //    elija a mano. La cobertura es SIEMPRE "A": la matcheamos contra la opción
+  //    REAL del catálogo (aunque se llame "A - Resp. Civil"). La carrocería la
+  //    derivamos del tipo. Ambas quedan editables por si hace falta cambiarlas.
+  useEffect(() => {
+    if (!esNRE) return;
+    const norm = (s) => String(s || "").trim().toLowerCase();
+
+    // Cobertura NRE: SIEMPRE queda seteada (NRE opera solo "A").
+    //  1) la "A" del catálogo de NRE, o cualquier cobertura de NRE (sea cual sea
+    //     su nombre), o cualquier "A"; 2) si el catálogo no tiene nada, "A" literal.
+    const cobs = Array.isArray(coberturas) ? coberturas : [];
+    const nombres = cobs.map((c) => c.nombre);
+    const yaValida = poliza.cobertura && nombres.includes(poliza.cobertura);
+    if (!yaValida) {
+      const esA = (n) => {
+        n = norm(n);
+        return n === "a" || n.startsWith("a ") || n.startsWith("a-") || n.startsWith("a (");
+      };
+      const aCat =
+        cobs.find((c) => norm(c.compania_nombre).includes("nre") && esA(c.nombre)) ||
+        cobs.find((c) => norm(c.compania_nombre).includes("nre")) ||
+        cobs.find((c) => esA(c.nombre));
+      const destino = aCat ? aCat.nombre : "A";
+      if (poliza.cobertura !== destino) setP("cobertura", destino);
+    }
+
+    // Carrocería (opcional): la derivamos del tipo si está vacía.
+    if (!poliza.carroceria) {
+      const mapa = { auto: "Automóvil", camioneta: "Pick-up", moto: "Moto" };
+      const car = mapa[norm(poliza.tipo)];
+      if (car) setP("carroceria", car);
+    }
+  }, [esNRE, coberturas, poliza.tipo]); // eslint-disable-line
 
   const [idx, setIdx] = useState(0);
   const actual = pantallas[idx];
@@ -201,12 +257,26 @@ export default function RevisionRapidaStep({
           {/* VEHÍCULO */}
           {actual === "vehiculo" && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 text-amber-200 text-xs flex items-start gap-2">
-                <HiExclamationCircle className="shrink-0 mt-0.5 text-base" />
-                <span>El <b>tipo</b> define el precio. Ojo: furgones y pick-ups que el Mercosur llama "Automóvil" se cobran como <b>Camioneta</b>.</span>
-              </div>
-              <CampoSelect label="Tipo (define el precio) *" value={poliza.tipo || "Auto"} onChange={(v) => setP("tipo", v)} options={TIPOS_VEHICULO} />
-              {faltan.cobertura && <CampoSelect label="Cobertura *" value={poliza.cobertura} onChange={(v) => setP("cobertura", v)} options={coberturas.map((c) => c.nombre)} />}
+              {esNRE && (
+                <>
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 text-amber-200 text-xs flex items-start gap-2">
+                    <HiExclamationCircle className="shrink-0 mt-0.5 text-base" />
+                    <span>El <b>tipo</b> define el precio. Ojo: furgones y pick-ups que el Mercosur llama "Automóvil" se cobran como <b>Camioneta</b>.</span>
+                  </div>
+                  <CampoSelect label="Tipo (define el precio) *" value={poliza.tipo || "Auto"} onChange={(v) => setP("tipo", v)} options={TIPOS_VEHICULO} />
+                </>
+              )}
+              {faltan.cobertura && (esNRE ? (
+                <label className="flex flex-col gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-white/50 ml-1">Cobertura *</span>
+                  <div className="w-full rounded-2xl bg-black/40 border border-emerald-500/25 px-4 py-3.5 text-white text-base flex items-center gap-2">
+                    <HiCheckCircle className="text-emerald-400 shrink-0" />
+                    <span>{poliza.cobertura || "A"} <span className="text-white/40 text-sm">· NRE (fija)</span></span>
+                  </div>
+                </label>
+              ) : (
+                <CampoSelect label="Cobertura *" value={poliza.cobertura} onChange={(v) => setP("cobertura", v)} options={coberturas.map((c) => c.nombre)} />
+              ))}
               {faltan.marca && <Campo label="Marca *" value={poliza.marca} onChange={(v) => setP("marca", v)} placeholder="Ej: Toyota" />}
               {faltan.modelo && <Campo label="Modelo *" value={poliza.modelo} onChange={(v) => setP("modelo", v)} placeholder="Ej: Hilux" />}
               {faltan.anio && <Campo label="Año *" value={poliza.anio} onChange={(v) => setP("anio", v)} type="number" placeholder="Ej: 2020" />}

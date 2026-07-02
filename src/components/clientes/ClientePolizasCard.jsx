@@ -1,15 +1,17 @@
 // src/components/clientes/ClientePolizasCard.jsx
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { 
-  HiCollection, 
-  HiPlus, 
-  HiArrowRight, 
+import { Link, useNavigate } from "react-router-dom";
+import {
+  HiCollection,
+  HiPlus,
+  HiArrowRight,
   HiShieldCheck,
   HiOutlineDocumentSearch
 } from "react-icons/hi";
 
 const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
+  const navigate = useNavigate();
+
   // 🚀 Ordenamos: la póliza MÁS NUEVA primero. Criterio: fecha de emisión más reciente;
   // si dos comparten fecha, gana la de mayor ID (la que se creó después).
   const polizas = [...(cliente?.polizas || [])].sort((a, b) => {
@@ -19,13 +21,15 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
     return (Number(b?.id) || 0) - (Number(a?.id) || 0);
   });
 
-  const handleCrear = () => onCrearPoliza?.();
+  // 🆕 Las pólizas se cargan SOLO desde Solicitudes: ahí el sistema ya detecta si
+  //    el cliente existe y ofrece agregarle una nueva póliza. Este botón lleva ahí.
+  const handleCrear = () => navigate("/solicitudes");
 
   const fmt = (v) => (v === 0 || v ? String(v) : "—");
   const upper = (v) => (v ? String(v).toUpperCase() : "—");
 
   return (
-    <motion.section 
+    <motion.section
       className="rounded-3xl bg-[#0b0f1e] border border-white/10 shadow-2xl overflow-hidden mt-2"
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -54,7 +58,7 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
               </div>
             </div>
           </div>
-          
+
           <button
             type="button"
             onClick={handleCrear}
@@ -139,7 +143,7 @@ const ClientePolizasCard = ({ cliente, onCrearPoliza }) => {
                         <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Patente</span>
                         <span className="font-mono font-bold text-sky-400">{upper(p.patente)}</span>
                       </div>
-                      
+
                       <div className="flex flex-col gap-1 col-span-2 sm:col-span-4 pt-1">
                         <span className="text-[9px] uppercase font-black tracking-widest text-white/30">Cobertura</span>
                         <span className="font-medium text-white/70 truncate">{fmt(p.cobertura)}</span>

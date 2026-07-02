@@ -205,6 +205,34 @@ export default function CreateSolicitudModal({
       localidad: c.localidad || "",
     };
   });
+  // 🆕 Cliente EXISTENTE (viene del perfil): traemos sus datos reales (teléfono, etc.)
+  //    y esperamos a tenerlos antes de mostrar la revisión, para no volver a pedirlos.
+  const [cargandoCliente, setCargandoCliente] = useState(!!initialClienteId);
+  useEffect(() => {
+    if (!initialClienteId) { setCargandoCliente(false); return; }
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await api.get(`clientes/${initialClienteId}/`);
+        const c = res?.data || {};
+        if (!vivo) return;
+        setCliente((prev) => ({
+          ...prev,
+          nombre: prev.nombre || c.nombre || "",
+          apellido: prev.apellido || c.apellido || "",
+          telefono: c.telefono || prev.telefono || "",
+          dni_cuit_cuil: prev.dni_cuit_cuil || c.dni_cuit_cuil || c.dni || "",
+          direccion: prev.direccion || c.direccion || "",
+          localidad: prev.localidad || c.localidad || "",
+        }));
+      } catch (e) {
+        /* si falla, seguimos con lo que haya */
+      } finally {
+        if (vivo) setCargandoCliente(false);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [initialClienteId]);
   const [dniSlots, setDniSlots] = useState({ DNI_FRENTE: null, DNI_DORSO: null });
 
   const [polizaModo, setPolizaModo] = useState("nueva");
@@ -217,7 +245,7 @@ export default function CreateSolicitudModal({
     return {
       compania: pol.compania || initialCompania || "",
       numero_poliza: pol.numero || "",
-      cobertura: coberturaPorDefecto(pol.compania, coberturas), // 🆕 NRE → "A" automático; resto vacío (a mano)
+      cobertura: pol.cobertura || coberturaPorDefecto(pol.compania, coberturas), // 🆕 usa la del PDF si vino; si no, default (NRE → "A")
       oficina: "",
       patente: v.patente || initialPatente || "",
       marca: partes[0] || "",
@@ -240,7 +268,7 @@ export default function CreateSolicitudModal({
   const [tocoCantidadCuotas, setTocoCantidadCuotas] = useState(false);
   // 🎟️ Cupones leídos de la cuponera del PDF (AMCA, La Equidad…). Se mandan al
   //    crear para que las cuotas tomen las fechas EXACTAS (no 6 mensuales).
-  const [cuponesPdf, setCuponesPdf] = useState([]);
+  const [cuponesPdf, setCuponesPdf] = useState(() => initialDatosPdf?.cupones || []);
 
   useEffect(() => {
     // 🆕 Auto-asignar la oficina del usuario SIEMPRE (admin o no). Lo único manual es el responsable.
@@ -298,7 +326,11 @@ export default function CreateSolicitudModal({
 
   useEffect(() => {
     if (tocoCantidadCuotas) return;
-    if (coberturaObj && coberturaObj.cuotas_a_generar) {
+    // 🆕 Si el PDF trajo cuponera, MANDA la cuponera (su cantidad de cupones).
+    const cuponesPdfDetectados = initialDatosPdf?.cupones || [];
+    if (cuponesPdfDetectados.length) {
+      setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(cuponesPdfDetectados.length) }));
+    } else if (coberturaObj && coberturaObj.cuotas_a_generar) {
       setPoliza((s) => ({ ...s, cantidad_cuotas_override: String(coberturaObj.cuotas_a_generar) }));
     } else {
       setPoliza((s) => ({ ...s, cantidad_cuotas_override: "6" }));
@@ -490,7 +522,7 @@ export default function CreateSolicitudModal({
     const v = datos?.vehiculo || {};
     const pol = datos?.poliza || {};
     const cupones = datos?.cupones || [];
-    setCuponesPdf([]);
+    setCuponesPdf(cupones);
 
     setCliente((prev) => ({
       ...prev,
@@ -873,9 +905,16 @@ export default function CreateSolicitudModal({
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-hide">
           <AnimatePresence mode="wait">
-            {step === 0 && (
+            {step === 0 && cargandoCliente && (
+              <div className="flex flex-col items-center justify-center py-16 text-white/60 text-sm">
+                <div className="h-8 w-8 rounded-full border-2 border-white/20 border-t-sky-400 animate-spin mb-3" />
+                Cargando datos del cliente…
+              </div>
+            )}
+            {step === 0 && !cargandoCliente && (
               <motion.div key="rev" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
                 <RevisionRapidaStep
+                  clienteModo={clienteModo}
                   cliente={cliente}
                   setCliente={setCliente}
                   poliza={poliza}

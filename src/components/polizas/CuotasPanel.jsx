@@ -10,32 +10,39 @@ import { pagarCuota } from "../../store/slices/polizasSlice";
 const CARD = "rounded-2xl border border-white/[0.06] bg-[#121829]";
 
 /* ═══════════════════════════════════════════════════════════════════
-   ESTADO REAL DE UNA CUOTA (según la FECHA DE PAGO, no el vto propio)
+   ¿La póliza usa CUPONERA? (AMCA / Antártida / La Equidad)
    ───────────────────────────────────────────────────────────────────
-   Las cuotas se pagan POR ADELANTADO: cada cuota cubre desde el vto de la
-   cuota ANTERIOR hasta su propio vto. Por eso el cliente tiene que PAGAR una
-   cuota el día en que se le termina la cobertura de la anterior.
-
-     fechaPagoObjetivo(cuota) = vto de la cuota anterior
-     Cuota #1 (no hay anterior) = su propio vto
-
-   NOTA: es la misma regla que _fecha_pago_objetivo del backend. Está replicada
-   acá solo para este panel; lo ideal es centralizarla en src/utils/cuotas.js
-   (getEstadoCuota / resumenCuotas) para que aplique en TODA la app.
+   En esas compañías, cada cupón trae IMPRESA su propia fecha de pago
+   (la de Rapipago / Pago Fácil). Por eso la cuota se muestra y se evalúa
+   por su PROPIO fecha_vencimiento, no por el de la cuota anterior.
    ═══════════════════════════════════════════════════════════════════ */
-function fechaPagoObjetivo(idx, lista) {
+function esCuponera(poliza) {
+  const c = `${poliza?.compania || ""} ${poliza?.compania_nombre || ""}`.toLowerCase();
+  return /amca|antartida|antártida|equidad|mutual/.test(c);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FECHA OBJETIVO DE UNA CUOTA
+   ───────────────────────────────────────────────────────────────────
+   - Cuponera (usarPropio = true) → su PROPIO vto (fecha del cupón).
+   - Resto (NRE, etc.)            → vto de la cuota ANTERIOR (pago por
+     adelantado). Cuota #1 (no hay anterior) = su propio vto.
+   ═══════════════════════════════════════════════════════════════════ */
+function fechaObjetivo(idx, lista, usarPropio) {
   const actual = lista[idx];
+  const propio = actual?.fecha_vencimiento ? dayjs(actual.fecha_vencimiento).startOf("day") : null;
+  if (usarPropio) return propio;
   if (idx > 0) {
     const anterior = lista[idx - 1];
     if (anterior?.fecha_vencimiento) return dayjs(anterior.fecha_vencimiento).startOf("day");
   }
-  return actual?.fecha_vencimiento ? dayjs(actual.fecha_vencimiento).startOf("day") : null;
+  return propio;
 }
 
-function estadoReal(idx, lista) {
+function estadoReal(idx, lista, usarPropio) {
   const c = lista[idx];
   if (c?.pagado) return "pagada";
-  const payby = fechaPagoObjetivo(idx, lista);
+  const payby = fechaObjetivo(idx, lista, usarPropio);
   if (!payby || !payby.isValid()) return "pendiente";
   const diff = payby.diff(dayjs().startOf("day"), "day");
   if (diff < 0) return "vencida";
@@ -60,23 +67,29 @@ export default function CuotasPanel({ poliza }) {
 
   const [busyIds, setBusyIds] = useState({});
 
+  // ¿Esta póliza usa cuponera? (AMCA/Antártida/La Equidad → fecha propia)
+  const usarPropio = useMemo(
+    () => esCuponera(poliza),
+    [poliza?.compania, poliza?.compania_nombre]
+  );
+
   // Ordenamos por número de cuota para poder mirar la cuota anterior.
   const cuotasOrdenadas = useMemo(
     () => [...rows].sort((a, b) => Number(a?.cuota_nro || 0) - Number(b?.cuota_nro || 0)),
     [rows]
   );
 
-  // Resumen calculado con la FECHA DE PAGO real (no el vto propio de la cuota).
+  // Resumen calculado con la fecha objetivo correcta según el tipo de póliza.
   const resumen = useMemo(() => {
     let pagadas = 0, pendientes = 0, vencidas = 0;
     cuotasOrdenadas.forEach((_c, i) => {
-      const st = estadoReal(i, cuotasOrdenadas);
+      const st = estadoReal(i, cuotasOrdenadas, usarPropio);
       if (st === "pagada") pagadas += 1;
       else if (st === "vencida") vencidas += 1;
       else pendientes += 1; // pendiente + vence_hoy
     });
     return { total: cuotasOrdenadas.length, pagadas, pendientes, vencidas };
-  }, [cuotasOrdenadas]);
+  }, [cuotasOrdenadas, usarPropio]);
 
   const progreso = resumen.total ? Math.round((resumen.pagadas / resumen.total) * 100) : 0;
 
@@ -150,8 +163,8 @@ export default function CuotasPanel({ poliza }) {
         ) : (
           cuotasOrdenadas.map((c, i) => {
             const monto = fmtMonto(c.monto);
-            const st = estadoReal(i, cuotasOrdenadas);
-            const payby = fechaPagoObjetivo(i, cuotasOrdenadas);
+            const st = estadoReal(i, cuotasOrdenadas, usarPropio);
+            const payby = fechaObjetivo(i, cuotasOrdenadas, usarPropio);
             const cfg = ROW[st] || ROW.pendiente;
             const Icon = cfg.icon;
 
