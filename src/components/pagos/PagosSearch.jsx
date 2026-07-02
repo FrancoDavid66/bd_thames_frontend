@@ -251,7 +251,21 @@ export default function PagosSearch({ onBuscar }) {
   }, []);
 
   const recientes = useMemo(() => (Array.isArray(recientesDni) ? recientesDni : []).slice(0, 6), [recientesDni]);
-  const polizas   = useMemo(() => Array.isArray(buscarClienteData?.polizas) ? buscarClienteData.polizas : [], [buscarClienteData]);
+  // 🆕 Buscador de Pagos: mostramos solo lo accionable → activas, vencidas y
+  //    finalizadas RENOVABLES (finalizaron hace ≤3 días y sin renovar).
+  //    Escondemos el historial viejo (finalizadas antiguas) y las canceladas.
+  const polizas   = useMemo(() => {
+    const arr = Array.isArray(buscarClienteData?.polizas) ? buscarClienteData.polizas : [];
+    return arr.filter((p) => {
+      const e = String(p?.estado || "").toLowerCase();
+      if (e === "activa" || e === "vencida") return true;
+      if (e === "finalizada") {
+        const diasDesdeFin = p?.fecha_fin ? dayjs().diff(dayjs(p.fecha_fin), "day") : null;
+        return diasDesdeFin !== null && diasDesdeFin >= 0 && diasDesdeFin <= 3 && !p?.tiene_renovacion;
+      }
+      return false; // canceladas y finalizadas viejas → fuera
+    });
+  }, [buscarClienteData]);
   const cliente   = buscarClienteData?.cliente || null;
 
   const limpiar = useCallback(() => {

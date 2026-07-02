@@ -133,8 +133,7 @@ export default function ModalFormaPago({
     if (step === 2) return (destinoId && !destinoEsOtra) || (destinoEsOtra && destinoOtra.trim() !== "");
     if (step === 3) return (
       enviadoPor.trim() !== "" &&
-      cuitRemitente.trim() !== "" &&
-      nroOperacion.trim() !== ""
+      cuitRemitente.trim() !== ""
     );
     if (step === 4) return Number.isFinite(montoNum) && isValidISODate(fechaPago);
     return false;
@@ -461,23 +460,10 @@ export default function ModalFormaPago({
                               className="w-full px-3 py-2.5 rounded-xl bg-slate-900/80 border border-amber-700/40 focus:border-amber-500 text-sm text-amber-100 placeholder:text-slate-600 outline-none transition-colors font-mono" />
                           </div>
 
-                          {/* N° Operación */}
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs text-amber-500 font-bold uppercase tracking-wider mb-1.5">
-                              🔢 N° de operación <span className="text-rose-400">*</span>
-                            </label>
-                            <input type="text" inputMode="numeric" value={nroOperacion}
-                              onChange={e => setNroOperacion(e.target.value)}
-                              placeholder="Ej: 158049917305"
-                              className="w-full px-3 py-2.5 rounded-xl bg-slate-900/80 border border-amber-700/40 focus:border-amber-500 text-sm text-amber-100 placeholder:text-slate-600 outline-none transition-colors font-mono" />
-                            <p className="text-[10px] text-amber-800/70 mt-1">
-                              Número del comprobante de Mercado Pago / banco
-                            </p>
-                          </div>
                         </div>
 
                         {/* Indicador de campos faltantes */}
-                        {(!enviadoPor.trim() || !cuitRemitente.trim() || !nroOperacion.trim()) && (
+                        {(!enviadoPor.trim() || !cuitRemitente.trim()) && (
                           <p className="text-[11px] text-slate-500 text-center">
                             Todos los campos son obligatorios para transferencias
                           </p>
