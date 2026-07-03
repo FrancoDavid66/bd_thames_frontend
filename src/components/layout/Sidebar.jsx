@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.jsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -46,6 +46,9 @@ export default function Sidebar({
   bajasPendientes = 0,
   // 🚀 NUEVO: Badge de servicios fijos (vencidos + por vencer ≤3d)
   serviciosAlertas = 0,
+  // 🆕 Verificación y Siniestros: el dato ya se pedía en App.jsx, faltaba pasarlo
+  verificacionCount = 0,
+  siniestrosAbiertos = 0,
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -107,8 +110,8 @@ export default function Sidebar({
           { to: "/polizas/renovaciones", label: "Renovaciones",  icon: "refresh", badge: renovacionesPendientes, tone: "amber" },
           { to: "/cuponeras",            label: "Cuponeras",     icon: "receipt", badge: cuponVencidas },
           { to: "/polizas/bajas",        label: "Bajas",         icon: "ban",     badge: bajasPendientes, tone: "red" },
-          { to: "/polizas/verificacion", label: "Verificación",  icon: "shield" },
-          { to: "/siniestros",           label: "Siniestros",    icon: "doc" },
+          { to: "/polizas/verificacion", label: "Verificación",  icon: "shield", badge: verificacionCount, tone: "amber" },
+          { to: "/siniestros",           label: "Siniestros",    icon: "doc",    badge: siniestrosAbiertos, tone: "red" },
         ]
       },
       // 💰 Finanzas: todo lo que es plata en un solo lugar
@@ -130,7 +133,7 @@ export default function Sidebar({
         ]
       }] : [])
     ];
-  }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas]);
+  }, [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, verificacionCount, siniestrosAbiertos]);
 
   const [open, setOpen] = useState({
     cartera:  true, // 📋 el libro de negocio abierto por defecto
@@ -138,11 +141,10 @@ export default function Sidebar({
     admin:    ["/gruas", "/cotizaciones", "/marketing", "/estadisticas", "/competencia", "/geo", "/admin"].some(p => location.pathname.startsWith(p)),
   });
 
-  // Cerrar sidebar automáticamente al cambiar de ruta
-  useEffect(() => {
-    if (isOpen) onClose();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  // 🆕 El cierre automático al cambiar de ruta ya lo maneja App.jsx
+  //    (ahí SÍ se chequea si es mobile antes de cerrar). Este efecto
+  //    duplicaba esa lógica pero sin el chequeo, y cerraba el sidebar
+  //    en escritorio también — por eso "se borraba" en cada click.
 
   const toggle = (id) => setOpen(prev => ({ ...prev, [id]: !prev[id] }));
 

@@ -463,6 +463,7 @@ function App() {
           renovacionesPendientes={renovacionesPendientes}
           bajasPendientes={bajasPendientes}
           siniestrosAbiertos={siniestrosAbiertos}
+          verificacionCount={verificacionCount}
           serviciosAlertas={serviciosAlertas}
           user={user} 
         />

@@ -464,8 +464,12 @@ export default function CreateSolicitudModal({
   const autoOk = Object.keys(autoErrors).length === 0;           // paso 5
   const fechasOk = Object.keys(fechasErrors).length === 0;       // paso 6
   const polizaOk = companiaOk && autoOk && fechasOk;
+  // 🆕 En carga rápida (PDF) también exigimos el DNI: es lo único que permite
+  //    reconocer si el cliente YA está en el sistema (por otro auto, por ejemplo).
+  //    Sin esto, un cliente existente se podía duplicar si el PDF no traía DNI.
+  const dniOk = clienteModo === "existente" || !paso1Errors.dni_cuit_cuil;
   const canSubmit = modoRapido
-    ? (responsableOk && oficinaOk && !saving)
+    ? (responsableOk && oficinaOk && dniOk && !saving)
     : (responsableOk && oficinaOk && datosClienteOk && polizaOk && !saving);
 
   // Responsables visibles: admin → TODOS (sin importar la oficina); empleado → los suyos
@@ -600,8 +604,16 @@ export default function CreateSolicitudModal({
       telefono: cliente.telefono,
     });
     if (!canSubmit) {
-      console.warn("[ALTA] ⛔ canSubmit=false → no se crea. Falta responsable u oficina (admin).");
-      toast.error("Faltan datos: revisá responsable" + (isWebAdmin ? " y sucursal." : "."));
+      console.warn("[ALTA] ⛔ canSubmit=false → no se crea.");
+      // 🆕 Mensaje dinámico: antes siempre decía "revisá responsable", aunque
+      //    el problema fuera otro (ej: DNI faltante en carga rápida) y confundía.
+      const faltan = {};
+      if (!responsableOk) faltan.responsable = "Responsable";
+      if (!oficinaOk) faltan.oficina = "Sucursal";
+      if (modoRapido && !dniOk) faltan.dni = "DNI del cliente";
+      if (!modoRapido && !datosClienteOk) faltan.datos = "datos del cliente";
+      if (!modoRapido && !polizaOk) faltan.poliza = "datos de la póliza";
+      toast.error(listaFaltantes(faltan) || "Faltan datos para crear la solicitud.");
       return;
     }
     setSaving(true);
@@ -757,8 +769,10 @@ export default function CreateSolicitudModal({
 
       // 🆕 En vez de cerrar, ofrecemos cobrar la 1ª cuota.
       //    onCreated + onClose se ejecutan al terminar ese flujo (o si no hay póliza).
+      //    AMCA cobra por Rapipago/Pago Fácil (fuera de Thames): no se ofrece "cobrar ahora".
       const nuevaPolizaId = raw?.poliza_id;
-      if (nuevaPolizaId) {
+      const esAmca = String(finalCompania || "").trim().toUpperCase() === "AMCA";
+      if (nuevaPolizaId && !esAmca) {
         setCreatedRaw(raw);
         setCobroPolizaId(nuevaPolizaId);
       } else {

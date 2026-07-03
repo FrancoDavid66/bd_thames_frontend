@@ -139,7 +139,9 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel, i
 
   /* ===== El usuario decide continuar al alta ===== */
   const handleContinuar = (clienteIdParaVincular = null) => {
-    onConfirmNuevo?.({ cliente_id: clienteIdParaVincular });
+    // 🆕 Mandamos también el DNI ya escrito/confirmado acá, así
+    //    CreateSolicitudModal no lo vuelve a pedir en el paso siguiente.
+    onConfirmNuevo?.({ cliente_id: clienteIdParaVincular, dni: onlyDigits(dni) });
   };
 
   /* ===== Reiniciar búsqueda ===== */
