@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
-import { HiCheckCircle, HiClock, HiExclamationCircle } from "react-icons/hi";
+import { HiCheckCircle, HiClock, HiExclamationCircle, HiShieldCheck, HiShieldExclamation } from "react-icons/hi";
 
 import { pagarCuota } from "../../store/slices/polizasSlice";
 
@@ -91,6 +91,21 @@ export default function CuotasPanel({ poliza }) {
     return { total: cuotasOrdenadas.length, pagadas, pendientes, vencidas };
   }, [cuotasOrdenadas, usarPropio]);
 
+
+  // Cobertura real: hasta cuándo quedó cubierto el cliente según la última cuota PAGADA.
+  const coberturaResumen = useMemo(() => {
+    const pagadas = cuotasOrdenadas.filter((c) => c.pagado);
+    if (!pagadas.length) return null;
+    const ultima = pagadas.reduce(
+      (max, c) => (Number(c.cuota_nro) > Number(max.cuota_nro) ? c : max),
+      pagadas[0]
+    );
+    const hasta = ultima?.fecha_vencimiento ? dayjs(ultima.fecha_vencimiento).startOf("day") : null;
+    if (!hasta || !hasta.isValid()) return null;
+    const vigente = hasta.diff(dayjs().startOf("day"), "day") >= 0;
+    return { hasta, vigente };
+  }, [cuotasOrdenadas]);
+
   const progreso = resumen.total ? Math.round((resumen.pagadas / resumen.total) * 100) : 0;
 
   const handleMarcarPagada = async (cuota) => {
@@ -127,6 +142,43 @@ export default function CuotasPanel({ poliza }) {
 
   return (
     <div className="space-y-4">
+      {/* Cobertura real (hasta cuándo está cubierto) */}
+      {coberturaResumen ? (
+        <div
+          className={`flex items-center gap-3 rounded-2xl border p-4 ${
+            coberturaResumen.vigente
+              ? "border-emerald-500/30 bg-emerald-500/10"
+              : "border-rose-500/30 bg-rose-500/10"
+          }`}
+        >
+          {coberturaResumen.vigente ? (
+            <HiShieldCheck className="h-6 w-6 shrink-0 text-emerald-400" />
+          ) : (
+            <HiShieldExclamation className="h-6 w-6 shrink-0 text-rose-400" />
+          )}
+          <div>
+            <div
+              className={`text-[10px] uppercase tracking-wide font-bold ${
+                coberturaResumen.vigente ? "text-emerald-300/70" : "text-rose-300/70"
+              }`}
+            >
+              {coberturaResumen.vigente ? "Cobertura vigente hasta" : "Cobertura vencida desde"}
+            </div>
+            <div
+              className={`text-lg font-bold ${
+                coberturaResumen.vigente ? "text-emerald-200" : "text-rose-200"
+              }`}
+            >
+              {fmtFecha(coberturaResumen.hasta)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#121829] p-4 text-sm text-slate-400">
+          Sin pagos registrados todavía · no hay cobertura activa.
+        </div>
+      )}
+
       {/* Progreso */}
       <div>
         <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
