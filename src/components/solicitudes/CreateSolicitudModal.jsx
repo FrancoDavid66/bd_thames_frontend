@@ -555,7 +555,7 @@ export default function CreateSolicitudModal({
     }));
   };
 
-  const handleVerifyConfirmedNuevo = ({ cliente_id } = {}) => {
+  const handleVerifyConfirmedNuevo = ({ cliente_id, dni, patente } = {}) => {
     setVerifyOpen(false);
     // Si nos pasaron un cliente_id (CLIENTE_OTRO_AUTO o PATENTE_BAJA),
     // autocompletamos el step 1 en modo "existente" para no duplicar el cliente.
@@ -563,6 +563,16 @@ export default function CreateSolicitudModal({
       setClienteModo("existente");
       setClienteId(String(cliente_id));
       toast.success("Cliente vinculado. Solo falta cargar los datos del auto.");
+      return;
+    }
+    // 🆕 Cliente NUEVO: el DNI (y patente) que se tipeó/verificó en el gate
+    // pasa al formulario. Antes se perdía acá y lo volvía a pedir 2 pantallas
+    // después. No pisa nada que ya estuviera cargado (ej: por el PDF).
+    if (dni) {
+      setCliente((prev) => ({ ...prev, dni_cuit_cuil: prev.dni_cuit_cuil || dni }));
+    }
+    if (patente) {
+      setPoliza((prev) => ({ ...prev, patente: prev.patente || patente }));
     }
   };
 

@@ -38,6 +38,11 @@ export default function RenovacionModal({
   const [nuevoNumero, setNuevoNumero] = useState("");
   const [nuevaCompania, setNuevaCompania] = useState("");
   const [nuevaFecha, setNuevaFecha] = useState("");
+  // 🆕 Tipo y precio: se confirman/corrigen a mano en cada renovación.
+  const [tipo, setTipo] = useState("");
+  const [precioCuota, setPrecioCuota] = useState("");
+
+  const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
 
   // 🆕 Input que aparece SOLO cuando el backend dijo "COBERTURA_NO_CONFIGURADA"
   const [cantidadCuotasOverride, setCantidadCuotasOverride] = useState("");
@@ -49,6 +54,8 @@ export default function RenovacionModal({
 
     setNuevoNumero(item?.numero_poliza || "");
     setNuevaCompania(item?.compania || "");
+    setTipo(item?.tipo || "");
+    setPrecioCuota("");
 
     // Default sugerido para override = cantidad de cuotas de la póliza original
     setCantidadCuotasOverride(
@@ -84,6 +91,8 @@ export default function RenovacionModal({
       nuevoNumero: (nuevoNumero || "").trim() || undefined,
       nuevaCompania: (nuevaCompania || "").trim() || undefined,
       nuevaFecha: nuevaFecha || undefined,
+      tipo: tipo || undefined,
+      precio_cuota: precioCuota !== "" ? precioCuota : undefined,
     };
 
     // Si el banner muestra el input de cuotas y el usuario lo completó, lo enviamos
@@ -99,10 +108,12 @@ export default function RenovacionModal({
     onSubmit(payload);
   };
 
-  const canSubmit = necesitaOverride
-    ? Number.isFinite(parseInt(cantidadCuotasOverride, 10)) &&
-      parseInt(cantidadCuotasOverride, 10) > 0
-    : true;
+  const canSubmit =
+    !!tipo &&
+    (necesitaOverride
+      ? Number.isFinite(parseInt(cantidadCuotasOverride, 10)) &&
+        parseInt(cantidadCuotasOverride, 10) > 0
+      : true);
 
   return (
     <AnimatePresence>
@@ -191,6 +202,39 @@ export default function RenovacionModal({
               />
               <div className="text-xs text-white/60">
                 Si existe, el backend lo hace único (agrega sufijo -R1, -R2…).
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-xs font-semibold text-white/90">Tipo de vehículo *</label>
+              <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
+              >
+                <option value="" className="bg-slate-900">— Elegir —</option>
+                {TIPOS_VEHICULO.map((t) => (
+                  <option key={t} value={t} className="bg-slate-900">{t}</option>
+                ))}
+              </select>
+              <div className="text-xs text-white/60">
+                Confirmá o corregí el tipo (define el precio). Si nació mal cargado, corregilo acá.
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-xs font-semibold text-white/90">Precio de cuota (opcional)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={precioCuota}
+                onChange={(e) => setPrecioCuota(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
+                placeholder="Ej: 35000"
+              />
+              <div className="text-xs text-white/60">
+                Si lo dejás vacío, las cuotas quedan en $0 y se cargan después desde Pagos.
               </div>
             </div>
 

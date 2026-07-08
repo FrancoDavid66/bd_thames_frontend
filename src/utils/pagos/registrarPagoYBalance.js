@@ -18,6 +18,7 @@ import { toast } from "react-hot-toast";
  * @param {Object} options.poliza     - póliza asociada (obligatorio)
  * @param {string} options.formaPago  - "efectivo" | "transferencia" (obligatorio)
  * @param {number|string} options.monto - monto pagado (obligatorio > 0)
+ * @param {number|string} [options.responsableEmpleadoId] - quién cobró (opcional)
  * @param {boolean} [options.registrarEnBalance=true] - si además crea Ingreso
  * @param {Function} [options.onSuccess] - callback opcional al finalizar (si todo ok)
  */
@@ -27,6 +28,7 @@ export const registrarPagoYBalance = async ({
   poliza,
   formaPago,
   monto,
+  responsableEmpleadoId,
   registrarEnBalance = true,
   extraData = {},       // 🔑 datos extra del wizard (cuit, nro_op, billetera, etc.)
   onSuccess,
@@ -51,6 +53,7 @@ export const registrarPagoYBalance = async ({
       throw new Error("Forma de pago inválida");
     const montoFinal = toAmount(monto);
     if (!montoFinal || montoFinal <= 0) throw new Error("Monto inválido");
+    if (!responsableEmpleadoId) throw new Error("Falta elegir quién cobra");
 
     const fechaPago = todayISO();
 
@@ -61,6 +64,8 @@ export const registrarPagoYBalance = async ({
         forma_pago: formaPago,
         monto: montoFinal,
         fecha_pago: fechaPago,
+        // 🆕 Quién cobró
+        responsable_empleado: responsableEmpleadoId,
         // 🔑 Datos de transferencia del wizard
         destino_cuenta:  extraData?.destino_cuenta  || "",
         enviado_por:     extraData?.enviado_por      || "",

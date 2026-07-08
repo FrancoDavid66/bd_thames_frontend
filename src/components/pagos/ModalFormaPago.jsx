@@ -14,6 +14,7 @@ import {
   HiChevronLeft, HiCheck, HiUser, HiArrowRight,
 } from "react-icons/hi";
 import { sendAdminPagoRegistrado } from "../../services/notifications/pagos";
+import { solicitudesApi } from "../../services/solicitudes.js";
 
 const LS_LAST_METODO  = "pagos:lastMetodo";
 const LS_LAST_DESTINO = "pagos:lastDestinoCuenta";
@@ -61,14 +62,15 @@ export default function ModalFormaPago({
   const [fechaPago,    setFechaPago]    = useState(getLocalISODate());
   const [observaciones,setObservaciones]= useState("");
   const [submitting,   setSubmitting]   = useState(false);
+  // 🆕 Quién cobra
+  const [responsableId, setResponsableId] = useState("");
+  const [empleados, setEmpleados] = useState([]);
+  const [empleadosLoading, setEmpleadosLoading] = useState(false);
 
   const inputMontoRef = useRef(null);
 
-  // 🔒 Precio fijo NRE: si la póliza es de NRE y la cuota ya tiene precio (>0),
-  // el monto se muestra fijo (el de la cuota) y NO se puede editar. El admin lo
-  // corrige por otra vía. Para otras compañías o cuotas en $0, sigue editable.
-  const esNRE = /nre/i.test(String(polizaCompania || ""));
-  const montoFijo = esNRE && defaultMonto != null && Number(defaultMonto) > 0;
+  // 🆕 El monto SIEMPRE es editable, cualquier compañía (incluida NRE).
+  // El valor de `defaultMonto` es solo un precargado, no un precio fijo.
 
   /* ── Bloquear scroll ── */
   useEffect(() => {
@@ -94,7 +96,27 @@ export default function ModalFormaPago({
     setFechaPago(getLocalISODate());
     setObservaciones("");
     setSubmitting(false);
-  }, [isOpen, clienteNombreApellido, montoFijo, defaultMonto]);
+    setResponsableId("");
+  }, [isOpen, clienteNombreApellido, defaultMonto]);
+
+  // 🆕 Traer empleados activos (mismo endpoint que usa Solicitudes)
+  useEffect(() => {
+    if (!isOpen) return;
+    let alive = true;
+    setEmpleadosLoading(true);
+    (async () => {
+      try {
+        const emps = await solicitudesApi.empleadosActivos();
+        const arr = Array.isArray(emps) ? emps : emps?.results || [];
+        if (alive) setEmpleados(arr.filter((e) => e?.activo !== false));
+      } catch {
+        if (alive) setEmpleados([]);
+      } finally {
+        if (alive) setEmpleadosLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [isOpen]);
 
   /* ── Medios normalizados ── */
   const medios = useMemo(() => {
@@ -135,9 +157,9 @@ export default function ModalFormaPago({
       enviadoPor.trim() !== "" &&
       cuitRemitente.trim() !== ""
     );
-    if (step === 4) return Number.isFinite(montoNum) && isValidISODate(fechaPago);
+    if (step === 4) return Number.isFinite(montoNum) && isValidISODate(fechaPago) && !!responsableId;
     return false;
-  }, [step, destinoId, destinoEsOtra, destinoOtra, enviadoPor, cuitRemitente, nroOperacion, montoNum, fechaPago]);
+  }, [step, destinoId, destinoEsOtra, destinoOtra, enviadoPor, cuitRemitente, nroOperacion, montoNum, fechaPago, responsableId]);
 
   /* ── Navegación ── */
   const next = () => {
@@ -184,6 +206,8 @@ export default function ModalFormaPago({
         destino_cuenta: needsDestino ? destino : undefined,
         medio_cobro_id: medioSeleccionado ? Number(medioSeleccionado.id) : undefined,
         destino_tipo: medioSeleccionado?.proveedor,
+        // 🆕 Quién cobró
+        responsable_empleado: Number(responsableId),
       };
 
       safeSetLS(LS_LAST_METODO, metodo);
@@ -512,32 +536,47 @@ export default function ModalFormaPago({
                             <span className="text-pink-400 font-bold text-lg shrink-0">AR$</span>
                             <input ref={inputMontoRef} type="text" inputMode="decimal"
                               value={monto}
-                              readOnly={montoFijo}
-                              onChange={montoFijo ? undefined : (e => {
+                              onChange={(e => {
                                 // Solo permitir números, coma y punto
                                 const raw = e.target.value.replace(/[^\d.,]/g, "");
                                 setMonto(raw);
                               })}
-                              onBlur={montoFijo ? undefined : (e => {
+                              onBlur={(e => {
                                 // Al salir del campo, formatear con separador de miles
                                 const n = Number.parseFloat(String(monto).replace(/\./g, "").replace(",", "."));
                                 if (Number.isFinite(n) && n > 0) {
                                   setMonto(n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
                                 }
                               })}
-                              onFocus={montoFijo ? undefined : (e => {
+                              onFocus={(e => {
                                 // Al entrar al campo, mostrar número limpio para editar
                                 const n = Number.parseFloat(String(monto).replace(/\./g, "").replace(",", "."));
                                 if (Number.isFinite(n)) setMonto(String(n));
                               })}
                               placeholder={defaultMonto ? Number(defaultMonto).toLocaleString("es-AR") : "0"}
-                              className={`flex-1 bg-transparent text-3xl font-bold text-pink-200 placeholder:text-pink-900 outline-none border-b-2 pb-1 transition-colors ${montoFijo ? "cursor-not-allowed border-pink-800/40" : "border-pink-700/50 focus:border-pink-500"}`} />
+                              className="flex-1 bg-transparent text-3xl font-bold text-pink-200 placeholder:text-pink-900 outline-none border-b-2 pb-1 transition-colors border-pink-700/50 focus:border-pink-500" />
                           </div>
-                          {montoFijo && (
-                            <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-pink-300/80">
-                              🔒 Precio fijo de la lista. No se modifica.
-                            </p>
-                          )}
+                        </div>
+
+                        {/* 🆕 Quién cobra */}
+                        <div>
+                          <label className="block text-xs text-slate-400 font-medium mb-1.5">
+                            <HiUser className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                            Responsable (quién cobra) *
+                          </label>
+                          <select
+                            value={responsableId}
+                            onChange={(e) => setResponsableId(e.target.value)}
+                            disabled={empleadosLoading}
+                            className="w-full h-10 px-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-slate-200 outline-none focus:border-pink-500 transition-colors disabled:opacity-50"
+                          >
+                            <option value="">
+                              {empleadosLoading ? "Cargando…" : "— Elegir —"}
+                            </option>
+                            {empleados.map((e) => (
+                              <option key={e.id} value={e.id}>{e.nombre}</option>
+                            ))}
+                          </select>
                         </div>
 
                         {/* Fecha y observaciones */}

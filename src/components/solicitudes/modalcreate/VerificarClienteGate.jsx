@@ -23,6 +23,10 @@ const normalizePatente = (v) =>
     .replace(/[^A-Z0-9]/g, "")
     .trim();
 
+// 🆕 Config de la auto-búsqueda por DNI (sin apretar el botón).
+const DNI_MIN_LEN = 7; // DNI argentino: mínimo 7 dígitos (CUIT/CUIL = 11)
+const AUTO_SEARCH_DEBOUNCE_MS = 600; // espera esta pausa antes de buscar sola
+
 /* ===================== Pequeño input local ===================== */
 function Field({ label, icon: Icon, value, onChange, placeholder, onEnter, disabled, autoFocus }) {
   return (
@@ -73,6 +77,10 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel, i
   const [resultado, setResultado] = useState(null); // { caso, cliente_match, patente_match }
   const [showMatchModal, setShowMatchModal] = useState(false);
 
+  // 🆕 Guarda la última combinación DNI+patente ya buscada (a mano o sola),
+  // para no repetir la misma consulta dos veces.
+  const lastAutoKeyRef = useRef("");
+
   useEffect(() => {
     if (open) {
       setDni(initialDni || "");
@@ -80,6 +88,7 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel, i
       setSearching(false);
       setResultado(null);
       setShowMatchModal(false);
+      lastAutoKeyRef.current = "";
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -133,15 +142,41 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel, i
     if (!open) { autoRanRef.current = false; return; }
     if (autoVerificar && !autoRanRef.current && (initialDni || initialPatente)) {
       autoRanRef.current = true;
+      // 🆕 marcamos esta combinación como "ya buscada" para que el efecto de
+      // auto-búsqueda por tipeo (de abajo) no la vuelva a disparar de nuevo.
+      lastAutoKeyRef.current = `${onlyDigits(initialDni)}|${normalizePatente(initialPatente)}`;
       verificar(initialDni || "", initialPatente || "");
     }
   }, [open, autoVerificar, initialDni, initialPatente, verificar]);
 
+  // 🆕 Auto-búsqueda mientras se tipea el DNI (sin apretar el botón).
+  // Espera una pausa de AUTO_SEARCH_DEBOUNCE_MS para no buscar en cada tecla,
+  // y no repite la búsqueda si la combinación DNI+patente ya se consultó.
+  useEffect(() => {
+    if (!open || searching) return;
+    const d = onlyDigits(dni);
+    if (d.length < DNI_MIN_LEN) return;
+
+    const key = `${d}|${normalizePatente(patente)}`;
+    if (key === lastAutoKeyRef.current) return;
+
+    const t = setTimeout(() => {
+      lastAutoKeyRef.current = key;
+      verificar();
+    }, AUTO_SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(t);
+  }, [dni, patente, open, searching, verificar]);
+
   /* ===== El usuario decide continuar al alta ===== */
   const handleContinuar = (clienteIdParaVincular = null) => {
-    // 🆕 Mandamos también el DNI ya escrito/confirmado acá, así
-    //    CreateSolicitudModal no lo vuelve a pedir en el paso siguiente.
-    onConfirmNuevo?.({ cliente_id: clienteIdParaVincular, dni: onlyDigits(dni) });
+    // 🆕 Mandamos también el DNI y la patente que se tipearon/verificaron acá,
+    // para que el formulario de alta no los pida de nuevo.
+    onConfirmNuevo?.({
+      cliente_id: clienteIdParaVincular,
+      dni: onlyDigits(dni),
+      patente: normalizePatente(patente),
+    });
   };
 
   /* ===== Reiniciar búsqueda ===== */
@@ -150,6 +185,7 @@ export default function VerificarClienteGate({ open, onConfirmNuevo, onCancel, i
     setPatente("");
     setResultado(null);
     setShowMatchModal(false);
+    lastAutoKeyRef.current = ""; // 🆕 permite volver a auto-buscar el mismo DNI
   };
 
   if (!open) return null;

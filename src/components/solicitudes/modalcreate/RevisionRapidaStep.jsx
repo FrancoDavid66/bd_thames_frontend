@@ -147,6 +147,10 @@ export default function RevisionRapidaStep({
     }
   }, [esNRE, coberturas, poliza.tipo]); // eslint-disable-line
 
+  // 🆕 El Tipo define el precio en NRE, así que exigimos que el operador lo
+  //    elija de forma ACTIVA (no alcanza con que ya tenga un valor por default).
+  const [tipoConfirmado, setTipoConfirmado] = useState(false);
+
   const [idx, setIdx] = useState(0);
   const actual = pantallas[idx];
   const esUltima = idx === pantallas.length - 1;
@@ -165,6 +169,7 @@ export default function RevisionRapidaStep({
     : actual === "compania" ? !!poliza.compania
     : actual === "asegurado" ? !!cliente.telefono
     : actual === "vehiculo" ? (
+        (!esNRE || tipoConfirmado) &&
         !!poliza.cobertura &&
         (!faltan.marca  || !!poliza.marca) &&
         (!faltan.modelo || !!poliza.modelo) &&
@@ -263,7 +268,12 @@ export default function RevisionRapidaStep({
                     <HiExclamationCircle className="shrink-0 mt-0.5 text-base" />
                     <span>El <b>tipo</b> define el precio. Ojo: furgones y pick-ups que el Mercosur llama "Automóvil" se cobran como <b>Camioneta</b>.</span>
                   </div>
-                  <CampoSelect label="Tipo (define el precio) *" value={poliza.tipo || "Auto"} onChange={(v) => setP("tipo", v)} options={TIPOS_VEHICULO} />
+                  <CampoSelect
+                    label="Tipo (define el precio) *"
+                    value={tipoConfirmado ? poliza.tipo : ""}
+                    onChange={(v) => { setP("tipo", v); setTipoConfirmado(true); }}
+                    options={TIPOS_VEHICULO}
+                  />
                 </>
               )}
               {faltan.cobertura && (esNRE ? (
