@@ -28,6 +28,7 @@ import {
   HiRefresh,
   HiArrowCircleDown,
   HiArrowCircleUp,
+  HiDownload,
 } from "react-icons/hi";
 
 import { fetchIngresos } from "../store/slices/ingresosSlice";
@@ -172,6 +173,41 @@ const HomePage = () => {
       setTotalesMes({ ingresos: ti, egresos: te, cargando: false });
     } catch {
       setTotalesMes((p) => ({ ...p, cargando: false }));
+    }
+  }, []);
+
+  // 🆕 TEMPORAL - Reporte AMCA (Excel). Sacar este bloque + el boton de abajo
+  // + polizas/urls.py + polizas/views/reporte_amca.py cuando ya no haga falta.
+  const [descargandoAmca, setDescargandoAmca] = useState(false);
+
+  const handleDescargarReporteAmca = useCallback(async () => {
+    setDescargandoAmca(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(`${API_BASE}polizas/amca/reporte-excel/`, { headers });
+      if (!response.ok) throw new Error("Error al descargar el reporte");
+
+      const blob = await response.blob();
+      let filename = `reporte_amca_${dayjs().format("YYYY-MM-DD")}.xlsx`;
+      const disposition = response.headers.get("Content-Disposition");
+      if (disposition && disposition.includes("filename=")) {
+        filename = disposition.split("filename=")[1].replace(/"/g, "");
+      }
+
+      const objectUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error(error);
+      alert("Hubo un error al generar el reporte de AMCA.");
+    } finally {
+      setDescargandoAmca(false);
     }
   }, []);
 
@@ -666,6 +702,21 @@ const HomePage = () => {
                   >
                     <HiShieldCheck className="h-5 w-5 opacity-70" />
                     <span className="text-xs font-semibold">Ver Pólizas</span>
+                  </motion.button>
+
+                  {/* 🆕 TEMPORAL - Reporte AMCA (Excel). Sacar cuando ya no haga falta. */}
+                  <motion.button
+                    type="button"
+                    onClick={handleDescargarReporteAmca}
+                    disabled={descargandoAmca}
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-amber-500 dark:bg-amber-500/90 p-3 text-white shadow-md shadow-amber-500/20 transition hover:bg-amber-400 disabled:opacity-60"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <HiDownload className={`h-5 w-5 opacity-80 ${descargandoAmca ? "animate-pulse" : ""}`} />
+                    <span className="text-xs font-semibold">
+                      {descargandoAmca ? "Generando..." : "Reporte AMCA"}
+                    </span>
                   </motion.button>
                 </div>
               </Card>
