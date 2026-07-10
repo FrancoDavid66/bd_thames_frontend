@@ -41,6 +41,7 @@ import RecordatoriosCuotasModal from "../components/pagos/RecordatoriosCuotasMod
 import HistorialRecordatorios from "../components/pagos/HistorialRecordatorios";
 import ReporteEfectividadModal from "../components/pagos/ReporteEfectividadModal"; // 🚀 NUEVO COMPONENTE
 import ReporteContactosModal from "../components/pagos/ReporteContactosModal"; // 🆕 REPORTE PDF/EXCEL
+import ReportePagosNREModal from "../components/pagos/ReportePagosNREModal"; // 🆕 REPORTE PAGOS NRE (Excel, antes de automatizar)
 // 🚨 Sistema unificado de alertas del cliente (siniestros + póliza + cuotas + verificación)
 import AlertasClienteBadges from "../components/pagos/AlertasClienteBadges";
 import AlertasClienteModal from "../components/pagos/AlertasClienteModal";
@@ -622,6 +623,7 @@ const PagosPage = () => {
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
   const [showReporteModal, setShowReporteModal] = useState(false); // 🚀 NUEVO ESTADO
   const [showContactosModal, setShowContactosModal] = useState(false); // 🆕 REPORTE CONTACTOS
+  const [showReporteNREModal, setShowReporteNREModal] = useState(false); // 🆕 REPORTE PAGOS NRE
 
   // 🚨 Aviso de alertas: el usuario debe confirmar "Entendido" para poder cobrar.
   // Se resetea cada vez que cambia el cliente seleccionado.
@@ -1094,6 +1096,19 @@ const PagosPage = () => {
                 >
                   <HiDownload className="text-base sm:text-lg" />
                   <span className="hidden sm:inline">Reporte Contactos</span>
+                </motion.button>
+
+                {/* 🆕 BOTÓN REPORTE PAGOS NRE (Excel, previo a automatizar el envío) */}
+                <motion.button
+                  type="button"
+                  onClick={() => setShowReporteNREModal(true)}
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl px-3 sm:px-4 py-2 h-10 sm:h-11 text-xs sm:text-sm font-semibold text-white shadow-sm cursor-pointer border border-amber-500/50 bg-amber-600 hover:bg-amber-500 transition-colors"
+                  title="Descargar pagos de NRE (altas nuevas) con costo y margen"
+                >
+                  <HiDownload className="text-base sm:text-lg" />
+                  <span className="hidden sm:inline">Pagos NRE</span>
                 </motion.button>
               </>
             )}
@@ -1615,6 +1630,12 @@ const PagosPage = () => {
         onClose={() => setShowContactosModal(false)}
         isWebAdmin={isWebAdmin}
         userOficina={userOficina}
+      />
+
+      {/* 🆕 MODAL REPORTE PAGOS NRE (Excel, previo a automatizar el envío) */}
+      <ReportePagosNREModal
+        isOpen={showReporteNREModal}
+        onClose={() => setShowReporteNREModal(false)}
       />
     </div>
   );
