@@ -33,6 +33,7 @@ import {
   HiCheck,
   HiClock,
   HiRefresh,
+  HiPencil,
 } from "react-icons/hi";
 
 import {
@@ -288,6 +289,7 @@ function InfoBlock({ tono, Icon, label, titulo, subtitulo, hint }) {
  * @param {number} [props.idx=0] - Posición de la cuota actual en el array
  * @param {string|Date} [props.polizaFechaEmision=null] - Fecha de emisión de la póliza
  * @param {function} [props.onMarcarPagada] - Callback al marcar como pagada
+ * @param {function} [props.onCambiarFecha] - Callback para abrir el modal de cambio de fecha de vencimiento
  * @param {boolean} [props.busy=false] - Si está procesando una acción
  * @param {"full"|"compact"|"mini"} [props.variant="full"] - Variante visual
  * @param {boolean} [props.showMonto=true] - Mostrar el monto
@@ -299,6 +301,7 @@ export default function CuotaInfoCard({
   idx = 0,
   polizaFechaEmision = null,
   onMarcarPagada,
+  onCambiarFecha,
   busy = false,
   variant = "full",
   showMonto = true,
@@ -426,11 +429,23 @@ export default function CuotaInfoCard({
 
               {/* Box: Vencimiento */}
               <div className={`flex-1 rounded-lg border ${vtoStyles.bg} ${vtoStyles.border} p-2.5`}>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <HiCalendar className={`${vtoStyles.iconColor} text-sm`} />
-                  <div className={`text-[10px] uppercase tracking-wide font-bold ${vtoStyles.subtitle}`}>
-                    Fin de cobertura / Vence
+                <div className="flex items-center justify-between gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <HiCalendar className={`${vtoStyles.iconColor} text-sm`} />
+                    <div className={`text-[10px] uppercase tracking-wide font-bold ${vtoStyles.subtitle}`}>
+                      Fin de cobertura / Vence
+                    </div>
                   </div>
+                  {onCambiarFecha && (
+                    <button
+                      type="button"
+                      onClick={() => onCambiarFecha(cuota)}
+                      className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                      title="Cambiar fecha de vencimiento"
+                    >
+                      <HiPencil className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
                 <div className={`text-base font-bold ${vtoStyles.title}`}>
                   {fmtFecha(cuota?.fecha_vencimiento)}

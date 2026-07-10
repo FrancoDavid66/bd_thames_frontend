@@ -1237,16 +1237,14 @@ const CuotaRow = memo(
                           Fin de cobertura / Vence
                         </div>
                       </div>
-                      {!cuota?.pagado && (
-                        <button
-                          type="button"
-                          onClick={() => abrirModalFecha(cuota)}
-                          className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
-                          title="Cambiar fecha de vencimiento"
-                        >
-                          <HiPencil className="w-3 h-3" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => abrirModalFecha(cuota)}
+                        className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                        title="Cambiar fecha de vencimiento"
+                      >
+                        <HiPencil className="w-3 h-3" />
+                      </button>
                     </div>
                     <div className={`text-base font-bold ${vtoStyles.title}`}>
                       {fmtFecha(cuota?.fecha_vencimiento)}
