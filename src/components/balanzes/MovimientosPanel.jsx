@@ -53,19 +53,38 @@ const fmtMoney = (n) =>
 
 const fmtFecha = (f) => (f ? dayjs(f).format("DD/MM/YYYY") : "—");
 
+// 🚀 NUEVO: hora local (HH:mm) del momento en que se registró el movimiento.
+//    La hora vive en created_at (DateTimeField auto_now_add del backend), NO en
+//    "fecha" (que es solo la fecha elegida por el usuario). Si el movimiento es
+//    viejo y no tiene created_at, devolvemos "" y la tabla no muestra hora.
+const fmtHora = (item) => {
+  const ts = item?.created_at;
+  if (!ts) return "";
+  const d = dayjs(ts);
+  return d.isValid() ? d.format("HH:mm") : "";
+};
+
 // 🚀 Descripción para mostrar: si el movimiento tiene PATENTE (viene del backend
 //    en item.patente para los cobros de cuota), reemplazamos el "Póliza XXXX" de
 //    la descripción por la patente. Ej:
 //      "Pago cuota 3 - Póliza 12345"  →  "Pago cuota 3 - FDT601"
 //    Si no hay patente (egresos, cargas manuales), se muestra la descripción tal cual.
+// 🚀 Abrevia SOLO al mostrar: "Pago cuota 1 - ..." → "PC 1 - ...".
+//    Es puramente visual: la descripción real guardada en la base NO cambia.
+//    El ^ hace que solo reemplace cuando arranca con "Pago cuota" (no toca
+//    egresos que casualmente tengan esas palabras en el medio del texto).
+const abreviarPagoCuota = (txt) => (txt || "").replace(/^Pago\s+cuota\b/i, "PC");
+
 const descripcionConPatente = (item) => {
   const desc = item?.descripcion || "—";
   const patente = (item?.patente || "").toString().trim();
-  if (!patente) return desc;
+  if (!patente) return abreviarPagoCuota(desc);
   // Saca el fragmento "Póliza <numero>" (con o sin acento) y pone la patente.
   const sinPoliza = desc.replace(/P[oó]liza\s+\S+/i, patente);
   // Si la descripción no tenía "Póliza ...", agregamos la patente al final.
-  return sinPoliza === desc ? `${desc} · ${patente}` : sinPoliza;
+  const conPatente = sinPoliza === desc ? `${desc} · ${patente}` : sinPoliza;
+  // Por último, abreviamos "Pago cuota" → "PC" (solo visual).
+  return abreviarPagoCuota(conPatente);
 };
 
 // 🚀 Chip de color para la FORMA de pago (que se note más que texto gris).
@@ -530,6 +549,7 @@ export default function MovimientosPanel({ oficinasAdmin = [], oficinaProp = "AL
               ) : (
                 items.map((item) => {
                   const ing = esIngreso(item);
+                  const hora = fmtHora(item);
                   return (
                     <tr
                       key={`${item._tipo}-${item.id}`}
@@ -538,8 +558,16 @@ export default function MovimientosPanel({ oficinasAdmin = [], oficinaProp = "AL
                       <td className="px-2 py-2 text-center">
                         <TipoBadge item={item} />
                       </td>
-                      <td className="px-3 py-2 font-bold text-suave dark:text-suave-dark whitespace-nowrap">
-                        {fmtFecha(item.fecha)}
+                      {/* 🚀 FECHA + HORA en la misma columna: fecha arriba, hora chiquita abajo */}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="font-bold text-suave dark:text-suave-dark leading-tight">
+                          {fmtFecha(item.fecha)}
+                        </div>
+                        {hora && (
+                          <div className="text-[10px] font-black text-suave/70 dark:text-suave-dark/70 tabular-nums leading-tight">
+                            {hora} hs
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2 font-bold text-titulo dark:text-titulo-dark">{descripcionConPatente(item)}</td>
                       <td className="px-3 py-2 font-bold text-suave dark:text-suave-dark">{item.categoria || "—"}</td>
