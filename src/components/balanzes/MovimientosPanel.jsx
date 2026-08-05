@@ -1,9 +1,15 @@
-// src/components/balanzes/MovimientosPanel.jsx  (diseño Duo)
+// src/components/balanzes/MovimientosPanel.jsx  (diseño Duo · responsive)
 //
 // 🚀 SOLO LA TABLA de movimientos (Ingresos + Egresos en una sola vista).
 //    Los FILTROS ya NO viven acá: los maneja el toolbar único (BalancesFilters)
 //    en la página, y esta tabla recibe los datos ya cargados por props.
 //    Así Resumen y Movimientos comparten el mismo box de filtros.
+//
+// 📱 RESPONSIVE:
+//    - En DESKTOP (sm+): la tabla de siempre (6 columnas).
+//    - En MOBILE (<640px): cada movimiento se muestra como TARJETA apilada
+//      (Tipo + Monto arriba; fecha, forma de pago y oficina abajo como chips).
+//    Es la opción más cómoda: no hay scroll horizontal ni textos cortados.
 //
 // Props:
 //   items     → array de movimientos ya cargados (los trae la página)
@@ -49,31 +55,33 @@ const descripcionConPatente = (item) => {
   return abreviarPagoCuota(conPatente);
 };
 
+// Estilos del chip de forma de pago (compartidos entre tabla y tarjeta).
+const FORMA_ESTILOS = {
+  EFECTIVO: "bg-duo-verde/10 text-duo-verde dark:text-duo-verde border-duo-verde/30",
+  TRANSFERENCIA: "bg-duo-violeta/10 text-duo-violeta dark:text-duo-violeta border-duo-violeta/30",
+  TARJETA: "bg-duo-amarillo/10 text-duo-amarillo dark:text-duo-amarillo border-duo-amarillo/30",
+  MERCADOPAGO: "bg-duo-azul/10 text-duo-azul dark:text-duo-azul border-duo-azul/30",
+  OTRO: "bg-suave/10 text-suave dark:text-suave-dark border-linea dark:border-linea-dark",
+};
+const FORMA_LABEL = {
+  EFECTIVO: "Efectivo",
+  TRANSFERENCIA: "Transferencia",
+  TARJETA: "Tarjeta",
+  MERCADOPAGO: "Mercado Pago",
+  OTRO: "Otro",
+};
+
 // Chip de color para la FORMA de pago.
 const FormaBadge = ({ forma }) => {
   const f = String(forma || "").toUpperCase();
   if (!f) return <span className="text-suave dark:text-suave-dark">—</span>;
-  const estilos = {
-    EFECTIVO: "bg-duo-verde/10 text-duo-verde dark:text-duo-verde border-duo-verde/30",
-    TRANSFERENCIA: "bg-duo-violeta/10 text-duo-violeta dark:text-duo-violeta border-duo-violeta/30",
-    TARJETA: "bg-duo-amarillo/10 text-duo-amarillo dark:text-duo-amarillo border-duo-amarillo/30",
-    MERCADOPAGO: "bg-duo-azul/10 text-duo-azul dark:text-duo-azul border-duo-azul/30",
-    OTRO: "bg-suave/10 text-suave dark:text-suave-dark border-linea dark:border-linea-dark",
-  };
-  const label = {
-    EFECTIVO: "Efectivo",
-    TRANSFERENCIA: "Transferencia",
-    TARJETA: "Tarjeta",
-    MERCADOPAGO: "Mercado Pago",
-    OTRO: "Otro",
-  };
   return (
     <span
       className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black whitespace-nowrap border-2 ${
-        estilos[f] || "bg-suave/10 text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
+        FORMA_ESTILOS[f] || FORMA_ESTILOS.OTRO
       }`}
     >
-      {label[f] || f}
+      {FORMA_LABEL[f] || f}
     </span>
   );
 };
@@ -96,6 +104,55 @@ const TipoBadge = ({ item }) => {
   );
 };
 
+// 📱 Chip de oficina (reutilizado en tabla y tarjeta).
+const OficinaBadge = ({ nombre }) =>
+  nombre ? (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-lg border-2 border-duo-azul/30 bg-duo-azul/10 text-duo-azul dark:text-duo-azul text-[11px] font-black whitespace-nowrap">
+      {nombre}
+    </span>
+  ) : (
+    <span className="text-suave dark:text-suave-dark">—</span>
+  );
+
+// 📱 TARJETA de movimiento (solo mobile). Muestra lo mismo que una fila de la
+//    tabla pero apilado y sin scroll horizontal.
+const MovimientoCard = ({ item }) => {
+  const ing = esIngreso(item);
+  const hora = fmtHora(item);
+  return (
+    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl shadow-[0_2px_0_var(--color-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)] p-3">
+      {/* Fila superior: tipo + descripción + monto */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <TipoBadge item={item} />
+          <div className="min-w-0">
+            <p className="font-black text-sm text-titulo dark:text-titulo-dark truncate">
+              {descripcionConPatente(item)}
+            </p>
+            <p className="text-[11px] font-bold text-suave dark:text-suave-dark leading-tight mt-0.5">
+              {fmtFecha(item.fecha)}
+              {hora && <span className="tabular-nums"> · {hora} hs</span>}
+            </p>
+          </div>
+        </div>
+        <p
+          className={`font-mono font-black text-lg tracking-tight whitespace-nowrap shrink-0 ${
+            ing ? "text-duo-verde dark:text-duo-verde" : "text-duo-rojo dark:text-duo-rojo"
+          }`}
+        >
+          {ing ? "+" : "−"} {fmtMoney(item.monto)}
+        </p>
+      </div>
+
+      {/* Fila inferior: chips de forma de pago + oficina */}
+      <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+        <FormaBadge forma={item.forma_pago} />
+        {item.oficina_nombre && <OficinaBadge nombre={item.oficina_nombre} />}
+      </div>
+    </div>
+  );
+};
+
 export default function MovimientosPanel({
   items = [],
   count = 0,
@@ -106,6 +163,9 @@ export default function MovimientosPanel({
   onPage = () => {},
   onReintentar = () => {},
 }) {
+  // Estado compartido (loading / error / vacío) para reusarlo en mobile y desktop.
+  const estadoVacio = !loading && !error && items.length === 0;
+
   return (
     <div className="space-y-4">
       {/* Contador de resultados — SIEMPRE visible */}
@@ -115,8 +175,34 @@ export default function MovimientosPanel({
         </span>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl overflow-hidden">
+      {/* ═══════════════ MOBILE: tarjetas (oculto en sm+) ═══════════════ */}
+      <div className="sm:hidden space-y-2.5">
+        {loading ? (
+          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl py-8 text-center font-bold text-suave dark:text-suave-dark">
+            Cargando…
+          </div>
+        ) : error ? (
+          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl py-8 flex flex-col items-center gap-3">
+            <span className="text-duo-rojo font-bold px-4 text-center">{error}</span>
+            <button
+              type="button"
+              onClick={onReintentar}
+              className="min-h-[44px] border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul text-suave dark:text-suave-dark hover:text-duo-azul rounded-xl px-4 py-2 font-black transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : estadoVacio ? (
+          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl py-8 text-center font-bold text-suave dark:text-suave-dark px-4">
+            No hay movimientos con estos filtros.
+          </div>
+        ) : (
+          items.map((item) => <MovimientoCard key={`${item._tipo}-${item.id}`} item={item} />)
+        )}
+      </div>
+
+      {/* ═══════════════ DESKTOP: tabla (oculto en mobile) ═══════════════ */}
+      <div className="hidden sm:block bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -184,13 +270,7 @@ export default function MovimientosPanel({
                         <FormaBadge forma={item.forma_pago} />
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {item.oficina_nombre ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg border-2 border-duo-azul/30 bg-duo-azul/10 text-duo-azul dark:text-duo-azul text-[11px] font-black whitespace-nowrap">
-                            {item.oficina_nombre}
-                          </span>
-                        ) : (
-                          <span className="text-suave dark:text-suave-dark">—</span>
-                        )}
+                        <OficinaBadge nombre={item.oficina_nombre} />
                       </td>
                       <td
                         className={`px-3 py-2 text-right font-mono font-black whitespace-nowrap text-base sm:text-lg tracking-tight ${
@@ -206,35 +286,38 @@ export default function MovimientosPanel({
             </tbody>
           </table>
         </div>
-
-        {/* Paginación */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 bg-surface dark:bg-surface-dark border-t-2 border-linea dark:border-linea-dark">
-            <span className="text-xs font-bold text-suave dark:text-suave-dark">
-              Página {page} de {totalPages} · {count} resultados
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={page <= 1 || loading}
-                onClick={() => onPage(page - 1)}
-                className="p-1.5 rounded-xl border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
-              >
-                <HiChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-xs font-mono font-black text-titulo dark:text-titulo-dark min-w-[60px] text-center">
-                {page} / {totalPages}
-              </span>
-              <button
-                disabled={page >= totalPages || loading}
-                onClick={() => onPage(page + 1)}
-                className="p-1.5 rounded-xl border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
-              >
-                <HiChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* ═══════════════ Paginación (compartida) ═══════════════ */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-2 px-3 py-3 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl">
+          <span className="text-[11px] sm:text-xs font-bold text-suave dark:text-suave-dark min-w-0 truncate">
+            Página {page} de {totalPages}
+            <span className="hidden sm:inline"> · {count} resultados</span>
+          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              disabled={page <= 1 || loading}
+              onClick={() => onPage(page - 1)}
+              className="inline-flex items-center justify-center w-11 h-11 rounded-xl border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
+              aria-label="Página anterior"
+            >
+              <HiChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-xs font-mono font-black text-titulo dark:text-titulo-dark min-w-[52px] text-center">
+              {page} / {totalPages}
+            </span>
+            <button
+              disabled={page >= totalPages || loading}
+              onClick={() => onPage(page + 1)}
+              className="inline-flex items-center justify-center w-11 h-11 rounded-xl border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
+              aria-label="Página siguiente"
+            >
+              <HiChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

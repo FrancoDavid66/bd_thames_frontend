@@ -1,4 +1,4 @@
-// src/pages/BalancesPage.jsx  (diseño Duo)
+// src/pages/BalancesPage.jsx  (diseño Duo · responsive)
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlus } from "react-icons/fa";
@@ -375,19 +375,19 @@ const BalancesPage = () => {
           </p>
         </div>
 
-        {/* Botones de carga rápida — 3D Duo */}
-        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+        {/* Botones de carga rápida — 3D Duo. 📱 Full-width apilados en mobile. */}
+        <div className="flex flex-col sm:flex-row gap-2 md:shrink-0">
           <button
             type="button"
             onClick={() => setModalTipo("INGRESO")}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-duo-verde border-2 border-duo-verde shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-duo-verde border-2 border-duo-verde shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all"
           >
             <FaPlus /> Nuevo ingreso
           </button>
           <button
             type="button"
             onClick={() => setModalTipo("EGRESO")}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-duo-rojo border-2 border-duo-rojo shadow-[0_5px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-duo-rojo border-2 border-duo-rojo shadow-[0_5px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5 transition-all"
           >
             <FaPlus /> Nuevo egreso
           </button>
@@ -423,7 +423,8 @@ const BalancesPage = () => {
       />
 
       {/* ===================== SELECTOR DE VISTA ===================== */}
-      <div className="mb-5 border-b-2 border-linea dark:border-linea-dark flex flex-wrap gap-2 pb-1">
+      {/* 📱 scroll-x por si no entran los tabs; sin barra visible. */}
+      <div className="mb-5 border-b-2 border-linea dark:border-linea-dark flex gap-2 pb-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {[
           { id: "movimientos", label: "💰 Movimientos" },
           { id: "resumen", label: "📊 Resumen" },
@@ -434,7 +435,7 @@ const BalancesPage = () => {
               key={tab.id}
               type="button"
               onClick={() => setVista(tab.id)}
-              className={`whitespace-nowrap px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-black transition border-2 border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+              className={`whitespace-nowrap shrink-0 min-h-[44px] px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-black transition border-2 border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
             >
               {tab.label}
             </button>

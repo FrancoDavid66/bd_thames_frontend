@@ -1,4 +1,4 @@
-// src/components/balanzes/MovimientoCreateModal.jsx  (diseño Duo — WIZARD 2 pasos)
+// src/components/balanzes/MovimientoCreateModal.jsx  (diseño Duo — WIZARD 2 pasos · responsive)
 //
 // 🚀 Componente ÚNICO para cargar un INGRESO o un EGRESO.
 //    Reemplaza a IngresoCreateModal.jsx y EgresoCreateModal.jsx.
@@ -12,11 +12,13 @@
 //      Paso 2 → Forma de pago (Efectivo / Transferencia) + billetera (si transf.)
 //               + Motivo (+ Sucursal si admin) + Resumen + Confirmar
 //
-//    SIMPLIFICACIONES respecto a la versión de 3 pasos:
-//      - Solo 2 formas de pago: EFECTIVO y TRANSFERENCIA.
-//      - Sin selección de categoría: se guarda como "Sin categoría".
-//      - La billetera se escribe a mano (texto libre) y solo cuando es transferencia.
-//      - La fecha ya no se pide: se usa la de hoy automáticamente.
+// 📱 RESPONSIVE:
+//    - Inputs y cards con tap target ≥ 44-48px; inputs con text-base (sin zoom iOS).
+//    - Footer: en pantallas MUY chicas los botones se apilan (Guardar arriba,
+//      Atrás abajo) para que el texto no se corte; desde sm van en fila.
+//    - El alto total y el scroll del modal los maneja <ModalWrapper>. Si notás
+//      que en un celu muy bajito el footer queda tapado, revisá que ModalWrapper
+//      use max-h-[Nvh] + overflow-y-auto en su contenedor (ver nota al final).
 //
 import { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -181,8 +183,9 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
   const isTransferencia = form.forma_pago === "TRANSFERENCIA";
 
-  const inputBase = `w-full px-3 py-2.5 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none ${T.inputFocus} transition-colors`;
-  const selectBase = `w-full px-3 py-2.5 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-bold focus:outline-none ${T.inputFocus} transition-colors cursor-pointer dark:[color-scheme:dark]`;
+  // 📱 h-12 (48px) + text-base en mobile (sin zoom de iOS).
+  const inputBase = `w-full h-12 px-3 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none ${T.inputFocus} transition-colors`;
+  const selectBase = `w-full h-12 px-3 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold focus:outline-none ${T.inputFocus} transition-colors cursor-pointer dark:[color-scheme:dark]`;
 
   // ── Validación por PASO ────────────────────────────────────────
   const validarPaso = (n) => {
@@ -324,7 +327,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 <button
                   type="button"
                   onClick={() => cambiarTipo("INGRESO")}
-                  className={`flex flex-col items-center justify-center gap-2 py-6 rounded-2xl border-2 font-black transition-all ${
+                  className={`flex flex-col items-center justify-center gap-2 py-5 sm:py-6 rounded-2xl border-2 font-black transition-all ${
                     esIngreso
                       ? THEME.INGRESO.cardOn
                       : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -339,7 +342,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 <button
                   type="button"
                   onClick={() => cambiarTipo("EGRESO")}
-                  className={`flex flex-col items-center justify-center gap-2 py-6 rounded-2xl border-2 font-black transition-all ${
+                  className={`flex flex-col items-center justify-center gap-2 py-5 sm:py-6 rounded-2xl border-2 font-black transition-all ${
                     !esIngreso
                       ? THEME.EGRESO.cardOn
                       : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -387,7 +390,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                     key={fp}
                     type="button"
                     onClick={() => setFormaPago(fp)}
-                    className={`px-4 py-2.5 text-sm rounded-xl font-black transition-colors border-2 ${
+                    className={`min-h-[48px] px-4 py-2.5 text-sm rounded-xl font-black transition-colors border-2 ${
                       form.forma_pago === fp
                         ? T.formaOn
                         : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -482,15 +485,16 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
         {/* ============================================================ */}
         {/* FOOTER · navegación                                          */}
+        {/* 📱 En mobile se apila (Guardar arriba, Atrás abajo); fila en sm+ */}
         {/* ============================================================ */}
-        <div className="flex items-center justify-between gap-3 pt-4 border-t-2 border-linea dark:border-linea-dark">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t-2 border-linea dark:border-linea-dark">
           {/* Botón izquierdo: Cancelar (paso 1) o Atrás (paso 2) */}
           {paso === 1 ? (
-            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
+            <button type="button" onClick={onClose} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
               Cancelar
             </button>
           ) : (
-            <button type="button" onClick={irAtras} className="px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
+            <button type="button" onClick={irAtras} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
               ← Atrás
             </button>
           )}
@@ -501,12 +505,12 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
               type="button"
               onClick={irSiguiente}
               disabled={!pasoUnoOk}
-              className={`px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${!pasoUnoOk ? T.btnDisabled : T.btnOk}`}
+              className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${!pasoUnoOk ? T.btnDisabled : T.btnOk}`}
             >
               Siguiente →
             </button>
           ) : (
-            <button type="submit" disabled={finalDisabled} className={`px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${finalDisabled ? T.btnDisabled : T.btnOk}`}>
+            <button type="submit" disabled={finalDisabled} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${finalDisabled ? T.btnDisabled : T.btnOk}`}>
               {submitting ? "Guardando…" : `Guardar ${esIngreso ? "ingreso" : "egreso"}`}
             </button>
           )}

@@ -1,4 +1,4 @@
-// src/components/balanzes/BalanceChart.jsx  (diseño Duo)
+// src/components/balanzes/BalanceChart.jsx  (diseño Duo · responsive)
 import { useMemo, useState, useEffect } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -94,6 +94,17 @@ const currencyAR = (v) =>
     maximumFractionDigits: 0,
   });
 
+// Formato compacto para el eje Y en mobile: 40000 -> "$40k", 1500000 -> "$1,5M".
+// Así el eje no ocupa 80px de ancho en pantallas chicas.
+const currencyShort = (v) => {
+  const n = Number(v) || 0;
+  const abs = Math.abs(n);
+  const signo = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${signo}$${(abs / 1_000_000).toLocaleString("es-AR", { maximumFractionDigits: 1 })}M`;
+  if (abs >= 1_000) return `${signo}$${Math.round(abs / 1_000)}k`;
+  return `${signo}$${abs}`;
+};
+
 /* 🎨 Hook: detecta si está activo el modo oscuro (mirando la clase 'dark' del
    <html>). Se usa para pasarle a Recharts colores de eje/grid que combinen con
    el tema (Recharts necesita colores concretos, no clases Tailwind). */
@@ -111,6 +122,22 @@ function useIsDark() {
     return () => obs.disconnect();
   }, []);
   return dark;
+}
+
+/* 📱 Hook chiquito: ¿el ancho de pantalla es < 640px (mobile)? Lo usamos para
+   decidir el ancho/formato del eje Y sin depender de clases Tailwind (Recharts
+   pide números concretos). */
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [breakpoint]);
+  return isMobile;
 }
 
 // Tooltip Duo — se adapta a claro/oscuro con tokens.
@@ -147,6 +174,7 @@ const BalanceChart = ({
 }) => {
   const [range, setRange] = useState(defaultRange);
   const isDark = useIsDark();
+  const isMobile = useIsMobile();
 
   // Colores de eje / grilla según tema (Recharts pide colores concretos).
   const axisColor = isDark ? "#94a3b8" : "#64748b";   // --color-suave(-dark)
@@ -167,7 +195,8 @@ const BalanceChart = ({
     <button
       type="button"
       onClick={() => setRange(id)}
-      className={`flex-1 px-3 py-1.5 rounded-xl transition-all font-black ${
+      // 📱 min-h-[40px] → botón cómodo de tocar en mobile.
+      className={`flex-1 min-h-[40px] px-3 py-1.5 rounded-xl transition-all font-black ${
         range === id
           ? "bg-duo-azul text-white shadow-[0_3px_0_var(--color-duo-azul-sombra)]"
           : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -179,17 +208,17 @@ const BalanceChart = ({
 
   return (
     <div
-      className={`bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl px-4 py-3 sm:px-5 sm:py-4 mb-6 ${className}`}
+      className={`bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl px-3 py-3 sm:px-5 sm:py-4 mb-6 ${className}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-duo-azul via-duo-azul/60 to-duo-verde flex items-center justify-center text-white">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-duo-azul via-duo-azul/60 to-duo-verde flex items-center justify-center text-white">
             <HiOutlinePresentationChartBar className="w-5 h-5" />
           </div>
-          <div className="flex flex-col">
-            <h3 className="text-sm sm:text-base font-black text-titulo dark:text-titulo-dark tracking-tight">
-              Ingresos vs Egresos{" "}
-              <span className="text-[11px] text-suave dark:text-suave-dark font-bold ml-1 bg-surface dark:bg-surface-dark px-2 py-0.5 rounded-lg border-2 border-linea dark:border-linea-dark">
+          <div className="flex flex-col min-w-0">
+            <h3 className="text-sm sm:text-base font-black text-titulo dark:text-titulo-dark tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Ingresos vs Egresos</span>
+              <span className="text-[11px] text-suave dark:text-suave-dark font-bold bg-surface dark:bg-surface-dark px-2 py-0.5 rounded-lg border-2 border-linea dark:border-linea-dark">
                 {range === "12m" ? "Histórico anual" : "Evolución diaria"}
               </span>
             </h3>
@@ -211,7 +240,9 @@ const BalanceChart = ({
 
       <div className="h-[220px] sm:h-[300px] w-full mt-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+          {/* 📱 En mobile el margen izquierdo es 0 y el eje Y usa formato corto
+              ($40k) con menos ancho, así el gráfico aprovecha toda la pantalla. */}
+          <ComposedChart data={data} margin={{ top: 10, right: 0, left: isMobile ? 0 : -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
             <XAxis
               dataKey="label"
@@ -221,11 +252,12 @@ const BalanceChart = ({
               interval="preserveStartEnd"
               axisLine={false}
               tickLine={false}
+              minTickGap={isMobile ? 16 : 5}
             />
             <YAxis
-              tickFormatter={(v) => `$${currencyAR(v)}`}
+              tickFormatter={(v) => (isMobile ? currencyShort(v) : `$${currencyAR(v)}`)}
               domain={[yMin, "auto"]}
-              width={80}
+              width={isMobile ? 44 : 80}
               tick={{ fontSize: 10, fill: axisColor, fontWeight: 700 }}
               stroke={axisColor}
               axisLine={false}

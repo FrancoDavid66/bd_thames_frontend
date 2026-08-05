@@ -1,4 +1,4 @@
-// src/components/balanzes/CategoriaSelect.jsx  (diseño Duo)
+// src/components/balanzes/CategoriaSelect.jsx  (diseño Duo · responsive)
 import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCategorias } from "../../store/slices/balanceSlice";
@@ -34,6 +34,8 @@ export default function CategoriaSelect({
       <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
         {label} <span className={asteriskColor}>*</span>
       </label>
+      {/* 📱 h-12 (48px) → tap target cómodo en mobile; text-base evita el zoom
+          automático de iOS al enfocar (Safari hace zoom si el input < 16px). */}
       <input
         ref={refProp}
         name="categoria"
@@ -41,7 +43,7 @@ export default function CategoriaSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={tipo === "INGRESO" ? "Ej: Cobro de póliza, Honorarios…" : "Ej: Limpieza, Internet, Viáticos…"}
-        className="w-full px-3 py-2.5 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors"
+        className="w-full h-12 px-3 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors"
         autoComplete="off"
       />
       <datalist id={`categoria-opciones-${tipo}`}>
