@@ -124,7 +124,6 @@ export default function MovimientosPanel({
                 <th className="text-center px-2 py-2.5 font-black uppercase tracking-wide w-10">Tipo</th>
                 <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Fecha</th>
                 <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Descripción</th>
-                <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Categoría</th>
                 <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Forma</th>
                 <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Oficina</th>
                 <th className="text-right px-3 py-2.5 font-black uppercase tracking-wide">Monto</th>
@@ -133,13 +132,13 @@ export default function MovimientosPanel({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
+                  <td colSpan={6} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
                     Cargando…
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8">
+                  <td colSpan={6} className="text-center py-8">
                     <div className="flex flex-col items-center gap-3">
                       <span className="text-duo-rojo font-bold">{error}</span>
                       <button
@@ -154,7 +153,7 @@ export default function MovimientosPanel({
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
+                  <td colSpan={6} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
                     No hay movimientos con estos filtros.
                   </td>
                 </tr>
@@ -181,7 +180,6 @@ export default function MovimientosPanel({
                         )}
                       </td>
                       <td className="px-3 py-2 font-bold text-titulo dark:text-titulo-dark">{descripcionConPatente(item)}</td>
-                      <td className="px-3 py-2 font-bold text-suave dark:text-suave-dark">{item.categoria || "—"}</td>
                       <td className="px-3 py-2 text-center">
                         <FormaBadge forma={item.forma_pago} />
                       </td>

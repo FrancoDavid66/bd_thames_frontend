@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlus } from "react-icons/fa";
-import { HiCog, HiOfficeBuilding } from "react-icons/hi";
+import { HiOfficeBuilding } from "react-icons/hi";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import axios from "axios";
@@ -18,7 +18,6 @@ import { fetchBalanceDiario } from "../store/slices/balanceSlice";
 
 // 🚀 UN solo modal combinado para cargar ingreso O egreso.
 import MovimientoCreateModal from "../components/balanzes/MovimientoCreateModal";
-import BalanzesSettingsModal from "../components/balanzes/BalanzesSettingsModal";
 
 // 🚀 Toolbar ÚNICO de filtros (compartido por Resumen y Movimientos).
 import BalancesFilters from "../components/balanzes/BalancesFilters";
@@ -185,7 +184,6 @@ const BalancesPage = () => {
 
   // Modales / vista
   const [modalTipo, setModalTipo] = useState(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [vista, setVista] = useState("movimientos");
 
   const ofiParam = isWebAdmin ? oficinaSeleccionada : userOficina;
@@ -393,16 +391,6 @@ const BalancesPage = () => {
           >
             <FaPlus /> Nuevo egreso
           </button>
-          {isWebAdmin && (
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              title="Configuración de Categorías"
-              className="inline-flex items-center justify-center w-11 h-11 sm:w-auto sm:px-3 shrink-0 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-duo-azul/10 hover:border-duo-azul text-suave dark:text-suave-dark hover:text-duo-azul dark:hover:text-duo-azul transition"
-            >
-              <HiCog className="text-xl" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -509,7 +497,6 @@ const BalancesPage = () => {
         tipoInicial={modalTipo || "INGRESO"}
         onClose={() => setModalTipo(null)}
       />
-      <BalanzesSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 };
