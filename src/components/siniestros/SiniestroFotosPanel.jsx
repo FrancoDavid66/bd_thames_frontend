@@ -1,4 +1,9 @@
-// src/components/siniestros/SiniestroFotosPanel.jsx
+// src/components/siniestros/SiniestroFotosPanel.jsx  (responsive)
+//
+// 📱 RESPONSIVE: los botones de cada foto (Ver 🔍 / Borrar 🗑) HOY aparecen solo
+//    con hover, que en el celu no existe → en mobile quedan SIEMPRE visibles
+//    (con un velo oscuro suave para que se lean sobre la foto); en desktop (sm+)
+//    se mantiene el comportamiento hover de siempre. Botones a 44px en mobile.
 import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -192,12 +197,14 @@ export default function SiniestroFotosPanel({
               className="relative group aspect-square rounded-xl overflow-hidden bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark"
             >
               <img src={foto.url} alt={foto.nombre || "Foto"} loading="lazy" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+              {/* 📱 En mobile: velo suave + botones siempre visibles. En sm+: hover. */}
+              <div className="absolute inset-0 bg-black/25 sm:bg-black/0 sm:group-hover:bg-black/50 transition-colors flex items-center justify-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                 <button
                   type="button"
                   onClick={() => setPreviewUrl(foto.url)}
-                  className="h-9 w-9 rounded-lg bg-duo-azul text-white flex items-center justify-center"
+                  className="h-10 w-10 sm:h-9 sm:w-9 rounded-lg bg-duo-azul text-white flex items-center justify-center shadow-lg"
                   title="Ver en grande"
+                  aria-label="Ver en grande"
                 >
                   <HiZoomIn className="w-4 h-4" />
                 </button>
@@ -205,8 +212,9 @@ export default function SiniestroFotosPanel({
                   <button
                     type="button"
                     onClick={() => handleDelete(foto)}
-                    className="h-9 w-9 rounded-lg bg-duo-rojo text-white flex items-center justify-center"
+                    className="h-10 w-10 sm:h-9 sm:w-9 rounded-lg bg-duo-rojo text-white flex items-center justify-center shadow-lg"
                     title="Eliminar"
+                    aria-label="Eliminar foto"
                   >
                     <HiTrash className="w-4 h-4" />
                   </button>

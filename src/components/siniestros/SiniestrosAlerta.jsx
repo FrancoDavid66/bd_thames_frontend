@@ -1,4 +1,8 @@
-// src/components/siniestros/SiniestrosAlerta.jsx
+// src/components/siniestros/SiniestrosAlerta.jsx  (responsive)
+//
+// 📱 RESPONSIVE: banner y badge ya se adaptaban. Esta pasada: el botón "Ver"
+//    del banner con tap target ≥44px, y el MODAL a hoja desde abajo en mobile
+//    (centrado en desktop) con scroll interno (max-h) para no desbordar.
 //
 // 🧩 COMPONENTE UNIFICADO — reemplaza a los 3 viejos:
 //   - SiniestrosBadge   → <SiniestrosAlerta variant="badge" />
@@ -140,7 +144,7 @@ export default function SiniestrosAlerta({
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-xs font-black transition-colors hover:brightness-95"
+              className="shrink-0 inline-flex items-center justify-center gap-1 min-h-[40px] px-3 py-1.5 rounded-lg bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-xs font-black transition-colors hover:brightness-95"
             >
               {expanded ? "Ocultar" : "Ver"}
               {expanded ? <HiChevronUp className="w-3 h-3" /> : <HiChevronDown className="w-3 h-3" />}
@@ -196,17 +200,17 @@ export default function SiniestrosAlerta({
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm"
       >
         <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 10 }}
           transition={{ type: "spring", stiffness: 280, damping: 24 }}
-          className="w-full max-w-xl bg-card dark:bg-card-dark rounded-3xl border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden"
+          className="w-full sm:max-w-xl max-h-[92vh] flex flex-col bg-card dark:bg-card-dark rounded-t-3xl sm:rounded-3xl border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden"
         >
-          {hayAbiertos && <div className="h-1.5 bg-duo-rojo animate-pulse" />}
-          <div className="p-5 space-y-4">
+          {hayAbiertos && <div className="shrink-0 h-1.5 bg-duo-rojo animate-pulse" />}
+          <div className="p-5 space-y-4 overflow-y-auto">
             <div className="text-center pb-3 border-b-2 border-linea dark:border-linea-dark">
               <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] mb-2">
                 <HiShieldExclamation className="w-7 h-7 text-duo-rojo" />

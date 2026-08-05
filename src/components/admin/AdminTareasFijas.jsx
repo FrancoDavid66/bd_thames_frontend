@@ -2,6 +2,14 @@
 //
 // Configuración del Control diario POR OFICINA: elegís una oficina y definís
 // sus tareas (horario, días, foto, margen). Cada oficina tiene las suyas.
+//
+// 📱 RESPONSIVE (esta pasada):
+//   - Chips de oficina: scroll horizontal cómodo en mobile (no se amontonan).
+//   - Fila de tarea: nombre + info arriba y botones Editar/Borrar abajo a lo
+//     ancho (antes eran íconos de 36px, difíciles de tocar). En sm+ vuelven a
+//     ser íconos a la derecha como antes.
+//   - Modal: inputs a 48px (.inp con más padding) para buen tap target y sin
+//     zoom de iOS (font 16px). Botón guardar full-width.
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   HiPlus, HiPencil, HiTrash, HiX, HiSave, HiClock, HiCamera, HiOfficeBuilding,
@@ -193,13 +201,13 @@ export default function AdminTareasFijas() {
         </div>
       </div>
 
-      {/* Selector de oficina */}
-      <div className="flex flex-wrap gap-2">
+      {/* Selector de oficina — scroll horizontal cómodo en mobile */}
+      <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {oficinas.map((o) => (
           <button
             key={o.id}
             onClick={() => setOficinaSel(String(o.id))}
-            className={`flex items-center gap-1.5 rounded-xl border-2 px-4 py-2 text-sm font-black transition ${
+            className={`shrink-0 flex items-center gap-1.5 rounded-xl border-2 px-4 min-h-[44px] text-sm font-black transition ${
               String(oficinaSel) === String(o.id)
                 ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white shadow-[0_3px_0_var(--color-transferencia-fuerte)]"
                 : "border-[var(--color-linea)] bg-[var(--color-card)] text-[var(--color-suave)] hover:text-[var(--color-titulo)]"
@@ -220,7 +228,7 @@ export default function AdminTareasFijas() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-sm font-semibold text-[var(--color-suave)]">
               {tareasOficina.length} tarea{tareasOficina.length === 1 ? "" : "s"} en <strong className="text-[var(--color-titulo)]">{ofiActual?.nombre}</strong>
             </span>
@@ -228,7 +236,7 @@ export default function AdminTareasFijas() {
               {tareasOficina.length === 0 && (
                 <button
                   onClick={cargarBase} disabled={cargandoBase}
-                  className="flex items-center gap-1.5 rounded-xl border-2 border-[var(--color-transferencia)] px-3 py-2 text-[13px] font-black text-[var(--color-transferencia)] transition hover:bg-[var(--color-transferencia)]/10 disabled:opacity-50"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--color-transferencia)] px-3 min-h-[44px] text-[13px] font-black text-[var(--color-transferencia)] transition hover:bg-[var(--color-transferencia)]/10 disabled:opacity-50"
                 >
                   {cargandoBase ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-transferencia)]/40 border-t-[var(--color-transferencia)]" /> : <HiTemplate />}
                   Cargar lista base
@@ -236,7 +244,7 @@ export default function AdminTareasFijas() {
               )}
               <button
                 onClick={() => abrir()}
-                className="flex items-center gap-1.5 rounded-xl bg-[var(--color-transferencia)] px-4 py-2 text-[13px] font-black text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-transferencia-fuerte)]"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--color-transferencia)] px-4 min-h-[44px] text-[13px] font-black text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-transferencia-fuerte)]"
               >
                 <HiPlus /> Nueva
               </button>
@@ -250,13 +258,13 @@ export default function AdminTareasFijas() {
           ) : (
             <div className="space-y-2">
               {tareasOficina.map((it) => (
-                <div key={it.id} className="flex items-center gap-3 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-4 py-3">
+                <div key={it.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-black text-[var(--color-titulo)]">{it.nombre}</span>
                       {!it.activa && <span className="rounded bg-[var(--color-linea)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-suave)]">inactiva</span>}
                     </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-semibold text-[var(--color-suave)]">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[var(--color-suave)]">
                       {it.responsable_nombre && <span>{it.responsable_nombre}</span>}
                       <span>{it.frecuencia}</span>
                       {it.hora_esperada && (
@@ -267,8 +275,15 @@ export default function AdminTareasFijas() {
                       {it.requiere_foto && <span className="flex items-center gap-0.5 text-[var(--color-oficina)]"><HiCamera /> foto</span>}
                     </div>
                   </div>
-                  <button onClick={() => abrir(it)} className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-oficina)] hover:text-[var(--color-oficina)]"><HiPencil /></button>
-                  <button onClick={() => borrar(it)} className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]"><HiTrash /></button>
+                  {/* 📱 En mobile: botones a lo ancho con texto. En sm+: íconos a la derecha. */}
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => abrir(it)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:h-10 sm:w-10 px-3 sm:px-0 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] font-black text-[13px] transition hover:border-[var(--color-oficina)] hover:text-[var(--color-oficina)]">
+                      <HiPencil /> <span className="sm:hidden">Editar</span>
+                    </button>
+                    <button onClick={() => borrar(it)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:h-10 sm:w-10 px-3 sm:px-0 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] font-black text-[13px] transition hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]">
+                      <HiTrash /> <span className="sm:hidden">Borrar</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -285,7 +300,7 @@ export default function AdminTareasFijas() {
           >
             <div className="mb-1 flex items-center justify-between">
               <h3 className="text-lg font-black text-[var(--color-titulo)]">{editingId ? "Editar tarea" : "Nueva tarea"}</h3>
-              <button onClick={() => setModalOpen(false)} className="rounded-lg p-1.5 text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX className="text-xl" /></button>
+              <button onClick={() => setModalOpen(false)} aria-label="Cerrar" className="inline-flex items-center justify-center w-11 h-11 rounded-lg text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX className="text-xl" /></button>
             </div>
             <p className="mb-4 text-[12px] font-black text-[var(--color-transferencia)]">{ofiActual?.nombre}</p>
 
@@ -375,7 +390,7 @@ export default function AdminTareasFijas() {
             </div>
 
             <button onClick={guardar} disabled={saving}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-transferencia)] py-3 text-sm font-black text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-transferencia-fuerte)] disabled:opacity-50">
+              className="mt-5 flex w-full min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[var(--color-transferencia)] py-3 text-sm font-black text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-transferencia-fuerte)] disabled:opacity-50">
               {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <HiSave />}
               {editingId ? "Guardar cambios" : "Crear tarea"}
             </button>
@@ -384,11 +399,14 @@ export default function AdminTareasFijas() {
       )}
 
       <style>{`
-        .inp { width:100%; border-radius:0.75rem; border:2px solid var(--color-linea);
-          background:var(--color-surface); padding:0.6rem 0.75rem; font-size:0.85rem;
+        /* 📱 h-12 (48px) + font 16px → tap target cómodo y sin zoom de iOS al enfocar.
+           En sm+ el texto baja a 0.85rem para mantener el look compacto de escritorio. */
+        .inp { width:100%; height:3rem; border-radius:0.75rem; border:2px solid var(--color-linea);
+          background:var(--color-surface); padding:0 0.9rem; font-size:1rem;
           font-weight:600; color:var(--color-titulo); outline:none; }
         .inp:focus { border-color:var(--color-transferencia); }
         .dark .inp { color-scheme: dark; }
+        @media (min-width: 640px) { .inp { font-size:0.85rem; } }
       `}</style>
     </div>
   );

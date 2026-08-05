@@ -1,4 +1,4 @@
-/* src/pages/ControlDiarioPage.jsx
+/* src/pages/ControlDiarioPage.jsx  (responsive)
  *
  * Control diario (tareas recurrentes con foto) — REDISEÑO simple y claro.
  *
@@ -9,6 +9,10 @@
  *   3) Foto simple: un solo botón por tarea. El paso de responsable solo
  *      aparece en la 1ª foto. Botón bloqueado mientras sube (anti doble-envío).
  *   4) Una oficina a la vez: si hay varias (admin), selector de chips arriba.
+ *
+ * 📱 RESPONSIVE: esta pantalla ya venía bien (max-w-lg, tarjetas apiladas).
+ *    Ajustes de esta pasada: chips de oficina con scroll cómodo, botones de
+ *    refresh/cerrar a 44px, y el visor de foto (FotoModal) full-width en mobile.
  *
  * Paleta semántica real (surface/card/titulo/marca) con modo claro + oscuro.
  */
@@ -28,12 +32,13 @@ function FotoModal({ foto, onClose }) {
   return (
     <AnimatePresence>
       {foto && (
-        <motion.div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-4"
+        <motion.div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-3 sm:p-4"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-          <motion.div className="relative max-h-[85vh] max-w-lg overflow-hidden rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
+          <motion.div className="relative max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}>
-            <button onClick={onClose} className="absolute right-2 top-2 rounded-lg bg-card/90 dark:bg-card-dark/90 border-2 border-linea dark:border-linea-dark p-2 text-titulo dark:text-titulo-dark"><HiX className="text-xl" /></button>
+            <button onClick={onClose} aria-label="Cerrar"
+              className="absolute right-2 top-2 inline-flex items-center justify-center w-11 h-11 rounded-lg bg-card/90 dark:bg-card-dark/90 border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark"><HiX className="text-xl" /></button>
             <img src={foto} alt="Foto de la tarea" className="max-h-[85vh] w-full object-contain" />
           </motion.div>
         </motion.div>
@@ -49,17 +54,17 @@ function WizardResponsable({ open, tarea, oficina, empleados, onClose, onElegido
     <WizardShell open={open} titulo="¿Quién hizo esta tarea?"
       subtitulo={`${tarea?.nombre || ""} · ${oficina?.oficina_nombre || ""}`}
       pasoActual={0} totalPasos={2} onClose={onClose} maxW="max-w-md">
-      <div className="p-6">
+      <div className="p-5 sm:p-6">
         {emps.length === 0 ? (
           <div className={`rounded-xl border-2 border-linea dark:border-linea-dark p-4 text-center text-[13px] ${UI.txtSuave}`}>
             No hay empleados cargados en esta oficina.
-            <button onClick={() => onElegido(null)} className={`mt-3 w-full rounded-lg py-2.5 text-[13px] ${UI.btnPrimary}`}>Subir igual sin responsable</button>
+            <button onClick={() => onElegido(null)} className={`mt-3 w-full rounded-lg py-3 text-[13px] ${UI.btnPrimary}`}>Subir igual sin responsable</button>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
             {emps.map((e) => (
               <button key={e.id} onClick={() => onElegido(e.id)}
-                className="flex items-center gap-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-left transition hover:border-marca hover:bg-marca/10">
+                className="flex items-center gap-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 min-h-[56px] text-left transition hover:border-marca hover:bg-marca/10">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-marca/15 text-[12px] font-bold text-marca">
                   {String(e.nombre || "").slice(0, 2).toUpperCase()}
                 </span>
@@ -138,7 +143,7 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
         className={`rounded-2xl border-2 p-3.5 transition ${
           done ? "border-ingreso/35 bg-ingreso/[0.06]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
         }`}>
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3 sm:gap-3.5">
           {/* Ícono de estado */}
           <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
             done ? "bg-ingreso text-white" : "bg-marca/15 text-marca"
@@ -158,7 +163,7 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
               <HiCheckCircle className="text-ingreso text-2xl" />
             ) : puedeSumar ? (
               <button onClick={onSubirClick} disabled={cargando}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] ${UI.btnPrimary}`}>
+                className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl px-4 py-2.5 text-[13px] ${UI.btnPrimary}`}>
                 {cargando
                   ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                   : subidas === 0
@@ -267,8 +272,8 @@ export default function ControlDiarioPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className={`text-2xl font-extrabold ${UI.txtTitulo}`}>Control diario</h1>
-          <button onClick={() => { setLoading(true); cargar(); }}
-            className="rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2 text-suave dark:text-suave-dark hover:opacity-70">
+          <button onClick={() => { setLoading(true); cargar(); }} aria-label="Actualizar"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-suave dark:text-suave-dark hover:opacity-70">
             <HiRefresh className={`text-lg ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -289,16 +294,16 @@ export default function ControlDiarioPage() {
           </div>
         ) : (
           <>
-            {/* Selector de oficina (solo si hay varias) */}
+            {/* Selector de oficina (solo si hay varias) — scroll horizontal cómodo */}
             {variasOfis && (
-              <div className="flex gap-2 overflow-x-auto py-3 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto py-3 -mx-4 px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {oficinas.map((o) => {
                   const on = o.oficina_id === ofiActiva.oficina_id;
                   const okOfi = o.total > 0 && o.cumplidas === o.total;
                   return (
                     <button key={o.oficina_id} onClick={() => setOfiSel(o.oficina_id)}
-                      className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold border-2 transition-colors ${
-                        on ? "bg-marca border-marca text-white" : `border-linea dark:border-linea-dark ${UI.txtSuave}`
+                      className={`shrink-0 rounded-full px-4 min-h-[44px] text-[13px] font-semibold border-2 transition-colors ${
+                        on ? "bg-marca border-marca text-white" : `border-linea dark:border-linea-dark bg-card dark:bg-card-dark ${UI.txtSuave}`
                       }`}>
                       {okOfi ? "✓ " : ""}{o.oficina_nombre}
                     </button>
@@ -309,8 +314,8 @@ export default function ControlDiarioPage() {
 
             {/* HERO: progreso grande */}
             <div className={`mt-3 mb-5 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5`}>
-              <div className="flex items-center justify-between mb-3">
-                <div>
+              <div className="flex items-center justify-between mb-3 gap-3">
+                <div className="min-w-0">
                   <div className={`text-[34px] font-extrabold leading-none ${UI.txtTitulo}`}>
                     {nHechas}<span className={`text-base font-semibold ${UI.txtSuave}`}> / {total} hechas</span>
                   </div>

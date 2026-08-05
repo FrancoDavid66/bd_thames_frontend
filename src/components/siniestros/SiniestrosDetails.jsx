@@ -1,4 +1,10 @@
-// src/components/siniestros/SiniestrosDetails.jsx
+// src/components/siniestros/SiniestrosDetails.jsx  (responsive)
+//
+// 📱 RESPONSIVE: ya venía muy bien — la bitácora se apila abajo en mobile
+//    (flex-col lg:flex-row) y vuelve al costado en desktop. Esta pasada: los
+//    grids de datos usan 1 columna en pantallas muy chicas (<380px) y 2 desde
+//    ahí, para que los valores largos no se corten; botón "Nota" con buen tap.
+//    NOTA: el scroll interno del modal lo maneja <ModalDuo> (no se toca acá).
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
@@ -98,7 +104,7 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
             <Dato label="Cliente" value={siniestro.cliente_label} />
             <Dato label="Póliza" value={siniestro.poliza_label} />
             <Dato label="Vehículo" value={[siniestro.marca_auto, siniestro.modelo_auto, siniestro.ano_auto].filter(Boolean).join(" ")} />
@@ -123,7 +129,7 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
           {(siniestro.tercero_nombre || siniestro.tercero_patente) && (
             <div className="p-4 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] rounded-2xl">
               <span className="block text-[10px] font-black uppercase tracking-wide text-duo-rojo mb-3">Datos del tercero</span>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
                 <Dato label="Nombre" value={siniestro.tercero_nombre} />
                 <Dato label="Teléfono" value={siniestro.tercero_telefono} />
                 <Dato label="Patente" value={siniestro.tercero_patente} mono />

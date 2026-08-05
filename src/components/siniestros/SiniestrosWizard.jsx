@@ -1,9 +1,16 @@
-// src/components/siniestros/SiniestrosWizard.jsx
+// src/components/siniestros/SiniestrosWizard.jsx  (responsive)
 //
 // 🧙 Wizard paso a paso para cargar un siniestro (diseño Duo claro/oscuro).
 // Guía al usuario: Póliza → Tipo → Fecha → Relato → Fotos → Tercero.
 // Las fotos se cargan en modo BORRADOR (memoria) y se suben al crear
 // el siniestro: onSubmit(payload, draftFotos).
+//
+// 📱 RESPONSIVE:
+//   - La hoja se limita a max-h-[92vh] y es columna flex: header (progreso) y
+//     footer (botones) FIJOS, el contenido del paso SCROLLEA en el medio. Así
+//     nada se corta ni desborda en celulares bajitos.
+//   - Header de pasos: en mobile muestra solo los 6 puntitos + la etiqueta del
+//     PASO ACTIVO (las 6 etiquetas de texto se ven recién desde sm:, donde entran).
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -392,22 +399,23 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
       <motion.div
         initial={{ scale: 0.96, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 20 }}
-        className="w-full max-w-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-t-3xl sm:rounded-3xl shadow-2xl my-0 sm:my-auto"
+        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-t-3xl sm:rounded-3xl shadow-2xl"
       >
-        {/* ── Header: progreso ── */}
-        <div className="px-6 pt-6 pb-4 border-b-2 border-linea dark:border-linea-dark">
+        {/* ── Header: progreso (fijo) ── */}
+        <div className="shrink-0 px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b-2 border-linea dark:border-linea-dark">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-black text-suave dark:text-suave-dark">
               {initialData ? "Editar siniestro" : "Nuevo siniestro"} — paso {step} de {STEPS.length}
             </p>
             <button
               onClick={onClose}
-              className="h-9 w-9 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark flex items-center justify-center transition-colors"
+              aria-label="Cerrar"
+              className="shrink-0 inline-flex items-center justify-center h-11 w-11 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark transition-colors"
             >
               <HiX className="w-4 h-4" />
             </button>
@@ -421,7 +429,8 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
             />
           </div>
 
-          <div className="flex items-center justify-between mt-3">
+          {/* 📱 En mobile: solo puntitos + etiqueta del paso activo. En sm+: las 6 etiquetas. */}
+          <div className="flex items-center justify-center sm:justify-between gap-1.5 sm:gap-0 mt-3">
             {STEPS.map(({ id, label }) => (
               <div key={id} className="flex flex-col items-center gap-1">
                 <div className={`h-2 w-2 rounded-full transition-colors ${
@@ -429,16 +438,20 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                   id === step ? "bg-duo-azul ring-2 ring-duo-azul/40" :
                   "bg-linea dark:bg-linea-dark"
                 }`} />
-                <span className={`text-[10px] font-black ${id === step ? "text-duo-azul" : "text-suave dark:text-suave-dark"}`}>
+                <span className={`hidden sm:block text-[10px] font-black ${id === step ? "text-duo-azul" : "text-suave dark:text-suave-dark"}`}>
                   {label}
                 </span>
               </div>
             ))}
+            {/* Etiqueta del paso activo (solo mobile) */}
+            <span className="sm:hidden ml-2 text-xs font-black text-duo-azul">
+              {STEPS[step - 1]?.label}
+            </span>
           </div>
         </div>
 
-        {/* ── Contenido animado ── */}
-        <div className="relative" style={{ minHeight: 340 }}>
+        {/* ── Contenido animado (scrollea) ── */}
+        <div className="relative min-h-0 flex-1 overflow-y-auto">
           <AnimatePresence custom={direction} mode="wait">
             <motion.div
               key={step}
@@ -767,13 +780,13 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
           </AnimatePresence>
         </div>
 
-        {/* ── Footer: botones ── */}
-        <div className="px-6 pb-6 pt-4 flex gap-3 border-t-2 border-linea dark:border-linea-dark">
+        {/* ── Footer: botones (fijo) ── */}
+        <div className="shrink-0 px-5 sm:px-6 pb-6 pt-4 flex gap-3 border-t-2 border-linea dark:border-linea-dark">
           {step > 1 && (
             <button
               type="button"
               onClick={goBack}
-              className="h-12 px-5 rounded-2xl bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark font-black flex items-center gap-2 transition-colors"
+              className="h-12 px-4 sm:px-5 rounded-2xl bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark font-black flex items-center justify-center gap-2 transition-colors"
             >
               <HiArrowLeft className="w-4 h-4" /> Volver
             </button>

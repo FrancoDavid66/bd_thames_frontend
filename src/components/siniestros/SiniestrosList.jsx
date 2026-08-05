@@ -1,4 +1,9 @@
-// src/components/siniestros/SiniestrosList.jsx
+// src/components/siniestros/SiniestrosList.jsx  (responsive)
+//
+// 📱 RESPONSIVE: la tarjeta HOY pone los datos a la izquierda y (fecha + 3
+//    botones) a la derecha — en 375px se aprieta. Ahora en mobile los datos van
+//    ARRIBA y una fila con fecha + botones Ver/Editar/Borrar (44px) va ABAJO,
+//    separada por un borde. En desktop (sm+) vuelve a ser datos-izq / acciones-der.
 import { memo } from "react";
 import { HiEye, HiPencil, HiTrash, HiExclamationCircle } from "react-icons/hi";
 import dayjs from "dayjs";
@@ -37,7 +42,7 @@ const SiniestroCard = memo(({ s, isWebAdmin, onView, onEdit, onDelete }) => {
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge tono={cfg.tono} size="sm">{s.estado_label || cfg.label}</Badge>
@@ -71,8 +76,9 @@ const SiniestroCard = memo(({ s, isWebAdmin, onView, onEdit, onDelete }) => {
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-3 shrink-0">
-          <div className="text-right">
+        {/* 📱 En mobile: fila abajo (fecha + botones) separada por borde. En sm+: columna a la derecha. */}
+        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-3 shrink-0 pt-3 sm:pt-0 border-t-2 sm:border-t-0 border-linea dark:border-linea-dark">
+          <div className="text-left sm:text-right">
             <p className="text-sm font-mono font-black text-titulo dark:text-titulo-dark">
               {s.fecha_siniestro ? dayjs(s.fecha_siniestro).format("DD/MM/YYYY") : "Sin fecha"}
             </p>
@@ -82,22 +88,22 @@ const SiniestroCard = memo(({ s, isWebAdmin, onView, onEdit, onDelete }) => {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 sm:gap-1.5">
             <button onClick={() => onView(s)}
-              className="h-9 w-9 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul hover:brightness-95 flex items-center justify-center transition-all"
-              title="Ver detalle">
-              <HiEye className="w-4 h-4" />
+              className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul hover:brightness-95 flex items-center justify-center transition-all"
+              title="Ver detalle" aria-label="Ver detalle">
+              <HiEye className="w-5 h-5 sm:w-4 sm:h-4" />
             </button>
             <button onClick={() => onEdit(s)}
-              className="h-9 w-9 rounded-lg bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-95 flex items-center justify-center transition-all"
-              title="Editar">
-              <HiPencil className="w-4 h-4" />
+              className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-95 flex items-center justify-center transition-all"
+              title="Editar" aria-label="Editar">
+              <HiPencil className="w-5 h-5 sm:w-4 sm:h-4" />
             </button>
             {isWebAdmin && (
               <button onClick={() => onDelete(s)}
-                className="h-9 w-9 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo hover:brightness-95 flex items-center justify-center transition-all"
-                title="Eliminar">
-                <HiTrash className="w-4 h-4" />
+                className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo hover:brightness-95 flex items-center justify-center transition-all"
+                title="Eliminar" aria-label="Eliminar">
+                <HiTrash className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
             )}
           </div>

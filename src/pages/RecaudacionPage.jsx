@@ -1,4 +1,11 @@
-// src/pages/RecaudacionPage.jsx  (diseño Duo)
+// src/pages/RecaudacionPage.jsx  (diseño Duo · responsive)
+//
+// 📱 RESPONSIVE (esta pasada):
+//   - VISTA EMPLEADO: la barra de 3 pasos (StepsBar) queda más compacta en
+//     mobile sin aplastarse; inputs/botones ya a 44-48px.
+//   - VISTA ADMIN: toolbar de filtros (fecha/oficina/actualizar) se apila a lo
+//     ancho en mobile; KPIs y grilla 1 col en celu (2-4 en desktop, como antes);
+//     paginación con botones ≥44px; modal ticket y foto ampliada full-width.
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -640,7 +647,7 @@ function StepsBar({ steps }) {
     <div className="flex items-center">
       {steps.map((s, i) => (
         <div key={i} className="flex items-center flex-1 last:flex-none">
-          <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <div className="flex flex-col items-center gap-1.5 shrink-0 w-16 sm:w-auto">
             <span
               className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-black border-2 transition-colors ${
                 s.done
@@ -650,7 +657,7 @@ function StepsBar({ steps }) {
             >
               {s.done ? <HiCheck className="w-5 h-5" /> : i + 1}
             </span>
-            <span className={`text-[11px] text-center leading-tight font-black ${s.done ? "text-ingreso dark:text-ingreso-claro" : "text-suave dark:text-suave-dark"}`}>
+            <span className={`text-[10px] sm:text-[11px] text-center leading-tight font-black ${s.done ? "text-ingreso dark:text-ingreso-claro" : "text-suave dark:text-suave-dark"}`}>
               {s.label}
             </span>
           </div>
@@ -820,19 +827,19 @@ function AdminView() {
         <EstadoCierresDia />
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-        <div className="flex gap-2 flex-wrap flex-1">
+      {/* Toolbar — 📱 apilada a lo ancho en mobile */}
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap flex-1">
           <input
             type="date"
             value={filtroFecha}
             onChange={onChangeFecha}
-            className="h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-sm font-bold px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]"
+            className="h-11 w-full sm:w-auto rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]"
           />
           <select
             value={filtroOficina}
             onChange={onChangeOficina}
-            className="h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-sm font-bold px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark] cursor-pointer"
+            className="h-11 w-full sm:w-auto rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark] cursor-pointer"
           >
             <option value="">Todas las sucursales</option>
             {oficinas.map((o) => (
@@ -843,7 +850,7 @@ function AdminView() {
         <button
           onClick={refresh}
           disabled={loading}
-          className="h-10 px-4 rounded-xl bg-oficina text-white text-sm font-black shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all inline-flex items-center gap-2 disabled:opacity-50 shrink-0"
+          className="h-11 w-full sm:w-auto px-4 rounded-xl bg-oficina text-white text-sm font-black shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
         >
           <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           {loading ? "Cargando..." : "Actualizar"}
@@ -1014,17 +1021,19 @@ function AdminView() {
           <button
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
-            className="h-9 w-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
+            aria-label="Página anterior"
+            className="h-11 w-11 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
           >
-            <HiChevronLeft className="w-4 h-4" />
+            <HiChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-xs font-mono font-bold text-suave dark:text-suave-dark px-2">{page} / {totalPages}</span>
+          <span className="text-xs font-mono font-bold text-suave dark:text-suave-dark px-2 min-w-[60px] text-center">{page} / {totalPages}</span>
           <button
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="h-9 w-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
+            aria-label="Página siguiente"
+            className="h-11 w-11 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
           >
-            <HiChevronRight className="w-4 h-4" />
+            <HiChevronRight className="w-5 h-5" />
           </button>
         </div>
       )}

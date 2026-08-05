@@ -5,6 +5,10 @@
  * Da tolerancia (default 5 min) después de la hora.
  * Se monta una vez (global, dentro del Router). Solo actúa si la oficina del
  * usuario tiene un horario cargado y todavía no cerró hoy.
+ *
+ * 📱 RESPONSIVE: en mobile aparece como HOJA desde abajo (ocupa el ancho, más
+ *    cómoda para el pulgar, coherente con los demás modales de la app); en
+ *    desktop (sm+) se centra como tarjeta. Botones ≥44px.
  */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -124,9 +128,9 @@ export default function CierreCajaReminder() {
   const borde = enTolerancia ? "border-egreso/50" : "border-tarjeta/50";
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       <div
-        className={`w-full max-w-sm rounded-3xl border-2 ${borde} bg-card dark:bg-card-dark p-6 text-center shadow-2xl`}
+        className={`w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl border-2 ${borde} bg-card dark:bg-card-dark p-6 pb-8 sm:pb-6 text-center shadow-2xl`}
       >
         {/* Encabezado */}
         <div className="mb-5 flex items-center justify-between">
@@ -135,7 +139,8 @@ export default function CierreCajaReminder() {
           </span>
           <button
             onClick={descartar}
-            className="rounded-lg p-1.5 bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+            aria-label="Cerrar"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
           >
             <HiX className="text-lg" />
           </button>
@@ -160,13 +165,13 @@ export default function CierreCajaReminder() {
         {/* Acciones */}
         <button
           onClick={() => { navigate(RUTA_CIERRE); descartar(); }}
-          className="mt-6 w-full rounded-2xl bg-oficina py-3.5 text-sm font-black text-white shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
+          className="mt-6 w-full min-h-[52px] rounded-2xl bg-oficina py-3.5 text-sm font-black text-white shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
         >
           Ir a cerrar caja
         </button>
         <button
           onClick={descartar}
-          className="mt-2 w-full rounded-xl py-2.5 text-[12px] font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+          className="mt-2 w-full min-h-[44px] rounded-xl py-2.5 text-[12px] font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
         >
           Ahora no
         </button>

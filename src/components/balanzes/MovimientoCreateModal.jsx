@@ -1,4 +1,4 @@
-// src/components/balanzes/MovimientoCreateModal.jsx  (diseño Duo — WIZARD 2 pasos · responsive)
+// src/components/balanzes/MovimientoCreateModal.jsx  (diseño Duo — WIZARD 3 PASOS · responsive)
 //
 // 🚀 Componente ÚNICO para cargar un INGRESO o un EGRESO.
 //    Reemplaza a IngresoCreateModal.jsx y EgresoCreateModal.jsx.
@@ -7,18 +7,22 @@
 //      <MovimientoCreateModal isOpen={...} onClose={...} tipoInicial="INGRESO" />
 //      <MovimientoCreateModal isOpen={...} onClose={...} tipoInicial="EGRESO" />
 //
-//    WIZARD de 2 pasos (hoja desde abajo, estilo Duolingo):
+//    🆕 WIZARD de 3 PASOS (antes eran 2; el paso 2 quedaba largo y no entraba en
+//       celulares chicos). Ahora cada pantalla es cortita:
 //      Paso 1 → Tipo (Ingreso / Egreso) + Monto
 //      Paso 2 → Forma de pago (Efectivo / Transferencia) + billetera (si transf.)
-//               + Motivo (+ Sucursal si admin) + Resumen + Confirmar
+//      Paso 3 → Motivo (+ Sucursal si admin) + Resumen + Confirmar
+//
+//    SIMPLIFICACIONES respecto a la versión vieja:
+//      - Solo 2 formas de pago: EFECTIVO y TRANSFERENCIA.
+//      - Sin selección de categoría: se guarda como "Sin categoría".
+//      - La billetera se escribe a mano (texto libre) y solo cuando es transferencia.
+//      - La fecha ya no se pide: se usa la de hoy automáticamente.
 //
 // 📱 RESPONSIVE:
 //    - Inputs y cards con tap target ≥ 44-48px; inputs con text-base (sin zoom iOS).
-//    - Footer: en pantallas MUY chicas los botones se apilan (Guardar arriba,
-//      Atrás abajo) para que el texto no se corte; desde sm van en fila.
-//    - El alto total y el scroll del modal los maneja <ModalWrapper>. Si notás
-//      que en un celu muy bajito el footer queda tapado, revisá que ModalWrapper
-//      use max-h-[Nvh] + overflow-y-auto en su contenedor (ver nota al final).
+//    - Footer: en pantallas chicas los botones se apilan (principal arriba, Atrás
+//      abajo); desde sm van en fila. El alto/scroll del modal lo maneja ModalWrapper.
 //
 import { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -41,8 +45,8 @@ const today = () => dayjs().format("YYYY-MM-DD");
 const API_BASE = (import.meta.env.VITE_API_URL || "/api/").toString();
 const OFICINAS_URL = (API_BASE.endsWith("/") ? API_BASE : API_BASE + "/") + "usuarios/oficinas/";
 
-// 🚀 Cantidad de pasos del wizard
-const TOTAL_PASOS = 2;
+// 🚀 Cantidad de pasos del wizard (ahora 3)
+const TOTAL_PASOS = 3;
 
 // ⚠️ Tailwind NO soporta clases dinámicas. Definimos las clases COMPLETAS por tipo.
 //    Usan los tokens semánticos de index.css (ingreso = verde, egreso = rojo).
@@ -195,6 +199,8 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
     }
     if (n === 2) {
       if (isTransferencia && !form.billetera?.trim()) e.billetera = "Indicá la billetera / cuenta.";
+    }
+    if (n === 3) {
       if (!form.descripcion?.trim()) e.descripcion = "El motivo es obligatorio.";
       if (isWebAdmin && !form.oficina) e.oficina = "Seleccioná la sucursal.";
     }
@@ -220,6 +226,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
   const irSiguiente = () => {
     if (paso === 1) { if (validarPaso(1)) setPaso(2); return; }
+    if (paso === 2) { if (validarPaso(2)) setPaso(3); return; }
   };
 
   const handleSubmit = async (ev) => {
@@ -286,6 +293,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
   // ¿Se puede avanzar / confirmar según el paso actual?
   const pasoUnoOk = form.monto && Number(form.monto) > 0;
+  const pasoDosOk = !isTransferencia || !!form.billetera?.trim();
   const finalDisabled =
     submitting ||
     !form.monto ||
@@ -293,16 +301,21 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
     (isTransferencia && !form.billetera?.trim()) ||
     (isWebAdmin && !form.oficina);
 
+  // ¿El botón "Siguiente" del paso actual está habilitado?
+  const siguienteDisabled = paso === 1 ? !pasoUnoOk : paso === 2 ? !pasoDosOk : false;
+
   const tituloPaso =
     paso === 1
       ? "¿Qué querés cargar?"
-      : `${esIngreso ? "Ingreso" : "Egreso"} — forma de pago y motivo`;
+      : paso === 2
+        ? `${esIngreso ? "Ingreso" : "Egreso"} — forma de pago`
+        : `${esIngreso ? "Ingreso" : "Egreso"} — motivo y confirmación`;
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose} title={tituloPaso}>
-      {/* 🚀 BARRA DE PROGRESO (2 segmentos estilo Duo) */}
+      {/* 🚀 BARRA DE PROGRESO (3 segmentos estilo Duo) */}
       <div className="flex items-center gap-1.5 mb-5">
-        {[1, 2].map((n) => (
+        {[1, 2, 3].map((n) => (
           <div key={n} className="flex-1 h-2 rounded-full bg-linea dark:bg-linea-dark overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${T.barra}`}
@@ -377,11 +390,10 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
         )}
 
         {/* ============================================================ */}
-        {/* PASO 2 · FORMA DE PAGO + BILLETERA + MOTIVO (+ SUCURSAL)      */}
+        {/* PASO 2 · FORMA DE PAGO + BILLETERA                            */}
         {/* ============================================================ */}
         {paso === 2 && (
           <div className="space-y-5">
-            {/* FORMA DE PAGO */}
             <div>
               <label className="block text-xs font-black mb-2 text-suave dark:text-suave-dark">Forma de pago <span className="text-duo-rojo">*</span></label>
               <div className="grid grid-cols-2 gap-2">
@@ -417,14 +429,21 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                   {errors.billetera && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.billetera}</p>}
                 </div>
               ) : (
-                <p className="text-[11px] font-bold text-suave dark:text-suave-dark italic mt-2">
-                  Pago en efectivo: no hace falta indicar cuenta.
-                </p>
+                <div className="mt-3 rounded-xl border-2 border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-4 text-center">
+                  <p className="text-[13px] font-bold text-suave dark:text-suave-dark italic">
+                    Pago en efectivo: no hace falta indicar cuenta. 👍
+                  </p>
+                </div>
               )}
             </div>
+          </div>
+        )}
 
-            <div className="border-t-2 border-linea dark:border-linea-dark" />
-
+        {/* ============================================================ */}
+        {/* PASO 3 · MOTIVO (+ SUCURSAL) + RESUMEN                        */}
+        {/* ============================================================ */}
+        {paso === 3 && (
+          <div className="space-y-5">
             {/* MOTIVO */}
             <div>
               <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
@@ -485,10 +504,10 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
         {/* ============================================================ */}
         {/* FOOTER · navegación                                          */}
-        {/* 📱 En mobile se apila (Guardar arriba, Atrás abajo); fila en sm+ */}
+        {/* 📱 En mobile se apila (principal arriba, Atrás/Cancelar abajo) */}
         {/* ============================================================ */}
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t-2 border-linea dark:border-linea-dark">
-          {/* Botón izquierdo: Cancelar (paso 1) o Atrás (paso 2) */}
+          {/* Botón izquierdo: Cancelar (paso 1) o Atrás (pasos 2 y 3) */}
           {paso === 1 ? (
             <button type="button" onClick={onClose} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
               Cancelar
@@ -499,13 +518,13 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
             </button>
           )}
 
-          {/* Botón derecho: Siguiente (paso 1) o Confirmar (paso 2) */}
+          {/* Botón derecho: Siguiente (pasos 1 y 2) o Confirmar (paso 3) */}
           {paso < TOTAL_PASOS ? (
             <button
               type="button"
               onClick={irSiguiente}
-              disabled={!pasoUnoOk}
-              className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${!pasoUnoOk ? T.btnDisabled : T.btnOk}`}
+              disabled={siguienteDisabled}
+              className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${siguienteDisabled ? T.btnDisabled : T.btnOk}`}
             >
               Siguiente →
             </button>

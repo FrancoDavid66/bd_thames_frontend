@@ -1,5 +1,8 @@
-// src/components/recaudacion/EstadoCierresDia.jsx  (diseño Duo)
+// src/components/recaudacion/EstadoCierresDia.jsx  (diseño Duo · responsive)
 // 🚀 Muestra, para un día, qué sucursales cerraron caja y cuáles NO.
+// 📱 RESPONSIVE: ya venía bien (encabezado apila en mobile, lista en grid). Esta
+//    pasada: el selector de fecha y el botón "Hoy" con tap target ≥44px, y la
+//    lista de sucursales usa 1 columna en celu (2 desde sm).
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { HiCheckCircle, HiXCircle, HiCalendar } from "react-icons/hi";
@@ -50,18 +53,18 @@ export default function EstadoCierresDia() {
         <h3 className="text-sm sm:text-base font-black text-titulo dark:text-titulo-dark">
           ¿Quién cerró caja {esHoy ? "hoy" : "ese día"}?
         </h3>
-        <div className="flex items-center gap-2 rounded-xl border-2 border-linea dark:border-linea-dark px-2.5 py-1.5 focus-within:border-oficina transition-colors">
+        <div className="flex items-center gap-2 rounded-xl border-2 border-linea dark:border-linea-dark px-3 h-11 focus-within:border-oficina transition-colors">
           <HiCalendar className="text-oficina w-4 h-4 shrink-0" />
           <input
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="bg-transparent text-xs sm:text-sm font-bold text-titulo dark:text-titulo-dark outline-none dark:[color-scheme:dark]"
+            className="flex-1 min-w-0 bg-transparent text-base sm:text-sm font-bold text-titulo dark:text-titulo-dark outline-none dark:[color-scheme:dark]"
           />
           {!esHoy && (
             <button
               onClick={() => setFecha(dayjs().format("YYYY-MM-DD"))}
-              className="text-[11px] text-oficina hover:opacity-80 font-black"
+              className="shrink-0 text-[11px] text-oficina hover:opacity-80 font-black px-1"
             >
               Hoy
             </button>

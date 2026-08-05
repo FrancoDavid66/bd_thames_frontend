@@ -7,6 +7,13 @@
  * Un solo componente que, según `flujo` (item.tipo), muestra los pasos que
  * correspondan. Comparte header, barra de progreso, navegación y footer.
  * Usa la paleta semántica real (surface/card/titulo/marca) — modo claro+oscuro.
+ *
+ * 📱 RESPONSIVE:
+ *   - La hoja se limita a max-h-[92vh] y es columna flex: header fijo arriba,
+ *     contenido con scroll propio en el medio, footer fijo abajo. Así el footer
+ *     (botones) nunca queda tapado ni se corta en celulares bajitos.
+ *   - Footer: en mobile los botones se APILAN (principal arriba a lo ancho,
+ *     Cancelar abajo); en sm+ van en fila a la derecha como antes.
  */
 import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -468,20 +475,21 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
       {isOpen && item && (
         <motion.div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-          <motion.div className={`w-full max-w-lg rounded-t-3xl sm:rounded-3xl ${UI.sheet} shadow-2xl overflow-hidden`}
+          <motion.div className={`w-full max-w-lg max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl ${UI.sheet} shadow-2xl overflow-hidden`}
             initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 26, stiffness: 220 }} onClick={(e) => e.stopPropagation()}>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b-2 border-linea dark:border-linea-dark">
+            {/* Header (fijo) */}
+            <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-4 border-b-2 border-linea dark:border-linea-dark">
               <div className="min-w-0">
                 <h2 className="text-base font-bold text-titulo dark:text-titulo-dark truncate">{cfg.titulo}</h2>
                 {cfg.sub ? <p className="text-[11px] text-suave dark:text-suave-dark truncate">{cfg.sub}</p> : null}
               </div>
-              <button onClick={onClose} className="shrink-0 p-2 rounded-lg bg-titulo/5 dark:bg-white/5 text-suave dark:text-suave-dark hover:opacity-70"><HiX className="text-xl" /></button>
+              <button onClick={onClose} aria-label="Cerrar" className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg bg-titulo/5 dark:bg-white/5 text-suave dark:text-suave-dark hover:opacity-70"><HiX className="text-xl" /></button>
             </div>
 
-            {/* Cuerpo: éxito o contenido del paso */}
+            {/* Cuerpo: éxito o contenido del paso (scrollea) */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <AnimatePresence mode="wait">
               {hecho ? (
                 <motion.div key="exito" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-6">
@@ -504,12 +512,14 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
                 </motion.div>
               )}
             </AnimatePresence>
+            </div>
 
-            {/* Footer (no se muestra en éxito ni en revisión, que traen sus botones) */}
+            {/* Footer (fijo abajo · no se muestra en éxito ni en revisión, que traen sus botones) */}
+            {/* 📱 En mobile se apila (principal arriba, Cancelar abajo); fila a la derecha en sm+ */}
             {!hecho && !enRevision && (
-              <div className="px-6 py-5 border-t-2 border-linea dark:border-linea-dark flex justify-end gap-3">
-                <button onClick={onClose} disabled={saving} className={`px-6 py-2.5 rounded-xl text-sm ${UI.btnGhost}`}>Cancelar</button>
-                <button onClick={acc.fn} disabled={acc.disabled} className={`px-6 py-2.5 rounded-xl text-sm inline-flex items-center gap-2 ${UI.btnPrimary}`}>
+              <div className="shrink-0 px-5 sm:px-6 py-4 sm:py-5 border-t-2 border-linea dark:border-linea-dark flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button onClick={onClose} disabled={saving} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm ${UI.btnGhost}`}>Cancelar</button>
+                <button onClick={acc.fn} disabled={acc.disabled} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm inline-flex items-center justify-center gap-2 ${UI.btnPrimary}`}>
                   {saving
                     ? <><div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Procesando…</>
                     : <>{acc.icon || <HiCheck />} {acc.label}</>}

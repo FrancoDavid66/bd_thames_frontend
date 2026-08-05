@@ -1,8 +1,12 @@
-// src/pages/SiniestrosPage.jsx
+// src/pages/SiniestrosPage.jsx  (responsive)
 //
 // 🚨 Página de Siniestros (diseño Duo claro/oscuro).
 // Orquesta todo: lista + búsqueda + filtro por estado + wizard (alta/edición)
 // + detalle + borrar. Es autónoma (no recibe props; la ruta la monta sola).
+//
+// 📱 RESPONSIVE: encabezado apila el botón "Nuevo siniestro" full-width en
+//    mobile; los chips de estado hacen scroll horizontal (no se amontonan);
+//    buscador a 48px. El resto ya venía bien.
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
@@ -138,12 +142,12 @@ export default function SiniestrosPage() {
       className="max-w-5xl mx-auto px-4 sm:px-0 py-4 sm:py-6 space-y-5"
     >
       {/* ── Encabezado ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center">
+          <div className="h-12 w-12 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center shrink-0">
             <span className="text-2xl">🚨</span>
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-titulo dark:text-titulo-dark">Siniestros</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-sm font-bold text-suave dark:text-suave-dark">{siniestros?.length || 0} en total</span>
@@ -152,9 +156,12 @@ export default function SiniestrosPage() {
           </div>
         </div>
 
-        <Boton3D variant="verde" onClick={abrirAlta}>
-          <HiPlus className="w-5 h-5" /> Nuevo siniestro
-        </Boton3D>
+        {/* 📱 Full-width en mobile; ancho natural en desktop (el wrapper w-auto lo encoge). */}
+        <div className="w-full sm:w-auto shrink-0">
+          <Boton3D variant="verde" full onClick={abrirAlta}>
+            <HiPlus className="w-5 h-5" /> Nuevo siniestro
+          </Boton3D>
+        </div>
       </div>
 
       {/* ── Búsqueda ── */}
@@ -164,12 +171,12 @@ export default function SiniestrosPage() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por cliente, patente, póliza o N° de reclamo..."
-          className="w-full h-13 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark py-3 text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+          className="w-full h-13 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-base font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
         />
       </div>
 
-      {/* ── Chips de estado ── */}
-      <div className="flex gap-2 flex-wrap">
+      {/* ── Chips de estado — 📱 scroll horizontal en mobile (no se amontonan) ── */}
+      <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {FILTROS.map((f) => {
           const active = filtroEstado === f.value;
           return (
@@ -177,7 +184,7 @@ export default function SiniestrosPage() {
               key={f.value || "todos"}
               type="button"
               onClick={() => setFiltroEstado(f.value)}
-              className={`h-9 px-4 rounded-xl border-2 text-xs font-black transition-colors ${
+              className={`shrink-0 min-h-[40px] px-4 rounded-xl border-2 text-xs font-black transition-colors ${
                 active
                   ? "bg-duo-azul border-duo-azul text-white"
                   : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
