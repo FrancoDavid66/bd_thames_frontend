@@ -1071,7 +1071,7 @@ function SeccionClienteCampos({ form, set, faltaCampo }) {
           onChange={set("cli_telefono")}
           placeholder="11..."
           inputMode="tel"
-          className={faltaCampo("cli_telefono") ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft" : ""}
+          className={faltaCampo("cli_telefono") ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft [&_input]:!text-[#5a4600] [&_input]:placeholder:!text-[#5a4600]/50" : ""}
         />
         <InputDuo label="Localidad" value={form.cli_localidad} onChange={set("cli_localidad")} placeholder="Ej: Ramos Mejía" />
         <InputDuo label="Dirección" value={form.cli_direccion} onChange={set("cli_direccion")} placeholder="Opcional" />
@@ -1117,7 +1117,7 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
             onChange={set("cobertura")}
             placeholder="— Elegir —"
             options={coberturas.map((c) => ({ value: c.nombre || c, label: c.nombre || c }))}
-            className={`sm:col-span-2 ${faltaCobertura ? "[&_select]:border-duo-amarillo [&_select]:bg-duo-amarillo-soft" : ""}`}
+            className={`sm:col-span-2 ${faltaCobertura ? "[&_select]:border-duo-amarillo [&_select]:bg-duo-amarillo-soft [&_select]:!text-[#5a4600]" : ""}`}
           />
         ) : (
           <InputDuo
@@ -1125,7 +1125,7 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
             value={form.cobertura}
             onChange={set("cobertura")}
             placeholder="A / B / C9…"
-            className={`sm:col-span-2 ${faltaCobertura ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft" : ""}`}
+            className={`sm:col-span-2 ${faltaCobertura ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft [&_input]:!text-[#5a4600] [&_input]:placeholder:!text-[#5a4600]/50" : ""}`}
           />
         )}
       </div>
@@ -1228,7 +1228,7 @@ function SeccionVehiculo({ form, set, companias, coberturas, opcionesCompania, f
           onChange={set("patente")}
           placeholder="ABC123"
           style={{ textTransform: "uppercase" }}
-          className={faltaCampo("patente") ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft" : ""}
+          className={faltaCampo("patente") ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft [&_input]:!text-[#5a4600] [&_input]:placeholder:!text-[#5a4600]/50" : ""}
         />
         <InputDuo label="Marca" value={form.marca} onChange={set("marca")} placeholder="Ford" />
         <InputDuo label="Modelo" value={form.modelo} onChange={set("modelo")} placeholder="Fiesta" />
@@ -1241,7 +1241,7 @@ function SeccionVehiculo({ form, set, companias, coberturas, opcionesCompania, f
             onChange={set("compania")}
             placeholder="— Elegir —"
             options={opcionesCompania}
-            className={faltaCompania ? "[&_select]:border-duo-amarillo [&_select]:bg-duo-amarillo-soft" : ""}
+            className={faltaCompania ? "[&_select]:border-duo-amarillo [&_select]:bg-duo-amarillo-soft [&_select]:!text-[#5a4600]" : ""}
           />
         ) : (
           <InputDuo
@@ -1249,7 +1249,7 @@ function SeccionVehiculo({ form, set, companias, coberturas, opcionesCompania, f
             value={form.compania}
             onChange={set("compania")}
             placeholder="NRE / AMCA…"
-            className={faltaCompania ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft" : ""}
+            className={faltaCompania ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft [&_input]:!text-[#5a4600] [&_input]:placeholder:!text-[#5a4600]/50" : ""}
           />
         )}
       </div>

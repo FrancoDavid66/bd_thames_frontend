@@ -46,24 +46,24 @@ const TOTAL_PASOS = 2;
 //    Usan los tokens semánticos de index.css (ingreso = verde, egreso = rojo).
 const THEME = {
   INGRESO: {
-    text: "text-ingreso",
-    formaOn: "bg-ingreso/20 text-ingreso dark:text-ingreso-claro border-ingreso",
-    inputFocus: "focus:border-ingreso",
-    resumenMonto: "text-ingreso dark:text-ingreso-claro",
-    barra: "bg-ingreso",
-    cardOn: "border-ingreso bg-ingreso/10 text-ingreso dark:text-ingreso-claro shadow-[0_4px_0_var(--color-ingreso-fuerte)]",
-    btnOk: "bg-ingreso text-white shadow-[0_5px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5",
-    btnDisabled: "bg-ingreso/30 text-white/50 cursor-not-allowed",
+    text: "text-duo-verde",
+    formaOn: "bg-duo-verde/20 text-duo-verde dark:text-duo-verde border-duo-verde",
+    inputFocus: "focus:border-duo-verde",
+    resumenMonto: "text-duo-verde dark:text-duo-verde",
+    barra: "bg-duo-verde",
+    cardOn: "border-duo-verde bg-duo-verde/10 text-duo-verde dark:text-duo-verde shadow-[0_4px_0_var(--color-duo-verde-sombra)]",
+    btnOk: "bg-duo-verde text-white shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5",
+    btnDisabled: "bg-duo-verde/30 text-white/50 cursor-not-allowed",
   },
   EGRESO: {
-    text: "text-egreso",
-    formaOn: "bg-egreso/20 text-egreso dark:text-egreso-claro border-egreso",
-    inputFocus: "focus:border-egreso",
-    resumenMonto: "text-egreso dark:text-egreso-claro",
-    barra: "bg-egreso",
-    cardOn: "border-egreso bg-egreso/10 text-egreso dark:text-egreso-claro shadow-[0_4px_0_var(--color-egreso-fuerte)]",
-    btnOk: "bg-egreso text-white shadow-[0_5px_0_var(--color-egreso-fuerte)] active:shadow-[0_0_0_var(--color-egreso-fuerte)] active:translate-y-0.5",
-    btnDisabled: "bg-egreso/30 text-white/50 cursor-not-allowed",
+    text: "text-duo-rojo",
+    formaOn: "bg-duo-rojo/20 text-duo-rojo dark:text-duo-rojo border-duo-rojo",
+    inputFocus: "focus:border-duo-rojo",
+    resumenMonto: "text-duo-rojo dark:text-duo-rojo",
+    barra: "bg-duo-rojo",
+    cardOn: "border-duo-rojo bg-duo-rojo/10 text-duo-rojo dark:text-duo-rojo shadow-[0_4px_0_var(--color-duo-rojo-sombra)]",
+    btnOk: "bg-duo-rojo text-white shadow-[0_5px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5",
+    btnDisabled: "bg-duo-rojo/30 text-white/50 cursor-not-allowed",
   },
 };
 
@@ -354,8 +354,8 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
             {/* MONTO */}
             <div>
-              <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">Monto <span className="text-egreso">*</span></label>
-              <div className={`flex items-center gap-2 w-full px-3 h-12 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark transition-colors focus-within:border-${esIngreso ? "ingreso" : "egreso"}`}>
+              <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">Monto <span className="text-duo-rojo">*</span></label>
+              <div className={`flex items-center gap-2 w-full px-3 h-12 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark transition-colors ${esIngreso ? "focus-within:border-duo-verde" : "focus-within:border-duo-rojo"}`}>
                 <span className="text-suave dark:text-suave-dark font-black shrink-0">$</span>
                 <input
                   ref={montoRef}
@@ -368,7 +368,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                   placeholder="0"
                 />
               </div>
-              {errors.monto && <p className="text-[11px] font-bold text-egreso mt-1">{errors.monto}</p>}
+              {errors.monto && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.monto}</p>}
             </div>
           </div>
         )}
@@ -380,7 +380,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
           <div className="space-y-5">
             {/* FORMA DE PAGO */}
             <div>
-              <label className="block text-xs font-black mb-2 text-suave dark:text-suave-dark">Forma de pago <span className="text-egreso">*</span></label>
+              <label className="block text-xs font-black mb-2 text-suave dark:text-suave-dark">Forma de pago <span className="text-duo-rojo">*</span></label>
               <div className="grid grid-cols-2 gap-2">
                 {["EFECTIVO", "TRANSFERENCIA"].map((fp) => (
                   <button
@@ -402,7 +402,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
               {isTransferencia ? (
                 <div className="mt-3">
                   <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
-                    ¿De qué billetera / cuenta? <span className="text-egreso">*</span>
+                    ¿De qué billetera / cuenta? <span className="text-duo-rojo">*</span>
                   </label>
                   <input
                     name="billetera"
@@ -411,7 +411,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                     placeholder="Ej: Mercado Pago Franco, Santander…"
                     className={inputBase}
                   />
-                  {errors.billetera && <p className="text-[11px] font-bold text-egreso mt-1">{errors.billetera}</p>}
+                  {errors.billetera && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.billetera}</p>}
                 </div>
               ) : (
                 <p className="text-[11px] font-bold text-suave dark:text-suave-dark italic mt-2">
@@ -425,7 +425,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
             {/* MOTIVO */}
             <div>
               <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
-                Motivo del {esIngreso ? "ingreso" : "egreso"} <span className="text-egreso">*</span>
+                Motivo del {esIngreso ? "ingreso" : "egreso"} <span className="text-duo-rojo">*</span>
               </label>
               <input
                 name="descripcion"
@@ -434,13 +434,13 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 placeholder={esIngreso ? "Ej: Cobro seña, venta póliza…" : "Ej: Artículos de limpieza, luz…"}
                 className={inputBase}
               />
-              {errors.descripcion && <p className="text-[11px] font-bold text-egreso mt-1">{errors.descripcion}</p>}
+              {errors.descripcion && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.descripcion}</p>}
             </div>
 
             {/* SUCURSAL (solo admin) */}
             {isWebAdmin && (
               <div>
-                <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">Sucursal <span className="text-egreso">*</span></label>
+                <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">Sucursal <span className="text-duo-rojo">*</span></label>
                 <select name="oficina" value={form.oficina} onChange={handleChange} className={selectBase}>
                   <option value="">Seleccioná la sucursal…</option>
                   {oficinas.map((o) => (
@@ -449,7 +449,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                     </option>
                   ))}
                 </select>
-                {errors.oficina && <p className="text-[11px] font-bold text-egreso mt-1">{errors.oficina}</p>}
+                {errors.oficina && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.oficina}</p>}
               </div>
             )}
 

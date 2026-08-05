@@ -114,7 +114,7 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const inputCls =
-    "flex-1 px-4 py-2.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-xs sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-oficina transition-colors";
+    "flex-1 px-4 py-2.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-xs sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors";
 
   return (
     <div className="fixed inset-0 z-[1000]">
@@ -124,8 +124,8 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
           {/* Header */}
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-oficina/15 flex items-center justify-center">
-                <HiCog className="text-xl text-oficina" />
+              <div className="w-10 h-10 rounded-2xl bg-duo-azul/15 flex items-center justify-center">
+                <HiCog className="text-xl text-duo-azul" />
               </div>
               <div className="flex flex-col">
                 <h2 className="text-base md:text-lg font-black tracking-tight">Categorías</h2>
@@ -141,13 +141,13 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
             <div className="flex bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-xl p-1">
               <button
                 onClick={() => { setTab("INGRESO"); setEditId(null); setConfirmDelId(null); }}
-                className={`flex-1 py-2 rounded-lg text-sm font-black transition-colors ${tab === "INGRESO" ? "bg-ingreso/20 text-ingreso dark:text-ingreso-claro" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                className={`flex-1 py-2 rounded-lg text-sm font-black transition-colors ${tab === "INGRESO" ? "bg-duo-verde/20 text-duo-verde dark:text-duo-verde" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
               >
                 Categorías de Ingreso
               </button>
               <button
                 onClick={() => { setTab("EGRESO"); setEditId(null); setConfirmDelId(null); }}
-                className={`flex-1 py-2 rounded-lg text-sm font-black transition-colors ${tab === "EGRESO" ? "bg-egreso/20 text-egreso dark:text-egreso-claro" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                className={`flex-1 py-2 rounded-lg text-sm font-black transition-colors ${tab === "EGRESO" ? "bg-duo-rojo/20 text-duo-rojo dark:text-duo-rojo" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
               >
                 Categorías de Egreso
               </button>
@@ -169,8 +169,8 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                   !newCat.trim() || adding
                     ? "bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark cursor-not-allowed"
                     : tab === "INGRESO"
-                      ? "bg-ingreso shadow-[0_4px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5"
-                      : "bg-egreso shadow-[0_4px_0_var(--color-egreso-fuerte)] active:shadow-[0_0_0_var(--color-egreso-fuerte)] active:translate-y-0.5"
+                      ? "bg-duo-verde shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5"
+                      : "bg-duo-rojo shadow-[0_4px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5"
                 }`}
               >
                 <HiPlus className="text-lg" /> Agregar
@@ -183,7 +183,7 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar categoría…"
-                className="w-full pl-9 px-4 py-2.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-xs sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-oficina transition-colors"
+                className="w-full pl-9 px-4 py-2.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-xs sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors"
               />
             </div>
 
@@ -207,7 +207,7 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") saveEdit(cat); if (e.key === "Escape") setEditId(null); }}
-                          className="flex-1 px-3 py-1.5 rounded-lg border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-sm font-bold focus:outline-none focus:border-oficina"
+                          className="flex-1 px-3 py-1.5 rounded-lg border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-sm font-bold focus:outline-none focus:border-duo-azul"
                         />
                       ) : (
                         <div className="flex-1 min-w-0 flex items-center gap-2">
@@ -222,19 +222,19 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                       {/* Acciones */}
                       {editando ? (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => saveEdit(cat)} disabled={busy} className="p-2 rounded-lg bg-ingreso hover:bg-ingreso-fuerte text-white"><HiCheck /></button>
+                          <button onClick={() => saveEdit(cat)} disabled={busy} className="p-2 rounded-lg bg-duo-verde hover:bg-duo-verde-sombra text-white"><HiCheck /></button>
                           <button onClick={() => setEditId(null)} className="p-2 rounded-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark hover:brightness-95 text-suave dark:text-suave-dark"><HiX /></button>
                         </div>
                       ) : confirmando ? (
                         <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-black text-egreso dark:text-egreso-claro mr-1 hidden sm:inline">¿Borrar?</span>
-                          <button onClick={() => removeCat(cat)} disabled={busy} className="p-2 rounded-lg bg-egreso hover:bg-egreso-fuerte text-white"><HiCheck /></button>
+                          <span className="text-[11px] font-black text-duo-rojo dark:text-duo-rojo mr-1 hidden sm:inline">¿Borrar?</span>
+                          <button onClick={() => removeCat(cat)} disabled={busy} className="p-2 rounded-lg bg-duo-rojo hover:bg-duo-rojo-sombra text-white"><HiCheck /></button>
                           <button onClick={() => setConfirmDelId(null)} className="p-2 rounded-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark hover:brightness-95 text-suave dark:text-suave-dark"><HiX /></button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
                           <button onClick={() => startEdit(cat)} title="Renombrar" className="p-2 rounded-lg bg-card dark:bg-card-dark hover:brightness-95 text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark border-2 border-linea dark:border-linea-dark"><HiPencil /></button>
-                          <button onClick={() => setConfirmDelId(cat.id)} title="Eliminar" className="p-2 rounded-lg bg-card dark:bg-card-dark hover:bg-egreso hover:text-white text-egreso border-2 border-egreso/30"><HiTrash /></button>
+                          <button onClick={() => setConfirmDelId(cat.id)} title="Eliminar" className="p-2 rounded-lg bg-card dark:bg-card-dark hover:bg-duo-rojo hover:text-white text-duo-rojo border-2 border-duo-rojo/30"><HiTrash /></button>
                         </div>
                       )}
                     </div>

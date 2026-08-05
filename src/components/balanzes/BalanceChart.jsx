@@ -122,16 +122,16 @@ const CustomTooltip = ({ active, payload, label }) => {
       <div className="font-black mb-2 text-suave dark:text-suave-dark uppercase tracking-wide border-b-2 border-linea dark:border-linea-dark pb-1">{label}</div>
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-between items-center gap-4">
-          <span className="text-ingreso font-black">Ingresos</span>
-          <span className="text-ingreso dark:text-ingreso-claro font-mono font-black">${currencyAR(p.ingresos)}</span>
+          <span className="text-duo-verde font-black">Ingresos</span>
+          <span className="text-duo-verde dark:text-duo-verde font-mono font-black">${currencyAR(p.ingresos)}</span>
         </div>
         <div className="flex justify-between items-center gap-4">
-          <span className="text-egreso font-black">Egresos</span>
-          <span className="text-egreso dark:text-egreso-claro font-mono font-black">${currencyAR(p.egresos)}</span>
+          <span className="text-duo-rojo font-black">Egresos</span>
+          <span className="text-duo-rojo dark:text-duo-rojo font-mono font-black">${currencyAR(p.egresos)}</span>
         </div>
         <div className="flex justify-between items-center gap-4 pt-1 mt-1 border-t-2 border-linea dark:border-linea-dark">
-          <span className="text-oficina font-black">Balance</span>
-          <span className="text-oficina dark:text-oficina-claro font-mono font-black">${currencyAR(p.balance)}</span>
+          <span className="text-duo-azul font-black">Balance</span>
+          <span className="text-duo-azul dark:text-duo-azul font-mono font-black">${currencyAR(p.balance)}</span>
         </div>
       </div>
     </div>
@@ -169,7 +169,7 @@ const BalanceChart = ({
       onClick={() => setRange(id)}
       className={`flex-1 px-3 py-1.5 rounded-xl transition-all font-black ${
         range === id
-          ? "bg-oficina text-white shadow-[0_3px_0_var(--color-oficina-fuerte)]"
+          ? "bg-duo-azul text-white shadow-[0_3px_0_var(--color-duo-azul-sombra)]"
           : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
       }`}
     >
@@ -183,7 +183,7 @@ const BalanceChart = ({
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-oficina via-oficina/60 to-ingreso flex items-center justify-center text-white">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-duo-azul via-duo-azul/60 to-duo-verde flex items-center justify-center text-white">
             <HiOutlinePresentationChartBar className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
@@ -243,16 +243,16 @@ const BalanceChart = ({
               }}
             />
             {/* Barras con bordes redondeados arriba (tus tokens: ingreso / egreso) */}
-            <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={40} />
-            <Bar dataKey="egresos" name="Egresos" fill="#f43f5e" radius={[6, 6, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="ingresos" name="Ingresos" fill="#58cc02" radius={[6, 6, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="egresos" name="Egresos" fill="#ff4b4b" radius={[6, 6, 0, 0]} maxBarSize={40} />
             {/* Línea de balance (oficina / celeste) */}
             <Line
               type="monotone"
               dataKey="balance"
               name="Balance Neto"
-              stroke="#0ea5e9"
+              stroke="#1cb0f6"
               strokeWidth={3}
-              dot={{ r: 3, fill: "#0ea5e9", strokeWidth: 0 }}
+              dot={{ r: 3, fill: "#1cb0f6", strokeWidth: 0 }}
               activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
             />
             <ReferenceLine y={0} stroke={axisColor} strokeWidth={1} />

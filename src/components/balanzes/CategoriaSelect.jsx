@@ -10,7 +10,7 @@ export default function CategoriaSelect({
   error,
   refProp,
   label = "Categoría",
-  asteriskColor = "text-egreso",
+  asteriskColor = "text-duo-rojo",
 }) {
   const dispatch = useDispatch();
   const { categorias } = useSelector((s) => s.balance || {});
@@ -41,7 +41,7 @@ export default function CategoriaSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={tipo === "INGRESO" ? "Ej: Cobro de póliza, Honorarios…" : "Ej: Limpieza, Internet, Viáticos…"}
-        className="w-full px-3 py-2.5 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-oficina transition-colors"
+        className="w-full px-3 py-2.5 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors"
         autoComplete="off"
       />
       <datalist id={`categoria-opciones-${tipo}`}>
@@ -49,7 +49,7 @@ export default function CategoriaSelect({
           <option key={c} value={c} />
         ))}
       </datalist>
-      {error && <p className="text-[11px] font-bold text-egreso mt-1">{error}</p>}
+      {error && <p className="text-[11px] font-bold text-duo-rojo mt-1">{error}</p>}
     </div>
   );
 }
