@@ -73,7 +73,9 @@ const fmtHora = (item) => {
 //    Es puramente visual: la descripción real guardada en la base NO cambia.
 //    El ^ hace que solo reemplace cuando arranca con "Pago cuota" (no toca
 //    egresos que casualmente tengan esas palabras en el medio del texto).
-const abreviarPagoCuota = (txt) => (txt || "").replace(/^Pago\s+cuota\b/i, "PC");
+// Reemplaza "Pago cuota" (al principio del texto, con o sin espacios previos y
+// en cualquier combinación de mayúsculas) por "PC". Es puramente visual.
+const abreviarPagoCuota = (txt) => (txt || "").replace(/^\s*pago\s+cuota\b/i, "PC");
 
 const descripcionConPatente = (item) => {
   const desc = item?.descripcion || "—";
@@ -513,7 +515,6 @@ export default function MovimientosPanel({ oficinasAdmin = [], oficinaProp = "AL
                 <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Descripción</th>
                 <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Categoría</th>
                 <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Forma</th>
-                <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Compañía</th>
                 <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Oficina</th>
                 <th className="text-right px-3 py-2.5 font-black uppercase tracking-wide">Monto</th>
               </tr>
@@ -521,13 +522,13 @@ export default function MovimientosPanel({ oficinasAdmin = [], oficinaProp = "AL
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
+                  <td colSpan={7} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
                     Cargando…
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8">
+                  <td colSpan={7} className="text-center py-8">
                     <div className="flex flex-col items-center gap-3">
                       <span className="text-egreso font-bold">{error}</span>
                       <button
@@ -542,7 +543,7 @@ export default function MovimientosPanel({ oficinasAdmin = [], oficinaProp = "AL
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
+                  <td colSpan={7} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
                     No hay movimientos con estos filtros.
                   </td>
                 </tr>
@@ -574,16 +575,6 @@ export default function MovimientosPanel({ oficinasAdmin = [], oficinaProp = "AL
                       {/* 🚀 FORMA resaltada con chip de color */}
                       <td className="px-3 py-2 text-center">
                         <FormaBadge forma={item.forma_pago} />
-                      </td>
-                      {/* 🚀 COMPAÑÍA con chip semántico (ámbar). Egresos → guion. */}
-                      <td className="px-3 py-2 text-center">
-                        {item.compania ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg border-2 border-tarjeta/30 bg-tarjeta/10 text-tarjeta dark:text-tarjeta-claro text-[11px] font-black whitespace-nowrap">
-                            {item.compania}
-                          </span>
-                        ) : (
-                          <span className="text-suave dark:text-suave-dark">—</span>
-                        )}
                       </td>
                       {/* 🚀 OFICINA resaltada con chip */}
                       <td className="px-3 py-2 text-center">
