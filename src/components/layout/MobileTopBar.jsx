@@ -4,13 +4,13 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaHome, FaClipboardList, FaUsers, FaFileAlt, FaMoneyCheckAlt,
-  FaEllipsisH, FaBullhorn, FaMapMarkedAlt, FaChartBar, FaChartPie,
-  FaDatabase, FaSyncAlt, FaTimes, FaBan, FaCashRegister, FaClock,
-  FaFileInvoiceDollar, FaCarCrash, FaTruckMoving, FaShieldAlt,
-  FaReceipt, // 🚀 NUEVO ÍCONO PARA SERVICIOS FIJOS
-  FaClipboardCheck, // 🆕 ÍCONO PARA TAREAS DEL DÍA
-  FaCamera, // 🆕 ÍCONO PARA CONTROL DIARIO
-  FaStar,   // 🆕 ÍCONO PARA RANKING
+  FaEllipsisH, FaChartPie,
+  FaDatabase, FaSyncAlt, FaTimes, FaBan, FaCashRegister,
+  FaFileInvoiceDollar, FaCarCrash, FaShieldAlt,
+  FaReceipt,
+  FaClipboardCheck,
+  FaCamera,
+  FaStar,
 } from "react-icons/fa";
 
 import { useAuth } from "../../context/AuthContext";
@@ -19,7 +19,7 @@ const Badge = ({ value = 0 }) => {
   const v = Number(value) || 0;
   if (v <= 0) return null;
   return (
-    <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white shadow-lg">
+    <span className="absolute -right-2 -top-1.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-duo-rojo px-1 text-[10px] font-black text-white">
       {v}
     </span>
   );
@@ -31,7 +31,6 @@ export default function MobileTopBar({
   renovacionesPendientes = 0,
   bajasPendientes = 0,
   cuponVencidas = 0,
-  // 🚀 NUEVO
   serviciosAlertas = 0,
 }) {
   const { user } = useAuth();
@@ -55,7 +54,7 @@ export default function MobileTopBar({
     }
     return [
       { to: "/", label: "Inicio", icon: FaHome },
-      { to: "/solicitudes", label: "Solicitudes", icon: FaClipboardList, badge: solTotal },
+      { to: "/solicitudes", label: "Altas", icon: FaClipboardList },
       { to: "/clientes", label: "Clientes", icon: FaUsers },
       { to: "/polizas", label: "Pólizas", icon: FaFileAlt },
       { to: "/pagos", label: "Pagos", icon: FaMoneyCheckAlt },
@@ -84,34 +83,28 @@ export default function MobileTopBar({
     return [
       {
         title: "Gestión de Pólizas",
-        color: "text-blue-300",
+        tone: "azul",
         items: [
           { to: "/tareas", label: "Tareas del día", icon: FaClipboardCheck },
           { to: "/control-diario", label: "Control diario", icon: FaCamera },
           { to: "/ranking", label: "Ranking", icon: FaStar },
-          { to: "/vencimientos", label: "Vencimientos", icon: FaClock },
           { to: "/cuponeras", label: "Cuponeras", icon: FaFileAlt, badge: cuponVencidas },
           { to: "/polizas/renovaciones", label: "Renovaciones", icon: FaSyncAlt, badge: renovacionesPendientes },
           { to: "/polizas/bajas", label: "Bajas", icon: FaBan, badge: bajasPendientes },
-          { to: "/polizas/verificacion", label: "Verificación", icon: FaShieldAlt },
           { to: "/siniestros", label: "Siniestros", icon: FaCarCrash },
         ]
       },
       {
         title: "Finanzas",
-        color: "text-emerald-300",
+        tone: "verde",
         items: finanzasItems,
       },
       ...(isWebAdmin ? [{
         title: "Gerencia & Admin",
-        color: "text-purple-300",
+        tone: "violeta",
         items: [
-          { to: "/gruas", label: "Grúas", icon: FaTruckMoving },
           { to: "/cotizaciones", label: "Cotizador", icon: FaFileInvoiceDollar },
-          { to: "/marketing", label: "Campañas", icon: FaBullhorn },
           { to: "/estadisticas", label: "Estadísticas", icon: FaChartPie },
-          { to: "/competencia", label: "Competencia", icon: FaChartBar },
-          { to: "/geo", label: "Mapa Geo", icon: FaMapMarkedAlt },
           { to: "/admin", label: "Configuración", icon: FaShieldAlt },
         ]
       }] : [])
@@ -128,12 +121,24 @@ export default function MobileTopBar({
     }, 0);
   }, [menuSections]);
 
+  // Clases del recuadro del ícono según el tono del tramo
+  const toneBox = {
+    azul: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul",
+    verde: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde",
+    violeta: "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta",
+  };
+  const toneTitle = {
+    azul: "text-duo-azul",
+    verde: "text-duo-verde-sombra dark:text-duo-verde",
+    violeta: "text-duo-violeta",
+  };
+
   return (
     <>
       <AnimatePresence>
         {moreOpen && !isVendedor && (
           <motion.div
-            className="lg:hidden fixed inset-0 z-[60] bg-black/60"
+            className="fixed inset-0 z-[60] bg-black/60 lg:hidden"
             onClick={() => setMoreOpen(false)}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -141,28 +146,28 @@ export default function MobileTopBar({
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
             <motion.div
-              className="absolute left-3 right-3 rounded-2xl border border-blue-700/40 dark:border-gray-800 bg-blue-900/95 dark:bg-gray-900/95 backdrop-blur p-3 shadow-2xl"
+              className="absolute left-3 right-3 rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 shadow-2xl"
               style={{ bottom: sheetBottom }}
               onClick={(e) => e.stopPropagation()}
-              initial={{ y: 18, opacity: 0, scale: 0.98 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 14, opacity: 0, scale: 0.985 }}
-              transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.9 }}
+              initial={{ y: 18, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 14, opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
             >
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-extrabold text-white">Menú Completo</div>
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-black text-titulo dark:text-titulo-dark">Menú Completo</div>
                 <button
-                  className="rounded-xl border border-white/10 px-3 py-2 text-white/90 hover:bg-white/10 cursor-pointer"
+                  className="cursor-pointer rounded-xl border-2 border-linea dark:border-linea-dark px-3 py-2 text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
                   onClick={() => setMoreOpen(false)}
                 >
                   <FaTimes />
                 </button>
               </div>
 
-              <div className="max-h-[65vh] overflow-y-auto custom-scrollbar pb-2">
+              <div className="max-h-[65vh] overflow-y-auto pb-2">
                 {menuSections.map((section, idx) => (
                   <div key={idx} className="mb-3">
-                    <div className={`text-[10px] font-black uppercase tracking-widest ${section.color} mb-1.5 px-1`}>
+                    <div className={`mb-1.5 px-1 text-[10px] font-black uppercase tracking-widest ${toneTitle[section.tone]}`}>
                       {section.title}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -170,13 +175,9 @@ export default function MobileTopBar({
                         <button
                           key={to}
                           onClick={() => { setMoreOpen(false); navigate(to); }}
-                          className="cursor-pointer relative flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-3 text-left text-xs font-semibold text-white hover:bg-white/10 active:scale-[0.99] transition"
+                          className="relative flex cursor-pointer items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-3 text-left text-xs font-bold text-titulo dark:text-titulo-dark transition hover:border-oficina active:scale-[0.99]"
                         >
-                          <span className={`relative inline-flex items-center justify-center h-7 w-7 rounded-lg ${
-                            section.title === 'Finanzas' ? 'bg-emerald-500/15 text-emerald-300' :
-                            section.title === 'Gerencia & Admin' ? 'bg-purple-500/15 text-purple-300' :
-                            'bg-blue-500/15 text-blue-300'
-                          }`}>
+                          <span className={`relative inline-flex h-7 w-7 items-center justify-center rounded-lg ${toneBox[section.tone]}`}>
                             <Icon className="h-3.5 w-3.5" />
                             {badge > 0 && <Badge value={badge} />}
                           </span>
@@ -192,15 +193,15 @@ export default function MobileTopBar({
         )}
       </AnimatePresence>
 
-      {/* Barra fija inferior */}
+      {/* Barra fija inferior (Duo) */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-950 border-t border-slate-200 dark:border-gray-800 shadow-lg"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark lg:hidden"
         style={{
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
           height: `calc(${MOBILE_NAV_H}px + env(safe-area-inset-bottom, 0px))`,
         }}
       >
-        <div className="flex items-center justify-around h-full px-1">
+        <div className="flex h-full items-center justify-around px-1">
           {primaryTabs.map(({ to, label, icon: Icon, badge }) => {
             const active = isPrimaryActive(to);
             return (
@@ -208,15 +209,15 @@ export default function MobileTopBar({
                 key={to}
                 to={to}
                 end={to === "/"}
-                className={`relative flex flex-col items-center justify-center flex-1 h-full transition gap-0.5 ${
-                  active ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+                className={`relative flex h-full flex-1 flex-col items-center justify-center gap-0.5 transition ${
+                  active ? "text-duo-azul" : "text-suave dark:text-suave-dark"
                 }`}
               >
                 <div className="relative">
                   <Icon className="h-5 w-5" />
                   {badge > 0 && <Badge value={badge} />}
                 </div>
-                <span className="text-[10px] font-semibold leading-tight">{label}</span>
+                <span className="text-[10px] font-black leading-tight">{label}</span>
               </NavLink>
             );
           })}
@@ -224,15 +225,15 @@ export default function MobileTopBar({
           {!isVendedor && (
             <button
               onClick={() => setMoreOpen(true)}
-              className={`relative flex flex-col items-center justify-center flex-1 h-full transition gap-0.5 ${
-                moreOpen ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+              className={`relative flex h-full flex-1 flex-col items-center justify-center gap-0.5 transition ${
+                moreOpen ? "text-duo-azul" : "text-suave dark:text-suave-dark"
               }`}
             >
               <div className="relative">
                 <FaEllipsisH className="h-5 w-5" />
                 {moreBadgeTotal > 0 && <Badge value={moreBadgeTotal} />}
               </div>
-              <span className="text-[10px] font-semibold leading-tight">Más</span>
+              <span className="text-[10px] font-black leading-tight">Más</span>
             </button>
           )}
         </div>

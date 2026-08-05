@@ -1,4 +1,4 @@
-// src/components/estadisticas/ContabilidadPanel.jsx
+// src/components/estadisticas/ContabilidadPanel.jsx  (diseño Duo)
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { HiCash, HiCreditCard, HiExclamationCircle, HiTrendingUp, HiRefresh } from "react-icons/hi";
@@ -7,13 +7,13 @@ const token = () => localStorage.getItem("access_token") || localStorage.getItem
 const authH = () => token() ? { Authorization: `Bearer ${token()}` } : {};
 
 const fmt = (n) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0);
-const fmtFull = (n) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n || 0);
+const fmtFull = (n) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0);
 
 function StatRow({ label, value, accent }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-slate-800/60 last:border-0">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className={`text-sm font-semibold tabular-nums ${accent}`}>{value}</span>
+    <div className="flex items-center justify-between py-2.5 border-b-2 border-linea/50 dark:border-linea-dark/50 last:border-0">
+      <span className="text-xs font-bold text-suave dark:text-suave-dark">{label}</span>
+      <span className={`text-sm font-mono font-black tabular-nums ${accent}`}>{value}</span>
     </div>
   );
 }
@@ -48,27 +48,27 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-slate-100">Contabilidad</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Contabilidad</h2>
+          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
             {oficina ? getOficinaNombre(oficina) : "Todas las sucursales"} · {mes}/{anio}
           </p>
         </div>
         <button onClick={fetch_} disabled={loading}
-          className="h-8 w-8 flex items-center justify-center rounded-xl border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors">
+          className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors">
           <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 px-4 py-3 text-xs text-rose-300">
+        <div className="flex items-center gap-2 rounded-xl border-2 border-egreso/30 bg-egreso/10 px-4 py-3 text-xs font-bold text-egreso dark:text-egreso-claro">
           <HiExclamationCircle className="shrink-0" /> {error}
-          <button onClick={fetch_} className="ml-auto underline">Reintentar</button>
+          <button onClick={fetch_} className="ml-auto underline font-black">Reintentar</button>
         </div>
       )}
 
       {loading && !data && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-8 flex items-center justify-center">
-          <div className="w-5 h-5 rounded-full border border-slate-700 border-t-slate-300 animate-spin" />
+        <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-8 flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full border-2 border-linea dark:border-linea-dark border-t-oficina animate-spin" />
         </div>
       )}
 
@@ -80,29 +80,29 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
-            className="md:col-span-1 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 flex flex-col gap-3"
+            className="md:col-span-1 rounded-3xl border-2 border-ingreso/30 bg-ingreso/[0.06] p-5 flex flex-col gap-3"
           >
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                <HiCash className="text-emerald-400 text-sm" />
+              <div className="w-9 h-9 rounded-xl bg-ingreso/15 border-2 border-ingreso/30 flex items-center justify-center">
+                <HiCash className="text-ingreso text-sm" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600">Recaudación del mes</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-ingreso">Recaudación del mes</span>
             </div>
-            <div className="text-4xl font-light text-emerald-300 tabular-nums leading-none">
+            <div className="text-4xl font-black text-ingreso tabular-nums leading-none">
               {fmt(rec.total)}
             </div>
-            <div className="space-y-2 pt-2 border-t border-emerald-500/10">
+            <div className="space-y-2 pt-2 border-t-2 border-ingreso/15">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <HiCash className="text-slate-600" /> Efectivo
+                <span className="flex items-center gap-1.5 text-[10px] font-bold text-suave dark:text-suave-dark">
+                  <HiCash className="text-suave dark:text-suave-dark" /> Efectivo
                 </span>
-                <span className="text-xs font-medium text-emerald-400 tabular-nums">{fmt(rec.efectivo)}</span>
+                <span className="text-xs font-mono font-black text-ingreso tabular-nums">{fmt(rec.efectivo)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <HiCreditCard className="text-slate-600" /> Transferencia
+                <span className="flex items-center gap-1.5 text-[10px] font-bold text-suave dark:text-suave-dark">
+                  <HiCreditCard className="text-suave dark:text-suave-dark" /> Transferencia
                 </span>
-                <span className="text-xs font-medium text-sky-400 tabular-nums">{fmt(rec.transferencia)}</span>
+                <span className="text-xs font-mono font-black text-oficina tabular-nums">{fmt(rec.transferencia)}</span>
               </div>
             </div>
           </motion.div>
@@ -112,24 +112,24 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: 0.05 }}
-            className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 flex flex-col gap-4"
+            className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 flex flex-col gap-4"
           >
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-sky-500/10 flex items-center justify-center">
-                <HiTrendingUp className="text-sky-400 text-sm" />
+              <div className="w-9 h-9 rounded-xl bg-oficina/10 border-2 border-oficina/30 flex items-center justify-center">
+                <HiTrendingUp className="text-oficina text-sm" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Proyección del mes</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">Proyección del mes</span>
             </div>
 
             {/* Barra de cobro */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] text-slate-500">
+              <div className="flex items-center justify-between text-[10px] font-bold text-suave dark:text-suave-dark">
                 <span>Cobrado</span>
-                <span className="text-slate-300 font-medium">{cobradoPct.toFixed(0)}%</span>
+                <span className="text-titulo dark:text-titulo-dark font-black">{cobradoPct.toFixed(0)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div className="h-2.5 rounded-full bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark overflow-hidden">
                 <motion.div
-                  className="h-full rounded-full bg-sky-500"
+                  className="h-full rounded-full bg-oficina"
                   initial={{ width: 0 }}
                   animate={{ width: `${cobradoPct}%` }}
                   transition={{ duration: 0.8, ease: "easeOut" }}
@@ -138,9 +138,9 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             </div>
 
             <div className="space-y-0">
-              <StatRow label="Esperado del mes"  value={fmtFull(mes_.esperado)}  accent="text-slate-300" />
-              <StatRow label="Ya cobrado"        value={fmtFull(mes_.cobrado)}   accent="text-emerald-400" />
-              <StatRow label="Pendiente de cobro" value={fmtFull(mes_.pendiente)} accent="text-amber-400" />
+              <StatRow label="Esperado del mes"  value={fmtFull(mes_.esperado)}  accent="text-titulo dark:text-titulo-dark" />
+              <StatRow label="Ya cobrado"        value={fmtFull(mes_.cobrado)}   accent="text-ingreso" />
+              <StatRow label="Pendiente de cobro" value={fmtFull(mes_.pendiente)} accent="text-[#d97706] dark:text-tarjeta-claro" />
             </div>
           </motion.div>
 
@@ -149,22 +149,22 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: 0.1 }}
-            className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5 flex flex-col gap-4"
+            className="rounded-3xl border-2 border-egreso/30 bg-egreso/[0.06] p-5 flex flex-col gap-4"
           >
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center">
-                <HiExclamationCircle className="text-rose-400 text-sm" />
+              <div className="w-9 h-9 rounded-xl bg-egreso/10 border-2 border-egreso/30 flex items-center justify-center">
+                <HiExclamationCircle className="text-egreso text-sm" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-rose-700">Plata en la calle</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-egreso">Plata en la calle</span>
             </div>
             <div>
-              <p className="text-[10px] text-slate-600 mb-3">Cuotas vencidas e impagas acumuladas hasta hoy</p>
-              <div className="text-3xl font-light text-rose-400 tabular-nums leading-none">
+              <p className="text-[10px] font-bold text-suave dark:text-suave-dark mb-3">Cuotas vencidas e impagas acumuladas hasta hoy</p>
+              <div className="text-3xl font-black text-egreso tabular-nums leading-none">
                 {fmt(data.morosidad_historica)}
               </div>
             </div>
-            <div className="pt-2 border-t border-rose-500/10">
-              <p className="text-[10px] text-slate-600 leading-relaxed">
+            <div className="pt-2 border-t-2 border-egreso/15">
+              <p className="text-[10px] font-bold text-suave dark:text-suave-dark leading-relaxed">
                 Este monto no se cobra en el período actual. Representa deuda acumulada de períodos anteriores.
               </p>
             </div>

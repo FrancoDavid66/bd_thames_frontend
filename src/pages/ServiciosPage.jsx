@@ -1,4 +1,4 @@
-// src/pages/ServiciosPage.jsx
+// src/pages/ServiciosPage.jsx  (diseño Duo)
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,7 +48,8 @@ const getIcon = (nombre = "") => {
   return HiOutlineCash;
 };
 
-const fmt = (n) => `$${Number(n || 0).toLocaleString("es-AR")}`;
+// 🚀 Sin decimales: $40.000
+const fmt = (n) => `$${Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
 
 export default function ServiciosPage() {
   const dispatch = useDispatch();
@@ -76,15 +77,20 @@ export default function ServiciosPage() {
     const yaIntentado = autoGenAttempted.current.has(periodo);
     const serviciosActivos = servicios.filter(s => s.activo);
 
+    // 🐛 FIX: los pagos cargados tienen que ser DEL período actual. Al cambiar de
+    //   mes, `pagos` todavía tiene los del mes anterior por un instante; sin este
+    //   chequeo se disparaba una generación espuria comparando contra datos viejos.
+    const pagosSonDeEstePeriodo = pagos.length === 0 || pagos[0]?.periodo === periodo;
+
     // Condiciones para auto-generar:
     // - No lo intentamos ya en este mes
-    // - Cargaron las plantillas y los pagos
+    // - Cargaron las plantillas y los pagos, y los pagos son de ESTE mes
     // - Faltan pagos: hay menos pagos que servicios activos
-    // - Hay servicios activos
-    // - No está corriendo otra generación
+    // - Hay servicios activos y no está corriendo otra generación
     const faltanPagos = !yaIntentado &&
       pagosStatus === "succeeded" &&
       serviciosStatus === "succeeded" &&
+      pagosSonDeEstePeriodo &&
       serviciosActivos.length > pagos.length &&
       serviciosActivos.length > 0 &&
       !autoGenerating;
@@ -94,7 +100,7 @@ export default function ServiciosPage() {
       handleAutoGenerar();
     }
     // eslint-disable-next-line
-  }, [pagosStatus, serviciosStatus, pagos.length, servicios.length, periodo]);
+  }, [pagosStatus, serviciosStatus, pagos, servicios, periodo]);
 
   const handleAutoGenerar = async () => {
     const [anio, mes] = periodo.split("-");
@@ -169,16 +175,16 @@ export default function ServiciosPage() {
   const esMesActual = periodo === dayjs().format("YYYY-MM");
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 sm:px-6 lg:px-10 py-6 transition-colors">
+    <div className="min-h-screen bg-surface dark:bg-surface-dark px-4 sm:px-6 lg:px-10 py-6 transition-colors">
       <div className="max-w-7xl mx-auto">
 
         {/* ═══════════ HEADER ═══════════ */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-titulo dark:text-titulo-dark">
               Servicios y Gastos Fijos
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-sm font-bold text-suave dark:text-suave-dark mt-0.5">
               Pagos recurrentes mensuales
             </p>
           </div>
@@ -186,12 +192,12 @@ export default function ServiciosPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setCrudOpen(true)}
-              className="inline-flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition"
+              className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark hover:border-oficina text-titulo dark:text-titulo-dark transition-colors"
             >
               <HiOutlineCog className="w-4 h-4" />
               Servicios
               {servicios.length > 0 && (
-                <span className="ml-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md px-1.5 py-0.5 font-semibold">
+                <span className="ml-1 text-[10px] bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded-lg px-1.5 py-0.5 font-black">
                   {servicios.filter((s) => s.activo).length}
                 </span>
               )}
@@ -199,7 +205,7 @@ export default function ServiciosPage() {
             <button
               onClick={handleGenerarManual}
               disabled={autoGenerating}
-              className="inline-flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold bg-sky-500 hover:bg-sky-400 text-white transition disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0"
             >
               <HiOutlineRefresh className={`w-4 h-4 ${autoGenerating ? "animate-spin" : ""}`} />
               Generar pagos
@@ -241,29 +247,29 @@ export default function ServiciosPage() {
 
         {/* ═══════════ SELECTOR DE MES ═══════════ */}
         <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-1">
             <button
               onClick={mesAnterior}
-              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              className="p-2 rounded-xl hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
             >
               <HiOutlineChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={mesActual}
-              className="px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-[140px] text-center hover:text-sky-500"
+              className="px-3 py-1 text-sm font-black text-titulo dark:text-titulo-dark min-w-[140px] text-center hover:text-oficina transition-colors"
             >
               <HiOutlineCalendar className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
               {periodoLabel}
             </button>
             <button
               onClick={mesSiguiente}
-              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              className="p-2 rounded-xl hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
             >
               <HiOutlineChevronRight className="w-4 h-4" />
             </button>
           </div>
           {!esMesActual && (
-            <button onClick={mesActual} className="text-xs text-sky-500 hover:underline">
+            <button onClick={mesActual} className="text-xs font-black text-oficina hover:underline">
               Volver al mes actual
             </button>
           )}
@@ -271,9 +277,9 @@ export default function ServiciosPage() {
 
         {/* ═══════════ CARGANDO / GENERANDO / SIN SERVICIOS ═══════════ */}
         {pagosStatus === "loading" || autoGenerating ? (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
-            <div className="w-8 h-8 mx-auto mb-3 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
-            <p className="text-sm text-slate-500">
+          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl py-16 text-center">
+            <div className="w-8 h-8 mx-auto mb-3 border-2 border-oficina/30 border-t-oficina rounded-full animate-spin" />
+            <p className="text-sm font-bold text-suave dark:text-suave-dark">
               {autoGenerating ? `Generando pagos de ${periodoLabel}...` : "Cargando..."}
             </p>
           </div>
@@ -312,14 +318,14 @@ export default function ServiciosPage() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl p-4 flex items-center gap-3"
+                className="mt-4 bg-ingreso/10 border-2 border-ingreso/30 rounded-3xl p-4 flex items-center gap-3"
               >
-                <HiCheckCircle className="w-6 h-6 text-emerald-500 shrink-0" />
+                <HiCheckCircle className="w-6 h-6 text-ingreso shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  <p className="text-sm font-black text-ingreso dark:text-ingreso-claro">
                     ¡Todo pagado en {periodoLabel}! 🎉
                   </p>
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  <p className="text-xs font-bold text-ingreso dark:text-ingreso-claro/80 mt-0.5">
                     No tenés cuentas pendientes
                   </p>
                 </div>
@@ -350,22 +356,22 @@ export default function ServiciosPage() {
 // SECCIÓN (Por pagar / Pagados)
 // ════════════════════════════════════════════════════════════
 function Seccion({ titulo, count, tone, icon: Icon, children }) {
-  const tones = {
-    sky: "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400",
-    emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+  const pin = {
+    sky: "text-oficina border-oficina/35 bg-oficina/10",
+    emerald: "text-ingreso border-ingreso/35 bg-ingreso/10",
   };
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <Icon className={`w-5 h-5 ${tone === "sky" ? "text-sky-500" : "text-emerald-500"}`} />
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+        <Icon className={`w-5 h-5 ${tone === "sky" ? "text-oficina" : "text-ingreso"}`} />
+        <h2 className="text-sm font-black uppercase tracking-[0.08em] text-titulo dark:text-titulo-dark">
           {titulo}
         </h2>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tones[tone]}`}>
+        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border-2 ${pin[tone]}`}>
           {count}
         </span>
       </div>
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl overflow-hidden">
         {children}
       </div>
     </div>
@@ -380,23 +386,23 @@ function Tabla({ pagos, onClick, pagados = false }) {
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-            <th className="text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <tr className="border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
               Servicio
             </th>
-            <th className="text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden md:table-cell">
+            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark hidden md:table-cell">
               Categoría
             </th>
-            <th className="text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
               {pagados ? "Fecha pago" : "Vencimiento"}
             </th>
-            <th className="text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
               Estado
             </th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <th className="text-right px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
               Monto
             </th>
-            <th className="text-right px-4 py-2.5 w-20"></th>
+            <th className="text-right px-4 py-3 w-20"></th>
           </tr>
         </thead>
         <tbody>
@@ -424,37 +430,44 @@ function Fila({ pago, index, onClick, pagado }) {
 
   if (pagado) {
     estadoBadge = "Pagado";
-    estadoColor = "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400";
+    estadoColor = "text-ingreso border-ingreso/35 bg-ingreso/10";
     estadoIcon = <HiOutlineCheck className="w-3 h-3" />;
-    iconBg = "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400";
+    iconBg = "bg-ingreso/10 text-ingreso border-ingreso/30";
     fechaMostrar = dayjs(pago.fecha_pago).format("DD/MM");
   } else if (vencido) {
     estadoBadge = `Vencido (${Math.abs(dias)}d)`;
-    estadoColor = "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
+    estadoColor = "text-egreso border-egreso/35 bg-egreso/10";
     estadoIcon = <HiOutlineExclamationCircle className="w-3 h-3" />;
-    iconBg = "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400";
+    iconBg = "bg-egreso/10 text-egreso border-egreso/30";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   } else if (dias === 0) {
     estadoBadge = "Vence HOY";
-    estadoColor = "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400";
+    estadoColor = "text-tarjeta border-tarjeta/35 bg-tarjeta/10";
     estadoIcon = <HiOutlineClock className="w-3 h-3" />;
-    iconBg = "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400";
+    iconBg = "bg-tarjeta/10 text-tarjeta border-tarjeta/30";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   } else if (urgente) {
     estadoBadge = `En ${dias} día${dias !== 1 ? "s" : ""}`;
-    estadoColor = "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400";
+    estadoColor = "text-tarjeta border-tarjeta/35 bg-tarjeta/10";
     estadoIcon = <HiOutlineClock className="w-3 h-3" />;
-    iconBg = "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400";
+    iconBg = "bg-tarjeta/10 text-tarjeta border-tarjeta/30";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   } else {
     estadoBadge = "Pendiente";
-    estadoColor = "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400";
+    estadoColor = "text-suave dark:text-suave-dark border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark";
     estadoIcon = null;
-    iconBg = "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400";
+    iconBg = "bg-oficina/10 text-oficina border-oficina/30";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   }
 
   const monto = pagado ? pago.monto_real : pago.servicio_monto_estimado;
+
+  // Franja de color al inicio de la fila según estado
+  const franja = pagado
+    ? "border-l-4 border-ingreso/60"
+    : vencido
+      ? "border-l-4 border-egreso"
+      : "border-l-4 border-egreso-claro";
 
   return (
     <motion.tr
@@ -463,62 +476,62 @@ function Fila({ pago, index, onClick, pagado }) {
       exit={{ opacity: 0 }}
       transition={{ delay: index * 0.02 }}
       onClick={onClick}
-      className={`border-b border-slate-100 dark:border-slate-800/60 cursor-pointer transition group ${
+      className={`border-b-2 border-linea/50 dark:border-linea-dark/50 cursor-pointer transition group ${
         pagado
-          ? "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          ? "hover:bg-surface dark:hover:bg-surface-dark"
           : vencido
-            ? "bg-rose-50/70 dark:bg-rose-900/10 hover:bg-rose-100/70 dark:hover:bg-rose-900/20"
-            : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+            ? "bg-egreso/[0.06] hover:bg-egreso/10"
+            : "hover:bg-surface dark:hover:bg-surface-dark"
       }`}
     >
-      <td className={`px-4 py-3 ${pagado ? "" : vencido ? "border-l-4 border-rose-600" : "border-l-4 border-rose-400"}`}>
+      <td className={`px-4 py-3 ${franja}`}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border-2 ${iconBg}`}>
             <Icon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <p className={`font-semibold truncate text-sm ${pagado ? "text-slate-500 dark:text-slate-400" : "text-slate-900 dark:text-slate-100"}`}>
+            <p className={`font-black truncate text-sm ${pagado ? "text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
               {pago.servicio_nombre}
             </p>
             {pago.servicio_proveedor && (
-              <p className="text-xs text-slate-400 truncate">{pago.servicio_proveedor}</p>
+              <p className="text-xs font-bold text-suave dark:text-suave-dark truncate">{pago.servicio_proveedor}</p>
             )}
           </div>
         </div>
       </td>
 
       <td className="px-4 py-3 hidden md:table-cell">
-        <span className="text-xs text-slate-500 dark:text-slate-400">
+        <span className="text-xs font-bold text-suave dark:text-suave-dark">
           {pago.servicio_categoria || "—"}
         </span>
       </td>
 
       <td className="px-4 py-3">
-        <span className="text-sm text-slate-700 dark:text-slate-300 font-medium tabular-nums">
+        <span className="text-sm font-black text-titulo dark:text-titulo-dark tabular-nums">
           {fechaMostrar}
         </span>
       </td>
 
       <td className="px-4 py-3">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${estadoColor}`}>
+        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black border-2 ${estadoColor}`}>
           {estadoIcon}
           {estadoBadge}
         </span>
       </td>
 
       <td className="px-4 py-3 text-right">
-        <span className={`text-sm font-bold tabular-nums ${pagado ? "text-slate-500 dark:text-slate-400" : "text-slate-900 dark:text-slate-100"}`}>
-          ${Number(monto || 0).toLocaleString("es-AR")}
+        <span className={`text-base font-mono font-black tabular-nums ${pagado ? "text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
+          ${Number(monto || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
         </span>
       </td>
 
       <td className="px-4 py-3 text-right">
         <button
           onClick={(e) => { e.stopPropagation(); onClick(); }}
-          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${
+          className={`text-xs font-black px-3.5 py-1.5 rounded-xl transition-all border-2 ${
             pagado
-              ? "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
-              : "bg-sky-500 hover:bg-sky-600 text-white shadow-sm"
+              ? "text-suave dark:text-suave-dark border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:border-oficina hover:text-oficina"
+              : "bg-oficina text-white border-oficina shadow-[0_3px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5"
           }`}
         >
           {pagado ? "Ver" : "Pagar"}
@@ -533,28 +546,34 @@ function Fila({ pago, index, onClick, pagado }) {
 // ════════════════════════════════════════════════════════════
 function StatCard({ label, value, sub, icon: Icon, tone }) {
   const tones = {
-    sky: "from-sky-500/10 to-sky-500/5 border-sky-200 dark:border-sky-900/50 text-sky-600 dark:text-sky-400",
-    emerald: "from-emerald-500/10 to-emerald-500/5 border-emerald-200 dark:border-emerald-900/50 text-emerald-600 dark:text-emerald-400",
-    amber: "from-amber-500/10 to-amber-500/5 border-amber-200 dark:border-amber-900/50 text-amber-600 dark:text-amber-400",
-    rose: "from-rose-500/10 to-rose-500/5 border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400",
+    sky: "border-oficina/35",
+    emerald: "border-ingreso/35",
+    amber: "border-tarjeta/35",
+    rose: "border-egreso/35",
+  };
+  const iconTones = {
+    sky: "bg-oficina text-white shadow-[0_4px_0_var(--color-oficina-fuerte)]",
+    emerald: "bg-ingreso text-white shadow-[0_4px_0_var(--color-ingreso-fuerte)]",
+    amber: "bg-tarjeta text-white shadow-[0_4px_0_#d97706]",
+    rose: "bg-egreso text-white shadow-[0_4px_0_var(--color-egreso-fuerte)]",
   };
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-start gap-3"
+      className={`bg-card dark:bg-card-dark rounded-2xl border-2 ${tones[tone]} p-4 flex items-start gap-3`}
     >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br ${tones[tone]} border`}>
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconTones[tone]}`}>
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <p className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
           {label}
         </p>
-        <p className="text-xl font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-0.5">
+        <p className="text-xl sm:text-2xl font-black text-titulo dark:text-titulo-dark tabular-nums mt-0.5 leading-none">
           {value}
         </p>
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{sub}</p>
+        <p className="text-[10px] font-bold text-suave dark:text-suave-dark mt-1">{sub}</p>
       </div>
     </motion.div>
   );
@@ -565,19 +584,19 @@ function StatCard({ label, value, sub, icon: Icon, tone }) {
 // ════════════════════════════════════════════════════════════
 function EmptyNoServicios({ onOpen }) {
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 px-6 text-center">
-      <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center">
-        <HiOutlineCash className="w-7 h-7 text-sky-500" />
+    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl py-16 px-6 text-center">
+      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-oficina/10 border-2 border-oficina/30 flex items-center justify-center">
+        <HiOutlineCash className="w-7 h-7 text-oficina" />
       </div>
-      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
+      <h3 className="text-base font-black text-titulo dark:text-titulo-dark mb-1">
         Sin servicios cargados
       </h3>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-5 max-w-sm mx-auto">
+      <p className="text-sm font-bold text-suave dark:text-suave-dark mb-5 max-w-sm mx-auto">
         Cargá tus gastos fijos una sola vez y te aviso 3 días antes de cada vencimiento.
       </p>
       <button
         onClick={onOpen}
-        className="inline-flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold bg-sky-500 hover:bg-sky-400 text-white transition"
+        className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
       >
         <HiOutlinePlus className="w-4 h-4" />
         Agregar primer servicio
@@ -588,13 +607,13 @@ function EmptyNoServicios({ onOpen }) {
 
 function EmptySinPagos({ onGenerar, periodoLabel }) {
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 px-6 text-center">
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl py-16 px-6 text-center">
+      <p className="text-sm font-bold text-suave dark:text-suave-dark mb-4">
         No hay pagos para {periodoLabel}
       </p>
       <button
         onClick={onGenerar}
-        className="inline-flex items-center gap-2 px-4 h-9 rounded-lg text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-white transition"
+        className="inline-flex items-center gap-2 px-4 h-10 rounded-xl text-xs font-black bg-oficina text-white border-2 border-oficina shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
       >
         <HiOutlineRefresh className="w-3.5 h-3.5" />
         Generar pagos del mes

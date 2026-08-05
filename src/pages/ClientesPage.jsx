@@ -1,16 +1,19 @@
 // src/pages/ClientesPage.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
-import { HiShieldCheck, HiRefresh, HiUserGroup, HiTrash, HiX, HiUserAdd } from "react-icons/hi";
+import { motion } from "framer-motion";
+import { HiShieldCheck, HiRefresh, HiUserAdd, HiSearch, HiCheckCircle, HiExclamation } from "react-icons/hi";
 import toast from "react-hot-toast";
 
-// 🚀 IMPORTACIONES DE SEGURIDAD Y COMPONENTES GLOBALES
+// 🚀 SEGURIDAD Y COMPONENTES GLOBALES
 import { useAuth } from "../context/AuthContext";
-import ClienteCreateModal from "../components/clientes/ClienteCreateModal";
-import ClienteEditModal from "../components/clientes/ClienteEditModal"; // ✅ Usamos el modal global corregido
-import ClientesFilter from "../components/clientes/ClientesFilter";
+import ClienteFormModal from "../components/clientes/ClienteFormModal"; // ✅ Modal unificado (alta/edición)
 import ClientesTable from "../components/clientes/ClientesTable";
+import ConfirmModal from "../components/comunes/ConfirmModal";
+import Boton3D from "../components/ui/Boton3D";
+import CardDuo from "../components/ui/CardDuo";
+import PageContainer from "../components/ui/PageContainer";
+import { lanzarConfetti } from "../utils/confetti"; // 🎉 celebración al crear
 
 import {
   fetchClientes,
@@ -22,100 +25,34 @@ import {
   setOrdering,
 } from "../store/slices/clientesSlice";
 
-const AnimatedDiv = ({ children, className = "" }) => (
-  <motion.div
-    className={className}
-    initial={{ opacity: 0, y: 15 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, ease: "easeOut" }}
-  >
-    {children}
-  </motion.div>
-);
+// Chips de estado (fuera del componente: no se recrean por render)
+const FILTROS_ESTADO = [
+  { value: "todos", label: "Todos" },
+  { value: "activos", label: "Con pólizas" },
+  { value: "inactivos", label: "Sin pólizas" },
+];
 
-// 📱 MODAL MOBILE-FIRST (Diseño consistente para toda la App)
-const ModalShell = ({ open, title, children, onClose, icon }) => {
+// Mini-tarjeta de estadística (contador tipo Duolingo)
+const StatCard = React.memo(function StatCard({ icon, num, label, tono }) {
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-[#0b0f1e] border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
-              <div className="flex items-center gap-3">
-                {icon && (
-                  <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/80 shrink-0">
-                    {icon}
-                  </div>
-                )}
-                <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-tighter">
-                  {title}
-                </h3>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg bg-white/5 text-white/40 hover:text-white transition-all"
-              >
-                <HiX className="text-xl" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto scrollbar-hide">{children}</div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    <CardDuo className="p-4 flex items-center gap-3">
+      <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-xl shrink-0 ${tono}`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="text-2xl font-black leading-none text-titulo dark:text-titulo-dark">{num}</div>
+        <div className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark truncate">{label}</div>
+      </div>
+    </CardDuo>
   );
-};
-
-const ConfirmModal = ({ open, nombre, onClose, onConfirm, loading }) => (
-  <ModalShell open={open} title="Eliminar Registro" onClose={onClose} icon={<HiTrash className="text-rose-400" />}>
-    <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3">
-       <div>
-         <p className="text-sm text-rose-100 font-medium">
-           ¿Confirmás la eliminación de <span className="font-bold text-white">"{nombre}"</span>?
-         </p>
-         <p className="text-[10px] text-rose-400/80 uppercase font-black tracking-widest mt-2">Esta acción no se puede deshacer.</p>
-       </div>
-    </div>
-
-    <div className="mt-8 flex flex-col sm:flex-row items-center justify-end gap-3 border-t border-white/5 pt-4">
-      <button
-        onClick={onClose}
-        className="w-full sm:w-auto h-12 sm:h-10 px-6 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all"
-        disabled={loading}
-      >
-        Cancelar
-      </button>
-      <button
-        onClick={onConfirm}
-        className="w-full sm:w-auto h-12 sm:h-10 px-8 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-rose-900/40 hover:bg-rose-500 disabled:opacity-50 transition-all"
-        disabled={loading}
-      >
-        {loading ? "Borrando..." : "Eliminar Cliente"}
-      </button>
-    </div>
-  </ModalShell>
-);
+});
 
 const ClientesPage = () => {
   const dispatch = useDispatch();
   const { user } = useAuth();
-  
-  // 🛡️ Filtro de permisos Admin
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
+
+  // 🛡️ Permisos admin
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
   const {
     clientes = [],
@@ -132,26 +69,40 @@ const ClientesPage = () => {
   const total = Number.isFinite(count) ? count : 0;
 
   const [clienteAEliminar, setClienteAEliminar] = useState(null);
-  const [clienteAEditar, setClienteAEditar] = useState(null);
   const [clienteCrearAbierto, setClienteCrearAbierto] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [busqueda, setBusqueda] = useState(search); // buscador local con debounce
 
   useEffect(() => {
     const promise = dispatch(fetchClientes({ page, page_size: pageSize, search, estado, ordering }));
     return () => { if (promise?.abort) promise.abort(); };
   }, [dispatch, page, pageSize, search, estado, ordering]);
 
-  const handleBuscar = useCallback((texto) => { dispatch(setSearch(texto || "")); }, [dispatch]);
-  const handleEstado = useCallback((nuevoEstado) => { dispatch(setEstado(nuevoEstado || "todos")); }, [dispatch]);
+  // Debounce del buscador (300ms) → despacha setSearch
+  useEffect(() => {
+    const t = setTimeout(() => { dispatch(setSearch(busqueda.trim().toLowerCase())); }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda, dispatch]);
+
+  const handleEstado = useCallback((nuevo) => { dispatch(setEstado(nuevo || "todos")); }, [dispatch]);
   const handlePageChange = useCallback((p) => { dispatch(setPage(p)); }, [dispatch]);
   const handlePageSizeChange = useCallback((ps) => { dispatch(setPageSize(ps)); }, [dispatch]);
-  const handleRefresh = useCallback(() => { dispatch(fetchClientes({ page, page_size: pageSize, search, estado, ordering })); }, [dispatch, page, pageSize, search, estado, ordering]);
+  const handleRefresh = useCallback(() => {
+    dispatch(fetchClientes({ page, page_size: pageSize, search, estado, ordering }));
+  }, [dispatch, page, pageSize, search, estado, ordering]);
 
-  const headerSubtitle = useMemo(() => {
-    if (status === "loading") return "Sincronizando...";
-    const val = total > 0 ? total : clientes.length;
-    return `${val} cliente${val === 1 ? "" : "s"} registrado${val === 1 ? "" : "s"}`;
-  }, [status, total, clientes.length]);
+  // KPIs rápidos (de la página actual — sin queries extra)
+  const stats = useMemo(() => {
+    let completos = 0, incompletos = 0, polizas = 0;
+    for (const c of clientes) {
+      const est = String(c?.estado ?? "").toLowerCase();
+      if (est.includes("completo")) completos++;
+      else if (est.includes("borrador") || est.includes("incompleto")) incompletos++;
+      if (Array.isArray(c?.polizas)) polizas += c.polizas.filter((p) => p?.estado === "activa").length;
+      else if (Number.isFinite(c?.polizas_activas)) polizas += Number(c.polizas_activas);
+    }
+    return { completos, incompletos, polizas };
+  }, [clientes]);
 
   const onConfirmDelete = async () => {
     if (!isWebAdmin) return toast.error("Permiso denegado");
@@ -166,153 +117,180 @@ const ClientesPage = () => {
     } catch (e) { toast.error("Error al borrar"); } finally { setSaving(false); }
   };
 
-  // ✅ CORRECCIÓN: El modal de edición maneja su propio guardado.
-  // Solo refrescamos la lista al terminar.
-  const onSaveEdit = () => {
-    setClienteAEditar(null);
-    handleRefresh();
-  };
-
-  // ✅ CORRECCIÓN: Quitamos el toast duplicado de aquí (ya está en el hook)
-  const onClienteCreado = () => {
+  // 🎉 Al crear con éxito: confetti celebratorio + refrescar
+  const onClienteCreado = useCallback(() => {
     setClienteCrearAbierto(false);
-    handleRefresh(); 
-  };
+    lanzarConfetti();
+    handleRefresh();
+  }, [handleRefresh]);
 
   return (
-    <div className="min-h-[100dvh] bg-[#0b0f19] text-white px-4 sm:px-6 py-6 pb-24 overflow-x-hidden">
-      <AnimatedDiv className="max-w-7xl mx-auto flex flex-col h-full min-h-[calc(100vh-100px)]">
-        
-        {/* Cabecera Adaptable */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-6 pb-4 border-b border-white/10">
+    <PageContainer className="overflow-x-hidden">
+      <motion.div
+        className="flex flex-col"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
+        {/* ===== TOPBAR ===== */}
+        <CardDuo className="p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-             <div className="h-12 w-12 rounded-2xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-               <HiUserGroup className="text-2xl" />
-             </div>
-             <div className="min-w-0 flex-1">
-               <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase truncate">Directorio General</h1>
-               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                 <div className="flex items-center gap-1.5 text-emerald-400">
-                   <HiShieldCheck className="text-sm shrink-0" />
-                   <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
-                      Sucursal: {user?.perfil?.oficina_nombre || 'Soporte'}
-                   </span>
-                 </div>
-                 <span className="hidden sm:inline text-white/20">•</span>
-                 <span className="text-[10px] text-white/30 uppercase tracking-widest whitespace-nowrap">
-                    {headerSubtitle}
-                 </span>
-               </div>
-             </div>
+            <div className="h-14 w-14 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-2 border-duo-azul flex items-center justify-center text-2xl shrink-0">
+              👥
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight truncate text-titulo dark:text-titulo-dark">Clientes</h1>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="inline-flex items-center gap-1 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde px-2.5 py-1 rounded-full text-[11px] font-extrabold">
+                  <HiShieldCheck className="text-sm" /> {user?.perfil?.oficina_nombre || "Soporte"}
+                </span>
+                <span className="text-[12px] font-extrabold text-suave dark:text-suave-dark">
+                  {status === "loading" ? "Sincronizando…" : `${total} registrados`}
+                </span>
+              </div>
+            </div>
           </div>
+          <Boton3D variant="verde" onClick={() => setClienteCrearAbierto(true)} className="shrink-0">
+            <HiUserAdd className="text-lg" /> Nuevo Cliente
+          </Boton3D>
+        </CardDuo>
 
-          {/* Botones de Control (Grid en móvil) */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-            <button
-              onClick={() => setClienteCrearAbierto(true)}
-              className="col-span-2 sm:col-span-1 h-12 sm:h-10 px-5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-black uppercase text-[10px] tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-900/40 cursor-pointer"
-            >
-              <HiUserAdd className="text-sm" /> Nuevo Cliente
-            </button>
-            
-            <button
-              onClick={() => dispatch(setOrdering("-id"))}
-              className={`h-11 sm:h-10 px-2 sm:px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                ordering === "-id" ? "bg-white text-black shadow-lg" : "bg-white/5 border border-white/10 text-white/40 hover:text-white"
-              }`}
-            >
-              Nuevos
-            </button>
-            <button
-              onClick={() => dispatch(setOrdering("apellido"))}
-              className={`h-11 sm:h-10 px-2 sm:px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                ordering === "apellido" ? "bg-white text-black shadow-lg" : "bg-white/5 border border-white/10 text-white/40 hover:text-white"
-              }`}
-            >
-              A-Z
-            </button>
-            <button
-              onClick={handleRefresh}
-              className="col-span-2 sm:col-span-1 h-11 sm:h-10 px-2 sm:px-4 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              title="Refrescar"
-            >
-              <HiRefresh className={status === "loading" ? "animate-spin text-lg" : "text-lg"} />
-              <span className="sm:hidden text-[10px] font-black uppercase tracking-widest">Actualizar</span>
-            </button>
+        {/* ===== STATS ===== */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+          <StatCard icon="👤" num={total} label="Total" tono="bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]" />
+          <StatCard icon="✅" num={stats.completos} label="Completos" tono="bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]" />
+          <StatCard icon="⚠️" num={stats.incompletos} label="Incompletos" tono="bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)]" />
+          <StatCard icon="🛡️" num={stats.polizas} label="Pólizas" tono="bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]" />
+        </div>
+
+        {/* ===== BUSCADOR + CHIPS ===== */}
+        <div className="flex flex-col lg:flex-row gap-3 mb-4">
+          <div className="relative flex-1">
+            <HiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-xl" />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, apellido, DNI o CUIT…"
+              className="w-full h-14 pl-12 pr-4 rounded-2xl bg-card dark:bg-card-dark border-[3px] border-linea dark:border-linea-dark text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal outline-none focus:border-duo-azul transition-colors"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {FILTROS_ESTADO.map((f) => {
+              const on = estado === f.value;
+              return (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => handleEstado(f.value)}
+                  className={`px-4 py-2.5 rounded-2xl text-[12px] font-extrabold uppercase tracking-wide transition-all cursor-pointer border-2 ${
+                    on
+                      ? "bg-duo-azul text-white border-duo-azul-sombra shadow-[0_3px_0_var(--color-duo-azul-sombra)]"
+                      : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark hover:border-duo-azul"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <ClientesFilter onFilterText={handleBuscar} onFilterEstado={handleEstado} />
+        {/* ===== ORDEN + REFRESCAR ===== */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark mr-1">Ordenar:</span>
+          <button
+            onClick={() => dispatch(setOrdering("-id"))}
+            className={`h-10 px-4 rounded-xl text-[12px] font-extrabold uppercase tracking-wide transition-all cursor-pointer border-2 ${
+              ordering === "-id" ? "bg-duo-verde text-white border-duo-verde-sombra shadow-[0_3px_0_var(--color-duo-verde-sombra)]" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
+            }`}
+          >
+            🆕 Nuevos
+          </button>
+          <button
+            onClick={() => dispatch(setOrdering("apellido"))}
+            className={`h-10 px-4 rounded-xl text-[12px] font-extrabold uppercase tracking-wide transition-all cursor-pointer border-2 ${
+              ordering === "apellido" ? "bg-duo-verde text-white border-duo-verde-sombra shadow-[0_3px_0_var(--color-duo-verde-sombra)]" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
+            }`}
+          >
+            🔤 A-Z
+          </button>
+          <button
+            onClick={handleRefresh}
+            className="h-10 px-4 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul border-2 border-duo-azul/30 hover:border-duo-azul transition-all flex items-center gap-2 cursor-pointer ml-auto"
+            title="Refrescar"
+          >
+            <HiRefresh className={status === "loading" ? "animate-spin text-lg" : "text-lg"} />
+            <span className="text-[12px] font-extrabold uppercase tracking-wide">Actualizar</span>
+          </button>
+        </div>
 
-        {/* Tabla Principal */}
-        <div className="mt-4 flex-1 min-h-[400px] flex flex-col bg-white/[0.02] border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative">
-          
+        {/* ===== TABLA / LISTA ===== */}
+        <CardDuo className="flex-1 min-h-[400px] flex flex-col overflow-hidden relative p-0">
           {status === "loading" && clientes.length === 0 && (
-            <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center">
-              <div className="h-8 w-8 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mb-3" />
-              <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Sincronizando Sucursal...</p>
+            <div className="absolute inset-0 z-10 bg-card/70 dark:bg-card-dark/70 backdrop-blur-sm flex flex-col items-center justify-center">
+              <div className="h-10 w-10 border-4 border-duo-azul/30 border-t-duo-azul rounded-full animate-spin mb-3" />
+              <p className="text-suave dark:text-suave-dark text-[12px] font-extrabold uppercase tracking-wide">Sincronizando…</p>
             </div>
           )}
 
           {status === "failed" && (
-            <div className="m-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="m-4 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-2 border-duo-rojo/30 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                 <HiShieldCheck className="text-rose-400 text-2xl shrink-0" />
-                 <div>
-                   <p className="text-rose-100 font-bold text-sm uppercase tracking-tight">Acceso Interrumpido</p>
-                   <p className="text-rose-400/80 text-[10px] uppercase font-black tracking-widest mt-0.5 leading-snug">{error || "Error de servidor."}</p>
-                 </div>
+                <HiExclamation className="text-duo-rojo text-2xl shrink-0" />
+                <div>
+                  <p className="font-black text-[15px] text-titulo dark:text-titulo-dark">Ups, algo salió mal</p>
+                  <p className="text-suave dark:text-suave-dark text-[12px] font-extrabold mt-0.5">{error || "Error de servidor."}</p>
+                </div>
               </div>
-              <button onClick={handleRefresh} className="h-10 px-6 rounded-xl bg-rose-500 text-white font-black uppercase text-[10px] w-full sm:w-auto">Reintentar</button>
+              <Boton3D variant="rojo" size="sm" onClick={handleRefresh}>Reintentar</Boton3D>
             </div>
           )}
 
           {clientes.length > 0 && (
-            <div className="flex-1 overflow-x-hidden flex flex-col h-full">
-              {/* ✅ IMPORTANTE: ClientesTable debe recibir onEdit y onDelete si quieres botones por fila */}
-              <ClientesTable 
-                clientes={clientes} 
-                page={page} 
-                pageSize={pageSize} 
-                total={total} 
-                onPageChange={handlePageChange} 
-                onPageSizeChange={handlePageSizeChange} 
-                showFooter={true} 
+            <div className="flex-1 overflow-x-hidden flex flex-col">
+              <ClientesTable
+                clientes={clientes}
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                showFooter={true}
               />
-              <div className="p-3 border-t border-white/5 bg-black/20 text-center mt-auto">
-                 <span className="text-[9px] sm:text-[10px] font-black text-white/20 uppercase tracking-widest px-2">
-                   {isWebAdmin ? "Modo Administrador: Control total de registros." : "Modo Operador: Base de datos protegida."}
-                 </span>
+              <div className="p-3 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-center">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-suave dark:text-suave-dark uppercase tracking-wide">
+                  {isWebAdmin ? <><HiCheckCircle className="text-duo-verde" /> Modo Administrador</> : "Base de datos protegida"}
+                </span>
               </div>
             </div>
           )}
-        </div>
-      </AnimatedDiv>
 
-      {/* 🚀 MODAL DE ALTA (Admin ve selector de oficina) */}
-      <ClienteCreateModal 
-        isOpen={clienteCrearAbierto} 
-        onClose={() => setClienteCrearAbierto(false)} 
-        onSuccess={onClienteCreado} 
-      />
+          {clientes.length === 0 && status !== "loading" && status !== "failed" && (
+            <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
+              <div className="text-6xl mb-3">🔍</div>
+              <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">No hay clientes para mostrar</p>
+              <p className="text-[12px] font-extrabold text-suave dark:text-suave-dark mt-1">Probá cambiar los filtros o creá uno nuevo.</p>
+            </div>
+          )}
+        </CardDuo>
+      </motion.div>
 
-      {/* 🚀 MODAL DE EDICIÓN GLOBAL */}
-      <ClienteEditModal 
-        isOpen={!!clienteAEditar} 
-        cliente={clienteAEditar} 
-        onClose={() => setClienteAEditar(null)} 
-        onSave={onSaveEdit} 
+      {/* MODAL DE ALTA (unificado — sin cliente = modo alta) */}
+      <ClienteFormModal
+        isOpen={clienteCrearAbierto}
+        onClose={() => setClienteCrearAbierto(false)}
+        onSuccess={onClienteCreado}
       />
 
       {/* MODAL ELIMINAR */}
-      <ConfirmModal 
-        open={!!clienteAEliminar} 
-        nombre={`${clienteAEliminar?.nombre ?? ""} ${clienteAEliminar?.apellido ?? ""}`.trim()} 
-        onClose={() => setClienteAEliminar(null)} 
-        onConfirm={onConfirmDelete} 
-        loading={saving} 
+      <ConfirmModal
+        isOpen={!!clienteAEliminar}
+        nombre={`${clienteAEliminar?.nombre ?? ""} ${clienteAEliminar?.apellido ?? ""}`.trim()}
+        onClose={() => setClienteAEliminar(null)}
+        onConfirm={onConfirmDelete}
+        confirmDisabled={saving}
       />
-    </div>
+    </PageContainer>
   );
 };
 

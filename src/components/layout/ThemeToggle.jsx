@@ -1,23 +1,21 @@
-import { useDispatch, useSelector } from "react-redux";
+// src/components/layout/ThemeToggle.jsx
 import { FaMoon, FaSun } from "react-icons/fa";
-import { toggleTheme } from "../../store/slices/themeSlice";
+// 🎨 Ahora usa el motor único de tema (antes usaba el themeSlice de Redux).
+import { useTheme } from "../../context/ThemeContext";
 
 export default function ThemeToggle({ small = false }) {
-  const dispatch = useDispatch();
-  const mode = useSelector((state) => state.theme.mode);
-
-  const handleToggle = () => dispatch(toggleTheme());
+  const { isDark, toggleTheme } = useTheme();
 
   const sizeClasses = small ? "h-9 w-9 text-sm" : "h-10 w-10 text-base";
 
   return (
     <button
-      onClick={handleToggle}
-      className={`inline-flex items-center justify-center rounded-full bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 hover:scale-105 transition ${sizeClasses}`}
+      onClick={toggleTheme}
+      className={`inline-flex items-center justify-center rounded-full border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-tarjeta-claro dark:text-duo-amarillo transition hover:border-duo-amarillo hover:text-duo-amarillo-sombra dark:hover:text-duo-amarillo ${sizeClasses}`}
       aria-label="Cambiar tema"
-      title={mode === "light" ? "Modo oscuro" : "Modo claro"}
+      title={isDark ? "Modo claro" : "Modo oscuro"}
     >
-      {mode === "light" ? <FaMoon /> : <FaSun />}
+      {isDark ? <FaSun /> : <FaMoon />}
     </button>
   );
 }

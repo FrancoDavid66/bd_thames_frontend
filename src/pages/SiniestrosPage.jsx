@@ -1,209 +1,251 @@
 // src/pages/SiniestrosPage.jsx
-import { useState, useEffect, useMemo } from "react";
+//
+// 🚨 Página de Siniestros (diseño Duo claro/oscuro).
+// Orquesta todo: lista + búsqueda + filtro por estado + wizard (alta/edición)
+// + detalle + borrar. Es autónoma (no recibe props; la ruta la monta sola).
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getSiniestros, addSiniestro, editSiniestro, removeSiniestro } from "../store/slices/siniestrosSlice";
-import SiniestrosList    from "../components/siniestros/SiniestrosList";
-import SiniestrosForm    from "../components/siniestros/SiniestrosForm";
-import SiniestrosWizard  from "../components/siniestros/SiniestrosWizard";
-import SiniestrosDetails from "../components/siniestros/SiniestrosDetails";
-import SiniestrosDeleteModal from "../components/siniestros/SiniestrosDeleteModal";
+import { motion } from "framer-motion";
+import { HiPlus, HiSearch, HiExclamationCircle } from "react-icons/hi";
 import { toast } from "react-hot-toast";
-import { useAuth } from "../context/AuthContext";
-import { HiPlus, HiRefresh, HiExclamationCircle, HiClock, HiCheckCircle, HiDocumentSearch } from "react-icons/hi";
-import dayjs from "dayjs";
 
-const ESTADOS = [
-  { key: "todos",      label: "Todos" },
-  { key: "PENDIENTE",  label: "Pendiente doc." },
-  { key: "DENUNCIADO", label: "Denunciado" },
-  { key: "INSPECCION", label: "Inspección" },
-  { key: "LIQUIDACION",label: "Liquidación" },
-  { key: "CERRADO",    label: "Cerrado" },
+import { useAuth } from "../context/AuthContext";
+import {
+  getSiniestros,
+  addSiniestro,
+  editSiniestro,
+  removeSiniestro,
+  addFoto,
+} from "../store/slices/siniestrosSlice";
+import { invalidarCacheSiniestrosCliente } from "../hooks/useSiniestrosCliente";
+
+import SiniestrosList from "../components/siniestros/SiniestrosList";
+import SiniestrosDetails from "../components/siniestros/SiniestrosDetails";
+import SiniestrosWizard from "../components/siniestros/SiniestrosWizard";
+import ModalDuo from "../components/ui/ModalDuo";
+import Boton3D from "../components/ui/Boton3D";
+import Badge from "../components/ui/Badge";
+
+// Filtros por estado (chips). value === "" → todos.
+const FILTROS = [
+  { value: "",            label: "Todos"      },
+  { value: "PENDIENTE",   label: "Falta doc." },
+  { value: "DENUNCIADO",  label: "Denunciado" },
+  { value: "INSPECCION",  label: "Inspección" },
+  { value: "LIQUIDACION", label: "Liquidación"},
+  { value: "CERRADO",     label: "Cerrado"    },
 ];
 
+// Sube las fotos borrador (del wizard) al siniestro recién creado.
+async function subirFotosBorrador(dispatch, siniestroId, draftFotos) {
+  if (!siniestroId || !Array.isArray(draftFotos) || draftFotos.length === 0) return;
+  for (const f of draftFotos) {
+    try {
+      await dispatch(addFoto({
+        siniestro_id: Number(siniestroId),
+        url: f.url,
+        public_id: f.public_id,
+        nombre: f.nombre || "",
+        mime: f.mime || "image/jpeg",
+      })).unwrap();
+    } catch {
+      // Si una foto falla no cortamos el resto.
+    }
+  }
+}
+
 export default function SiniestrosPage() {
-  const dispatch   = useDispatch();
-  const { user }   = useAuth();
-  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+  const dispatch = useDispatch();
+  const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN" || !!user?.is_superuser;
 
   const { siniestros, loading } = useSelector((s) => s.siniestros);
 
-  const [selected, setSelected]     = useState(null);
-  const [formOpen, setFormOpen]     = useState(false);
-  const [wizardOpen, setWizardOpen]  = useState(false);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  // UI state
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
 
-  // Filtros
-  const [filtroEstado, setFiltroEstado] = useState("todos");
-  const [filtroQ, setFiltroQ]           = useState("");
+  // Modales
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [editData, setEditData] = useState(null);      // siniestro a editar (o null = alta)
+  const [verSiniestro, setVerSiniestro] = useState(null);
+  const [borrarSiniestro, setBorrarSiniestro] = useState(null);
+  const [borrando, setBorrando] = useState(false);
 
-  useEffect(() => { dispatch(getSiniestros()); }, [dispatch]);
+  useEffect(() => {
+    dispatch(getSiniestros());
+  }, [dispatch]);
 
-  const handleAdd = async (data) => {
-    try {
-      await dispatch(addSiniestro(data)).unwrap();
-      toast.success("Siniestro creado");
-      setFormOpen(false);
-    } catch { toast.error("Error al crear el siniestro"); }
-  };
+  // Filtrado en memoria (búsqueda + estado)
+  const listaFiltrada = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return (siniestros || []).filter((s) => {
+      if (filtroEstado && s.estado !== filtroEstado) return false;
+      if (!q) return true;
+      const campos = [
+        s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia,
+        s.marca_auto, s.modelo_auto,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return campos.includes(q);
+    });
+  }, [siniestros, busqueda, filtroEstado]);
 
-  const handleEdit = async (data) => {
-    try {
-      await dispatch(editSiniestro({ id: selected.id, siniestro: data })).unwrap();
+  const abiertos = useMemo(
+    () => (siniestros || []).filter((s) => s.estado !== "CERRADO").length,
+    [siniestros]
+  );
+
+  // ── Handlers ──────────────────────────────────────────
+  const abrirAlta = () => { setEditData(null); setWizardOpen(true); };
+  const abrirEdicion = (s) => { setEditData(s); setWizardOpen(true); };
+
+  // El wizard llama esto con (payload, draftFotos)
+  const handleGuardar = async (payload, draftFotos = []) => {
+    if (editData?.id) {
+      // Edición: no tocamos fotos borrador (se manejan desde el detalle).
+      const actualizado = await dispatch(editSiniestro({ id: editData.id, siniestro: payload })).unwrap();
+      invalidarCacheSiniestrosCliente(actualizado?.cliente ?? payload.cliente);
       toast.success("Siniestro actualizado");
-      setFormOpen(false);
-    } catch { toast.error("Error al actualizar"); }
-  };
-
-  const handleDelete = async () => {
-    try {
-      await dispatch(removeSiniestro(selected.id)).unwrap();
-      toast.success("Siniestro eliminado");
-      setDeleteOpen(false);
-      setSelected(null);
-    } catch { toast.error("Error al eliminar"); }
-  };
-
-  // KPIs
-  const kpis = useMemo(() => {
-    const abiertos  = siniestros.filter(s => s.estado !== "CERRADO").length;
-    const pendientes= siniestros.filter(s => s.estado === "PENDIENTE").length;
-    const cerrados  = siniestros.filter(s => s.estado === "CERRADO").length;
-    const mesActual = siniestros.filter(s =>
-      s.fecha_siniestro && dayjs(s.fecha_siniestro).isAfter(dayjs().startOf("month"))
-    ).length;
-    return { abiertos, pendientes, cerrados, mesActual, total: siniestros.length };
-  }, [siniestros]);
-
-  // Lista filtrada
-  const filtrados = useMemo(() => {
-    let list = [...siniestros];
-    if (filtroEstado !== "todos") list = list.filter(s => s.estado === filtroEstado);
-    if (filtroQ.trim()) {
-      const q = filtroQ.toLowerCase();
-      list = list.filter(s =>
-        (s.cliente_label || "").toLowerCase().includes(q) ||
-        (s.patente || "").toLowerCase().includes(q) ||
-        (s.nro_reclamo_cia || "").toLowerCase().includes(q) ||
-        (s.marca_auto || "").toLowerCase().includes(q) ||
-        (s.descripcion || "").toLowerCase().includes(q)
-      );
+    } else {
+      // Alta: creamos y luego subimos las fotos borrador.
+      const creado = await dispatch(addSiniestro(payload)).unwrap();
+      await subirFotosBorrador(dispatch, creado?.id, draftFotos);
+      invalidarCacheSiniestrosCliente(creado?.cliente ?? payload.cliente);
+      toast.success("Siniestro cargado");
     }
-    return list;
-  }, [siniestros, filtroEstado, filtroQ]);
+    // El error se propaga y lo maneja el propio wizard (toast rojo).
+  };
+
+  const confirmarBorrado = async () => {
+    if (!borrarSiniestro?.id || borrando) return;
+    setBorrando(true);
+    try {
+      await dispatch(removeSiniestro(borrarSiniestro.id)).unwrap();
+      invalidarCacheSiniestrosCliente(borrarSiniestro.cliente);
+      toast.success("Siniestro eliminado");
+      setBorrarSiniestro(null);
+    } catch {
+      toast.error("No se pudo eliminar el siniestro");
+    } finally {
+      setBorrando(false);
+    }
+  };
 
   return (
-    <div className="p-4 sm:p-6 w-full max-w-7xl mx-auto space-y-6">
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-100">Centro de Siniestros</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            {isWebAdmin ? "Vista administrador — todas las agencias" : "Siniestros de tu oficina"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => dispatch(getSiniestros())}
-            className="h-10 w-10 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-colors">
-            <HiRefresh className="w-4 h-4" />
-          </button>
-          <button onClick={() => { setSelected(null); setWizardOpen(true); }}
-            className="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-colors">
-            <HiPlus className="w-4 h-4" /> Nuevo Siniestro
-          </button>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Este mes",   value: kpis.mesActual, color: "text-indigo-400",  Icon: HiDocumentSearch },
-          { label: "Abiertos",   value: kpis.abiertos,  color: "text-amber-400",   Icon: HiClock },
-          { label: "Sin docs",   value: kpis.pendientes,color: "text-rose-400",    Icon: HiExclamationCircle },
-          { label: "Cerrados",   value: kpis.cerrados,  color: "text-emerald-400", Icon: HiCheckCircle },
-        ].map(({ label, value, color, Icon }) => (
-          <div key={label} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
-            <Icon className={`w-7 h-7 shrink-0 ${color}`} />
-            <div>
-              <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">{label}</p>
-              <p className={`text-2xl font-black ${color}`}>{value}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-5xl mx-auto px-4 sm:px-0 py-4 sm:py-6 space-y-5"
+    >
+      {/* ── Encabezado ── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center">
+            <span className="text-2xl">🚨</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-titulo dark:text-titulo-dark">Siniestros</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-sm font-bold text-suave dark:text-suave-dark">{siniestros?.length || 0} en total</span>
+              {abiertos > 0 && <Badge tono="rojo" size="sm">{abiertos} abierto{abiertos !== 1 ? "s" : ""}</Badge>}
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <input
-          type="text" placeholder="Buscar por cliente, patente, reclamo..."
-          value={filtroQ} onChange={e => setFiltroQ(e.target.value)}
-          className="flex-1 h-10 px-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-        />
-        <div className="flex gap-1.5 flex-wrap">
-          {ESTADOS.map(({ key, label }) => (
-            <button key={key} onClick={() => setFiltroEstado(key)}
-              className={`h-10 px-4 rounded-xl text-sm font-medium border transition-colors ${
-                filtroEstado === key
-                  ? "bg-indigo-600 border-indigo-500 text-white"
-                  : "bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600"
-              }`}>
-              {label}
-            </button>
-          ))}
         </div>
+
+        <Boton3D variant="verde" onClick={abrirAlta}>
+          <HiPlus className="w-5 h-5" /> Nuevo siniestro
+        </Boton3D>
       </div>
 
-      {/* Resultados */}
-      <p className="text-xs text-slate-500">
-        {filtrados.length} siniestro{filtrados.length !== 1 ? "s" : ""}
-        {filtroQ || filtroEstado !== "todos" ? ` (filtrado de ${siniestros.length} total)` : ""}
-      </p>
+      {/* ── Búsqueda ── */}
+      <div className="relative">
+        <HiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-suave dark:text-suave-dark" />
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por cliente, patente, póliza o N° de reclamo..."
+          className="w-full h-13 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark py-3 text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+        />
+      </div>
 
-      {/* Lista */}
-      {loading ? (
-        <div className="flex justify-center items-center h-40">
-          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      {/* ── Chips de estado ── */}
+      <div className="flex gap-2 flex-wrap">
+        {FILTROS.map((f) => {
+          const active = filtroEstado === f.value;
+          return (
+            <button
+              key={f.value || "todos"}
+              type="button"
+              onClick={() => setFiltroEstado(f.value)}
+              className={`h-9 px-4 rounded-xl border-2 text-xs font-black transition-colors ${
+                active
+                  ? "bg-duo-azul border-duo-azul text-white"
+                  : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Lista ── */}
+      {loading && (!siniestros || siniestros.length === 0) ? (
+        <div className="flex justify-center py-20">
+          <div className="w-10 h-10 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
         </div>
       ) : (
         <SiniestrosList
-          siniestros={filtrados}
+          siniestros={listaFiltrada}
           isWebAdmin={isWebAdmin}
-          onView={(s) => { setSelected(s); setDetailOpen(true); }}
-          onEdit={(s) => { setSelected(s); setFormOpen(true); }}
-          onDelete={(s) => { setSelected(s); setDeleteOpen(true); }}
+          onView={setVerSiniestro}
+          onEdit={abrirEdicion}
+          onDelete={setBorrarSiniestro}
         />
       )}
 
-      {/* Modales */}
-      {/* Wizard para nuevos siniestros */}
+      {/* ── Wizard (alta / edición) ── */}
       <SiniestrosWizard
         isOpen={wizardOpen}
         onClose={() => setWizardOpen(false)}
-        onSubmit={handleAdd}
+        onSubmit={handleGuardar}
+        initialData={editData}
         isAdmin={isWebAdmin}
       />
 
-      {/* Formulario clásico para editar */}
-      <SiniestrosForm
-        isOpen={formOpen && !!selected}
-        onClose={() => setFormOpen(false)}
-        onSubmit={selected ? handleEdit : handleAdd}
-        initialData={selected}
-      />
+      {/* ── Detalle ── */}
       <SiniestrosDetails
-        isOpen={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        siniestro={selected}
-        onEdit={() => { setDetailOpen(false); setFormOpen(true); }}
+        isOpen={!!verSiniestro}
+        siniestro={verSiniestro}
+        onClose={() => setVerSiniestro(null)}
       />
-      <SiniestrosDeleteModal
-        isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={handleDelete}
-        siniestro={selected}
-      />
-    </div>
+
+      {/* ── Confirmar borrado ── */}
+      <ModalDuo
+        isOpen={!!borrarSiniestro}
+        onClose={() => setBorrarSiniestro(null)}
+        title="Eliminar siniestro"
+        subtitle="Esta acción no se puede deshacer"
+        icon={<HiExclamationCircle className="w-6 h-6" />}
+        iconTono="rojo"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm font-bold text-titulo dark:text-titulo-dark">
+            ¿Seguro que querés eliminar el siniestro
+            {borrarSiniestro?.cliente_label ? <> de <b>{borrarSiniestro.cliente_label}</b></> : ""}
+            {borrarSiniestro?.id ? <> (#{borrarSiniestro.id})</> : ""}? Se borrarán también sus fotos y su bitácora.
+          </p>
+          <div className="flex gap-2">
+            <Boton3D variant="blanco" full onClick={() => setBorrarSiniestro(null)} disabled={borrando}>
+              Cancelar
+            </Boton3D>
+            <Boton3D variant="rojo" full onClick={confirmarBorrado} disabled={borrando}>
+              {borrando ? "Eliminando..." : "Sí, eliminar"}
+            </Boton3D>
+          </div>
+        </div>
+      </ModalDuo>
+    </motion.div>
   );
 }

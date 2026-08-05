@@ -70,23 +70,23 @@ export default function AdminHorariosCierre() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <span className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-400" />
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-linea)] border-t-[var(--color-oficina)]" />
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-[13px] text-slate-400">
+      <p className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4 text-[13px] font-semibold text-[var(--color-suave)]">
         Configurá el horario de cada cierre por oficina. El sistema avisa con un pop-up
-        <strong className="text-slate-300"> {filas[0]?.aviso_min ?? 30} min antes</strong> y da
-        <strong className="text-slate-300"> {filas[0]?.tolerancia_min ?? 5} min de tolerancia</strong>.
+        <strong className="text-[var(--color-titulo)]"> {filas[0]?.aviso_min ?? 30} min antes</strong> y da
+        <strong className="text-[var(--color-titulo)]"> {filas[0]?.tolerancia_min ?? 5} min de tolerancia</strong>.
         Dejá vacío un turno si esa oficina no lo tiene.
       </p>
 
       {filas.map((f, i) => (
-        <div key={f.oficina} className="rounded-2xl border border-white/10 bg-slate-900 p-4">
-          <div className="mb-3 text-[15px] font-bold text-white">{f.oficina_nombre}</div>
+        <div key={f.oficina} className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4">
+          <div className="mb-3 text-[15px] font-black text-[var(--color-titulo)]">{f.oficina_nombre}</div>
 
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Cierre mediodía">
@@ -106,7 +106,7 @@ export default function AdminHorariosCierre() {
           <button
             onClick={() => guardar(f)}
             disabled={guardando === f.oficina}
-            className="mt-3 flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="mt-3 flex items-center gap-1.5 rounded-xl bg-[var(--color-oficina)] px-4 py-2.5 text-sm font-black text-white shadow-[0_4px_0_var(--color-oficina-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-oficina-fuerte)] disabled:opacity-50"
           >
             {guardando === f.oficina
               ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -117,9 +117,11 @@ export default function AdminHorariosCierre() {
       ))}
 
       <style>{`
-        .inp { width:100%; border-radius:0.6rem; border:1px solid rgba(255,255,255,.1);
-          background:#0f172a; padding:0.55rem 0.7rem; font-size:0.85rem; color:#e2e8f0; outline:none; }
-        .inp:focus { border-color:rgba(99,102,241,.5); }
+        .inp { width:100%; border-radius:0.75rem; border:2px solid var(--color-linea);
+          background:var(--color-surface); padding:0.6rem 0.75rem; font-size:0.875rem;
+          font-weight:600; color:var(--color-titulo); outline:none; }
+        .inp:focus { border-color:var(--color-oficina); }
+        .dark .inp { color-scheme: dark; }
       `}</style>
     </div>
   );
@@ -128,7 +130,7 @@ export default function AdminHorariosCierre() {
 function Campo({ label, children }) {
   return (
     <div>
-      <label className="mb-1 flex items-center gap-1 text-[12px] font-semibold text-slate-400">
+      <label className="mb-1 flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-[var(--color-suave)]">
         <HiClock className="text-[13px]" /> {label}
       </label>
       {children}

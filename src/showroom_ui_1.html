@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAMES · Librería UI (Showroom)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+  :root{
+    --duo-verde:#58cc02; --duo-verde-sombra:#4daa02; --duo-verde-soft:#d7ffb8;
+    --duo-azul:#1cb0f6; --duo-azul-sombra:#1899d6; --duo-azul-soft:#ddf4ff;
+    --duo-amarillo:#ffc800; --duo-amarillo-sombra:#e6a800; --duo-amarillo-soft:#fff3c4;
+    --duo-rojo:#ff4b4b; --duo-rojo-sombra:#ea2b2b; --duo-rojo-soft:#ffe0e0;
+    --duo-violeta:#ce82ff; --duo-violeta-sombra:#b968e6; --duo-violeta-soft:#f3e8ff;
+    --marca:#b80000;
+    /* superficies CLARO */
+    --surface:#f8fafc; --card:#fff; --linea:#e2e8f0; --titulo:#0f172a; --suave:#64748b;
+  }
+  html.dark{
+    --surface:#0f172a; --card:#1e293b; --linea:#334155; --titulo:#f1f5f9; --suave:#94a3b8;
+    --duo-verde-soft:#1f3d0a; --duo-azul-soft:#0b3a52; --duo-amarillo-soft:#3d3208; --duo-rojo-soft:#4a1414; --duo-violeta-soft:#331a4a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Nunito',sans-serif;background:var(--surface);color:var(--titulo);padding:24px;transition:background .2s;}
+  .wrap{max-width:840px;margin:0 auto;}
+  .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px;}
+  h1{font-size:28px;font-weight:900;}
+  .lead{color:var(--suave);font-weight:800;font-size:14px;margin-top:2px;}
+  h2{display:inline-block;background:var(--marca);color:#fff;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;padding:6px 16px;border-radius:999px;margin-bottom:14px;}
+  .card{background:var(--card);border:2px solid var(--linea);border-radius:24px;padding:22px;box-shadow:0 2px 0 var(--linea);margin-bottom:26px;}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr;}}
+
+  /* Boton3D */
+  .btn{border:none;cursor:pointer;font-family:inherit;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#fff;border-radius:16px;position:relative;top:0;transition:all .08s;display:inline-flex;align-items:center;gap:6px;font-size:15px;padding:14px 24px;}
+  .btn:active{top:5px!important;}
+  .btn.sm{font-size:12px;padding:9px 16px;border-radius:12px;}
+  .btn.lg{font-size:17px;padding:16px 32px;}
+  .v{background:var(--duo-verde);box-shadow:0 5px 0 var(--duo-verde-sombra);} .v:active{box-shadow:0 0 0 var(--duo-verde-sombra);}
+  .a{background:var(--duo-azul);box-shadow:0 5px 0 var(--duo-azul-sombra);} .a:active{box-shadow:0 0 0 var(--duo-azul-sombra);}
+  .r{background:var(--duo-rojo);box-shadow:0 5px 0 var(--duo-rojo-sombra);} .r:active{box-shadow:0 0 0 var(--duo-rojo-sombra);}
+  .y{background:var(--duo-amarillo);color:var(--titulo);box-shadow:0 5px 0 var(--duo-amarillo-sombra);} .y:active{box-shadow:0 0 0 var(--duo-amarillo-sombra);}
+  .vi{background:var(--duo-violeta);box-shadow:0 5px 0 var(--duo-violeta-sombra);} .vi:active{box-shadow:0 0 0 var(--duo-violeta-sombra);}
+  .bl{background:var(--card);color:var(--duo-azul);border:2px solid var(--linea);box-shadow:0 5px 0 var(--linea);} .bl:active{box-shadow:0 0 0 var(--linea);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* Badge */
+  .badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:11px;padding:6px 14px;}
+  .bv{background:var(--duo-verde-soft);color:var(--duo-verde-sombra);}
+  html.dark .bv{color:var(--duo-verde);}
+  .by{background:var(--duo-amarillo-soft);color:var(--duo-amarillo-sombra);} html.dark .by{color:var(--duo-amarillo);}
+  .br{background:var(--duo-rojo-soft);color:var(--duo-rojo);}
+  .ba{background:var(--duo-azul-soft);color:var(--duo-azul);}
+  .bvi{background:var(--duo-violeta-soft);color:var(--duo-violeta);}
+  .bn{background:var(--surface);color:var(--suave);border:1px solid var(--linea);}
+
+  /* Input / Select */
+  label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--suave);margin:0 0 8px 4px;}
+  .inp{width:100%;height:52px;border-radius:16px;border:3px solid var(--linea);background:var(--surface);color:var(--titulo);font-family:inherit;font-weight:700;font-size:15px;padding:0 16px;outline:none;transition:border .15s;}
+  .inp:focus{border-color:var(--duo-azul);}
+  .inp.err{border-color:var(--duo-rojo);}
+  .errtxt{font-size:11px;font-weight:800;color:var(--duo-rojo);margin:6px 0 0 4px;}
+  .req{color:var(--duo-rojo);}
+
+  /* Barra progreso */
+  .bp-top{display:flex;justify-content:space-between;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--suave);margin-bottom:6px;}
+  .bp{height:16px;background:var(--linea);border-radius:999px;overflow:hidden;}
+  .bp-fill{height:100%;border-radius:999px;transition:width .5s;position:relative;}
+  .bp-fill::after{content:'';position:absolute;top:2px;left:6px;right:6px;height:3px;background:rgba(255,255,255,.4);border-radius:999px;}
+
+  /* Tabla */
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;padding:14px;border-bottom:2px solid var(--linea);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--suave);}
+  td{padding:14px;border-bottom:1px solid var(--linea);font-weight:700;font-size:14px;}
+  tr.click{cursor:pointer;} tr.click:hover td{background:var(--surface);}
+  .pol{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 8px;border-radius:8px;background:var(--duo-azul-soft);color:var(--duo-azul);font-weight:900;}
+
+  /* toggle */
+  .toggle{border:none;cursor:pointer;font-family:inherit;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border-radius:12px;padding:9px 16px;font-size:12px;color:#fff;display:inline-flex;gap:6px;align-items:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>🎨 Librería UI · THAMES</h1>
+      <div class="lead">Todos los componentes reutilizables. Probalos y cambiá el tema →</div>
+    </div>
+    <button class="toggle a" id="tema" onclick="toggleTema()" style="box-shadow:0 4px 0 var(--duo-azul-sombra)">🌙 Oscuro</button>
+  </div>
+
+  <h2>🔘 Boton3D</h2>
+  <div class="card">
+    <div class="row">
+      <button class="btn v">Verde</button>
+      <button class="btn a">Azul</button>
+      <button class="btn r">🗑️ Borrar</button>
+      <button class="btn y">Amarillo</button>
+      <button class="btn bl">Cancelar</button>
+      <button class="btn vi">Violeta</button>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn v sm">Chico</button>
+      <button class="btn v">Mediano</button>
+      <button class="btn v lg">Grande</button>
+      <button class="btn a" disabled>Deshabilitado</button>
+    </div>
+  </div>
+
+  <h2>🏷️ Badge</h2>
+  <div class="card">
+    <div class="row">
+      <span class="badge bv">Completo</span>
+      <span class="badge by">Pendiente</span>
+      <span class="badge br">Vencida</span>
+      <span class="badge ba">Info</span>
+      <span class="badge bvi">Extra</span>
+      <span class="badge bn">Neutro</span>
+    </div>
+  </div>
+
+  <h2>⌨️ InputDuo / SelectDuo</h2>
+  <div class="card">
+    <div class="grid2">
+      <div><label>Nombre <span class="req">*</span></label><input class="inp" placeholder="Escribí un nombre…"></div>
+      <div><label>Teléfono</label><input class="inp" placeholder="11 5555-1234"></div>
+      <div><label>Con error</label><input class="inp err" value="mal-email"><div class="errtxt">El email no es válido</div></div>
+      <div><label>Sucursal</label><select class="inp"><option>Elegí una…</option><option>Centro</option><option>Norte</option></select></div>
+    </div>
+  </div>
+
+  <h2>📊 BarraProgreso</h2>
+  <div class="card">
+    <div style="margin-bottom:18px">
+      <div class="bp-top"><span>Alta de cliente (por pasos)</span><span id="pasotxt">Paso 2 de 4</span></div>
+      <div class="bp"><div class="bp-fill" id="bpaso" style="width:50%;background:var(--duo-verde)"></div></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn bl sm" onclick="mover(-1)">◀ Atrás</button>
+        <button class="btn v sm" onclick="mover(1)">Siguiente ▶</button>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div class="bp-top"><span>Completitud (por %)</span><span>80%</span></div>
+      <div class="bp"><div class="bp-fill" style="width:80%;background:var(--duo-azul)"></div></div>
+    </div>
+    <div>
+      <div class="bp-top"><span>Cobro terminado</span><span style="color:var(--duo-verde-sombra)">¡Completo! 🎉</span></div>
+      <div class="bp"><div class="bp-fill" style="width:100%;background:var(--duo-verde)"></div></div>
+    </div>
+  </div>
+
+  <h2>📋 TablaDuo</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Cliente</th><th>DNI / CUIT</th><th style="text-align:center">Pólizas</th><th style="text-align:center">Estado</th></tr></thead>
+      <tbody>
+        <tr class="click"><td>Martín González</td><td>20.345.678</td><td style="text-align:center"><span class="pol">3</span></td><td style="text-align:center"><span class="badge bv">Completo</span></td></tr>
+        <tr class="click"><td>Lucía Ramírez</td><td>27.891.234</td><td style="text-align:center"><span class="pol">1</span></td><td style="text-align:center"><span class="badge by">Borrador</span></td></tr>
+        <tr class="click"><td>Carlos Pérez</td><td>23.456.789</td><td style="text-align:center"><span class="pol">2</span></td><td style="text-align:center"><span class="badge bv">Completo</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="text-align:center;color:var(--suave);font-weight:800;font-size:12px;margin-top:20px">
+    Todos importables desde <code>src/components/ui/</code> · claro + oscuro incluidos 🌗<br>
+    (Falta acá el ModalDuo — en React abre en pop-up; en la app real lo vas a ver)
+  </p>
+</div>
+
+<script>
+  let paso = 2;
+  function toggleTema(){
+    const dark = document.documentElement.classList.toggle('dark');
+    document.getElementById('tema').textContent = dark ? '☀️ Claro' : '🌙 Oscuro';
+  }
+  function mover(d){
+    paso = Math.max(0, Math.min(4, paso + d));
+    const pct = (paso/4)*100;
+    const fill = document.getElementById('bpaso');
+    fill.style.width = pct + '%';
+    fill.style.background = pct>=100 ? 'var(--duo-verde)' : 'var(--duo-verde)';
+    document.getElementById('pasotxt').textContent = paso>=4 ? '¡Completo! 🎉' : ('Paso '+paso+' de 4');
+  }
+</script>
+</body>
+</html>

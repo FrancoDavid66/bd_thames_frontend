@@ -1,9 +1,13 @@
 // src/components/solicitudes/ResponsablesModal.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+//
+// Gestión de responsables (empleados) + selección.
+//   · selectMode=false → ABM completo (crear / editar / activar / borrar).
+//   · selectMode=true  → lista para elegir uno (botón "Elegir").
+// Admin puede asignar sucursal; el empleado hereda la suya.
+// Usa `api` (axios con JWT) contra /empleados/ y /usuarios/oficinas/.
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  HiX,
-  HiTrash,
   HiPencil,
   HiCheck,
   HiBan,
@@ -11,28 +15,17 @@ import {
   HiUserGroup,
   HiShieldCheck,
   HiOfficeBuilding,
+  HiTrash,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
-// 🚀 IMPORTACIONES DE SEGURIDAD
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 
-const modalVariants = {
-  initial: { opacity: 0, scale: 0.95 },
-  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
-};
-
-const sectionVariants = {
-  initial: { opacity: 0, y: 15 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
-
-const itemVariants = {
-  initial: { opacity: 0, x: -10 },
-  animate: { opacity: 1, x: 0 },
-};
+import ModalDuo from "../ui/ModalDuo";
+import Boton3D from "../ui/Boton3D";
+import InputDuo from "../ui/InputDuo";
+import SelectDuo from "../ui/SelectDuo";
 
 export default function ResponsablesModal({
   onClose,
@@ -42,16 +35,14 @@ export default function ResponsablesModal({
   onSelect,
 }) {
   const { user } = useAuth();
+  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  // 🏢 Gestión de Oficinas (Solo Admin)
   const [oficinas, setOficinas] = useState([]);
-  const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevaOficinaId, setNuevaOficinaId] = useState("");
-  const [nuevoActivo, setNuevoActivo] = useState(true);
   const [creating, setCreating] = useState(false);
 
   const [editId, setEditId] = useState(null);
@@ -61,27 +52,30 @@ export default function ResponsablesModal({
   const [onlyActive, setOnlyActive] = useState(selectMode);
   const [selectedId, setSelectedId] = useState(selectedIdProp);
 
+  /* ── cargar ── */
   const cargarOficinas = useCallback(async () => {
     if (!isWebAdmin) return;
     try {
-      const res = await api.get('/usuarios/oficinas/');
+      const res = await api.get("/usuarios/oficinas/");
       setOficinas(Array.isArray(res.data) ? res.data : res.data?.results || []);
-    } catch (e) { console.error("Error al cargar oficinas"); }
+    } catch {
+      /* silencioso */
+    }
   }, [isWebAdmin]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      // 🚀 RUTA CORREGIDA: Apuntamos al endpoint blindado en solicitudes/views.py
-      const res = await api.get('/empleados/'); 
+      const res = await api.get("/empleados/");
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      
       arr.sort((a, b) => {
-        if (!!b.activo - !!a.activo !== 0) return (!!b.activo - !!a.activo);
-        return String(a.nombre || "").localeCompare(String(b.nombre || ""), "es", { sensitivity: "base" });
+        if (!!b.activo - !!a.activo !== 0) return !!b.activo - !!a.activo;
+        return String(a.nombre || "").localeCompare(String(b.nombre || ""), "es", {
+          sensitivity: "base",
+        });
       });
       setItems(arr);
-    } catch (e) {
+    } catch {
       toast.error("Error al cargar responsables");
     } finally {
       setLoading(false);
@@ -93,6 +87,7 @@ export default function ResponsablesModal({
     if (isWebAdmin) cargarOficinas();
   }, [cargar, cargarOficinas, isWebAdmin]);
 
+  /* ── acciones ── */
   const crear = async () => {
     const nombre = (nuevoNombre || "").trim();
     if (!nombre) return toast.error("Ingresá un nombre");
@@ -100,17 +95,14 @@ export default function ResponsablesModal({
 
     setCreating(true);
     try {
-      const payload = { 
-        nombre, 
-        activo: !!nuevoActivo,
-        oficina: isWebAdmin ? nuevaOficinaId : (user?.perfil?.oficina?.id || user?.perfil?.oficina)
+      const payload = {
+        nombre,
+        activo: true,
+        oficina: isWebAdmin ? nuevaOficinaId : user?.perfil?.oficina?.id || user?.perfil?.oficina,
       };
-
-      // 🚀 RUTA CORREGIDA
-      await api.post('/empleados/', payload);
+      await api.post("/empleados/", payload);
       setNuevoNombre("");
       if (isWebAdmin) setNuevaOficinaId("");
-      
       toast.success("Responsable agregado");
       await cargar();
       onChanged?.();
@@ -123,37 +115,40 @@ export default function ResponsablesModal({
 
   const activar = async (emp, activo) => {
     try {
-      // 🚀 RUTA CORREGIDA
       await api.patch(`/empleados/${emp.id}/`, { activo });
       toast.success(activo ? "Activado" : "Desactivado");
       await cargar();
       onChanged?.();
-    } catch (e) { toast.error("Error al actualizar"); }
+    } catch {
+      toast.error("Error al actualizar");
+    }
   };
 
   const guardarEdicion = async () => {
     const nombre = (editNombre || "").trim();
     if (!nombre) return toast.error("Nombre requerido");
     try {
-      // 🚀 RUTA CORREGIDA
       await api.patch(`/empleados/${editId}/`, { nombre });
       toast.success("Nombre actualizado");
       setEditId(null);
       await cargar();
       onChanged?.();
-    } catch (e) { toast.error("Error al guardar"); }
+    } catch {
+      toast.error("Error al guardar");
+    }
   };
 
   const eliminar = async (emp) => {
     if (!confirm(`¿Eliminar a "${emp.nombre}"?`)) return;
     try {
-      // 🚀 RUTA CORREGIDA
       await api.delete(`/empleados/${emp.id}/`);
       toast.success("Eliminado");
       await cargar();
       onChanged?.();
       if (String(selectedId) === String(emp.id)) setSelectedId(null);
-    } catch (e) { toast.error("No se puede eliminar (tiene historial)"); }
+    } catch {
+      toast.error("No se puede eliminar (tiene historial)");
+    }
   };
 
   const filtered = useMemo(() => {
@@ -164,130 +159,182 @@ export default function ResponsablesModal({
     return list;
   }, [items, q, onlyActive]);
 
-  const confirmarSeleccion = () => {
-    if (!selectMode) return;
-    const emp = items.find((i) => String(i.id) === String(selectedId)) || null;
-    onSelect?.(emp);
-    onClose?.();
-  };
-
+  /* ── render ── */
   return (
-    <AnimatePresence>
-      <motion.div className="fixed inset-0 z-[200] flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-
-        <motion.div
-          variants={modalVariants} initial="initial" animate="animate" exit="exit"
-          className="relative w-full max-w-3xl h-[85vh] sm:h-auto mx-auto rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col bg-[#0b0f1e]"
-        >
-          {/* Header */}
-          <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0f0c28]/90 backdrop-blur">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center border border-sky-500/20">
-                <HiUserGroup className="text-xl" />
-              </div>
-              <div>
-                 <h3 className="text-white font-black text-lg uppercase tracking-tighter">
-                   {selectMode ? "Seleccionar Responsable" : "Gestión de Equipo"}
-                 </h3>
-                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    {isWebAdmin ? "Control Global" : `Sucursal: ${user?.perfil?.oficina_nombre || 'Local'}`}
-                 </p>
-              </div>
+    <ModalDuo
+      isOpen
+      onClose={onClose}
+      icon={<HiUserGroup />}
+      iconTono="violeta"
+      size="md"
+      title={selectMode ? "Elegir Responsable" : "Equipo / Responsables"}
+      subtitle={isWebAdmin ? "Control global" : `Sucursal: ${user?.perfil?.oficina_nombre || "Local"}`}
+    >
+      {/* Alta (solo ABM) */}
+      {!selectMode && (
+        <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+            <div className={isWebAdmin ? "sm:col-span-5" : "sm:col-span-9"}>
+              <InputDuo
+                label="Nombre"
+                value={nuevoNombre}
+                onChange={(e) => setNuevoNombre(e.target.value)}
+                placeholder="FRANCO…"
+              />
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg bg-white/5 text-white/40 hover:text-white"><HiX className="text-xl" /></button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-            {!selectMode && (
-              <motion.section className="p-4 rounded-2xl border border-white/10 bg-white/[0.03] shadow-inner" variants={sectionVariants} initial="initial" animate="animate">
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                  <div className={isWebAdmin ? "sm:col-span-5" : "sm:col-span-8"}>
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1 mb-1 block">Nombre</label>
-                    <input
-                      value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)}
-                      placeholder="FRANCO..." className="w-full h-11 px-4 rounded-xl bg-black/40 border border-white/10 text-white font-bold text-sm outline-none focus:ring-2 ring-sky-500/50"
-                    />
-                  </div>
-
-                  {isWebAdmin && (
-                    <div className="sm:col-span-4">
-                      <label className="text-[10px] font-black text-sky-400/50 uppercase tracking-widest ml-1 mb-1 block">Asignar Sucursal</label>
-                      <select 
-                        value={nuevaOficinaId}
-                        onChange={(e) => setNuevaOficinaId(e.target.value)}
-                        className="w-full h-11 px-3 rounded-xl bg-black/40 border border-sky-500/20 text-sky-400 font-bold text-sm outline-none focus:ring-2 ring-sky-500/50 cursor-pointer"
-                      >
-                        <option value="">— Elegir —</option>
-                        {oficinas.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="sm:col-span-3 flex items-center gap-3">
-                    <button onClick={crear} disabled={creating} className="w-full h-11 rounded-xl bg-sky-500 text-black font-black uppercase text-xs hover:scale-105 transition-all">
-                      {creating ? "..." : "Agregar"}
-                    </button>
-                  </div>
-                </div>
-              </motion.section>
-            )}
-
-            {/* Búsqueda */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-              <div className="relative w-full sm:w-80 group">
-                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-sky-400" />
-                <input
-                  value={q} onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs outline-none"
+            {isWebAdmin && (
+              <div className="sm:col-span-4">
+                <SelectDuo
+                  label="Sucursal"
+                  value={nuevaOficinaId}
+                  onChange={(e) => setNuevaOficinaId(e.target.value)}
+                  placeholder="— Elegir —"
+                  options={oficinas.map((o) => ({ value: o.id, label: o.nombre }))}
                 />
               </div>
-              <button onClick={() => setOnlyActive(!onlyActive)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase border ${onlyActive ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/40'}`}>
-                {onlyActive ? "Activos" : "Todos"}
-              </button>
-            </div>
-
-            {/* Lista */}
-            <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden divide-y divide-white/5">
-              {loading ? (
-                <div className="p-10 text-center text-sky-400 text-[10px] font-black uppercase tracking-widest animate-pulse">Cargando...</div>
-              ) : filtered.length === 0 ? (
-                <div className="p-10 text-center text-white/20 text-[10px] font-black uppercase tracking-widest">Sin registros en esta oficina</div>
-              ) : (
-                filtered.map((emp) => {
-                  const editing = editId === emp.id;
-                  const isSelected = String(selectedId) === String(emp.id);
-
-                  return (
-                    <motion.div key={emp.id} className={`p-4 flex items-center gap-4 ${isSelected ? 'bg-sky-500/10' : ''}`} variants={itemVariants}>
-                      <div className="flex-1 min-w-0">
-                        {editing ? (
-                          <input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} className="w-full bg-white/10 border border-sky-500/30 rounded-lg px-3 py-1 text-white font-bold outline-none" autoFocus />
-                        ) : (
-                          <div className="flex flex-col">
-                             <p className={`font-black text-sm uppercase truncate ${!emp.activo ? 'text-white/20 line-through' : 'text-white'}`}>{emp.nombre}</p>
-                             {isWebAdmin && <div className="flex items-center gap-1 text-[9px] font-black text-sky-400 uppercase mt-0.5 opacity-60"><HiOfficeBuilding /> {emp.oficina_nombre || "S/A"}</div>}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {editing ? (
-                          <><button onClick={guardarEdicion} className="p-2 text-emerald-400"><HiCheck /></button><button onClick={() => setEditId(null)} className="p-2 text-rose-400"><HiBan /></button></>
-                        ) : (
-                          <><button onClick={() => { setEditId(emp.id); setEditNombre(emp.nombre); }} className="p-2 text-white/10 hover:text-white"><HiPencil /></button><button onClick={() => activar(emp, !emp.activo)} className={`p-2 ${emp.activo ? 'text-emerald-500/20' : 'text-amber-500/20'}`}>{emp.activo ? <HiShieldCheck /> : <HiBan />}</button><button onClick={() => eliminar(emp)} className="p-2 text-rose-500/20 hover:text-rose-500"><HiTrash /></button></>
-                        )}
-                        {selectMode && !editing && (
-                          <button onClick={() => { setSelectedId(emp.id); onSelect?.(emp); onClose(); }} className={`ml-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${isSelected ? 'bg-sky-500 text-black' : 'bg-white/5 text-white/40'}`}>Elegir</button>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
+            )}
+            <div className="sm:col-span-3">
+              <Boton3D variant="violeta" full onClick={crear} disabled={creating}>
+                {creating ? "…" : "Agregar"}
+              </Boton3D>
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      )}
+
+      {/* Búsqueda */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between mb-4">
+        <div className="relative flex-1">
+          <HiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-lg pointer-events-none" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar…"
+            className="w-full h-12 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[14px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+          />
+        </div>
+        <button
+          onClick={() => setOnlyActive(!onlyActive)}
+          className={`px-4 h-12 rounded-2xl text-[11px] font-black uppercase tracking-wide border-2 transition ${
+            onlyActive
+              ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde border-duo-verde"
+              : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
+          }`}
+        >
+          {onlyActive ? "Solo activos" : "Todos"}
+        </button>
+      </div>
+
+      {/* Lista */}
+      <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden divide-y-2 divide-linea dark:divide-[var(--color-linea-dark)]">
+        {loading ? (
+          <div className="p-10 text-center text-duo-azul text-[11px] font-black uppercase tracking-widest animate-pulse">
+            Cargando…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-10 text-center text-suave dark:text-suave-dark text-[11px] font-black uppercase tracking-widest">
+            Sin registros
+          </div>
+        ) : (
+          filtered.map((emp) => {
+            const editing = editId === emp.id;
+            const isSelected = String(selectedId) === String(emp.id);
+            return (
+              <div
+                key={emp.id}
+                className={`p-3.5 flex items-center gap-3 ${
+                  isSelected ? "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)]" : ""
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  {editing ? (
+                    <input
+                      value={editNombre}
+                      onChange={(e) => setEditNombre(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border-2 border-duo-azul bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark font-bold outline-none"
+                      autoFocus
+                    />
+                  ) : (
+                    <div className="flex flex-col">
+                      <p
+                        className={`font-black text-[14px] uppercase truncate ${
+                          !emp.activo
+                            ? "text-suave dark:text-suave-dark line-through"
+                            : "text-titulo dark:text-titulo-dark"
+                        }`}
+                      >
+                        {emp.nombre}
+                      </p>
+                      {isWebAdmin && (
+                        <div className="flex items-center gap-1 text-[10px] font-black text-duo-violeta uppercase mt-0.5">
+                          <HiOfficeBuilding /> {emp.oficina_nombre || "S/A"}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  {selectMode ? (
+                    <button
+                      onClick={() => {
+                        setSelectedId(emp.id);
+                        onSelect?.(emp);
+                        onClose?.();
+                      }}
+                      className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide transition ${
+                        isSelected
+                          ? "bg-duo-violeta text-white"
+                          : "bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-duo-violeta"
+                      }`}
+                    >
+                      Elegir
+                    </button>
+                  ) : editing ? (
+                    <>
+                      <button onClick={guardarEdicion} className="p-2.5 rounded-xl text-duo-verde-sombra dark:text-duo-verde hover:bg-duo-verde-soft dark:hover:bg-[var(--color-duo-verde-soft-dark)]">
+                        <HiCheck />
+                      </button>
+                      <button onClick={() => setEditId(null)} className="p-2.5 rounded-xl text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]">
+                        <HiBan />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditId(emp.id);
+                          setEditNombre(emp.nombre);
+                        }}
+                        className="p-2.5 rounded-xl text-suave dark:text-suave-dark hover:text-duo-azul hover:bg-duo-azul-soft dark:hover:bg-[var(--color-duo-azul-soft-dark)]"
+                        title="Editar"
+                      >
+                        <HiPencil />
+                      </button>
+                      <button
+                        onClick={() => activar(emp, !emp.activo)}
+                        className={`p-2.5 rounded-xl ${
+                          emp.activo ? "text-duo-verde-sombra dark:text-duo-verde" : "text-duo-amarillo-sombra dark:text-duo-amarillo"
+                        } hover:bg-surface dark:hover:bg-surface-dark`}
+                        title={emp.activo ? "Desactivar" : "Activar"}
+                      >
+                        {emp.activo ? <HiShieldCheck /> : <HiBan />}
+                      </button>
+                      <button
+                        onClick={() => eliminar(emp)}
+                        className="p-2.5 rounded-xl text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]"
+                        title="Eliminar"
+                      >
+                        <HiTrash />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </ModalDuo>
   );
 }

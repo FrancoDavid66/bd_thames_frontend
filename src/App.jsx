@@ -22,22 +22,14 @@ import PagosPage from "./pages/PagosPage";
 import SiniestrosPage from "./pages/SiniestrosPage";
 import ClienteProfilePage from "./pages/ClienteProfilePage";
 import PolizaDetails from "./components/polizas/PolizaDetails";
-import GeoPage from "./pages/GeoPage";
 import PropiedadesPage from "./pages/PropiedadesPage";
-import AlquileresPage from "./pages/AlquileresPage";
-import AlquilerDetails from "./components/alquileres/AlquilerDetails";
 import BalanzesPage from "./pages/BalanzesPage";
 import SolicitudesPage from "./pages/SolicitudesPage";
-import GruasPage from "./pages/GruasPage";
 import CuponerasPage from "./pages/CuponerasPage";
-import CompetenciaPage from "./pages/CompetenciaPage";
 import EstadisticasPage from "./pages/EstadisticasPage";
-import MarketingPage from "./pages/MarketingPage";
 import RenovacionesPage from "./pages/RenovacionesPage";
-import VencimientosPage from "./pages/VencimientosPage";
 import BajasPage from "./pages/BajasPage";
 import RecaudacionPage from "./pages/RecaudacionPage";
-import VerificacionCompaniaPage from "./pages/VerificacionCompaniaPage";
 
 // 🚀 NUEVA APP: SERVICIOS Y GASTOS FIJOS
 import ServiciosPage from "./pages/ServiciosPage";
@@ -63,16 +55,24 @@ import PortalAseguradoPage from "./pages/PortalAseguradoPage";
 
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
+// 🚀 Marca de "ya mostré la bienvenida en esta sesión". Se guarda en
+//    sessionStorage: vive mientras la pestaña esté abierta y se borra al
+//    cerrar sesión. Así el logo "Preparando tu entorno..." aparece SOLO
+//    cuando recién iniciás sesión, y NO en cada cambio de pantalla.
+const WELCOME_FLAG = "welcomeShown";
+
 function App() {
-  const { mode } = useSelector((state) => state.theme);
+  // 🎨 El tema (claro/oscuro) ahora lo maneja ThemeProvider (context).
+  //    Ya no se lee de Redux ni se aplica la clase 'dark' desde acá.
   const location = useLocation();
   const dispatch = useDispatch();
-  
+
   // 🚀 EXTRAEMOS DATOS DE AUTENTICACIÓN
   const { user, loading } = useAuth();
 
   // 🚀 ESTADO PARA LA PANTALLA DE BIENVENIDA
-  const [showWelcome, setShowWelcome] = useState(true);
+  //    Arranca APAGADA. Solo se prende una vez por login (ver useEffect abajo).
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const isMobile = useMemo(
     () =>
@@ -107,9 +107,6 @@ function App() {
 
   // --- Contador Bajas ---
   const [bajasPendientes, setBajasPendientes] = useState(0);
-
-  // --- Contador Pólizas en verificación ---
-  const [verificacionCount, setVerificacionCount] = useState(0);
 
   // --- Contador Siniestros abiertos (no cerrados) ---
   const [siniestrosAbiertos, setSiniestrosAbiertos] = useState(0);
@@ -161,7 +158,7 @@ function App() {
                 (import.meta?.env?.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) ||
                 (window.__API_URL__ || "");
     const base = raw.toString().trim();
-    if (!base) return ""; 
+    if (!base) return "";
     return base.endsWith("/") ? base : `${base}/`;
   }, []);
 
@@ -174,7 +171,7 @@ function App() {
   const fetchJSON = async (url) => {
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch(url, { 
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) return null;
@@ -250,16 +247,6 @@ function App() {
     } catch {}
   };
 
-  // ====== Pólizas en verificación: fetch ======
-  const fetchVerificacionCount = async () => {
-    if (!user) return;
-    try {
-      const apiRoot = getApiRoot();
-      const data = await fetchJSON(`${apiRoot}polizas/?estado=en_verificacion&page_size=1`);
-      if (data) setVerificacionCount(Number(data.count) || 0);
-    } catch {}
-  };
-
   // ====== Siniestros abiertos: fetch ======
   const fetchSiniestrosCount = async () => {
     if (!user) return;
@@ -290,19 +277,33 @@ function App() {
   // 🚀 USE-EFFECTS
   // ========================================================
 
+  // 🚀 BIENVENIDA — solo 1 vez por login (no en cada pantalla).
+  //    - Con user y SIN marca en sessionStorage → mostramos el logo 2.2s
+  //      y dejamos la marca, para que no vuelva a salir al navegar.
+  //    - Sin user (logout / login nuevo) → borramos la marca, así el
+  //      próximo inicio de sesión sí muestra la bienvenida.
   useEffect(() => {
+    let yaMostrada = false;
+    try { yaMostrada = sessionStorage.getItem(WELCOME_FLAG) === "1"; } catch {}
+
     if (user) {
-      const timer = setTimeout(() => {
-        setShowWelcome(false);
-      }, 2200);
-      return () => clearTimeout(timer);
+      if (!yaMostrada) {
+        setShowWelcome(true);
+        try { sessionStorage.setItem(WELCOME_FLAG, "1"); } catch {}
+        const timer = setTimeout(() => setShowWelcome(false), 2200);
+        return () => clearTimeout(timer);
+      }
+      // ya se mostró en esta sesión → nada (no molestar al navegar)
+      setShowWelcome(false);
     } else {
-      setShowWelcome(true); 
+      // sin sesión: limpiamos la marca para el próximo login
+      try { sessionStorage.removeItem(WELCOME_FLAG); } catch {}
+      setShowWelcome(false);
     }
   }, [user]);
 
   useEffect(() => {
-    if (!user) return; 
+    if (!user) return;
 
     const unsub = solicitudesRealtime.subscribe((evt) => {
       if (evt && evt.data) {
@@ -316,17 +317,13 @@ function App() {
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
     fetchBajasCountersApp();
-    fetchVerificacionCount();
     fetchSiniestrosCount();
     fetchServiciosCounters();
 
     return () => { try { unsub && unsub(); } catch {} };
-  }, [user]); 
+  }, [user]);
 
-  useEffect(() => {
-    if (mode === "dark") document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, [mode]);
+  // (El manejo de la clase 'dark' se movió a ThemeProvider — ver src/context/ThemeContext.jsx)
 
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
@@ -338,7 +335,6 @@ function App() {
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
     fetchBajasCountersApp();
-    fetchVerificacionCount();
     fetchSiniestrosCount();
     fetchServiciosCounters();
   }, [location.pathname, location.search, user]);
@@ -350,8 +346,7 @@ function App() {
       fetchCuponerasCounters();
       fetchRenovacionesCounters();
       fetchBajasCountersApp();
-      fetchVerificacionCount();
-      fetchSiniestrosCount();
+        fetchSiniestrosCount();
       fetchServiciosCounters();
     }, 60_000);
     return () => clearInterval(id);
@@ -384,10 +379,41 @@ function App() {
     );
   }
 
+  // 🦉 LOADER DE INGRESO (Duo) — mientras la app valida la sesión.
+  //    Tu LOGO ORIGINAL dentro de un cuadrado Duo con relieve 3D + barra.
+  //    Claro/oscuro con los tokens de la app (surface/card/marca).
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-brand-200">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center gap-6 bg-surface dark:bg-surface-dark transition-colors">
+        {/* Cuadrado Duo 3D con el logo horizontal adentro (el logo NO se toca) */}
+        <motion.div
+          className="flex items-center justify-center rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-7 py-6 shadow-[0_6px_0_var(--color-linea)] dark:shadow-[0_6px_0_var(--color-linea-dark)]"
+          initial={{ scale: 0.9, opacity: 0, y: 10 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+          <motion.img
+            src={logoThames}
+            alt="Estudio Thames"
+            className="h-14 w-auto sm:h-16"
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
+
+        <div className="text-[11px] font-black uppercase tracking-[0.2em] text-suave dark:text-suave-dark">
+          Entrando…
+        </div>
+
+        {/* Barra de progreso Duo */}
+        <div className="h-2.5 w-52 overflow-hidden rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+          <motion.div
+            className="h-full rounded-full bg-marca"
+            initial={{ width: "10%" }}
+            animate={{ width: ["10%", "90%", "10%"] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
       </div>
     );
   }
@@ -408,7 +434,7 @@ function App() {
         {showWelcome && (
           <motion.div
             key="welcome-overlay"
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#030712] text-white"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-surface dark:bg-surface-dark"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
             transition={{ duration: 0.6, ease: "easeInOut" }}
@@ -417,30 +443,31 @@ function App() {
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
-              className="flex flex-col items-center text-center px-4"
+              className="flex flex-col items-center px-4 text-center"
             >
-              <motion.div 
+              {/* Isotipo grande en cuadrado Duo con relieve 3D */}
+              <motion.div
                 animate={{ y: [-5, 5, -5] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="mb-8"
+                className="mb-8 flex h-32 w-32 items-center justify-center rounded-[2rem] border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 shadow-[0_8px_0_var(--color-linea)] dark:shadow-[0_8px_0_var(--color-linea-dark)]"
               >
-                <img 
-                  src={logoThames} 
-                  alt="Logo Thames" 
-                  className="h-28 w-auto drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]" 
+                <img
+                  src={logoThames}
+                  alt="Logo Thames"
+                  className="h-full w-full object-contain"
                 />
               </motion.div>
 
-              <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
-                Bienvenido, {user?.username}
+              <h1 className="text-4xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-5xl">
+                Bienvenido, <span className="text-marca">{user?.username}</span>
               </h1>
-              <p className="mt-4 text-xs sm:text-sm font-medium tracking-widest text-zinc-500 uppercase">
-                Preparando tu entorno de trabajo...
+              <p className="mt-4 text-xs font-black uppercase tracking-widest text-suave dark:text-suave-dark sm:text-sm">
+                Preparando tu entorno de trabajo…
               </p>
-              
-              <div className="mt-8 h-1 w-64 overflow-hidden rounded-full bg-white/10 relative">
-                <motion.div 
-                  className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-emerald-400"
+
+              <div className="relative mt-8 h-2.5 w-64 overflow-hidden rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+                <motion.div
+                  className="absolute left-0 top-0 h-full bg-marca"
                   initial={{ width: "0%" }}
                   animate={{ width: "100%" }}
                   transition={{ duration: 1.8, ease: "easeInOut" }}
@@ -463,9 +490,8 @@ function App() {
           renovacionesPendientes={renovacionesPendientes}
           bajasPendientes={bajasPendientes}
           siniestrosAbiertos={siniestrosAbiertos}
-          verificacionCount={verificacionCount}
           serviciosAlertas={serviciosAlertas}
-          user={user} 
+          user={user}
         />
 
         <motion.div
@@ -476,12 +502,10 @@ function App() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} verificacionCount={verificacionCount} siniestrosAbiertos={siniestrosAbiertos} />
+          <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} siniestrosAbiertos={siniestrosAbiertos} />
 
           <motion.main
-            className={`flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pb-20 lg:pb-8 overflow-y-auto transition-all duration-200 ${
-              verificacionCount > 0 ? "pt-24" : "pt-16"
-            }`}
+            className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pb-20 lg:pb-8 overflow-y-auto transition-all duration-200 pt-16"
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -30, opacity: 0 }}
@@ -503,41 +527,31 @@ function App() {
                 <Route path="/polizas" element={<PolizasPage />} />
                 <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
                 <Route path="/polizas/bajas" element={<BajasPage />} />
-                <Route path="/polizas/verificacion" element={<VerificacionCompaniaPage />} />
                 <Route path="/polizas/:id" element={<PolizaDetails />} />
-                <Route path="/vencimientos" element={<VencimientosPage />} />
                 <Route path="/pagos" element={<PagosPage />} />
                 <Route path="/balanzes" element={<BalanzesPage />} />
-                
+
                 {/* 🚀 RUTA PROTEGIDA: SERVICIOS Y GASTOS FIJOS (Solo Admin) */}
-                <Route 
-                  path="/servicios" 
-                  element={user.perfil?.rol === 'ADMIN' ? <ServiciosPage /> : <Navigate to="/" replace />} 
-                />
-                
-                <Route path="/siniestros" element={<SiniestrosPage />} />
-                <Route path="/cuponeras" element={<CuponerasPage />} />
-                <Route path="/geo" element={<GeoPage />} />
-                <Route path="/competencia" element={<CompetenciaPage />} />
-                <Route path="/estadisticas" element={<EstadisticasPage />} />
-                <Route path="/recaudacion" element={<RecaudacionPage />} />
-                
-                {/* 🚀 NUEVA RUTA DE COTIZACIONES */}
-                <Route path="/cotizaciones" element={<CotizacionesPage />} />
-                
-                {/* 🚀 RUTA PROTEGIDA PARA ADMIN PANEL */}
-                <Route 
-                  path="/admin" 
-                  element={user.perfil?.rol === 'ADMIN' ? <AdminPage /> : <Navigate to="/" replace />} 
+                <Route
+                  path="/servicios"
+                  element={user.perfil?.rol === 'ADMIN' ? <ServiciosPage /> : <Navigate to="/" replace />}
                 />
 
-                <Route 
-                  path="/marketing" 
-                  element={user.perfil?.rol === 'ADMIN' ? <MarketingPage /> : <Navigate to="/" replace />} 
+                <Route path="/siniestros" element={<SiniestrosPage />} />
+                <Route path="/cuponeras" element={<CuponerasPage />} />
+                <Route path="/estadisticas" element={<EstadisticasPage />} />
+                <Route path="/recaudacion" element={<RecaudacionPage />} />
+
+                {/* 🚀 NUEVA RUTA DE COTIZACIONES */}
+                <Route path="/cotizaciones" element={<CotizacionesPage />} />
+
+                {/* 🚀 RUTA PROTEGIDA PARA ADMIN PANEL */}
+                <Route
+                  path="/admin"
+                  element={user.perfil?.rol === 'ADMIN' ? <AdminPage /> : <Navigate to="/" replace />}
                 />
-                
+
                 <Route path="/solicitudes" element={<SolicitudesPage />} />
-                <Route path="/gruas" element={<GruasPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AnimatePresence>

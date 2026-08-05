@@ -136,14 +136,16 @@ export const deleteCliente = createAsyncThunk(
 );
 
 // Pagar cuota (actualiza el estado financiero del cliente)
+// 🚀 clienteId es OPCIONAL: si el componente lo pasa, actualizamos SOLO ese cliente
+//    en la cache (rápido). Si no lo pasa, caemos al modo compatible (recorre todo).
 export const pagarCuota = createAsyncThunk(
   "clientes/pagarCuota",
-  async ({ cuotaId, fecha_pago }, { rejectWithValue }) => {
+  async ({ cuotaId, fecha_pago, clienteId }, { rejectWithValue }) => {
     try {
       const payload = {};
       if (fecha_pago) payload.fecha_pago = fecha_pago;
       const { data } = await api.patch(`cuotas/${cuotaId}/pagar/`, payload);
-      return { cuotaId, ...data };
+      return { cuotaId, clienteId, ...data };
     } catch (error) {
       return rejectWithValue(error.response?.data || "Error al pagar la cuota");
     }
@@ -300,10 +302,10 @@ const clientesSlice = createSlice({
 
       // -------- PAGAR CUOTA (Update Cache) --------
       .addCase(pagarCuota.fulfilled, (state, action) => {
-        const { cuotaId, fecha_pago } = action.payload || {};
+        const { cuotaId, fecha_pago, clienteId } = action.payload || {};
         if (!cuotaId) return;
 
-        const updateFn = (cliente) => {
+        const marcarEnCliente = (cliente) => {
           if (!cliente?.polizas?.length) return;
           cliente.polizas.forEach((poliza) => {
             const cuota = poliza.cuotas?.find((c) => c.id === cuotaId);
@@ -314,8 +316,18 @@ const clientesSlice = createSlice({
           });
         };
 
-        Object.values(state.byId).forEach(updateFn);
-        state.clientes.forEach(updateFn);
+        // 🚀 RÁPIDO: si sabemos a qué cliente pertenece, tocamos SOLO ese.
+        if (clienteId != null) {
+          const key = String(clienteId);
+          if (state.byId[key]) marcarEnCliente(state.byId[key]);
+          const enLista = state.clientes.find((c) => String(c.id) === key);
+          if (enLista) marcarEnCliente(enLista);
+          return;
+        }
+
+        // 🐢 COMPATIBLE: sin clienteId, recorremos todo (como antes).
+        Object.values(state.byId).forEach(marcarEnCliente);
+        state.clientes.forEach(marcarEnCliente);
       });
   },
 });

@@ -61,31 +61,12 @@ export const getSiniestros = createAsyncThunk(
 export const addSiniestro = createAsyncThunk(
   'siniestros/addSiniestro',
   async (siniestro, { rejectWithValue }) => {
-    // 🐛 DEBUG: log del payload exacto que mandamos
-    console.group("🚨 [addSiniestro] POST /api/siniestros/");
-    console.log("📦 Payload enviado:", siniestro);
-    console.log("📦 Payload JSON:", JSON.stringify(siniestro, null, 2));
-    console.log("🔑 Headers:", getAuthHeaders());
-    console.log("🌐 URL:", `${BASE_URL}siniestros/`);
-    console.groupEnd();
-
     try {
       const response = await axios.post(`${BASE_URL}siniestros/`, siniestro, {
         headers: getAuthHeaders(),
       });
-      console.log("✅ [addSiniestro] OK", response.data);
       return unwrapItem(response.data);
     } catch (error) {
-      // 🐛 DEBUG: log completo del error
-      console.group("❌ [addSiniestro] ERROR 400");
-      console.error("Status:", error.response?.status);
-      console.error("Status text:", error.response?.statusText);
-      console.error("Response data:", error.response?.data);
-      console.error("Response JSON:", JSON.stringify(error.response?.data, null, 2));
-      console.error("Headers:", error.response?.headers);
-      console.error("Full error:", error);
-      console.groupEnd();
-
       return rejectWithValue(error.response?.data || 'Error al crear el siniestro');
     }
   }

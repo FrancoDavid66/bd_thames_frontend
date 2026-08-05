@@ -27,8 +27,6 @@ import {
   renovarPoliza,
   marcarNoRenueva,
   desmarcarNoRenueva,
-  verificarRenovacion,
-  desVerificarRenovacion,
   fetchRenovacionesOficinas,
   fetchRenovacionesResumen,
   fetchRenovacionesGlobalResumen,
@@ -42,16 +40,19 @@ import {
 } from "../store/slices/renovacionesSlice";
 
 import RenovacionModal from "../components/renovaciones/RenovacionModal";
-import RenovacionesFiltersBar from "../components/renovaciones/RenovacionesFiltersBar";
-import RenovacionesTabs from "../components/renovaciones/RenovacionesTabs";
+import RenovacionesToolbar from "../components/renovaciones/RenovacionesToolbar";
 import Renovacionestable from "../components/renovaciones/Renovacionestable";
 import DescartarRenovacionModal from "../components/renovaciones/DescartarRenovacionModal";
-import ProgresoDelDia from "../components/renovaciones/ProgresoDelDia";
 import PolizaYaRenovadaModal from "../components/renovaciones/PolizaYaRenovadaModal";
 import { useRenovacionesProgreso } from "../hooks/useRenovacionesProgreso";
 import { useAuth } from "../context/AuthContext";
 
-const cx = (...a) => a.filter(Boolean).join(" ");
+// 🎨 UI THAMES
+import PageContainer from "../components/ui/PageContainer";
+import Boton3D from "../components/ui/Boton3D";
+
+// Helpers compartidos (cx y getVencimiento antes estaban definidos acá)
+import { cx, getVencimiento } from "../components/renovaciones/utils";
 
 /* =========================================================
  * Helpers de detección de estado en frontend
@@ -59,16 +60,6 @@ const cx = (...a) => a.filter(Boolean).join(" ");
  * ========================================================= */
 
 const DIAS_SIN_GESTION_LIMITE = 30;
-
-function getVencimiento(p) {
-  return (
-    p?.ultima_cuota_vencimiento ||
-    p?.vto_referencia ||
-    p?.fecha_vencimiento ||
-    p?.proxima_vencimiento_impaga ||
-    null
-  );
-}
 
 function diasVencidaDe(p) {
   const v = getVencimiento(p);
@@ -144,94 +135,30 @@ function clasificarTab(p) {
 }
 
 /* =========================================================
- * Badges chiquitos
- * ========================================================= */
-
-const Badge = ({ children, tone = "neutral" }) => {
-  const map = {
-    neutral: "bg-white/10 text-white border-white/15",
-    green: "bg-emerald-500/15 text-emerald-100 border-emerald-400/30",
-    yellow: "bg-amber-500/15 text-amber-100 border-amber-400/30",
-    red: "bg-rose-500/15 text-rose-100 border-rose-400/30",
-    blue: "bg-sky-500/15 text-sky-100 border-sky-400/30",
-    sky: "bg-sky-500/15 text-sky-100 border-sky-400/30",
-  };
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-        map[tone] || map.neutral
-      )}
-    >
-      {children}
-    </span>
-  );
-};
-
-/* =========================================================
- * KPIs en cards
- * ========================================================= */
-
-function KpiCard({ label, value, tone = "neutral", hint }) {
-  const toneMap = {
-    neutral: "border-white/10 bg-white/5",
-    green: "border-emerald-400/20 bg-emerald-500/5",
-    yellow: "border-amber-400/20 bg-amber-500/5",
-    red: "border-rose-400/20 bg-rose-500/5",
-    sky: "border-sky-400/20 bg-sky-500/5",
-  };
-  const valueColor = {
-    neutral: "text-white",
-    green: "text-emerald-200",
-    yellow: "text-amber-200",
-    red: "text-rose-200",
-    sky: "text-sky-200",
-  };
-  return (
-    <div
-      className={cx(
-        "rounded-xl border px-3 py-2.5",
-        toneMap[tone] || toneMap.neutral
-      )}
-    >
-      <div className="text-[10px] font-bold uppercase tracking-wider text-white/50">
-        {label}
-      </div>
-      <div className={cx("mt-0.5 text-xl font-extrabold tabular-nums", valueColor[tone] || valueColor.neutral)}>
-        {value ?? 0}
-      </div>
-      {hint && (
-        <div className="mt-0.5 text-[10px] text-white/40">{hint}</div>
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
- * Resumen en una línea (reemplaza la card de KPIs)
+ * Resumen en una línea
  * ========================================================= */
 
 function ResumenInline({ tab, kpis }) {
-  const N = ({ children, tone = "white" }) => {
+  const N = ({ children, tone = "titulo" }) => {
     const map = {
-      white: "text-white",
-      amber: "text-amber-300",
-      rose: "text-rose-300",
+      titulo: "text-titulo dark:text-titulo-dark",
+      amarillo: "text-duo-amarillo-sombra dark:text-duo-amarillo",
+      rojo: "text-duo-rojo",
     };
-    return <span className={cx("font-bold tabular-nums", map[tone])}>{children}</span>;
+    return <span className={cx("font-black tabular-nums", map[tone])}>{children}</span>;
   };
 
   if (tab === "vencidas") {
     return (
-      <span className="text-xs text-white/55">
-        <N tone="rose">{kpis.total}</N> sin renovar · <N tone="amber">{kpis.masDe30}</N> hace 30+ días
+      <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
+        <N tone="rojo">{kpis.total}</N> sin renovar · <N tone="amarillo">{kpis.masDe30}</N> hace 30+ días
       </span>
     );
   }
 
-  const label = tab === "renovar_hoy" ? "para renovar hoy" : "para los próximos 3 días";
+  const label = tab === "renovar_hoy" ? "que vencen hoy" : "para los próximos 3 días";
   return (
-    <span className="text-xs text-white/55">
+    <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
       <N>{kpis.total}</N> {label}
     </span>
   );
@@ -338,7 +265,9 @@ export default function RenovacionesPage() {
 
   // 🆕 Errores estructurados del backend
   const [renovarError, setRenovarError] = useState(null);    // banner dentro del modal de renovar
-  const [polizaRenovadaModal, setPolizaRenovadaModal] = useState({ open: false, error: null });
+  const [polizaRenovadaModal, setPolizaRenovadaModal] = useState({ open: false, error: null, item: null });
+  // Último payload del modal de renovar, para reintentar con confirmación
+  const [ultimoPayload, setUltimoPayload] = useState(null);
 
   // 🎮 Gamificación: tracking del progreso del día
   const {
@@ -567,135 +496,178 @@ export default function RenovacionesPage() {
     [dispatch, load, loadResumen]
   );
 
-  /* ============ Handlers de "Verificar" ============ */
-  const handleVerificar = useCallback(
-    async (item) => {
+  /* ============ Renovar (centralizado) ============
+     Se usa desde el modal de renovar Y desde el aviso "ya se renovó".
+     - payload: datos del modal (número, compañía, precio, etc.)
+     - confirmar: true cuando el usuario ya vio el aviso "ya se renovó"
+       y apretó "Renovar igual" → manda confirmar_renovacion al backend
+       para que renueve igual en vez de avisar de nuevo.
+     - itemOverride: la póliza a renovar (si no viene, usa `selected`).
+  */
+  const ejecutarRenovacion = useCallback(
+    async (payload, { confirmar = false, itemOverride = null } = {}) => {
+      const item = itemOverride || selected;
       if (!item?.id) return;
-      try {
-        await dispatch(verificarRenovacion({ polizaId: item.id })).unwrap();
-        registrarProgreso("verificar");
-        toast.success("Verificada");
-      } catch (e) {
-        toast.error(e?.message || "No se pudo verificar");
-      }
-    },
-    [dispatch, registrarProgreso]
-  );
 
-  const handleDesVerificar = useCallback(
-    async (item) => {
-      if (!item?.id) return;
+      setSubmitting(true);
+      setRenovarError(null);
+
+      const finalPayload = {
+        ...(payload || {}),
+        transferir_grua:
+          payload?.transferir_grua ??
+          payload?.transferirGrua ??
+          payload?.grua ??
+          1,
+      };
+      if (confirmar) finalPayload.confirmar_renovacion = true;
+
       try {
-        await dispatch(desVerificarRenovacion({ polizaId: item.id })).unwrap();
-        toast.success("Verificación deshecha");
+        const res = await dispatch(
+          renovarPoliza({ id: item.id, payload: finalPayload })
+        ).unwrap();
+        const nuevaId = res?.data?.id;
+
+        registrarProgreso("renovar");
+        toast.success("Póliza renovada correctamente");
+        setModalOpen(false);
+        setSelected(null);
+        setRenovarError(null);
+        setPolizaRenovadaModal({ open: false, error: null });
+
+        // Abrimos la póliza nueva en otra pestaña, sin salir de Renovaciones.
+        if (nuevaId) {
+          window.open(`/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
+        }
+
+        // Recargamos para que la póliza renovada desaparezca de la tabla.
+        await load({ force: true });
+        await loadResumen({ force: true });
       } catch (e) {
-        toast.error(e?.message || "No se pudo deshacer");
+        // Detectar error estructurado del backend
+        const backendError =
+          e?.raw ||
+          e?.response?.data ||
+          e?.data ||
+          (typeof e === "object" && e?.error ? e : null);
+
+        if (backendError?.error) {
+          const code = backendError.error;
+
+          if (code === "POLIZA_YA_RENOVADA") {
+            // 🆕 AVISO (no bloqueo): cerramos el modal de renovar y abrimos el
+            // cartel "¿seguro? ya se renovó". Guardamos la póliza para poder
+            // reintentar con confirmación desde ese cartel.
+            setModalOpen(false);
+            setRenovarError(null);
+            setPolizaRenovadaModal({ open: true, error: backendError, item });
+          } else if (
+            code === "COBERTURA_NO_CONFIGURADA" ||
+            code === "SIN_CUOTAS_REFERENCIA" ||
+            code === "NUMERO_DUPLICADO" ||
+            code === "COMPANIA_INVALIDA"
+          ) {
+            setRenovarError(backendError);
+          } else if (code === "POLIZA_FINALIZADA") {
+            setModalOpen(false);
+            setSelected(null);
+            toast.error(backendError.message);
+          } else {
+            setRenovarError(backendError);
+          }
+        } else {
+          toast.error(e?.message || "No se pudo renovar");
+        }
+      } finally {
+        setSubmitting(false);
       }
     },
-    [dispatch]
+    [dispatch, selected, load, loadResumen, registrarProgreso]
   );
 
   /* =========================================================
    * Render
    * ========================================================= */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-3 md:p-6">
-      {/* ============ Header (limpio, sin mega-card) ============ */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
-            <HiClipboardCheck className="text-emerald-400" />
-            Renovaciones
-          </h1>
-          {!isWebAdmin && (
-            <p className="mt-0.5 text-xs font-bold uppercase tracking-widest text-sky-400">
-              {user?.perfil?.oficina_nombre || "Tu Sucursal"}
-            </p>
-          )}
-        </div>
+    <PageContainer width="lg">
+      {/* ============ Header ============ */}
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-titulo dark:text-titulo-dark flex items-center gap-2">
+          <HiClipboardCheck className="text-duo-verde" />
+          Renovaciones
+        </h1>
 
-        <button
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+        <Boton3D
+          variant="blanco"
+          size="sm"
           onClick={() => {
             load({ force: true });
             loadResumen({ force: true });
           }}
           disabled={loading}
-          type="button"
         >
           <HiRefresh className={loading ? "animate-spin" : ""} />
           Actualizar
-        </button>
+        </Boton3D>
       </div>
 
-      {/* ============ Buscador + sucursal ============ */}
-      <RenovacionesFiltersBar
+      {/* ============ Toolbar: pestañas + buscador + sucursal ============ */}
+      <RenovacionesToolbar
         loading={loading}
         search={search}
         setSearch={setSearch}
         oficina={oficina}
         setOficina={setOficina}
         oficinasOptions={oficinasOptions}
-        isWebAdmin={isWebAdmin}
         totalCount={totalCount}
+        activeTab={tab}
+        onChangeTab={setTab}
+        tabCounts={tabCounts}
       />
 
-      {/* ============ Filtros (tabs) ============ */}
-      <div className="mt-3">
-        <RenovacionesTabs
-          activeTab={tab}
-          onChange={setTab}
-          counts={tabCounts}
-        />
-      </div>
-
       {!!error && (
-        <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-200 flex items-center gap-2">
+        <div className="mt-4 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-2 border-duo-rojo/40 p-3 text-sm font-bold text-duo-rojo flex items-center gap-2">
           <HiExclamation className="text-lg" />
-          No se pudieron cargar las pólizas. Intenta actualizar.
+          No se pudieron cargar las pólizas. Intentá actualizar.
         </div>
       )}
 
-      {/* ============ Resumen en línea + progreso del día ============ */}
-      <div className="mt-4 mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* ============ Resumen en línea ============ */}
+      <div className="mt-4 mb-3">
         <ResumenInline tab={tab} kpis={kpis} />
-        <ProgresoDelDia
-          hechasHoy={hechasHoy}
-          pendientesTotales={tabCounts?.renovar_hoy || 0}
-        />
       </div>
 
       {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="text-xs text-white/65">
+        <div className="text-[13px] font-bold text-suave dark:text-suave-dark">
           {tab === "vencidas" ? (
             <span>
-              Mostrando <span className="text-white font-semibold">{receivedCount}</span>{" "}
+              Mostrando <span className="text-titulo dark:text-titulo-dark">{receivedCount}</span>{" "}
               sin renovar de{" "}
-              <span className="text-white font-semibold">{totalCount}</span> pólizas en pantalla
+              <span className="text-titulo dark:text-titulo-dark">{totalCount}</span> en pantalla
             </span>
           ) : (
             <span>
-              Página <span className="text-white font-semibold">{safePage}</span> de{" "}
-              <span className="text-white font-semibold">{totalPages}</span>
+              Página <span className="text-titulo dark:text-titulo-dark">{safePage}</span> de{" "}
+              <span className="text-titulo dark:text-titulo-dark">{totalPages}</span>
             </span>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5">
-            <span className="text-xs font-semibold text-white/50">Ver:</span>
+          <div className="flex items-center gap-2 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-1.5">
+            <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Ver:</span>
             <select
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value || 25));
                 setPage(1);
               }}
-              className="bg-transparent text-sm font-bold text-white outline-none cursor-pointer"
+              className="bg-transparent text-sm font-bold text-titulo dark:text-titulo-dark outline-none cursor-pointer"
               aria-label="Tamaño de página"
             >
               {[10, 25, 50, 100].map((n) => (
-                <option key={n} value={n} className="bg-slate-900 text-white">
+                <option key={n} value={n} className="bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark">
                   {n}
                 </option>
               ))}
@@ -703,14 +675,14 @@ export default function RenovacionesPage() {
           </div>
 
           <button
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50 transition-colors"
+            className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-1.5 text-sm font-extrabold text-titulo dark:text-titulo-dark hover:border-duo-azul/40 disabled:opacity-40 transition-colors"
             disabled={!canPrev || loading}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             Anterior
           </button>
           <button
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50 transition-colors"
+            className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-1.5 text-sm font-extrabold text-titulo dark:text-titulo-dark hover:border-duo-azul/40 disabled:opacity-40 transition-colors"
             disabled={!canNext || loading}
             onClick={() => setPage((p) => p + 1)}
           >
@@ -722,7 +694,6 @@ export default function RenovacionesPage() {
       {/* ============ TABLA ============ */}
       <Renovacionestable
         items={itemsPaginados}
-        oficinasOptions={oficinasOptions}
         loading={loading}
         submitting={submitting}
         tab={tab}
@@ -732,8 +703,6 @@ export default function RenovacionesPage() {
         }}
         onMarcarNoRenueva={openNoRenuevaModal}
         onDesmarcarNoRenueva={handleDesmarcarNoRenueva}
-        onVerificar={handleVerificar}
-        onDesVerificar={handleDesVerificar}
       />
 
       {/* ============ Modal de renovación ============ */}
@@ -747,93 +716,30 @@ export default function RenovacionesPage() {
           setSelected(null);
           setRenovarError(null);
         }}
-        onSubmit={async (payload) => {
-          if (!selected?.id) return;
-          setSubmitting(true);
-          setRenovarError(null);
-
-          const finalPayload = {
-            ...(payload || {}),
-            transferir_grua:
-              payload?.transferir_grua ??
-              payload?.transferirGrua ??
-              payload?.grua ??
-              1,
-          };
-
-          try {
-            const res = await dispatch(
-              renovarPoliza({ id: selected.id, payload: finalPayload })
-            ).unwrap();
-            const nuevaId = res?.data?.id;
-
-            registrarProgreso("renovar");
-            toast.success("Póliza renovada correctamente");
-            setModalOpen(false);
-            setSelected(null);
-            setRenovarError(null);
-
-            // Abrimos la póliza nueva en otra pestaña, sin salir de Renovaciones.
-            if (nuevaId) {
-              window.open(`/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
-            }
-
-            // Recargamos para que la póliza renovada desaparezca de la tabla.
-            await load({ force: true });
-            await loadResumen({ force: true });
-          } catch (e) {
-            // 🆕 Detectar error estructurado del backend
-            // Puede venir como e.raw (axios) o e.response.data dependiendo del slice
-            const backendError =
-              e?.raw ||
-              e?.response?.data ||
-              e?.data ||
-              (typeof e === "object" && e?.error ? e : null);
-
-            if (backendError?.error) {
-              // Error estructurado
-              const code = backendError.error;
-
-              if (code === "POLIZA_YA_RENOVADA") {
-                // Cerrar modal de renovar y abrir modal especial
-                setModalOpen(false);
-                setRenovarError(null);
-                setPolizaRenovadaModal({ open: true, error: backendError });
-              } else if (
-                code === "COBERTURA_NO_CONFIGURADA" ||
-                code === "SIN_CUOTAS_REFERENCIA" ||
-                code === "NUMERO_DUPLICADO" ||
-                code === "COMPANIA_INVALIDA"
-              ) {
-                // Mostrar banner DENTRO del modal de renovar
-                setRenovarError(backendError);
-              } else if (code === "POLIZA_FINALIZADA") {
-                // Cerrar modal con toast simple
-                setModalOpen(false);
-                setSelected(null);
-                toast.error(backendError.message);
-              } else {
-                // Otros errores: mostrar banner dentro del modal
-                setRenovarError(backendError);
-              }
-            } else {
-              // Error genérico (red, etc.)
-              toast.error(e?.message || "No se pudo renovar");
-            }
-          } finally {
-            setSubmitting(false);
-          }
+        onSubmit={(payload) => {
+          // Guardamos el último payload por si el usuario tiene que confirmar
+          // "renovar igual" en el cartel de aviso.
+          setUltimoPayload(payload);
+          ejecutarRenovacion(payload);
         }}
         submitting={submitting}
       />
 
-      {/* ============ Modal "Póliza ya renovada" ============ */}
+      {/* ============ Modal "Póliza ya renovada" (AVISO Sí/No) ============ */}
       <PolizaYaRenovadaModal
         open={polizaRenovadaModal.open}
         error={polizaRenovadaModal.error}
+        submitting={submitting}
         onClose={() => {
           setPolizaRenovadaModal({ open: false, error: null });
           setSelected(null);
+        }}
+        onConfirmar={() => {
+          // 🆕 "Renovar igual": reintenta con confirmar_renovacion=true.
+          ejecutarRenovacion(ultimoPayload, {
+            confirmar: true,
+            itemOverride: polizaRenovadaModal.item,
+          });
         }}
       />
 
@@ -845,6 +751,6 @@ export default function RenovacionesPage() {
         onSubmit={confirmarNoRenueva}
         submitting={submitting}
       />
-    </div>
+    </PageContainer>
   );
 }

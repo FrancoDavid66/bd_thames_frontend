@@ -1,4 +1,4 @@
-// src/components/recaudacion/RankingCierres.jsx
+// src/components/recaudacion/RankingCierres.jsx  (diseño Duo)
 // 🚀 Ranking de cumplimiento: por oficina, cuántos días cerró de los que debía.
 //    Toca una fila para ver las fechas exactas que faltaron.
 import { useEffect, useMemo, useState, Fragment } from "react";
@@ -76,7 +76,6 @@ export default function RankingCierres({ isAdmin = true }) {
         };
       })
       .sort((a, b) => {
-        // peor cumplimiento primero; los sin datos (pct null) al final
         if (a.pct === null) return 1;
         if (b.pct === null) return -1;
         return a.pct - b.pct;
@@ -87,43 +86,43 @@ export default function RankingCierres({ isAdmin = true }) {
   const irMes = (delta) => setMes(dayjs(`${mes}-01`).add(delta, "month").format("YYYY-MM"));
 
   const pctColor = (pct) => {
-    if (pct === null) return "text-slate-500";
-    if (pct >= 90) return "text-emerald-300";
-    if (pct >= 70) return "text-amber-300";
-    return "text-rose-300";
+    if (pct === null) return "text-suave dark:text-suave-dark";
+    if (pct >= 90) return "text-ingreso dark:text-ingreso-claro";
+    if (pct >= 70) return "text-tarjeta";
+    return "text-egreso dark:text-egreso-claro";
   };
   const pctDot = (pct) => {
-    if (pct === null) return "⚪";
-    if (pct >= 90) return "🟢";
-    if (pct >= 70) return "🟡";
-    return "🔴";
+    if (pct === null) return "bg-suave/40 dark:bg-suave-dark/40";
+    if (pct >= 90) return "bg-ingreso";
+    if (pct >= 70) return "bg-tarjeta";
+    return "bg-egreso";
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 space-y-5">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h3 className="text-sm sm:text-base font-bold text-slate-100">Cumplimiento de cierres por sucursal</h3>
-          <p className="text-[11px] text-slate-500">Tocá una fila para ver las fechas que faltaron</p>
+          <h3 className="text-sm sm:text-base font-black text-titulo dark:text-titulo-dark">Cumplimiento de cierres por sucursal</h3>
+          <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-0.5">Tocá una fila para ver las fechas que faltaron</p>
         </div>
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
-          <button onClick={() => irMes(-1)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400">
+        <div className="flex items-center gap-1">
+          <button onClick={() => irMes(-1)} className="p-2 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark transition-colors">
             <HiChevronLeft className="w-4 h-4" />
           </button>
-          <span className="px-2 text-xs sm:text-sm font-semibold text-slate-200 capitalize min-w-[120px] text-center">
+          <span className="px-2 text-xs sm:text-sm font-black text-titulo dark:text-titulo-dark capitalize min-w-[120px] text-center">
             {mesLabel}
           </span>
-          <button onClick={() => irMes(1)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400">
+          <button onClick={() => irMes(1)} className="p-2 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark transition-colors">
             <HiChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* Selector de días de caja */}
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] text-slate-500">Días de caja:</span>
-        <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-bold text-suave dark:text-suave-dark">Días de caja:</span>
+        <div className="flex gap-1">
           {[
             { id: "lunvie", label: "Lun-Vie" },
             { id: "lunsab", label: "Lun-Sáb" },
@@ -132,8 +131,10 @@ export default function RankingCierres({ isAdmin = true }) {
             <button
               key={opt.id}
               onClick={() => setModoDias(opt.id)}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors ${
-                modoDias === opt.id ? "bg-sky-500/20 text-sky-300" : "text-slate-400 hover:text-slate-200"
+              className={`px-3 py-1.5 text-[11px] font-black rounded-xl border-2 transition-colors ${
+                modoDias === opt.id
+                  ? "bg-oficina/15 border-oficina/40 text-oficina dark:text-oficina-claro"
+                  : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-oficina"
               }`}
             >
               {opt.label}
@@ -144,19 +145,19 @@ export default function RankingCierres({ isAdmin = true }) {
 
       {/* Tabla */}
       {loading ? (
-        <p className="text-sm text-slate-500">Cargando...</p>
+        <p className="text-sm font-bold text-suave dark:text-suave-dark">Cargando...</p>
       ) : filas.length === 0 ? (
-        <p className="text-sm text-slate-500">No hay sucursales para mostrar.</p>
+        <p className="text-sm font-bold text-suave dark:text-suave-dark">No hay sucursales para mostrar.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                <th className="text-left py-2 px-2">Sucursal</th>
-                <th className="text-center py-2 px-2">Cerró</th>
-                <th className="text-center py-2 px-2">Debía</th>
-                <th className="text-center py-2 px-2">Faltó</th>
-                <th className="text-right py-2 px-2">Cumplimiento</th>
+              <tr className="text-[10px] uppercase tracking-wide text-suave dark:text-suave-dark border-b-2 border-linea dark:border-linea-dark">
+                <th className="text-left font-black py-2.5 px-2">Sucursal</th>
+                <th className="text-center font-black py-2.5 px-2">Cerró</th>
+                <th className="text-center font-black py-2.5 px-2">Debía</th>
+                <th className="text-center font-black py-2.5 px-2">Faltó</th>
+                <th className="text-right font-black py-2.5 px-2">Cumplimiento</th>
                 <th className="w-6"></th>
               </tr>
             </thead>
@@ -167,34 +168,37 @@ export default function RankingCierres({ isAdmin = true }) {
                   <Fragment key={f.id}>
                     <tr
                       onClick={() => setAbierta(exp ? null : f.id)}
-                      className="border-b border-slate-800/60 hover:bg-slate-900/50 cursor-pointer transition-colors"
+                      className="border-b-2 border-linea/60 dark:border-linea-dark/60 hover:bg-surface dark:hover:bg-surface-dark cursor-pointer transition-colors"
                     >
-                      <td className="py-2.5 px-2 text-slate-200 font-medium">{f.nombre}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-300 font-mono">{f.cerro}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400 font-mono">{f.debia}</td>
-                      <td className={`py-2.5 px-2 text-center font-mono font-bold ${f.falto > 0 ? "text-rose-300" : "text-slate-500"}`}>
+                      <td className="py-3 px-2 text-titulo dark:text-titulo-dark font-black">{f.nombre}</td>
+                      <td className="py-3 px-2 text-center text-titulo dark:text-titulo-dark font-mono font-bold">{f.cerro}</td>
+                      <td className="py-3 px-2 text-center text-suave dark:text-suave-dark font-mono font-bold">{f.debia}</td>
+                      <td className={`py-3 px-2 text-center font-mono font-black ${f.falto > 0 ? "text-egreso dark:text-egreso-claro" : "text-suave dark:text-suave-dark"}`}>
                         {f.falto}
                       </td>
-                      <td className={`py-2.5 px-2 text-right font-black ${pctColor(f.pct)}`}>
-                        {pctDot(f.pct)} {f.pct === null ? "—" : `${f.pct}%`}
+                      <td className={`py-3 px-2 text-right font-black ${pctColor(f.pct)}`}>
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${pctDot(f.pct)}`} />
+                          {f.pct === null ? "—" : `${f.pct}%`}
+                        </span>
                       </td>
-                      <td className="text-center text-slate-500">
+                      <td className="text-center text-suave dark:text-suave-dark">
                         <HiChevronDown className={`w-4 h-4 inline transition-transform ${exp ? "rotate-180" : ""}`} />
                       </td>
                     </tr>
                     {exp && (
-                      <tr key={`${f.id}-det`} className="bg-slate-900/40">
-                        <td colSpan={6} className="px-3 py-3">
+                      <tr key={`${f.id}-det`} className="bg-surface dark:bg-surface-dark">
+                        <td colSpan={6} className="px-3 py-3.5">
                           {f.faltantes.length === 0 ? (
-                            <p className="text-xs text-emerald-300">✅ No faltó ningún día de caja este mes.</p>
+                            <p className="text-xs font-black text-ingreso dark:text-ingreso-claro">✅ No faltó ningún día de caja este mes.</p>
                           ) : (
                             <div>
-                              <p className="text-[11px] text-slate-400 mb-2">
-                                Días que <span className="text-rose-300 font-semibold">no cerró</span> ({f.faltantes.length}):
+                              <p className="text-[11px] font-bold text-suave dark:text-suave-dark mb-2.5">
+                                Días que <span className="text-egreso dark:text-egreso-claro font-black">no cerró</span> ({f.faltantes.length}):
                               </p>
                               <div className="flex flex-wrap gap-1.5">
                                 {f.faltantes.map((d) => (
-                                  <span key={d} className="text-[11px] font-mono px-2 py-0.5 rounded-md border border-rose-500/30 bg-rose-500/[0.08] text-rose-300">
+                                  <span key={d} className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg border-2 border-egreso/30 bg-egreso/10 text-egreso dark:text-egreso-claro">
                                     {dayjs(d).format("ddd DD/MM")}
                                   </span>
                                 ))}

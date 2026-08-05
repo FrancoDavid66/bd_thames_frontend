@@ -1,3 +1,4 @@
+// src/components/estadisticas/EstadisticasSummaryCards.jsx  (diseño Duo)
 import React from "react";
 import {
   HiDownload,
@@ -8,47 +9,56 @@ import {
   HiOutlineTrendingDown,
 } from "react-icons/hi";
 
+/* Cada tarjeta con su color Duo:
+   - TOTALES  → oficina (celeste)
+   - ACTIVAS  → ingreso (verde)
+   - ALTAS    → ingreso (verde)
+   - VENCIDAS → tarjeta (ámbar)
+   - BAJAS    → egreso  (rojo)   */
 const CARD_META = {
   TOTALES: {
     title: "PÓLIZAS\nTOTALES",
     description: "Stock total de pólizas en las oficinas.",
     linkText: "Ver lista →",
     icon: HiOutlineChartBar,
-    iconClass: "text-cyan-400",
-    linkClass: "text-cyan-400",
+    tone: "oficina",
   },
   ACTIVAS: {
     title: "PÓLIZAS\nACTIVAS",
     description: "Al día con todos los pagos.",
     linkText: "Ver lista →",
     icon: HiOutlineShieldCheck,
-    iconClass: "text-emerald-400",
-    linkClass: "text-emerald-400",
+    tone: "ingreso",
   },
   ALTAS: {
     title: "ALTAS DEL MES",
     description: "Emitidas en el período.",
     linkText: "Ver lista →",
     icon: HiOutlineTrendingUp,
-    iconClass: "text-emerald-400",
-    linkClass: "text-emerald-400",
+    tone: "ingreso",
   },
   VENCIDAS: {
     title: "VENCIDAS\n(MORA)",
     description: "Fuera de término o sin cobertura.",
     linkText: "Ver morosos →",
     icon: HiOutlineExclamation,
-    iconClass: "text-orange-400",
-    linkClass: "text-orange-400",
+    tone: "tarjeta",
   },
   BAJAS: {
     title: "BAJAS DEL MES",
     description: "Cancelaciones exactas.",
     linkText: "Ver lista →",
     icon: HiOutlineTrendingDown,
-    iconClass: "text-rose-400",
-    linkClass: "text-rose-400",
+    tone: "egreso",
   },
+};
+
+// Clases por tono (borde + ícono + link). Ámbar usa el hex directo (no hay token -fuerte).
+const TONE = {
+  oficina: { border: "border-oficina/35", accent: "text-oficina" },
+  ingreso: { border: "border-ingreso/35", accent: "text-ingreso" },
+  tarjeta: { border: "border-tarjeta/40", accent: "text-[#d97706] dark:text-tarjeta-claro" },
+  egreso: { border: "border-egreso/35", accent: "text-egreso" },
 };
 
 const DEFAULT_ORDER = ["TOTALES", "ACTIVAS", "ALTAS", "VENCIDAS", "BAJAS"];
@@ -98,6 +108,7 @@ export default function EstadisticasSummaryCards({
       {DEFAULT_ORDER.map((type) => {
         const meta     = CARD_META[type];
         const Icon     = meta.icon;
+        const tone     = TONE[meta.tone];
         const value    = getCardValue(type, totales);
         const isDownloading = downloadingType === type;
         // Badge de mora — solo aparece si el backend ya devuelve el campo
@@ -110,12 +121,12 @@ export default function EstadisticasSummaryCards({
             key={type}
             type="button"
             onClick={() => handleOpenList(type)}
-            className="group relative w-full text-left rounded-2xl bg-slate-800/95 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 shadow-xl transition-all duration-200 px-7 py-8 min-h-[204px] focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            className={`group relative w-full text-left rounded-3xl bg-card dark:bg-card-dark border-2 ${tone.border} hover:-translate-y-1 transition-all duration-200 px-6 py-6 min-h-[204px] focus:outline-none`}
             title={`Ver lista ${type.toLowerCase()}`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="text-[13px] font-black tracking-wide text-slate-300 whitespace-pre-line uppercase leading-5">
+                <h3 className="text-[13px] font-black tracking-wide text-suave dark:text-suave-dark whitespace-pre-line uppercase leading-5">
                   {meta.title}
                 </h3>
               </div>
@@ -132,25 +143,25 @@ export default function EstadisticasSummaryCards({
                       handleDownload(event, type);
                     }
                   }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/80 transition disabled:opacity-50"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition"
                 >
                   {isDownloading ? (
-                    <span className="h-4 w-4 rounded-full border-2 border-slate-500 border-t-white animate-spin" />
+                    <span className="h-4 w-4 rounded-full border-2 border-linea dark:border-linea-dark border-t-oficina animate-spin" />
                   ) : (
                     <HiDownload className="text-lg" />
                   )}
                 </span>
-                <Icon className={`text-2xl ${meta.iconClass}`} />
+                <Icon className={`text-2xl ${tone.accent}`} />
               </div>
             </div>
 
             <div className="mt-5 flex items-end gap-2">
-              <span className="text-3xl font-black tracking-tight text-white">
+              <span className="text-3xl font-black tracking-tight text-titulo dark:text-titulo-dark">
                 {loading ? "—" : formatNumber(value)}
               </span>
 
               {type === "BAJAS" && (
-                <span className="pb-1 text-sm font-extrabold text-rose-400">
+                <span className="pb-1 text-sm font-black text-egreso">
                   ({Number(churnGlobal || churnPromedio || 0).toFixed(1)}% Churn)
                 </span>
               )}
@@ -162,7 +173,7 @@ export default function EstadisticasSummaryCards({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); if (typeof onCardClick === "function") onCardClick("ACTIVAS_EN_MORA"); }}
-                  className="inline-flex items-center gap-1 text-[11px] font-mono border border-amber-700/60 bg-amber-900/30 text-amber-400 rounded px-2 py-0.5 hover:bg-amber-700/40 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-[11px] font-mono font-black border-2 border-tarjeta/40 bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro rounded-lg px-2 py-0.5 hover:bg-tarjeta/20 transition-colors cursor-pointer"
                 >
                   {formatNumber(enMora)} con cuota vencida →
                 </button>
@@ -170,18 +181,18 @@ export default function EstadisticasSummaryCards({
                   role="button"
                   title="Descargar Excel — en mora"
                   onClick={(e) => { e.stopPropagation(); if (typeof onDownloadExcel === "function") onDownloadExcel("ACTIVAS_EN_MORA"); }}
-                  className="inline-flex items-center justify-center h-5 w-5 rounded text-slate-500 hover:text-amber-400 hover:bg-amber-900/30 transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center h-5 w-5 rounded text-suave dark:text-suave-dark hover:text-[#d97706] dark:hover:text-tarjeta-claro hover:bg-tarjeta/10 transition-colors cursor-pointer"
                 >
                   <HiDownload className="text-xs" />
                 </span>
               </div>
             )}
 
-            <p className="mt-4 text-sm leading-5 text-slate-400 max-w-[190px]">
+            <p className="mt-4 text-sm font-semibold leading-5 text-suave dark:text-suave-dark max-w-[190px]">
               {meta.description}
             </p>
 
-            <span className={`mt-1 inline-block text-sm font-extrabold ${meta.linkClass}`}>
+            <span className={`mt-1 inline-block text-sm font-black ${tone.accent}`}>
               {meta.linkText}
             </span>
           </button>

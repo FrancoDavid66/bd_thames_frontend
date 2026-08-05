@@ -1,5 +1,4 @@
-// src/components/estadisticas/EstadisticasHeader.jsx
-import { motion } from "framer-motion";
+// src/components/estadisticas/EstadisticasHeader.jsx  (diseño Duo)
 import { HiChartBar, HiRefresh, HiSparkles, HiDownload } from "react-icons/hi";
 import AnimatedCard from "./AnimatedCard";
 
@@ -11,28 +10,17 @@ export default function EstadisticasHeader({
   onOpenExport,
 }) {
   return (
-    <AnimatedCard
-      index={0}
-      interactive={false}
-      glow="from-sky-500/60 via-indigo-500/40 to-transparent"
-    >
+    <AnimatedCard index={0} interactive={false}>
       <div className="relative flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-        <motion.div
-          className="pointer-events-none absolute inset-x-4 -top-1 h-px bg-gradient-to-r from-transparent via-sky-400/80 to-transparent"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 1, 0.3, 1] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        />
-
         <div>
-          <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-sky-300">
-            <HiSparkles className="h-4 w-4 text-emerald-300" />
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-oficina">
+            <HiSparkles className="h-4 w-4 text-ingreso" />
             Tablero de oficinas · {periodoLabel}
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-50 sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-3xl">
             📊 Estadísticas por oficina
           </h1>
-          <p className="mt-1 text-sm text-slate-300">
+          <p className="mt-1 text-sm font-bold text-suave dark:text-suave-dark max-w-xl">
             Visualizá el stock por sucursal, las altas y bajas del mes, la
             antigüedad del libro y el churn basado en cuotas vencidas.
           </p>
@@ -40,42 +28,33 @@ export default function EstadisticasHeader({
 
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <motion.button
+            <button
               type="button"
               onClick={onOpenExport}
-              className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 ring-1 ring-slate-700/80"
-              whileHover={{ scale: 1.05, y: -1 }}
-              whileTap={{ scale: 0.96 }}
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-oficina px-3.5 py-2 text-xs font-black text-titulo dark:text-titulo-dark transition-colors"
             >
-              <HiDownload className="h-4 w-4 text-sky-300" />
+              <HiDownload className="h-4 w-4 text-oficina" />
               Descargar asegurados
-            </motion.button>
+            </button>
 
-            <motion.button
+            <button
               type="button"
               onClick={onRefresh}
-              className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 hover:bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-sky-900/40"
-              whileHover={{ scale: 1.05, y: -1 }}
-              whileTap={{ scale: 0.96 }}
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-oficina border-2 border-oficina px-3.5 py-2 text-xs font-black text-white shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all disabled:opacity-60"
             >
               <HiRefresh className={loading ? "animate-spin" : ""} />
               {loading ? "Actualizando..." : "Actualizar datos"}
-            </motion.button>
+            </button>
           </div>
 
           {fuenteRespuesta && (
-            <motion.span
-              className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 px-2 py-0.5 text-[11px] font-medium text-slate-200 ring-1 ring-slate-700/80"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35 }}
-            >
-              <HiChartBar className="h-3 w-3 text-sky-300" />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark px-2.5 py-0.5 text-[11px] font-black text-suave dark:text-suave-dark">
+              <HiChartBar className="h-3 w-3 text-oficina" />
               Fuente:{" "}
-              <span className="uppercase font-semibold text-sky-200">
+              <span className="uppercase font-black text-oficina">
                 {fuenteRespuesta}
               </span>
-            </motion.span>
+            </span>
           )}
         </div>
       </div>

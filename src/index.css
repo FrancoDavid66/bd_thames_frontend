@@ -1,5 +1,124 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   🌙 DARK MODE (Tailwind v4)
+   --------------------------------------------------------------------------
+   En Tailwind v4, "darkMode: 'class'" del tailwind.config.js NO alcanza:
+   por defecto "dark:" responde al tema del SISTEMA OPERATIVO. Esta línea hace
+   que "dark:" responda a la clase ".dark" en <html> (que pone el ThemeProvider).
+   SIN esta línea, el botón de tema pone la clase pero no cambia nada visual.
+   ========================================================================== */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   🎨 PALETA SEMÁNTICA DE LA APP (Tailwind v4 — se define acá con @theme)
+   --------------------------------------------------------------------------
+   Estos colores generan utilidades automáticamente. Ejemplos:
+     bg-ingreso      text-ingreso      border-ingreso
+     bg-egreso/15    text-egreso       ring-egreso
+   Ventaja: si mañana cambia el verde de "ingreso", se toca UN solo lugar acá
+   y cambia en toda la app.
+
+   Nombres → función (no color), para que sea flexible:
+     ingreso        = verde   (emerald-500)  → plata que entra / efectivo
+     egreso         = rojo    (rose-500)     → plata que sale
+     transferencia  = índigo  (indigo-500)
+     tarjeta        = ámbar   (amber-500)    → tarjeta / caja chica
+     oficina        = celeste (sky-500)      → sucursal / acción / mercado pago
+     marca          = rojo intenso (#B80000) → branding / logo (NO usar para egreso)
+   ========================================================================== */
+@theme {
+  /* Ingreso (verde) */
+  --color-ingreso: #10b981;        /* emerald-500 */
+  --color-ingreso-fuerte: #059669; /* emerald-600 (hover) */
+  --color-ingreso-claro: #6ee7b7;  /* emerald-300 (texto sobre fondo tenue) */
+
+  /* Egreso (rojo suave) */
+  --color-egreso: #f43f5e;         /* rose-500 */
+  --color-egreso-fuerte: #e11d48;  /* rose-600 (hover) */
+  --color-egreso-claro: #fda4af;   /* rose-300 */
+
+  /* Transferencia (índigo) */
+  --color-transferencia: #6366f1;       /* indigo-500 */
+  --color-transferencia-claro: #a5b4fc; /* indigo-300 */
+
+  /* Tarjeta / Caja Chica (ámbar) */
+  --color-tarjeta: #f59e0b;        /* amber-500 */
+  --color-tarjeta-claro: #fcd34d;  /* amber-300 */
+
+  /* Oficina / Acción / Mercado Pago (celeste) */
+  --color-oficina: #0ea5e9;        /* sky-500 */
+  --color-oficina-fuerte: #0284c7; /* sky-600 (hover) */
+  --color-oficina-claro: #7dd3fc;  /* sky-300 */
+
+  /* Marca (branding — rojo intenso). Distinto del egreso a propósito. */
+  --color-marca: #b80000;
+
+  /* ------------------------------------------------------------------
+     SUPERFICIES (fondos / bordes / texto) — pensadas para MODO CLARO.
+     En oscuro se usan las variantes -dark de más abajo con "dark:".
+     Ejemplos de uso:
+       bg-surface        → fondo general de la página
+       bg-card           → fondo de tarjetas / tabla / modales
+       border-linea      → bordes suaves
+       text-titulo       → texto principal
+       text-suave        → texto secundario / labels
+     ------------------------------------------------------------------ */
+  --color-surface: #f8fafc;      /* slate-50  — fondo página (claro) */
+  --color-card: #ffffff;         /* blanco    — tarjetas (claro) */
+  --color-linea: #e2e8f0;        /* slate-200 — bordes (claro) */
+  --color-titulo: #0f172a;       /* slate-900 — texto fuerte (claro) */
+  --color-suave: #64748b;        /* slate-500 — texto secundario (claro) */
+
+  /* Variantes para MODO OSCURO (se aplican con dark:bg-surface-dark, etc.) */
+  --color-surface-dark: #0f172a; /* slate-900 — fondo página (oscuro) */
+  --color-card-dark: #1e293b;    /* slate-800 — tarjetas (oscuro) */
+  --color-linea-dark: #334155;   /* slate-700 — bordes (oscuro) */
+  --color-titulo-dark: #f1f5f9;  /* slate-100 — texto fuerte (oscuro) */
+  --color-suave-dark: #94a3b8;   /* slate-400 — texto secundario (oscuro) */
+
+  /* ==================================================================
+     🦉 ESTILO DUOLINGO — colores planos y vivos + sombras 3D
+     ------------------------------------------------------------------
+     Cada color "vivo" trae su versión -sombra (más oscura) para el
+     efecto de botón 3D (borde inferior que se hunde al apretar).
+     Uso: bg-duo-verde, text-duo-azul, shadow-[0_5px_0] con duo-*-sombra.
+     Los -soft son los fondos tenues de badges/chips (modo claro).
+     ================================================================== */
+  --color-duo-verde: #58cc02;        /* verde icónico — éxito / completo / activa */
+  --color-duo-verde-sombra: #4daa02; /* sombra 3D */
+  --color-duo-verde-soft: #d7ffb8;   /* fondo tenue badge */
+
+  --color-duo-azul: #1cb0f6;         /* celeste — acción / links / oficina */
+  --color-duo-azul-sombra: #1899d6;
+  --color-duo-azul-soft: #ddf4ff;
+
+  --color-duo-amarillo: #ffc800;     /* amarillo — pendiente / por vencer / atención */
+  --color-duo-amarillo-sombra: #e6a800;
+  --color-duo-amarillo-soft: #fff3c4;
+
+  --color-duo-rojo: #ff4b4b;         /* rojo — eliminar / vencida / error */
+  --color-duo-rojo-sombra: #ea2b2b;
+  --color-duo-rojo-soft: #ffe0e0;
+
+  --color-duo-violeta: #ce82ff;      /* violeta — extra / documentación */
+  --color-duo-violeta-sombra: #b968e6;
+  --color-duo-violeta-soft: #f3e8ff;
+
+  /* Texto/superficie estilo Duo (claro): gris oscuro, NO negro puro */
+  --color-duo-texto: #3c3c3c;
+  --color-duo-suave: #afafaf;
+  --color-duo-linea: #e5e5e5;
+  --color-duo-fondo: #f7f7f7;
+
+  /* Variantes DARK del estilo Duo (fondos tenues legibles sobre oscuro) */
+  --color-duo-verde-soft-dark: #1f3d0a;
+  --color-duo-azul-soft-dark: #0b3a52;
+  --color-duo-amarillo-soft-dark: #3d3208;
+  --color-duo-rojo-soft-dark: #4a1414;
+  --color-duo-violeta-soft-dark: #331a4a;
+}
+
 @font-face {
   font-family: "MiFuentePersonalizada";
   /* RUTAS ABSOLUTAS DESDE LA RAÍZ DEL SITIO */
@@ -29,11 +148,44 @@ html {
 body {
   margin: 0;
   font-family: "MiFuentePersonalizada", sans-serif;
-  background-color: #2f3b4d; /* Color oscuro neutro */
-  color: #f2f2f2; /* Texto claro */
+
+  /* 🎨 El fondo/texto del body ahora sigue el tema (antes estaba fijo en
+     oscuro y "pisaba" el modo claro). En claro usa surface; en oscuro,
+     surface-dark. La clase .dark la pone el ThemeProvider en <html>. */
+  background-color: var(--color-surface);
+  color: var(--color-titulo);
 
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
+}
+
+.dark body {
+  background-color: var(--color-surface-dark);
+  color: var(--color-titulo-dark);
+}
+
+/* ==========================================================================
+   🔽 SELECTS / DROPDOWNS NATIVOS
+   --------------------------------------------------------------------------
+   El menú desplegable de un <select> lo dibuja el navegador (no Tailwind),
+   así que las clases "dark:bg-..." en <option> NO siempre se respetan y el
+   menú sale con los colores crudos del navegador (azul/blanco).
+   Con esto forzamos que las opciones sigan el tema de la app:
+     - color-scheme le avisa al navegador si es claro u oscuro.
+     - pintamos <option> a mano en modo oscuro.
+   ========================================================================== */
+.dark select {
+  color-scheme: dark;
+}
+
+.dark select option {
+  background-color: var(--color-card-dark); /* fondo de cada opción (oscuro) */
+  color: var(--color-titulo-dark);          /* texto claro */
+}
+
+/* En modo claro dejamos el esquema claro explícito (por las dudas) */
+select {
+  color-scheme: light;
 }
 
 /* iOS Safari: evita scroll raro / rebote visual */

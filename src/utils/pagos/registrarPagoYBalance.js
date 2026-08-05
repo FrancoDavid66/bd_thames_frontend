@@ -1,16 +1,17 @@
 /* src/utils/pagos/registrarPagoYBalance.js — Reemplaza TODO el archivo con esta versión */
-import { marcarCuotaComoPagada, registrarIngreso } from "../../store/slices/pagosSlice";
+import { marcarCuotaComoPagada } from "../../store/slices/pagosSlice";
 import { toast } from "react-hot-toast";
 
 /**
  * Flujo completo en el front:
- * 1) Marca la cuota como pagada (PATCH /cuotas/{id}/pagar/).
- * 2) Registra el ingreso en "balanzes" (POST /ingresos).
- *    - Si el paso 2 falla, la cuota queda pagada igualmente y se avisa.
+ * 1) Marca la cuota como pagada (PATCH /cuotas/{id}/pagar/) con el flag
+ *    `registrar_en_balance`. El backend, al registrar el Pago, crea el
+ *    Ingreso en "balanzes" AUTOMÁTICAMENTE (señal `crear_ingreso_automatico`).
  *
- * NOTA: Si preferís que el backend haga ambos pasos de una (crear Pago + Ingreso),
- * luego migraremos a un thunk `registrarPago` que use /pagos/registrar/. Por ahora
- * este helper respeta tu slice actual.
+ * ⚠️ IMPORTANTE: el front YA NO hace un POST /ingresos aparte.
+ *    Antes había un "paso 2" que creaba el Ingreso a mano desde acá y eso
+ *    DUPLICABA el ingreso en balances (el backend ya lo crea solo).
+ *    Ahora el front solo marca la cuota pagada; el ingreso lo hace el backend.
  *
  * @param {Object} options
  * @param {Function} options.dispatch - dispatch de Redux (obligatorio)
@@ -18,8 +19,8 @@ import { toast } from "react-hot-toast";
  * @param {Object} options.poliza     - póliza asociada (obligatorio)
  * @param {string} options.formaPago  - "efectivo" | "transferencia" (obligatorio)
  * @param {number|string} options.monto - monto pagado (obligatorio > 0)
- * @param {number|string} [options.responsableEmpleadoId] - quién cobró (opcional)
- * @param {boolean} [options.registrarEnBalance=true] - si además crea Ingreso
+ * @param {number|string} [options.responsableEmpleadoId] - quién cobró (obligatorio)
+ * @param {boolean} [options.registrarEnBalance=true] - si el backend crea el Ingreso
  * @param {Function} [options.onSuccess] - callback opcional al finalizar (si todo ok)
  */
 export const registrarPagoYBalance = async ({
@@ -57,7 +58,8 @@ export const registrarPagoYBalance = async ({
 
     const fechaPago = todayISO();
 
-    // 1) Marcar cuota como pagada — con todos los datos del wizard
+    // ── ÚNICO PASO: Marcar cuota como pagada — con todos los datos del wizard ──
+    //    El backend crea el Pago y, por la señal, el Ingreso en balances.
     await dispatch(
       marcarCuotaComoPagada({
         id: cuota.id,
@@ -73,33 +75,14 @@ export const registrarPagoYBalance = async ({
         nro_operacion:   extraData?.nro_operacion    || "",
         observaciones:   extraData?.observaciones    || "",
         medio_cobro_id:  extraData?.medio_cobro_id   || undefined,
+        // El backend usa este flag para decidir si crea el Ingreso.
         registrar_en_balance: registrarEnBalance,
       })
     ).unwrap();
 
-    toast.success("✅ Cuota pagada correctamente");
+    toast.success("✅ Cuota pagada y registrada en balances");
 
-    // 2) Registrar ingreso en balances (opcional)
-    if (registrarEnBalance) {
-      const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
-      const ingresoData = {
-        descripcion: `Pago de cuota #${cuota.cuota_nro} - Póliza ${poliza.numero_poliza}`,
-        monto: montoFinal,
-        categoria: "Pago de Póliza",
-        forma_pago: formaPago,
-        pagado_por: clienteNombre || "Cliente",
-      };
-
-      try {
-        await dispatch(registrarIngreso(ingresoData)).unwrap();
-        toast.success("✔️ Ingreso registrado en balances");
-      } catch (e) {
-        console.error("Error registrando ingreso:", e);
-        toast.error("El pago se registró, pero falló el ingreso en balances.");
-      }
-    }
-
-    // 3) Callback de éxito
+    // Callback de éxito
     onSuccess?.();
   } catch (error) {
     console.error("Error en registrarPagoYBalance:", error);

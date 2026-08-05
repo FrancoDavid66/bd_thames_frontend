@@ -1,4 +1,4 @@
-// src/components/estadisticas/VehiculosExportModal.jsx
+// src/components/estadisticas/VehiculosExportModal.jsx  (diseño Duo)
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { HiDownload, HiX, HiOfficeBuilding, HiTruck, HiCalendar, HiSearch, HiShieldCheck, HiExclamationCircle } from "react-icons/hi";
@@ -10,7 +10,7 @@ function Field({ label, icon: Icon, children }) {
   return (
     <div className="flex flex-col gap-1">
       {label && (
-        <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+        <label className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark flex items-center gap-1">
           {Icon && <Icon className="text-xs" />}{label}
         </label>
       )}
@@ -19,7 +19,7 @@ function Field({ label, icon: Icon, children }) {
   );
 }
 
-const inputCls = "h-8 rounded-lg bg-slate-950 border border-slate-800 px-2.5 text-xs text-slate-300 outline-none focus:border-slate-600 placeholder:text-slate-700 transition-colors w-full";
+const inputCls = "h-9 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark px-2.5 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-oficina placeholder:text-suave dark:placeholder:text-suave-dark transition-colors w-full dark:[color-scheme:dark]";
 const selectCls = `${inputCls} cursor-pointer`;
 
 export default function VehiculosExportModal({ open, onClose, apiBase, oficinas, getOficinaNombre, defaults }) {
@@ -105,17 +105,17 @@ export default function VehiculosExportModal({ open, onClose, apiBase, oficinas,
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
             <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95 translate-y-2" enterTo="opacity-100 scale-100 translate-y-0" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-              <Dialog.Panel className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
+              <Dialog.Panel className="w-full max-w-xl rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-2xl overflow-hidden">
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900/80">
+                <div className="flex items-center justify-between px-5 py-4 border-b-2 border-linea dark:border-linea-dark">
                   <div>
-                    <Dialog.Title className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-                      <HiDownload className="text-sky-400" /> Exportar vehículos
+                    <Dialog.Title className="text-sm font-black text-titulo dark:text-titulo-dark flex items-center gap-2">
+                      <HiDownload className="text-oficina" /> Exportar vehículos
                     </Dialog.Title>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Descargá el set filtrado en CSV o Excel</p>
+                    <p className="text-[10px] font-bold text-suave dark:text-suave-dark mt-0.5">Descargá el set filtrado en CSV o Excel</p>
                   </div>
-                  <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors">
+                  <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-egreso hover:text-egreso transition-colors">
                     <HiX className="text-xs" />
                   </button>
                 </div>
@@ -165,9 +165,9 @@ export default function VehiculosExportModal({ open, onClose, apiBase, oficinas,
                     </Field>
 
                     <Field label="Solo activas">
-                      <label className="flex items-center gap-2 h-8 px-2.5 rounded-lg border border-slate-800 bg-slate-950 cursor-pointer hover:border-slate-700 transition-colors">
-                        <input type="checkbox" checked={soloAct} onChange={e => setSoloAct(e.target.checked)} className="w-3.5 h-3.5 accent-emerald-500" />
-                        <span className="text-xs text-slate-400 flex items-center gap-1"><HiShieldCheck className="text-emerald-500 text-xs"/>Solo activas</span>
+                      <label className="flex items-center gap-2 h-9 px-2.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark cursor-pointer hover:border-ingreso transition-colors">
+                        <input type="checkbox" checked={soloAct} onChange={e => setSoloAct(e.target.checked)} className="w-4 h-4 accent-[var(--color-ingreso)]" />
+                        <span className="text-xs font-bold text-titulo dark:text-titulo-dark flex items-center gap-1"><HiShieldCheck className="text-ingreso text-xs"/>Solo activas</span>
                       </label>
                     </Field>
 
@@ -179,19 +179,19 @@ export default function VehiculosExportModal({ open, onClose, apiBase, oficinas,
                   </div>
 
                   {error && (
-                    <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 px-3 py-2.5 text-xs text-rose-300">
+                    <div className="flex items-center gap-2 rounded-xl border-2 border-egreso/30 bg-egreso/10 px-3 py-2.5 text-xs font-bold text-egreso dark:text-egreso-claro">
                       <HiExclamationCircle className="shrink-0" /> {error}
                     </div>
                   )}
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-slate-800 bg-slate-900/40">
-                  <button onClick={onClose} className="h-8 px-4 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors text-xs font-medium">
+                <div className="flex items-center justify-end gap-2 px-5 py-4 border-t-2 border-linea dark:border-linea-dark">
+                  <button onClick={onClose} className="h-9 px-4 rounded-xl border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-egreso hover:text-egreso transition-colors text-xs font-black">
                     Cancelar
                   </button>
                   <button onClick={handleDownload} disabled={downloading}
-                    className="h-8 flex items-center gap-1.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
+                    className="h-9 flex items-center gap-1.5 px-4 rounded-xl bg-oficina text-white border-2 border-oficina shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 text-xs font-black transition-all">
                     <HiDownload className={downloading ? "animate-pulse" : ""} />
                     {downloading ? "Descargando..." : "Descargar"}
                   </button>

@@ -1,13 +1,14 @@
 // src/components/renovaciones/DescartarRenovacionModal.jsx
 //
-// Modal chico para elegir el motivo cuando se marca "No renovar".
-// 5 motivos predefinidos + "Otro" con texto libre.
+// Modal para elegir el motivo cuando se marca "No renovar".
+// 5 motivos predefinidos + "Otro" con texto libre. Estilo THAMES (ModalDuo).
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiExclamation } from "react-icons/hi";
+import { HiXCircle, HiExclamation } from "react-icons/hi";
 
-const cx = (...a) => a.filter(Boolean).join(" ");
+import ModalDuo from "../ui/ModalDuo";
+import Boton3D from "../ui/Boton3D";
+import { cx } from "./utils";
 
 const MOTIVOS = [
   { value: "CAMBIO_COMPANIA", label: "Cambió de compañía", emoji: "🏢" },
@@ -35,8 +36,6 @@ export default function DescartarRenovacionModal({
     }
   }, [open]);
 
-  if (!open) return null;
-
   const isOtro = motivo === "OTRO";
   const canSubmit = !!motivo && (!isOtro || detalle.trim().length > 0);
 
@@ -45,137 +44,84 @@ export default function DescartarRenovacionModal({
     onSubmit?.({ motivo, detalle: detalle.trim() });
   };
 
+  const subtitle = item?.patente
+    ? `${item.patente}${item?.cliente ? ` · ${item.cliente.apellido}, ${item.cliente.nombre}` : ""}`
+    : null;
+
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget && !submitting) onClose?.();
-        }}
-      >
-        <motion.div
-          className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
-          initial={{ y: 18, opacity: 0, scale: 0.98 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: 18, opacity: 0, scale: 0.98 }}
-        >
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
-            <div>
-              <div className="text-lg font-extrabold text-white">No renovar</div>
-              <div className="mt-1 text-xs text-white/70">
-                {item?.patente && (
-                  <>
-                    <span className="font-semibold text-white">{item.patente}</span>
-                    {item?.cliente && (
-                      <> · {item.cliente.apellido}, {item.cliente.nombre}</>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+    <ModalDuo
+      isOpen={open}
+      onClose={onClose}
+      title="No renovar"
+      subtitle={subtitle}
+      icon={<HiXCircle />}
+      iconTono="rojo"
+      size="sm"
+      footer={
+        <>
+          <Boton3D variant="blanco" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Boton3D>
+          <Boton3D variant="rojo" onClick={handleSubmit} disabled={!canSubmit || submitting}>
+            {submitting ? "Guardando…" : "Confirmar 'No renueva'"}
+          </Boton3D>
+        </>
+      }
+    >
+      <p className="text-sm font-bold text-titulo dark:text-titulo-dark mb-3">
+        ¿Por qué este cliente no va a renovar?
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        {MOTIVOS.map((m) => {
+          const active = motivo === m.value;
+          return (
             <button
-              className="rounded-xl border border-white/10 bg-white/10 px-2.5 py-1.5 text-white hover:bg-white/15 transition-colors disabled:opacity-50"
-              onClick={onClose}
+              key={m.value}
+              type="button"
+              onClick={() => setMotivo(m.value)}
               disabled={submitting}
-              type="button"
-              title="Cerrar"
-            >
-              <HiX />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="p-4 space-y-3">
-            <p className="text-xs text-white/70">
-              ¿Por qué este cliente no va a renovar?
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              {MOTIVOS.map((m) => {
-                const active = motivo === m.value;
-                return (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setMotivo(m.value)}
-                    disabled={submitting}
-                    className={cx(
-                      "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold text-left transition-all disabled:opacity-50",
-                      active
-                        ? "border-rose-400/60 bg-rose-500/20 text-rose-50 ring-2 ring-rose-500/30"
-                        : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
-                    )}
-                  >
-                    <span className="text-base">{m.emoji}</span>
-                    <span>{m.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Detalle (opcional siempre, obligatorio si motivo=OTRO) */}
-            <div className="mt-2">
-              <label className="text-[11px] font-bold text-white/70 mb-1 block">
-                Detalle {isOtro ? <span className="text-rose-400">*</span> : <span className="text-white/40">(opcional)</span>}
-              </label>
-              <textarea
-                value={detalle}
-                onChange={(e) => setDetalle(e.target.value)}
-                disabled={submitting}
-                rows={2}
-                maxLength={300}
-                placeholder={
-                  isOtro
-                    ? "Especificá el motivo…"
-                    : "Notas adicionales (ej: 'llamar en 30 días')"
-                }
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/30 transition-colors disabled:opacity-50 resize-none"
-              />
-              <div className="mt-0.5 text-right text-[10px] text-white/40">
-                {detalle.length}/300
-              </div>
-            </div>
-
-            {/* Aviso */}
-            <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5">
-              <HiExclamation className="mt-0.5 shrink-0 text-amber-400" />
-              <div className="text-[11px] leading-relaxed text-amber-100/90">
-                Esto <strong>no cancela ni da de baja</strong> la póliza. Solo marca que el cliente no va a renovar.
-                Podés revertirlo en cualquier momento desde la pestaña "No renovaron".
-              </div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex flex-col-reverse gap-2 border-t border-white/10 p-4 md:flex-row md:justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15 transition-colors disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit || submitting}
               className={cx(
-                "rounded-xl px-5 py-2 text-sm font-extrabold transition-colors shadow-md",
-                canSubmit && !submitting
-                  ? "bg-rose-500 text-white hover:bg-rose-400 shadow-rose-500/20"
-                  : "bg-white/20 text-white/50 shadow-none cursor-not-allowed"
+                "flex items-center gap-2 rounded-2xl border-2 px-3 py-2.5 text-xs font-black text-left transition-all disabled:opacity-50",
+                active
+                  ? "border-duo-rojo bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo"
+                  : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-rojo/40"
               )}
             >
-              {submitting ? "Guardando…" : "Confirmar 'No renueva'"}
+              <span className="text-base">{m.emoji}</span>
+              <span>{m.label}</span>
             </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+          );
+        })}
+      </div>
+
+      {/* Detalle */}
+      <div className="mt-3">
+        <label className="text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-1 block">
+          Detalle {isOtro ? <span className="text-duo-rojo">*</span> : <span className="text-suave/60 dark:text-suave-dark/60">(opcional)</span>}
+        </label>
+        <textarea
+          value={detalle}
+          onChange={(e) => setDetalle(e.target.value)}
+          disabled={submitting}
+          rows={2}
+          maxLength={300}
+          placeholder={isOtro ? "Especificá el motivo…" : "Notas adicionales (ej: 'llamar en 30 días')"}
+          className="w-full rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-colors disabled:opacity-50 resize-none"
+        />
+        <div className="mt-0.5 text-right text-[10px] font-bold text-suave dark:text-suave-dark">
+          {detalle.length}/300
+        </div>
+      </div>
+
+      {/* Aviso */}
+      <div className="mt-3 flex items-start gap-2 rounded-2xl border-2 border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-2.5">
+        <HiExclamation className="mt-0.5 shrink-0 text-duo-amarillo-sombra dark:text-duo-amarillo" />
+        <div className="text-[11px] font-bold leading-relaxed text-duo-amarillo-sombra dark:text-duo-amarillo">
+          Esto <strong>no cancela ni da de baja</strong> la póliza. Solo marca que el cliente no va a renovar.
+          Podés revertirlo en cualquier momento.
+        </div>
+      </div>
+    </ModalDuo>
   );
 }

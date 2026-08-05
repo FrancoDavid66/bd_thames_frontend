@@ -58,15 +58,15 @@ export const fetchAdminCoberturas = createAsyncThunk('admin/fetchCoberturas', as
 const adminSlice = createSlice({
   name: 'admin',
   initialState: {
-    oficinas: [], 
-    usuarios: [], 
+    oficinas: [],
+    usuarios: [],
     responsables: [],
-    companias: [], 
+    companias: [],
     coberturas: [],
-    loadingOficinas: false, 
-    loadingUsuarios: false, 
+    loadingOficinas: false,
+    loadingUsuarios: false,
     loadingResponsables: false,
-    loadingCompanias: false, 
+    loadingCompanias: false,
     loadingCoberturas: false,
   },
   reducers: {},
@@ -75,7 +75,7 @@ const adminSlice = createSlice({
       .addCase(fetchAdminOficinas.pending, (state) => { state.loadingOficinas = true; })
       .addCase(fetchAdminOficinas.fulfilled, (state, action) => { state.loadingOficinas = false; state.oficinas = action.payload; })
       .addCase(fetchAdminOficinas.rejected, (state) => { state.loadingOficinas = false; })
-      
+
       .addCase(fetchAdminUsuarios.pending, (state) => { state.loadingUsuarios = true; })
       .addCase(fetchAdminUsuarios.fulfilled, (state, action) => { state.loadingUsuarios = false; state.usuarios = action.payload; })
       .addCase(fetchAdminUsuarios.rejected, (state) => { state.loadingUsuarios = false; })

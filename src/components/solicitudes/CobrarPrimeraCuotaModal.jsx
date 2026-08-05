@@ -1,23 +1,25 @@
 // src/components/solicitudes/CobrarPrimeraCuotaModal.jsx
 //
 // Post-alta: pregunta si se cobra la 1ª cuota.
-//   1) "¿Cobrás la primera cuota ahora?"  (Sí / Ahora no)
-//   2) Si Sí → abre el modal de cobro (reutiliza ModalFormaPago).
-//   3) Al pagar → ofrece descargar el comprobante (reutiliza DescargarFactura).
+//   1) "¿Cobrás la primera cuota ahora?"  (Sí / Ahora no)  ← diseño Duo
+//   2) Si Sí → abre el modal de cobro (reutiliza ModalFormaPago de Pagos).
+//   3) Al pagar → 🎉 confetti + ofrece descargar el comprobante.
 //
-// Reutiliza TODO lo que ya existe: no crea endpoints ni lógica de pago nueva.
+// Reutiliza TODA la lógica de pago existente: no crea endpoints ni lógica nueva.
 
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiCash, HiCheckCircle } from "react-icons/hi";
+import { HiCash, HiCheckCircle, HiUser, HiOfficeBuilding } from "react-icons/hi";
 import toast from "react-hot-toast";
 
 import api from "../../services/api";
 import { fetchMediosCobro } from "../../store/slices/pagosSlice";
 import { registrarPagoYBalance } from "../../utils/pagos/registrarPagoYBalance";
-import ModalFormaPago from "../pagos/ModalFormaPago";
-import DescargarFactura from "../pagos/DescargarFactura";
+import ModalFormaPago from "../pagos/ModalesCobro";
+import { BotonDescargarPDF } from "../pagos/Comprobante";
+
+import Boton3D from "../ui/Boton3D";
 
 const pad = (n) => String(n).padStart(2, "0");
 const hhmm = () => {
@@ -32,6 +34,20 @@ const fmtMonto = (n) => {
   const num = Number(n);
   return Number.isFinite(num) ? `$ ${num.toLocaleString("es-AR")}` : null;
 };
+
+// 🎉 Confetti seguro: usa canvas-confetti si está instalado; si no, no rompe.
+async function lanzarConfetti() {
+  try {
+    const mod = await import("canvas-confetti");
+    const confetti = mod.default || mod;
+    const colores = ["#58CC02", "#1CB0F6", "#FFC800", "#CE82FF"];
+    confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: colores });
+    setTimeout(() => confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 }, colors: colores }), 150);
+    setTimeout(() => confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 }, colors: colores }), 300);
+  } catch {
+    /* si no está la librería, seguimos sin confetti */
+  }
+}
 
 export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
   const dispatch = useDispatch();
@@ -57,15 +73,12 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
         const res = await api.get(`polizas/${polizaId}/`);
         const pol = res?.data || {};
 
-        // El cliente puede venir como ID o como objeto: si falta el nombre, lo buscamos.
         let cli = pol.cliente;
         const cliId = cli && typeof cli === "object" ? cli.id ?? cli.pk : cli;
         if (cliId && (!cli || typeof cli !== "object" || !(cli.nombre || cli.apellido))) {
           try {
             cli = (await api.get(`clientes/${cliId}/`))?.data || cli;
-          } catch {
-            /* seguimos con lo que haya */
-          }
+          } catch {}
         }
         pol.cliente = cli;
 
@@ -111,8 +124,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
       formaPago,
       monto: payload?.monto,
       // ⚠️ false a propósito: el backend YA crea el ingreso solo (señal
-      //    crear_ingreso_automatico al registrar el Pago). Si lo pedimos otra vez
-      //    acá, se duplica y falla (por eso saltaba el toast rojo).
+      //    crear_ingreso_automatico al registrar el Pago).
       registrarEnBalance: false,
       extraData: {
         destino_cuenta: payload?.destino_cuenta || "",
@@ -128,9 +140,6 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
           ...cuota,
           pagado: true,
           fecha_pago: payload?.fecha_pago || todayISO(),
-          // 🆕 Timestamp COMPLETO (con hora). El PDF lo usa como fecha de pago.
-          //    Sin la hora, "2026-07-01" se lee como UTC 00:00 y en Argentina (UTC-3)
-          //    se corre al día anterior 21:00. Con hora, muestra HOY y cobertura = mañana.
           pago_registrado_en: ahora.toISOString(),
           monto: payload?.monto ?? cuota?.monto,
           forma_pago: formaPago,
@@ -138,61 +147,84 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
           pago_hm_full: `${ahora.toLocaleDateString("es-AR")} ${hhmm()}`,
         });
         setStep("listo");
+        lanzarConfetti(); // 🎉
       },
     });
   };
 
+  const montoCuota = fmtMonto(cuota?.monto);
+
   return (
     <>
-      {/* ── Paso 1: preguntar ── */}
+      {/* ── Paso 1: preguntar (diseño Duo) ── */}
       <AnimatePresence>
         {step === "preguntar" && (
           <motion.div
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[160] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => onClose?.()}
           >
             <motion.div
-              className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/10 shadow-2xl p-6"
-              initial={{ y: 30, opacity: 0 }}
+              className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden"
+              initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 30, opacity: 0 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 26, stiffness: 220 }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center gap-3 mb-3">
-                <span className="p-2.5 rounded-2xl bg-indigo-500/15 border border-indigo-500/20">
-                  <HiCash className="text-indigo-300 text-xl" />
-                </span>
-                <h3 className="text-white font-black text-lg">Solicitud creada ✅</h3>
-              </div>
-              <p className="text-sm text-slate-300 mb-1">¿Querés cobrar la primera cuota ahora?</p>
-              {cuota && (
-                <p className="text-[13px] text-slate-400 mb-5">
-                  Cuota 1 · {fmtMonto(cuota.monto) || "monto a definir"}
+              <div className="p-6 text-center">
+                {/* Ícono grande */}
+                <motion.div
+                  className="mx-auto mb-4 h-20 w-20 rounded-3xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde flex items-center justify-center"
+                  initial={{ scale: 0.6, rotate: -8 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                >
+                  <HiCash className="text-duo-verde-sombra dark:text-duo-verde text-5xl" />
+                </motion.div>
+
+                <h3 className="text-xl font-black text-titulo dark:text-titulo-dark">Alta creada ✅</h3>
+                <p className="text-[13px] font-bold text-suave dark:text-suave-dark mt-1 mb-4">
+                  ¿Cobrás la primera cuota ahora?
                 </p>
-              )}
-              {!cuota && <div className="mb-5" />}
-              <div className="flex gap-2.5">
-                <button
-                  onClick={() => onClose?.()}
-                  className="flex-1 py-3 rounded-2xl bg-white/5 text-white/70 font-bold text-sm hover:bg-white/10 transition"
-                >
-                  Ahora no
-                </button>
-                <button
-                  disabled={loading || !cuota}
-                  onClick={() => setStep("cobrar")}
-                  className="flex-1 py-3 rounded-2xl bg-indigo-500 text-white font-black text-sm hover:bg-indigo-400 transition disabled:opacity-40"
-                >
-                  {loading ? "Cargando…" : "Sí, cobrar"}
-                </button>
+
+                {/* Tarjeta con datos de la cuota EN GRANDE */}
+                <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-5 text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+                      Cuota 1
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-full">
+                      <HiOfficeBuilding /> {poliza?.compania || "—"}
+                    </span>
+                  </div>
+                  <div className="text-3xl font-black text-titulo dark:text-titulo-dark leading-none">
+                    {montoCuota || "$ a definir"}
+                  </div>
+                  {clienteNombreAp && (
+                    <div className="flex items-center gap-1.5 text-[12px] font-bold text-suave dark:text-suave-dark mt-2">
+                      <HiUser /> {clienteNombreAp}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  <Boton3D variant="verde" full size="lg" disabled={loading || !cuota} onClick={() => setStep("cobrar")}>
+                    <HiCash /> {loading ? "Cargando…" : "Sí, cobrar ahora"}
+                  </Boton3D>
+                  <Boton3D variant="blanco" full onClick={() => onClose?.()}>
+                    Ahora no
+                  </Boton3D>
+                </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Paso 2: cobro (reutiliza ModalFormaPago) ── */}
+      {/* ── Paso 2: cobro (reutiliza ModalFormaPago de Pagos, sin tocar) ── */}
       <ModalFormaPago
         isOpen={step === "cobrar"}
         onClose={() => setStep("preguntar")}
@@ -207,43 +239,56 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
         pagoCuota="Cuota 1"
       />
 
-      {/* ── Paso 3: listo + comprobante (reutiliza DescargarFactura) ── */}
+      {/* ── Paso 3: listo + comprobante (diseño Duo + confetti) ── */}
       <AnimatePresence>
         {step === "listo" && (
           <motion.div
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[160] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => onClose?.()}
           >
             <motion.div
-              className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/10 shadow-2xl p-6 text-center"
-              initial={{ y: 30, opacity: 0 }}
+              className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden text-center"
+              initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 30, opacity: 0 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 26, stiffness: 220 }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="mx-auto mb-3 h-14 w-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                <HiCheckCircle className="text-emerald-400 text-3xl" />
-              </div>
-              <h3 className="text-white font-black text-lg mb-1">¡Cuota cobrada!</h3>
-              <p className="text-[13px] text-slate-400 mb-5">
-                Descargá el comprobante para el cliente.
-              </p>
-              <div className="flex flex-col gap-2.5">
-                <DescargarFactura
-                  cliente={poliza?.cliente}
-                  poliza={poliza}
-                  cuota={cuotaPagada}
-                  label="Descargar comprobante"
-                  tone="primary"
-                  className="w-full justify-center"
-                />
-                <button
-                  onClick={() => onClose?.()}
-                  className="w-full py-3 rounded-2xl bg-white/5 text-white/70 font-bold text-sm hover:bg-white/10 transition"
+              <div className="p-6">
+                <motion.div
+                  className="mx-auto mb-4 h-24 w-24 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde flex items-center justify-center"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", damping: 10, stiffness: 180 }}
                 >
-                  Cerrar
-                </button>
+                  <HiCheckCircle className="text-duo-verde-sombra dark:text-duo-verde text-6xl" />
+                </motion.div>
+
+                <h3 className="text-2xl font-black text-titulo dark:text-titulo-dark mb-1">¡Cuota cobrada! 🎉</h3>
+                {fmtMonto(cuotaPagada?.monto) && (
+                  <p className="text-[15px] font-black text-duo-verde-sombra dark:text-duo-verde mb-1">
+                    {fmtMonto(cuotaPagada?.monto)} · {cuotaPagada?.forma_pago || "efectivo"}
+                  </p>
+                )}
+                <p className="text-[13px] font-bold text-suave dark:text-suave-dark mb-5">
+                  Descargá el comprobante para el cliente.
+                </p>
+
+                <div className="flex flex-col gap-2.5">
+                  <BotonDescargarPDF
+                    cliente={poliza?.cliente}
+                    poliza={poliza}
+                    cuota={cuotaPagada}
+                    label="Descargar comprobante"
+                    className="w-full justify-center"
+                  />
+                  <Boton3D variant="blanco" full onClick={() => onClose?.()}>
+                    Cerrar
+                  </Boton3D>
+                </div>
               </div>
             </motion.div>
           </motion.div>

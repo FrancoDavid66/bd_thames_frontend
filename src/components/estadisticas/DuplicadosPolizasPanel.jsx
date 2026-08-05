@@ -1,4 +1,4 @@
-// src/components/estadisticas/DuplicadosPolizasPanel.jsx
+// src/components/estadisticas/DuplicadosPolizasPanel.jsx  (diseño Duo)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -212,24 +212,24 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-100">Duplicados</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Grupos de pólizas con datos repetidos — ideal para limpiar la base</p>
+          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Duplicados</h2>
+          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">Grupos de pólizas con datos repetidos — ideal para limpiar la base</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Criterio */}
           <select
             value={por}
             onChange={e => setPor(e.target.value)}
-            className="h-8 bg-slate-900 border border-slate-800 rounded-lg px-2.5 text-xs text-slate-300 outline-none focus:border-slate-700 cursor-pointer"
+            className="h-9 bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-xl px-2.5 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-oficina cursor-pointer dark:[color-scheme:dark]"
           >
             {CRITERIOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
           <button onClick={descargarTodo} disabled={downloading || loadList}
-            className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg border border-emerald-600 bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors">
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 rounded-xl border-2 border-ingreso bg-ingreso text-white text-xs font-black hover:bg-ingreso-fuerte shadow-[0_4px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all">
             {downloading ? "Descargando…" : "Descargar todo"}
           </button>
           <button onClick={() => { fetchResumen(); fetchListado(); }} disabled={loadRes || loadList}
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors">
+            className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors">
             <HiRefresh className={`text-sm ${(loadRes || loadList) ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -237,7 +237,7 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 px-4 py-3 text-xs text-rose-300">
+        <div className="flex items-center gap-2 rounded-xl border-2 border-egreso/30 bg-egreso/10 px-4 py-3 text-xs font-bold text-egreso dark:text-egreso-claro">
           <HiExclamationCircle className="shrink-0" /> {error}
         </div>
       )}
@@ -252,51 +252,51 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, delay: i * 0.05 }}
-            className={`rounded-2xl border p-4 text-left transition-all ${
+            className={`rounded-2xl border-2 p-4 text-left transition-all ${
               por === c.value
-                ? "border-sky-500/40 bg-sky-500/8 ring-1 ring-sky-500/20"
-                : "border-slate-800 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900"
+                ? "border-oficina bg-oficina/[0.08] ring-2 ring-oficina/20"
+                : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:border-oficina/50"
             }`}
           >
-            <div className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${por === c.value ? "text-sky-400" : "text-slate-500"}`}>
+            <div className={`text-[10px] font-black uppercase tracking-wider mb-2 ${por === c.value ? "text-oficina" : "text-suave dark:text-suave-dark"}`}>
               {c.label}
             </div>
-            <div className={`text-3xl font-light tabular-nums ${loadRes ? "text-slate-700" : por === c.value ? "text-sky-300" : "text-slate-300"}`}>
+            <div className={`text-3xl font-black tabular-nums ${loadRes ? "text-suave dark:text-suave-dark" : por === c.value ? "text-oficina" : "text-titulo dark:text-titulo-dark"}`}>
               {loadRes ? "—" : c.v.toLocaleString("es-AR")}
             </div>
-            <div className="text-[10px] text-slate-600 mt-1">grupos duplicados</div>
+            <div className="text-[10px] font-bold text-suave dark:text-suave-dark mt-1">grupos duplicados</div>
           </motion.button>
         ))}
       </div>
 
       {/* Listado grupos */}
-      <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/50">
+      <div className="rounded-2xl border-2 border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-800 bg-slate-900/80">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
           <div>
-            <span className="text-xs font-semibold text-slate-200">Grupos — {CRITERIOS.find(c => c.value === por)?.label}</span>
-            <span className="ml-2 text-[10px] text-slate-600">{count.toLocaleString("es-AR")} grupos</span>
+            <span className="text-xs font-black text-titulo dark:text-titulo-dark">Grupos — {CRITERIOS.find(c => c.value === por)?.label}</span>
+            <span className="ml-2 text-[10px] font-bold text-suave dark:text-suave-dark">{count.toLocaleString("es-AR")} grupos</span>
           </div>
           <div className="flex items-center gap-2">
             <select value={perGroup} onChange={e => setPerGroup(Number(e.target.value) || 12)}
-              className="h-7 bg-slate-950 border border-slate-800 rounded-lg px-2 text-[10px] text-slate-400 outline-none">
+              className="h-8 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-lg px-2 text-[10px] font-bold text-suave dark:text-suave-dark outline-none dark:[color-scheme:dark]">
               {[8,12,25,50].map(v => <option key={v} value={v}>{v} por grupo</option>)}
             </select>
             <select value={pageSize} onChange={e => setPageSize(Number(e.target.value) || 10)}
-              className="h-7 bg-slate-950 border border-slate-800 rounded-lg px-2 text-[10px] text-slate-400 outline-none">
+              className="h-8 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-lg px-2 text-[10px] font-bold text-suave dark:text-suave-dark outline-none dark:[color-scheme:dark]">
               {[5,10,25].map(v => <option key={v} value={v}>{v} grupos/pág</option>)}
             </select>
           </div>
         </div>
 
         {/* Grupos */}
-        <div className="divide-y divide-slate-800/40">
+        <div className="divide-y-2 divide-linea/40 dark:divide-linea-dark/40">
           {loadList ? (
-            <div className="py-10 text-center text-xs text-slate-600">Cargando...</div>
+            <div className="py-10 text-center text-xs text-suave dark:text-suave-dark font-bold">Cargando...</div>
           ) : grupos.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-sm text-emerald-400 font-medium">¡Sin duplicados!</p>
-              <p className="text-xs text-slate-600 mt-1">No hay grupos duplicados con este criterio.</p>
+              <p className="text-sm text-ingreso font-black">¡Sin duplicados!</p>
+              <p className="text-xs font-bold text-suave dark:text-suave-dark mt-1">No hay grupos duplicados con este criterio.</p>
             </div>
           ) : grupos.map((g, idx) => {
             const items  = g._items || [];
@@ -306,62 +306,62 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
                 {/* Cabecera grupo */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Clave duplicada</div>
-                    <div className="text-sm font-semibold text-rose-400">{keyStr || "—"}</div>
-                    <div className="text-[10px] text-slate-600 mt-0.5">{Number(g?.count || items.length || 0)} pólizas</div>
+                    <div className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider mb-0.5">Clave duplicada</div>
+                    <div className="text-sm font-black text-egreso">{keyStr || "—"}</div>
+                    <div className="text-[10px] font-bold text-suave dark:text-suave-dark mt-0.5">{Number(g?.count || items.length || 0)} pólizas</div>
                   </div>
                   <div className="flex items-center gap-2">
                     {items.filter(it => String(it.estado) === "activa").length > 1 && (
                       <button onClick={() => abrirResolver(items)}
-                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-amber-500 bg-amber-500/90 text-slate-950 font-bold hover:bg-amber-400 transition-colors text-[10px]">
+                        className="flex items-center gap-1.5 h-8 px-2.5 rounded-xl border-2 border-tarjeta bg-tarjeta text-white font-black hover:bg-[#d97706] shadow-[0_3px_0_#d97706] active:shadow-[0_0_0_#d97706] active:translate-y-0.5 transition-all text-[10px]">
                         Resolver
                       </button>
                     )}
                     <button onClick={() => copyText(keyStr)}
-                      className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors text-[10px]">
+                      className="flex items-center gap-1.5 h-8 px-2.5 rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors text-[10px] font-black">
                       <HiOutlineClipboardCopy className="text-xs" /> Copiar
                     </button>
                   </div>
                 </div>
 
                 {/* Mini tabla del grupo */}
-                <div className="rounded-xl border border-slate-800 overflow-hidden">
+                <div className="rounded-xl border-2 border-linea dark:border-linea-dark overflow-hidden">
                   <table className="min-w-full text-xs">
                     <thead>
-                      <tr className="border-b border-slate-800 bg-slate-950/50">
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Póliza</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Cliente</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Patente</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Oficina</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Estado</th>
+                      <tr className="border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                        <th className="px-3 py-2 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Póliza</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Cliente</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Patente</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Oficina</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Estado</th>
                         <th className="px-3 py-2 text-right"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/40">
+                    <tbody className="divide-y-2 divide-linea/40 dark:divide-linea-dark/40">
                       {items.length === 0 ? (
-                        <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-600 text-[10px]">Sin ítems. Aumentá "por grupo".</td></tr>
+                        <tr><td colSpan={6} className="px-3 py-4 text-center text-suave dark:text-suave-dark text-[10px] font-bold">Sin ítems. Aumentá "por grupo".</td></tr>
                       ) : items.map(it => (
-                        <tr key={it.id} className="hover:bg-slate-800/20 transition-colors group">
+                        <tr key={it.id} className="hover:bg-oficina/5 transition-colors group">
                           <td className="px-3 py-2.5">
-                            <button onClick={() => navigate(`/polizas/${it.id}`)} className="font-medium text-sky-400 hover:text-sky-300 transition-colors text-left">
+                            <button onClick={() => navigate(`/polizas/${it.id}`)} className="font-black text-oficina hover:text-oficina-fuerte transition-colors text-left">
                               #{it.id}{it.numero_poliza ? ` · ${it.numero_poliza}` : ""}
                             </button>
-                            {it.compania && <div className="text-[10px] text-slate-600">{it.compania}</div>}
+                            {it.compania && <div className="text-[10px] font-bold text-suave dark:text-suave-dark">{it.compania}</div>}
                           </td>
                           <td className="px-3 py-2.5">
-                            <div className="text-slate-200">{it?.cliente?.nombre || "—"}</div>
-                            {it?.cliente?.dni_cuit_cuil && <div className="text-[10px] text-slate-600">{it.cliente.dni_cuit_cuil}</div>}
+                            <div className="font-bold text-titulo dark:text-titulo-dark">{it?.cliente?.nombre || "—"}</div>
+                            {it?.cliente?.dni_cuit_cuil && <div className="text-[10px] font-bold text-suave dark:text-suave-dark">{it.cliente.dni_cuit_cuil}</div>}
                           </td>
-                          <td className="px-3 py-2.5 text-slate-400">{it.patente || "—"}</td>
-                          <td className="px-3 py-2.5 text-slate-400">{getOficinaNombre ? (getOficinaNombre(it.oficina) || "—") : (it.oficina ?? "—")}</td>
+                          <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.patente || "—"}</td>
+                          <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{getOficinaNombre ? (getOficinaNombre(it.oficina) || "—") : (it.oficina ?? "—")}</td>
                           <td className="px-3 py-2.5">
-                            <span className={`text-[10px] font-medium ${it.estado === "activa" ? "text-emerald-400" : "text-slate-500"}`}>
+                            <span className={`text-[10px] font-black ${it.estado === "activa" ? "text-ingreso" : "text-suave dark:text-suave-dark"}`}>
                               {it.estado || "—"}
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             <button onClick={() => navigate(`/polizas/${it.id}`)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 text-[10px] font-medium">
+                              className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[10px] font-black">
                               Ver <HiArrowRight className="text-xs" />
                             </button>
                           </td>
@@ -377,15 +377,15 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
 
         {/* Paginación */}
         {totalPagesN > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-800/60 bg-slate-900/40">
-            <span className="text-[10px] text-slate-600">Página {page} de {totalPagesN}</span>
+          <div className="flex items-center justify-between px-5 py-3 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <span className="text-[10px] font-bold text-suave dark:text-suave-dark">Página {page} de {totalPagesN}</span>
             <div className="flex items-center gap-1.5">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-                className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-colors">
+                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors">
                 <HiChevronLeft className="text-xs" />
               </button>
               <button onClick={() => setPage(p => Math.min(totalPagesN, p + 1))} disabled={page >= totalPagesN}
-                className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-colors">
+                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors">
                 <HiChevronRight className="text-xs" />
               </button>
             </div>
@@ -395,13 +395,13 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
 
       {/* ── Modal: Resolver doble cobertura activa ── */}
       {resolverItems && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4"
           onClick={() => !resolviendo && setResolverItems(null)}>
-          <div className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+          <div className="w-full max-w-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-slate-800">
-              <h3 className="text-base font-semibold text-slate-100">Resolver duplicado</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Elegí la póliza que queda <b className="text-emerald-400">activa</b>. Las demás pasan a <b className="text-slate-300">finalizada</b> (no se borran).</p>
+            <div className="px-5 py-4 border-b-2 border-linea dark:border-linea-dark">
+              <h3 className="text-base font-black text-titulo dark:text-titulo-dark">Resolver duplicado</h3>
+              <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">Elegí la póliza que queda <b className="text-ingreso">activa</b>. Las demás pasan a <b className="text-titulo dark:text-titulo-dark">finalizada</b> (no se borran).</p>
             </div>
 
             <div className="px-5 py-4 space-y-2 max-h-[50vh] overflow-y-auto">
@@ -409,19 +409,19 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
                 const sel = it.id === resolverActiva;
                 return (
                   <label key={it.id}
-                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${sel ? "border-emerald-500/50 bg-emerald-500/10" : "border-slate-800 bg-slate-900/50 hover:border-slate-700"}`}>
-                    <input type="radio" name="activa" checked={sel} onChange={() => setResolverActiva(it.id)} className="mt-1 accent-emerald-500" />
+                    className={`flex items-start gap-3 rounded-2xl border-2 p-3 cursor-pointer transition-colors ${sel ? "border-ingreso bg-ingreso/10" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-ingreso/50"}`}>
+                    <input type="radio" name="activa" checked={sel} onChange={() => setResolverActiva(it.id)} className="mt-1 accent-[var(--color-ingreso)]" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-200 font-medium">#{it.id}{it.numero_poliza ? ` · ${it.numero_poliza}` : ""}</div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-sm text-titulo dark:text-titulo-dark font-black">#{it.id}{it.numero_poliza ? ` · ${it.numero_poliza}` : ""}</div>
+                      <div className="text-[11px] font-bold text-suave dark:text-suave-dark">
                         {it.compania ? `${it.compania} · ` : ""}
                         {it.fecha_emision ? `emisión ${it.fecha_emision}` : ""}
                         {it.fecha_vencimiento ? ` · vence ${it.fecha_vencimiento}` : ""}
                       </div>
-                      <div className="text-[10px] mt-0.5">
-                        <span className={it.estado === "activa" ? "text-emerald-400" : "text-slate-500"}>estado actual: {it.estado || "—"}</span>
-                        {sel && <span className="ml-2 text-emerald-400 font-semibold">→ queda ACTIVA</span>}
-                        {!sel && <span className="ml-2 text-rose-400">→ pasa a finalizada</span>}
+                      <div className="text-[10px] mt-0.5 font-black">
+                        <span className={it.estado === "activa" ? "text-ingreso" : "text-suave dark:text-suave-dark"}>estado actual: {it.estado || "—"}</span>
+                        {sel && <span className="ml-2 text-ingreso">→ queda ACTIVA</span>}
+                        {!sel && <span className="ml-2 text-egreso">→ pasa a finalizada</span>}
                       </div>
                     </div>
                   </label>
@@ -429,13 +429,13 @@ export default function DuplicadosPolizasPanel({ apiBase, oficina, getOficinaNom
               })}
             </div>
 
-            <div className="px-5 py-4 border-t border-slate-800 flex items-center justify-end gap-2">
+            <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark flex items-center justify-end gap-2">
               <button onClick={() => setResolverItems(null)} disabled={resolviendo}
-                className="h-9 px-4 rounded-lg border border-slate-700 text-slate-300 text-sm hover:bg-slate-900 disabled:opacity-50 transition-colors">
+                className="h-10 px-4 rounded-xl border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-black hover:border-egreso hover:text-egreso disabled:opacity-50 transition-colors">
                 Cancelar
               </button>
               <button onClick={ejecutarResolver} disabled={resolviendo || !resolverActiva}
-                className="h-9 px-4 rounded-lg bg-amber-500 text-slate-950 text-sm font-bold hover:bg-amber-400 disabled:opacity-50 transition-colors">
+                className="h-10 px-4 rounded-xl bg-tarjeta text-white text-sm font-black border-2 border-tarjeta shadow-[0_4px_0_#d97706] active:shadow-[0_0_0_#d97706] active:translate-y-0.5 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all">
                 {resolviendo ? "Aplicando…" : "Resolver ahora"}
               </button>
             </div>

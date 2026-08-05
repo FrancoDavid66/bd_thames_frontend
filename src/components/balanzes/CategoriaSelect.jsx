@@ -1,16 +1,16 @@
-// src/components/balanzes/CategoriaSelect.jsx
+// src/components/balanzes/CategoriaSelect.jsx  (diseño Duo)
 import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCategorias } from "../../store/slices/balanceSlice";
 
-export default function CategoriaSelect({ 
-  value, 
-  onChange, 
+export default function CategoriaSelect({
+  value,
+  onChange,
   tipo, // "INGRESO" o "EGRESO"
-  error, 
+  error,
   refProp,
   label = "Categoría",
-  asteriskColor = "text-sky-400"
+  asteriskColor = "text-egreso",
 }) {
   const dispatch = useDispatch();
   const { categorias } = useSelector((s) => s.balance || {});
@@ -24,14 +24,14 @@ export default function CategoriaSelect({
   const opciones = useMemo(() => {
     if (!categorias) return [];
     return categorias
-      .filter(c => c.tipo === tipo || c.tipo === "AMBOS")
-      .map(c => c.nombre)
+      .filter((c) => c.tipo === tipo || c.tipo === "AMBOS")
+      .map((c) => c.nombre)
       .sort((a, b) => a.localeCompare(b));
   }, [categorias, tipo]);
 
   return (
     <div>
-      <label className="block text-xs font-medium mb-1.5 text-zinc-400">
+      <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
         {label} <span className={asteriskColor}>*</span>
       </label>
       <input
@@ -40,8 +40,8 @@ export default function CategoriaSelect({
         list={`categoria-opciones-${tipo}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={tipo === 'INGRESO' ? "Ej: Cobro de póliza, Honorarios…" : "Ej: Limpieza, Internet, Viáticos…"}
-        className="w-full px-3 py-2.5 border rounded-xl bg-zinc-900 border-zinc-800 text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
+        placeholder={tipo === "INGRESO" ? "Ej: Cobro de póliza, Honorarios…" : "Ej: Limpieza, Internet, Viáticos…"}
+        className="w-full px-3 py-2.5 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-oficina transition-colors"
         autoComplete="off"
       />
       <datalist id={`categoria-opciones-${tipo}`}>
@@ -49,7 +49,7 @@ export default function CategoriaSelect({
           <option key={c} value={c} />
         ))}
       </datalist>
-      {error && <p className="text-[11px] text-rose-400 mt-1">{error}</p>}
+      {error && <p className="text-[11px] font-bold text-egreso mt-1">{error}</p>}
     </div>
   );
 }

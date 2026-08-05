@@ -23,33 +23,33 @@ const EMPTY = { compania: "", email: "", dias_gracia: 3 };
 
 function FilaCorreo({ correo, onEdit, onDelete }) {
   return (
-    <tr className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors group">
+    <tr className="group border-b-2 border-[var(--color-linea)] last:border-b-0 hover:bg-[var(--color-surface)]">
       <td className="px-4 py-3">
-        <p className="text-sm font-semibold text-slate-100">{correo.compania}</p>
+        <p className="text-sm font-black text-[var(--color-titulo)]">{correo.compania}</p>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
-          <HiMail className="text-slate-500 text-sm shrink-0" />
-          <span className="text-sm text-slate-300 font-mono">{correo.email}</span>
+          <HiMail className="shrink-0 text-sm text-[var(--color-suave)]" />
+          <span className="font-mono text-sm text-[var(--color-titulo)]">{correo.email}</span>
         </div>
       </td>
       <td className="px-4 py-3 text-center">
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <span className="inline-flex items-center rounded-full border-2 border-[var(--color-tarjeta)]/30 bg-[var(--color-tarjeta)]/15 px-2.5 py-0.5 text-xs font-black text-[#d97706]">
           {correo.dias_gracia} {correo.dias_gracia === 1 ? "día" : "días"}
         </span>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center justify-end gap-2">
           <button
             onClick={() => onEdit(correo)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-oficina)] hover:text-[var(--color-oficina)]"
             title="Editar"
           >
             <HiPencil className="text-sm" />
           </button>
           <button
             onClick={() => onDelete(correo)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]"
             title="Eliminar"
           >
             <HiTrash className="text-sm" />
@@ -113,33 +113,33 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] shadow-2xl">
 
         {/* Header modal */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between border-b-2 border-[var(--color-linea)] px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center">
-              <HiMail className="text-rose-400 text-base" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-egreso)] text-white shadow-[0_3px_0_var(--color-egreso-fuerte)]">
+              <HiMail className="text-base" />
             </div>
-            <p className="text-sm font-semibold text-slate-200">
+            <p className="text-sm font-black text-[var(--color-titulo)]">
               {isNew ? "Agregar correo de compañía" : `Editar — ${correo.compania}`}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            className="rounded-lg p-1.5 text-[var(--color-suave)] transition-colors hover:text-[var(--color-titulo)]"
           >
             <HiX />
           </button>
         </div>
 
         {/* Cuerpo */}
-        <div className="px-6 py-5 space-y-4">
+        <div className="space-y-4 px-6 py-5">
 
           {/* Compañía — selector del catálogo */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+            <label className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-[var(--color-suave)]">
               Compañía
             </label>
             <div className="relative">
@@ -147,7 +147,7 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
                 value={form.compania}
                 onChange={(e) => set("compania", e.target.value)}
                 disabled={!isNew} // en edición no se puede cambiar la compañía
-                className="w-full appearance-none bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-rose-500/50 focus:outline-none transition-colors pr-9 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full appearance-none rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 pr-9 text-sm font-semibold text-[var(--color-titulo)] outline-none transition-colors focus:border-[var(--color-egreso)] disabled:cursor-not-allowed disabled:opacity-50 dark:[color-scheme:dark]"
               >
                 <option value="">Seleccioná una compañía...</option>
                 {companiasCatalogo.map((c) => (
@@ -156,22 +156,22 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
                   </option>
                 ))}
               </select>
-              <HiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none" />
+              <HiChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--color-suave)]" />
             </div>
-            {errors.compania && <p className="text-xs text-rose-400 mt-1">{errors.compania}</p>}
+            {errors.compania && <p className="mt-1 text-xs font-bold text-[var(--color-egreso)]">{errors.compania}</p>}
             {!isNew && (
-              <p className="text-xs text-slate-600 mt-1">La compañía no se puede cambiar una vez creada.</p>
+              <p className="mt-1 text-xs text-[var(--color-suave)]">La compañía no se puede cambiar una vez creada.</p>
             )}
             {companiasCatalogo.length === 0 && (
-              <p className="text-xs text-amber-400 mt-1">
-                No hay compañías en el catálogo. Cargalas desde la pestaña "Catálogos".
+              <p className="mt-1 text-xs font-bold text-[#d97706]">
+                No hay compañías en el catálogo. Cargalas desde la pestaña "Aseguradoras".
               </p>
             )}
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+            <label className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-[var(--color-suave)]">
               Correo(s) de bajas
             </label>
             <input
@@ -179,17 +179,17 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
               value={form.email}
               onChange={(e) => set("email", e.target.value)}
               placeholder="bajas@compania.com.ar, mesa@compania.com.ar"
-              className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5 text-sm placeholder:text-slate-600 focus:border-rose-500/50 focus:outline-none transition-colors font-mono"
+              className="w-full rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 font-mono text-sm text-[var(--color-titulo)] outline-none transition-colors placeholder:text-[var(--color-suave)] focus:border-[var(--color-egreso)]"
             />
-            {errors.email && <p className="text-xs text-rose-400 mt-1">{errors.email}</p>}
-            <p className="text-xs text-slate-600 mt-1">
+            {errors.email && <p className="mt-1 text-xs font-bold text-[var(--color-egreso)]">{errors.email}</p>}
+            <p className="mt-1 text-xs text-[var(--color-suave)]">
               A estos correos se mandarán las solicitudes de baja cuando haya mora. Podés poner varios separados por coma.
             </p>
           </div>
 
           {/* Días de gracia */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+            <label className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-[var(--color-suave)]">
               Días de mora mínimos
             </label>
             <div className="flex items-center gap-3">
@@ -199,32 +199,32 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
                 max={90}
                 value={form.dias_gracia}
                 onChange={(e) => set("dias_gracia", Number(e.target.value))}
-                className="w-24 bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5 text-sm text-center focus:border-rose-500/50 focus:outline-none transition-colors"
+                className="w-24 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 text-center text-sm font-bold text-[var(--color-titulo)] outline-none transition-colors focus:border-[var(--color-egreso)]"
               />
-              <p className="text-xs text-slate-500 flex-1">
+              <p className="flex-1 text-xs text-[var(--color-suave)]">
                 Pólizas con mora menor a este valor no entran al proceso de baja para esta compañía.
               </p>
             </div>
-            {errors.dias_gracia && <p className="text-xs text-rose-400 mt-1">{errors.dias_gracia}</p>}
+            {errors.dias_gracia && <p className="mt-1 text-xs font-bold text-[var(--color-egreso)]">{errors.dias_gracia}</p>}
           </div>
 
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-6 py-4 border-t border-slate-800">
+        <div className="flex gap-3 border-t-2 border-[var(--color-linea)] px-6 py-4">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-xs text-slate-400 border border-slate-700 hover:border-slate-600 hover:text-slate-200 transition-colors"
+            className="flex-1 rounded-xl border-2 border-[var(--color-linea)] py-2.5 text-xs font-black text-[var(--color-suave)] transition-colors hover:text-[var(--color-titulo)]"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-[2] py-2.5 rounded-xl text-xs font-semibold text-slate-900 bg-slate-100 hover:bg-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+            className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-[var(--color-egreso)] py-2.5 text-xs font-black text-white shadow-[0_4px_0_var(--color-egreso-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-egreso-fuerte)] disabled:opacity-40"
           >
             {loading ? (
-              <span className="w-4 h-4 border border-slate-400 border-t-slate-800 rounded-full animate-spin" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
             ) : (
               <HiCheck className="text-sm" />
             )}
@@ -291,22 +291,22 @@ export default function AdminCorreosBajas() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
       {/* Header sección */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-            <HiMail className="text-rose-400" /> Correos de bajas por compañía
+          <h2 className="flex items-center gap-2 text-lg font-black text-[var(--color-titulo)]">
+            <HiMail className="text-[var(--color-egreso)]" /> Correos de bajas por compañía
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="mt-1 text-sm font-semibold text-[var(--color-suave)]">
             Configurá a qué email se notifica cada compañía cuando hay pólizas con mora.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={cargar}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:text-[var(--color-titulo)]"
             title="Actualizar"
           >
             <HiRefresh className={`text-base ${loading ? "animate-spin" : ""}`} />
@@ -314,7 +314,7 @@ export default function AdminCorreosBajas() {
           <button
             onClick={() => setModal({})}
             disabled={companiasSinCorreo.length === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-colors text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-xl bg-[var(--color-egreso)] px-4 py-2.5 text-sm font-black text-white shadow-[0_4px_0_var(--color-egreso-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-egreso-fuerte)] disabled:cursor-not-allowed disabled:opacity-40"
             title={companiasSinCorreo.length === 0 ? "Todas las compañías ya tienen correo configurado" : ""}
           >
             <HiPlus className="text-base" /> Agregar compañía
@@ -324,10 +324,10 @@ export default function AdminCorreosBajas() {
 
       {/* Alerta si quedan compañías sin correo */}
       {companiasCatalogo.length > 0 && companiasSinCorreo.length > 0 && (
-        <div className="p-3 rounded-xl bg-amber-500/8 border border-amber-500/20 flex items-start gap-3">
-          <span className="text-amber-400 text-sm shrink-0 mt-0.5">⚠</span>
-          <p className="text-xs text-amber-300">
-            <span className="font-semibold">{companiasSinCorreo.length} compañía{companiasSinCorreo.length > 1 ? "s" : ""} sin correo configurado:</span>{" "}
+        <div className="flex items-start gap-3 rounded-2xl border-2 border-[var(--color-tarjeta)]/30 bg-[var(--color-tarjeta)]/10 p-3">
+          <span className="mt-0.5 shrink-0 text-sm text-[#d97706]">⚠</span>
+          <p className="text-xs font-semibold text-[#d97706]">
+            <span className="font-black">{companiasSinCorreo.length} compañía{companiasSinCorreo.length > 1 ? "s" : ""} sin correo configurado:</span>{" "}
             {companiasSinCorreo.map((c) => c.nombre).join(", ")}.
             Sin correo, el sistema no puede notificar la baja a esa compañía.
           </p>
@@ -335,37 +335,37 @@ export default function AdminCorreosBajas() {
       )}
 
       {/* Tabla */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)]">
 
         {/* Cabecera */}
-        <div className="grid grid-cols-4 px-4 py-3 bg-slate-900/80 border-b border-slate-800">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Compañía</span>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Email destino</span>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 text-center">Días mínimos</span>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 text-right">Acciones</span>
+        <div className="grid grid-cols-4 border-b-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-4 py-3">
+          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)]">Compañía</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)]">Email destino</span>
+          <span className="text-center text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)]">Días mínimos</span>
+          <span className="text-right text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)]">Acciones</span>
         </div>
 
         {loading ? (
-          <div className="py-12 flex justify-center">
-            <div className="w-5 h-5 border border-slate-600 border-t-slate-300 rounded-full animate-spin" />
+          <div className="flex justify-center py-12">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-linea)] border-t-[var(--color-egreso)]" />
           </div>
         ) : correos.length === 0 ? (
           <div className="py-12 text-center">
-            <HiMail className="text-slate-700 text-3xl mx-auto mb-3" />
-            <p className="text-sm text-slate-600">No hay compañías configuradas</p>
-            <p className="text-xs text-slate-700 mt-1">
+            <HiMail className="mx-auto mb-3 text-3xl text-[var(--color-suave)]" />
+            <p className="text-sm font-bold text-[var(--color-suave)]">No hay compañías configuradas</p>
+            <p className="mt-1 text-xs text-[var(--color-suave)]">
               Agregá una para que el sistema pueda enviar emails de baja.
             </p>
             <button
               onClick={() => setModal({})}
-              className="mt-4 px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-colors text-sm font-semibold"
+              className="mt-4 inline-flex items-center gap-1 rounded-xl bg-[var(--color-egreso)] px-4 py-2.5 text-sm font-black text-white shadow-[0_4px_0_var(--color-egreso-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-egreso-fuerte)]"
             >
-              <HiPlus className="inline mr-1" /> Agregar primera compañía
+              <HiPlus /> Agregar primera compañía
             </button>
           </div>
         ) : (
           <table className="w-full border-collapse">
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody>
               {correos.map((c) => (
                 <FilaCorreo
                   key={c.id}
@@ -379,8 +379,8 @@ export default function AdminCorreosBajas() {
         )}
 
         {correos.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-800/60 bg-slate-900/60">
-            <span className="text-xs text-slate-700">
+          <div className="border-t-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-4 py-3">
+            <span className="text-xs font-semibold text-[var(--color-suave)]">
               {correos.length} de {companiasCatalogo.length} compañía{companiasCatalogo.length !== 1 ? "s" : ""} configurada{correos.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -399,30 +399,30 @@ export default function AdminCorreosBajas() {
 
       {/* Modal confirmar eliminación */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm overflow-hidden rounded-3xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] shadow-2xl">
             <div className="px-6 py-5">
-              <p className="text-sm font-semibold text-slate-200 mb-2">¿Eliminar correo?</p>
-              <p className="text-sm text-slate-400">
+              <p className="mb-2 text-sm font-black text-[var(--color-titulo)]">¿Eliminar correo?</p>
+              <p className="text-sm text-[var(--color-suave)]">
                 Vas a eliminar el correo de{" "}
-                <span className="text-slate-200 font-semibold">{confirmDelete.compania}</span>.
+                <span className="font-black text-[var(--color-titulo)]">{confirmDelete.compania}</span>.
                 El sistema ya no podrá enviar notificaciones de baja a esta compañía.
               </p>
             </div>
-            <div className="flex gap-3 px-6 py-4 border-t border-slate-800">
+            <div className="flex gap-3 border-t-2 border-[var(--color-linea)] px-6 py-4">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2.5 rounded-xl text-xs text-slate-400 border border-slate-700 hover:border-slate-600 hover:text-slate-200 transition-colors"
+                className="flex-1 rounded-xl border-2 border-[var(--color-linea)] py-2.5 text-xs font-black text-[var(--color-suave)] transition-colors hover:text-[var(--color-titulo)]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-[2] py-2.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-[var(--color-egreso)] py-2.5 text-xs font-black text-white shadow-[0_4px_0_var(--color-egreso-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-egreso-fuerte)] disabled:opacity-40"
               >
                 {deleting ? (
-                  <span className="w-4 h-4 border border-white/40 border-t-white rounded-full animate-spin" />
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 ) : (
                   <HiTrash className="text-sm" />
                 )}

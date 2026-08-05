@@ -1,18 +1,17 @@
-/* src/pages/PolizasPage.jsx — Lista de pólizas (rediseño slate+indig o) */
+/* src/pages/PolizasPage.jsx — Lista de pólizas (rediseño THAMES) */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { batch, useDispatch, useSelector } from "react-redux";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { HiDownload, HiX } from "react-icons/hi";
-import dayjs from "dayjs";
-import { motion, AnimatePresence } from "framer-motion";
 
 import { useAuth } from "../context/AuthContext";
 import PolizaTable from "../components/polizas/PolizaTable";
 import PolizaFilter from "../components/polizas/PolizaFilter";
+import PageContainer from "../components/ui/PageContainer";
+import CardDuo from "../components/ui/CardDuo";
 
 import {
-  fetchPolizas, fetchPolizasKpis, exportarPolizas,
+  fetchPolizas, fetchPolizasKpis,
   selectResumenCuotas, setPage, setPageSize, setSearch, setEstado, setEstadoFinanciero,
   setCliente, setPatente, setOrdering, setModo, setOficina,
   setFechaVencimientoDesde, setFechaVencimientoHasta, setVencidasUltimosDias, setVencidasMasDeDias,
@@ -101,8 +100,6 @@ export default function PolizasPage() {
   // 🚀 Filtro de aseguradora: 100% del lado del cliente (no se manda al back-end)
   const [companiaLocal, setCompaniaLocal] = useState("");
 
-  const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState("pdf");
 
   useEffect(() => { setSearchDraft(search || ""); }, [search]);
 
@@ -223,49 +220,18 @@ export default function PolizasPage() {
     setSearchDraft(""); dispatch(setSearch("")); dispatch(fetchPolizas({ force: true })); dispatch(fetchPolizasKpis({ force: true }));
   }, [dispatch]);
 
-  const handleConfirmExport = async () => {
-    setExportModalOpen(false);
-    const toastId = toast.loading(`Generando planilla en ${exportFormat.toUpperCase()}...`);
-    try {
-      const { fileUrl, formato } = await dispatch(exportarPolizas({ formato: exportFormat })).unwrap();
-      const link = document.createElement("a");
-      link.href = fileUrl;
-      link.setAttribute("download", `Auditoria_Polizas_${dayjs().format("YYYYMMDD_HHmm")}.${formato}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(fileUrl);
-      toast.success("¡Planilla descargada con éxito!", { id: toastId });
-    } catch (error) {
-      toast.error("Error al generar la planilla. Verificá tu conexión.", { id: toastId });
-    }
-  };
-
   const pagingLabel = cursorEnabled ? "cursor" : `página ${page}`;
   const totalLabel = companiaLocal ? `${listFiltrada.length}` : cursorEnabled ? `${listFiltrada.length}` : `${total}`;
   const isWebAdmin = user?.perfil?.rol === "ADMIN";
 
   return (
-    <div className="relative mx-auto max-w-7xl px-3 py-3 text-slate-100 sm:px-4 sm:py-4">
+    <PageContainer>
       {/* Header */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Pólizas</h1>
-          <p className="text-xs text-slate-400 sm:text-sm">
-            {isWebAdmin ? "Buscá y filtrá sin cargar todo el universo." : `Gestionando cartera de: ${user?.perfil?.oficina_nombre || "Sucursal"}`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-300 transition-colors hover:bg-indigo-500/20 sm:text-sm"
-          >
-            <HiDownload size={16} /> Exportar planilla
-          </button>
-          <Link to="/clientes" className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs hover:bg-slate-700 sm:text-sm">Ver clientes</Link>
-          <Link to="/solicitudes" className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs hover:bg-slate-700 sm:text-sm">Ver solicitudes</Link>
-        </div>
+      <div className="mb-4">
+        <h1 className="text-2xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-3xl">Pólizas</h1>
+        <p className="text-xs font-bold text-suave dark:text-suave-dark sm:text-sm">
+          {isWebAdmin ? "Buscá y filtrá sin cargar todo el universo." : `Gestionando cartera de: ${user?.perfil?.oficina_nombre || "Sucursal"}`}
+        </p>
       </div>
 
       <PolizaFilter
@@ -305,14 +271,14 @@ export default function PolizasPage() {
       />
 
       {error && status === "failed" && (
-        <div className="mt-2 rounded-xl border border-rose-700/50 bg-rose-950/30 p-3 text-xs text-rose-100">
+        <div className="mt-2 rounded-2xl border-2 border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 text-xs font-bold text-duo-rojo">
           {typeof error === "string" ? error : JSON.stringify(error)}
         </div>
       )}
 
-      <div className="mt-2 text-xs text-slate-400 sm:text-sm">
+      <div className="mt-2 text-xs font-bold text-suave dark:text-suave-dark sm:text-sm">
         Mostrando {listFiltrada.length} de {totalLabel} pólizas ({pagingLabel})
-        {companiaLocal ? <span className="ml-1 text-sky-400">· filtrado por “{companiaLocal}”</span> : null}
+        {companiaLocal ? <span className="ml-1 text-duo-azul">· filtrado por “{companiaLocal}”</span> : null}
       </div>
 
       <div className="mt-2 sm:mt-3">
@@ -325,59 +291,6 @@ export default function PolizasPage() {
         />
       </div>
 
-      {/* Modal de exportación */}
-      <AnimatePresence>
-        {exportModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="flex w-full max-w-sm flex-col rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl"
-            >
-              <div className="flex items-center justify-between rounded-t-3xl border-b border-slate-800 bg-slate-950/40 p-5">
-                <h3 className="flex items-center gap-2 text-lg font-black text-white">
-                  <HiDownload className="text-indigo-400" /> Planilla de auditoría
-                </h3>
-                <button onClick={() => setExportModalOpen(false)} className="rounded-full bg-slate-800 p-2 text-slate-500 transition-colors hover:bg-rose-500 hover:text-white">
-                  <HiX size={20} />
-                </button>
-              </div>
-
-              <div className="p-6">
-                <label className="mb-3 block text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">Formato de descarga</label>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setExportFormat("pdf")}
-                    className={`flex-1 rounded-xl border-2 py-3 font-black transition-all ${exportFormat === "pdf" ? "border-rose-500 bg-rose-500/10 text-rose-400" : "border-slate-800 bg-slate-800/60 text-slate-500 hover:border-slate-700"}`}
-                  >
-                    📄 Imprimir PDF
-                  </button>
-                  <button
-                    onClick={() => setExportFormat("xlsx")}
-                    className={`flex-1 rounded-xl border-2 py-3 font-black transition-all ${exportFormat === "xlsx" ? "border-emerald-500 bg-emerald-500/10 text-emerald-400" : "border-slate-800 bg-slate-800/60 text-slate-500 hover:border-slate-700"}`}
-                  >
-                    📊 Bajar Excel
-                  </button>
-                </div>
-                <p className="mt-4 text-center text-[10px] leading-relaxed text-slate-500">
-                  La planilla se generará con las columnas adaptadas para control manual.
-                </p>
-              </div>
-
-              <div className="rounded-b-3xl border-t border-slate-800 bg-slate-950/40 p-5">
-                <button
-                  onClick={handleConfirmExport}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 py-3.5 font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-900/30 transition-all hover:bg-indigo-400 active:scale-95"
-                >
-                  <HiDownload size={18} /> Descargar planilla
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </PageContainer>
   );
 }

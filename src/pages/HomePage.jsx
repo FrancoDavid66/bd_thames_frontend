@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import axios from "axios";
-import { motion } from "framer-motion";
 
 // 🚀 IMPORTAMOS AUTH PARA EL SALUDO
 import { useAuth } from "../context/AuthContext";
@@ -13,9 +12,8 @@ import { useAuth } from "../context/AuthContext";
 import Card from "../components/comunes/Card";
 import BalanceChart from "../components/balanzes/BalanceChart";
 
-// 🚀 Modales ya existentes para cargar ingreso / egreso
-import IngresoCreateModal from "../components/balanzes/IngresoCreateModal";
-import EgresoCreateModal from "../components/balanzes/EgresoCreateModal";
+// 🚀 UN solo modal combinado para cargar ingreso O egreso.
+import MovimientoCreateModal from "../components/balanzes/MovimientoCreateModal";
 
 import {
   HiCash,
@@ -28,7 +26,6 @@ import {
   HiRefresh,
   HiArrowCircleDown,
   HiArrowCircleUp,
-  HiDownload,
 } from "react-icons/hi";
 
 import { fetchIngresos } from "../store/slices/ingresosSlice";
@@ -69,6 +66,40 @@ const FRASES_MOTIVADORAS = [
   "Pequeños pasos todos los días construyen grandes carteras.",
 ];
 
+// 🦉 Tarjeta KPI Duo (borde grueso, sombra 3D, sin animación)
+function KpiCard({ titulo, children, icon, color = "oficina", nota, onClick }) {
+  // color → clases del recuadro del ícono (fondo tenue + texto vivo)
+  const iconTone = {
+    ingreso: "bg-ingreso/15 text-ingreso-fuerte dark:text-ingreso-claro",
+    egreso: "bg-egreso/15 text-egreso-fuerte dark:text-egreso-claro",
+    oficina: "bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro",
+    tarjeta: "bg-tarjeta/15 text-[#d97706] dark:text-tarjeta-claro",
+    transferencia: "bg-transferencia/15 text-transferencia dark:text-transferencia-claro",
+  }[color];
+
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 transition-all ${
+        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_6px_0_var(--color-linea)] dark:hover:shadow-[0_6px_0_var(--color-linea-dark)]" : ""
+      }`}
+    >
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+            {titulo}
+          </span>
+          <div className={`rounded-xl p-2 ${iconTone}`}>{icon}</div>
+        </div>
+        {children}
+        {nota && (
+          <p className="text-xs font-semibold text-suave dark:text-suave-dark">{nota}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const HomePage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -86,9 +117,8 @@ const HomePage = () => {
     return FRASES_MOTIVADORAS[randomIndex];
   });
 
-  // 🚀 Estado de los modales de Caja Rápida
-  const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
-  const [modalEgresoAbierto, setModalEgresoAbierto] = useState(false);
+  // 🚀 Caja Rápida: un solo estado "INGRESO" | "EGRESO" | null.
+  const [modalTipo, setModalTipo] = useState(null);
 
   // ---- STORE ----
   const ingresos = useSelector((state) => state.ingresos?.list || []);
@@ -176,41 +206,6 @@ const HomePage = () => {
     }
   }, []);
 
-  // 🆕 TEMPORAL - Reporte AMCA (Excel). Sacar este bloque + el boton de abajo
-  // + polizas/urls.py + polizas/views/reporte_amca.py cuando ya no haga falta.
-  const [descargandoAmca, setDescargandoAmca] = useState(false);
-
-  const handleDescargarReporteAmca = useCallback(async () => {
-    setDescargandoAmca(true);
-    try {
-      const token = localStorage.getItem("access_token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await fetch(`${API_BASE}polizas/amca/reporte-excel/`, { headers });
-      if (!response.ok) throw new Error("Error al descargar el reporte");
-
-      const blob = await response.blob();
-      let filename = `reporte_amca_${dayjs().format("YYYY-MM-DD")}.xlsx`;
-      const disposition = response.headers.get("Content-Disposition");
-      if (disposition && disposition.includes("filename=")) {
-        filename = disposition.split("filename=")[1].replace(/"/g, "");
-      }
-
-      const objectUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(objectUrl);
-    } catch (error) {
-      console.error(error);
-      alert("Hubo un error al generar el reporte de AMCA.");
-    } finally {
-      setDescargandoAmca(false);
-    }
-  }, []);
-
   // Cargar datos
   useEffect(() => {
     dispatch(fetchIngresos());
@@ -234,15 +229,11 @@ const HomePage = () => {
     dispatch(fetchPolizasKpis(esAdmin ? {} : { oficina: miOficina }));
   }, [dispatch, user]);
 
-  // 🚀 Al cerrar cada modal, refrescamos para que el tablero quede al día
-  const cerrarIngreso = () => {
-    setModalIngresoAbierto(false);
+  // 🚀 Al cerrar el modal, refrescamos para que el tablero quede al día.
+  //    (Refresca ingresos Y egresos porque el modal combinado maneja ambos.)
+  const cerrarMovimiento = () => {
+    setModalTipo(null);
     dispatch(fetchIngresos());
-    cargarTotalesMes();
-  };
-
-  const cerrarEgreso = () => {
-    setModalEgresoAbierto(false);
     dispatch(fetchEgresos());
     cargarTotalesMes();
   };
@@ -273,9 +264,6 @@ const HomePage = () => {
     };
   }, []);
 
-  const currentYear = dayjs().year();
-  const currentMonth = dayjs().month();
-
   // ---- CÁLCULOS DEL MES (totales reales del backend, sin el tope de 500) ----
   const totalIngresosMes = totalesMes.ingresos;
   const totalEgresosMes = totalesMes.egresos;
@@ -287,449 +275,220 @@ const HomePage = () => {
   const totalTareasSolicitudes =
     (solCounters.pendiente_alta || 0) + (solCounters.pendiente_envio || 0);
 
-  // Variants para animar las cards
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i = 0) => ({
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        delay: 0.1 + i * 0.1,
-        ease: "easeOut",
-      },
-    }),
-  };
-
   return (
-    <motion.div
-      className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-slate-50 dark:bg-slate-950 px-4 py-6 sm:px-6 lg:px-10 transition-colors duration-300"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      {/* 🚀 Fondo con efectos de luz suaves y modernos */}
-      <div
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
-        <motion.div
-          className="absolute -top-32 -left-10 h-96 w-96 rounded-full bg-blue-500/10 dark:bg-blue-500/5 blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.5, 0.8, 0.5],
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -bottom-32 -right-10 h-96 w-96 rounded-full bg-emerald-500/10 dark:bg-emerald-500/5 blur-3xl"
-          animate={{
-            scale: [1, 1.5, 1],
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
-
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-6 z-10">
+    <div className="min-h-[calc(100vh-4rem)] bg-surface dark:bg-surface-dark px-4 py-6 sm:px-6 lg:px-10 transition-colors">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6">
 
         {/* HEADER / BIENVENIDA */}
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          custom={0}
-        >
-          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none">
-            <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                  {todayLabel}
-                </p>
-                <h1 className="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-50 sm:text-3xl tracking-tight">
-                  Hola, {user?.username || 'Equipo'} 👋
-                </h1>
-                <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400 max-w-xl italic">
-                  "{fraseDelDia}"
-                </p>
-              </div>
-
-              <div className="flex flex-col items-end gap-2">
-                <motion.span
-                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-400/30 shadow-sm"
-                  animate={{ y: [-2, 2, -2] }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  <HiSparkles className="h-4 w-4" />
-                  Dashboard Activo
-                </motion.span>
-              </div>
+        <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 shadow-[0_4px_0_var(--color-linea)] dark:shadow-[0_4px_0_var(--color-linea-dark)]">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-oficina">
+                {todayLabel}
+              </p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-3xl">
+                Hola, {user?.username || 'Equipo'} 👋
+              </h1>
+              <p className="mt-2 max-w-xl text-sm font-semibold italic text-suave dark:text-suave-dark">
+                "{fraseDelDia}"
+              </p>
             </div>
-          </Card>
-        </motion.div>
+
+            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-oficina/30 bg-oficina/10 px-3 py-1.5 text-xs font-black text-oficina-fuerte dark:text-oficina-claro">
+              <HiSparkles className="h-4 w-4" />
+              Dashboard Activo
+            </span>
+          </div>
+        </div>
 
         {/* TARJETAS RESUMEN */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 
           {/* Ingresos del mes */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={1}
-            whileHover={{ scale: 1.02, y: -4 }}
-          >
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Ingresos del mes
-                  </span>
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 rounded-lg">
-                    <HiCash className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                </div>
-                <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                  $ {formatMoney(totalIngresosMes)}
-                </p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Total cobrado este mes
-                </p>
-              </div>
-            </Card>
-          </motion.div>
+          <KpiCard titulo="Ingresos del mes" color="ingreso" icon={<HiCash className="h-5 w-5" />} nota="Total cobrado este mes">
+            <p className="text-2xl font-black text-ingreso-fuerte dark:text-ingreso-claro">
+              $ {formatMoney(totalIngresosMes)}
+            </p>
+          </KpiCard>
 
           {/* Egresos del mes */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={2}
-            whileHover={{ scale: 1.02, y: -4 }}
-          >
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Egresos del mes
-                  </span>
-                  <div className="p-2 bg-rose-100 dark:bg-rose-500/20 rounded-lg">
-                    <HiTrendingDown className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-                  </div>
-                </div>
-                <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">
-                  $ {formatMoney(totalEgresosMes)}
-                </p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Total gastado este mes
-                </p>
-              </div>
-            </Card>
-          </motion.div>
+          <KpiCard titulo="Egresos del mes" color="egreso" icon={<HiTrendingDown className="h-5 w-5" />} nota="Total gastado este mes">
+            <p className="text-2xl font-black text-egreso-fuerte dark:text-egreso-claro">
+              $ {formatMoney(totalEgresosMes)}
+            </p>
+          </KpiCard>
 
           {/* Balance del mes */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={3}
-            whileHover={{ scale: 1.02, y: -4 }}
-          >
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Balance Neto
-                  </span>
-                  <div className="p-2 bg-teal-100 dark:bg-teal-500/20 rounded-lg">
-                    <HiTrendingUp className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                  </div>
-                </div>
-                <p className={`text-2xl font-extrabold ${balanceMes >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-red-600 dark:text-red-400'}`}>
-                  $ {formatMoney(balanceMes)}
-                </p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Ingresos − Egresos del mes
-                </p>
-              </div>
-            </Card>
-          </motion.div>
+          <KpiCard titulo="Balance Neto" color="ingreso" icon={<HiTrendingUp className="h-5 w-5" />} nota="Ingresos − Egresos del mes">
+            <p className={`text-2xl font-black ${balanceMes >= 0 ? 'text-ingreso-fuerte dark:text-ingreso-claro' : 'text-egreso-fuerte dark:text-egreso-claro'}`}>
+              $ {formatMoney(balanceMes)}
+            </p>
+          </KpiCard>
 
           {/* Pólizas activas (FIX) */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={4}
-            whileHover={{ scale: 1.02, y: -4 }}
-          >
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Pólizas activas
-                  </span>
-                  <div className="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg">
-                    <HiShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-                <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-50">
-                  {polizasActivas}
-                </p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Solo en estado "activa"
-                </p>
-              </div>
-            </Card>
-          </motion.div>
+          <KpiCard titulo="Pólizas activas" color="oficina" icon={<HiShieldCheck className="h-5 w-5" />} nota='Solo en estado "activa"'>
+            <p className="text-2xl font-black text-titulo dark:text-titulo-dark">
+              {polizasActivas}
+            </p>
+          </KpiCard>
 
           {/* Clientes */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={5}
-            whileHover={{ scale: 1.02, y: -4 }}
-          >
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Total Clientes
-                  </span>
-                  <div className="p-2 bg-indigo-100 dark:bg-indigo-500/20 rounded-lg">
-                    <HiUsers className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                </div>
-                <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-50">
-                  {totalClientes}
-                </p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Personas en tu base de datos
-                </p>
-              </div>
-            </Card>
-          </motion.div>
+          <KpiCard titulo="Total Clientes" color="transferencia" icon={<HiUsers className="h-5 w-5" />} nota="Personas en tu base de datos">
+            <p className="text-2xl font-black text-titulo dark:text-titulo-dark">
+              {totalClientes}
+            </p>
+          </KpiCard>
 
           {/* Renovaciones por vencer */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={6}
-            whileHover={{ scale: 1.02, y: -4 }}
-          >
-            <Card
-              onClick={() => navigate("/polizas/renovaciones")}
-              className="cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Renovaciones
-                  </span>
-                  <div className="p-2 bg-amber-100 dark:bg-amber-500/20 rounded-lg">
-                    <HiRefresh className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                </div>
-                <div className="flex items-end gap-4">
-                  <div>
-                    <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 leading-none">
-                      {renovHoy}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Vencen hoy</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-extrabold text-slate-700 dark:text-slate-200 leading-none">
-                      {renovProximas}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Próximas</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-extrabold text-rose-600 dark:text-rose-400 leading-none">
-                      {renovVencidas}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Vencidas</p>
-                  </div>
-                </div>
+          <KpiCard titulo="Renovaciones" color="tarjeta" icon={<HiRefresh className="h-5 w-5" />} onClick={() => navigate("/polizas/renovaciones")}>
+            <div className="flex items-end gap-4">
+              <div>
+                <p className="text-2xl font-black leading-none text-[#d97706] dark:text-tarjeta-claro">
+                  {renovHoy}
+                </p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Vencen hoy</p>
               </div>
-            </Card>
-          </motion.div>
+              <div>
+                <p className="text-lg font-black leading-none text-titulo dark:text-titulo-dark">
+                  {renovProximas}
+                </p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Próximas</p>
+              </div>
+              <div>
+                <p className="text-lg font-black leading-none text-egreso-fuerte dark:text-egreso-claro">
+                  {renovVencidas}
+                </p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Vencidas</p>
+              </div>
+            </div>
+          </KpiCard>
         </div>
 
         {/* GRID PRINCIPAL: DASHBOARD + LATERAL */}
         <div className="grid gap-4 lg:grid-cols-3">
 
           {/* Gráfico de balances */}
-          <motion.div
-            className="lg:col-span-2 col-span-3"
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={7}
-          >
+          <div className="col-span-3 lg:col-span-2">
             <BalanceChart ingresos={ingresos} egresos={egresos} />
-          </motion.div>
+          </div>
 
           {/* Lateral derecho: Tareas y Accesos */}
           <div className="flex flex-col gap-4">
 
             {/* Tareas Pendientes */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              custom={8}
-            >
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                    Tareas Pendientes
-                  </h2>
-                  <span className="rounded-full bg-amber-100 dark:bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                    {totalTareasSolicitudes} avisos
+            <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark pb-3">
+                <h2 className="text-sm font-black text-titulo dark:text-titulo-dark">
+                  Tareas Pendientes
+                </h2>
+                <span className="rounded-full bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-duo-amarillo-sombra dark:text-duo-amarillo">
+                  {totalTareasSolicitudes} avisos
+                </span>
+              </div>
+              <ul className="mt-4 space-y-3 text-sm">
+                <li
+                  onClick={() => navigate("/solicitudes")}
+                  className="group flex cursor-pointer items-center justify-between rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
+                >
+                  <span className="font-bold text-titulo dark:text-titulo-dark">Alta en compañía</span>
+                  <span className="rounded-md bg-egreso/10 px-2 py-1 text-xs font-black text-egreso-fuerte dark:text-egreso-claro">
+                    {solCounters.pendiente_alta}
                   </span>
-                </div>
-                <ul className="mt-4 space-y-3 text-sm">
-                  <li
-                    onClick={() => navigate("/solicitudes")}
-                    className="cursor-pointer group flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    <span className="font-medium text-slate-600 dark:text-slate-300">Alta en compañía</span>
-                    <span className="text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2 py-1 rounded-md">
-                      {solCounters.pendiente_alta}
-                    </span>
-                  </li>
-                  <li
-                    onClick={() => navigate("/solicitudes")}
-                    className="cursor-pointer group flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    <span className="font-medium text-slate-600 dark:text-slate-300">Envío de póliza</span>
-                    <span className="text-xs font-bold text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded-md">
-                      {solCounters.pendiente_envio}
-                    </span>
-                  </li>
-                </ul>
-              </Card>
-            </motion.div>
+                </li>
+                <li
+                  onClick={() => navigate("/solicitudes")}
+                  className="group flex cursor-pointer items-center justify-between rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
+                >
+                  <span className="font-bold text-titulo dark:text-titulo-dark">Envío de póliza</span>
+                  <span className="rounded-md bg-oficina/10 px-2 py-1 text-xs font-black text-oficina-fuerte dark:text-oficina-claro">
+                    {solCounters.pendiente_envio}
+                  </span>
+                </li>
+              </ul>
+            </div>
 
             {/* Accesos Rápidos */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              custom={9}
-            >
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                    Accesos Rápidos
-                  </h2>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark pb-3">
+                <h2 className="text-sm font-black text-titulo dark:text-titulo-dark">
+                  Accesos Rápidos
+                </h2>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
 
-                  {/* Cargar Ingreso */}
-                  <motion.button
-                    type="button"
-                    onClick={() => setModalIngresoAbierto(true)}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiArrowCircleDown className="h-6 w-6 opacity-90" />
-                    <span className="text-xs font-semibold">Cargar Ingreso</span>
-                  </motion.button>
+                {/* Cargar Ingreso */}
+                <button
+                  type="button"
+                  onClick={() => setModalTipo("INGRESO")}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-verde p-3 text-white shadow-[0_4px_0_var(--color-duo-verde-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-verde-sombra)]"
+                >
+                  <HiArrowCircleDown className="h-6 w-6" />
+                  <span className="text-xs font-black">Cargar Ingreso</span>
+                </button>
 
-                  {/* Cargar Egreso */}
-                  <motion.button
-                    type="button"
-                    onClick={() => setModalEgresoAbierto(true)}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-rose-600 dark:bg-rose-600/90 p-3 text-white shadow-md shadow-rose-600/20 transition hover:bg-rose-500"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiArrowCircleUp className="h-6 w-6 opacity-90" />
-                    <span className="text-xs font-semibold">Cargar Egreso</span>
-                  </motion.button>
+                {/* Cargar Egreso */}
+                <button
+                  type="button"
+                  onClick={() => setModalTipo("EGRESO")}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-rojo p-3 text-white shadow-[0_4px_0_var(--color-duo-rojo-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-rojo-sombra)]"
+                >
+                  <HiArrowCircleUp className="h-6 w-6" />
+                  <span className="text-xs font-black">Cargar Egreso</span>
+                </button>
 
-                  {/* Nueva Póliza → flujo de alta (Solicitudes) */}
-                  <motion.button
-                    type="button"
-                    onClick={() => navigate("/solicitudes")}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-blue-600 dark:bg-blue-600/90 p-3 text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-500"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiPlusSm className="h-6 w-6 opacity-80" />
-                    <span className="text-xs font-semibold">Nueva Póliza</span>
-                  </motion.button>
+                {/* Nueva Póliza → flujo de alta (Solicitudes) */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/solicitudes")}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-azul p-3 text-white shadow-[0_4px_0_var(--color-duo-azul-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-azul-sombra)]"
+                >
+                  <HiPlusSm className="h-6 w-6" />
+                  <span className="text-xs font-black">Nueva Póliza</span>
+                </button>
 
-                  {/* Nuevo Cliente */}
-                  <motion.button
-                    type="button"
-                    onClick={() => navigate("/clientes")}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiUsers className="h-5 w-5 opacity-70" />
-                    <span className="text-xs font-semibold">Nuevo Cliente</span>
-                  </motion.button>
+                {/* Nuevo Cliente */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/clientes")}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-all active:translate-y-0.5"
+                >
+                  <HiUsers className="h-5 w-5" />
+                  <span className="text-xs font-black">Nuevo Cliente</span>
+                </button>
 
-                  {/* Ir a Pagos */}
-                  <motion.button
-                    type="button"
-                    onClick={() => navigate("/pagos")}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-600/90 p-3 text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiCash className="h-5 w-5 opacity-80" />
-                    <span className="text-xs font-semibold">Ir a Pagos</span>
-                  </motion.button>
+                {/* Ir a Pagos */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/pagos")}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-verde p-3 text-white shadow-[0_4px_0_var(--color-duo-verde-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-verde-sombra)]"
+                >
+                  <HiCash className="h-5 w-5" />
+                  <span className="text-xs font-black">Ir a Pagos</span>
+                </button>
 
-                  {/* Ver Pólizas */}
-                  <motion.button
-                    type="button"
-                    onClick={() => navigate("/polizas")}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-slate-700 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiShieldCheck className="h-5 w-5 opacity-70" />
-                    <span className="text-xs font-semibold">Ver Pólizas</span>
-                  </motion.button>
-
-                  {/* 🆕 TEMPORAL - Reporte AMCA (Excel). Sacar cuando ya no haga falta. */}
-                  <motion.button
-                    type="button"
-                    onClick={handleDescargarReporteAmca}
-                    disabled={descargandoAmca}
-                    className="cursor-pointer flex flex-col items-center justify-center gap-2 rounded-xl bg-amber-500 dark:bg-amber-500/90 p-3 text-white shadow-md shadow-amber-500/20 transition hover:bg-amber-400 disabled:opacity-60"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <HiDownload className={`h-5 w-5 opacity-80 ${descargandoAmca ? "animate-pulse" : ""}`} />
-                    <span className="text-xs font-semibold">
-                      {descargandoAmca ? "Generando..." : "Reporte AMCA"}
-                    </span>
-                  </motion.button>
-                </div>
-              </Card>
-            </motion.div>
+                {/* Ver Pólizas */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/polizas")}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-all active:translate-y-0.5"
+                >
+                  <HiShieldCheck className="h-5 w-5" />
+                  <span className="text-xs font-black">Ver Pólizas</span>
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>
       </div>
 
-      {/* 🚀 Modales de Caja Rápida (los mismos que en Balances) */}
-      <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={cerrarIngreso} />
-      <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={cerrarEgreso} />
-    </motion.div>
+      {/* 🚀 Modal de Caja Rápida (combinado, el mismo que en Balances) */}
+      <MovimientoCreateModal
+        isOpen={modalTipo !== null}
+        tipoInicial={modalTipo || "INGRESO"}
+        onClose={cerrarMovimiento}
+      />
+    </div>
   );
 };
 

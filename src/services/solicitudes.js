@@ -1,5 +1,11 @@
 // src/services/solicitudes.js
 // Servicio para Solicitudes + Documentos + Empleados (catálogo)
+//
+// 🧹 LIMPIEZA: se quitaron los métodos que pegaban a endpoints YA BORRADOS del
+//    backend (daban 404): resumen, enviar, emitirConstancia, convertir, cancelar,
+//    tomar, reasignar, descargarComprobante, y el crear "simple".
+//    El flujo real es: listar + crearCompleto + terminar + (docs/empleados/asociar).
+//    También se sacó el console.log de debug del token.
 
 /* ===================== URL helpers ===================== */
 function normalizeBase(raw) {
@@ -31,16 +37,16 @@ const ROOT = normalizeBase(ENV_BASE);
 // 👇 Acá unificamos: siempre /api como prefijo
 const API_BASE = ROOT ? `${ROOT}/api` : "/api";
 
-const API  = `${API_BASE}/solicitudes`;
+const API = `${API_BASE}/solicitudes`;
 const DOCS = `${API_BASE}/documentos`;
-const EMP  = `${API_BASE}/empleados`;
+const EMP = `${API_BASE}/empleados`;
 
 async function http(method, url, body, opts = {}) {
-  // 🚀 PARCHE CLAVE: Rescatamos el token de seguridad
-  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt');
-  
-  // 🎤 MICRÓFONO: Verificamos si lo atrapó antes de mandarlo
-  console.log(`🔑 [FRONTEND] Token inyectado en petición a ${url}:`, token ? "✅ SÍ HAY TOKEN" : "❌ NO HAY TOKEN (null)");
+  // Token de seguridad (JWT) desde localStorage
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("jwt");
 
   const isForm = body instanceof FormData;
   const headers = isForm
@@ -50,7 +56,6 @@ async function http(method, url, body, opts = {}) {
         ...(body ? { "Content-Type": "application/json" } : {}),
       };
 
-  // 🚀 PARCHE CLAVE: Inyectamos el Token en la cabecera si existe
   if (token && token !== "undefined" && token !== "null") {
     headers["Authorization"] = `Bearer ${token.trim()}`;
   }
@@ -61,7 +66,7 @@ async function http(method, url, body, opts = {}) {
       method,
       headers,
       ...(body ? { body: isForm ? body : JSON.stringify(body) } : {}),
-      ...opts, // 🚀 Acá viaja el 'signal' limpiamente por detrás
+      ...opts, // acá viaja el 'signal' limpiamente por detrás
     });
   } catch (e) {
     const err = new Error("No se pudo conectar con el servidor.");
@@ -114,10 +119,8 @@ function qs(params = {}) {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
-    
-    // 🚀 PARCHE: Evitamos que el signal u objetos se conviertan a texto en la URL
+    // Evitamos que el signal u objetos se conviertan a texto en la URL
     if (typeof v === "object" && !Array.isArray(v)) return;
-
     if (Array.isArray(v)) {
       v.forEach((x) => q.append(k, x ?? ""));
     } else {
@@ -131,22 +134,11 @@ function qs(params = {}) {
 export const solicitudesApi = {
   // -------- Solicitudes --------
   async listar(params = {}) {
-    // 🚀 PARCHE: Extraemos el signal de los parámetros visuales
+    // Extraemos el signal de los parámetros visuales
     const { signal, ...restParams } = params || {};
     const opts = signal ? { signal } : {};
-    
-    // Mandamos `null` como body, y `opts` con el signal en el 4to parámetro
     const data = await http("GET", `${API}/` + qs(restParams), null, opts);
     return unwrapList(data);
-  },
-
-  resumen() {
-    return http("GET", `${API}/resumen/`);
-  },
-
-  crear(body) {
-    // body debe incluir telefono (string) y demás campos
-    return http("POST", `${API}/`, body);
   },
 
   eliminar(id) {
@@ -163,96 +155,21 @@ export const solicitudesApi = {
     return http("PATCH", `${API}/${id}/`, { estado });
   },
 
-  // Comodidad: marcar "en proceso"
-  enProceso(id) {
-    return this.setEstado(id, "EN_REVISION");
-  },
-
-  // NUEVO: crear todo en una transacción (Cliente + DNI + Póliza + Cuotas + Solicitud + Fotos)
+  // Creación completa (Cliente + DNI + Póliza + Cuotas + Solicitud + Fotos) en una transacción.
   crearCompleto(payload, opts = {}) {
-    // payload debe seguir el contrato:
-    // { cliente:{...}, cliente_fotos:{...}, poliza:{...}, solicitud:{...}, fotos:{...}, opciones:{...} }
     return http("POST", `${API}/crear-completo/`, payload, opts);
   },
 
-  // Terminar con fallback si no existe la acción del backend
+  // Terminar (con fallback a PATCH TERMINADA si no existe la acción)
   async terminar(id) {
     try {
       return await http("POST", `${API}/${id}/terminar/`, {});
     } catch {
-      // Fallback: marcar como TERMINADA por PATCH
       return this.setEstado(id, "TERMINADA");
     }
   },
 
-  // Enviar solicitud de seguros
-  enviar(id, payload = {}) {
-    return http("POST", `${API}/${id}/enviar/`, payload);
-  },
-
-  emitirConstancia(id) {
-    return http("POST", `${API}/${id}/emitir_constancia/`, {});
-  },
-
-  convertir(id, poliza_id) {
-    return http(
-      "POST",
-      `${API}/${id}/convertir/`,
-      poliza_id ? { poliza_id } : {}
-    );
-  },
-
-  cancelar(id) {
-    return http("POST", `${API}/${id}/cancelar/`, {});
-  },
-
-  // --- Asignación ---
-  /**
-   * Tomar una solicitud.
-   * Admite:
-   * tomar(id, { empleado_id })
-   * tomar(id, { responsable: 'Nombre' })
-   * tomar(id, empleado_idNumber)
-   * tomar(id, 'Nombre')
-   * tomar(id, 'Nombre', empleado_idNumber)
-   */
-  tomar(id, arg, empleadoId) {
-    let body = {};
-    if (typeof arg === "object" && arg !== null) {
-      body = { ...arg };
-    } else if (typeof arg === "number" && empleadoId === undefined) {
-      body = { empleado_id: arg };
-    } else if (typeof arg === "string" && typeof empleadoId === "number") {
-      body = { responsable: arg, empleado_id: empleadoId };
-    } else if (typeof arg === "string") {
-      body = { responsable: arg };
-    } else if (typeof empleadoId === "number") {
-      body = { empleado_id: empleadoId };
-    }
-    return http("POST", `${API}/${id}/tomar/`, body);
-  },
-
-  /**
-   * Reasignar una solicitud.
-   * Admite mismas variantes que `tomar`.
-   */
-  reasignar(id, arg, empleadoId) {
-    let body = {};
-    if (typeof arg === "object" && arg !== null) {
-      body = { ...arg };
-    } else if (typeof arg === "number" && empleadoId === undefined) {
-      body = { empleado_id: arg };
-    } else if (typeof arg === "string" && typeof empleadoId === "number") {
-      body = { responsable: arg, empleado_id: empleadoId };
-    } else if (typeof arg === "string") {
-      body = { responsable: arg };
-    } else if (typeof empleadoId === "number") {
-      body = { empleado_id: empleadoId };
-    }
-    return http("POST", `${API}/${id}/reasignar/`, body);
-  },
-
-  // NUEVO: marcar tareas operativas de la solicitud (alta_compania / enviar_poliza)
+  // Marcar tareas operativas de la solicitud (alta_compania / enviar_poliza)
   /**
    * @param {number|string} id
    * @param {"alta"|"alta_compania"|"pendiente_alta"|"envio"|"enviar_poliza"|"pendiente_envio"} key
@@ -270,11 +187,7 @@ export const solicitudesApi = {
     const k = map[key] || key;
     const payload = { key: k, done: !!done };
 
-    // Intentamos acciones dedicadas
-    const candidates = [
-      `${API}/${id}/marcar_tarea/`,
-      `${API}/${id}/tareas/`,
-    ];
+    const candidates = [`${API}/${id}/marcar_tarea/`, `${API}/${id}/tareas/`];
     for (const url of candidates) {
       try {
         return await http("POST", url, payload);
@@ -282,42 +195,20 @@ export const solicitudesApi = {
         // probar siguiente
       }
     }
-
-    // Fallback: PATCH directo al campo booleano si existe
     if (k === "alta_compania" || k === "enviar_poliza") {
       return http("PATCH", `${API}/${id}/`, { [k]: !!done });
     }
-
-    // Último recurso: devolver shape mínimo para no romper UI
     return { id, [k]: !!done };
-  },
-
-  // Si seguís usando el endpoint del backend para el PNG:
-  async descargarComprobante(id, filename = "comprobante.png") {
-    const res = await http("GET", `${API}/${id}/comprobante_png/`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   },
 
   // -------- Documentos --------
   async listarDocs(solicitudId) {
-    const data = await http(
-      "GET",
-      `${DOCS}/?solicitud=${encodeURIComponent(solicitudId)}`
-    );
+    const data = await http("GET", `${DOCS}/?solicitud=${encodeURIComponent(solicitudId)}`);
     return unwrapList(data);
   },
 
   crearDoc(payload) {
-    // { solicitud, tipo, url, public_id, nombre, mime }
-    // admite FormData o JSON (http maneja ambos)
+    // { solicitud, tipo, url, public_id, nombre, mime } — admite FormData o JSON
     return http("POST", `${DOCS}/`, payload);
   },
 
@@ -340,14 +231,11 @@ export const solicitudesApi = {
     return unwrapList(data);
   },
 
-  // --- ABM Empleados ---
   crearEmpleado(body) {
-    // body: { nombre: string, activo?: boolean }
     return http("POST", `${EMP}/`, body);
   },
 
   actualizarEmpleado(id, body) {
-    // body: { nombre?: string, activo?: boolean }
     return http("PATCH", `${EMP}/${id}/`, body);
   },
 
@@ -362,10 +250,10 @@ export const solicitudesApi = {
    *
    * @param {number|string} id  ID de la solicitud
    * @param {{
-   * poliza_id:number|string,
-   * modo?:'copiar'|'mover',
-   * incluir?:{fotos?:string[], docs?:string[]},
-   * cliente?:{dni_frente?:boolean,dni_dorso?:boolean,pasaporte_frente?:boolean,pasaporte_dorso?:boolean}
+   *   poliza_id:number|string,
+   *   modo?:'copiar'|'mover',
+   *   incluir?:{fotos?:string[], docs?:string[]},
+   *   cliente?:{dni_frente?:boolean,dni_dorso?:boolean,pasaporte_frente?:boolean,pasaporte_dorso?:boolean}
    * }} params
    */
   asociarAPoliza(id, { poliza_id, modo = "copiar", incluir, cliente } = {}) {
@@ -373,24 +261,18 @@ export const solicitudesApi = {
 
     const payload = { poliza_id, modo };
 
-    // incluir: solo mando si hay arrays no vacíos
     if (incluir && (Array.isArray(incluir.fotos) || Array.isArray(incluir.docs))) {
       const inc = {};
-      if (Array.isArray(incluir.fotos) && incluir.fotos.length)
-        inc.fotos = incluir.fotos;
-      if (Array.isArray(incluir.docs) && incluir.docs.length)
-        inc.docs = incluir.docs;
+      if (Array.isArray(incluir.fotos) && incluir.fotos.length) inc.fotos = incluir.fotos;
+      if (Array.isArray(incluir.docs) && incluir.docs.length) inc.docs = incluir.docs;
       if (Object.keys(inc).length) payload.incluir = inc;
     }
 
-    // cliente: mando solo flags presentes (true/false)
     if (cliente && typeof cliente === "object") {
       const c = {};
-      ["dni_frente", "dni_dorso", "pasaporte_frente", "pasaporte_dorso"].forEach(
-        (k) => {
-          if (k in cliente) c[k] = !!cliente[k];
-        }
-      );
+      ["dni_frente", "dni_dorso", "pasaporte_frente", "pasaporte_dorso"].forEach((k) => {
+        if (k in cliente) c[k] = !!cliente[k];
+      });
       if (Object.keys(c).length) payload.cliente = c;
     }
 

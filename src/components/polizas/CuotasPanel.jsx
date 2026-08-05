@@ -4,14 +4,17 @@ import { useDispatch } from "react-redux";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import axios from "axios";
-import { HiX, HiShieldCheck, HiShieldExclamation } from "react-icons/hi";
+import { HiShieldCheck, HiShieldExclamation } from "react-icons/hi";
 
 import { pagarCuota } from "../../store/slices/polizasSlice";
 import CuotaInfoCard from "./CuotaInfoCard";
+import CardDuo from "../ui/CardDuo";
+import BarraProgreso from "../ui/BarraProgreso";
+import ModalDuo from "../ui/ModalDuo";
+import InputDuo from "../ui/InputDuo";
+import Boton3D from "../ui/Boton3D";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
-
-const CARD = "rounded-2xl border border-white/[0.06] bg-[#121829]";
 
 /* ═══════════════════════════════════════════════════════════════════
    ¿La póliza usa CUPONERA? (AMCA / Antártida / La Equidad)
@@ -196,28 +199,28 @@ export default function CuotasPanel({ poliza }) {
       {/* Cobertura real (hasta cuándo está cubierto) */}
       {coberturaResumen ? (
         <div
-          className={`flex items-center gap-3 rounded-2xl border p-4 ${
+          className={`flex items-center gap-3 rounded-2xl border-2 p-4 ${
             coberturaResumen.vigente
-              ? "border-emerald-500/30 bg-emerald-500/10"
-              : "border-rose-500/30 bg-rose-500/10"
+              ? "border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]"
+              : "border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]"
           }`}
         >
           {coberturaResumen.vigente ? (
-            <HiShieldCheck className="h-6 w-6 shrink-0 text-emerald-400" />
+            <HiShieldCheck className="h-6 w-6 shrink-0 text-duo-verde" />
           ) : (
-            <HiShieldExclamation className="h-6 w-6 shrink-0 text-rose-400" />
+            <HiShieldExclamation className="h-6 w-6 shrink-0 text-duo-rojo" />
           )}
           <div>
             <div
-              className={`text-[10px] uppercase tracking-wide font-bold ${
-                coberturaResumen.vigente ? "text-emerald-300/70" : "text-rose-300/70"
+              className={`text-[10px] font-black uppercase tracking-wide ${
+                coberturaResumen.vigente ? "text-duo-verde-sombra/70 dark:text-duo-verde/70" : "text-duo-rojo/70"
               }`}
             >
               {coberturaResumen.vigente ? "Cobertura vigente hasta" : "Cobertura vencida desde"}
             </div>
             <div
-              className={`text-lg font-bold ${
-                coberturaResumen.vigente ? "text-emerald-200" : "text-rose-200"
+              className={`text-lg font-black ${
+                coberturaResumen.vigente ? "text-duo-verde-sombra dark:text-duo-verde" : "text-duo-rojo"
               }`}
             >
               {fmtFecha(coberturaResumen.hasta)}
@@ -225,50 +228,40 @@ export default function CuotasPanel({ poliza }) {
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.06] bg-[#121829] p-4 text-sm text-slate-400">
+        <CardDuo className="p-4 text-sm font-bold text-suave dark:text-suave-dark">
           Sin pagos registrados todavía · no hay cobertura activa.
-        </div>
+        </CardDuo>
       )}
 
       {/* Progreso */}
-      <div>
-        <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
-          <span>{resumen.pagadas} de {resumen.total} pagadas</span>
-          <span>{progreso}%</span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
-          <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progreso}%` }} />
-        </div>
-      </div>
+      <BarraProgreso valor={progreso} label={`${resumen.pagadas} de ${resumen.total} pagadas`} />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2.5">
-        <div className={`${CARD} p-3 text-center`}>
-          <div className="text-lg font-semibold text-emerald-400">{resumen.pagadas}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Pagadas</div>
-        </div>
-        <div className={`${CARD} p-3 text-center`}>
-          <div className="text-lg font-semibold text-amber-400">{resumen.pendientes}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Pendientes</div>
-        </div>
-        <div className={`${CARD} p-3 text-center`}>
-          <div className="text-lg font-semibold text-rose-400">{resumen.vencidas}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Vencidas</div>
-        </div>
+        <CardDuo className="p-3 text-center">
+          <div className="text-lg font-black text-duo-verde-sombra dark:text-duo-verde">{resumen.pagadas}</div>
+          <div className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Pagadas</div>
+        </CardDuo>
+        <CardDuo className="p-3 text-center">
+          <div className="text-lg font-black text-duo-amarillo-sombra dark:text-duo-amarillo">{resumen.pendientes}</div>
+          <div className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Pendientes</div>
+        </CardDuo>
+        <CardDuo className="p-3 text-center">
+          <div className="text-lg font-black text-duo-rojo">{resumen.vencidas}</div>
+          <div className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Vencidas</div>
+        </CardDuo>
       </div>
 
       {/* Lista de cuotas */}
-      <div className={`${CARD} overflow-hidden divide-y divide-white/5`}>
+      <CardDuo className="overflow-hidden divide-y-2 divide-linea dark:divide-linea-dark">
         {cuotasOrdenadas.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">
+          <div className="p-8 text-center text-sm font-bold text-suave dark:text-suave-dark">
             Esta póliza no tiene cuotas registradas.
           </div>
         ) : (
           cuotasOrdenadas.map((c, i) => {
             // 🎯 Para AMCA/cuponera (usarPropio) la fecha límite de pago es la PROPIA;
             // para el resto (NRE, pago adelantado) es la de la cuota ANTERIOR.
-            // Se la inyectamos como fecha_limite_pago: utils/cuotas.js ya la prioriza
-            // (fechaLimitePago) sin que haya que tocar ese archivo compartido.
             const objetivo = fechaObjetivo(i, cuotasOrdenadas, usarPropio);
             const cuotaConLimite = {
               ...c,
@@ -290,59 +283,46 @@ export default function CuotasPanel({ poliza }) {
             );
           })
         )}
-      </div>
+      </CardDuo>
 
       {/* Modal: Cambiar fecha de vencimiento (cualquier cuota, pagada o no) */}
-      {modalFechaOpen && cuotaFechaSeleccionada && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center px-3">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={isSubmittingFecha ? undefined : cerrarModalFecha} />
-          <div className="relative z-[71] w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800 px-5 py-5 sm:px-6 sm:py-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <h3 className="text-base sm:text-lg font-bold text-white">Cambiar Vencimiento</h3>
-              <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-8 w-8 rounded-lg border flex items-center justify-center text-slate-300 bg-slate-700 hover:bg-slate-600 border-slate-600 cursor-pointer">
-                <HiX className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-300">
-                Cuota <span className="font-bold text-emerald-400">#{cuotaFechaSeleccionada.cuota_nro}</span>
-              </p>
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1">Nueva fecha</label>
-                <input
-                  type="date"
-                  value={nuevaFecha}
-                  onChange={(e) => setNuevaFecha(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl bg-slate-900 border border-slate-600 text-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                />
-              </div>
-              <label className="flex items-start gap-3 cursor-pointer mt-2 bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20">
-                <input
-                  type="checkbox"
-                  checked={ajustarSiguientes}
-                  onChange={(e) => setAjustarSiguientes(e.target.checked)}
-                  className="mt-1 accent-indigo-500 w-4 h-4"
-                />
-                <span className="text-sm text-indigo-200">
-                  Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).
-                </span>
-              </label>
-              <div className="mt-5 flex justify-end gap-2">
-                <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-10 px-4 rounded-xl border border-slate-600 bg-slate-700 text-sm text-white hover:bg-slate-600 cursor-pointer font-medium">
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleCambiarFecha}
-                  disabled={isSubmittingFecha || !nuevaFecha}
-                  className="h-10 px-4 rounded-xl border border-transparent bg-indigo-500 text-sm font-bold text-white hover:bg-indigo-400 flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-500/30"
-                >
-                  {isSubmittingFecha ? "Guardando..." : "Guardar cambios"}
-                </button>
-              </div>
-            </div>
-          </div>
+      <ModalDuo
+        isOpen={modalFechaOpen && !!cuotaFechaSeleccionada}
+        onClose={cerrarModalFecha}
+        title="Cambiar Vencimiento"
+        subtitle={cuotaFechaSeleccionada ? `Cuota #${cuotaFechaSeleccionada.cuota_nro}` : ""}
+        size="sm"
+        footer={
+          <>
+            <Boton3D variant="blanco" onClick={cerrarModalFecha} disabled={isSubmittingFecha} full>
+              Cancelar
+            </Boton3D>
+            <Boton3D variant="verde" onClick={handleCambiarFecha} disabled={isSubmittingFecha || !nuevaFecha} full>
+              {isSubmittingFecha ? "Guardando..." : "Guardar cambios"}
+            </Boton3D>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <InputDuo
+            type="date"
+            label="Nueva fecha"
+            value={nuevaFecha}
+            onChange={(e) => setNuevaFecha(e.target.value)}
+          />
+          <label className="flex items-start gap-3 cursor-pointer rounded-2xl border-2 border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3">
+            <input
+              type="checkbox"
+              checked={ajustarSiguientes}
+              onChange={(e) => setAjustarSiguientes(e.target.checked)}
+              className="mt-1 accent-duo-azul w-4 h-4"
+            />
+            <span className="text-sm font-bold text-duo-azul">
+              Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).
+            </span>
+          </label>
         </div>
-      )}
+      </ModalDuo>
     </div>
   );
 }

@@ -1,33 +1,31 @@
-// src/pages/BalancesPage.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+// src/pages/BalancesPage.jsx  (diseño Duo)
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlus } from "react-icons/fa";
 import { HiCog, HiOfficeBuilding } from "react-icons/hi";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import axios from "axios"; // 🚀 IMPORTAMOS AXIOS
+import axios from "axios";
 dayjs.locale("es");
 
-// 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
+// 🚀 CONTEXTO PARA SEGURIDAD (escudo de sucursal)
 import { useAuth } from "../context/AuthContext";
 
 import { fetchIngresos } from "../store/slices/ingresosSlice";
 import { fetchEgresos } from "../store/slices/egresosSlice";
 import { fetchBalanceDiario } from "../store/slices/balanceSlice";
 
-import IngresoCreateModal from "../components/balanzes/IngresoCreateModal";
-import EgresoCreateModal from "../components/balanzes/EgresoCreateModal";
-import IngresoTable from "../components/balanzes/IngresoTable";
-import EgresoTable from "../components/balanzes/EgresoTable";
-
-import DescargarBalanceDiarioButton from "../components/balanzes/DescargarBalanceDiarioButton";
-import BalanceChart from "../components/balanzes/BalanceChart";
-import BalanceExportPanel from "../components/balanzes/BalanceExportPanel";
-import HistorialPagosPanel from "../components/balanzes/HistorialPagosPanel";
-import HistorialIngresosPanel from "../components/balanzes/HistorialIngresosPanel";
-import HistorialEgresosPanel from "../components/balanzes/HistorialEgresosPanel";
-import TransferenciasPanel from "../components/balanzes/TransferenciasPanel";
+// 🚀 UN solo modal combinado para cargar ingreso O egreso (reemplaza a
+//    IngresoCreateModal + EgresoCreateModal).
+import MovimientoCreateModal from "../components/balanzes/MovimientoCreateModal";
 import BalanzesSettingsModal from "../components/balanzes/BalanzesSettingsModal";
+
+// 🚀 UNA sola tabla de movimientos (ingresos + egresos) con filtro de
+//    oficina + fechas + descarga (Excel/PDF) integrada.
+import MovimientosPanel from "../components/balanzes/MovimientosPanel";
+
+// 🚀 Gráfico Ingresos vs Egresos (diseño Duo, se adapta a claro/oscuro).
+import BalanceChart from "../components/balanzes/BalanceChart";
 
 /* -------------------- Helpers -------------------- */
 const toNumber = (v) => {
@@ -35,50 +33,49 @@ const toNumber = (v) => {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
+// 🚀 Sin decimales: $40.000 en vez de $40.000,00
 const fmtMoney = (n) =>
   (Number(n) || 0).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 
-/* 🚀 KPI card OPTIMIZADO — más legible: etiqueta tenue, número grande y claro */
-function KpiCard({ title, value, variant = "blue" }) {
-  const variants = {
-    green: "from-emerald-500/15 to-emerald-500/[0.04] border-emerald-500/30",
-    red: "from-rose-500/15 to-rose-500/[0.04] border-rose-500/30",
-    blue: "from-sky-500/15 to-sky-500/[0.04] border-sky-500/30",
-    amber: "from-amber-500/15 to-amber-500/[0.04] border-amber-500/30",
-  };
+/* 🚀 KPI card — etiqueta tenue, número grande (estilo Duo, cajas mejoradas) */
+const KPI_VARIANTS = {
+  green: "border-ingreso/30 bg-ingreso/[0.06]",
+  red: "border-egreso/30 bg-egreso/[0.06]",
+  blue: "border-oficina/30 bg-oficina/[0.06]",
+  amber: "border-tarjeta/30 bg-tarjeta/[0.06]",
+};
+const KpiCard = React.memo(function KpiCard({ title, value, variant = "blue" }) {
   return (
-    <div className={`bg-gradient-to-br ${variants[variant]} border px-4 py-3 rounded-2xl shadow-sm min-w-0 flex flex-col justify-center`}>
-      <h3 className="text-[10px] sm:text-[11px] uppercase tracking-wider text-zinc-400 truncate" title={title}>
+    <div className={`border-2 ${KPI_VARIANTS[variant]} px-4 py-4 rounded-2xl min-w-0 flex flex-col gap-1.5 justify-center`}>
+      <h3 className="text-[11px] font-black uppercase tracking-[0.08em] text-suave dark:text-suave-dark truncate" title={title}>
         {title}
       </h3>
-      <p className="text-lg sm:text-2xl font-black mt-1 tracking-tight text-zinc-50 truncate">
-        ${fmtMoney(value)}
+      <p className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-titulo dark:text-titulo-dark truncate">
+        <span className="text-lg sm:text-xl opacity-60 mr-0.5">$</span>{fmtMoney(value)}
       </p>
     </div>
   );
-}
+});
 
-/* 🚀 FILA DE KPIs (Admin) — reorganizada en 2 bloques con aire para no amontonar */
+/* 🚀 FILA DE KPIs (Admin) — 2 bloques: Ingresos / Egresos y resultado */
 const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
-  <div className={`rounded-2xl border shadow-sm overflow-hidden ${highlight ? "border-sky-500/40 bg-sky-500/[0.04]" : "border-zinc-800 bg-zinc-950/40"}`}>
-    {/* Encabezado de la sucursal: el (Día/Mes) se muestra UNA sola vez acá */}
-    <div className={`flex items-center gap-2 px-4 py-3 border-b ${highlight ? "border-sky-500/30" : "border-zinc-800/80"}`}>
+  <div className={`rounded-3xl border-2 overflow-hidden ${highlight ? "border-oficina/40 bg-oficina/[0.05]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"}`}>
+    <div className={`flex items-center gap-2 px-4 py-3 border-b-2 ${highlight ? "border-oficina/30" : "border-linea dark:border-linea-dark"}`}>
       <span className="text-base shrink-0">{highlight ? "🌍" : "🏢"}</span>
-      <h2 className={`text-sm font-bold tracking-wide truncate ${highlight ? "text-sky-300" : "text-zinc-200"}`}>
+      <h2 className={`text-sm font-black tracking-wide truncate ${highlight ? "text-oficina dark:text-oficina-claro" : "text-titulo dark:text-titulo-dark"}`}>
         {title}
       </h2>
-      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-zinc-500 shrink-0">
+      <span className="ml-auto text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark shrink-0">
         {suffix}
       </span>
     </div>
 
     <div className="p-4 space-y-4">
-      {/* Bloque 1: Ingresos */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80 mb-2">Ingresos</p>
+        <p className="text-[10px] font-black uppercase tracking-wider text-ingreso dark:text-ingreso-claro mb-2">Ingresos</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <KpiCard title="Total" value={metrics.tIn} variant="green" />
           <KpiCard title="Efectivo" value={metrics.tInEfe} variant="green" />
@@ -86,9 +83,8 @@ const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
         </div>
       </div>
 
-      {/* Bloque 2: Egresos y resultado */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Egresos y resultado</p>
+        <p className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-2">Egresos y resultado</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <KpiCard title="Egresos" value={metrics.tEg} variant="red" />
           <KpiCard title="Neto" value={metrics.tBal} variant="blue" />
@@ -99,16 +95,6 @@ const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
   </div>
 );
 
-const TABS = [
-  { id: "resumen",   label: "Resumen" },
-  { id: "grafico",   label: "Gráfico" },
-  { id: "detalle",   label: "Detalle" },
-  { id: "historial",         label: "📋 Historial de Pagos" },
-  { id: "hist_ingresos",     label: "💰 Historial de Ingresos" },
-  { id: "hist_egresos",      label: "💸 Historial de Egresos" },
-  { id: "transferencias",    label: "🏦 Transferencias" },
-];
-
 const BalancesPage = () => {
   const dispatch = useDispatch();
 
@@ -118,29 +104,26 @@ const BalancesPage = () => {
   const userOficina = user?.perfil?.oficina?.codigo || user?.perfil?.oficina?.id || user?.perfil?.oficina || "";
 
   const [oficinaSeleccionada, setOficinaSeleccionada] = useState("ALL");
-  const [adminTimeView, setAdminTimeView] = useState("dia"); 
+  const [adminTimeView, setAdminTimeView] = useState("dia");
 
   const { list: ingresos = [], status: ingresosStatus } = useSelector((s) => s.ingresos || {});
   const { list: egresos = [], status: egresosStatus } = useSelector((s) => s.egresos || {});
-  
+
   const balanceState = useSelector((s) => s.balance || {});
   const balanceData = balanceState?.data;
   const balanceStatus = balanceState?.status;
 
-  // 🚀 ESTADO LOCAL PARA GARANTIZAR QUE CARGUEN LAS OFICINAS
+  // 🚀 Lista de oficinas (solo admin) para el filtro
   const [oficinasAdmin, setOficinasAdmin] = useState([]);
 
   useEffect(() => {
-    // 🚀 PEDIMOS LA LISTA OFICIAL A LA BASE DE DATOS SI ES ADMIN
     if (isWebAdmin) {
       const token = localStorage.getItem("access_token");
       const baseURL = import.meta.env.VITE_API_URL;
-      
       axios.get(`${baseURL}usuarios/oficinas/`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => {
-        // Axios puede devolver { results: [...] } si hay paginación, o el array directo
         const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
         setOficinasAdmin(data);
       })
@@ -149,32 +132,30 @@ const BalancesPage = () => {
   }, [isWebAdmin]);
 
   const [fecha, setFecha] = useState(() => dayjs().format("YYYY-MM-DD"));
-  const [activeTab, setActiveTab] = useState("resumen");
-  const [resumenMovTab, setResumenMovTab] = useState("ingresos");
-  
-  const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
-  const [modalEgresoAbierto, setModalEgresoAbierto] = useState(false);
+  // 🚀 Un solo estado: "INGRESO" | "EGRESO" | null (cuál modal está abierto).
+  const [modalTipo, setModalTipo] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [chartYear, setChartYear] = useState(() => dayjs().year());
-  const [chartMonth, setChartMonth] = useState("all"); 
+  // 🚀 Vista activa: "resumen" (KPIs) o "movimientos" (la tabla). Abre en Movimientos.
+  const [vista, setVista] = useState("movimientos");
 
-  // REFRESCO TOTAL
+  // REFRESCO A (siempre): KPIs del día
   useEffect(() => {
     const ofi = isWebAdmin ? oficinaSeleccionada : userOficina;
-    // Primer y último día del mes actual para traer todo el mes
-    const desde = dayjs().startOf("month").format("YYYY-MM-DD");
-    const hasta  = dayjs().endOf("month").format("YYYY-MM-DD");
     dispatch(fetchBalanceDiario({ fecha, oficina: ofi }));
-    dispatch(fetchIngresos({ oficina: ofi, desde, hasta, page_size: 500 }));
-    dispatch(fetchEgresos({  oficina: ofi, desde, hasta, page_size: 500 }));
   }, [dispatch, fecha, oficinaSeleccionada, isWebAdmin, userOficina]);
 
-  const hoy = useMemo(() => dayjs(), []);
-  const mesActual = hoy.month();
-  const anioActual = hoy.year();
+  // REFRESCO B (solo Vista Mensual del admin): totales del mes (1000 registros)
+  useEffect(() => {
+    if (!isWebAdmin || adminTimeView !== "mes") return;
+    const ofi = isWebAdmin ? oficinaSeleccionada : userOficina;
+    const desde = dayjs(fecha).startOf("month").format("YYYY-MM-DD");
+    const hasta  = dayjs(fecha).endOf("month").format("YYYY-MM-DD");
+    dispatch(fetchIngresos({ oficina: ofi, desde, hasta, page_size: 500 }));
+    dispatch(fetchEgresos({  oficina: ofi, desde, hasta, page_size: 500 }));
+  }, [dispatch, isWebAdmin, adminTimeView, oficinaSeleccionada, fecha, userOficina]);
 
-  // El backend ya filtra por mes (fecha__gte/lte), solo aplicamos filtro de oficina
+  // El backend ya filtra por mes; acá solo aplicamos el filtro de oficina
   const ingresosMensuales = useMemo(() =>
     ingresos.filter((i) => {
       if (!isWebAdmin) return true;
@@ -192,7 +173,7 @@ const BalancesPage = () => {
   );
 
   // ==========================================
-  // 🚀 FUNCIÓN MÁGICA: Extrae métricas Día/Mes por Oficina
+  // 🚀 Métricas Día/Mes por Oficina (para los KPIs)
   // ==========================================
   const getMetrics = useCallback((ofiCode, timeView) => {
     if (timeView === "dia") {
@@ -228,87 +209,72 @@ const BalancesPage = () => {
     }
   }, [balanceData, ingresosMensuales, egresosMensuales]);
 
+  // 🚀 Memo de métricas por oficina (evita recalcular getMetrics en cada render)
+  const metricsPorOficina = useMemo(() => {
+    const map = {
+      ALL: getMetrics("ALL", adminTimeView),
+      _sin: getMetrics(null, adminTimeView),
+    };
+    (balanceData?.por_oficina || []).forEach((ofi) => {
+      map[ofi.scope.oficina] = getMetrics(ofi.scope.oficina, adminTimeView);
+    });
+    return map;
+  }, [getMetrics, adminTimeView, balanceData]);
+
   const suffix = adminTimeView === "dia" ? "(Día)" : "(Mes)";
   const cargando = ingresosStatus === "loading" || egresosStatus === "loading" || balanceStatus === "loading";
 
-  // 🚀 MÉTRICAS PARA EL EMPLEADO (Solo del Día)
+  // 🚀 Etiqueta legible de la fecha/periodo activo (solo texto visible, no cambia la lógica)
+  const fechaLabelDia = dayjs(fecha).format("DD/MM/YYYY");
+  const fechaLabelMes = dayjs(fecha).format("MMMM YYYY");
+  const periodoActivo = adminTimeView === "mes" ? fechaLabelMes : fechaLabelDia;
+
+  // 🚀 Métricas del empleado común (solo del día)
   const empMetricsDia = getMetrics("ALL", "dia");
 
-  const yearsOptions = useMemo(() => {
-    const yearsSet = new Set();
-    [...ingresos, ...egresos].forEach((item) => {
-      if (!item.fecha) return;
-      const y = dayjs(item.fecha).year();
-      if (Number.isFinite(y)) yearsSet.add(y);
-    });
-    if (yearsSet.size === 0) yearsSet.add(anioActual);
-    return Array.from(yearsSet).sort();
-  }, [ingresos, egresos, anioActual]);
-
-  const ingresosPreview = useMemo(() => ingresosMensuales.slice(0, 20), [ingresosMensuales]);
-  const egresosPreview = useMemo(() => egresosMensuales.slice(0, 20), [egresosMensuales]);
-
-  const ingresosChart = useMemo(() => ingresosMensuales.filter((i) => {
-      if (!i.fecha) return false;
-      const d = dayjs(i.fecha);
-      if (chartYear && d.year() !== chartYear) return false;
-      if (chartMonth !== "all" && d.month() + 1 !== Number(chartMonth)) return false;
-      return true;
-  }), [ingresosMensuales, chartYear, chartMonth]);
-
-  const egresosChart = useMemo(() => egresosMensuales.filter((e) => {
-      if (!e.fecha) return false;
-      const d = dayjs(e.fecha);
-      if (chartYear && d.year() !== chartYear) return false;
-      if (chartMonth !== "all" && d.month() + 1 !== Number(chartMonth)) return false;
-      return true;
-  }), [egresosMensuales, chartYear, chartMonth]);
-
   return (
-    <div className="p-3 sm:p-4 md:p-6 pb-10 text-zinc-50 max-w-7xl mx-auto w-full overflow-x-hidden">
-      {/* Header Adaptable */}
+    <div className="p-3 sm:p-4 md:p-6 pb-10 text-titulo dark:text-titulo-dark max-w-7xl mx-auto w-full overflow-x-hidden">
+      {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-4">
         <div className="min-w-0">
-          <p className="text-[11px] sm:text-xs tracking-[0.18em] uppercase text-zinc-500 mb-1 flex items-center gap-2 truncate">
-            Balance diario
+          <p className="text-[11px] sm:text-xs font-black tracking-[0.18em] uppercase text-suave dark:text-suave-dark mb-1 flex items-center gap-2 truncate">
+            Balance
             {!isWebAdmin && (
-              <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-widest truncate">
-                <HiOfficeBuilding className="shrink-0" /> <span className="truncate">{user?.perfil?.oficina_nombre || `Oficina ${userOficina}`}</span>
+              <span className="inline-flex items-center gap-1 bg-ingreso/10 text-ingreso dark:text-ingreso-claro border-2 border-ingreso/30 px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest truncate">
+                <HiOfficeBuilding className="shrink-0" /> <span className="truncate">{user?.perfil?.oficina_nombre || `Sucursal ${userOficina}`}</span>
               </span>
             )}
           </p>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight truncate">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight truncate text-titulo dark:text-titulo-dark">
             Resumen de balances
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1 truncate">
-            Visualizando datos del:{" "}
-            <strong className="text-zinc-100">
+          <p className="text-xs sm:text-sm font-bold text-suave dark:text-suave-dark mt-1 truncate">
+            Caja del día:{" "}
+            <strong className="text-titulo dark:text-titulo-dark font-black">
               {dayjs(fecha).format("DD [de] MMMM YYYY")}
             </strong>
           </p>
           {cargando ? (
-            <p className="text-[11px] mt-1 text-sky-400 font-semibold animate-pulse">
+            <p className="text-[11px] mt-1 text-oficina dark:text-oficina-claro font-black animate-pulse">
               Actualizando caja...
             </p>
           ) : null}
         </div>
 
-        {/* Filtro + acciones */}
+        {/* Filtro de oficina + fecha del resumen + acciones */}
         <div className="w-full xl:w-auto flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
-            
             {isWebAdmin && (
-              <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-2xl px-3 py-2 w-full sm:w-auto min-w-0">
-                <HiOfficeBuilding className="text-zinc-400 shrink-0" />
+              <div className="flex items-center gap-2 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl px-3 py-2 w-full sm:w-auto min-w-0 focus-within:border-oficina transition-colors">
+                <HiOfficeBuilding className="text-suave dark:text-suave-dark shrink-0" />
                 <select
                   value={oficinaSeleccionada}
                   onChange={(e) => setOficinaSeleccionada(e.target.value)}
-                  className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-zinc-50 border-none focus:ring-0 p-0 cursor-pointer outline-none truncate"
+                  className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm font-bold text-titulo dark:text-titulo-dark border-none focus:ring-0 p-0 cursor-pointer outline-none truncate dark:[color-scheme:dark]"
                 >
-                  <option value="ALL" className="bg-zinc-900 text-zinc-100">Todas las cajas</option>
-                  {/* 🚀 Opciones dinámicas cargadas con Axios directamente */}
+                  <option value="ALL">Todas las sucursales</option>
                   {oficinasAdmin.map(ofi => (
-                    <option key={ofi.id} value={ofi.id} className="bg-zinc-900 text-zinc-100">
+                    <option key={ofi.id} value={ofi.id}>
                       {ofi.nombre}
                     </option>
                   ))}
@@ -316,425 +282,188 @@ const BalancesPage = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-2xl px-3 py-2 w-full sm:w-auto min-w-0">
-              <span className="text-[11px] sm:text-xs text-zinc-400 shrink-0">Fecha</span>
+            <div className="flex items-center gap-2 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl px-3 py-2 w-full sm:w-auto min-w-0 focus-within:border-oficina transition-colors">
+              <span className="text-[11px] sm:text-xs font-black text-suave dark:text-suave-dark shrink-0">Fecha</span>
               <input
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
-                className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-zinc-50 border border-zinc-800 rounded-xl px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                className="flex-1 min-w-0 bg-surface dark:bg-surface-dark text-xs sm:text-sm font-bold text-titulo dark:text-titulo-dark border-2 border-linea dark:border-linea-dark rounded-xl px-2 py-1 focus:outline-none focus:border-oficina dark:[color-scheme:dark]"
               />
               <button
                 type="button"
                 onClick={() => setFecha(dayjs().format("YYYY-MM-DD"))}
-                className="text-[10px] sm:text-xs font-semibold text-sky-300 hover:text-sky-200 px-2 py-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 transition shrink-0"
+                className="text-[10px] sm:text-xs font-black text-oficina dark:text-oficina-claro hover:text-oficina-fuerte px-2 py-1 rounded-xl border-2 border-oficina/30 bg-oficina/10 hover:bg-oficina/20 transition shrink-0"
               >
                 Hoy
               </button>
             </div>
-          </div>
 
-          {isWebAdmin && (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-none">
-                <DescargarBalanceDiarioButton 
-                  fecha={fecha} 
-                  oficina={oficinaSeleccionada === "ALL" ? "" : oficinaSeleccionada} 
-                />
-              </div>
+            {isWebAdmin && (
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 title="Configuración de Categorías"
-                className="inline-flex items-center justify-center w-10 h-10 shrink-0 rounded-2xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 transition"
+                className="inline-flex items-center justify-center w-10 h-10 shrink-0 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-oficina/10 hover:border-oficina text-suave dark:text-suave-dark hover:text-oficina dark:hover:text-oficina-claro transition"
               >
                 <HiCog className="text-xl" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 🚀 Acceso rápido: cargar ingreso/egreso (siempre visible) */}
+      {/* Botones de carga rápida (siempre visibles) — 3D Duo */}
       <div className="flex flex-col sm:flex-row gap-2 mb-5">
         <button
           type="button"
-          onClick={() => setModalIngresoAbierto(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-sm"
+          onClick={() => setModalTipo("INGRESO")}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-ingreso border-2 border-ingreso shadow-[0_5px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 transition-all"
         >
           <FaPlus /> Nuevo ingreso
         </button>
         <button
           type="button"
-          onClick={() => setModalEgresoAbierto(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white bg-rose-600 hover:bg-rose-500 transition shadow-sm"
+          onClick={() => setModalTipo("EGRESO")}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-egreso border-2 border-egreso shadow-[0_5px_0_var(--color-egreso-fuerte)] active:shadow-[0_0_0_var(--color-egreso-fuerte)] active:translate-y-0.5 transition-all"
         >
           <FaPlus /> Nuevo egreso
         </button>
       </div>
 
-      {/* Tabs principales */}
-      <div className="mt-2 mb-5 border-b border-zinc-800 flex flex-wrap justify-between items-end gap-y-2">
-        <div className="flex flex-wrap gap-2 pb-1">
-          {TABS.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap px-3 sm:px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-semibold transition border ${active ? "bg-zinc-950 border-zinc-700 text-white" : "bg-zinc-900 border-transparent text-zinc-400 hover:bg-zinc-900/80 hover:text-white"}`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 🚀 TOGGLE DE DÍA/MES (Solo Admin) */}
-        {isWebAdmin && activeTab === "resumen" && (
-          <div className="hidden sm:flex bg-zinc-950 border border-zinc-800 rounded-xl p-1 mb-1 shadow-sm">
+      {/* ===================== SELECTOR DE VISTA ===================== */}
+      <div className="mb-5 border-b-2 border-linea dark:border-linea-dark flex flex-wrap gap-2 pb-1">
+        {[
+          { id: "movimientos", label: "💰 Movimientos" },
+          { id: "resumen", label: "📊 Resumen" },
+        ].map((tab) => {
+          const active = vista === tab.id;
+          return (
             <button
-              onClick={() => setAdminTimeView("dia")}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "dia" ? "bg-sky-500/20 text-sky-400" : "text-zinc-400 hover:text-zinc-200"}`}
+              key={tab.id}
+              type="button"
+              onClick={() => setVista(tab.id)}
+              className={`whitespace-nowrap px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-black transition border-2 border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
             >
-              Diario
+              {tab.label}
             </button>
-            <button
-              onClick={() => setAdminTimeView("mes")}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "mes" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-400 hover:text-zinc-200"}`}
-            >
-              Mensual
-            </button>
-          </div>
-        )}
+          );
+        })}
       </div>
 
-      {/* TAB: Resumen */}
-      {activeTab === "resumen" && (
-        <section className="space-y-6">
-          
-          {/* Toggle Día/Mes para mobile (Admin) */}
-          {isWebAdmin && (
-            <div className="sm:hidden flex bg-zinc-950 border border-zinc-800 rounded-xl p-1 shadow-sm">
-              <button
-                onClick={() => setAdminTimeView("dia")}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "dia" ? "bg-sky-500/20 text-sky-400" : "text-zinc-400 hover:text-zinc-200"}`}
-              >
-                Vista Diaria
-              </button>
-              <button
-                onClick={() => setAdminTimeView("mes")}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${adminTimeView === "mes" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-400 hover:text-zinc-200"}`}
-              >
-                Vista Mensual
-              </button>
-            </div>
-          )}
-
-          {/* 🚀 TARJETAS KPI (Diferenciadas por ROL) */}
+      {/* ===================== RESUMEN (KPIs) ===================== */}
+      {vista === "resumen" && (
+      <section className="space-y-6">
+        {/* Encabezado del resumen + periodo activo visible junto a los KPIs */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Toggle Día/Mes (Solo Admin) */}
           {isWebAdmin ? (
-            <div className="space-y-5">
-              {oficinaSeleccionada === "ALL" ? (
-                <>
-                  <KpiRowGroup 
-                    title="Caja General (Todas las Sucursales)" 
-                    metrics={getMetrics("ALL", adminTimeView)} 
-                    suffix={suffix} 
-                    highlight={true} 
-                  />
-                  {/* Se mapea balanceData para dibujar las KPI cards dinámicas */}
-                  {balanceData?.por_oficina?.map(ofi => (
-                    <KpiRowGroup 
-                      key={ofi.scope.oficina}
-                      title={`Sucursal: ${ofi.scope.oficina_nombre}`} 
-                      metrics={getMetrics(ofi.scope.oficina, adminTimeView)} 
-                      suffix={suffix} 
-                    />
-                  ))}
-                  {balanceData?.sin_oficina && (
-                    <KpiRowGroup 
-                      title="Sin Sucursal Asignada" 
-                      metrics={getMetrics(null, adminTimeView)} 
-                      suffix={suffix} 
-                    />
-                  )}
-                </>
-              ) : (
-                <KpiRowGroup 
-                  title="Sucursal Seleccionada" 
-                  metrics={getMetrics("ALL", adminTimeView)} 
-                  suffix={suffix} 
-                  highlight={true}
-                />
-              )}
+            <div className="min-w-0">
+              <div className="flex bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-1 w-full sm:w-auto sm:inline-flex">
+                <button
+                  onClick={() => setAdminTimeView("dia")}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-black rounded-xl transition-all ${adminTimeView === "dia" ? "bg-oficina text-white shadow-[0_3px_0_var(--color-oficina-fuerte)]" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                >
+                  Vista Diaria
+                </button>
+                <button
+                  onClick={() => setAdminTimeView("mes")}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-black rounded-xl transition-all ${adminTimeView === "mes" ? "bg-ingreso text-white shadow-[0_3px_0_var(--color-ingreso-fuerte)]" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                >
+                  Vista Mensual
+                </button>
+              </div>
+              {/* Aclaración de qué muestra cada vista */}
+              <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-1.5">
+                {adminTimeView === "dia"
+                  ? "Vista Diaria: totales de la fecha seleccionada."
+                  : "Vista Mensual: acumulado del mes de la fecha seleccionada."}
+              </p>
             </div>
           ) : (
-            // 🚀 VISTA EMPLEADO COMÚN (Sin Caja Chica)
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              <KpiCard title="Neto Total (Día)" value={empMetricsDia.tBal} variant="blue" />
-              <KpiCard title="Ingreso Efectivo (Día)" value={empMetricsDia.tInEfe} variant="green" />
-              <KpiCard title="Ingreso Transf. (Día)" value={empMetricsDia.tInTransf} variant="green" />
-            </div>
+            <span />
           )}
 
-          {/* Acciones rápidas */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4">
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => setModalIngresoAbierto(true)}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-500 text-white px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold hover:bg-emerald-600 active:scale-[0.99]"
-              >
-                <FaPlus size={12} /> Nuevo ingreso
-              </button>
-              <button
-                onClick={() => setModalEgresoAbierto(true)}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-rose-500 text-white px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold hover:bg-rose-600 active:scale-[0.99]"
-              >
-                <FaPlus size={12} /> Nuevo egreso
-              </button>
-            </div>
-          </div>
-
-          {/* Sub-tabs de movimientos */}
-          <section className="space-y-3 pt-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-col gap-1 min-w-0">
-                <h2 className="text-sm md:text-base font-semibold truncate">
-                  Movimientos del mes (primeros 20)
-                </h2>
-                <div className="flex gap-1 bg-zinc-950 border border-zinc-800 rounded-full p-1 text-[11px] sm:text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setResumenMovTab("ingresos")}
-                    className={`flex-1 px-3 py-1 rounded-full transition truncate ${
-                      resumenMovTab === "ingresos" ? "bg-zinc-100 text-zinc-900 font-semibold" : "text-zinc-300 hover:text-white"
-                    }`}
-                  >
-                    Ingresos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResumenMovTab("egresos")}
-                    className={`flex-1 px-3 py-1 rounded-full transition truncate ${
-                      resumenMovTab === "egresos" ? "bg-zinc-100 text-zinc-900 font-semibold" : "text-zinc-300 hover:text-white"
-                    }`}
-                  >
-                    Egresos
-                  </button>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab("detalle")}
-                className="text-[11px] sm:text-xs md:text-sm text-sky-300 hover:text-sky-200 underline-offset-2 hover:underline whitespace-nowrap shrink-0"
-              >
-                Ver detalle
-              </button>
-            </div>
-
-            <div className="-mx-2 md:mx-0">
-              {resumenMovTab === "ingresos" && (
-                <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-3 sm:p-4 overflow-x-auto">
-                  <h3 className="text-[11px] sm:text-xs font-semibold mb-2 text-emerald-300 uppercase tracking-wide">
-                    Ingresos del mes (primeros 20)
-                  </h3>
-                  <IngresoTable ingresos={ingresosPreview} />
-                </div>
-              )}
-              {resumenMovTab === "egresos" && (
-                <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-3 sm:p-4 overflow-x-auto">
-                  <h3 className="text-[11px] sm:text-xs font-semibold mb-2 text-rose-300 uppercase tracking-wide">
-                    Egresos del mes (primeros 20)
-                  </h3>
-                  <EgresoTable egresos={egresosPreview} />
-                </div>
-              )}
-            </div>
-          </section>
-        </section>
-      )}
-
-      {/* TAB: Gráfico */}
-      {activeTab === "grafico" && (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] sm:text-xs text-zinc-400">Año</span>
-              <select
-                value={chartYear}
-                onChange={(e) => setChartYear(Number(e.target.value))}
-                className="bg-zinc-950 border border-zinc-800 text-[11px] sm:text-xs rounded-xl px-2 py-1 text-zinc-50 focus:outline-none focus:ring-1 focus:ring-sky-400"
-              >
-                {yearsOptions.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] sm:text-xs text-zinc-400">Mes</span>
-              <select
-                value={chartMonth}
-                onChange={(e) => setChartMonth(e.target.value)}
-                className="bg-zinc-950 border border-zinc-800 text-[11px] sm:text-xs rounded-xl px-2 py-1 text-zinc-50 focus:outline-none focus:ring-1 focus:ring-sky-400"
-              >
-                <option value="all">Todos</option>
-                {Array.from({ length: 12 }).map((_, idx) => {
-                  const m = idx + 1;
-                  return (
-                    <option key={m} value={m}>
-                      {dayjs().month(idx).format("MMMM")}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          </div>
-
-          <div className="-mx-2 sm:mx-0">
-            <BalanceChart ingresos={ingresosChart} egresos={egresosChart} className="w-full" />
-          </div>
-          <p className="text-[11px] sm:text-xs text-zinc-400">
-            Filtrá por año y mes para analizar cómo se comportan tus ingresos y
-            egresos. Para ver el detalle por movimiento, usá la pestaña
-            &quot;Detalle&quot;.
+          {/* Fecha / periodo que se está mostrando */}
+          <p className="text-xs font-bold text-suave dark:text-suave-dark shrink-0">
+            Mostrando:{" "}
+            <strong className="text-titulo dark:text-titulo-dark font-black">
+              {periodoActivo}
+            </strong>{" "}
+            <span className="uppercase tracking-wider text-[10px] font-black">
+              {suffix}
+            </span>
           </p>
-        </section>
-      )}
+        </div>
 
-      {/* TAB: Detalle */}
-      {activeTab === "detalle" && (
-        <section className="space-y-6">
-          {/* Vista simplificada para CELULAR */}
-          <div className="md:hidden space-y-4">
-            <div className="grid grid-cols-1 gap-3">
-              <div className="bg-emerald-600 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Ingresos del Día</h3>
-                <p className="text-2xl font-extrabold mt-1 truncate">
-                  ${fmtMoney(empMetricsDia.tIn)}
-                </p>
-              </div>
-              <div className="bg-rose-600 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Egresos del Día</h3>
-                <p className="text-2xl font-extrabold mt-1 truncate">
-                  ${fmtMoney(empMetricsDia.tEg)}
-                </p>
-              </div>
-              <div className="bg-sky-600/40 border border-sky-400/50 text-white p-3 rounded-2xl shadow-sm min-w-0">
-                <h3 className="text-xs opacity-90 truncate">Resultado del Día</h3>
-                <p
-                  className={`text-2xl font-extrabold mt-1 truncate ${
-                    empMetricsDia.tBal >= 0
-                      ? "text-sky-50"
-                      : "text-rose-100"
-                  }`}
-                >
-                  ${fmtMoney(empMetricsDia.tBal)}
-                </p>
-              </div>
-            </div>
-
-            {/* Listados resumidos */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Movimientos principales (vista móvil)</h3>
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-300">Ingresos (primeros 10)</p>
-                <ul className="space-y-1 text-xs">
-                  {ingresosMensuales.slice(0, 10).map((i) => (
-                    <li key={i.id} className="flex justify-between items-center gap-2 bg-zinc-950 rounded-xl px-2 py-1.5 min-w-0">
-                      <span className="truncate flex-1">{i.descripcion || "Ingreso"}</span>
-                      <span className="font-semibold shrink-0">${fmtMoney(i.monto)}</span>
-                    </li>
-                  ))}
-                  {ingresosMensuales.length === 0 && (
-                    <li className="text-zinc-400 text-xs">No hay ingresos este mes.</li>
-                  )}
-                </ul>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-300">Egresos (primeros 10)</p>
-                <ul className="space-y-1 text-xs">
-                  {egresosMensuales.slice(0, 10).map((e) => (
-                    <li key={e.id} className="flex justify-between items-center gap-2 bg-zinc-950 rounded-xl px-2 py-1.5 min-w-0">
-                      <span className="truncate flex-1">{e.descripcion || "Egreso"}</span>
-                      <span className="font-semibold shrink-0">${fmtMoney(e.monto)}</span>
-                    </li>
-                  ))}
-                  {egresosMensuales.length === 0 && (
-                    <li className="text-zinc-400 text-xs">No hay egresos este mes.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-zinc-500">
-              Para ver el detalle completo con todas las columnas y exportar el
-              Excel, usá la versión de escritorio.
-            </p>
-          </div>
-
-          {/* Vista completa SOLO DESKTOP */}
-          <div className="hidden md:block space-y-6">
-            <div className="-mx-2 sm:mx-0">
-              <BalanceExportPanel
-                ingresos={ingresosMensuales}
-                egresos={egresosMensuales}
-                mes={dayjs(fecha).format("YYYY-MM")}
-                oficina={isWebAdmin ? oficinaSeleccionada : userOficina}
-                fileName={`Reporte_Mensual_${dayjs(fecha).format("YYYY-MM")}.xlsx`}
-                className="w-full"
+        {/* Tarjetas KPI (según ROL) */}
+        {isWebAdmin ? (
+          <div className="space-y-5">
+            {oficinaSeleccionada === "ALL" ? (
+              <>
+                <KpiRowGroup
+                  title="Caja General (Todas las Sucursales)"
+                  metrics={metricsPorOficina.ALL}
+                  suffix={suffix}
+                  highlight={true}
+                />
+                {balanceData?.por_oficina?.map(ofi => (
+                  <KpiRowGroup
+                    key={ofi.scope.oficina}
+                    title={`Sucursal: ${ofi.scope.oficina_nombre}`}
+                    metrics={metricsPorOficina[ofi.scope.oficina]}
+                    suffix={suffix}
+                  />
+                ))}
+                {balanceData?.sin_oficina && (
+                  <KpiRowGroup
+                    title="Sin Sucursal Asignada"
+                    metrics={metricsPorOficina._sin}
+                    suffix={suffix}
+                  />
+                )}
+              </>
+            ) : (
+              <KpiRowGroup
+                title="Sucursal Seleccionada"
+                metrics={metricsPorOficina.ALL}
+                suffix={suffix}
+                highlight={true}
               />
-            </div>
-
-            <section className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">Ingresos del mes</h2>
-              </div>
-              <div className="-mx-4 md:mx-0 overflow-x-auto">
-                <IngresoTable ingresos={ingresosMensuales} />
-              </div>
-
-              <div className="mt-4">
-                <h2 className="text-lg font-semibold mb-2">Egresos del mes</h2>
-              </div>
-              <div className="-mx-4 md:mx-0 overflow-x-auto">
-                <EgresoTable egresos={egresosMensuales} />
-              </div>
-            </section>
+            )}
           </div>
-        </section>
+        ) : (
+          // Vista empleado común (sin Caja Chica)
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <KpiCard title="Neto Total (Día)" value={empMetricsDia.tBal} variant="blue" />
+            <KpiCard title="Ingreso Efectivo (Día)" value={empMetricsDia.tInEfe} variant="green" />
+            <KpiCard title="Ingreso Transf. (Día)" value={empMetricsDia.tInTransf} variant="green" />
+          </div>
+        )}
+
+        {/* 🚀 Gráfico Ingresos vs Egresos (nuevo UI Duo) */}
+        <BalanceChart ingresos={ingresosMensuales} egresos={egresosMensuales} />
+      </section>
       )}
 
-      {/* ── Tab: Historial de Pagos ── */}
-      {activeTab === "historial" && (
-        <section className="mt-2">
-          <HistorialPagosPanel oficinasAdmin={oficinasAdmin} oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina} />
-        </section>
-      )}
-
-      {/* ── Tab: Historial de Ingresos ── */}
-      {activeTab === "hist_ingresos" && (
-        <section className="mt-2">
-          <HistorialIngresosPanel oficinasAdmin={oficinasAdmin} oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina} />
-        </section>
-      )}
-
-      {/* ── Tab: Historial de Egresos ── */}
-      {activeTab === "hist_egresos" && (
-        <section className="mt-2">
-          <HistorialEgresosPanel oficinasAdmin={oficinasAdmin} oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina} />
-        </section>
-      )}
-
-      {activeTab === "transferencias" && (
-        <section className="mt-2">
-          <TransferenciasPanel />
-        </section>
+      {/* ============ MOVIMIENTOS (tabla única + filtro fechas + descarga) ============ */}
+      {vista === "movimientos" && (
+      <section className="mt-2">
+        <MovimientosPanel
+          oficinasAdmin={oficinasAdmin}
+          oficinaProp={isWebAdmin ? oficinaSeleccionada : userOficina}
+          fechaInicial={fecha}
+          modoInicial={isWebAdmin ? adminTimeView : "dia"}
+        />
+      </section>
       )}
 
       {/* Modales */}
-      <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={() => setModalIngresoAbierto(false)} />
-      <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={() => setModalEgresoAbierto(false)} />
+      <MovimientoCreateModal
+        isOpen={modalTipo !== null}
+        tipoInicial={modalTipo || "INGRESO"}
+        onClose={() => setModalTipo(null)}
+      />
       <BalanzesSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );

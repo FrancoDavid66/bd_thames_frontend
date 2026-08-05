@@ -1,4 +1,4 @@
-// src/components/estadisticas/EstadisticasFilters.jsx
+// src/components/estadisticas/EstadisticasFilters.jsx  (diseño Duo)
 import { useEffect, useState } from "react";
 import AnimatedCard from "./AnimatedCard";
 import { HiOfficeBuilding, HiCalendar, HiChartBar } from "react-icons/hi";
@@ -20,6 +20,11 @@ const sortOficinas = (arr, getOficinaNombre) => {
   });
 };
 
+const fieldCls =
+  "h-11 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-sm font-bold px-2.5 text-titulo dark:text-titulo-dark focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]";
+const labelCls =
+  "text-xs font-black text-titulo dark:text-titulo-dark flex items-center gap-1.5";
+
 export default function EstadisticasFilters({
   oficina,
   setOficina,
@@ -36,7 +41,7 @@ export default function EstadisticasFilters({
 }) {
   const raw = Array.isArray(oficinasOptions) ? oficinasOptions : [];
   const unique = Array.from(new Set(raw.map((x) => String(x ?? "").trim()).filter(Boolean)));
-  
+
   const ordered = sortOficinas(unique, getOficinaNombre);
 
   const currentYear = new Date().getFullYear();
@@ -76,16 +81,16 @@ export default function EstadisticasFilters({
   };
 
   return (
-    <AnimatedCard index={1} interactive={false} glow="from-emerald-500/40 via-cyan-500/25 to-transparent">
+    <AnimatedCard index={1} interactive={false}>
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {/* Oficina */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-            <HiOfficeBuilding className="text-sky-300" />
+        <div className="flex flex-col gap-1.5">
+          <label className={labelCls}>
+            <HiOfficeBuilding className="text-oficina" />
             Oficina
           </label>
           <select
-            className="h-9 rounded-lg bg-slate-950 border border-slate-700 text-xs sm:text-sm px-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className={fieldCls}
             value={String(oficina ?? "")}
             onChange={(e) => setOficina(String(e.target.value))}
           >
@@ -94,7 +99,7 @@ export default function EstadisticasFilters({
             {ordered.map((of) => {
               // 🚀 ACÁ CONVERTIMOS EL ID AL NOMBRE REAL DE LA DB
               const label = typeof getOficinaNombre === "function" ? getOficinaNombre(of) : of;
-              
+
               return (
                 <option key={of} value={of}>
                   {label}
@@ -105,9 +110,9 @@ export default function EstadisticasFilters({
         </div>
 
         {/* Año */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-            <HiCalendar className="text-sky-300" />
+        <div className="flex flex-col gap-1.5">
+          <label className={labelCls}>
+            <HiCalendar className="text-oficina" />
             Año
           </label>
           <input
@@ -116,7 +121,7 @@ export default function EstadisticasFilters({
             pattern="[0-9]*"
             maxLength={4}
             placeholder="2026"
-            className="h-9 rounded-lg bg-slate-950 border border-slate-700 text-xs sm:text-sm px-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className={fieldCls}
             value={anioInput}
             onChange={handleYearChange}
             onBlur={() => commitYear(anioInput)}
@@ -124,17 +129,17 @@ export default function EstadisticasFilters({
               if (e.key === "Enter") e.currentTarget.blur();
             }}
           />
-          <div className="text-[10px] text-slate-400">Rango: {minYear}–{maxYear}</div>
+          <div className="text-[10px] font-bold text-suave dark:text-suave-dark">Rango: {minYear}–{maxYear}</div>
         </div>
 
         {/* Mes */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-            <HiCalendar className="text-sky-300" />
+        <div className="flex flex-col gap-1.5">
+          <label className={labelCls}>
+            <HiCalendar className="text-oficina" />
             Mes
           </label>
           <select
-            className="h-9 rounded-lg bg-slate-950 border border-slate-700 text-xs sm:text-sm px-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className={fieldCls}
             value={mes}
             onChange={(e) => onMesChange(e.target.value)}
           >
@@ -154,13 +159,13 @@ export default function EstadisticasFilters({
         </div>
 
         {/* Modo de cálculo */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-            <HiChartBar className="text-sky-300" />
+        <div className="flex flex-col gap-1.5">
+          <label className={labelCls}>
+            <HiChartBar className="text-oficina" />
             Modo de cálculo
           </label>
           <select
-            className="h-9 rounded-lg bg-slate-950 border border-slate-700 text-xs sm:text-sm px-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className={fieldCls}
             value={fuenteSnapshot}
             onChange={(e) => setFuenteSnapshot(e.target.value)}
           >
@@ -169,7 +174,7 @@ export default function EstadisticasFilters({
           </select>
 
           {desde && hasta && (
-            <span className="mt-0.5 text-[10px] text-slate-400">
+            <span className="mt-0.5 text-[10px] font-bold text-suave dark:text-suave-dark">
               Período: {desde} → {hasta}
             </span>
           )}

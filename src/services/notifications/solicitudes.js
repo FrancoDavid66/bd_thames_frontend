@@ -34,10 +34,30 @@ function fanout(evt) {
   try { ch && ch.postMessage(evt); } catch {}
 }
 
+// 🧹 Antes pegaba a solicitudesApi.resumen() (endpoint /resumen/ BORRADO → 404
+//    cada 5s). Ahora los contadores se calculan desde la LISTA real de solicitudes.
+function _tareas(s) {
+  return {
+    alta_compania: Boolean(s?.tareas?.alta_compania ?? s?.alta_compania ?? false),
+    enviar_poliza: Boolean(s?.tareas?.enviar_poliza ?? s?.enviar_poliza ?? false),
+  };
+}
+
 async function pollOnce() {
   try {
-    const counters = await solicitudesApi.resumen(); // {por_asegurar, ...}
-    const json = JSON.stringify(counters || {});
+    const lista = await solicitudesApi.listar(); // array de solicitudes
+    const arr = Array.isArray(lista) ? lista : [];
+    const activos = arr.filter((s) => s?.estado !== "TERMINADA");
+
+    // Mismos contadores que usa el Header / la página.
+    const counters = {
+      por_asegurar: activos.filter((s) => !_tareas(s).alta_compania).length,
+      vigentes_24h: activos.filter((s) => !_tareas(s).enviar_poliza).length,
+      total: arr.length,
+      terminadas: arr.filter((s) => s?.estado === "TERMINADA").length,
+    };
+
+    const json = JSON.stringify(counters);
     if (json !== lastJSON) {
       lastJSON = json;
       fanout({ type: "solicitudes.counters.backend", data: counters });

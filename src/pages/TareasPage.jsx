@@ -1,64 +1,46 @@
-/* src/pages/TareasPage.jsx */
-import { useEffect, useState } from "react";
+/* src/pages/TareasPage.jsx
+ *
+ * Página de "Tareas del día". Usa la paleta semántica real de la app
+ * (surface/card/titulo/suave/linea/marca) con soporte modo CLARO + OSCURO.
+ * Look Duo marcado: border-2, botones con relieve 3D.
+ * Absorbe en un solo archivo lo que antes eran 4 componentes:
+ *   TareasHeader · TareaCard · TareaItem · TareaSeccion
+ * y usa el TareaWizard único en lugar de los 5 modales viejos.
+ */
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import {
-  HiPaperAirplane, HiDocumentText, HiUser, HiIdentification, HiCamera, HiCheckCircle, HiCloudUpload,
-} from "react-icons/hi";
+import { HiRefresh, HiCheck, HiChevronRight, HiCheckCircle } from "react-icons/hi";
 
 import { fetchTareasDia, marcarPolizaEnviada } from "../store/slices/tareasSlice";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import TareasHeader from "../components/tareas/TareasHeader";
-import TareaCard from "../components/tareas/TareaCard";
-import TareaItem from "../components/tareas/TareaItem";
-import CompletarDatoClienteModal from "../components/tareas/CompletarDatoClienteModal";
-import SubirFotosDniModal from "../components/tareas/SubirFotosDniModal";
-import CompletarDatosPolizaModal from "../components/tareas/CompletarDatosPolizaModal";
-import SubirFotosVehiculoModal from "../components/tareas/SubirFotosVehiculoModal";
-import SubirPolizaSistemaModal from "../components/tareas/SubirPolizaSistemaModal";
-
-const SECCIONES = [
-  // RENOVADAS de hoy → subir la póliza nueva al sistema
-  { key: "subir_poliza", titulo: "Subir póliza a sistema", icon: HiCloudUpload, tipo: "subir-poliza-sistema", accion: "Subir",
-    c: { icon: "text-violet-400", chip: "bg-violet-500/15", badge: "bg-violet-500/20 text-violet-300", btn: "border-violet-500/40 text-violet-300 hover:bg-violet-500/10" } },
-  // ALTAS de hoy a las que les faltan datos
-  { key: "datos_poliza", titulo: "Completar datos de la póliza", icon: HiDocumentText, tipo: "poliza-datos", accion: "Completar",
-    c: { icon: "text-amber-400", chip: "bg-amber-500/15", badge: "bg-amber-500/20 text-amber-300", btn: "border-amber-500/40 text-amber-300 hover:bg-amber-500/10" } },
-  { key: "datos_cliente", titulo: "Completar datos del cliente", icon: HiUser, tipo: "cliente-datos", accion: "Completar",
-    c: { icon: "text-sky-400", chip: "bg-sky-500/15", badge: "bg-sky-500/20 text-sky-300", btn: "border-sky-500/40 text-sky-300 hover:bg-sky-500/10" } },
-  { key: "fotos_dni", titulo: "Subir fotos de DNI", icon: HiIdentification, tipo: "cliente-fotos", accion: "Subir",
-    c: { icon: "text-fuchsia-400", chip: "bg-fuchsia-500/15", badge: "bg-fuchsia-500/20 text-fuchsia-300", btn: "border-fuchsia-500/40 text-fuchsia-300 hover:bg-fuchsia-500/10" } },
-  { key: "fotos_poliza", titulo: "Subir fotos de la póliza", icon: HiCamera, tipo: "poliza-fotos", accion: "Subir",
-    c: { icon: "text-emerald-400", chip: "bg-emerald-500/15", badge: "bg-emerald-500/20 text-emerald-300", btn: "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" } },
-];
+import TareaWizard from "../components/tareas/TareaWizard";
+import {
+  UI, SECCIONES, SECCION_ENVIAR, TODAS_SECCIONES, mensajeProgreso, itemKey,
+} from "../components/tareas/tareasUI";
 
 export default function TareasPage() {
   const dispatch = useDispatch();
   const { data, loading, marcando } = useSelector((s) => s.tareas);
-
   const { user } = useAuth();
-  const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+  const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+
   const [oficinas, setOficinas] = useState([]);
   const [oficinaSel, setOficinaSel] = useState(""); // "" = todas
-
   const [baseTotal, setBaseTotal] = useState(0);
-  const [abierta, setAbierta] = useState(null); // key de la tarjeta abierta
-  const [datoCliente, setDatoCliente] = useState(null);
-  const [fotosCliente, setFotosCliente] = useState(null);
-  const [datosPoliza, setDatosPoliza] = useState(null);
-  const [fotosPoliza, setFotosPoliza] = useState(null);
-  const [subirPoliza, setSubirPoliza] = useState(null);
+  const [abierta, setAbierta] = useState(null);     // key de la sección expandida
+  const [wizard, setWizard] = useState(null);       // { flujo, item } | null
 
-  // Recarga al cambiar la oficina elegida (admin). "" = todas.
+  // Recargar al cambiar de oficina
   useEffect(() => {
     dispatch(fetchTareasDia(oficinaSel ? { oficina: oficinaSel } : {}));
   }, [dispatch, oficinaSel]);
 
-  // Cargar la lista de oficinas (solo admin, para el selector)
+  // Cargar oficinas (solo admin)
   useEffect(() => {
-    if (!isWebAdmin) return;
+    if (!isAdmin) return;
     let alive = true;
     (async () => {
       try {
@@ -68,114 +50,192 @@ export default function TareasPage() {
       } catch { if (alive) setOficinas([]); }
     })();
     return () => { alive = false; };
-  }, [isWebAdmin]);
+  }, [isAdmin]);
 
   const recargar = () => dispatch(fetchTareasDia(oficinaSel ? { oficina: oficinaSel } : {}));
-  useEffect(() => {
-    if (data) {
-      const t = SECCIONES.reduce((a, sec) => a + ((data[sec.key] || []).length), 0);
-      setBaseTotal((p) => Math.max(p, t));
-    }
-  }, [data]);
 
-  const total = SECCIONES.reduce((acc, sec) => acc + ((data?.[sec.key] || []).length), 0);
+  // Totales y progreso
+  const total = useMemo(
+    () => TODAS_SECCIONES.reduce((a, s) => a + ((data?.[s.key] || []).length), 0),
+    [data]
+  );
+  useEffect(() => {
+    if (data) setBaseTotal((p) => Math.max(p, total));
+  }, [data, total]);
   const hechas = Math.max(0, baseTotal - total);
   const pct = baseTotal > 0 ? Math.round((hechas / baseTotal) * 100) : 0;
 
+  const enviar = data?.[SECCION_ENVIAR.key] || [];
+
+  // Acciones
   const onMarcarEnviada = async (polizaId) => {
     const res = await dispatch(marcarPolizaEnviada(polizaId));
     if (marcarPolizaEnviada.fulfilled.match(res)) toast.success("Marcada como enviada ✅");
     else toast.error(res.payload || "No se pudo marcar.");
   };
+  const abrirWizard = (sec, item) => setWizard({ flujo: sec.tipo, item });
+  const onSaved = () => { setWizard(null); recargar(); };
 
-  const onAccion = (seccion, item) => {
-    if (seccion.tipo === "cliente-datos") setDatoCliente(item);
-    else if (seccion.tipo === "cliente-fotos") setFotosCliente(item);
-    else if (seccion.tipo === "poliza-datos") setDatosPoliza(item);
-    else if (seccion.tipo === "poliza-fotos") setFotosPoliza(item);
-    else if (seccion.tipo === "subir-poliza-sistema") setSubirPoliza(item);
-  };
-
-  const onCompletado = () => {
-    setDatoCliente(null); setFotosCliente(null); setDatosPoliza(null); setFotosPoliza(null); setSubirPoliza(null);
-    recargar();
-  };
-
-  const celebra = !loading && total === 0 && baseTotal > 0;
   const seccionAbierta = SECCIONES.find((s) => s.key === abierta) || null;
   const itemsAbiertos = seccionAbierta ? (data?.[seccionAbierta.key] || []) : [];
-  const IconAbierta = seccionAbierta?.icon;
+  const celebra = !loading && total === 0 && baseTotal > 0;
+
+  /* ── fila de un item (antes TareaItem) ── */
+  const Fila = ({ sec, item }) => {
+    const pat = (item.patente_real || item.patente || "").trim();
+    const patente = pat && pat !== "—" ? pat : "";
+    const sub = sec.tipo === "enviar"
+      ? [item.vehiculo, item.compania].filter(Boolean).join(" · ")
+      : sec.key === "fotos_poliza" ? (item.vehiculo || "") : (item.detalle || "");
+    return (
+      <motion.div layout exit={{ opacity: 0, x: 12 }} className="flex items-center gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-semibold truncate ${UI.txtTitulo}`}>{item.cliente}</span>
+            {patente && (
+              <span className="shrink-0 rounded-md bg-titulo/5 dark:bg-white/10 px-1.5 py-0.5 text-[11px] font-mono font-bold tracking-wide text-titulo dark:text-titulo-dark">{patente}</span>
+            )}
+          </div>
+          {sub && <div className={`text-xs truncate ${UI.txtSuave}`}>{sub}</div>}
+        </div>
+        <div className="ml-auto shrink-0">
+          {sec.tipo === "enviar" ? (
+            <button onClick={() => onMarcarEnviada(item.poliza_id)} disabled={marcando === item.poliza_id}
+              aria-label="Marcar como enviada"
+              className="w-9 h-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-titulo/5 dark:bg-white/5 hover:bg-marca hover:border-marca text-suave dark:text-suave-dark hover:text-white transition-colors inline-flex items-center justify-center disabled:opacity-50">
+              <HiCheck className="w-5 h-5" />
+            </button>
+          ) : (
+            <button onClick={() => abrirWizard(sec, item)}
+              className="inline-flex items-center gap-1 h-9 px-3 rounded-xl border-2 border-marca/40 font-bold text-marca hover:bg-marca/10 text-sm transition-colors">
+              {sec.accion} <HiChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
+  /* ── cabecera de una lista (título + contador) ── */
+  const CabLista = ({ sec, n }) => (
+    <div className="flex items-center gap-2.5 px-4 py-3 border-b-2 border-linea dark:border-linea-dark">
+      <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-marca/15 text-marca">
+        <sec.icon className="w-5 h-5" />
+      </span>
+      <span className={`text-sm font-black ${UI.txtTitulo}`}>{sec.titulo}</span>
+      <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-marca/15 text-marca">{n}</span>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 px-4 py-6 sm:px-6 lg:px-8">
+    <div className={`${UI.screen} px-4 py-6 sm:px-6 lg:px-8`}>
       <div className="max-w-7xl mx-auto">
-        <TareasHeader total={total} hechas={hechas} pct={pct} oficina={data?.oficina} fecha={data?.fecha}
-          loading={loading} onRefresh={recargar} />
 
-        {/* Selector de oficina (solo admin) */}
-        {isWebAdmin && (
+        {/* ── Header (antes TareasHeader) ── */}
+        <div className="mb-6">
+          <div className="flex items-end justify-between gap-3 mb-2">
+            <div>
+              <div className={`text-sm ${UI.txtSuave}`}>
+                Tareas de hoy{data?.oficina && data.oficina !== "Todas" ? ` · Oficina ${data.oficina}` : ""}
+              </div>
+              <div className={`text-base font-black mt-0.5 ${UI.txtTitulo}`}>{mensajeProgreso(pct, total)}</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div>
+                  <span className="text-2xl font-black text-marca">{hechas}</span>
+                  <span className={`text-sm ${UI.txtSuave}`}> / {hechas + total}</span>
+                </div>
+                <div className={`text-[11px] ${UI.txtSuave}`}>completadas</div>
+              </div>
+              <button onClick={recargar} aria-label="Actualizar"
+                className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-titulo/5 dark:bg-white/5 hover:bg-titulo/10 dark:hover:bg-white/10 text-suave dark:text-suave-dark transition-colors">
+                <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+          <div className="h-2.5 rounded-full bg-titulo/10 dark:bg-white/10 overflow-hidden">
+            <div className="h-full bg-marca rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+          </div>
+          {data?.fecha && <div className={`text-[11px] mt-1.5 ${UI.txtSuave}`}>{data.fecha}</div>}
+        </div>
+
+        {/* ── Selector de oficina (solo admin) ── */}
+        {isAdmin && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mt-2 scrollbar-hide">
-            <button
-              onClick={() => setOficinaSel("")}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                oficinaSel === "" ? "bg-indigo-500 border-indigo-400 text-white" : "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800"
-              }`}>
+            <button onClick={() => setOficinaSel("")}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-bold border-2 transition-colors ${oficinaSel === "" ? "bg-marca border-marca text-white" : `border-linea dark:border-linea-dark ${UI.txtSuave} hover:bg-titulo/5 dark:hover:bg-white/5`}`}>
               Todas
             </button>
             {oficinas.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => setOficinaSel(String(o.id))}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                  String(oficinaSel) === String(o.id) ? "bg-indigo-500 border-indigo-400 text-white" : "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800"
-                }`}>
+              <button key={o.id} onClick={() => setOficinaSel(String(o.id))}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-bold border-2 transition-colors ${String(oficinaSel) === String(o.id) ? "bg-marca border-marca text-white" : `border-linea dark:border-linea-dark ${UI.txtSuave} hover:bg-titulo/5 dark:hover:bg-white/5`}`}>
                 {o.nombre}
               </button>
             ))}
           </div>
         )}
 
-        {loading && !data && <div className="text-center py-16 text-slate-500 text-sm">Cargando tareas…</div>}
+        {loading && !data && <div className={`text-center py-16 text-sm ${UI.txtSuave}`}>Cargando tareas…</div>}
 
+        {/* ── Estado vacío / celebración ── */}
         {(celebra || (!loading && total === 0)) && (
           <div className="text-center py-16">
-            <HiCheckCircle className="w-16 h-16 mx-auto text-emerald-500 mb-3" />
-            <div className="text-xl font-semibold text-slate-100">{celebra ? "¡Completaste todo! 🎉" : "¡Todo al día!"}</div>
-            <div className="text-sm text-slate-500 mt-1">{celebra ? "Gran trabajo hoy." : "No hay tareas pendientes por ahora."}</div>
+            <HiCheckCircle className="w-16 h-16 mx-auto text-ingreso mb-3" />
+            <div className={`text-xl font-black ${UI.txtTitulo}`}>{celebra ? "¡Completaste todo! 🎉" : "¡Todo al día!"}</div>
+            <div className={`text-sm mt-1 ${UI.txtSuave}`}>{celebra ? "Gran trabajo hoy." : "No hay tareas pendientes por ahora."}</div>
           </div>
         )}
 
         {data && total > 0 && (
           <>
-            {/* Tarjetas resumen */}
+            {/* ── Enviar póliza: banda directa (1 tap, sin wizard) ── */}
+            {enviar.length > 0 && (
+              <div className={`${UI.card} overflow-hidden mb-4`}>
+                <CabLista sec={SECCION_ENVIAR} n={enviar.length} />
+                <div className="divide-y-2 divide-linea dark:divide-linea-dark max-h-[40vh] overflow-y-auto">
+                  <AnimatePresence initial={false}>
+                    {enviar.map((item) => <Fila key={itemKey(SECCION_ENVIAR, item)} sec={SECCION_ENVIAR} item={item} />)}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* ── Tarjetas resumen (antes TareaCard) ── */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {SECCIONES.map((sec) => (
-                <TareaCard key={sec.key} seccion={sec} count={(data[sec.key] || []).length}
-                  activa={abierta === sec.key}
-                  onClick={() => setAbierta(abierta === sec.key ? null : sec.key)} />
-              ))}
+              {SECCIONES.map((sec) => {
+                const count = (data[sec.key] || []).length;
+                const vacia = count === 0;
+                const activa = abierta === sec.key;
+                const Icon = sec.icon;
+                return (
+                  <button key={sec.key} type="button"
+                    onClick={vacia ? undefined : () => setAbierta(activa ? null : sec.key)}
+                    disabled={vacia}
+                    className={`text-left rounded-2xl border-2 p-4 transition-all ${activa ? "border-marca ring-2 ring-marca/30 bg-marca/5" : `border-linea dark:border-linea-dark bg-card dark:bg-card-dark ${UI.cardHover}`} ${vacia ? "opacity-40 cursor-default" : "cursor-pointer"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="w-10 h-10 rounded-lg flex items-center justify-center bg-marca/15 text-marca">
+                        <Icon className="w-5 h-5" />
+                      </span>
+                      <span className={`text-2xl font-black ${count > 0 ? UI.txtTitulo : "text-suave/50"}`}>{count}</span>
+                    </div>
+                    <div className={`mt-3 text-sm font-bold leading-snug ${UI.txtTitulo}`}>{sec.titulo}</div>
+                    {!vacia && <div className="mt-1 text-xs font-bold text-marca">{activa ? "Ocultar lista" : "Ver lista"}</div>}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Lista de la tarjeta abierta */}
+            {/* ── Lista de la sección abierta (antes TareaSeccion) ── */}
             <AnimatePresence mode="wait">
               {seccionAbierta && itemsAbiertos.length > 0 && (
                 <motion.div key={seccionAbierta.key}
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  className="mt-5 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
-                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-800">
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${seccionAbierta.c.chip}`}>
-                      {IconAbierta && <IconAbierta className={`w-5 h-5 ${seccionAbierta.c.icon}`} />}
-                    </span>
-                    <span className="text-sm font-medium text-slate-200">{seccionAbierta.titulo}</span>
-                    <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${seccionAbierta.c.badge}`}>{itemsAbiertos.length}</span>
-                  </div>
-                  <div className="divide-y divide-slate-800 max-h-[60vh] overflow-y-auto">
+                  className={`mt-5 ${UI.card} overflow-hidden`}>
+                  <CabLista sec={seccionAbierta} n={itemsAbiertos.length} />
+                  <div className="divide-y-2 divide-linea dark:divide-linea-dark max-h-[60vh] overflow-y-auto">
                     <AnimatePresence initial={false}>
-                      {itemsAbiertos.map((item) => (
-                        <TareaItem key={`${seccionAbierta.key}-${item.poliza_id || item.cliente_id}`} item={item}
-                          seccion={seccionAbierta} marcando={marcando}
-                          onMarcarEnviada={onMarcarEnviada} onAccion={onAccion} />
-                      ))}
+                      {itemsAbiertos.map((item) => <Fila key={itemKey(seccionAbierta, item)} sec={seccionAbierta} item={item} />)}
                     </AnimatePresence>
                   </div>
                 </motion.div>
@@ -185,11 +245,14 @@ export default function TareasPage() {
         )}
       </div>
 
-      <CompletarDatoClienteModal isOpen={!!datoCliente} item={datoCliente} onClose={() => setDatoCliente(null)} onSaved={onCompletado} />
-      <SubirFotosDniModal isOpen={!!fotosCliente} item={fotosCliente} onClose={() => setFotosCliente(null)} onSaved={onCompletado} />
-      <CompletarDatosPolizaModal isOpen={!!datosPoliza} item={datosPoliza} onClose={() => setDatosPoliza(null)} onSaved={onCompletado} />
-      <SubirFotosVehiculoModal isOpen={!!fotosPoliza} item={fotosPoliza} onClose={() => setFotosPoliza(null)} onSaved={onCompletado} />
-      <SubirPolizaSistemaModal isOpen={!!subirPoliza} item={subirPoliza} onClose={() => setSubirPoliza(null)} onSaved={onCompletado} />
+      {/* ── Wizard único (reemplaza los 5 modales) ── */}
+      <TareaWizard
+        isOpen={!!wizard}
+        flujo={wizard?.flujo}
+        item={wizard?.item}
+        onClose={() => setWizard(null)}
+        onSaved={onSaved}
+      />
     </div>
   );
 }

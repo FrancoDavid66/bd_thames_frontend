@@ -1,4 +1,4 @@
-// src/components/estadisticas/ControlFechasPanel.jsx
+// src/components/estadisticas/ControlFechasPanel.jsx  (diseño Duo)
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -152,8 +152,8 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-100">Control de Fechas</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Control de Fechas</h2>
+          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
             Pólizas cuya fecha de emisión es igual al vencimiento de su 1ª cuota
           </p>
         </div>
@@ -161,14 +161,14 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
           <button
             onClick={descargarTodo}
             disabled={downloading || loading}
-            className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg border border-emerald-600 bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors"
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 rounded-xl border-2 border-ingreso bg-ingreso text-white text-xs font-black hover:bg-ingreso-fuerte shadow-[0_4px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all"
           >
             {downloading ? "Descargando…" : "Descargar todo"}
           </button>
           <button
             onClick={fetchListado}
             disabled={loading}
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors"
+            className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
           >
             <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -177,80 +177,80 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 px-4 py-3 text-xs text-rose-300">
+        <div className="flex items-center gap-2 rounded-xl border-2 border-egreso/30 bg-egreso/10 px-4 py-3 text-xs font-bold text-egreso dark:text-egreso-claro">
           <HiExclamationCircle className="shrink-0" /> {error}
         </div>
       )}
 
       {/* KPI */}
-      <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-5">
-        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-rose-400 mb-2">
+      <div className="rounded-3xl border-2 border-egreso/30 bg-egreso/[0.06] p-5">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-egreso mb-2">
           <HiCalendar className="text-sm" /> Emisión = Vto. 1ª cuota
         </div>
-        <div className="text-4xl font-light tabular-nums text-rose-300">
+        <div className="text-4xl font-black tabular-nums text-egreso">
           {loading ? "—" : count.toLocaleString("es-AR")}
         </div>
-        <div className="text-[11px] text-slate-500 mt-1">
+        <div className="text-[11px] font-bold text-suave dark:text-suave-dark mt-1">
           pólizas con este problema (cobertura de 0 días en la 1ª cuota)
         </div>
       </div>
 
       {/* Tabla */}
-      <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/50">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900/80">
-          <span className="text-xs font-semibold text-slate-200">Pólizas detectadas</span>
-          <span className="text-[10px] text-slate-600">{count.toLocaleString("es-AR")} en total</span>
+      <div className="rounded-2xl border-2 border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+          <span className="text-xs font-black text-titulo dark:text-titulo-dark">Pólizas detectadas</span>
+          <span className="text-[10px] font-bold text-suave dark:text-suave-dark">{count.toLocaleString("es-AR")} en total</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-950/50">
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Póliza</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Cliente</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Patente</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Compañía</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Oficina</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Emisión</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Vto. 1ª cuota</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Estado</th>
-                <th className="px-3 py-2 text-right"></th>
+              <tr className="border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Póliza</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Cliente</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Patente</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Compañía</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Oficina</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Emisión</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Vto. 1ª cuota</th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Estado</th>
+                <th className="px-3 py-2.5 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/40">
+            <tbody className="divide-y-2 divide-linea/50 dark:divide-linea-dark/50">
               {loading ? (
-                <tr><td colSpan={9} className="px-3 py-10 text-center text-slate-600 text-[11px]">Cargando...</td></tr>
+                <tr><td colSpan={9} className="px-3 py-10 text-center text-suave dark:text-suave-dark text-[11px] font-bold">Cargando...</td></tr>
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-3 py-12 text-center">
-                    <p className="text-sm text-emerald-400 font-medium">¡Sin problemas!</p>
-                    <p className="text-[11px] text-slate-600 mt-1">No hay pólizas con la emisión igual al vencimiento de su 1ª cuota.</p>
+                    <p className="text-sm text-ingreso font-black">¡Sin problemas!</p>
+                    <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-1">No hay pólizas con la emisión igual al vencimiento de su 1ª cuota.</p>
                   </td>
                 </tr>
               ) : (
                 rows.map((it) => (
-                  <tr key={it.id} className="hover:bg-slate-800/20 transition-colors group">
+                  <tr key={it.id} className="hover:bg-oficina/5 transition-colors group">
                     <td className="px-3 py-2.5">
                       <a
                         href={`/polizas/${it.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-medium text-sky-400 hover:text-sky-300 transition-colors"
+                        className="font-black text-oficina hover:text-oficina-fuerte transition-colors"
                       >
                         #{it.id}{it.numero_poliza ? ` · ${it.numero_poliza}` : ""}
                       </a>
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="text-slate-200">{it.cliente || "—"}</div>
-                      {it.cliente_dni && <div className="text-[10px] text-slate-600">{it.cliente_dni}</div>}
+                      <div className="font-bold text-titulo dark:text-titulo-dark">{it.cliente || "—"}</div>
+                      {it.cliente_dni && <div className="text-[10px] font-bold text-suave dark:text-suave-dark">{it.cliente_dni}</div>}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-400">{it.patente || "—"}</td>
-                    <td className="px-3 py-2.5 text-slate-400">{it.compania || "—"}</td>
-                    <td className="px-3 py-2.5 text-slate-400">{it.oficina_nombre || ofiName(it.oficina)}</td>
-                    <td className="px-3 py-2.5 text-rose-300 font-medium tabular-nums">{fmtFecha(it.fecha_emision)}</td>
-                    <td className="px-3 py-2.5 text-rose-300 font-medium tabular-nums">{fmtFecha(it.vto_primera_cuota)}</td>
+                    <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.patente || "—"}</td>
+                    <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.compania || "—"}</td>
+                    <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.oficina_nombre || ofiName(it.oficina)}</td>
+                    <td className="px-3 py-2.5 text-egreso font-mono font-black tabular-nums">{fmtFecha(it.fecha_emision)}</td>
+                    <td className="px-3 py-2.5 text-egreso font-mono font-black tabular-nums">{fmtFecha(it.vto_primera_cuota)}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`text-[10px] font-medium ${it.estado === "activa" ? "text-emerald-400" : "text-slate-500"}`}>
+                      <span className={`text-[10px] font-black ${it.estado === "activa" ? "text-ingreso" : "text-suave dark:text-suave-dark"}`}>
                         {it.estado || "—"}
                       </span>
                     </td>
@@ -259,7 +259,7 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
                         href={`/polizas/${it.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 text-[10px] font-medium"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[10px] font-black"
                       >
                         Ver <HiArrowRight className="text-xs" />
                       </a>
@@ -273,20 +273,20 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
 
         {/* Paginación */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-800/60 bg-slate-900/40">
-            <span className="text-[10px] text-slate-600">Página {page} de {totalPages}</span>
+          <div className="flex items-center justify-between px-5 py-3 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <span className="text-[10px] font-bold text-suave dark:text-suave-dark">Página {page} de {totalPages}</span>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-colors"
+                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors"
               >
                 <HiChevronLeft className="text-xs" />
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-colors"
+                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors"
               >
                 <HiChevronRight className="text-xs" />
               </button>

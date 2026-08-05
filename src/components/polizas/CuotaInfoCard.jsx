@@ -207,32 +207,32 @@ function buildFraseCobertura(cobertura, estado, cuota) {
  */
 const TONO_STYLES = {
   success: {
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/30",
-    title: "text-emerald-200",
-    subtitle: "text-emerald-300/70",
-    iconColor: "text-emerald-400",
+    bg: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]",
+    border: "border-duo-verde/30",
+    title: "text-duo-verde-sombra dark:text-duo-verde",
+    subtitle: "text-duo-verde-sombra/70 dark:text-duo-verde/70",
+    iconColor: "text-duo-verde",
   },
   warning: {
-    bg: "bg-orange-500/10",
-    border: "border-orange-500/30",
-    title: "text-orange-100",
-    subtitle: "text-orange-300/80",
-    iconColor: "text-orange-400",
+    bg: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)]",
+    border: "border-duo-amarillo/30",
+    title: "text-duo-amarillo-sombra dark:text-duo-amarillo",
+    subtitle: "text-duo-amarillo-sombra/80 dark:text-duo-amarillo/80",
+    iconColor: "text-duo-amarillo-sombra dark:text-duo-amarillo",
   },
   danger: {
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/30",
-    title: "text-rose-100",
-    subtitle: "text-rose-300/80",
-    iconColor: "text-rose-400",
+    bg: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]",
+    border: "border-duo-rojo/30",
+    title: "text-duo-rojo",
+    subtitle: "text-duo-rojo/80",
+    iconColor: "text-duo-rojo",
   },
   neutral: {
-    bg: "bg-white/5",
-    border: "border-white/10",
-    title: "text-white",
-    subtitle: "text-neutral-400",
-    iconColor: "text-neutral-400",
+    bg: "bg-surface dark:bg-surface-dark",
+    border: "border-linea dark:border-linea-dark",
+    title: "text-titulo dark:text-titulo-dark",
+    subtitle: "text-suave dark:text-suave-dark",
+    iconColor: "text-suave dark:text-suave-dark",
   },
 };
 
@@ -358,15 +358,15 @@ export default function CuotaInfoCard({
 
   // ─── Variante FULL (default): tarjeta completa con número, monto, info y acción ───
   return (
-    <div className="p-4 sm:p-5 bg-neutral-950 hover:bg-neutral-900/90 transition-colors">
+    <div className="p-4 sm:p-5 bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
         {/* ── Bloque 1: Número de cuota + monto ── */}
         <div className="flex flex-col gap-1 md:w-28 shrink-0">
-          <div className="text-xl font-bold text-white">#{cuota?.cuota_nro}</div>
+          <div className="text-xl font-black text-titulo dark:text-titulo-dark">#{cuota?.cuota_nro}</div>
           {showMonto && (
-            <div className="text-xs text-neutral-400">
-              <span className="text-white font-medium">{fmtMoney(cuota?.monto ?? cuota?.importe)}</span>
+            <div className="text-xs text-suave dark:text-suave-dark">
+              <span className="text-titulo dark:text-titulo-dark font-bold">{fmtMoney(cuota?.monto ?? cuota?.importe)}</span>
             </div>
           )}
         </div>
@@ -421,10 +421,10 @@ export default function CuotaInfoCard({
 
               {/* Flecha central: período de cobertura */}
               <div className="flex flex-col items-center justify-center shrink-0 px-1">
-                <div className="text-[9px] uppercase tracking-wide font-bold text-neutral-400 text-center leading-tight mb-0.5">
+                <div className="text-[9px] uppercase tracking-wide font-bold text-suave dark:text-suave-dark text-center leading-tight mb-0.5">
                   Período de<br />cobertura
                 </div>
-                <div className="text-2xl text-neutral-500 leading-none">→</div>
+                <div className="text-2xl text-suave dark:text-suave-dark leading-none">→</div>
               </div>
 
               {/* Box: Vencimiento */}
@@ -440,7 +440,7 @@ export default function CuotaInfoCard({
                     <button
                       type="button"
                       onClick={() => onCambiarFecha(cuota)}
-                      className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                      className="text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors shrink-0"
                       title="Cambiar fecha de vencimiento"
                     >
                       <HiPencil className="w-3 h-3" />
@@ -465,7 +465,7 @@ export default function CuotaInfoCard({
         {showAction && (
           <div className="flex md:justify-end md:w-44 shrink-0">
             {cuota?.pagado ? (
-              <div className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-700/40 bg-emerald-700/20 px-3 py-2 text-xs sm:text-sm text-emerald-300 font-bold">
+              <div className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2 text-xs sm:text-sm text-duo-verde-sombra dark:text-duo-verde font-black uppercase tracking-wide">
                 <HiCheck className="h-4 w-4" /> Pagada
               </div>
             ) : onMarcarPagada ? (
@@ -473,7 +473,7 @@ export default function CuotaInfoCard({
                 type="button"
                 disabled={busy}
                 onClick={() => onMarcarPagada(cuota)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs sm:text-sm border border-emerald-500/60 disabled:opacity-60 font-semibold transition-all active:scale-95"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-duo-verde hover:brightness-105 text-white px-3 py-2.5 text-xs sm:text-sm shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:top-[4px] relative top-0 disabled:opacity-60 font-black uppercase tracking-wide transition-all"
               >
                 {busy ? (
                   <HiRefresh className="h-4 w-4 animate-spin" />

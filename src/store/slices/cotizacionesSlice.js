@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast';
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem("access_token"); 
+  const token = localStorage.getItem("access_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

@@ -290,50 +290,6 @@ export const desmarcarNoRenueva = createAsyncThunk(
   }
 );
 
-/**
- * 🆕 Verificar renovación — marca la fila como "ya la revisé" (tilde gris).
- */
-export const verificarRenovacion = createAsyncThunk(
-  "renovaciones/verificarRenovacion",
-  async ({ polizaId }, { rejectWithValue }) => {
-    try {
-      const { data } = await api.post(`polizas/${polizaId}/verificar-renovacion/`);
-      return { polizaId, data };
-    } catch (err) {
-      return rejectWithValue({
-        polizaId,
-        message:
-          err?.response?.data?.detail ||
-          err?.response?.data?.error ||
-          err?.message ||
-          "Error al verificar",
-      });
-    }
-  }
-);
-
-/**
- * 🆕 Des-verificar (deshacer el tilde).
- */
-export const desVerificarRenovacion = createAsyncThunk(
-  "renovaciones/desVerificarRenovacion",
-  async ({ polizaId }, { rejectWithValue }) => {
-    try {
-      const { data } = await api.post(`polizas/${polizaId}/des-verificar-renovacion/`);
-      return { polizaId, data };
-    } catch (err) {
-      return rejectWithValue({
-        polizaId,
-        message:
-          err?.response?.data?.detail ||
-          err?.response?.data?.error ||
-          err?.message ||
-          "Error al deshacer verificación",
-      });
-    }
-  }
-);
-
 export const fetchRenovaciones = createAsyncThunk(
   "renovaciones/fetchRenovaciones",
   async (params = {}, { rejectWithValue, getState }) => {
@@ -370,27 +326,6 @@ export const fetchRenovaciones = createAsyncThunk(
         err?.message ||
         "Error al cargar renovaciones";
       return rejectWithValue({ message: msg, raw: err?.response?.data, query });
-    }
-  }
-);
-
-// 🆕 Pólizas que recién finalizaron (≤3 días) y todavía no se renovaron.
-// El módulo de Renovaciones normal las esconde; estas se muestran aparte.
-export const fetchRenovacionesRecientes = createAsyncThunk(
-  "renovaciones/fetchRenovacionesRecientes",
-  async (params = {}, { rejectWithValue }) => {
-    const query = buildRenovacionesQuery(stripForce(params));
-    try {
-      const { data } = await api.get(`polizas/renovaciones/recientes/${query}`);
-      const normalized = normalizeRenovacionesResponse(data);
-      return { normalized };
-    } catch (err) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Error al cargar recién vencidas";
-      return rejectWithValue({ message: msg, raw: err?.response?.data });
     }
   }
 );
@@ -559,11 +494,6 @@ const initialState = {
   oficinasError: null,
   oficinasCache: null,
 
-  // 🆕 Recién finalizadas (≤3 días) sin renovar
-  recientes: [],
-  recientesStatus: "idle",
-  recientesError: null,
-
   actionStatusById: {},
   lastActionResult: null,
 };
@@ -711,22 +641,6 @@ const renovacionesSlice = createSlice({
       .addCase(fetchRenovaciones.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload?.message || "Error al cargar renovaciones";
-      })
-
-      // ---------- RECIÉN FINALIZADAS (≤3 días) ----------
-      .addCase(fetchRenovacionesRecientes.pending, (state) => {
-        state.recientesStatus = "loading";
-        state.recientesError = null;
-      })
-      .addCase(fetchRenovacionesRecientes.fulfilled, (state, action) => {
-        state.recientesStatus = "succeeded";
-        state.recientesError = null;
-        state.recientes = action.payload?.normalized?.items || [];
-      })
-      .addCase(fetchRenovacionesRecientes.rejected, (state, action) => {
-        state.recientesStatus = "failed";
-        state.recientesError = action.payload?.message || "Error al cargar recién vencidas";
-        state.recientes = [];
       })
 
       // ---------- RESUMEN ----------
@@ -879,52 +793,6 @@ const renovacionesSlice = createSlice({
         const id = action.payload?.polizaId ?? action.meta.arg?.polizaId;
         const msg = action.payload?.message || "Error al deshacer";
         if (id != null) setActionError(state, id, "desmarcar_no_renueva", msg);
-      })
-
-      // ── 🆕 VERIFICAR ──
-      .addCase(verificarRenovacion.pending, (state, action) => {
-        const id = action.meta.arg?.polizaId;
-        if (id != null) setActionLoading(state, id, "verificar");
-      })
-      .addCase(verificarRenovacion.fulfilled, (state, action) => {
-        const { polizaId, data } = action.payload || {};
-        if (polizaId != null) setActionSuccess(state, polizaId, "verificar");
-        state.items = (state.items || []).map((p) =>
-          p.id === polizaId
-            ? {
-                ...p,
-                renovacion_verificada: true,
-                renovacion_verificada_en: data?.renovacion_verificada_en || new Date().toISOString(),
-              }
-            : p
-        );
-        invalidateAllCache(state);
-      })
-      .addCase(verificarRenovacion.rejected, (state, action) => {
-        const id = action.payload?.polizaId ?? action.meta.arg?.polizaId;
-        const msg = action.payload?.message || "Error al verificar";
-        if (id != null) setActionError(state, id, "verificar", msg);
-      })
-
-      // ── 🆕 DES-VERIFICAR ──
-      .addCase(desVerificarRenovacion.pending, (state, action) => {
-        const id = action.meta.arg?.polizaId;
-        if (id != null) setActionLoading(state, id, "des_verificar");
-      })
-      .addCase(desVerificarRenovacion.fulfilled, (state, action) => {
-        const { polizaId } = action.payload || {};
-        if (polizaId != null) setActionSuccess(state, polizaId, "des_verificar");
-        state.items = (state.items || []).map((p) =>
-          p.id === polizaId
-            ? { ...p, renovacion_verificada: false, renovacion_verificada_en: null }
-            : p
-        );
-        invalidateAllCache(state);
-      })
-      .addCase(desVerificarRenovacion.rejected, (state, action) => {
-        const id = action.payload?.polizaId ?? action.meta.arg?.polizaId;
-        const msg = action.payload?.message || "Error al deshacer verificación";
-        if (id != null) setActionError(state, id, "des_verificar", msg);
       })
 
       .addCase(fetchRenovacionesOficinas.fulfilled, (state, action) => {

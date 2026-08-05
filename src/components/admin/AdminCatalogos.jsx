@@ -1,9 +1,8 @@
 // src/components/admin/AdminCatalogos.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  HiPlus, HiTrash, HiPencil, HiCollection, HiShieldCheck, 
+import {
+  HiPlus, HiTrash, HiPencil, HiCollection, HiShieldCheck,
   HiX, HiOfficeBuilding, HiPhotograph, HiArrowLeft, HiStar, HiDocumentText,
   HiCash
 } from "react-icons/hi";
@@ -30,34 +29,34 @@ const parseTextToArray = (text) => {
 export default function AdminCatalogos() {
   const dispatch = useDispatch();
   const { companias, coberturas, loadingCompanias, loadingCoberturas } = useSelector((state) => state.admin);
-  
-  const [view, setView] = useState("LIST"); 
+
+  const [view, setView] = useState("LIST");
   const [selectedCia, setSelectedCia] = useState(null);
   const [q, setQ] = useState("");
 
   const [ciaModalOpen, setCiaModalOpen] = useState(false);
   const [cobModalOpen, setCobModalOpen] = useState(false);
-  
+
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const [ciaForm, setCiaForm] = useState({ 
-    nombre: "", 
-    comision_default: "0.00", 
-    antiguedad_maxima: "25", 
-    activa: true, 
-    logo_url: "" 
+  const [ciaForm, setCiaForm] = useState({
+    nombre: "",
+    comision_default: "0.00",
+    antiguedad_maxima: "25",
+    activa: true,
+    logo_url: ""
   });
-  
+
   // 🚀 FORMULARIO ÚNICO UNIFICADO PARA COBERTURAS
-  const [cobForm, setCobForm] = useState({ 
-    nombre: "", 
-    activa: true, 
-    cuotas_a_generar: 6, 
+  const [cobForm, setCobForm] = useState({
+    nombre: "",
+    activa: true,
+    cuotas_a_generar: 6,
     genera_cupones_robo: false,
-    beneficios_default: [], 
-    fotos_requeridas: [], 
-    documentos_requeridos: [] 
+    beneficios_default: [],
+    fotos_requeridas: [],
+    documentos_requeridos: []
   });
 
   useEffect(() => {
@@ -150,7 +149,7 @@ export default function AdminCatalogos() {
       });
       if (!res.ok) throw new Error("No se pudo eliminar.");
       toast.success("Eliminado");
-      
+
       if (tipo === 'cia') { setView("LIST"); dispatch(fetchAdminCompanias()); }
       else dispatch(fetchAdminCoberturas());
     } catch (e) { toast.error(e.message); }
@@ -165,90 +164,97 @@ export default function AdminCatalogos() {
   }, [coberturas, selectedCia]);
 
   return (
-    <div className="space-y-6">
-      <AnimatePresence mode="wait">
-        {view === "LIST" ? (
-          <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-2xl border border-white/10 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20"><HiCollection /></div>
-                <div><h2 className="text-lg font-bold text-white uppercase">Aseguradoras</h2></div>
-              </div>
-              <button onClick={() => openCiaModal()} className="bg-amber-600 px-4 py-2 rounded-xl text-sm font-bold text-black"><HiPlus className="inline mr-1"/> Nueva Empresa</button>
+    <div className="space-y-5">
+      {view === "LIST" ? (
+        <div>
+          <div className="mb-5 flex items-center justify-between rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-tarjeta)] text-white shadow-[0_4px_0_#d97706]"><HiCollection /></div>
+              <div><h2 className="text-lg font-black text-[var(--color-titulo)]">Aseguradoras</h2></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {companias.filter(c => c.nombre.toLowerCase().includes(q.toLowerCase())).map(cia => (
-                <div key={cia.id} onClick={() => { setSelectedCia(cia); setView("PROFILE"); }} className="bg-slate-900/40 border border-white/10 rounded-3xl p-5 hover:border-amber-500/50 cursor-pointer transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center text-white/20"><HiOfficeBuilding /></div>
-                    <h3 className="text-white font-black uppercase">{cia.nombre}</h3>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-            <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 mb-6">
-              <button onClick={() => setView("LIST")} className="text-[10px] font-black text-slate-500 uppercase mb-4 flex items-center gap-1"><HiArrowLeft /> Volver</button>
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-3xl font-black text-white uppercase">{selectedCia?.nombre}</h2>
-                  <p className="text-[10px] font-bold text-amber-500 uppercase">Comisión: {selectedCia?.comision_default}% | Antigüedad: {selectedCia?.antiguedad_maxima} años</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => openCiaModal(selectedCia)} className="p-3 rounded-xl bg-white/5 text-sky-400 border border-white/10 hover:bg-white/10 transition-colors"><HiPencil /></button>
-                  <button onClick={() => deleteItem(selectedCia.id, 'cia')} className="p-3 rounded-xl bg-white/5 text-rose-400 border border-white/10 hover:bg-white/10 transition-colors"><HiTrash /></button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="w-full">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-2">
-                    <HiShieldCheck className="text-emerald-500 text-lg" /> Catálogo de Coberturas
-                  </h3>
-                  <button onClick={() => openCobModal()} className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 px-4 py-2 rounded-xl font-black uppercase text-xs transition-colors flex items-center gap-1">
-                    <HiPlus /> Nueva Cobertura
-                  </button>
-                </div>
+            <button onClick={() => openCiaModal()} className="flex items-center gap-1.5 rounded-xl bg-[var(--color-tarjeta)] px-4 py-2.5 text-sm font-black text-white shadow-[0_4px_0_#d97706] transition-all active:translate-y-0.5 active:shadow-[0_0_0_#d97706]"><HiPlus /> Nueva Empresa</button>
+          </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {ciaCoverages.length === 0 ? (
-                    <div className="col-span-full text-center py-10 bg-slate-900/20 border border-white/5 rounded-2xl">
-                      <p className="text-white/40 text-sm font-medium">Sin coberturas cargadas.</p>
-                    </div>
-                  ) : (
-                    ciaCoverages.map(cob => (
-                      <div key={cob.id} className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 flex justify-between items-center group hover:bg-white/5 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center ${cob.activa ? 'bg-emerald-500/10 text-emerald-500' : 'bg-white/5 text-white/20'}`}><HiShieldCheck /></div>
-                          <div>
-                            <p className="text-white font-black uppercase text-sm">{cob.nombre}</p>
-                            <div className="flex flex-wrap gap-2 mt-1.5">
-                                <span className="bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest">
-                                    {cob.cuotas_a_generar} Cuotas
-                                </span>
-                                {cob.genera_cupones_robo && (
-                                    <span className="bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest">
-                                        Robo
-                                    </span>
-                                )}
-                            </div>
+          {/* Buscador */}
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar aseguradora..."
+            className="mb-4 w-full rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-4 py-3 text-sm font-semibold text-[var(--color-titulo)] outline-none placeholder:text-[var(--color-suave)] focus:border-[var(--color-tarjeta)]"
+          />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {companias.filter(c => c.nombre.toLowerCase().includes(q.toLowerCase())).map(cia => (
+              <div key={cia.id} onClick={() => { setSelectedCia(cia); setView("PROFILE"); }} className="cursor-pointer rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-5 transition-all hover:border-[var(--color-tarjeta)]">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-surface)] text-[var(--color-suave)]"><HiOfficeBuilding /></div>
+                  <h3 className="font-black text-[var(--color-titulo)]">{cia.nombre}</h3>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="mb-5 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-6">
+            <button onClick={() => setView("LIST")} className="mb-4 flex items-center gap-1 text-[11px] font-black uppercase text-[var(--color-suave)] transition hover:text-[var(--color-titulo)]"><HiArrowLeft /> Volver</button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black text-[var(--color-titulo)]">{selectedCia?.nombre}</h2>
+                <p className="mt-1 text-[11px] font-black uppercase text-[#d97706]">Comisión: {selectedCia?.comision_default}% · Antigüedad: {selectedCia?.antiguedad_maxima} años</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => openCiaModal(selectedCia)} className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-oficina)] hover:text-[var(--color-oficina)]"><HiPencil /></button>
+                <button onClick={() => deleteItem(selectedCia.id, 'cia')} className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]"><HiTrash /></button>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[var(--color-titulo)]">
+                  <HiShieldCheck className="text-lg text-[var(--color-ingreso)]" /> Catálogo de Coberturas
+                </h3>
+                <button onClick={() => openCobModal()} className="flex items-center gap-1 rounded-xl bg-[var(--color-ingreso)] px-4 py-2.5 text-xs font-black uppercase text-white shadow-[0_4px_0_var(--color-ingreso-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-ingreso-fuerte)]">
+                  <HiPlus /> Nueva Cobertura
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {ciaCoverages.length === 0 ? (
+                  <div className="col-span-full rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] py-10 text-center">
+                    <p className="text-sm font-semibold text-[var(--color-suave)]">Sin coberturas cargadas.</p>
+                  </div>
+                ) : (
+                  ciaCoverages.map(cob => (
+                    <div key={cob.id} className="flex items-center justify-between rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4 transition-colors hover:border-[var(--color-ingreso)]">
+                      <div className="flex items-center gap-4">
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cob.activa ? 'bg-[var(--color-ingreso)]/15 text-[var(--color-ingreso-fuerte)]' : 'bg-[var(--color-surface)] text-[var(--color-suave)]'}`}><HiShieldCheck /></div>
+                        <div>
+                          <p className="text-sm font-black uppercase text-[var(--color-titulo)]">{cob.nombre}</p>
+                          <div className="mt-1.5 flex flex-wrap gap-2">
+                              <span className="rounded border-2 border-[var(--color-oficina)]/30 bg-[var(--color-oficina)]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-[var(--color-oficina-fuerte)]">
+                                  {cob.cuotas_a_generar} Cuotas
+                              </span>
+                              {cob.genera_cupones_robo && (
+                                  <span className="rounded border-2 border-[var(--color-egreso)]/30 bg-[var(--color-egreso)]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-[var(--color-egreso-fuerte)]">
+                                      Robo
+                                  </span>
+                              )}
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => openCobModal(cob)} className="flex items-center gap-1.5 p-2 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-colors rounded-xl font-black text-xs uppercase"><HiPencil /> Editar</button>
-                          <button onClick={() => deleteItem(cob.id, 'cob')} className="p-2 text-rose-400 hover:text-rose-300 transition-colors bg-white/5 rounded-xl hover:bg-white/10"><HiTrash /></button>
-                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                      <div className="flex gap-2">
+                        <button onClick={() => openCobModal(cob)} className="flex items-center gap-1.5 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2 text-xs font-black uppercase text-[var(--color-oficina)] transition hover:border-[var(--color-oficina)]"><HiPencil /> Editar</button>
+                        <button onClick={() => deleteItem(cob.id, 'cob')} className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] transition hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]"><HiTrash /></button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+          </div>
+        </div>
+      )}
 
       <Modal open={ciaModalOpen} onClose={() => setCiaModalOpen(false)} title="Datos de Aseguradora">
         <form onSubmit={saveCia} className="space-y-4">
@@ -257,37 +263,37 @@ export default function AdminCatalogos() {
             <Input label="Comisión %" type="number" step="0.01" value={ciaForm.comision_default} onChange={v => setCiaForm({...ciaForm, comision_default: v})} />
             <Input label="Antigüedad Máx" type="number" value={ciaForm.antiguedad_maxima} onChange={v => setCiaForm({...ciaForm, antiguedad_maxima: v})} />
           </div>
-          <button type="submit" className="w-full bg-amber-500 text-black py-3 rounded-xl font-black uppercase text-xs mt-4 hover:bg-amber-400 transition-colors">Guardar</button>
+          <button type="submit" className="mt-2 w-full rounded-xl bg-[var(--color-tarjeta)] py-3 text-sm font-black uppercase text-white shadow-[0_4px_0_#d97706] transition-all active:translate-y-0.5 active:shadow-[0_0_0_#d97706]">Guardar</button>
         </form>
       </Modal>
 
       <Modal open={cobModalOpen} onClose={() => setCobModalOpen(false)} title="Configuración de Cobertura" wide>
         <form onSubmit={saveCob} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
                   <Input label="Nombre de Cobertura (ej: B1)" value={cobForm.nombre} onChange={v => setCobForm({...cobForm, nombre: v})} required />
               </div>
-              <div className="bg-black/20 p-4 rounded-2xl border border-white/5 space-y-4">
-                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+              <div className="space-y-4 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] p-4">
+                  <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[var(--color-ingreso-fuerte)]">
                     <HiCash className="text-lg" /> Parámetros de Facturación
                   </p>
                   <div className="grid grid-cols-2 gap-4">
-                      <Input 
-                          label="Cuotas a Generar" 
-                          type="number" 
-                          value={cobForm.cuotas_a_generar} 
-                          onChange={v => setCobForm({...cobForm, cuotas_a_generar: v})} 
-                          required 
+                      <Input
+                          label="Cuotas a Generar"
+                          type="number"
+                          value={cobForm.cuotas_a_generar}
+                          onChange={v => setCobForm({...cobForm, cuotas_a_generar: v})}
+                          required
                       />
                       <div className="flex flex-col justify-end pb-2">
-                          <label className="flex items-center gap-3 cursor-pointer group w-fit">
-                              <input 
-                                  type="checkbox" 
-                                  checked={cobForm.genera_cupones_robo} 
-                                  onChange={e => setCobForm({...cobForm, genera_cupones_robo: e.target.checked})} 
-                                  className="w-5 h-5 accent-emerald-500 rounded cursor-pointer" 
+                          <label className="group flex w-fit cursor-pointer items-center gap-3">
+                              <input
+                                  type="checkbox"
+                                  checked={cobForm.genera_cupones_robo}
+                                  onChange={e => setCobForm({...cobForm, genera_cupones_robo: e.target.checked})}
+                                  className="h-5 w-5 cursor-pointer accent-[var(--color-ingreso)]"
                               />
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)] transition-colors group-hover:text-[var(--color-titulo)]">
                                   Genera Chequera Robo
                               </span>
                           </label>
@@ -296,43 +302,40 @@ export default function AdminCatalogos() {
               </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/10">
+          <div className="grid grid-cols-1 gap-6 border-t-2 border-[var(--color-linea)] pt-4 md:grid-cols-3">
             <div>
-               <TagInput 
-                  label="¿Qué Cubre? (Beneficios)" 
-                  icon={<HiStar className="text-amber-500" />}
-                  color="amber"
-                  placeholder="Ej: Granizo, Enter" 
-                  tags={cobForm.beneficios_default} 
-                  onChange={(newTags) => setCobForm({...cobForm, beneficios_default: newTags})} 
+               <TagInput
+                  label="¿Qué Cubre? (Beneficios)"
+                  icon={<HiStar className="text-[var(--color-tarjeta)]" />}
+                  color="tarjeta"
+                  tags={cobForm.beneficios_default}
+                  onChange={(newTags) => setCobForm({...cobForm, beneficios_default: newTags})}
                   suggestions={["Robo Total", "Incendio Parcial", "Granizo", "Cristales", "Cerraduras"]}
                />
             </div>
             <div>
-               <TagInput 
-                  label="Fotos Obligatorias" 
-                  icon={<HiPhotograph className="text-sky-400" />}
-                  color="sky"
-                  placeholder="Ej: FRENTE, Enter" 
-                  tags={cobForm.fotos_requeridas} 
-                  onChange={(newTags) => setCobForm({...cobForm, fotos_requeridas: newTags})} 
+               <TagInput
+                  label="Fotos Obligatorias"
+                  icon={<HiPhotograph className="text-[var(--color-oficina)]" />}
+                  color="oficina"
+                  tags={cobForm.fotos_requeridas}
+                  onChange={(newTags) => setCobForm({...cobForm, fotos_requeridas: newTags})}
                   suggestions={["FRENTE", "TRASERA", "LATERAL_IZQ", "LATERAL_DER", "INTERIOR"]}
                />
             </div>
             <div>
-               <TagInput 
-                  label="Papeles Legales" 
-                  icon={<HiDocumentText className="text-indigo-400" />}
-                  color="indigo"
-                  placeholder="Ej: VTV, Enter" 
-                  tags={cobForm.documentos_requeridos} 
-                  onChange={(newTags) => setCobForm({...cobForm, documentos_requeridos: newTags})} 
+               <TagInput
+                  label="Papeles Legales"
+                  icon={<HiDocumentText className="text-[var(--color-transferencia)]" />}
+                  color="transferencia"
+                  tags={cobForm.documentos_requeridos}
+                  onChange={(newTags) => setCobForm({...cobForm, documentos_requeridos: newTags})}
                   suggestions={["CEDULA_VERDE_FRENTE", "CEDULA_VERDE_DORSO", "TITULO", "VTV"]}
                />
             </div>
           </div>
 
-          <button type="submit" disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-500 transition-colors text-white py-3.5 rounded-xl font-black uppercase text-sm mt-6 flex justify-center disabled:opacity-50 shadow-lg shadow-emerald-900/20">
+          <button type="submit" disabled={saving} className="mt-4 flex w-full justify-center rounded-xl bg-[var(--color-ingreso)] py-3.5 text-sm font-black uppercase text-white shadow-[0_4px_0_var(--color-ingreso-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-ingreso-fuerte)] disabled:opacity-50">
             {saving ? "Guardando..." : "Guardar Cobertura"}
           </button>
         </form>
@@ -344,10 +347,10 @@ export default function AdminCatalogos() {
 function Modal({ open, onClose, title, wide = false, children }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className={`bg-slate-900 border border-white/10 rounded-[2.5rem] w-full ${wide ? 'max-w-5xl' : 'max-w-md'} shadow-2xl p-8 relative overflow-y-auto max-h-[90vh]`}>
-        <button onClick={onClose} className="absolute top-6 right-6 text-white/20 hover:text-white"><HiX size={24}/></button>
-        <h3 className="text-white font-black uppercase mb-6 text-lg">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className={`relative max-h-[90vh] w-full overflow-y-auto rounded-3xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-8 shadow-2xl ${wide ? 'max-w-5xl' : 'max-w-md'}`}>
+        <button onClick={onClose} className="absolute right-6 top-6 text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX size={24}/></button>
+        <h3 className="mb-6 text-lg font-black uppercase text-[var(--color-titulo)]">{title}</h3>
         {children}
       </div>
     </div>
@@ -357,22 +360,22 @@ function Modal({ open, onClose, title, wide = false, children }) {
 function Input({ label, onChange, ...props }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
-      <input 
-        {...props} 
-        onChange={(e) => onChange(e.target.value)} 
-        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold outline-none focus:border-amber-500/50 transition-all" 
+      <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)]">{label}</label>
+      <input
+        {...props}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-4 py-3 text-sm font-bold text-[var(--color-titulo)] outline-none transition-all focus:border-[var(--color-tarjeta)]"
       />
     </div>
   );
 }
 
-function TagInput({ label, tags = [], onChange, placeholder, suggestions = [], icon, color = "sky" }) {
+function TagInput({ label, tags = [], onChange, suggestions = [], icon, color = "oficina" }) {
   const [input, setInput] = useState("");
   const colorClasses = {
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    sky: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-    indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+    tarjeta: "bg-[var(--color-tarjeta)]/10 text-[#d97706] border-[var(--color-tarjeta)]/30",
+    oficina: "bg-[var(--color-oficina)]/10 text-[var(--color-oficina-fuerte)] border-[var(--color-oficina)]/30",
+    transferencia: "bg-[var(--color-transferencia)]/10 text-[var(--color-transferencia)] border-[var(--color-transferencia)]/30"
   };
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -389,23 +392,23 @@ function TagInput({ label, tags = [], onChange, placeholder, suggestions = [], i
   };
   return (
     <div className="space-y-3">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+      <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[var(--color-suave)]">
         {icon} {label}
       </label>
-      <div className="bg-black/40 border border-white/10 rounded-2xl p-3 min-h-[120px] flex flex-col">
-        <div className="flex flex-wrap gap-2 mb-2">
+      <div className="flex min-h-[120px] flex-col rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] p-3">
+        <div className="mb-2 flex flex-wrap gap-2">
           {tags.map((tag, idx) => (
-            <span key={idx} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border flex items-center gap-2 ${colorClasses[color]}`}>
+            <span key={idx} className={`flex items-center gap-2 rounded-lg border-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${colorClasses[color]}`}>
               {tag}
-              <button type="button" onClick={() => removeTag(tag)} className="hover:text-white"><HiX /></button>
+              <button type="button" onClick={() => removeTag(tag)} className="hover:text-[var(--color-titulo)]"><HiX /></button>
             </span>
           ))}
         </div>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Agregar..." className="bg-transparent border-none outline-none text-sm text-white font-medium w-full" />
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Agregar..." className="w-full border-none bg-transparent text-sm font-medium text-[var(--color-titulo)] outline-none placeholder:text-[var(--color-suave)]" />
       </div>
       <div className="flex flex-wrap gap-1.5">
         {suggestions.filter(s => !tags.includes(s.toUpperCase())).map((sug, idx) => (
-            <button key={idx} type="button" onClick={() => addSuggestion(sug)} className="px-2 py-1 rounded bg-white/5 border border-white/10 text-white/50 text-[9px] font-bold uppercase hover:text-white">
+            <button key={idx} type="button" onClick={() => addSuggestion(sug)} className="rounded border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-2 py-1 text-[9px] font-bold uppercase text-[var(--color-suave)] transition hover:text-[var(--color-titulo)]">
                 + {sug}
             </button>
         ))}

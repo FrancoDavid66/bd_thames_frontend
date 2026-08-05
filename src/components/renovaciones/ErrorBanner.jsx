@@ -14,7 +14,7 @@
 import { motion } from "framer-motion";
 import { HiExclamation, HiX, HiInformationCircle } from "react-icons/hi";
 
-const cx = (...a) => a.filter(Boolean).join(" ");
+import { cx } from "./utils";
 
 // Severidad según el código de error
 function severityFor(code) {

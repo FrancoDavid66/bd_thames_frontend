@@ -1,19 +1,17 @@
-/* src/components/recaudacion/CierreCajaReminder.jsx
+/* src/components/recaudacion/CierreCajaReminder.jsx  (diseño Duo)
  *
  * Pop-up global que avisa a los cajeros cuándo cerrar caja.
  * Aparece "aviso_min" antes (default 30), con cuenta regresiva y sonido tipo caja.
  * Da tolerancia (default 5 min) después de la hora.
  * Se monta una vez (global, dentro del Router). Solo actúa si la oficina del
- * usuario tiene horarios cargados y todavía no cerró ese turno.
+ * usuario tiene un horario cargado y todavía no cerró hoy.
  */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { HiCash, HiX, HiClock } from "react-icons/hi";
 import api from "../../services/api";
 
 const RUTA_CIERRE = "/recaudacion"; // ajustá si tu ruta de cierre es otra
-const NOMBRE_TURNO = { mediodia: "mediodía", noche: "noche" };
 
 function playKaching() {
   try {
@@ -54,10 +52,10 @@ const fmt = (ms) => {
 export default function CierreCajaReminder() {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState(null);
-  const [aviso, setAviso] = useState(null); // {turno, hora:Date, limite:Date}
+  const [aviso, setAviso] = useState(null); // {hora:Date, limite:Date}
   const [now, setNow] = useState(Date.now());
-  const descartados = useRef(new Set()); // "mediodia-2026-06-26"
-  const sono = useRef(null); // turno con sonido ya emitido
+  const descartados = useRef(new Set()); // "2026-06-26"
+  const sono = useRef(null); // fecha con sonido ya emitido
 
   // Cargar config de mi oficina (y refrescar cada 2 min para detectar si ya cerró)
   const cargar = async () => {
@@ -74,37 +72,36 @@ export default function CierreCajaReminder() {
     return () => clearInterval(id);
   }, []);
 
-  // Tick cada segundo
+  // Tick ADAPTATIVO: con aviso en pantalla latimos cada 1s (contador suave);
+  // sin aviso (95% del tiempo) cada 30s (ahorra batería del celular del cajero).
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const periodo = aviso ? 1000 : 30000;
+    const id = setInterval(() => setNow(Date.now()), periodo);
     return () => clearInterval(id);
-  }, []);
+  }, [aviso]);
 
-  // Evaluar si hay que mostrar
+  // Evaluar si hay que mostrar (un solo horario por oficina)
   useEffect(() => {
     if (!cfg) { setAviso(null); return; }
     const hoyKey = new Date().toISOString().slice(0, 10);
-    const cerrados = cfg.cerrados_hoy || [];
     const avisoMin = cfg.aviso_min ?? 30;
     const tolMin = cfg.tolerancia_min ?? 5;
     const ahora = new Date();
 
-    for (const turno of ["mediodia", "noche"]) {
-      const hora = hhmmToDate(cfg[turno]);
-      if (!hora) continue;
-      if (cerrados.includes(turno)) continue;
-      if (descartados.current.has(`${turno}-${hoyKey}`)) continue;
+    const hora = hhmmToDate(cfg.hora_cierre);
+    if (!hora) { setAviso(null); return; }
+    if (cfg.cerro_hoy) { setAviso(null); return; }
+    if (descartados.current.has(hoyKey)) { setAviso(null); return; }
 
-      const inicio = new Date(hora.getTime() - avisoMin * 60000);
-      const limite = new Date(hora.getTime() + tolMin * 60000);
-      if (ahora >= inicio && ahora <= limite) {
-        if (sono.current !== `${turno}-${hoyKey}`) {
-          playKaching();
-          sono.current = `${turno}-${hoyKey}`;
-        }
-        setAviso({ turno, hora, limite });
-        return;
+    const inicio = new Date(hora.getTime() - avisoMin * 60000);
+    const limite = new Date(hora.getTime() + tolMin * 60000);
+    if (ahora >= inicio && ahora <= limite) {
+      if (sono.current !== hoyKey) {
+        playKaching();
+        sono.current = hoyKey;
       }
+      setAviso({ hora, limite });
+      return;
     }
     setAviso(null);
   }, [cfg, now]);
@@ -118,69 +115,62 @@ export default function CierreCajaReminder() {
 
   const descartar = () => {
     const hoyKey = new Date().toISOString().slice(0, 10);
-    descartados.current.add(`${aviso.turno}-${hoyKey}`);
+    descartados.current.add(hoyKey);
     setAviso(null);
   };
 
+  // Tokens de estado según urgencia (aviso previo = ámbar / tolerancia = rojo)
+  const acento = enTolerancia ? "text-egreso dark:text-egreso-claro" : "text-tarjeta dark:text-tarjeta-claro";
+  const borde = enTolerancia ? "border-egreso/50" : "border-tarjeta/50";
+
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div
+        className={`w-full max-w-sm rounded-3xl border-2 ${borde} bg-card dark:bg-card-dark p-6 text-center shadow-2xl`}
       >
-        <motion.div
-          initial={{ scale: 0.9, y: 20, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className={`w-full max-w-sm overflow-hidden rounded-2xl border ${
-            enTolerancia ? "border-rose-500/40" : "border-amber-500/40"
-          } bg-slate-950`}
+        {/* Encabezado */}
+        <div className="mb-5 flex items-center justify-between">
+          <span className={`flex items-center gap-2 text-sm font-black ${acento}`}>
+            <HiCash className="text-base" /> Cierre de caja
+          </span>
+          <button
+            onClick={descartar}
+            className="rounded-lg p-1.5 bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+          >
+            <HiX className="text-lg" />
+          </button>
+        </div>
+
+        {/* Contexto */}
+        <p className="text-[13px] font-bold text-suave dark:text-suave-dark">
+          {enTolerancia
+            ? "¡Se cumplió la hora! Cerrá YA (tolerancia):"
+            : `Tenés que cerrar la caja a las ${aviso.hora.getHours()}:${String(aviso.hora.getMinutes()).padStart(2, "0")}`}
+        </p>
+
+        {/* Protagonista: countdown grande */}
+        <div className={`my-4 font-mono text-6xl font-black tabular-nums ${acento}`}>
+          {fmt(restante)}
+        </div>
+
+        <p className="flex items-center justify-center gap-1 text-[12px] font-bold text-suave dark:text-suave-dark">
+          <HiClock /> {enTolerancia ? "Tiempo de tolerancia restante" : "Tiempo hasta el cierre"}
+        </p>
+
+        {/* Acciones */}
+        <button
+          onClick={() => { navigate(RUTA_CIERRE); descartar(); }}
+          className="mt-6 w-full rounded-2xl bg-oficina py-3.5 text-sm font-black text-white shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
         >
-          <div className={`flex items-center justify-between px-5 py-3 ${
-            enTolerancia ? "bg-rose-500/15" : "bg-amber-500/15"
-          }`}>
-            <span className={`flex items-center gap-2 text-sm font-bold ${
-              enTolerancia ? "text-rose-300" : "text-amber-300"
-            }`}>
-              <HiCash className="text-lg" /> Cierre de caja ({NOMBRE_TURNO[aviso.turno]})
-            </span>
-            <button onClick={descartar} className="rounded-lg p-1 text-slate-400 hover:bg-white/5">
-              <HiX className="text-lg" />
-            </button>
-          </div>
-
-          <div className="px-5 py-5 text-center">
-            <p className="text-[13px] text-slate-400">
-              {enTolerancia
-                ? "¡Se cumplió la hora! Cerrá YA (tolerancia):"
-                : `Tenés que cerrar la caja a las ${aviso.hora.getHours()}:${String(aviso.hora.getMinutes()).padStart(2, "0")}`}
-            </p>
-
-            <div className={`my-3 font-mono text-5xl font-black tabular-nums ${
-              enTolerancia ? "text-rose-400" : "text-amber-400"
-            }`}>
-              {fmt(restante)}
-            </div>
-
-            <p className="flex items-center justify-center gap-1 text-[12px] text-slate-500">
-              <HiClock /> {enTolerancia ? "Tiempo de tolerancia restante" : "Tiempo hasta el cierre"}
-            </p>
-
-            <button
-              onClick={() => { navigate(RUTA_CIERRE); descartar(); }}
-              className="mt-5 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-500"
-            >
-              Ir a cerrar caja
-            </button>
-            <button
-              onClick={descartar}
-              className="mt-2 w-full rounded-xl py-2 text-[12px] text-slate-500 hover:text-slate-300"
-            >
-              Ahora no
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+          Ir a cerrar caja
+        </button>
+        <button
+          onClick={descartar}
+          className="mt-2 w-full rounded-xl py-2.5 text-[12px] font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+        >
+          Ahora no
+        </button>
+      </div>
+    </div>
   );
 }

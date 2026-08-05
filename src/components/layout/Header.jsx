@@ -1,23 +1,27 @@
 // src/components/layout/Header.jsx
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { HiMenu, HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp, HiCurrencyDollar } from "react-icons/hi";
 import { FaPowerOff } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useDispatch, useSelector } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+
+// 🚀 Logo oficial para la pantalla de desconexión
+import logoThames from "../../assets/logos/logo_thames.svg";
 
 // Slices
-import { fetchResumen, selectSolicitudesResumen }                   from "../../store/slices/solicitudesSlice";
+// 🧹 Se quitó `fetchResumen` (borrado del slice). El contador de solicitudes
+//    ahora se calcula desde la lista real (fetchSolicitudes + items).
+import { fetchSolicitudes, selectSolicitudes }              from "../../store/slices/solicitudesSlice";
 import { fetchCuponerasCounters }                                    from "../../store/slices/cuponesRoboSlice";
 import { fetchRenovacionesGlobalResumen, selectRenovacionesGlobalResumen } from "../../store/slices/renovacionesSlice";
 import { fetchBajasGlobalCounters, selectBajasGlobalCounters }      from "../../store/slices/bajasSlice";
 
-// 🚀 Caja rápida: refresco de datos + modales ya existentes
+// 🚀 Caja rápida: refresco de datos + modal combinado (ingreso/egreso en uno)
 import { fetchIngresos } from "../../store/slices/ingresosSlice";
 import { fetchEgresos } from "../../store/slices/egresosSlice";
-import IngresoCreateModal from "../balanzes/IngresoCreateModal";
-import EgresoCreateModal from "../balanzes/EgresoCreateModal";
+import MovimientoCreateModal from "../balanzes/MovimientoCreateModal";
 
 // 🚀 Banner de atención (pagos pendientes de Micaela)
 import AtencionBanner from "./AtencionBanner";
@@ -37,39 +41,35 @@ function NotificationsDropdown({ items, total, onClose }) {
   }, [onClose]);
 
   return (
-    <motion.div
+    <div
       ref={ref}
-      initial={{ opacity: 0, y: -8, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.97 }}
-      transition={{ duration: 0.15 }}
-      className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl z-50 overflow-hidden"
+      className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-2xl"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark px-4 py-3">
         <div className="flex items-center gap-2">
-          <HiBell className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <HiBell className="h-4 w-4 text-suave dark:text-suave-dark" />
+          <span className="text-sm font-black text-titulo dark:text-titulo-dark">
             Pendientes
           </span>
           {total > 0 && (
-            <span className="text-[10px] font-mono bg-red-500 text-white rounded-full px-1.5 py-0.5">
+            <span className="rounded-full bg-duo-rojo px-1.5 py-0.5 text-[10px] font-black text-white">
               {total}
             </span>
           )}
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="rounded-lg p-1 text-suave dark:text-suave-dark transition-colors hover:text-titulo dark:hover:text-titulo-dark"
         >
-          <HiX className="w-4 h-4" />
+          <HiX className="h-4 w-4" />
         </button>
       </div>
 
       {/* Items */}
-      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+      <div className="divide-y-2 divide-linea dark:divide-linea-dark">
         {items.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-400 dark:text-slate-500">
+          <div className="px-4 py-8 text-center text-sm font-semibold text-suave dark:text-suave-dark">
             Sin pendientes por ahora 🎉
           </div>
         ) : (
@@ -78,20 +78,20 @@ function NotificationsDropdown({ items, total, onClose }) {
               key={i}
               to={item.to}
               onClick={onClose}
-              className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors group"
+              className="group flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface dark:hover:bg-surface-dark"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${item.dotColor}`} />
+              <div className="flex min-w-0 items-center gap-3">
+                <div className={`h-2 w-2 shrink-0 rounded-full ${item.dotColor}`} />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+                  <p className="truncate text-sm font-bold text-titulo dark:text-titulo-dark transition-colors group-hover:text-oficina">
                     {item.label}
                   </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                  <p className="mt-0.5 truncate text-xs text-suave dark:text-suave-dark">
                     {item.desc}
                   </p>
                 </div>
               </div>
-              <span className={`shrink-0 ml-2 text-xs font-mono font-semibold px-2 py-0.5 rounded-full border ${item.badgeCls}`}>
+              <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-xs font-black ${item.badgeCls}`}>
                 {item.count}
               </span>
             </Link>
@@ -101,13 +101,13 @@ function NotificationsDropdown({ items, total, onClose }) {
 
       {/* Footer */}
       {items.length > 0 && (
-        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center">
+        <div className="border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5">
+          <p className="text-center text-[11px] text-suave dark:text-suave-dark">
             Se actualiza automáticamente cada 2 minutos
           </p>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -128,76 +128,77 @@ function PreciosModal({ onClose }) {
   }, [onClose]);
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.18 }}
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+        className="w-full max-w-lg overflow-hidden rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-2xl"
       >
         {/* Encabezado */}
-        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-emerald-500">
+        <div className="flex items-center justify-between bg-marca px-5 py-4">
           <div className="flex items-center gap-2">
-            <HiCurrencyDollar className="w-5 h-5 text-white" />
-            <span className="text-base font-bold text-white">Lista de precios NRE</span>
+            <HiCurrencyDollar className="h-5 w-5 text-white" />
+            <span className="text-base font-black text-white">Lista de precios NRE</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+            className="rounded-lg p-1 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
           >
-            <HiX className="w-5 h-5" />
+            <HiX className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tabla */}
         <div className="p-5">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Precios de NRE. Si el cliente <span className="font-semibold text-slate-700 dark:text-slate-200">ya tiene vehículos asegurados</span>, el 2do y el 3ro o más llevan <span className="font-semibold text-emerald-600 dark:text-emerald-400">oferta</span>:
+          <p className="mb-3 text-xs text-suave dark:text-suave-dark">
+            Precios de NRE. Si el cliente <span className="font-black text-titulo dark:text-titulo-dark">ya tiene vehículos asegurados</span>, el 2do y el 3ro o más llevan <span className="font-black text-ingreso-fuerte dark:text-ingreso-claro">oferta</span>:
           </p>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                <th className="py-2 font-semibold">Vehículo</th>
-                <th className="py-2 font-semibold text-right">1er</th>
-                <th className="py-2 font-semibold text-right text-emerald-600 dark:text-emerald-400">2do 🏷️</th>
-                <th className="py-2 font-semibold text-right text-emerald-600 dark:text-emerald-400">3ro+ 🏷️</th>
+              <tr className="border-b-2 border-linea dark:border-linea-dark text-left text-suave dark:text-suave-dark">
+                <th className="py-2 font-black">Vehículo</th>
+                <th className="py-2 text-right font-black">1er</th>
+                <th className="py-2 text-right font-black text-ingreso-fuerte dark:text-ingreso-claro">2do 🏷️</th>
+                <th className="py-2 text-right font-black text-ingreso-fuerte dark:text-ingreso-claro">3ro+ 🏷️</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y-2 divide-linea dark:divide-linea-dark">
               {PRECIOS_LISTA.map((p) => (
                 <tr key={p.tipo}>
-                  <td className="py-2.5 font-medium text-slate-700 dark:text-slate-200">{p.tipo}</td>
-                  <td className="py-2.5 text-right font-bold text-slate-900 dark:text-white">${p.base}</td>
-                  <td className="py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${p.seg}</td>
-                  <td className="py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${p.ter}</td>
+                  <td className="py-2.5 font-bold text-titulo dark:text-titulo-dark">{p.tipo}</td>
+                  <td className="py-2.5 text-right font-black text-titulo dark:text-titulo-dark">${p.base}</td>
+                  <td className="py-2.5 text-right font-bold text-ingreso-fuerte dark:text-ingreso-claro">${p.seg}</td>
+                  <td className="py-2.5 text-right font-bold text-ingreso-fuerte dark:text-ingreso-claro">${p.ter}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* El Talita */}
-          <div className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">El Talita</p>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Auto: <span className="font-bold text-slate-900 dark:text-white">$25.000</span> (alta) / <span className="font-bold text-slate-900 dark:text-white">$30.000</span> (renovación). El resto, igual que arriba.
+          <div className="mt-4 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3">
+            <p className="mb-1 text-xs font-black uppercase tracking-wider text-oficina">El Talita</p>
+            <p className="text-sm text-titulo dark:text-titulo-dark">
+              Auto: <span className="font-black">$25.000</span> (alta) / <span className="font-black">$30.000</span> (renovación). El resto, igual que arriba.
             </p>
           </div>
 
-          <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-3 text-xs text-suave dark:text-suave-dark">
             🏷️ La oferta del 2do/3ro se aplica sola al cargar la póliza, según los vehículos que ya tenga el cliente. Sin promo: todas las cuotas al mismo precio.
           </p>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
+}
+
+/* ─── Helpers de contadores de solicitudes ─────────────────── */
+function getTareas(s) {
+  return {
+    alta_compania: Boolean(s?.tareas?.alta_compania ?? s?.alta_compania ?? false),
+    enviar_poliza: Boolean(s?.tareas?.enviar_poliza ?? s?.enviar_poliza ?? false),
+  };
 }
 
 /* ─── Header ───────────────────────────────────────────────── */
@@ -208,9 +209,8 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
   const [isLoggingOut, setIsLoggingOut]           = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // 🚀 Estado de los modales de Caja Rápida
-  const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
-  const [modalEgresoAbierto, setModalEgresoAbierto]   = useState(false);
+  // 🚀 Caja Rápida: un solo estado "INGRESO" | "EGRESO" | null.
+  const [modalTipo, setModalTipo] = useState(null);
   const [modalPreciosAbierto, setModalPreciosAbierto] = useState(false);
 
   const isAdmin       = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
@@ -220,10 +220,19 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
 
   // ── Leer todos los contadores desde Redux ───────────────────
 
-  // Solicitudes
-  const resumen  = useSelector(selectSolicitudesResumen);
-  const solAlta  = Number(resumen?.por_asegurar || 0);
-  const solEnvio = Number(resumen?.vigentes_24h || 0);
+  // Solicitudes — 🧹 ahora se calculan desde la LISTA real (no de un /resumen/).
+  //   solAlta  = activas sin "alta_compania"
+  //   solEnvio = activas sin "enviar_poliza"
+  const solicitudesList = useSelector(selectSolicitudes) || [];
+  const { solAlta, solEnvio } = useMemo(() => {
+    const activos = (Array.isArray(solicitudesList) ? solicitudesList : []).filter(
+      (s) => s?.estado !== "TERMINADA"
+    );
+    return {
+      solAlta:  activos.filter((s) => !getTareas(s).alta_compania).length,
+      solEnvio: activos.filter((s) => !getTareas(s).enviar_poliza).length,
+    };
+  }, [solicitudesList]);
 
   // Cuponeras — stats puede ser null antes del primer fetch
   const cuponStats   = useSelector((s) => s?.cuponesRobo?.stats || null);
@@ -246,7 +255,7 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
     if (isVendedor) return;
 
     const fetchAll = () => {
-      dispatch(fetchResumen());
+      dispatch(fetchSolicitudes());          // 🧹 antes: fetchResumen()
       dispatch(fetchCuponerasCounters({}));
       dispatch(fetchRenovacionesGlobalResumen({}));
       dispatch(fetchBajasGlobalCounters({}));
@@ -257,126 +266,130 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
     return () => clearInterval(id);
   }, [dispatch, isVendedor]);
 
-  // ── Items del dropdown ───────────────────────────────────────
+  // ── Items del dropdown (badges con tokens Duo) ───────────────
   const notifItems = [
     solAlta > 0 && {
       to:       "/solicitudes",
       label:    "Pendientes de alta",
       desc:     "Esperan ser cargadas en la compañía",
       count:    solAlta,
-      dotColor: "bg-red-500",
-      badgeCls: "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800",
+      dotColor: "bg-duo-rojo",
+      badgeCls: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo",
     },
     solEnvio > 0 && {
       to:       "/solicitudes",
       label:    "Pendientes de envío",
       desc:     "Esperan ser enviadas al asegurado",
       count:    solEnvio,
-      dotColor: "bg-orange-500",
-      badgeCls: "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800",
+      dotColor: "bg-duo-amarillo",
+      badgeCls: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
     },
     cuponVencidas > 0 && {
       to:       "/cuponeras",
       label:    "Cuponeras vencidas",
       desc:     "Cupones de robo sin pagar",
       count:    cuponVencidas,
-      dotColor: "bg-rose-500",
-      badgeCls: "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-800",
+      dotColor: "bg-duo-rojo",
+      badgeCls: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo",
     },
     renovPendientes > 0 && {
       to:       "/polizas/renovaciones",
       label:    "Renovaciones vencidas",
       desc:     "Pólizas vencidas sin renovar",
       count:    renovPendientes,
-      dotColor: "bg-amber-500",
-      badgeCls: "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800",
+      dotColor: "bg-duo-amarillo",
+      badgeCls: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
     },
     bajasPendientes > 0 && {
       to:       "/polizas/bajas",
       label:    "Bajas pendientes de envío",
       desc:     "Solicitudes de baja sin procesar",
       count:    bajasPendientes,
-      dotColor: "bg-slate-500",
-      badgeCls: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+      dotColor: "bg-suave",
+      badgeCls: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark",
     },
     Number(verificacionCount) > 0 && {
       to:       "/polizas?estado=en_verificacion",
       label:    "Pólizas en verificación",
       desc:     "Cobros con baja reciente — revisar",
       count:    Number(verificacionCount),
-      dotColor: "bg-orange-500",
-      badgeCls: "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800",
+      dotColor: "bg-duo-amarillo",
+      badgeCls: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
     },
     Number(siniestrosAbiertos) > 0 && {
       to:       "/siniestros",
       label:    "Siniestros abiertos",
       desc:     "Reclamos pendientes de resolución",
       count:    Number(siniestrosAbiertos),
-      dotColor: "bg-red-500",
-      badgeCls: "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800",
+      dotColor: "bg-duo-rojo",
+      badgeCls: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo",
     },
   ].filter(Boolean);
 
   // ── Handlers ─────────────────────────────────────────────────
+  //   🦉 Logout con pantalla Duo de "Desconectando…" (2s) y después cierra.
   const handleLogoutSequence = () => {
     setIsLoggingOut(true);
-    setTimeout(() => logout(), 2200);
+    setTimeout(() => logout(), 2000);
   };
 
   const closeNotif = useCallback(() => setShowNotifications(false), []);
 
-  // 🚀 Al cerrar cada modal, refrescamos para mantener el tablero al día
-  const cerrarIngreso = () => {
-    setModalIngresoAbierto(false);
+  // 🚀 Al cerrar el modal, refrescamos ingresos Y egresos (el modal combinado
+  //    maneja los dos), para mantener el tablero al día.
+  const cerrarMovimiento = () => {
+    setModalTipo(null);
     dispatch(fetchIngresos());
-  };
-
-  const cerrarEgreso = () => {
-    setModalEgresoAbierto(false);
     dispatch(fetchEgresos());
   };
 
   // ── Render ───────────────────────────────────────────────────
   return (
     <>
-      {/* Pantalla de desconexión */}
+      {/* 🦉 Pantalla de DESCONEXIÓN (Duo) — al cerrar sesión.
+          Tu LOGO ORIGINAL en un cuadrado Duo 3D + barra que se vacía. Claro/oscuro. */}
       <AnimatePresence>
         {isLoggingOut && (
           <motion.div
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#030712] text-white"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-surface dark:bg-surface-dark"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
+            {/* Cuadrado Duo 3D con el logo horizontal adentro (el logo NO se toca) */}
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              className="flex items-center justify-center rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-7 py-6 shadow-[0_6px_0_var(--color-linea)] dark:shadow-[0_6px_0_var(--color-linea-dark)]"
+              initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
-              className="flex flex-col items-center text-center px-4"
+              transition={{ duration: 0.4, ease: "easeOut" }}
             >
-              <motion.div
-                animate={{ scale: [1, 0.8, 0], opacity: [1, 0.5, 0], rotate: [0, -90] }}
-                transition={{ duration: 2, ease: "easeInOut" }}
-                className="h-24 w-24 mb-6 flex items-center justify-center rounded-[2rem] bg-rose-500/10 border border-rose-500/30 shadow-[0_0_50px_-10px_rgba(244,63,94,0.6)]"
-              >
-                <FaPowerOff className="text-5xl text-rose-500" />
-              </motion.div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-500">
-                Desconectando...
-              </h1>
-              <p className="mt-4 text-xs sm:text-sm font-medium tracking-widest text-zinc-500 uppercase">
-                Cerrando canal seguro de {nombreOficina}
-              </p>
-              <div className="mt-8 h-1 w-64 overflow-hidden rounded-full bg-white/10 relative">
-                <motion.div
-                  className="absolute left-0 top-0 h-full bg-gradient-to-r from-rose-500 to-orange-500"
-                  initial={{ width: "100%" }}
-                  animate={{ width: "0%" }}
-                  transition={{ duration: 1.8, ease: "easeInOut" }}
-                />
-              </div>
+              <motion.img
+                src={logoThames}
+                alt="Estudio Thames"
+                className="h-14 w-auto sm:h-16"
+                animate={{ opacity: [1, 0.55, 1] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              />
             </motion.div>
+
+            <div className="text-center">
+              <div className="text-xl font-black tracking-tight text-titulo dark:text-titulo-dark">
+                Cerrando sesión…
+              </div>
+              <div className="mt-1 text-[11px] font-bold uppercase tracking-widest text-suave dark:text-suave-dark">
+                Cerrando canal seguro de {nombreOficina}
+              </div>
+            </div>
+
+            <div className="h-2.5 w-52 overflow-hidden rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+              <motion.div
+                className="h-full rounded-full bg-marca"
+                initial={{ width: "100%" }}
+                animate={{ width: "0%" }}
+                transition={{ duration: 1.8, ease: "easeInOut" }}
+              />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -386,83 +399,77 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
         <AtencionBanner />
       </div>
 
-      {/* Header normal */}
+      {/* Header normal (Duo) */}
       <header
         role="banner"
         className={`
           fixed inset-x-0 z-40
-          bg-white/80 dark:bg-slate-900/80 backdrop-blur-md
-          border-b border-slate-200 dark:border-slate-800
-          h-20 flex items-center
+          bg-card/95 dark:bg-card-dark/95 backdrop-blur
+          border-b-2 border-linea dark:border-linea-dark
+          h-16 flex items-center
           transition-all duration-300
           ${sidebarOpen ? "lg:pl-64" : ""}
         `}
         style={{ top: 0, paddingTop: "env(safe-area-inset-top)" }}
       >
-        <div className="w-full flex items-center justify-between px-4 sm:px-6 h-full">
+        <div className="flex h-full w-full items-center justify-between px-4 sm:px-6">
 
           {/* Izquierda: menú + logo */}
           <div className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={toggleSidebar}
-              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
+              className="rounded-xl p-2 text-suave dark:text-suave-dark transition-colors hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark focus:outline-none"
             >
               {sidebarOpen ? <HiX className="text-2xl" /> : <HiMenu className="text-2xl" />}
             </button>
-            <div className="hidden sm:flex items-center">
-              <span className="text-xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
-                THAMES APP 3.0
+            <div className="hidden items-center gap-2.5 sm:flex">
+              {/* Isotipo (columna) en cuadradito Duo */}
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1.5">
+                <img src={logoThames} alt="Thames" className="h-full w-full object-contain" />
+              </span>
+              <span className="text-xl font-black tracking-tight text-titulo dark:text-titulo-dark">
+                THAMES <span className="text-marca">APP</span>
               </span>
             </div>
           </div>
 
           {/* Centro: logo mobile */}
-          <div className="sm:hidden absolute left-1/2 -translate-x-1/2">
-            <span className="text-lg font-black tracking-tight bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
+          <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 sm:hidden">
+            <img src={logoThames} alt="Thames" className="h-7 w-auto object-contain" />
+            <span className="text-lg font-black tracking-tight text-titulo dark:text-titulo-dark">
               THAMES
             </span>
           </div>
 
           {/* Derecha: caja rápida + campana + usuario + logout */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
 
-            {/* 🚀 Caja rápida: Ingreso / Egreso */}
+            {/* 🚀 Caja rápida: Ingreso / Egreso / Precios */}
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setModalIngresoAbierto(true)}
+                onClick={() => setModalTipo("INGRESO")}
                 title="Cargar Ingreso"
-                className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors focus:outline-none"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-2 text-ingreso-fuerte dark:text-ingreso-claro transition-colors hover:bg-ingreso/10 focus:outline-none"
               >
                 <HiArrowCircleDown className="text-xl" />
-                <span className="hidden sm:inline text-sm font-semibold">Ingreso</span>
+                <span className="hidden text-sm font-black sm:inline">Ingreso</span>
               </button>
               <button
-                onClick={() => setModalEgresoAbierto(true)}
+                onClick={() => setModalTipo("EGRESO")}
                 title="Cargar Egreso"
-                className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors focus:outline-none"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-2 text-egreso-fuerte dark:text-egreso-claro transition-colors hover:bg-egreso/10 focus:outline-none"
               >
                 <HiArrowCircleUp className="text-xl" />
-                <span className="hidden sm:inline text-sm font-semibold">Egreso</span>
+                <span className="hidden text-sm font-black sm:inline">Egreso</span>
               </button>
-              <motion.button
+              <button
                 onClick={() => setModalPreciosAbierto(true)}
                 title="Ver lista de precios"
-                className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-white font-semibold bg-gradient-to-r from-blue-600 to-emerald-500 focus:outline-none"
-                animate={{
-                  boxShadow: [
-                    "0 0 0 0 rgba(16,185,129,0.0)",
-                    "0 0 18px 3px rgba(16,185,129,0.6)",
-                    "0 0 0 0 rgba(16,185,129,0.0)",
-                  ],
-                  scale: [1, 1.05, 1],
-                }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-marca px-3 py-2 font-black text-white shadow-[0_4px_0_#8a0000] transition-all active:translate-y-0.5 active:shadow-[0_0_0_#8a0000] focus:outline-none"
               >
                 <HiCurrencyDollar className="text-xl" />
-                <span className="hidden sm:inline text-sm">Precios</span>
-              </motion.button>
+                <span className="hidden text-sm sm:inline">Precios</span>
+              </button>
             </div>
 
             {/* Campana — oculta para vendedores */}
@@ -470,44 +477,42 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications((v) => !v)}
-                  className={`relative p-2.5 rounded-xl transition-colors focus:outline-none ${
+                  className={`relative rounded-xl p-2.5 transition-colors focus:outline-none ${
                     showNotifications
-                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"
-                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      ? "bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro"
+                      : "text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark"
                   }`}
                   title="Notificaciones"
                 >
                   <HiBell className="text-xl" />
                   {totalNotif > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold inline-flex items-center justify-center leading-none">
+                    <span className="absolute -right-0.5 -top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-duo-rojo px-1 text-[10px] font-black leading-none text-white">
                       {totalNotif > 99 ? "99+" : totalNotif}
                     </span>
                   )}
                 </button>
 
-                <AnimatePresence>
-                  {showNotifications && (
-                    <NotificationsDropdown
-                      items={notifItems}
-                      total={totalNotif}
-                      onClose={closeNotif}
-                    />
-                  )}
-                </AnimatePresence>
+                {showNotifications && (
+                  <NotificationsDropdown
+                    items={notifItems}
+                    total={totalNotif}
+                    onClose={closeNotif}
+                  />
+                )}
               </div>
             )}
 
             {/* Píldora usuario */}
-            <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-full pr-1.5 pl-4 py-1.5 border border-slate-200 dark:border-slate-700 shadow-sm">
-              <div className="hidden sm:flex flex-col items-end mr-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <div className="flex items-center rounded-full border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark py-1.5 pl-4 pr-1.5">
+              <div className="mr-3 hidden flex-col items-end sm:flex">
+                <span className="text-xs font-black uppercase tracking-wider text-oficina">
                   {nombreOficina}
                 </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[120px]">
+                <span className="max-w-[120px] truncate text-[11px] font-bold text-suave dark:text-suave-dark">
                   {user?.username}
                 </span>
               </div>
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-emerald-400 flex items-center justify-center text-white font-extrabold text-base shadow-inner">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-marca text-base font-black text-white">
                 {avatarLetter}
               </div>
             </div>
@@ -515,8 +520,9 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
             {/* Logout */}
             <button
               onClick={handleLogoutSequence}
+              disabled={isLoggingOut}
               title="Cerrar Sesión"
-              className="p-3 rounded-full cursor-pointer text-slate-400 hover:text-white hover:bg-rose-500 transition-colors shadow-sm"
+              className="cursor-pointer rounded-full border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-suave dark:text-suave-dark transition-colors hover:bg-duo-rojo hover:text-white disabled:opacity-50"
             >
               <FaPowerOff className="text-lg" />
             </button>
@@ -525,9 +531,12 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
         </div>
       </header>
 
-      {/* 🚀 Modales de Caja Rápida (los mismos que en Balances) */}
-      <IngresoCreateModal isOpen={modalIngresoAbierto} onClose={cerrarIngreso} />
-      <EgresoCreateModal isOpen={modalEgresoAbierto} onClose={cerrarEgreso} />
+      {/* 🚀 Modal de Caja Rápida (combinado, el mismo que en Balances) */}
+      <MovimientoCreateModal
+        isOpen={modalTipo !== null}
+        tipoInicial={modalTipo || "INGRESO"}
+        onClose={cerrarMovimiento}
+      />
 
       {/* 💰 Modal de lista de precios */}
       <AnimatePresence>

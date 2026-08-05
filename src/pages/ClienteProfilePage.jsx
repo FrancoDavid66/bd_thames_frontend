@@ -1,21 +1,20 @@
 // src/pages/ClienteProfilePage.jsx
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { HiUser, HiShieldCheck, HiExclamationCircle, HiExternalLink } from 'react-icons/hi';
+import { HiShieldCheck, HiExclamationCircle, HiExternalLink, HiPencil, HiTrash } from 'react-icons/hi';
 
 import { useAuth } from '../context/AuthContext';
-import { fetchClienteById, fetchClientes, updateCliente, deleteCliente } from '../store/slices/clientesSlice';
+import { fetchClienteById, deleteCliente } from '../store/slices/clientesSlice';
 
-import ClienteEditModal from '../components/clientes/ClienteEditModal';
+import Boton3D from '../components/ui/Boton3D';
+import CardDuo from '../components/ui/CardDuo';
+import ClienteFormModal from '../components/clientes/ClienteFormModal';
 import ClienteDatosPersonalesCard from '../components/clientes/ClienteDatosPersonalesCard';
 import ClienteDocumentacionCard from '../components/clientes/ClienteDocumentacionCard';
 import ClientePolizasCard from '../components/clientes/ClientePolizasCard';
-import PolizaCreateModal from '../components/polizas/PolizaCreateModal';
-import BotonEditarCliente from '../components/comunes/BotonEditarCliente';
-import BotonBorrarCliente from '../components/comunes/BotonBorrarCliente';
 import ConfirmModal from '../components/comunes/ConfirmModal';
 
 const ClienteProfilePage = () => {
@@ -23,7 +22,7 @@ const ClienteProfilePage = () => {
   const idKey = String(id ?? '');
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
 
@@ -41,13 +40,12 @@ const ClienteProfilePage = () => {
 
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
-  const [modalCrearPolizaAbierto, setModalCrearPolizaAbierto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [cargandoPortal, setCargandoPortal] = useState(false);
 
   // 🚀 Abrir el Portal del Asegurado de este cliente (lo que ve el cliente) en otra pestaña.
   //    Pide el token al backend (lo crea si no existe) y abre el link.
-  const handleVerPortal = async () => {
+  const handleVerPortal = useCallback(async () => {
     if (!id || cargandoPortal) return;
     try {
       setCargandoPortal(true);
@@ -83,26 +81,25 @@ const ClienteProfilePage = () => {
     } finally {
       setCargandoPortal(false);
     }
-  };
-
-  // 🚀 MAGIA: Estado para inyectar la póliza al instante
-  const [polizasNuevas, setPolizasNuevas] = useState([]);
+  }, [id, cargandoPortal]);
 
   useEffect(() => {
     if (!id) return;
-    dispatch(fetchClienteById(id));
+    // 🚀 Guardamos la promesa para poder CANCELAR el fetch si el usuario
+    //    sale de la ficha antes de que termine (evita warning de componente
+    //    desmontado y ahorra una request innecesaria).
+    const promesa = dispatch(fetchClienteById(id));
+    return () => { if (promesa?.abort) promesa.abort(); };
   }, [dispatch, id]);
 
-  const handleSaveCliente = async (updated) => {
-    try {
-      await dispatch(updateCliente(updated)).unwrap();
-      toast.success('Ficha actualizada correctamente');
-      setModalEditarAbierto(false);
-      if (id) dispatch(fetchClienteById(id));
-    } catch { toast.error('No se pudo actualizar'); }
-  };
+  // El modal unificado (vía useClienteForm) ya hace el updateCliente + toast.
+  // Acá solo cerramos y refrescamos la ficha para traer los datos nuevos.
+  const handleSaveCliente = useCallback(() => {
+    setModalEditarAbierto(false);
+    if (id) dispatch(fetchClienteById(id));
+  }, [dispatch, id]);
 
-  const handleBorrarCliente = async () => {
+  const handleBorrarCliente = useCallback(async () => {
     if (!isWebAdmin) {
       toast.error('Acceso Denegado: Solo admins pueden borrar clientes.');
       setModalEliminarAbierto(false);
@@ -115,52 +112,25 @@ const ClienteProfilePage = () => {
       toast.success('Cliente eliminado definitivamente');
       navigate('/clientes');
     } catch { toast.error('No se pudo eliminar'); } finally { setEliminando(false); }
-  };
+  }, [isWebAdmin, cliente, eliminando, dispatch, navigate]);
 
-  const abrirCrearPoliza = () => setModalCrearPolizaAbierto(true);
+  // 🎨 Iniciales para el avatar del header (nombre + apellido)
+  const iniciales = useMemo(() => {
+    const n = String(cliente?.nombre || '').trim();
+    const a = String(cliente?.apellido || '').trim();
+    return (`${n.charAt(0)}${a.charAt(0)}`.toUpperCase().trim()) || '?';
+  }, [cliente]);
 
-  // 🚀 FIX: Atrapamos la póliza nueva e inyectamos al instante sin recargar la página
-  const handlePolizaCreada = (nuevaPoliza) => {
-    setModalCrearPolizaAbierto(false);
-    
-    // La agregamos localmente para que se vea YA MISMO en la tarjeta
-    if (nuevaPoliza && nuevaPoliza.id) {
-      setPolizasNuevas((prev) => [nuevaPoliza, ...prev]);
-    }
-
-    // Refrescamos Redux en segundo plano (con un mini delay para dar tiempo a la DB a asentar los datos)
-    setTimeout(() => {
-      if (id) dispatch(fetchClienteById(id));
-      dispatch(fetchClientes({ page: 1 }));
-    }, 600);
-  };
-
-  // 🚀 Fusionamos el cliente de Redux con las pólizas inyectadas en tiempo real
-  const clienteParaMostrar = useMemo(() => {
-    if (!cliente) return null;
-    
-    const polizasActuales = cliente.polizas || [];
-    const idsActuales = new Set(polizasActuales.map(p => p.id));
-    
-    // Evitamos duplicados por si Redux ya se actualizó y trajo la póliza nueva
-    const agregadas = polizasNuevas.filter(p => !idsActuales.has(p.id));
-    
-    return {
-      ...cliente,
-      polizas: [...agregadas, ...polizasActuales]
-    };
-  }, [cliente, polizasNuevas]);
-
-  if (detailStatus === 'loading' || (status === 'loading' && !clienteParaMostrar)) {
+  if (detailStatus === 'loading' || (status === 'loading' && !cliente)) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
-        <div className="h-10 w-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mb-4" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-sky-400/80">Cargando Ficha...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center bg-surface dark:bg-surface-dark">
+        <div className="h-12 w-12 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin mb-4" />
+        <p className="text-[11px] font-black uppercase tracking-widest text-duo-azul">Cargando Ficha...</p>
       </div>
     );
   }
 
-  if (detailStatus === 'failed' || (status === 'failed' && !clienteParaMostrar)) {
+  if (detailStatus === 'failed' || (status === 'failed' && !cliente)) {
     // 🚨 Distinguimos el tipo de error para mostrar un mensaje útil
     const httpStatus = detailError?.status || null;
     let titulo, mensaje, icono;
@@ -183,88 +153,102 @@ const ClienteProfilePage = () => {
     }
 
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
-        <HiExclamationCircle className="text-rose-500/50 text-6xl mb-4" />
-        <p className="text-sm font-bold text-rose-400 uppercase tracking-widest">{titulo}</p>
-        <p className="text-sm text-slate-400 mt-2 max-w-md">{mensaje}</p>
-        {httpStatus && (
-          <p className="text-[10px] text-slate-600 mt-2 font-mono">HTTP {httpStatus}</p>
-        )}
-        <button onClick={() => navigate('/clientes')} className="mt-6 px-6 py-3 rounded-xl bg-white/5 text-white/60 font-bold uppercase text-[10px] hover:bg-white/10 transition-colors">
-          Volver al Directorio
-        </button>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-surface dark:bg-surface-dark">
+        <CardDuo className="max-w-md w-full p-8 flex flex-col items-center">
+          <div className="h-16 w-16 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center mb-4">
+            <HiExclamationCircle className="text-duo-rojo text-4xl" />
+          </div>
+          <p className="text-lg font-black text-duo-rojo uppercase tracking-wide">{titulo}</p>
+          <p className="text-sm font-bold text-suave dark:text-suave-dark mt-2">{mensaje}</p>
+          {httpStatus && (
+            <p className="text-[10px] text-suave dark:text-suave-dark mt-2 font-mono">HTTP {httpStatus}</p>
+          )}
+          <div className="mt-6 w-full">
+            <Boton3D variant="blanco" size="sm" full onClick={() => navigate('/clientes')}>
+              Volver al Directorio
+            </Boton3D>
+          </div>
+        </CardDuo>
       </div>
     );
   }
 
-  if (!clienteParaMostrar) return null;
+  if (!cliente) return null;
 
   return (
     <motion.div
-      className="min-h-[100dvh] bg-[#0b0f19] text-white p-4 sm:p-6 lg:p-8 pb-24"
+      className="min-h-[100dvh] bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark p-4 sm:p-6 lg:p-8 pb-24"
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        
-        {/* Header Mobile-Friendly */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-4 min-w-0">
-             <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 shadow-lg">
-               <HiUser className="text-4xl" />
-             </div>
-             <div className="min-w-0">
-               <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-1">
-                 Ficha #{clienteParaMostrar.id}
-               </h2>
-               <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter truncate text-white">
-                 {`${clienteParaMostrar?.nombre ?? ''} ${clienteParaMostrar?.apellido ?? ''}`.trim()}
-               </h1>
-               <div className="flex items-center gap-2 mt-1">
-                 <HiShieldCheck className="text-emerald-400 text-sm shrink-0" />
-                 <span className="text-[9px] sm:text-[10px] text-emerald-400/80 font-black uppercase tracking-widest truncate">
-                    Sucursal: {user?.perfil?.oficina_nombre || 'Local'}
-                 </span>
-               </div>
-             </div>
+
+        {/* Header estilo Duolingo: banner con degradé azul */}
+        <div className="bg-gradient-to-br from-duo-azul to-[#0d9de0] rounded-3xl shadow-[0_4px_0_var(--color-duo-azul-sombra)] p-6 sm:p-7 flex flex-col md:flex-row md:items-center gap-5">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <div className="h-20 w-20 sm:h-22 sm:w-22 rounded-full bg-white text-duo-azul flex items-center justify-center text-3xl font-black shrink-0 border-4 border-white/50">
+              {iniciales}
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight truncate">
+                {`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim() || 'Cliente'}
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[13px] font-extrabold text-white/90">
+                <span>Ficha #{cliente.id}</span>
+                <span className="opacity-60">•</span>
+                <span className="inline-flex items-center gap-1">
+                  <HiShieldCheck className="text-base shrink-0" />
+                  {user?.perfil?.oficina_nombre || 'Local'}
+                </span>
+                <span className="opacity-60">•</span>
+                <span>Estado: {cliente?.estado || 'Activo'}</span>
+              </div>
+            </div>
           </div>
-          
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-            <button
-              type="button"
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <Boton3D
+              variant="amarillo"
+              size="sm"
               onClick={handleVerPortal}
               disabled={cargandoPortal}
               title="Abrir el portal que ve el cliente (otra pestaña)"
-              className="w-full sm:w-auto h-12 sm:h-10 inline-flex justify-center items-center gap-2 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-500/20 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <HiExternalLink className="text-base" />
               {cargandoPortal ? "Abriendo..." : "Ver portal"}
-            </button>
-            <div className="w-full sm:w-auto" onClick={() => setModalEditarAbierto(true)}>
-               <BotonEditarCliente className="w-full h-12 sm:h-10 flex justify-center" />
+            </Boton3D>
+
+            <div onClick={() => setModalEditarAbierto(true)}>
+              <Boton3D variant="blanco" size="sm">
+                <HiPencil className="text-base" />
+                Editar
+              </Boton3D>
             </div>
+
             {isWebAdmin && (
-              <div className="w-full sm:w-auto" onClick={() => setModalEliminarAbierto(true)}>
-                 <BotonBorrarCliente className="w-full h-12 sm:h-10 flex justify-center" />
+              <div onClick={() => setModalEliminarAbierto(true)}>
+                <Boton3D variant="rojo" size="sm">
+                  <HiTrash className="text-base" />
+                  Borrar
+                </Boton3D>
               </div>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-1"><ClienteDatosPersonalesCard cliente={clienteParaMostrar} /></div>
-          <div className="xl:col-span-2"><ClienteDocumentacionCard cliente={clienteParaMostrar} /></div>
-        </div>
+        {/* Datos personales a todo el ancho + documentación compacta debajo */}
+        <ClienteDatosPersonalesCard cliente={cliente} />
+
+        <ClienteDocumentacionCard cliente={cliente} />
 
         <div className="pt-2">
-          {/* 🚀 Pasamos el cliente fusionado a la tarjeta de Pólizas */}
-          <ClientePolizasCard cliente={clienteParaMostrar} onCrearPoliza={abrirCrearPoliza} />
+          {/* Tarjeta de pólizas: solo VER. El alta de pólizas va por Solicitudes. */}
+          <ClientePolizasCard cliente={cliente} />
         </div>
 
-        <ClienteEditModal isOpen={modalEditarAbierto} onClose={() => setModalEditarAbierto(false)} onSave={handleSaveCliente} cliente={clienteParaMostrar} />
-        <PolizaCreateModal isOpen={modalCrearPolizaAbierto} onClose={() => setModalCrearPolizaAbierto(false)} onSuccess={handlePolizaCreada} clienteId={clienteParaMostrar?.id} />
-        <ConfirmModal isOpen={modalEliminarAbierto} onClose={() => setModalEliminarAbierto(false)} nombre={`${clienteParaMostrar?.nombre ?? ''} ${clienteParaMostrar?.apellido ?? ''}`.trim()} onConfirm={handleBorrarCliente} confirmDisabled={eliminando} />
+        <ClienteFormModal isOpen={modalEditarAbierto} onClose={() => setModalEditarAbierto(false)} onSave={handleSaveCliente} cliente={cliente} />
+        <ConfirmModal isOpen={modalEliminarAbierto} onClose={() => setModalEliminarAbierto(false)} nombre={`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim()} onConfirm={handleBorrarCliente} confirmDisabled={eliminando} />
       </div>
     </motion.div>
   );

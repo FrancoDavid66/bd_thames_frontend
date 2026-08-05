@@ -1,4 +1,4 @@
-// src/pages/EstadisticasPage.jsx
+// src/pages/EstadisticasPage.jsx  (diseño Duo)
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiShieldCheck, HiTruck, HiChartBar } from "react-icons/hi";
@@ -60,27 +60,19 @@ const formatMixPercent = (value, total) => {
   return `${pct.toFixed(0)}%`;
 };
 
-const ORBS = [
-  { top: "12%", left: "10%", size: 140, duration: 18 },
-  { top: "70%", left: "15%", size: 160, duration: 22 },
-  { top: "30%", left: "85%", size: 120, duration: 20 },
-  { top: "65%", left: "80%", size: 180, duration: 26 },
-];
-
 function TabButton({ active, onClick, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "relative rounded-xl px-3 py-2 text-[12px] font-semibold transition",
+        "relative rounded-xl px-3.5 py-2 text-[12px] font-black transition-all border-2",
         active
-          ? "bg-white/10 text-slate-50 border border-white/15"
-          : "text-slate-300 hover:text-slate-50 hover:bg-white/5 border border-transparent",
+          ? "bg-oficina text-white border-oficina shadow-[0_3px_0_var(--color-oficina-fuerte)]"
+          : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark border-transparent hover:border-linea dark:hover:border-linea-dark",
       ].join(" ")}
     >
       {children}
-      {active && <span className="pointer-events-none absolute inset-x-2 -bottom-1 h-[2px] rounded-full bg-sky-400/80" />}
     </button>
   );
 }
@@ -112,35 +104,35 @@ function DistribucionPanel({ apiBase, oficina }) {
 
   const total = data?.total_polizas || 0;
 
-  const RankingCard = ({ title, items = {}, icon: Icon, color = "bg-sky-500" }) => (
-    <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-900/50 p-5 shadow-xl">
-      <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-        <Icon className="text-sky-400 text-lg" />
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">{title}</h3>
+  const RankingCard = ({ title, items = {}, icon: Icon, color = "bg-oficina" }) => (
+    <div className="flex flex-col gap-4 rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+      <div className="flex items-center gap-2 border-b-2 border-linea dark:border-linea-dark pb-3">
+        <Icon className="text-oficina text-lg" />
+        <h3 className="text-xs font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">{title}</h3>
       </div>
       <div className="space-y-4">
         {Object.entries(items || {}).length > 0 ? (
           Object.entries(items).map(([key, value]) => (
             <div key={key} className="group flex flex-col gap-1.5">
               <div className="flex justify-between items-end px-0.5">
-                <span className="text-[13px] font-medium text-slate-200 group-hover:text-white transition-colors">{key}</span>
+                <span className="text-[13px] font-bold text-titulo dark:text-titulo-dark">{key}</span>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-bold text-slate-50">{value.toLocaleString("es-AR")}</span>
-                  <span className="text-[10px] font-medium text-slate-500">{formatMixPercent(value, total)}</span>
+                  <span className="text-sm font-black text-titulo dark:text-titulo-dark">{value.toLocaleString("es-AR")}</span>
+                  <span className="text-[10px] font-bold text-suave dark:text-suave-dark">{formatMixPercent(value, total)}</span>
                 </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
-                <motion.div 
+              <div className="h-2.5 w-full rounded-full bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark overflow-hidden">
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: formatMixPercent(value, total) }}
                   transition={{ duration: 0.8, ease: "easeOut" }}
-                  className={`h-full rounded-full ${color} opacity-70 group-hover:opacity-100 transition-opacity`}
+                  className={`h-full rounded-full ${color}`}
                 />
               </div>
             </div>
           ))
         ) : (
-          <div className="py-10 text-center text-xs text-slate-500 italic">Sin datos disponibles.</div>
+          <div className="py-10 text-center text-xs font-bold text-suave dark:text-suave-dark italic">Sin datos disponibles.</div>
         )}
       </div>
     </div>
@@ -148,31 +140,31 @@ function DistribucionPanel({ apiBase, oficina }) {
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/20 text-sky-400">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oficina text-white shadow-[0_4px_0_var(--color-oficina-fuerte)]">
             <HiChartBar className="text-xl" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-100 tracking-tight">Distribución de Cartera</h2>
-            <p className="text-[11px] text-slate-400">Desglose detallado por compañía y tipo de cobertura.</p>
+            <h2 className="text-lg font-black text-titulo dark:text-titulo-dark tracking-tight">Distribución de Cartera</h2>
+            <p className="text-[11px] font-bold text-suave dark:text-suave-dark">Desglose detallado por compañía y tipo de cobertura.</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 transition hover:bg-white/5">
-            <input 
-              type="checkbox" 
-              checked={soloActivas} 
+          <label className="flex cursor-pointer select-none items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition hover:border-oficina">
+            <input
+              type="checkbox"
+              checked={soloActivas}
               onChange={e => setSoloActivas(e.target.checked)}
-              className="w-4 h-4 rounded border-white/20 bg-transparent text-sky-500 focus:ring-sky-500/30 accent-sky-500"
+              className="w-4 h-4 accent-[var(--color-oficina)]"
             />
-            <span className="text-xs font-semibold text-slate-200">Solo Activas</span>
+            <span className="text-xs font-black text-titulo dark:text-titulo-dark">Solo Activas</span>
           </label>
-          <button 
+          <button
             onClick={fetchDistribucion}
             disabled={loading}
-            className="h-9 rounded-xl bg-sky-500 px-5 text-xs font-bold text-white transition hover:bg-sky-400 shadow-lg shadow-sky-500/20 active:scale-95 disabled:opacity-50"
+            className="h-11 rounded-2xl bg-oficina px-5 text-xs font-black text-white border-2 border-oficina transition shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 disabled:opacity-50"
           >
             {loading ? "Cargando..." : "Actualizar"}
           </button>
@@ -180,8 +172,8 @@ function DistribucionPanel({ apiBase, oficina }) {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <RankingCard title="Ranking por Compañía" items={data?.por_compania} icon={HiTruck} color="bg-sky-500" />
-        <RankingCard title="Distribución por Cobertura" items={data?.por_cobertura} icon={HiShieldCheck} color="bg-emerald-500" />
+        <RankingCard title="Ranking por Compañía" items={data?.por_compania} icon={HiTruck} color="bg-oficina" />
+        <RankingCard title="Distribución por Cobertura" items={data?.por_cobertura} icon={HiShieldCheck} color="bg-ingreso" />
       </div>
     </div>
   );
@@ -254,7 +246,7 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
 
   // FÓRMULA DE CHURN CORREGIDA: Solo Bajas Reales / Totales * 100
   const churnGlobal = totales.total > 0 ? (totales.bajas / totales.total) * 100 : 0;
-  
+
   const periodoLabel = periodo || `${String(mes).padStart(2, "0")}/${String(anio).padStart(4, "0")}`;
 
   // 🚀 MANEJADOR DE CLICS EN LAS TARJETAS DE RESUMEN
@@ -307,17 +299,17 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
   return (
     <>
       <EstadisticasHeader periodoLabel={periodoLabel} fuenteRespuesta={fuenteRespuesta} loading={loading} onRefresh={fetchEstadisticas} onOpenExport={() => setShowExport(true)} />
-      
-      {error && <AnimatedCard index={2}><div className="rounded-xl border border-rose-500/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-100">{error}</div></AnimatedCard>}
-      
+
+      {error && <AnimatedCard index={2}><div className="rounded-2xl border-2 border-egreso/40 bg-egreso/10 px-3 py-2 text-xs font-bold text-egreso dark:text-egreso-claro">{error}</div></AnimatedCard>}
+
       {/* 🚀 PASAMOS EL HANDLER A LAS TARJETAS */}
-      <EstadisticasSummaryCards 
-        totales={totales} 
-        churnGlobal={churnGlobal} 
-        onCardClick={handleCardClick} 
-        onDownloadExcel={handleDownloadExcel} 
+      <EstadisticasSummaryCards
+        totales={totales}
+        churnGlobal={churnGlobal}
+        onCardClick={handleCardClick}
+        onDownloadExcel={handleDownloadExcel}
       />
-      
+
       <OficinasTable oficinasData={oficinasData} getOficinaNombre={getOficinaNombre} formatMixPercent={formatMixPercent} />
       <AltasPolizasPanel apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} defaultOficina={oficina} />
 
@@ -336,15 +328,15 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
 
       <AseguradosExportModal open={showExport} onClose={() => setShowExport(false)} apiBase={apiBase} oficinas={oficinasValidas} defaultOficina={oficina} getOficinaNombre={getOficinaNombre} />
       <VehiculosExportModal open={showVehiculosExport} onClose={() => setShowVehiculosExport(false)} apiBase={apiBase} oficinas={oficinasValidas} getOficinaNombre={getOficinaNombre} />
-      
+
       {/* 🚀 INYECTAMOS EL NUEVO MODAL ACÁ */}
-      <ListadoClientesModal 
-        isOpen={showListado} 
-        onClose={() => setShowListado(false)} 
-        tipo={tipoListado} 
+      <ListadoClientesModal
+        isOpen={showListado}
+        onClose={() => setShowListado(false)}
+        tipo={tipoListado}
         apiBase={apiBase}
         getOficinaNombre={getOficinaNombre}
-        filtros={{ oficina, anio, mes }} 
+        filtros={{ oficina, anio, mes }}
       />
     </>
   );
@@ -392,39 +384,31 @@ export default function EstadisticasPage() {
 
     const arr = Array.isArray(oficinasList) ? oficinasList : [];
     const match = arr.find(o => String(o.id) === strId || String(o.codigo) === strId);
-    
+
     if (match) return match.nombre;
     return `Oficina ${strId}`;
   }, [oficinasList]);
 
   return (
-    <motion.div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-sky-950 px-4 py-6 sm:px-6 lg:px-10" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }}>
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -top-32 left-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="absolute -bottom-32 right-4 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-        {ORBS.map((orb, idx) => (
-          <motion.div key={idx} className="absolute rounded-full bg-sky-400/10 blur-2xl shadow-[0_0_60px_rgba(56,189,248,0.35)]" style={{ top: orb.top, left: orb.left, width: orb.size, height: orb.size }} animate={{ y: ["-10px", "15px", "-10px"], x: ["0px", idx % 2 === 0 ? "10px" : "-10px", "0px"], opacity: [0.55, 0.95, 0.55] }} transition={{ duration: orb.duration, repeat: Infinity, ease: "easeInOut" }} />
-        ))}
-      </div>
-
+    <motion.div className="relative min-h-[calc(100vh-4rem)] bg-surface dark:bg-surface-dark px-4 py-6 sm:px-6 lg:px-10 transition-colors" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }}>
       <div className="relative mx-auto flex max-w-6xl flex-col gap-4">
-        
-        <EstadisticasFilters 
-          oficina={oficina} 
-          setOficina={setOficina} 
-          oficinasOptions={oficinasList.map(o => String(o.id))} 
-          anio={anio} 
-          onAnioChange={setAnio} 
-          mes={mes} 
-          onMesChange={setMes} 
-          fuenteSnapshot={fuenteSnapshot} 
-          setFuenteSnapshot={setFuenteSnapshot} 
-          desde={desde} 
-          hasta={hasta} 
-          getOficinaNombre={getOficinaNombre} 
+
+        <EstadisticasFilters
+          oficina={oficina}
+          setOficina={setOficina}
+          oficinasOptions={oficinasList.map(o => String(o.id))}
+          anio={anio}
+          onAnioChange={setAnio}
+          mes={mes}
+          onMesChange={setMes}
+          fuenteSnapshot={fuenteSnapshot}
+          setFuenteSnapshot={setFuenteSnapshot}
+          desde={desde}
+          hasta={hasta}
+          getOficinaNombre={getOficinaNombre}
         />
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
           <TabButton active={tab === "general"} onClick={() => setTab("general")}>General</TabButton>
           <TabButton active={tab === "calidad"} onClick={() => setTab("calidad")}>Calidad de datos</TabButton>
           <TabButton active={tab === "duplicados"} onClick={() => setTab("duplicados")}>Duplicados</TabButton>
@@ -438,11 +422,11 @@ export default function EstadisticasPage() {
         <AnimatePresence mode="wait">
           {tab === "general" && (
             <motion.div key="general" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
-              <EstadisticasGeneralPanel 
-                apiBase={apiBase} 
-                oficina={oficina} 
-                oficinasList={oficinasList} 
-                getOficinaNombre={getOficinaNombre} 
+              <EstadisticasGeneralPanel
+                apiBase={apiBase}
+                oficina={oficina}
+                oficinasList={oficinasList}
+                getOficinaNombre={getOficinaNombre}
                 anio={anio}
                 mes={mes}
                 fuenteSnapshot={fuenteSnapshot}
@@ -461,7 +445,7 @@ export default function EstadisticasPage() {
           {tab === "duplicados" && (
             <motion.div key="duplicados" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
               {/* Sub-solapas: Clientes / Pólizas */}
-              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
                 <TabButton active={dupSub === "clientes"} onClick={() => { setDupSub("clientes"); localStorage.setItem("estadisticas.dupSub", "clientes"); }}>
                   Clientes duplicados
                 </TabButton>
@@ -491,26 +475,26 @@ export default function EstadisticasPage() {
 
           {tab === "contabilidad" && (
             <motion.div key="contabilidad" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
-              <ContabilidadPanel 
-                apiBase={apiBase} 
-                oficina={oficina} 
-                anio={anio} 
-                mes={mes} 
-                getOficinaNombre={getOficinaNombre} 
+              <ContabilidadPanel
+                apiBase={apiBase}
+                oficina={oficina}
+                anio={anio}
+                mes={mes}
+                getOficinaNombre={getOficinaNombre}
               />
             </motion.div>
           )}
 
           {tab === "cobranzas" && (
             <motion.div key="cobranzas" className="flex  flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
-              <EfectividadMensajesPanel 
-                apiBase={apiBase} 
-                oficina={oficina} 
-                anio={anio} 
-                mes={mes} 
-                desde={desde} 
-                hasta={hasta} 
-                getOficinaNombre={getOficinaNombre} 
+              <EfectividadMensajesPanel
+                apiBase={apiBase}
+                oficina={oficina}
+                anio={anio}
+                mes={mes}
+                desde={desde}
+                hasta={hasta}
+                getOficinaNombre={getOficinaNombre}
               />
             </motion.div>
           )}

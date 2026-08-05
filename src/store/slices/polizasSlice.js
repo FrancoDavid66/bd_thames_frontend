@@ -489,35 +489,6 @@ export const enviarMensajesEstadoCuotas = createAsyncThunk(
   }
 );
 
-// 🚀 NUEVA ACCIÓN PARA DESCARGAR LA PLANILLA DE AUDITORÍA (Serializable)
-export const exportarPolizas = createAsyncThunk(
-  "polizas/exportar",
-  async ({ formato } = {}, { getState, rejectWithValue }) => {
-    try {
-      const state = getState();
-      const params = buildPolizasParams(state, {
-        includePaging: false, 
-        includeOrdering: true,
-        includeCursor: false,
-      });
-
-      params.formato = formato || "pdf";
-
-      const res = await api.get("polizas/asegurados-export/", {
-        params,
-        responseType: "blob",
-      });
-
-      const fileUrl = window.URL.createObjectURL(new Blob([res.data]));
-      
-      // Devolvemos la URL y el formato para guardarlo con la extensión correcta
-      return { fileUrl, formato: params.formato }; 
-    } catch (err) {
-      return rejectWithValue(err.response?.data || "Error al exportar pólizas");
-    }
-  }
-);
-
 /* ---------------- Slice ---------------- */
 
 const polizasSlice = createSlice({

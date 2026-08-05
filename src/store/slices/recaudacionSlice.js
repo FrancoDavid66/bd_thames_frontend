@@ -2,13 +2,24 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../services/api";
 
-// GET: Traer recaudaciones (Admin)
+// GET: Traer recaudaciones (Admin) — AHORA CON PAGINACIÓN REAL DEL BACKEND
+// El backend devuelve { count, next, previous, results }. Devolvemos res.data completo
+// para poder guardar tanto los results como el count en el estado.
+// Si por compatibilidad la respuesta viene como array plano (sin paginar),
+// la normalizamos a { results: array, count: array.length }.
 export const fetchRecaudaciones = createAsyncThunk(
   "recaudacion/fetchAll",
   async (filters = {}, { rejectWithValue }) => {
     try {
       const res = await api.get("recaudacion/", { params: filters });
-      return Array.isArray(res.data?.results) ? res.data.results : res.data || [];
+      const data = res.data;
+      // Respuesta paginada (DRF): { count, next, previous, results }
+      if (data && Array.isArray(data.results)) {
+        return data;
+      }
+      // Respuesta plana (array) → la envolvemos para mantener la misma forma
+      const arr = Array.isArray(data) ? data : [];
+      return { results: arr, count: arr.length };
     } catch (err) {
       return rejectWithValue(err?.response?.data || "Error al cargar los registros");
     }
@@ -46,6 +57,10 @@ const recaudacionSlice = createSlice({
   name: "recaudacion",
   initialState: {
     items: [],
+    // 🆕 Metadatos de paginación real (backend)
+    count: 0,
+    page: 1,
+    pageSize: 12,
     loading: false,
     error: null,
     uploading: false,
@@ -63,26 +78,31 @@ const recaudacionSlice = createSlice({
       })
       .addCase(fetchRecaudaciones.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload;
+        // El payload ahora es { count, next, previous, results }
+        const payload = action.payload || {};
+        state.items = payload.results || [];
+        state.count = payload.count ?? state.items.length;
       })
       .addCase(fetchRecaudaciones.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Upload Recaudacion
       .addCase(uploadRecaudacion.pending, (state) => {
         state.uploading = true;
       })
       .addCase(uploadRecaudacion.fulfilled, (state, action) => {
         state.uploading = false;
-        // Lo agregamos al principio de la lista
+        // Lo agregamos al principio de la lista (cosmético: el front refetchea después).
+        // Como la lista está paginada, incrementamos el count para mantener coherencia.
         state.items.unshift(action.payload);
+        state.count += 1;
       })
       .addCase(uploadRecaudacion.rejected, (state) => {
         state.uploading = false;
       })
-      
+
       // 🚀 Fetch Empleados
       .addCase(fetchEmpleadosActivos.pending, (state) => {
         state.loadingEmpleados = true;

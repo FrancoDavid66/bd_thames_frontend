@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiPhotograph, HiUpload, HiX, HiTrash, HiZoomIn } from "react-icons/hi";
+import { HiPhotograph, HiCamera, HiX, HiTrash, HiZoomIn } from "react-icons/hi";
 import { toast } from "react-hot-toast";
 
 import { uploadToCloudinary } from "../../utils/cloudinary";
@@ -14,14 +14,16 @@ import {
 } from "../../store/slices/siniestrosSlice";
 
 /**
- * Panel de galería de fotos del siniestro.
+ * Galería de fotos del siniestro (diseño Duo).
+ * - Modo PERSISTENTE: se pasa siniestroId → usa el slice (fotos guardadas).
+ * - Modo BORRADOR: sin siniestroId → guarda en memoria (draftFotos/onDraftChange).
+ *   Se usa en el wizard: las fotos se suben al crear el siniestro.
  *
- * @param {number|string} siniestroId  ID del siniestro (modo "persistente").
- *                                     Si no se pasa, funciona en modo "borrador".
- * @param {boolean} compact            Layout compacto (menos padding, menos texto).
- * @param {Array} draftFotos           Lista de fotos en memoria (modo borrador).
- * @param {Function} onDraftChange     Callback con la lista nueva (modo borrador).
- * @param {boolean} readOnly           Si true, solo muestra (no subir/borrar).
+ * @param {number|string} siniestroId  ID del siniestro (persistente).
+ * @param {boolean} compact            Layout compacto.
+ * @param {Array} draftFotos           Fotos en memoria (modo borrador).
+ * @param {Function} onDraftChange     Callback con la lista nueva (borrador).
+ * @param {boolean} readOnly           Solo mostrar (no subir/borrar).
  */
 export default function SiniestroFotosPanel({
   siniestroId,
@@ -37,7 +39,6 @@ export default function SiniestroFotosPanel({
   const isDraft = !siniestroId;
   const key = siniestroId ? String(siniestroId) : null;
 
-  // Fotos persistidas (vienen del slice)
   const fotosPersistidas = useSelector(
     (state) => (key ? state.siniestros.fotos?.[key] : null) || []
   );
@@ -45,24 +46,20 @@ export default function SiniestroFotosPanel({
     (state) => (key ? state.siniestros.fotosLoading?.[key] : false) || false
   );
 
-  // Lista actual: persistidas o borrador
   const fotos = isDraft ? (draftFotos || []) : fotosPersistidas;
 
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const fileInputRef = useRef(null);
+  const galeriaRef = useRef(null);  // input galería (sin capture)
+  const camaraRef = useRef(null);   // input cámara (capture="environment")
 
-  // Cargar fotos al montar (solo modo persistente)
   useEffect(() => {
-    if (siniestroId) {
-      dispatch(getFotosBySiniestro(siniestroId));
-    }
+    if (siniestroId) dispatch(getFotosBySiniestro(siniestroId));
   }, [dispatch, siniestroId]);
 
-  const handleFilesSelected = async (e) => {
-    const files = Array.from(e.target.files || []);
+  const procesarArchivos = async (fileList) => {
+    const files = Array.from(fileList || []);
     if (files.length === 0) return;
-    if (fileInputRef.current) fileInputRef.current.value = "";
 
     setUploading(true);
     const folder = `de-thames/siniestros/${siniestroId || "borrador"}/fotos`;
@@ -72,9 +69,7 @@ export default function SiniestroFotosPanel({
     for (const file of files) {
       try {
         const up = await uploadToCloudinary(file, { folder });
-
         if (isDraft) {
-          // Modo borrador: agregar al state local
           const nuevaFoto = {
             id: `temp-${Date.now()}-${Math.random()}`,
             url: up.secure_url,
@@ -85,7 +80,6 @@ export default function SiniestroFotosPanel({
           };
           onDraftChange?.([...(draftFotos || []), nuevaFoto]);
         } else {
-          // Modo persistente: enviar al backend
           await dispatch(addFoto({
             siniestro_id: Number(siniestroId),
             url: up.secure_url,
@@ -106,14 +100,15 @@ export default function SiniestroFotosPanel({
     if (failCount > 0) toast.error(`${failCount} foto${failCount > 1 ? "s" : ""} falló${failCount > 1 ? "ron" : ""}`);
   };
 
-  const handleDelete = async (foto) => {
-    if (!confirm("¿Eliminar esta foto? No se puede deshacer.")) return;
+  const onGaleria = (e) => { procesarArchivos(e.target.files); if (galeriaRef.current) galeriaRef.current.value = ""; };
+  const onCamara = (e) => { procesarArchivos(e.target.files); if (camaraRef.current) camaraRef.current.value = ""; };
 
+  const handleDelete = async (foto) => {
+    if (!window.confirm("¿Eliminar esta foto? No se puede deshacer.")) return;
     if (isDraft) {
       onDraftChange?.((draftFotos || []).filter((f) => f.id !== foto.id));
       return;
     }
-
     try {
       await dispatch(removeFoto({ fotoId: foto.id, siniestroId })).unwrap();
       toast.success("Foto eliminada");
@@ -124,75 +119,69 @@ export default function SiniestroFotosPanel({
 
   const canDelete = (foto) => {
     if (readOnly) return false;
-    if (isDraft) return true; // En borrador todos pueden borrar antes de guardar
-    return isAdmin; // Persistido: solo admin
+    if (isDraft) return true;
+    return isAdmin;
   };
 
   return (
     <div className={compact ? "" : "p-4"}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <HiPhotograph className={`${compact ? "w-4 h-4" : "w-5 h-5"} text-indigo-400`} />
-          <h3 className={`${compact ? "text-sm" : "text-base"} font-bold text-slate-200`}>
-            Galería de fotos
-          </h3>
-          {fotos.length > 0 && (
-            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-md">
-              {fotos.length}
-            </span>
-          )}
-        </div>
+      <div className="flex items-center gap-2 mb-3">
+        <HiPhotograph className="w-5 h-5 text-duo-azul" />
+        <h3 className="text-[15px] font-black text-titulo dark:text-titulo-dark">Fotos del siniestro</h3>
+        {fotos.length > 0 && (
+          <span className="text-xs font-black text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg">
+            {fotos.length}
+          </span>
+        )}
+      </div>
 
-        {!readOnly && (
+      {/* Botones: Sacar foto (cámara) + Elegir de galería */}
+      {!readOnly && (
+        <div className="flex gap-2.5 mb-3">
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => camaraRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 disabled:cursor-not-allowed text-white text-xs font-bold transition-colors"
+            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-azul transition-colors disabled:opacity-50"
           >
             {uploading ? (
-              <>
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Subiendo…
-              </>
+              <div className="w-6 h-6 border-2 border-duo-azul border-t-transparent rounded-full animate-spin" />
             ) : (
-              <>
-                <HiUpload className="w-3.5 h-3.5" /> Agregar
-              </>
+              <HiCamera className="text-2xl text-duo-azul" />
             )}
+            <span className="text-[11px] font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Sacar foto</span>
           </button>
-        )}
+          <button
+            type="button"
+            onClick={() => galeriaRef.current?.click()}
+            disabled={uploading}
+            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-violeta transition-colors disabled:opacity-50"
+          >
+            <HiPhotograph className="text-2xl text-duo-violeta" />
+            <span className="text-[11px] font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Elegir de galería</span>
+          </button>
+        </div>
+      )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleFilesSelected}
-          className="hidden"
-        />
-      </div>
+      {/* Inputs ocultos */}
+      <input ref={camaraRef} type="file" accept="image/*" capture="environment" onChange={onCamara} className="hidden" />
+      <input ref={galeriaRef} type="file" accept="image/*" multiple onChange={onGaleria} className="hidden" />
 
       {/* Grilla */}
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
         </div>
       ) : fotos.length === 0 ? (
-        <button
-          type="button"
-          onClick={() => !readOnly && fileInputRef.current?.click()}
-          disabled={readOnly || uploading}
-          className={`w-full ${compact ? "py-6" : "py-10"} border-2 border-dashed border-slate-700 rounded-2xl text-center hover:border-indigo-500 hover:bg-indigo-500/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-        >
-          <HiPhotograph className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">
-            {readOnly ? "Sin fotos" : "Tocá para agregar fotos"}
+        <div className="py-8 text-center border-2 border-dashed border-linea dark:border-linea-dark rounded-2xl">
+          <HiPhotograph className="w-9 h-9 text-suave dark:text-suave-dark mx-auto mb-2" />
+          <p className="text-sm font-bold text-suave dark:text-suave-dark">
+            {readOnly ? "Sin fotos" : "Todavía no agregaste fotos"}
           </p>
-        </button>
+        </div>
       ) : (
-        <div className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"}`}>
+        <div className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-3 sm:grid-cols-4"}`}>
           {fotos.map((foto) => (
             <motion.div
               key={foto.id}
@@ -200,21 +189,14 @@ export default function SiniestroFotosPanel({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="relative group aspect-square rounded-xl overflow-hidden bg-slate-800 border border-slate-700"
+              className="relative group aspect-square rounded-xl overflow-hidden bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark"
             >
-              <img
-                src={foto.url}
-                alt={foto.nombre || "Foto del siniestro"}
-                loading="lazy"
-                className="w-full h-full object-cover"
-              />
-
-              {/* Overlay con acciones */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+              <img src={foto.url} alt={foto.nombre || "Foto"} loading="lazy" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                 <button
                   type="button"
                   onClick={() => setPreviewUrl(foto.url)}
-                  className="p-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white"
+                  className="h-9 w-9 rounded-lg bg-duo-azul text-white flex items-center justify-center"
                   title="Ver en grande"
                 >
                   <HiZoomIn className="w-4 h-4" />
@@ -223,18 +205,16 @@ export default function SiniestroFotosPanel({
                   <button
                     type="button"
                     onClick={() => handleDelete(foto)}
-                    className="p-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white"
+                    className="h-9 w-9 rounded-lg bg-duo-rojo text-white flex items-center justify-center"
                     title="Eliminar"
                   >
                     <HiTrash className="w-4 h-4" />
                   </button>
                 )}
               </div>
-
-              {/* Badge "Pendiente" para borrador */}
               {foto._isDraft && (
-                <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/90 text-black">
-                  Pendiente
+                <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-duo-amarillo text-duo-texto">
+                  Nueva
                 </span>
               )}
             </motion.div>
@@ -242,20 +222,18 @@ export default function SiniestroFotosPanel({
         </div>
       )}
 
-      {/* Lightbox simple */}
+      {/* Lightbox */}
       <AnimatePresence>
         {previewUrl && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setPreviewUrl(null)}
             className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out"
           >
             <button
               type="button"
               onClick={() => setPreviewUrl(null)}
-              className="absolute top-4 right-4 h-10 w-10 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center"
+              className="absolute top-4 right-4 h-10 w-10 rounded-full bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark flex items-center justify-center"
             >
               <HiX className="w-5 h-5" />
             </button>

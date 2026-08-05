@@ -1,7 +1,6 @@
 // src/components/polizas/PolizaEditModal.jsx
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiDocumentText } from "react-icons/hi";
+import { HiDocumentText } from "react-icons/hi";
 import toast from "react-hot-toast";
 
 import { useDispatch } from "react-redux";
@@ -11,11 +10,10 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import { PolizasAPI } from "../../api/polizas";
 
-const modalVariants = {
-  initial: { opacity: 0, scale: 0.9, y: -20 },
-  animate: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", damping: 25, stiffness: 300 } },
-  exit: { opacity: 0, scale: 0.95, y: 10, transition: { duration: 0.2, ease: "easeInOut" } },
-};
+import ModalDuo from "../ui/ModalDuo";
+import InputDuo from "../ui/InputDuo";
+import SelectDuo from "../ui/SelectDuo";
+import Boton3D from "../ui/Boton3D";
 
 const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
 const COMBUSTIBLES = ["Nafta", "Diésel", "GNC", "Nafta/GNC", "Eléctrico", "Híbrido"];
@@ -211,257 +209,133 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
     const isOficinaField = key === "oficina";
     const isDisabled = isOficinaField && !isWebAdmin;
     const esSelect = ["compania", "oficina", "cobertura", "tipo"].includes(key);
+    const label = LABELS[key] || key.replace("_", " ");
+
+    if (esSelect) {
+      let opts = [];
+      if (key === "oficina") opts = oficinas.map((o) => ({ value: o.id, label: o.nombre }));
+      else if (key === "compania") opts = opcionesCompania.map((o) => ({ value: o, label: o }));
+      else if (key === "cobertura") opts = opcionesCobertura.map((o) => ({ value: o, label: o }));
+      else opts = TIPOS_VEHICULO.map((o) => ({ value: o, label: o }));
+
+      return (
+        <SelectDuo
+          key={key}
+          label={isOficinaField && !isWebAdmin ? `${label} (Solo Admin)` : label}
+          name={key}
+          value={formData[key] ?? ""}
+          onChange={handleChange}
+          disabled={isDisabled}
+          options={opts}
+          placeholder="— Seleccionar —"
+        />
+      );
+    }
 
     return (
-      <div key={key} className="flex flex-col gap-1.5">
-        <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-          {LABELS[key] || key.replace("_", " ")}
-          {isOficinaField && !isWebAdmin && <span className="ml-2 text-amber-500">(Solo Admin)</span>}
-        </label>
-
-        {esSelect ? (
-          <div className="relative group">
-            <select
-              name={key}
-              value={formData[key] ?? ""}
-              onChange={handleChange}
-              disabled={isDisabled}
-              className={`cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 pr-9 outline-none transition-all font-medium appearance-none ${
-                isDisabled
-                  ? "bg-black/40 text-white/30 cursor-not-allowed opacity-70"
-                  : "bg-black/40 text-white focus:ring-2 ring-emerald-500/40 hover:bg-white/5"
-              }`}
-            >
-              <option value="" className="bg-[#0f1324]">
-                — Seleccionar —
-              </option>
-
-              {key === "oficina" ? (
-                oficinas.map((opt) => (
-                  <option key={opt.id} value={opt.id} className="bg-[#0f1324]">
-                    {opt.nombre}
-                  </option>
-                ))
-              ) : (
-                (key === "compania"
-                  ? opcionesCompania
-                  : key === "cobertura"
-                  ? opcionesCobertura
-                  : TIPOS_VEHICULO
-                ).map((opt) => (
-                  <option key={opt} value={opt} className="bg-[#0f1324]">
-                    {opt}
-                  </option>
-                ))
-              )}
-            </select>
-            {!isDisabled && (
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors">
-                ▾
-              </span>
-            )}
-          </div>
-        ) : (
-          <input
-            type="text"
-            inputMode={key === "anio" ? "numeric" : undefined}
-            name={key}
-            value={formData[key] ?? ""}
-            onChange={handleChange}
-            className="cursor-text w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-medium bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-emerald-500/40 hover:bg-white/5"
-            placeholder={key === "patente" ? "ABC 123" : key === "anio" ? "2024" : ""}
-          />
-        )}
-      </div>
+      <InputDuo
+        key={key}
+        label={label}
+        name={key}
+        inputMode={key === "anio" ? "numeric" : undefined}
+        value={formData[key] ?? ""}
+        onChange={handleChange}
+        placeholder={key === "patente" ? "ABC 123" : key === "anio" ? "2024" : ""}
+      />
     );
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/70 px-2 sm:px-0 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <motion.div
-          className="relative bg-[#030712] rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.7)] w-full sm:w-[95%] sm:max-w-4xl max-h-[100vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-white/5"
-          variants={modalVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-        >
-          {/* Header */}
-          <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#010409]/80 backdrop-blur">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0 shadow-inner">
-                <HiDocumentText className="text-xl" />
-              </div>
-              <div>
-                <h2 className="text-base sm:text-xl font-black text-white uppercase tracking-widest leading-none mb-1.5">
-                  Editar Póliza
-                </h2>
-                <p className="text-[10px] font-bold text-amber-400/80 uppercase tracking-wider">
-                  ID Sistema: {poliza.id}
-                </p>
-              </div>
+    <ModalDuo
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Editar Póliza"
+      subtitle={`ID Sistema: ${poliza.id}`}
+      icon={<HiDocumentText />}
+      iconTono="amarillo"
+      size="lg"
+      footer={
+        <>
+          <Boton3D variant="blanco" onClick={onClose} disabled={saving} full>
+            Cancelar
+          </Boton3D>
+          <Boton3D variant="verde" type="submit" form="form-editar-poliza" disabled={saving} full>
+            {saving ? "Guardando..." : "Guardar Cambios"}
+          </Boton3D>
+        </>
+      }
+    >
+      <form id="form-editar-poliza" onSubmit={handleSubmit} className="space-y-8">
+        {/* ── Bloque 1: Datos de la póliza ── */}
+        <div>
+          <h3 className="text-[11px] font-black text-duo-verde-sombra dark:text-duo-verde uppercase tracking-wide mb-4 ml-1">
+            Datos de la Póliza
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+            {CAMPOS.map((key) => renderCampoGeneral(key))}
+          </div>
+        </div>
+
+        {/* ── Bloque 2: Datos técnicos del vehículo ── */}
+        <div>
+          <h3 className="text-[11px] font-black text-duo-azul uppercase tracking-wide mb-4 ml-1">
+            Datos Técnicos del Vehículo
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+            <SelectDuo
+              label={LABELS.combustible}
+              name="combustible"
+              value={formData.combustible ?? ""}
+              onChange={handleChange}
+              options={opcionesCombustible.map((o) => ({ value: o, label: o }))}
+              placeholder="— Seleccionar —"
+            />
+
+            <SelectDuo
+              label={LABELS.carroceria}
+              name="carroceria"
+              value={formData.carroceria ?? ""}
+              onChange={handleChange}
+              options={opcionesCarroceria.map((o) => ({ value: o, label: o }))}
+              placeholder="— Seleccionar —"
+            />
+
+            <InputDuo
+              label={LABELS.numero_chasis}
+              name="numero_chasis"
+              value={formData.numero_chasis ?? ""}
+              onChange={handleChange}
+              placeholder="8AP…"
+              className="[&_input]:font-mono [&_input]:uppercase"
+            />
+
+            <InputDuo
+              label={LABELS.numero_motor}
+              name="numero_motor"
+              value={formData.numero_motor ?? ""}
+              onChange={handleChange}
+              placeholder="Ej: HFX…"
+              className="[&_input]:font-mono [&_input]:uppercase"
+            />
+
+            {/* Observaciones (ocupa las 2 columnas) */}
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <label className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark ml-1">
+                {LABELS.observaciones}
+              </label>
+              <textarea
+                name="observaciones"
+                value={formData.observaciones ?? ""}
+                onChange={handleChange}
+                rows={3}
+                className="w-full rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-[15px] font-bold text-titulo dark:text-titulo-dark outline-none transition-colors resize-none focus:border-duo-azul placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal"
+                placeholder="Notas adicionales del vehículo…"
+              />
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer group h-10 w-10 flex items-center justify-center rounded-full bg-black/30 text-white/50 hover:bg-white/5 hover:text-amber-400 transition-all border border-white/5 hover:border-amber-400/20 shadow-inner"
-            >
-              <HiX className="text-xl group-hover:scale-110 transition-transform" />
-            </button>
           </div>
-
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-6 bg-black/10">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* ── Bloque 1: Datos de la póliza ── */}
-              <div>
-                <h3 className="text-[10px] font-black text-emerald-400/80 uppercase tracking-widest mb-4 ml-1">
-                  Datos de la Póliza
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
-                  {CAMPOS.map((key) => renderCampoGeneral(key))}
-                </div>
-              </div>
-
-              {/* ── Bloque 2: Datos técnicos del vehículo ── */}
-              <div>
-                <h3 className="text-[10px] font-black text-sky-400/80 uppercase tracking-widest mb-4 ml-1">
-                  Datos Técnicos del Vehículo
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
-                  {/* Combustible (select con valor actual inyectado) */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-                      {LABELS.combustible}
-                    </label>
-                    <div className="relative group">
-                      <select
-                        name="combustible"
-                        value={formData.combustible ?? ""}
-                        onChange={handleChange}
-                        className="cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 pr-9 outline-none transition-all font-medium appearance-none bg-black/40 text-white focus:ring-2 ring-sky-500/40 hover:bg-white/5"
-                      >
-                        <option value="" className="bg-[#0f1324]">
-                          — Seleccionar —
-                        </option>
-                        {opcionesCombustible.map((opt) => (
-                          <option key={opt} value={opt} className="bg-[#0f1324]">
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors">
-                        ▾
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Carrocería */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-                      {LABELS.carroceria}
-                    </label>
-                    <div className="relative group">
-                      <select
-                        name="carroceria"
-                        value={formData.carroceria ?? ""}
-                        onChange={handleChange}
-                        className="cursor-pointer w-full rounded-xl border border-white/10 px-4 py-3 pr-9 outline-none transition-all font-medium appearance-none bg-black/40 text-white focus:ring-2 ring-sky-500/40 hover:bg-white/5"
-                      >
-                        <option value="" className="bg-[#0f1324]">
-                          — Seleccionar —
-                        </option>
-                        {opcionesCarroceria.map((opt) => (
-                          <option key={opt} value={opt} className="bg-[#0f1324]">
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors">
-                        ▾
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* N° de Chasis */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-                      {LABELS.numero_chasis}
-                    </label>
-                    <input
-                      type="text"
-                      name="numero_chasis"
-                      value={formData.numero_chasis ?? ""}
-                      onChange={handleChange}
-                      className="cursor-text w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-mono uppercase bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-sky-500/40 hover:bg-white/5"
-                      placeholder="8AP…"
-                    />
-                  </div>
-
-                  {/* N° de Motor */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-                      {LABELS.numero_motor}
-                    </label>
-                    <input
-                      type="text"
-                      name="numero_motor"
-                      value={formData.numero_motor ?? ""}
-                      onChange={handleChange}
-                      className="cursor-text w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-mono uppercase bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-sky-500/40 hover:bg-white/5"
-                      placeholder="Ej: HFX…"
-                    />
-                  </div>
-
-                  {/* Observaciones (ocupa las 2 columnas) */}
-                  <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">
-                      {LABELS.observaciones}
-                    </label>
-                    <textarea
-                      name="observaciones"
-                      value={formData.observaciones ?? ""}
-                      onChange={handleChange}
-                      rows={3}
-                      className="cursor-text w-full rounded-xl border border-white/10 px-4 py-3 outline-none transition-all font-medium resize-none bg-black/40 text-white placeholder:text-white/20 focus:ring-2 ring-sky-500/40 hover:bg-white/5"
-                      placeholder="Notas adicionales del vehículo…"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={saving}
-                  className="cursor-pointer h-11 px-6 text-xs uppercase font-black text-white/50 hover:text-white hover:bg-white/5 rounded-xl transition-all tracking-widest disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="cursor-pointer h-11 px-8 rounded-xl bg-emerald-600 text-white text-xs uppercase font-black hover:bg-emerald-500 shadow-lg shadow-emerald-900/30 active:scale-95 transition-all tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    "Guardar Cambios"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </form>
+    </ModalDuo>
   );
 };
 

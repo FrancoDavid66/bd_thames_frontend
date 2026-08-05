@@ -1,86 +1,50 @@
 // src/components/solicitudes/FichaEmisionModal.jsx
-import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  HiX, 
-  HiClipboardCopy, 
-  HiExternalLink, 
-  HiCheck, 
-  HiOfficeBuilding,
-  HiPhotograph,
-  HiUser
-} from "react-icons/hi";
-import toast from "react-hot-toast";
-import { Link } from "react-router-dom"; // 🚀 IMPORTAMOS LINK
+//
+// Ficha técnica de emisión: muestra los datos de la solicitud (copiables) y
+// la evidencia fotográfica / documentos cargados. Solo lectura.
+// Carga documentos con `api` (axios con JWT).
 
-// 🚀 IMPORTACIONES DE SEGURIDAD
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { HiClipboardCopy, HiCheck, HiExternalLink, HiUser, HiTruck, HiPhotograph } from "react-icons/hi";
+import toast from "react-hot-toast";
+
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 
-// Definimos variants inline para animaciones profesionales
-const modalVariants = {
-  initial: { opacity: 0, scale: 0.95 },
-  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.25 } },
-};
+import ModalDuo from "../ui/ModalDuo";
+import Boton3D from "../ui/Boton3D";
+import Badge, { estadoATono } from "../ui/Badge";
 
-const sectionVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
-};
+/* ── helpers ── */
+const isImage = (doc) => String(doc?.mime || "").startsWith("image");
+const fmt = (k, v) => `${k}: ${v ?? "—"}`;
 
-const fieldVariants = {
-  initial: { opacity: 0, scale: 0.98 },
-  animate: { opacity: 1, scale: 1 },
-  hover: { scale: 1.02 },
-  tap: { scale: 0.98 },
+const ESTADO_LABEL = {
+  VIGENTE_24H: "Vigente 24h",
+  EN_REVISION: "En revisión",
+  BORRADOR: "Borrador",
+  VENCIDA: "Vencida",
+  CANCELADA: "Cancelada",
+  CONVERTIDA: "Convertida",
+  TERMINADA: "Terminada",
 };
-
-const buttonVariants = {
-  initial: { scale: 1 },
-  hover: { scale: 1.05 },
-  tap: { scale: 0.95 },
-};
-
-const imageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.5 } },
-};
-
-/* ---------- helpers ---------- */
-function isImage(doc) {
-  return String(doc?.mime || "").startsWith("image");
-}
-function format(k, v) {
-  return `${k}: ${v ?? "—"}`;
-}
-const estadoLabel = (estado) => {
-  switch (estado) {
-    case "VIGENTE_24H": return "VIGENTE 24 h";
-    case "EN_REVISION": return "EN REVISIÓN";
-    case "BORRADOR": return "BORRADOR";
-    case "VENCIDA": return "VENCIDA";
-    case "CANCELADA": return "CANCELADA";
-    case "CONVERTIDA": return "CONVERTIDA";
-    default: return estado || "—";
-  }
-};
+const estadoLabel = (e) => ESTADO_LABEL[e] || e || "—";
 
 function buildResumen(s) {
-  const datos = [
-    format("Cliente", s?.cliente_nombre),
-    format("DNI", s?.cliente_dni),
-    format("Teléfono", s?.telefono),
-    format("Vehículo", `${s?.vehiculo_marca || "—"} ${s?.vehiculo_modelo || ""}`.trim()),
-    format("Año", s?.vehiculo_anio),
-    format("Patente", s?.vehiculo_patente),
-    format("Cobertura", s?.cobertura_solicitada),
-    format("Compañía pref.", s?.compania_preferida),
-    format("Observaciones", s?.observaciones || "—"),
-    format("Código", s?.codigo || s?.id),
-    format("Estado", estadoLabel(s?.estado)),
-  ];
-  return datos.join("\n");
+  return [
+    fmt("Cliente", s?.cliente_nombre),
+    fmt("DNI", s?.cliente_dni),
+    fmt("Teléfono", s?.telefono),
+    fmt("Vehículo", `${s?.vehiculo_marca || "—"} ${s?.vehiculo_modelo || ""}`.trim()),
+    fmt("Año", s?.vehiculo_anio),
+    fmt("Patente", s?.vehiculo_patente),
+    fmt("Cobertura", s?.cobertura_solicitada),
+    fmt("Compañía pref.", s?.compania_preferida),
+    fmt("Observaciones", s?.observaciones || "—"),
+    fmt("Código", s?.codigo || s?.id),
+    fmt("Estado", estadoLabel(s?.estado)),
+  ].join("\n");
 }
 
 function splitNombreApellido(fullName) {
@@ -92,9 +56,9 @@ function splitNombreApellido(fullName) {
   return { nombre: parts.join(" "), apellido };
 }
 
-/* ================== COMPONENTE ================== */
+/* ═══════════ COMPONENTE ═══════════ */
 export default function FichaEmisionModal({ solicitud, onClose }) {
-  const { user } = useAuth(); // 🚀 Identificamos sucursal del usuario
+  const { user } = useAuth();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -106,23 +70,24 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
     [solicitud?.cliente_nombre]
   );
 
-  // 🚀 CARGA SEGURA: Usamos 'api' para inyectar JWT y evitar 401
-  const cargar = async () => {
-    if (!solicitud?.id) return;
-    setLoading(true);
-    try {
-      const res = await api.get(`/solicitudes/${solicitud.id}/documentos/`);
-      setDocs(res.data?.results || res.data || []);
-    } catch (e) {
-      console.error("[FichaEmision] Error:", e);
-      toast.error("Error al sincronizar documentos");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    cargar();
+    let vivo = true;
+    (async () => {
+      if (!solicitud?.id) return;
+      setLoading(true);
+      try {
+        const res = await api.get(`/solicitudes/${solicitud.id}/documentos/`);
+        if (!vivo) return;
+        setDocs(res.data?.results || res.data || []);
+      } catch {
+        toast.error("Error al sincronizar documentos");
+      } finally {
+        if (vivo) setLoading(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
   }, [solicitud?.id]);
 
   const copiarResumen = async () => {
@@ -130,200 +95,180 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
       await navigator.clipboard.writeText(buildResumen(solicitud));
       toast.success("Resumen copiado para emitir");
     } catch {
-      toast.error("Error al copiar portapapeles");
+      toast.error("Error al copiar");
     }
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[180] flex items-center justify-center p-4 sm:p-0"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      >
-        <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-
-        <motion.div
-          variants={modalVariants} initial="initial" animate="animate" exit="exit"
-          className="relative w-full max-w-6xl h-[95vh] sm:h-auto mx-auto rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col bg-[#0b0f1e]"
-        >
-          {/* Header Blindado */}
-          <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0f0c28]/90 backdrop-blur">
-            <div className="flex flex-col gap-1">
-               <h3 className="text-white font-black text-lg uppercase tracking-tighter">
-                Ficha Técnica de Emisión
-              </h3>
-              <div className="flex items-center gap-2">
-                 <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                    ID: #{solicitud?.codigo || solicitud?.id}
-                 </span>
-                 <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase border border-emerald-500/20">
-                    Sucursal: {user?.perfil?.oficina_nombre || 'Local'}
-                 </span>
-              </div>
-            </div>
-            <motion.button
-              onClick={onClose}
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white transition-all"
-              variants={buttonVariants} whileHover="hover" whileTap="tap"
+    <ModalDuo
+      isOpen
+      onClose={onClose}
+      icon={<HiClipboardCopy />}
+      iconTono="azul"
+      size="lg"
+      title="Ficha de Emisión"
+      subtitle={`#${solicitud?.codigo || solicitud?.id} · ${user?.perfil?.oficina_nombre || "Local"}`}
+      footer={
+        <>
+          <Boton3D variant="blanco" onClick={onClose}>
+            Cerrar
+          </Boton3D>
+          <Boton3D variant="azul" onClick={copiarResumen}>
+            <HiClipboardCopy /> Copiar resumen
+          </Boton3D>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Estado */}
+        <div className="flex items-center gap-2">
+          <Badge tono={estadoATono(solicitud?.estado)}>{estadoLabel(solicitud?.estado)}</Badge>
+          {solicitud?.poliza_id && (
+            <Link
+              to={`/polizas/${solicitud.poliza_id}`}
+              target="_blank"
+              className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-duo-azul hover:opacity-80"
             >
-              <HiX className="text-xl" />
-            </motion.button>
+              Póliza #{solicitud.poliza_id} <HiExternalLink />
+            </Link>
+          )}
+        </div>
+
+        {/* Asegurado + Vehículo */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Bloque icon={<HiUser />} tono="azul" titulo="Asegurado">
+            <Dato label="Nombre" value={nombreSolo} linkTo={solicitud?.cliente_id ? `/clientes/${solicitud.cliente_id}` : null} />
+            <Dato label="Apellido" value={apellidoSolo} linkTo={solicitud?.cliente_id ? `/clientes/${solicitud.cliente_id}` : null} />
+            <Dato label="DNI / CUIT" value={solicitud?.cliente_dni} />
+            <Dato label="Teléfono" value={solicitud?.telefono} />
+          </Bloque>
+
+          <Bloque icon={<HiTruck />} tono="amarillo" titulo="Vehículo">
+            <Dato label="Marca" value={solicitud?.vehiculo_marca} />
+            <Dato label="Modelo" value={solicitud?.vehiculo_modelo} />
+            <Dato label="Año" value={solicitud?.vehiculo_anio} />
+            <Dato label="Patente" value={solicitud?.vehiculo_patente} mono />
+          </Bloque>
+        </div>
+
+        {/* Config solicitud */}
+        <Bloque icon={<HiClipboardCopy />} tono="verde" titulo="Configuración" cols={2}>
+          <Dato label="Cobertura" value={solicitud?.cobertura_solicitada} />
+          <Dato label="Compañía pref." value={solicitud?.compania_preferida} />
+          <Dato label="Referencia" value={solicitud?.codigo || solicitud?.id} />
+          <Dato label="Estado" value={estadoLabel(solicitud?.estado)} />
+        </Bloque>
+
+        {solicitud?.observaciones && (
+          <div className="rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark p-4">
+            <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-2">
+              Observaciones
+            </div>
+            <CopyValue text={solicitud.observaciones} />
+          </div>
+        )}
+
+        {/* Fotos / docs */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <HiPhotograph className="text-duo-rojo text-lg" />
+            <h4 className="text-titulo dark:text-titulo-dark font-black text-[13px] uppercase tracking-wide">
+              Evidencia ({imagenes.length})
+            </h4>
+            {otros.length > 0 && (
+              <span className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                · {otros.length} docs
+              </span>
+            )}
           </div>
 
-          {/* Área de Datos */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-            
-            <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-6" variants={sectionVariants} initial="initial" animate="animate">
-              {/* Bloque Asegurado */}
-              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 shadow-inner">
-                <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
-                   <HiUser className="text-emerald-400" />
-                   <h4 className="text-white font-bold text-xs uppercase tracking-widest">Datos del Asegurado</h4>
-                </div>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* 🚀 CLIENTE CON ENLACE */}
-                  <DataBox 
-                    label="Nombre" 
-                    value={nombreSolo} 
-                    linkTo={solicitud?.cliente_id ? `/clientes/${solicitud.cliente_id}` : null} 
-                  />
-                  <DataBox 
-                    label="Apellido" 
-                    value={apellidoSolo} 
-                    linkTo={solicitud?.cliente_id ? `/clientes/${solicitud.cliente_id}` : null} 
-                  />
-                  <DataBox label="DNI/CUIT" value={solicitud?.cliente_dni} />
-                  <DataBox label="Teléfono" value={solicitud?.telefono} />
-                </dl>
-              </section>
-
-              {/* Bloque Vehículo */}
-              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 shadow-inner">
-                <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
-                   <HiOfficeBuilding className="text-sky-400" />
-                   <h4 className="text-white font-bold text-xs uppercase tracking-widest">Datos de la Unidad</h4>
-                </div>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <DataBox label="Marca" value={solicitud?.vehiculo_marca} />
-                  <DataBox label="Modelo" value={solicitud?.vehiculo_modelo} />
-                  <DataBox label="Año" value={solicitud?.vehiculo_anio} />
-                  <DataBox label="Dominio / Patente" value={solicitud?.vehiculo_patente} className="font-mono" />
-                </dl>
-              </section>
-            </motion.div>
-
-            {/* Configuración de Póliza */}
-            <motion.section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5" variants={sectionVariants}>
-              <h4 className="text-white/40 font-black text-[10px] uppercase tracking-widest mb-4">Configuración de Solicitud</h4>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <FieldBox label="Cobertura Solicitada" value={solicitud?.cobertura_solicitada} />
-                <FieldBox label="Compañía Preferida" value={solicitud?.compania_preferida} />
-                <FieldBox label="Estado Operativo" value={estadoLabel(solicitud?.estado)} />
-                <FieldBox label="Referencia Código" value={solicitud?.codigo || solicitud?.id} />
-                
-                {/* 🚀 PÓLIZA CON ENLACE (SI ESTÁ VINCULADA) */}
-                <FieldBox 
-                  label="Póliza Vinculada" 
-                  value={solicitud?.poliza_id ? `#${solicitud.poliza_id}` : "Ninguna"} 
-                  linkTo={solicitud?.poliza_id ? `/polizas/${solicitud.poliza_id}` : null}
-                />
+          {loading ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="aspect-video rounded-2xl bg-surface dark:bg-surface-dark animate-pulse" />
+              ))}
+            </div>
+          ) : imagenes.length === 0 && otros.length === 0 ? (
+            <p className="text-[13px] font-bold text-suave dark:text-suave-dark text-center py-6">
+              Sin documentos cargados.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {imagenes.map((d) => (
+                  <a
+                    key={d.id}
+                    href={d.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group relative block aspect-video rounded-2xl overflow-hidden border-2 border-linea dark:border-linea-dark"
+                  >
+                    <img src={d.url} alt="" className="w-full h-full object-cover transition group-hover:scale-105" />
+                    <div className="absolute top-2 right-2 h-6 w-6 rounded-lg bg-black/50 flex items-center justify-center text-white">
+                      <HiExternalLink />
+                    </div>
+                  </a>
+                ))}
               </div>
-
-              {solicitud?.observaciones && (
-                <div className="mt-6 p-4 rounded-xl bg-black/20 border border-white/5">
-                  <div className="text-white/30 text-[10px] font-black uppercase tracking-widest mb-2">Observaciones Internas</div>
-                  <CopyValue text={solicitud.observaciones} />
-                </div>
-              )}
-            </motion.section>
-
-            {/* Inspección Fotográfica */}
-            <motion.section className="space-y-4" variants={sectionVariants}>
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <HiPhotograph className="text-rose-400" />
-                  <h4 className="text-white font-bold text-xs uppercase tracking-widest">Evidencia Fotográfica ({imagenes.length})</h4>
-                </div>
-                {otros.length > 0 && <span className="text-[10px] font-bold text-white/30 uppercase">{otros.length} Docs Adicionales</span>}
-              </div>
-
-              {loading ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-video rounded-2xl bg-white/5 animate-pulse" />)}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {imagenes.map((d) => (
-                    <motion.a
-                      key={d.id} href={d.url} target="_blank" rel="noreferrer"
-                      className="group relative block aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-lg"
-                      variants={fieldVariants} whileHover="hover"
+              {otros.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {otros.map((d) => (
+                    <a
+                      key={d.id}
+                      href={d.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-[12px] font-black"
                     >
-                      <motion.img src={d.url} alt="" className="w-full h-full object-cover transition duration-500 group-hover:scale-110" variants={imageVariants} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                         <span className="text-[10px] font-black text-white uppercase truncate">{d.nombre || d.tipo}</span>
-                      </div>
-                      <div className="absolute top-2 right-2 h-6 w-6 rounded-lg bg-black/60 flex items-center justify-center text-white/60 group-hover:text-white"><HiExternalLink /></div>
-                    </motion.a>
+                      <HiExternalLink /> {d.nombre || d.tipo || "Documento"}
+                    </a>
                   ))}
                 </div>
               )}
-            </motion.section>
-          </div>
-
-          {/* Footer de Acciones */}
-          <div className="p-6 border-t border-white/5 bg-[#0f0c28]/95 flex flex-col sm:flex-row items-center justify-between gap-4">
-             <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest text-center sm:text-left">
-                Verificá que toda la documentación sea legible antes de proceder a la emisión definitiva.
-             </p>
-             <div className="flex gap-3 w-full sm:w-auto">
-                <motion.button
-                  onClick={copiarResumen}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-black font-black uppercase text-xs shadow-xl transition-all active:scale-95"
-                  variants={buttonVariants} whileHover="hover" whileTap="tap"
-                >
-                  <HiClipboardCopy className="text-lg" /> Copiar Resumen
-                </motion.button>
-                <button onClick={onClose} className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-white/5 text-white font-bold uppercase text-xs hover:bg-white/10 transition-all">
-                  Cerrar
-                </button>
-             </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+            </>
+          )}
+        </div>
+      </div>
+    </ModalDuo>
   );
 }
 
-/* ----------------- Sub-Componentes UI ----------------- */
-
-// 🚀 AHORA ACEPTAN "linkTo" PARA HACERLOS CLICKEABLES
-function DataBox({ label, value, className = "", linkTo }) {
+/* ── sub-componentes ── */
+function Bloque({ icon, tono = "azul", titulo, cols = 2, children }) {
+  const tonos = {
+    azul: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul",
+    verde: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde",
+    amarillo: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
+  };
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">{label}</span>
-      <div className={`p-2.5 rounded-xl bg-black/40 border border-white/5 shadow-inner ${className}`}>
-         <CopyValue text={value} linkTo={linkTo} />
+    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-base ${tonos[tono] || tonos.azul}`}>
+          {icon}
+        </div>
+        <h4 className="text-titulo dark:text-titulo-dark font-black text-[13px] uppercase tracking-wide">{titulo}</h4>
       </div>
+      <div className={`grid gap-3 ${cols === 2 ? "grid-cols-2" : "grid-cols-1"}`}>{children}</div>
     </div>
   );
 }
 
-function FieldBox({ label, value, linkTo }) {
+function Dato({ label, value, linkTo, mono = false }) {
   return (
-    <motion.div variants={fieldVariants} className="flex flex-col gap-1">
-      <div className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">{label}</div>
-      <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark ml-1">
+        {label}
+      </span>
+      <div className={`p-2.5 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark ${mono ? "font-mono" : ""}`}>
         <CopyValue text={value} linkTo={linkTo} />
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 function CopyValue({ text, linkTo }) {
   const [ok, setOk] = useState(false);
   const display = text ?? "—";
-
   const onCopy = async () => {
     if (!text) return;
     try {
@@ -331,29 +276,29 @@ function CopyValue({ text, linkTo }) {
       setOk(true);
       setTimeout(() => setOk(false), 1200);
       toast.success("Copiado");
-    } catch { toast.error("Error al copiar"); }
+    } catch {
+      toast.error("Error al copiar");
+    }
   };
-
   return (
     <div className="flex items-center justify-between gap-2 group/copy">
       {linkTo ? (
-        // 🚀 SI HAY UN LINK, RENDERIZAMOS LA ETIQUETA 'Link' CELESTE
-        <Link 
-          to={linkTo} 
-          target="_blank" 
+        <Link
+          to={linkTo}
+          target="_blank"
           rel="noopener noreferrer"
-          className="truncate text-xs sm:text-sm font-bold text-sky-400 hover:text-sky-300 hover:underline decoration-sky-400/30 underline-offset-4 transition-all"
+          className="truncate text-[13px] font-black text-duo-azul hover:opacity-80"
         >
           {String(display)}
         </Link>
       ) : (
-        <span className="truncate text-xs sm:text-sm font-bold text-white/90">{String(display)}</span>
+        <span className="truncate text-[13px] font-bold text-titulo dark:text-titulo-dark">{String(display)}</span>
       )}
-
       <button
-        onClick={onCopy} title="Copiar al portapapeles"
-        className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center transition-all ${
-          ok ? 'bg-emerald-500 text-white' : 'bg-white/5 text-white/20 group-hover/copy:bg-white/10 group-hover/copy:text-white/60'
+        onClick={onCopy}
+        title="Copiar"
+        className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center transition ${
+          ok ? "bg-duo-verde text-white" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark group-hover/copy:text-titulo dark:group-hover/copy:text-titulo-dark"
         }`}
       >
         {ok ? <HiCheck className="text-sm" /> : <HiClipboardCopy className="text-sm" />}

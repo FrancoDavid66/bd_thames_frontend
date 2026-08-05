@@ -1,13 +1,14 @@
 // src/components/renovaciones/RenovacionModal.jsx
+// Modal de renovar póliza — estilo THAMES (ModalDuo + InputDuo/SelectDuo/Boton3D).
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
-import { HiX, HiExclamation } from "react-icons/hi";
+import { HiRefresh, HiExclamation } from "react-icons/hi";
 
-// 🆕 Banner para errores estructurados
 import ErrorBanner from "./ErrorBanner";
-
-const cx = (...a) => a.filter(Boolean).join(" ");
+import ModalDuo from "../ui/ModalDuo";
+import Boton3D from "../ui/Boton3D";
+import InputDuo from "../ui/InputDuo";
+import SelectDuo from "../ui/SelectDuo";
 
 // 🎯 Helper interno: obtener la última cuota de una lista
 // (la de mayor cuota_nro y fecha_vencimiento)
@@ -16,14 +17,14 @@ function getUltimaCuota(cuotas) {
   return [...cuotas]
     .filter((c) => c && c.fecha_vencimiento)
     .sort((a, b) => {
-      // Primero por cuota_nro descendente
       const nroA = Number(a.cuota_nro || 0);
       const nroB = Number(b.cuota_nro || 0);
       if (nroB !== nroA) return nroB - nroA;
-      // Después por fecha descendente
       return new Date(b.fecha_vencimiento) - new Date(a.fecha_vencimiento);
     })[0] || null;
 }
+
+const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
 
 export default function RenovacionModal({
   open,
@@ -31,20 +32,14 @@ export default function RenovacionModal({
   onClose,
   onSubmit,
   submitting,
-  // 🆕 Error estructurado que viene del backend tras un intento fallido
-  // Formato: { error, message, detail, action, context }
+  // Error estructurado del backend: { error, message, detail, action, context }
   error = null,
 }) {
   const [nuevoNumero, setNuevoNumero] = useState("");
   const [nuevaCompania, setNuevaCompania] = useState("");
   const [nuevaFecha, setNuevaFecha] = useState("");
-  // 🆕 Tipo y precio: se confirman/corrigen a mano en cada renovación.
   const [tipo, setTipo] = useState("");
   const [precioCuota, setPrecioCuota] = useState("");
-
-  const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
-
-  // 🆕 Input que aparece SOLO cuando el backend dijo "COBERTURA_NO_CONFIGURADA"
   const [cantidadCuotasOverride, setCantidadCuotasOverride] = useState("");
 
   const necesitaOverride = error?.error === "COBERTURA_NO_CONFIGURADA";
@@ -56,35 +51,24 @@ export default function RenovacionModal({
     setNuevaCompania(item?.compania || "");
     setTipo(item?.tipo || "");
     setPrecioCuota("");
+    setCantidadCuotasOverride(item?.cantidad_cuotas ? String(item.cantidad_cuotas) : "");
 
-    // Default sugerido para override = cantidad de cuotas de la póliza original
-    setCantidadCuotasOverride(
-      item?.cantidad_cuotas ? String(item.cantidad_cuotas) : ""
-    );
-
-    // 🎯 LÓGICA UNIFICADA: la nueva póliza empieza el MISMO DÍA que venció
-    // la última cuota de la póliza vieja (sin gap).
+    // La nueva póliza empieza el MISMO DÍA que venció la última cuota de la vieja.
     let fechaCalculada = null;
     const ultimaCuota = getUltimaCuota(item?.cuotas);
     if (ultimaCuota?.fecha_vencimiento) {
       fechaCalculada = dayjs(ultimaCuota.fecha_vencimiento);
     }
-
     if (!fechaCalculada) {
       const fallbackStr =
         item?.ultima_cuota_vencimiento ||
         item?.vto_referencia ||
         item?.fecha_vencimiento ||
         item?.primer_pago;
-      if (fallbackStr) {
-        fechaCalculada = dayjs(fallbackStr);
-      }
+      if (fallbackStr) fechaCalculada = dayjs(fallbackStr);
     }
-
     setNuevaFecha(fechaCalculada ? fechaCalculada.format("YYYY-MM-DD") : "");
   }, [open, item]);
-
-  if (!open) return null;
 
   const handleSubmit = () => {
     const payload = {
@@ -94,214 +78,128 @@ export default function RenovacionModal({
       tipo: tipo || undefined,
       precio_cuota: precioCuota !== "" ? precioCuota : undefined,
     };
-
-    // Si el banner muestra el input de cuotas y el usuario lo completó, lo enviamos
     if (necesitaOverride) {
       const n = parseInt(cantidadCuotasOverride, 10);
       if (Number.isFinite(n) && n > 0) {
         payload.cantidad_cuotas_override = n;
-        // El backend lo lee como snake_case
         payload.cantidad_cuotas = n;
       }
     }
-
     onSubmit(payload);
   };
 
   const canSubmit =
     !!tipo &&
     (necesitaOverride
-      ? Number.isFinite(parseInt(cantidadCuotasOverride, 10)) &&
-        parseInt(cantidadCuotasOverride, 10) > 0
+      ? Number.isFinite(parseInt(cantidadCuotasOverride, 10)) && parseInt(cantidadCuotasOverride, 10) > 0
       : true);
 
+  const subtitle = item?.patente
+    ? `${item.patente}${item?.cliente ? ` · ${item.cliente.apellido}, ${item.cliente.nombre}` : ""}`
+    : (item?.cliente ? `${item.cliente.apellido}, ${item.cliente.nombre}` : null);
+
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
-        <motion.div
-          className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900 backdrop-blur-xl shadow-2xl max-h-[90vh] overflow-y-auto"
-          initial={{ y: 18, opacity: 0, scale: 0.98 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: 18, opacity: 0, scale: 0.98 }}
-        >
-          <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4 sticky top-0 bg-slate-900 z-10">
-            <div>
-              <div className="text-lg font-extrabold text-white">Renovar póliza</div>
-              <div className="mt-1 text-sm text-white/80">
-                {item?.patente ? (
-                  <>
-                    <span className="font-semibold text-white">{item.patente}</span> ·{" "}
-                    {item?.cliente?.apellido}, {item?.cliente?.nombre}
-                  </>
-                ) : (
-                  <>
-                    {item?.cliente?.apellido}, {item?.cliente?.nombre}
-                  </>
-                )}
+    <ModalDuo
+      isOpen={open}
+      onClose={submitting ? () => {} : onClose}
+      title="Renovar póliza"
+      subtitle={subtitle}
+      icon={<HiRefresh />}
+      iconTono="verde"
+      size="md"
+      footer={
+        <>
+          <Boton3D variant="blanco" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Boton3D>
+          <Boton3D variant="verde" onClick={handleSubmit} disabled={submitting || !canSubmit}>
+            {submitting ? "Procesando…" : necesitaOverride ? "Reintentar" : "Renovar póliza"}
+          </Boton3D>
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        {/* Banner de error del backend */}
+        {error && (
+          <ErrorBanner error={error}>
+            {necesitaOverride && (
+              <div className="bg-surface dark:bg-surface-dark rounded-xl p-3 mt-1">
+                <label className="text-xs font-black text-titulo dark:text-titulo-dark mb-1.5 block">
+                  Cantidad de cuotas (manual)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={cantidadCuotasOverride}
+                    onChange={(e) => setCantidadCuotasOverride(e.target.value)}
+                    disabled={submitting}
+                    placeholder="Ej: 6"
+                    className="w-24 rounded-xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-titulo dark:text-titulo-dark text-sm font-bold outline-none focus:border-duo-amarillo transition-colors disabled:opacity-50"
+                  />
+                  <span className="text-[11px] font-bold text-suave dark:text-suave-dark">
+                    cuotas mensuales se van a generar
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
+          </ErrorBanner>
+        )}
 
-            <button
-              className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-white hover:bg-white/15 transition-colors"
-              onClick={onClose}
-              disabled={submitting}
-              title="Cerrar"
-              type="button"
-            >
-              <HiX />
-            </button>
+        <InputDuo
+          label="Nuevo número (opcional)"
+          value={nuevoNumero}
+          onChange={(e) => setNuevoNumero(e.target.value)}
+          placeholder="Ej: 12345-ABC"
+        />
+
+        <SelectDuo
+          label="Tipo de vehículo"
+          required
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value)}
+          placeholder="— Elegir —"
+          options={TIPOS_VEHICULO.map((t) => ({ value: t, label: t }))}
+        />
+
+        <InputDuo
+          label="Precio de cuota (opcional)"
+          type="number"
+          min="0"
+          step="0.01"
+          value={precioCuota}
+          onChange={(e) => setPrecioCuota(e.target.value)}
+          placeholder="Ej: 35000"
+        />
+
+        <InputDuo
+          label="Nueva compañía (opcional)"
+          value={nuevaCompania}
+          onChange={(e) => setNuevaCompania(e.target.value)}
+          placeholder="Ej: RUS / SANCOR / etc."
+        />
+
+        <InputDuo
+          label="Inicio de vigencia (alta)"
+          type="date"
+          value={nuevaFecha}
+          onChange={(e) => setNuevaFecha(e.target.value)}
+        />
+        <p className="-mt-2 text-[11px] font-bold text-suave dark:text-suave-dark ml-1">
+          Es el día que <strong className="text-titulo dark:text-titulo-dark">arranca la cobertura</strong>. Por defecto, el día que vence la última cuota actual (así no queda hueco). La <strong className="text-titulo dark:text-titulo-dark">1ª cuota vence un mes después</strong>.
+        </p>
+
+        {/* Aviso */}
+        <div className="flex items-start gap-3 rounded-2xl border-2 border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-3.5">
+          <HiExclamation className="mt-0.5 shrink-0 text-xl text-duo-amarillo-sombra dark:text-duo-amarillo" />
+          <div className="text-[13px] font-bold leading-relaxed text-duo-amarillo-sombra dark:text-duo-amarillo">
+            <strong className="block text-sm font-black mb-0.5">Atención</strong>
+            La póliza actual pasará a <strong>FINALIZADA</strong> y se creará una nueva versión <strong>ACTIVA</strong>.
+            <span className="mt-1 block opacity-90">No te olvides de emitir/subir la póliza en la web de la aseguradora si corresponde.</span>
           </div>
-
-          <div className="grid gap-3 p-4">
-            {/* 🆕 Banner de error estructurado (cuando viene del backend) */}
-            <AnimatePresence>
-              {error && (
-                <ErrorBanner error={error}>
-                  {/* Input inline solo si el error es "COBERTURA_NO_CONFIGURADA" */}
-                  {necesitaOverride && (
-                    <div className="bg-black/30 rounded-lg p-3 mt-1">
-                      <label className="text-xs font-bold text-white/90 mb-1.5 block">
-                        Cantidad de cuotas (manual)
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="1"
-                          max="60"
-                          value={cantidadCuotasOverride}
-                          onChange={(e) => setCantidadCuotasOverride(e.target.value)}
-                          disabled={submitting}
-                          placeholder="Ej: 6"
-                          className="w-24 rounded-lg border border-white/15 bg-black/40 px-3 py-1.5 text-white text-sm outline-none focus:border-amber-400 transition-colors disabled:opacity-50"
-                        />
-                        <span className="text-[11px] text-white/60">
-                          cuotas mensuales se van a generar
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </ErrorBanner>
-              )}
-            </AnimatePresence>
-
-            <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">Nuevo número (opcional)</label>
-              <input
-                value={nuevoNumero}
-                onChange={(e) => setNuevoNumero(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
-                placeholder="Ej: 12345-ABC"
-              />
-              <div className="text-xs text-white/60">
-                Si existe, el backend lo hace único (agrega sufijo -R1, -R2…).
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">Tipo de vehículo *</label>
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
-              >
-                <option value="" className="bg-slate-900">— Elegir —</option>
-                {TIPOS_VEHICULO.map((t) => (
-                  <option key={t} value={t} className="bg-slate-900">{t}</option>
-                ))}
-              </select>
-              <div className="text-xs text-white/60">
-                Confirmá o corregí el tipo (define el precio). Si nació mal cargado, corregilo acá.
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">Precio de cuota (opcional)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={precioCuota}
-                onChange={(e) => setPrecioCuota(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
-                placeholder="Ej: 35000"
-              />
-              <div className="text-xs text-white/60">
-                Si lo dejás vacío, las cuotas quedan en $0 y se cargan después desde Pagos.
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">Nueva compañía (opcional)</label>
-              <input
-                value={nuevaCompania}
-                onChange={(e) => setNuevaCompania(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/30 transition-colors"
-                placeholder="Ej: RUS / SANCOR / etc."
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <label className="text-xs font-semibold text-white/90">Inicio de vigencia (alta)</label>
-              <input
-                type="date"
-                value={nuevaFecha}
-                onChange={(e) => setNuevaFecha(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
-              />
-              <div className="text-xs text-white/60">
-                Es el día que <strong className="text-white/80">arranca la cobertura</strong>. Por defecto, el día que vence la última cuota de la póliza actual (así no queda hueco). La <strong className="text-white/80">1ª cuota vence un mes después</strong>.
-              </div>
-            </div>
-
-            <div className="mt-1 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5">
-              <HiExclamation className="mt-0.5 shrink-0 text-xl text-amber-400" />
-              <div className="text-[13px] leading-relaxed text-amber-100/90">
-                <strong className="block text-sm font-bold text-amber-400 mb-0.5">Atención</strong>
-                La póliza actual pasará a estado <strong>FINALIZADA</strong> y se creará una nueva versión <strong>ACTIVA</strong>.
-                <br />
-                <span className="mt-1 block opacity-90">No te olvides de emitir/subir la póliza en la página web de la aseguradora si corresponde.</span>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
-              <button
-                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-white hover:bg-white/15 transition-colors"
-                onClick={onClose}
-                disabled={submitting}
-                type="button"
-              >
-                Cancelar
-              </button>
-
-              <button
-                className={cx(
-                  "rounded-xl px-5 py-2 font-extrabold text-black transition-colors shadow-md",
-                  submitting || !canSubmit
-                    ? "bg-white/40 shadow-none cursor-not-allowed"
-                    : "bg-emerald-400 hover:bg-emerald-300 shadow-emerald-500/20"
-                )}
-                disabled={submitting || !canSubmit}
-                type="button"
-                onClick={handleSubmit}
-              >
-                {submitting
-                  ? "Procesando..."
-                  : necesitaOverride
-                  ? "Reintentar renovación"
-                  : "Renovar póliza"}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </ModalDuo>
   );
 }
