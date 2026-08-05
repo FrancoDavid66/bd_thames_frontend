@@ -121,6 +121,9 @@ function App() {
   // 🚀 NUEVO: Contador de servicios fijos (vencidos + por vencer ≤3d)
   const [serviciosAlertas, setServiciosAlertas] = useState(0);
 
+  // 🆕 Contador Control Diario: tareas fijas de HOY que faltan hacer (sin foto).
+  const [controlDiarioPendientes, setControlDiarioPendientes] = useState(0);
+
   // ====== Helper: API ROOT ======
   const getApiRoot = () => {
     const raw = (
@@ -264,6 +267,27 @@ function App() {
     } catch {}
   };
 
+  // 🆕 ====== Control Diario: fetch (tareas fijas de hoy sin hacer) ======
+  //    Suma TODAS las tareas de hoy que NO están cumplidas (sin foto), de las
+  //    oficinas que devuelve el endpoint: para un empleado es su oficina; para
+  //    un admin, todas. La respuesta trae { oficinas: [{ tareas: [{ cumplida }] }] }.
+  const fetchControlDiarioCount = async () => {
+    if (!user) return;
+    try {
+      const apiRoot = getApiRoot();
+      const data = await fetchJSON(`${apiRoot}tareas-fijas/dia/`);
+      let pend = 0;
+      const ofis = Array.isArray(data?.oficinas) ? data.oficinas : [];
+      for (const o of ofis) {
+        const tareas = Array.isArray(o?.tareas) ? o.tareas : [];
+        pend += tareas.filter((t) => !t?.cumplida).length;
+      }
+      setControlDiarioPendientes(pend);
+    } catch {
+      setControlDiarioPendientes(0);
+    }
+  };
+
   // 🚀 ====== Servicios Fijos: fetch (solo admin) ======
   const fetchServiciosCounters = async () => {
     if (!user) return;
@@ -326,8 +350,17 @@ function App() {
     fetchBajasCountersApp();
     fetchSiniestrosCount();
     fetchServiciosCounters();
+    fetchControlDiarioCount();
 
-    return () => { try { unsub && unsub(); } catch {} };
+    // 🆕 Cuando Control Diario avisa que se completó/cambió una tarea,
+    //    refrescamos el globo del menú al toque (sin esperar los 60s).
+    const onControlDiarioCambio = () => fetchControlDiarioCount();
+    window.addEventListener("control-diario-cambio", onControlDiarioCambio);
+
+    return () => {
+      try { unsub && unsub(); } catch {}
+      window.removeEventListener("control-diario-cambio", onControlDiarioCambio);
+    };
   }, [user]);
 
   // (El manejo de la clase 'dark' se movió a ThemeProvider — ver src/context/ThemeContext.jsx)
@@ -345,6 +378,7 @@ function App() {
     fetchBajasCountersApp();
     fetchSiniestrosCount();
     fetchServiciosCounters();
+    fetchControlDiarioCount();
   }, [location.pathname, location.search, user]);
 
   useEffect(() => {
@@ -356,6 +390,7 @@ function App() {
       fetchBajasCountersApp();
         fetchSiniestrosCount();
       fetchServiciosCounters();
+      fetchControlDiarioCount();
     }, 60_000);
     return () => clearInterval(id);
   }, [DISABLE_POLL, user]);
@@ -503,6 +538,7 @@ function App() {
           bajasPendientes={bajasPendientes}
           siniestrosAbiertos={siniestrosAbiertos}
           serviciosAlertas={serviciosAlertas}
+          controlDiarioPendientes={controlDiarioPendientes}
           user={user}
         />
 
@@ -603,6 +639,7 @@ function App() {
         bajasPendientes={bajasPendientes}
         siniestrosAbiertos={siniestrosAbiertos}
         serviciosAlertas={serviciosAlertas}
+        controlDiarioPendientes={controlDiarioPendientes}
       />
     </>
   );

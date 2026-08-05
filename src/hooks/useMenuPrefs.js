@@ -110,4 +110,60 @@ export function useMenuPrefs() {
   };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 🧠 ACORDEONES DEL SIDEBAR con memoria propia.
+//    Guarda qué grupos (Cartera, Finanzas, Gerencia) están abiertos.
+//    👉 Primera vez: TODOS cerrados (lo que pediste).
+//    👉 Si el usuario abre uno, se recuerda y la próxima vez sigue abierto.
+//    👉 Clave separada "thames.menu.accordions" (no pisa las prefs del menú).
+//    👉 Se sincroniza entre pestañas.
+// ════════════════════════════════════════════════════════════════════
+const ACC_KEY = "thames.menu.accordions";
+
+// Por defecto: nada abierto (objeto vacío → todos cerrados).
+function readAccordions() {
+  try {
+    const raw = localStorage.getItem(ACC_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAccordions(state) {
+  try {
+    localStorage.setItem(ACC_KEY, JSON.stringify(state || {}));
+  } catch {
+    /* incógnito / storage lleno → ignoramos */
+  }
+}
+
+export function useAccordionPrefs() {
+  const [openGroups, setOpenGroups] = useState(() => readAccordions());
+
+  useEffect(() => { writeAccordions(openGroups); }, [openGroups]);
+
+  // 🔄 Sincronización entre pestañas
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== ACC_KEY) return;
+      setOpenGroups(readAccordions());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // ¿Está abierto ese grupo? (por defecto: NO)
+  const isOpen = useCallback((id) => Boolean(openGroups[id]), [openGroups]);
+
+  // Abrir/cerrar un grupo y recordar la elección.
+  const toggleGroup = useCallback((id) => {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  return { openGroups, isOpen, toggleGroup };
+}
+
 export default useMenuPrefs;

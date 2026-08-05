@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.jsx
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,6 +11,8 @@ import ThemeToggle from "./ThemeToggle";
 import logoThames from "../../assets/logos/logo_thames.svg";
 // 📚 Fuente única del menú (compartida con el Footer)
 import { ICON_MAP, SECTION_COLORS, QUICK_ACTIONS, buildMenuGroups } from "./menuData";
+// 🧠 Memoria de los acordeones (arrancan cerrados; recuerda si el usuario los abre)
+import { useAccordionPrefs } from "../../hooks/useMenuPrefs";
 
 export default function Sidebar({
   isOpen,
@@ -23,6 +25,7 @@ export default function Sidebar({
   bajasPendientes = 0,
   serviciosAlertas = 0,
   siniestrosAbiertos = 0,
+  controlDiarioPendientes = 0,   // 🆕 badge de Control diario (tareas de hoy sin hacer)
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -30,8 +33,6 @@ export default function Sidebar({
   const isVendedor = user?.perfil?.rol === "VENDEDOR";
   const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
-  const userInicial = (user?.first_name || user?.username || "U")[0].toUpperCase();
-  const userName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username || "Usuario";
   const oficinaNombre = user?.perfil?.oficina_nombre || "Sucursal";
 
   // 🚀 Accesos rápidos visibles según rol (Cotizador es solo admin)
@@ -40,21 +41,26 @@ export default function Sidebar({
     [isAdmin]
   );
 
+  // 🆕 Números para el globo de cada acceso rápido (por badgeKey).
+  //    Hoy solo Control Diario; si mañana querés otro, lo agregás acá.
+  const quickBadges = useMemo(
+    () => ({ controlDiario: Number(controlDiarioPendientes) || 0 }),
+    [controlDiarioPendientes]
+  );
+
   const menuGroups = useMemo(
     () => buildMenuGroups({
       isAdmin, isVendedor, solTotal, renovacionesPendientes,
       cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos,
+      controlDiarioPendientes,
     }),
-    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos]
+    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, controlDiarioPendientes]
   );
 
-  const [open, setOpen] = useState({
-    cartera: true,
-    finanzas: ["/pagos", "/recaudacion", "/balanzes", "/servicios"].some(p => location.pathname.startsWith(p)),
-    admin: ["/cotizaciones", "/estadisticas", "/admin"].some(p => location.pathname.startsWith(p)),
-  });
-
-  const toggle = (id) => setOpen(prev => ({ ...prev, [id]: !prev[id] }));
+  // 🧠 Acordeones con memoria: arrancan CERRADOS. Si el usuario abre uno, se
+  //    guarda en localStorage y la próxima vez sigue abierto.
+  const { isOpen: isGroupOpen, toggleGroup } = useAccordionPrefs();
+  const toggle = (id) => toggleGroup(id);
 
   return (
     <>
@@ -144,21 +150,6 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Usuario */}
-        <div className="px-4 py-3 border-b-2 border-linea dark:border-linea-dark shrink-0">
-          <div className="flex items-center gap-3 bg-surface dark:bg-surface-dark rounded-2xl px-3 py-2.5 border-2 border-linea dark:border-linea-dark">
-            <div className="h-9 w-9 rounded-full bg-duo-azul flex items-center justify-center text-sm font-black text-white shrink-0">
-              {userInicial}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-titulo dark:text-titulo-dark truncate leading-tight">{userName}</p>
-              <p className="text-[10px] font-bold text-suave dark:text-suave-dark truncate leading-tight uppercase tracking-wide">
-                {isAdmin ? "Administrador" : isVendedor ? "Vendedor" : "Operador"}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* ⭐ ACCESOS RÁPIDOS (multicolor). Emisión de póliza = hero (primero y grande) */}
         {!isVendedor && quickActions.length > 0 && (
           <div className="px-3 pt-3 shrink-0 space-y-2">
@@ -174,6 +165,8 @@ export default function Sidebar({
               const heroPad = q.hero ? "py-3" : "py-2.5";
               const heroIcon = q.hero ? "h-9 w-9" : "h-8 w-8";
               const heroTitle = q.hero ? "text-[14px]" : "text-[13px]";
+              // 🆕 Globo con el número (si este acceso rápido tiene badgeKey y hay pendientes)
+              const qBadge = q.badgeKey ? (quickBadges[q.badgeKey] || 0) : 0;
               return (
                 <NavLink
                   key={q.to}
@@ -184,6 +177,12 @@ export default function Sidebar({
                   {q.hero && (
                     <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center h-4 px-1.5 rounded-full bg-white text-[8px] font-black tracking-wide shadow" style={{ color: q.bg }}>
                       ★ RÁPIDO
+                    </span>
+                  )}
+                  {/* 🆕 Globo con cantidad de tareas pendientes (Control diario) */}
+                  {qBadge > 0 && (
+                    <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-white text-duo-rojo text-[11px] font-black shadow-[0_2px_0_rgba(0,0,0,.15)] border-2 border-duo-rojo/20">
+                      {qBadge}
                     </span>
                   )}
                   <span className={`flex items-center justify-center ${heroIcon} rounded-lg shrink-0 ${chip}`}>
@@ -197,6 +196,16 @@ export default function Sidebar({
                 </NavLink>
               );
             })}
+          </div>
+        )}
+
+        {/* 🚀 SEPARADOR — divide claramente los accesos rápidos del menú de secciones */}
+        {!isVendedor && quickActions.length > 0 && (
+          <div className="px-3 pt-3 pb-1 shrink-0">
+            <div className="border-t-2 border-linea dark:border-linea-dark" />
+            <p className="px-1 pt-2 text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+              Menú
+            </p>
           </div>
         )}
 
@@ -246,58 +255,52 @@ export default function Sidebar({
                       className={`
                         w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg
                         text-sm font-black transition-all duration-150
-                        ${open[group.id]
-                          ? "bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark"
-                          : "text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark"
+                        ${isGroupOpen(group.id)
+                          ? "text-titulo dark:text-titulo-dark"
+                          : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
                         }
                       `}>
-                      <div className="flex items-center gap-2">
-                        {(() => { const Icon = ICON_MAP[group.icon] || HiViewGrid; return <Icon className="w-[18px] h-[18px] shrink-0" style={{ color: sc.icon }} />; })()}
-                        <span>{group.title}</span>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: sc.icon }} />
+                        <span className="truncate uppercase tracking-widest text-[10px]">{group.title}</span>
                         <GroupBadge items={group.items} />
-                      </div>
-                      <motion.div
-                        animate={{ rotate: open[group.id] ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center justify-center h-6 w-6 rounded-lg text-suave dark:text-suave-dark">
-                        <HiChevronDown className="w-4 h-4" />
-                      </motion.div>
+                      </span>
+                      <HiChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isGroupOpen(group.id) ? "rotate-180" : ""}`} />
                     </button>
 
                     <AnimatePresence initial={false}>
-                      {open[group.id] && (
+                      {isGroupOpen(group.id) && (
                         <motion.div
+                          key="content"
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="overflow-hidden"
                         >
-                          <div className="pl-3 pt-1">
-                            <div className="pl-3 space-y-0.5 border-l-2" style={{ borderColor: sc.rail }}>
-                              {group.items.map(item => {
-                                const Icon = ICON_MAP[item.icon] || HiHome;
-                                return (
-                                  <NavLink key={item.to} to={item.to}
-                                    className={({ isActive }) => `
-                                      group flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] font-bold
-                                      transition-all duration-150
-                                      ${isActive
-                                        ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
-                                        : "text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
-                                      }
-                                    `}>
-                                    {({ isActive }) => (
-                                      <>
-                                        <Icon className="w-4 h-4 shrink-0" style={!isActive ? { color: sc.icon } : undefined} />
-                                        <span className="flex-1 truncate">{item.label}</span>
-                                        <Badge value={item.badge} tone={item.tone} />
-                                      </>
-                                    )}
-                                  </NavLink>
-                                );
-                              })}
-                            </div>
+                          <div className="pt-1 pl-1.5">
+                            {group.items.map(item => {
+                              const Icon = ICON_MAP[item.icon] || HiHome;
+                              return (
+                                <NavLink key={item.to} to={item.to} end={item.to === "/"}
+                                  className={({ isActive }) => `
+                                    group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-bold
+                                    transition-all duration-150 mb-0.5
+                                    ${isActive
+                                      ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
+                                      : "text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
+                                    }
+                                  `}>
+                                  {({ isActive }) => (
+                                    <>
+                                      <Icon className="w-4 h-4 shrink-0" style={!isActive ? { color: sc.icon } : undefined} />
+                                      <span className="flex-1 truncate">{item.label}</span>
+                                      <Badge value={item.badge} tone={item.tone} />
+                                    </>
+                                  )}
+                                </NavLink>
+                              );
+                            })}
                           </div>
                         </motion.div>
                       )}

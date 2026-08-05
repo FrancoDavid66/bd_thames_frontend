@@ -10,7 +10,7 @@ import {
   HiChartBar, HiClipboardList, HiClipboardCheck, HiRefresh,
   HiBan, HiCash, HiReceiptTax,
   HiShieldCheck, HiCog, HiViewGrid, HiStar,
-  HiPencilAlt, HiCalculator,
+  HiPencilAlt, HiCalculator, HiCamera,
 } from "react-icons/hi";
 
 export const ICON_MAP = {
@@ -19,7 +19,7 @@ export const ICON_MAP = {
   star: HiStar, tasks: HiClipboardCheck, refresh: HiRefresh,
   ban: HiBan, cash: HiCash, receipt: HiReceiptTax,
   shield: HiShieldCheck, cog: HiCog, grid: HiViewGrid,
-  pencil: HiPencilAlt, calc: HiCalculator,
+  pencil: HiPencilAlt, calc: HiCalculator, camera: HiCamera,
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -49,6 +49,14 @@ export const QUICK_ACTIONS = [
     icon: "db", bg: "var(--color-duo-azul)", shadow: "var(--color-duo-azul-sombra)",
   },
   {
+    // 🆕 Control Diario agregado a los accesos rápidos.
+    //    badgeKey: el Sidebar usa esta etiqueta para pintarle el globo con la
+    //    cantidad de tareas pendientes (controlDiarioPendientes).
+    to: "/control-diario", label: "Control diario", sub: "Tareas con foto del día",
+    icon: "camera", bg: "var(--color-duo-verde)", shadow: "var(--color-duo-verde-sombra)",
+    badgeKey: "controlDiario",
+  },
+  {
     to: "/cotizaciones", label: "Cotizador", sub: "Nueva cotización",
     icon: "calc", bg: "var(--color-duo-amarillo)", shadow: "var(--color-duo-amarillo-sombra)",
     darkText: true, adminOnly: true, // amarillo → texto oscuro; solo admin
@@ -62,6 +70,7 @@ export function buildMenuGroups({
   isAdmin, isVendedor,
   solTotal = 0, renovacionesPendientes = 0, cuponVencidas = 0,
   bajasPendientes = 0, serviciosAlertas = 0, siniestrosAbiertos = 0,
+  controlDiarioPendientes = 0,   // 🆕 tareas fijas de hoy sin hacer (badge Control diario)
 }) {
   if (isVendedor) {
     return [{
@@ -88,20 +97,22 @@ export function buildMenuGroups({
 
   return [
     {
+      // 🆕 PRINCIPAL ahora solo: Clientes, Pólizas, Tareas del día y Control diario.
       title: "Principal", flat: true, id: "principal",
-      items: [
-        { to: "/", label: "Inicio", icon: "home" },
-        { to: "/tareas", label: "Tareas del día", icon: "tasks", highlight: true },
-        { to: "/control-diario", label: "Control diario", icon: "clipboard" },
-        { to: "/ranking", label: "Ranking", icon: "star" },
-        { to: "/solicitudes", label: "Altas", icon: "clipboard", badge: solTotal, tone: "amarillo" },
-      ],
-    },
-    {
-      title: "Cartera", id: "cartera", icon: "doc",
       items: [
         { to: "/clientes", label: "Clientes", icon: "users" },
         { to: "/polizas", label: "Pólizas", icon: "doc" },
+        { to: "/tareas", label: "Tareas del día", icon: "tasks", highlight: true },
+        { to: "/control-diario", label: "Control diario", icon: "clipboard", badge: controlDiarioPendientes, tone: "rojo" },
+      ],
+    },
+    {
+      // 🆕 CARTERA absorbe Inicio, Ranking y Altas (antes estaban en Principal).
+      title: "Cartera", id: "cartera", icon: "doc",
+      items: [
+        { to: "/", label: "Inicio", icon: "home" },
+        { to: "/ranking", label: "Ranking", icon: "star" },
+        { to: "/solicitudes", label: "Altas", icon: "clipboard", badge: solTotal, tone: "amarillo" },
         { to: "/polizas/renovaciones", label: "Renovaciones", icon: "refresh", badge: renovacionesPendientes, tone: "amarillo" },
         { to: "/cuponeras", label: "Cuponeras", icon: "receipt", badge: cuponVencidas, tone: "rojo" },
         { to: "/polizas/bajas", label: "Bajas", icon: "ban", badge: bajasPendientes, tone: "rojo" },
