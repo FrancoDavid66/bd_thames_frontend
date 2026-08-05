@@ -12,8 +12,11 @@ import { useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 
 import Sidebar from "./components/layout/Sidebar";
+import FooterNav from "./components/layout/FooterNav";
 import Header from "./components/layout/Header";
 import MobileTopBar from "./components/layout/MobileTopBar";
+// 🧠 Preferencias del menú (sidebar/footer + abierto/cerrado) con memoria
+import useMenuPrefs from "./hooks/useMenuPrefs";
 
 import HomePage from "./pages/HomePage";
 import ClientesPage from "./pages/ClientesPage";
@@ -81,17 +84,21 @@ function App() {
     []
   );
 
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    try {
-      const stored = localStorage.getItem("sidebarOpen");
-      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023.5px)").matches) {
-        return false;
-      }
-      return stored === null ? true : stored === "true";
-    } catch {
-      return !isMobile;
-    }
-  });
+  // 🧠 Estado del menú CON MEMORIA (localStorage, clave propia que el logout no borra).
+  //    Ya NO hay "modos": el sidebar y el footer COEXISTEN y cada uno se
+  //    muestra/esconde con su propia lengüeta, de forma independiente.
+  //      - sidebarOpen:   1ra vez CERRADO; después recuerda.
+  //      - footerVisible: 1ra vez VISIBLE; después recuerda.
+  //    Se sincroniza entre pestañas/ventanas.
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    openSidebar,
+    closeSidebar: closeSidebarPref,
+    footerVisible,
+    showFooter,
+    hideFooter,
+  } = useMenuPrefs();
 
   // --- Contadores de Solicitudes ---
   const [solPendienteAlta, setSolPendienteAlta] = useState(0);
@@ -325,9 +332,10 @@ function App() {
 
   // (El manejo de la clase 'dark' se movió a ThemeProvider — ver src/context/ThemeContext.jsx)
 
+  // En mobile, al navegar cerramos el sidebar (para no tapar la pantalla).
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
-  }, [location.pathname, isMobile]);
+  }, [location.pathname, isMobile, setSidebarOpen]);
 
   useEffect(() => {
     if (!user) return;
@@ -352,8 +360,10 @@ function App() {
     return () => clearInterval(id);
   }, [DISABLE_POLL, user]);
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-  const closeSidebar = () => setSidebarOpen(false);
+  // Controles del menú. La EXCLUSIÓN MUTUA (nunca los dos abiertos) ya está
+  //  garantizada dentro del hook useMenuPrefs: abrir uno cierra el otro solo.
+  //  Acá solo alias legibles.
+  const closeSidebar = () => closeSidebarPref();
 
   // ========================================================
   // EARLY RETURNS
@@ -479,9 +489,11 @@ function App() {
       </AnimatePresence>
 
       <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
+        {/* Sidebar — SIEMPRE montado; se abre/cierra con su lengüeta */}
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
+          onOpen={openSidebar}
           solPendienteAlta={solPendienteAlta}
           solPendienteEnvio={solPendienteEnvio}
           cuponPendientes={cuponPendientes}
@@ -502,10 +514,15 @@ function App() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} siniestrosAbiertos={siniestrosAbiertos} />
+          <Header
+            sidebarOpen={sidebarOpen}
+            siniestrosAbiertos={siniestrosAbiertos}
+          />
 
           <motion.main
-            className="flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 pb-20 lg:pb-8 overflow-y-auto transition-all duration-200 pt-16"
+            className={`flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 overflow-y-auto transition-all duration-200 pt-16 ${
+              footerVisible ? "pb-24" : "pb-20 lg:pb-8"
+            }`}
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -30, opacity: 0 }}
@@ -557,17 +574,36 @@ function App() {
             </AnimatePresence>
           </motion.main>
 
-          <MobileTopBar
-            solPendienteAlta={solPendienteAlta}
-            solPendienteEnvio={solPendienteEnvio}
-            renovacionesPendientes={renovacionesPendientes}
-            bajasPendientes={bajasPendientes}
-            serviciosAlertas={serviciosAlertas}
-          />
+          {/* La barra móvil original solo cuando el FooterNav está ESCONDIDO
+              (así no quedan dos barras abajo pisándose). */}
+          {!footerVisible && (
+            <MobileTopBar
+              solPendienteAlta={solPendienteAlta}
+              solPendienteEnvio={solPendienteEnvio}
+              renovacionesPendientes={renovacionesPendientes}
+              bajasPendientes={bajasPendientes}
+              serviciosAlertas={serviciosAlertas}
+            />
+          )}
 
           <CierreCajaReminder />
         </motion.div>
       </div>
+
+      {/* 🚀 FOOTER (barra inferior) — SIEMPRE montado; se muestra/esconde con su
+          lengüeta, independiente del sidebar. */}
+      <FooterNav
+        isVisible={footerVisible}
+        onHide={hideFooter}
+        onShow={showFooter}
+        solPendienteAlta={solPendienteAlta}
+        solPendienteEnvio={solPendienteEnvio}
+        cuponVencidas={cuponVencidas}
+        renovacionesPendientes={renovacionesPendientes}
+        bajasPendientes={bajasPendientes}
+        siniestrosAbiertos={siniestrosAbiertos}
+        serviciosAlertas={serviciosAlertas}
+      />
     </>
   );
 }

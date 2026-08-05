@@ -1,6 +1,6 @@
 // src/components/layout/Header.jsx
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { HiMenu, HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp, HiCurrencyDollar } from "react-icons/hi";
+import { HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp, HiCurrencyDollar } from "react-icons/hi";
 import { FaPowerOff } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -202,7 +202,10 @@ function getTareas(s) {
 }
 
 /* ─── Header ───────────────────────────────────────────────── */
-export default function Header({ sidebarOpen, toggleSidebar, verificacionCount = 0, siniestrosAbiertos = 0 }) {
+export default function Header({ sidebarOpen, isFooter = false, verificacionCount = 0, siniestrosAbiertos = 0 }) {
+  // 🚀 El contenido se corre a la derecha (pl-64) SOLO cuando hay sidebar abierto.
+  //    En modo footer no hay sidebar, así que nunca se corre.
+  const shiftForSidebar = sidebarOpen && !isFooter;
   const dispatch = useDispatch();
   const { user, logout } = useAuth();
 
@@ -395,7 +398,7 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
       </AnimatePresence>
 
       {/* 🚀 Banner pulsante de pagos en atención — encima del header */}
-      <div className={`fixed inset-x-0 z-[45] ${sidebarOpen ? "lg:pl-64" : ""}`} style={{ top: 0 }}>
+      <div className={`fixed inset-x-0 z-[45] ${shiftForSidebar ? "lg:pl-64" : ""}`} style={{ top: 0 }}>
         <AtencionBanner />
       </div>
 
@@ -408,20 +411,14 @@ export default function Header({ sidebarOpen, toggleSidebar, verificacionCount =
           border-b-2 border-linea dark:border-linea-dark
           h-16 flex items-center
           transition-all duration-300
-          ${sidebarOpen ? "lg:pl-64" : ""}
+          ${shiftForSidebar ? "lg:pl-64" : ""}
         `}
         style={{ top: 0, paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="flex h-full w-full items-center justify-between px-4 sm:px-6">
 
-          {/* Izquierda: menú + logo */}
+          {/* Izquierda: logo (la hamburguesa se quitó — el sidebar se abre con la lengüeta lateral) */}
           <div className="flex items-center gap-3 sm:gap-4">
-            <button
-              onClick={toggleSidebar}
-              className="rounded-xl p-2 text-suave dark:text-suave-dark transition-colors hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark focus:outline-none"
-            >
-              {sidebarOpen ? <HiX className="text-2xl" /> : <HiMenu className="text-2xl" />}
-            </button>
             <div className="hidden items-center gap-2.5 sm:flex">
               {/* Isotipo (columna) en cuadradito Duo */}
               <span className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1.5">

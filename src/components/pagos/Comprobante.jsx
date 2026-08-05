@@ -383,6 +383,8 @@ const TICKET_HEIGHT = mmToPt(480);
 
 const tk = StyleSheet.create({
   page: { width: TICKET_WIDTH, height: TICKET_HEIGHT, paddingHorizontal: mmToPt(5), paddingVertical: mmToPt(8), fontFamily: "Helvetica", fontSize: 11, color: "#000", backgroundColor: "#fff" },
+  // 💗 Corazón relleno grande arriba del ticket (carácter ♥ — imprime en térmica).
+  heart: { fontSize: 46, textAlign: "center", marginBottom: 2, lineHeight: 1 },
   title: { fontSize: 16, fontWeight: "bold", textAlign: "center" },
   subtitle: { fontSize: 9, textAlign: "center", marginTop: 3 },
   pill: { alignSelf: "center", paddingVertical: 3, paddingHorizontal: 14, borderWidth: 2, borderColor: "#000", borderRadius: 6, marginTop: 8 },
@@ -412,6 +414,9 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
   return (
     <Document>
       <Page size={{ width: TICKET_WIDTH, height: TICKET_HEIGHT }} style={tk.page}>
+        {/* 💗 Corazón relleno grande, arriba de todo */}
+        <Text style={tk.heart}>♥</Text>
+
         <View style={tk.block}>
           <Text style={tk.title}>COMPROBANTE DE PAGO</Text>
           <Text style={tk.subtitle}>Servicios Jurídicos y Seguros</Text>
