@@ -268,7 +268,8 @@ const PolizaTable = ({
 
   return (
     <div className="overflow-hidden rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-[0_2px_0_var(--color-duo-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)]">
-      {isLoading && <div className="h-1 w-full animate-pulse bg-duo-azul" />}
+      {/* 🚫 Loader quitado a pedido: la barrita azul de "cargando" ya NO se muestra
+          en la tabla. El loader queda SOLO para el inicio/cierre de sesión (App.jsx). */}
 
       {/* ===== Desktop: tabla (md+) ===== */}
       <div className="hidden overflow-x-auto md:block">
