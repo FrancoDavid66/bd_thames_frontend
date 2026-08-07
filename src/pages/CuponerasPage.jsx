@@ -57,6 +57,20 @@ function getDiasRestantes(c) {
   return dayjs(c.fecha_vencimiento).diff(dayjs().startOf("day"), "day");
 }
 
+// 🆕 "Urgencia" del cliente = el vencimiento más urgente entre sus cupones
+//    impagos. Menor número = más urgente (los vencidos dan negativo → arriba).
+//    Si no tiene nada impago con fecha, va al fondo (Infinity).
+function urgenciaCliente(cupones) {
+  let min = Infinity;
+  for (const c of cupones) {
+    if (getVisual(c) === "PAGADA") continue;
+    const d = getDiasRestantes(c);
+    if (d === null) continue;
+    if (d < min) min = d;
+  }
+  return min;
+}
+
 function digitsOnly(v) { return String(v || "").replace(/\D+/g, ""); }
 
 function normalizePhoneAR(raw) {
@@ -288,16 +302,20 @@ export default function CuponerasPage() {
   const [pagoModal, setPagoModal] = useState(null);       // cupón a marcar pagado
   const [procesandoPago, setProcesandoPago] = useState(false);
 
-  /* cargar dashboard */
+  /* cargar dashboard
+     🆕 IMPORTANTE: ya NO pedimos page_size=500 con todo el histórico (eso traía
+     ~2866 cupones de golpe). Le pedimos al backend scope="MES": solo lo
+     accionable = vencidos impagos + lo que vence este mes (incluye hoy y 3 días).
+     El backend además ya excluye las pólizas dadas de baja / canceladas. */
   const loadDashboard = async (term = "") => {
     setLoading(true);
     setError("");
     try {
-      const params = { solo_ultimo: 0, page: 1, page_size: 500 };
+      const params = { solo_ultimo: 0, scope: "MES", page: 1, page_size: 100 };
       if (term.trim()) params.search = term.trim();
       const res = await http.get("polizas/cupones-robo/dashboard/", { params });
       const data = res.data || {};
-      setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0 });
+      setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0, reportados: 0 });
       setCupones(Array.isArray(data.results) ? data.results : []);
     } catch (e) {
       const msg =
@@ -345,16 +363,24 @@ export default function CuponerasPage() {
       )
     );
 
-    // filtro por scope (KPIs)
+    // filtro por scope (chips KPI). "ALL" = no filtra (muestra vencidos + del mes).
     const SCOPE_VISUAL = { PENDIENTE: "PENDIENTE", VENCIDA: "VENCIDA", POR_VENCER_7: "POR_VENCER", REPORTADO: "REPORTADO" };
     if (scope && scope !== "ALL") {
       const v = SCOPE_VISUAL[scope];
       grupos = grupos.filter((g) => g.cupones.some((c) => getVisual(c) === v));
     }
 
-    // ordenar clientes: primero los que tienen vencidas, luego reportadas, etc.
-    const peso = { rojo: 0, azul: 1, amarillo: 2, neutro: 3, verde: 4 };
-    grupos.sort((a, b) => (peso[resumenCliente(a.cupones).tono] ?? 5) - (peso[resumenCliente(b.cupones).tono] ?? 5));
+    // 🆕 Orden por URGENCIA real: el cliente con el vencimiento más próximo
+    //    (o más vencido) va primero. Vencidos (días negativos) → hoy (0) →
+    //    3 días → resto del mes. En empate, el que tiene fecha más vieja.
+    grupos.sort((a, b) => {
+      const ua = urgenciaCliente(a.cupones);
+      const ub = urgenciaCliente(b.cupones);
+      if (ua !== ub) return ua - ub;
+      const fa = a.cupones[0]?.fecha_vencimiento || "";
+      const fb = b.cupones[0]?.fecha_vencimiento || "";
+      return String(fa).localeCompare(String(fb));
+    });
 
     return grupos;
   }, [cupones, scope]);
@@ -428,7 +454,7 @@ export default function CuponerasPage() {
             Cuponeras de robo
           </h1>
           <p className="text-suave dark:text-suave-dark font-bold mt-1 ml-1 text-sm">
-            Buscá al cliente y tocá su tarjeta para ver y confirmar sus cuotas.
+            Vencidas y las que vencen este mes. Tocá al cliente para ver y confirmar sus cuotas.
           </p>
         </div>
         <Boton3D variant="blanco" size="sm" onClick={refreshAll} disabled={loading}>
@@ -479,7 +505,7 @@ export default function CuponerasPage() {
         <CardDuo className="flex flex-col items-center justify-center py-14 text-center">
           <div className="text-5xl mb-3">🎟️</div>
           <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">
-            {error ? "Error al cargar datos." : "No hay clientes con cuponeras para los filtros aplicados."}
+            {error ? "Error al cargar datos." : "No hay cuponeras vencidas ni por vencer este mes."}
           </p>
         </CardDuo>
       ) : (

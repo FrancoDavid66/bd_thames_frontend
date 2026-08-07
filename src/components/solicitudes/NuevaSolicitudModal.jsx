@@ -109,6 +109,7 @@ function formVacio() {
     cli_dni: "",
     cli_telefono: "",
     cli_localidad: "",
+    cli_provincia: "",
     cli_direccion: "",
     patente: "",
     marca: "",
@@ -275,8 +276,10 @@ export default function NuevaSolicitudModal({
 
       if (!clienteYaRegistrado) {
         if (!prev.cli_nombre) poner("cli_nombre", cli.nombre);
+        poner("cli_apellido", cli.apellido); // 🆕 apellido separado del PDF
         poner("cli_direccion", cli.direccion);
         poner("cli_localidad", cli.localidad);
+        poner("cli_provincia", cli.provincia); // 🆕 provincia del PDF
       }
       poner("patente", veh.patente);
       if (veh.patente) chips.push(`Patente: ${veh.patente}`);
@@ -435,6 +438,7 @@ export default function NuevaSolicitudModal({
               dni_cuit_cuil: soloDigitos(form.cli_dni),
               direccion: form.cli_direccion.trim(),
               localidad: form.cli_localidad.trim(),
+              provincia: form.cli_provincia.trim(), // 🆕 provincia
             },
         poliza: {
           modo: "nueva",
@@ -1074,6 +1078,7 @@ function SeccionClienteCampos({ form, set, faltaCampo }) {
           className={faltaCampo("cli_telefono") ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft [&_input]:!text-[#5a4600] [&_input]:placeholder:!text-[#5a4600]/50" : ""}
         />
         <InputDuo label="Localidad" value={form.cli_localidad} onChange={set("cli_localidad")} placeholder="Ej: Ramos Mejía" />
+        <InputDuo label="Provincia" value={form.cli_provincia} onChange={set("cli_provincia")} placeholder="Ej: Buenos Aires" />
         <InputDuo label="Dirección" value={form.cli_direccion} onChange={set("cli_direccion")} placeholder="Opcional" />
       </div>
     </SeccionCard>

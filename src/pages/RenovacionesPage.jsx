@@ -1,9 +1,14 @@
 // src/pages/RenovacionesPage.jsx
 //
 // Bandeja de renovaciones con 3 tabs:
-//   - Pendientes:   pólizas que aún no se renovaron y siguen vivas
-//   - Renovadas:    pólizas que ya tienen una versión nueva (es_renovacion=true)
-//   - No renovaron: vencidas hace 30+ días sin renovar, o marcadas manualmente
+//   - Vencen hoy:   pólizas que vencen HOY y siguen vivas
+//   - En 3 días:    pólizas que vencen dentro de los próximos 3 días
+//   - Vencidas:     pólizas que ya vencieron y no se renovaron
+//
+// 🆕 BUSCADOR GLOBAL: cuando hay texto en el buscador, se IGNORA el filtro de
+//    los tabs y se muestran TODAS las coincidencias (aunque la póliza venza en
+//    6 meses), así se puede buscar y renovar CUALQUIER póliza. Al borrar el
+//    texto, la tabla vuelve a la pestaña activa.
 //
 // El front filtra/segmenta los datos. El backend se ajustará después para
 // devolver campos extra (primera_cuota_pagada, cuotas_pagadas, no_renueva_manual, etc.)
@@ -52,7 +57,12 @@ import PageContainer from "../components/ui/PageContainer";
 import Boton3D from "../components/ui/Boton3D";
 
 // Helpers compartidos (cx y getVencimiento antes estaban definidos acá)
-import { cx, getVencimiento } from "../components/renovaciones/utils";
+import {
+  cx,
+  getVencimiento,
+  getNombreCompleto,
+  getCompania,
+} from "../components/renovaciones/utils";
 
 /* =========================================================
  * Helpers de detección de estado en frontend
@@ -60,6 +70,11 @@ import { cx, getVencimiento } from "../components/renovaciones/utils";
  * ========================================================= */
 
 const DIAS_SIN_GESTION_LIMITE = 30;
+
+// 🆕 Hasta cuántos días para atrás mostramos las VENCIDAS (decisión de Franco).
+// Coincide con el filtro del backend (?dias_vencidas=30). Una póliza que venció
+// hace más de esto ya no aparece: se da por perdida y no ensucia la bandeja.
+const DIAS_VENCIDAS_LIMITE = 30;
 
 function diasVencidaDe(p) {
   const v = getVencimiento(p);
@@ -128,25 +143,80 @@ function clasificarTab(p) {
   const d = diasParaVencer(p);
   if (d == null) return null;
 
-  if (d < 0) return "vencidas";       // se me pasó renovarla
+  // 🆕 Vencidas: solo las de los últimos 30 días. Las que vencieron hace más
+  //    tiempo NO se muestran (ya no se renuevan). Coincide con el backend.
+  if (d < 0) return d >= -DIAS_VENCIDAS_LIMITE ? "vencidas" : null;
   if (d === 0) return "renovar_hoy";  // vence hoy
   if (d <= 3) return "en_3_dias";     // vence dentro de los próximos 3 días
   return null;                         // vence más adelante → no la muestro todavía
 }
 
 /* =========================================================
+ * 🆕 BUSCADOR GLOBAL
+ * Cuando el admin escribe algo, la tabla deja de respetar el filtro de los
+ * tabs y muestra CUALQUIER póliza que coincida (por asegurado, patente,
+ * póliza, compañía). Así se puede renovar una póliza que todavía no está por
+ * vencer (le faltan más de 3 días). Solo se ocultan las que ya no tiene
+ * sentido renovar desde acá: renovadas, "no renueva", finalizadas o canceladas.
+ * ========================================================= */
+
+// Normaliza texto: minúsculas + sin acentos, para que "peña" matchee "pena".
+function norm(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+// ¿La póliza p coincide con el término q? (q ya viene normalizado)
+function matchSearch(p, q) {
+  if (!q) return true;
+  const campos = [
+    getNombreCompleto(p?.cliente),
+    p?.patente,
+    p?.numero_poliza,
+    getCompania(p),
+    p?.cliente?.dni_cuit_cuil,
+    p?.cliente?.telefono,
+  ];
+  const heno = norm(campos.filter(Boolean).join(" "));
+  return heno.includes(q);
+}
+
+// ¿Se puede ofrecer para renovar desde esta pantalla? (para el modo búsqueda)
+function esRenovableDesdeAca(p) {
+  if (isMarcadaNoRenueva(p)) return false;
+  if (isRenovada(p)) return false;
+  if (p?.tiene_renovacion) return false;
+  const estado = String(p?.estado || "").toLowerCase();
+  if (estado === "finalizada" || estado === "cancelada") return false;
+  return true;
+}
+
+/* =========================================================
  * Resumen en una línea
  * ========================================================= */
 
-function ResumenInline({ tab, kpis }) {
+function ResumenInline({ tab, kpis, buscando }) {
   const N = ({ children, tone = "titulo" }) => {
     const map = {
       titulo: "text-titulo dark:text-titulo-dark",
       amarillo: "text-duo-amarillo-sombra dark:text-duo-amarillo",
       rojo: "text-duo-rojo",
+      azul: "text-duo-azul",
     };
     return <span className={cx("font-black tabular-nums", map[tone])}>{children}</span>;
   };
+
+  // 🆕 En modo búsqueda mostramos un resumen distinto (no depende del tab).
+  if (buscando) {
+    return (
+      <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
+        <N tone="azul">{kpis.total}</N> resultado{kpis.total === 1 ? "" : "s"} de la búsqueda
+      </span>
+    );
+  }
 
   if (tab === "vencidas") {
     return (
@@ -280,6 +350,10 @@ export default function RenovacionesPage() {
 
   const loading = status === "loading";
 
+  // 🆕 ¿Estamos en modo búsqueda? (hay texto tipeado en el buscador)
+  const searchQuery = norm(search);
+  const buscando = searchQuery.length > 0;
+
   useEffect(() => {
     dispatch(fetchRenovacionesOficinas());
   }, [dispatch]);
@@ -302,16 +376,15 @@ export default function RenovacionesPage() {
     return out;
   }, [oficinas]);
 
-  /* ============ CARGA DE DATOS según TAB ============
-     Estrategia:
-     - tab=pendientes      → endpoint normal (oculta ya renovadas por default).
-                             Filtramos en frontend para quitar las "en seguimiento" también.
-     - tab=en_seguimiento  → endpoint normal (las verificadas siguen apareciendo).
-                             Filtramos en frontend a las que tienen renovacion_verificada=true.
-     - tab=renovadas       → include_renovadas=1 (trae también las renovadas).
-                             Después filtramos en frontend con es_renovacion=true.
-     - tab=no_renovaron    → include_renovadas=1 (necesitamos verlas).
-                             Filtramos en frontend a las que entran en la regla.
+  /* ============ CARGA DE DATOS ============
+     Traemos TODA la ventana de una sola vez (sin depender del tab ni de la
+     página). Así los contadores de los tabs y las filas mostradas salen
+     siempre del mismo conjunto y nunca quedan desfasados.
+
+     🆕 Cuando se busca, el término `search` viaja al backend igual, así que la
+     respuesta ya trae las pólizas que coinciden (incluidas las que vencen
+     más adelante). El front después decide mostrarlas todas (modo búsqueda)
+     o filtrarlas por tab (modo normal).
   ============================================================== */
 
   const load = useCallback(
@@ -323,9 +396,6 @@ export default function RenovacionesPage() {
           ? opts.oficina
           : oficina;
 
-      // Traemos TODA la ventana de una sola vez (sin depender del tab ni de la
-      // página). Así los contadores de los tabs y las filas mostradas salen
-      // siempre del mismo conjunto y nunca quedan desfasados.
       const payload = {
         dias: 30,
         solo_pendientes: false,
@@ -398,14 +468,32 @@ export default function RenovacionesPage() {
     setPage(1);
   }, [tab]);
 
-  /* ============ FILTRADO EN FRONTEND POR TAB ============ */
+  // 🆕 Cuando cambia el término de búsqueda, también volvemos a página 1
+  //    (si no, podrías quedar parado en la página 5 de un resultado corto).
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
+
+  /* ============ FILTRADO EN FRONTEND ============ */
   const itemsRaw = Array.isArray(items) ? items : [];
 
   const itemsForTab = useMemo(() => {
+    // 🆕 MODO BÚSQUEDA: ignoramos el filtro de tabs y mostramos TODAS las
+    //    coincidencias renovables (aunque venzan en 6 meses).
+    if (buscando) {
+      return itemsRaw.filter(
+        (p) => esRenovableDesdeAca(p) && matchSearch(p, searchQuery)
+      );
+    }
+    // MODO NORMAL: respetamos el tab activo.
     return itemsRaw.filter((p) => clasificarTab(p) === tab);
-  }, [itemsRaw, tab]);
+  }, [itemsRaw, tab, buscando, searchQuery]);
 
-  /* ============ CONTADORES PARA TABS Y KPIs ============ */
+  /* ============ CONTADORES PARA TABS Y KPIs ============
+     Los contadores de los tabs SIEMPRE salen del filtro por vencimiento
+     (no del buscador), así los números de las pestañas no cambian mientras
+     buscás una póliza puntual.
+  ============================================================== */
   const tabCounts = useMemo(() => {
     const acc = { renovar_hoy: 0, en_3_dias: 0, vencidas: 0 };
     for (const p of itemsRaw) {
@@ -415,22 +503,22 @@ export default function RenovacionesPage() {
     return acc;
   }, [itemsRaw]);
 
-  // KPIs específicos del tab activo
+  // KPIs específicos del tab activo (o del resultado de búsqueda)
   const kpis = useMemo(() => {
     const total = itemsForTab.length;
-    if (tab === "vencidas") {
+    if (!buscando && tab === "vencidas") {
       const masDe30 = itemsForTab.filter((p) => diasVencidaDe(p) >= 30).length;
       return { total, masDe30 };
     }
     return { total };
-  }, [tab, itemsForTab]);
+  }, [tab, itemsForTab, buscando]);
 
   const totalCount = itemsForTab.length;
   const totalPages =
     pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   const safePage = Math.min(Math.max(1, page), totalPages);
 
-  // Página visible (paginamos en frontend sobre el filtro del tab)
+  // Página visible (paginamos en frontend sobre el filtro activo)
   const itemsPaginados = useMemo(() => {
     const start = (safePage - 1) * pageSize;
     return itemsForTab.slice(start, start + pageSize);
@@ -535,14 +623,17 @@ export default function RenovacionesPage() {
         setRenovarError(null);
         setPolizaRenovadaModal({ open: false, error: null });
 
-        // Abrimos la póliza nueva en otra pestaña, sin salir de Renovaciones.
+        // 🆕 Vamos DIRECTO al detalle de la póliza nueva, dentro de la misma app.
+        //    Antes se usaba window.open(..., "_blank"), pero el navegador bloqueaba
+        //    el pop-up (al llamarse después de un await) y terminaba pateando al
+        //    Home. Con navigate() la navegación es interna y limpia.
         if (nuevaId) {
-          window.open(`/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
+          navigate(`/polizas/${nuevaId}`);
+        } else {
+          // Sin id nuevo (caso raro): recargamos la lista para reflejar el cambio.
+          await load({ force: true });
+          await loadResumen({ force: true });
         }
-
-        // Recargamos para que la póliza renovada desaparezca de la tabla.
-        await load({ force: true });
-        await loadResumen({ force: true });
       } catch (e) {
         // Detectar error estructurado del backend
         const backendError =
@@ -625,6 +716,14 @@ export default function RenovacionesPage() {
         tabCounts={tabCounts}
       />
 
+      {/* 🆕 Aviso de modo búsqueda: aclara que se ignora el filtro de pestañas */}
+      {buscando && (
+        <div className="mt-4 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-2 border-duo-azul/40 p-3 text-sm font-bold text-duo-azul flex items-center gap-2">
+          <HiCheckCircle className="text-lg shrink-0" />
+          Buscando en TODAS las pólizas (sin filtro de vencimiento). Podés renovar cualquiera. Borrá el texto para volver a las pestañas.
+        </div>
+      )}
+
       {!!error && (
         <div className="mt-4 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-2 border-duo-rojo/40 p-3 text-sm font-bold text-duo-rojo flex items-center gap-2">
           <HiExclamation className="text-lg" />
@@ -634,13 +733,21 @@ export default function RenovacionesPage() {
 
       {/* ============ Resumen en línea ============ */}
       <div className="mt-4 mb-3">
-        <ResumenInline tab={tab} kpis={kpis} />
+        <ResumenInline tab={tab} kpis={kpis} buscando={buscando} />
       </div>
 
       {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-[13px] font-bold text-suave dark:text-suave-dark">
-          {tab === "vencidas" ? (
+          {buscando ? (
+            <span>
+              Mostrando{" "}
+              <span className="text-titulo dark:text-titulo-dark">{receivedCount}</span>{" "}
+              de{" "}
+              <span className="text-titulo dark:text-titulo-dark">{totalCount}</span>{" "}
+              coincidencia{totalCount === 1 ? "" : "s"}
+            </span>
+          ) : tab === "vencidas" ? (
             <span>
               Mostrando <span className="text-titulo dark:text-titulo-dark">{receivedCount}</span>{" "}
               sin renovar de{" "}

@@ -35,7 +35,6 @@ export default function RenovacionModal({
   // Error estructurado del backend: { error, message, detail, action, context }
   error = null,
 }) {
-  const [nuevoNumero, setNuevoNumero] = useState("");
   const [nuevaCompania, setNuevaCompania] = useState("");
   const [nuevaFecha, setNuevaFecha] = useState("");
   const [tipo, setTipo] = useState("");
@@ -47,7 +46,9 @@ export default function RenovacionModal({
   useEffect(() => {
     if (!open) return;
 
-    setNuevoNumero(item?.numero_poliza || "");
+    // 🆕 NÚMERO AL RENOVAR: ya NO se pide en el modal.
+    //    El número lo genera SIEMPRE el sistema solo (corto y correlativo: 1002,
+    //    1003…). Si hiciera falta uno específico, se edita después en la póliza.
     setNuevaCompania(item?.compania || "");
     setTipo(item?.tipo || "");
     setPrecioCuota("");
@@ -72,7 +73,7 @@ export default function RenovacionModal({
 
   const handleSubmit = () => {
     const payload = {
-      nuevoNumero: (nuevoNumero || "").trim() || undefined,
+      // 🆕 Ya no se manda `nuevoNumero`: el backend genera el número corto solo.
       nuevaCompania: (nuevaCompania || "").trim() || undefined,
       nuevaFecha: nuevaFecha || undefined,
       tipo: tipo || undefined,
@@ -146,13 +147,6 @@ export default function RenovacionModal({
             )}
           </ErrorBanner>
         )}
-
-        <InputDuo
-          label="Nuevo número (opcional)"
-          value={nuevoNumero}
-          onChange={(e) => setNuevoNumero(e.target.value)}
-          placeholder="Ej: 12345-ABC"
-        />
 
         <SelectDuo
           label="Tipo de vehículo"
