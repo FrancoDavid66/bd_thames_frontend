@@ -397,15 +397,35 @@ export default function RenovacionesPage() {
           ? opts.oficina
           : oficina;
 
+      const q = (search || "").trim();
+
       const payload = {
         dias: 30,
         solo_pendientes: false,
-        search: (search || "").trim(),
+        search: q,
         ordering: "vto_referencia",
         oficina: ofi || undefined,
         page: 1,
         page_size: 500,
         include_renovadas: 1, // siempre, para ver también las vencidas viejas
+
+        // 🆕 include_finalizadas: SOLO cuando se está buscando.
+        //
+        // 🐛 EL BUG QUE ARREGLA:
+        //    El backend, en el endpoint de renovaciones, hace
+        //        qs.exclude(estado__iexact="finalizada")
+        //    salvo que le manden include_finalizadas. Y `auto_marcar_vencidas()`
+        //    pasa a "finalizada" a TODA póliza que pagó sus cuotas y cuya
+        //    cobertura ya venció. Resultado: el cliente que pagó todo y se le
+        //    venció hace 2 días desaparecía de la bandeja... siendo justo el
+        //    que hay que renovar.
+        //
+        // 🎯 Por qué solo al buscar: los tabs (Vencen hoy / En 3 días /
+        //    Vencidas) siguen mostrando la operación del día, sin llenarse de
+        //    pólizas finalizadas de hace años. Pero si vos escribís una patente,
+        //    aparece sí o sí, esté como esté.
+        ...(q ? { include_finalizadas: 1 } : {}),
+
         ...opts,
       };
 

@@ -2,8 +2,13 @@
 //
 // Portal del Asegurado (PÚBLICO, sin login). El cliente entra por el link único
 // que recibe por WhatsApp: /#/portal/<token>
-// Ve sus pólizas vigentes, cuotas, papeles y puede avisar "Ya pagué" en las
-// cuponeras de robo. Solo lectura (salvo el aviso de pago).
+// 👁️ SOLO LECTURA. El cliente ve sus cupones, fechas, papeles y los
+// comprobantes que la oficina le fue cargando.
+//
+// Ya NO hay botón "Ya pagué": el circuito real es que el cliente paga en
+// Rapipago / Pago Fácil / Mercado Pago y manda la FOTO del comprobante por
+// WhatsApp (responde el recordatorio que le llegó). La oficina sube esa foto
+// y marca el cupón pagado. Un solo camino, no dos.
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -100,7 +105,6 @@ export default function PortalAseguradoPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
-  const [enviando, setEnviando] = useState({});
   const [reciboBusy, setReciboBusy] = useState(null);
   const [recibo, setRecibo] = useState(null);          // { cli, pol, cuota } recibo a previsualizar (HTML)
   const [descargandoRecibo, setDescargandoRecibo] = useState(false);
@@ -157,38 +161,6 @@ export default function PortalAseguradoPage() {
     })();
     return () => { vivo = false; };
   }, [token]);
-
-  const reportarPago = async (polizaId, cupon) => {
-    setEnviando((m) => ({ ...m, [cupon.id]: true }));
-    try {
-      const res = await fetch(`${PORTAL_BASE}/${token}/cupon/${cupon.id}/reportar-pago/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.detail || "No se pudo registrar el aviso.");
-      // Actualizamos el estado local del cupón
-      setData((prev) => {
-        if (!prev) return prev;
-        const polizas = prev.polizas.map((p) => {
-          if (p.id !== polizaId) return p;
-          return {
-            ...p,
-            cupones_robo: p.cupones_robo.map((cp) =>
-              cp.id === cupon.id ? { ...cp, estado: "REPORTADO", reportado: true } : cp
-            ),
-          };
-        });
-        return { ...prev, polizas };
-      });
-      toast.success("¡Gracias! Recibimos tu aviso. Lo verificamos y te confirmamos.");
-    } catch (e) {
-      toast.error(e.message || "Error al enviar el aviso.");
-    } finally {
-      setEnviando((m) => { const c = { ...m }; delete c[cupon.id]; return c; });
-    }
-  };
 
   // -------- Loading --------
   if (cargando) {
@@ -365,52 +337,79 @@ export default function PortalAseguradoPage() {
                   </div>
                 )}
 
-                {/* Cuponeras de robo (lo importante para cobranza) */}
+                {/* Cuponera — lo que el cliente tiene que pagar */}
                 {cupones.length > 0 ? (
                   <div className="border-b-2 border-linea p-4 dark:border-linea-dark">
                     <div className="mb-2.5 flex items-center gap-2">
                       <HiShieldCheck className="h-4 w-4 text-oficina" />
-                      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark">Cuponeras de robo</span>
+                      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark">Tu cuponera</span>
                     </div>
                     <div className="space-y-2">
                       {cupones.map((cp) => {
                         const pagada = cp.pagado || cp.estado === "PAGADA";
-                        const reportada = cp.reportado || cp.estado === "REPORTADO";
+                        const vencido = !pagada && cp.fecha_vencimiento && dayjs(cp.fecha_vencimiento).isBefore(dayjs(), "day");
+                        const tieneComprobante = !!(cp.comprobante_url || "").trim();
                         return (
                           <div key={cp.id} className="rounded-xl border-2 border-linea bg-surface p-3 dark:border-linea-dark dark:bg-surface-dark">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">Vence {fmt(cp.fecha_vencimiento)}</span>
+                              <span className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">
+                                Vence {fmt(cp.fecha_vencimiento)}
+                              </span>
                               {pagada ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-ingreso-fuerte dark:text-ingreso-claro"><HiCheckCircle className="h-4 w-4" /> Pagada</span>
-                              ) : reportada ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-oficina-fuerte dark:text-oficina-claro"><HiClock className="h-4 w-4" /> Aviso recibido</span>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-ingreso-fuerte dark:text-ingreso-claro">
+                                  <HiCheckCircle className="h-4 w-4" /> Pagada
+                                </span>
+                              ) : vencido ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-egreso">
+                                  <HiExclamationCircle className="h-4 w-4" /> Pendiente
+                                </span>
                               ) : (
-                                <button
-                                  onClick={() => reportarPago(p.id, cp)}
-                                  disabled={!!enviando[cp.id]}
-                                  className="rounded-lg bg-duo-azul px-3 py-1.5 text-[11px] font-black text-white shadow-[0_3px_0_var(--color-duo-azul-sombra)] transition hover:brightness-105 disabled:opacity-50"
-                                >
-                                  {enviando[cp.id] ? "Enviando..." : "Ya pagué"}
-                                </button>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#d97706] dark:text-tarjeta-claro">
+                                  <HiClock className="h-4 w-4" /> A pagar
+                                </span>
                               )}
                             </div>
+
+                            {/* 📸 El comprobante que cargó la oficina: el respaldo del cliente */}
+                            {tieneComprobante ? (
+                              <button
+                                onClick={() => setVerDoc({ url: cp.comprobante_url, nombre: `Comprobante · vence ${fmt(cp.fecha_vencimiento)}` })}
+                                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-1.5 text-[11px] font-black text-titulo dark:text-titulo-dark transition hover:border-oficina"
+                              >
+                                <HiDocumentText className="h-4 w-4 text-ingreso" /> Ver comprobante
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
                     </div>
-                    <p className="mt-2 text-[11px] leading-snug text-suave dark:text-suave-dark">
-                      Cuando toques "Ya pagué", lo verificamos y te confirmamos. No hace falta que subas nada.
-                    </p>
+
+                    {/* Cómo pagar */}
                     <div className="mt-3 rounded-xl border-2 border-oficina/30 bg-oficina/10 p-3">
                       <div className="flex items-center gap-2 text-oficina-fuerte dark:text-oficina-claro">
                         <HiCash className="h-4 w-4" />
-                        <span className="text-[12px] font-black">Cómo pagar tus cuotas</span>
+                        <span className="text-[12px] font-black">Cómo pagar</span>
                       </div>
                       <p className="mt-1 text-[12px] leading-snug text-titulo dark:text-titulo-dark">
                         Podés abonar en <span className="font-black">Rapipago</span>,{" "}
                         <span className="font-black">Pago Fácil</span> o{" "}
-                        <span className="font-black">Mercado Pago</span> usando los datos de tu cuponera.
+                        <span className="font-black">Mercado Pago</span> (Pagar servicios) usando los datos de tu cuponera.
                       </p>
+                      <p className="mt-2 text-[12px] leading-snug text-titulo dark:text-titulo-dark">
+                        📸 Cuando pagues, <span className="font-black">mandanos la foto del comprobante por WhatsApp</span> y lo cargamos acá.
+                      </p>
+                      {p.oficina_whatsapp ? (
+                        <a
+                          href={`https://wa.me/${p.oficina_whatsapp}?text=${encodeURIComponent(
+                            `Hola, soy ${cliente?.nombre_completo || cliente?.nombre || ""}. Te paso el comprobante de pago de mi cuponera del auto ${p.patente || ""}.`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-duo-verde px-3.5 py-2 text-[12px] font-black text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] transition hover:brightness-105"
+                        >
+                          Enviar mi comprobante
+                        </a>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
