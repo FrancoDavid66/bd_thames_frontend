@@ -5,10 +5,11 @@
 //   - En 3 días:    pólizas que vencen dentro de los próximos 3 días
 //   - Vencidas:     pólizas que ya vencieron y no se renovaron
 //
-// 🆕 BUSCADOR GLOBAL: cuando hay texto en el buscador, se IGNORA el filtro de
-//    los tabs y se muestran TODAS las coincidencias (aunque la póliza venza en
-//    6 meses), así se puede buscar y renovar CUALQUIER póliza. Al borrar el
-//    texto, la tabla vuelve a la pestaña activa.
+// 🆕 BUSCADOR GLOBAL (SIN FILTROS): cuando hay texto en el buscador, se IGNORA
+//    TODO filtro (tabs, vencimiento, estado, ya renovada, "no renueva") y se
+//    muestran TODAS las coincidencias. Se puede renovar CUALQUIER póliza: si ya
+//    tenía una renovación, el backend avisa con el modal "¿Renovar igual?".
+//    Al borrar el texto, la tabla vuelve a la pestaña activa.
 //
 // El front filtra/segmenta los datos. El backend se ajustará después para
 // devolver campos extra (primera_cuota_pagada, cuotas_pagadas, no_renueva_manual, etc.)
@@ -152,12 +153,15 @@ function clasificarTab(p) {
 }
 
 /* =========================================================
- * 🆕 BUSCADOR GLOBAL
- * Cuando el admin escribe algo, la tabla deja de respetar el filtro de los
- * tabs y muestra CUALQUIER póliza que coincida (por asegurado, patente,
- * póliza, compañía). Así se puede renovar una póliza que todavía no está por
- * vencer (le faltan más de 3 días). Solo se ocultan las que ya no tiene
- * sentido renovar desde acá: renovadas, "no renueva", finalizadas o canceladas.
+ * 🆕 BUSCADOR GLOBAL — SIN FILTROS
+ * Cuando el admin escribe algo, la tabla deja de respetar CUALQUIER filtro
+ * (tab, vencimiento, estado, ya renovada, "no renueva") y muestra todas las
+ * coincidencias. El backend ya buscó por patente / asegurado / DNI / póliza /
+ * compañía / marca / modelo; acá solo se afina el resultado.
+ *
+ * Los candados de negocio siguen vivos donde corresponde: si la póliza ya se
+ * renovó, al apretar "Renovar" el backend responde POLIZA_YA_RENOVADA y sale
+ * el cartel "¿Renovar igual?".
  * ========================================================= */
 
 // Normaliza texto: minúsculas + sin acentos, para que "peña" matchee "pena".
@@ -170,6 +174,9 @@ function norm(s) {
 }
 
 // ¿La póliza p coincide con el término q? (q ya viene normalizado)
+// ⚠️ Los campos de acá tienen que cubrir los MISMOS que busca el backend
+//    (search_fields de PolizaViewSet). Si el backend trae una fila por "marca"
+//    y acá no miramos "marca", la fila se perdía y parecía que no existía.
 function matchSearch(p, q) {
   if (!q) return true;
   const campos = [
@@ -177,22 +184,16 @@ function matchSearch(p, q) {
     p?.patente,
     p?.numero_poliza,
     getCompania(p),
+    p?.marca,
+    p?.modelo,
     p?.cliente?.dni_cuit_cuil,
     p?.cliente?.telefono,
+    p?.oficina_nombre || p?.oficina?.nombre,
   ];
   const heno = norm(campos.filter(Boolean).join(" "));
   return heno.includes(q);
 }
 
-// ¿Se puede ofrecer para renovar desde esta pantalla? (para el modo búsqueda)
-function esRenovableDesdeAca(p) {
-  if (isMarcadaNoRenueva(p)) return false;
-  if (isRenovada(p)) return false;
-  if (p?.tiene_renovacion) return false;
-  const estado = String(p?.estado || "").toLowerCase();
-  if (estado === "finalizada" || estado === "cancelada") return false;
-  return true;
-}
 
 /* =========================================================
  * Resumen en una línea
@@ -478,12 +479,17 @@ export default function RenovacionesPage() {
   const itemsRaw = Array.isArray(items) ? items : [];
 
   const itemsForTab = useMemo(() => {
-    // 🆕 MODO BÚSQUEDA: ignoramos el filtro de tabs y mostramos TODAS las
-    //    coincidencias renovables (aunque venzan en 6 meses).
+    // 🆕 MODO BÚSQUEDA: CERO filtros. Mostramos todo lo que vino del backend y
+    //    coincide con el texto — venza cuando venza, esté como esté, aunque ya
+    //    tenga renovación o esté marcada "no renueva". El candado de verdad lo
+    //    pone el backend al momento de renovar.
     if (buscando) {
-      return itemsRaw.filter(
-        (p) => esRenovableDesdeAca(p) && matchSearch(p, searchQuery)
-      );
+      const local = itemsRaw.filter((p) => matchSearch(p, searchQuery));
+      // 🛟 Red de seguridad: el backend YA filtró por `search`. Si nuestro
+      //    filtro local deja todo afuera (un campo que el backend mira y
+      //    nosotros no), mostramos igual lo que trajo el backend en vez de
+      //    dejar la pantalla vacía.
+      return local.length > 0 ? local : itemsRaw;
     }
     // MODO NORMAL: respetamos el tab activo.
     return itemsRaw.filter((p) => clasificarTab(p) === tab);
@@ -720,7 +726,7 @@ export default function RenovacionesPage() {
       {buscando && (
         <div className="mt-4 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-2 border-duo-azul/40 p-3 text-sm font-bold text-duo-azul flex items-center gap-2">
           <HiCheckCircle className="text-lg shrink-0" />
-          Buscando en TODAS las pólizas (sin filtro de vencimiento). Podés renovar cualquiera. Borrá el texto para volver a las pestañas.
+          Modo búsqueda: se ignoran las pestañas y TODOS los filtros (vencimiento, estado, ya renovadas, "no renueva"). Podés renovar cualquiera. Borrá el texto para volver a las pestañas.
         </div>
       )}
 
@@ -804,6 +810,7 @@ export default function RenovacionesPage() {
         loading={loading}
         submitting={submitting}
         tab={tab}
+        buscando={buscando}
         onRenovar={(p) => {
           setSelected(p);
           setModalOpen(true);

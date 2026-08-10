@@ -1,15 +1,27 @@
 // src/components/renovaciones/Renovacionestable.jsx
 //
 // Tabla de renovaciones estilo THAMES (duo-*).
-// Columnas: Oficina · Patente · Compañía · Asegurado · Vto · Estado · Acciones
+// Columnas: Oficina · Patente · Compañía · Asegurado · Vto · Acciones
 // Acciones por fila: Renovar · No renueva · Ver. (Sin contacto.)
 // Desktop = tabla; mobile = tarjetas (mismo patrón que TablaDuo).
+//
+// 🆕 MODO BÚSQUEDA (prop `buscando`): la página manda TODAS las coincidencias,
+//    sin filtrar por vencimiento ni por estado. Acá sumamos un chip informativo
+//    ("Ya renovada", "Finalizada", "No renueva"…) para que se vea qué se está
+//    por tocar, y el botón "Renovar" queda SIEMPRE disponible.
 
 import { HiRefresh, HiX, HiEye, HiArrowLeft } from "react-icons/hi";
 
 import Boton3D from "../ui/Boton3D";
 import Badge from "../ui/Badge";
-import { cx, getVencimiento, formatVto, getNombreCompleto, getCompania } from "./utils";
+import {
+  cx,
+  getVencimiento,
+  formatVto,
+  getNombreCompleto,
+  getCompania,
+  situacionPoliza,
+} from "./utils";
 
 // Nombre de oficina de la póliza (soporta oficina_nombre, o el objeto oficina).
 function getOficina(p) {
@@ -22,20 +34,37 @@ function getOficina(p) {
 }
 
 /* ============ Acciones de una fila ============ */
-function AccionesFila({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
+function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
   const descartada = !!p?.renovacion_descartada;
 
+  // Descartada + modo normal  → solo "Revertir" (la fila está fuera de juego).
+  // Descartada + modo BÚSQUEDA → "Revertir" Y "Renovar": si la buscaste a mano
+  // es porque la querés renovar igual, sin tener que dar dos pasos.
   if (descartada) {
     return (
-      <Boton3D
-        variant="blanco"
-        size="sm"
-        onClick={() => onDesmarcarNoRenueva?.(p)}
-        disabled={submitting}
-        title="Revertir 'no renueva'"
-      >
-        <HiArrowLeft /> Revertir
-      </Boton3D>
+      <div className="flex items-center justify-end gap-2">
+        <Boton3D
+          variant="blanco"
+          size="sm"
+          onClick={() => onDesmarcarNoRenueva?.(p)}
+          disabled={submitting}
+          title="Revertir 'no renueva'"
+        >
+          <HiArrowLeft /> Revertir
+        </Boton3D>
+
+        {buscando && (
+          <Boton3D
+            variant="verde"
+            size="sm"
+            onClick={() => onRenovar?.(p)}
+            disabled={submitting}
+            title="Renovar igual"
+          >
+            <HiRefresh /> Renovar
+          </Boton3D>
+        )}
+      </div>
     );
   }
 
@@ -82,8 +111,9 @@ function AccionesFila({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcar
 }
 
 /* ============ Fila (desktop) ============ */
-function FilaDesktop({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
+function FilaDesktop({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
   const descartada = !!p?.renovacion_descartada;
+  const situacion = buscando ? situacionPoliza(p) : null;
   const textClass = descartada
     ? "line-through text-suave dark:text-suave-dark"
     : "text-titulo dark:text-titulo-dark";
@@ -100,7 +130,12 @@ function FilaDesktop({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarN
       <td className="p-4">
         <Badge tono="azul" size="sm">{getOficina(p)}</Badge>
       </td>
-      <td className={cx("p-4 text-sm font-black tracking-wider", textClass)}>{p?.patente || "—"}</td>
+      <td className={cx("p-4 text-sm font-black tracking-wider", textClass)}>
+        <div className="flex items-center gap-2">
+          <span>{p?.patente || "—"}</span>
+          {situacion && <Badge tono={situacion.tono} size="sm">{situacion.label}</Badge>}
+        </div>
+      </td>
       <td className={cx("p-4 text-sm font-bold", textClass)}>{getCompania(p)}</td>
       <td className={cx("p-4 text-sm font-bold", textClass)}>
         <div className="truncate max-w-[240px]" title={getNombreCompleto(p?.cliente)}>
@@ -114,6 +149,7 @@ function FilaDesktop({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarN
         <AccionesFila
           p={p}
           submitting={submitting}
+          buscando={buscando}
           onRenovar={onRenovar}
           onMarcarNoRenueva={onMarcarNoRenueva}
           onDesmarcarNoRenueva={onDesmarcarNoRenueva}
@@ -124,8 +160,9 @@ function FilaDesktop({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarN
 }
 
 /* ============ Tarjeta (mobile) ============ */
-function CardMobile({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
+function CardMobile({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
   const descartada = !!p?.renovacion_descartada;
+  const situacion = buscando ? situacionPoliza(p) : null;
   const textClass = descartada
     ? "line-through text-suave dark:text-suave-dark"
     : "text-titulo dark:text-titulo-dark";
@@ -141,7 +178,10 @@ function CardMobile({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarNo
     >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className={cx("text-base font-black tracking-wider", textClass)}>{p?.patente || "—"}</span>
-        <Badge tono="azul" size="sm">{getOficina(p)}</Badge>
+        <div className="flex items-center gap-1.5">
+          {situacion && <Badge tono={situacion.tono} size="sm">{situacion.label}</Badge>}
+          <Badge tono="azul" size="sm">{getOficina(p)}</Badge>
+        </div>
       </div>
       <div className={cx("text-sm font-bold", textClass)}>{getNombreCompleto(p?.cliente)}</div>
       <div className="mt-0.5 text-[13px] text-suave dark:text-suave-dark">
@@ -152,6 +192,7 @@ function CardMobile({ p, submitting, onRenovar, onMarcarNoRenueva, onDesmarcarNo
         <AccionesFila
           p={p}
           submitting={submitting}
+          buscando={buscando}
           onRenovar={onRenovar}
           onMarcarNoRenueva={onMarcarNoRenueva}
           onDesmarcarNoRenueva={onDesmarcarNoRenueva}
@@ -167,6 +208,7 @@ export default function Renovacionestable({
   loading = false,
   submitting = false,
   tab = "renovar_hoy",
+  buscando = false,
   onRenovar,
   onMarcarNoRenueva,
   onDesmarcarNoRenueva,
@@ -181,11 +223,15 @@ export default function Renovacionestable({
   }
 
   if (!items || items.length === 0) {
-    const empty = {
-      renovar_hoy: { icon: "🎉", text: "No hay pólizas que venzan hoy." },
-      en_3_dias: { icon: "🎉", text: "Nada vence en los próximos 3 días." },
-      vencidas: { icon: "✅", text: "No tenés pólizas sin renovar." },
-    }[tab] || { icon: "🔍", text: "Sin resultados." };
+    // En modo búsqueda el mensaje NO puede hablar de vencimientos (no filtramos
+    // por eso). Si no hay nada, es que no existe una póliza con ese texto.
+    const empty = buscando
+      ? { icon: "🔍", text: "Ninguna póliza coincide con esa búsqueda." }
+      : {
+          renovar_hoy: { icon: "🎉", text: "No hay pólizas que venzan hoy." },
+          en_3_dias: { icon: "🎉", text: "Nada vence en los próximos 3 días." },
+          vencidas: { icon: "✅", text: "No tenés pólizas sin renovar." },
+        }[tab] || { icon: "🔍", text: "Sin resultados." };
 
     return (
       <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-12 text-center">
@@ -223,6 +269,7 @@ export default function Renovacionestable({
                 key={p.id}
                 p={p}
                 submitting={submitting}
+                buscando={buscando}
                 onRenovar={onRenovar}
                 onMarcarNoRenueva={onMarcarNoRenueva}
                 onDesmarcarNoRenueva={onDesmarcarNoRenueva}
@@ -239,6 +286,7 @@ export default function Renovacionestable({
             key={p.id}
             p={p}
             submitting={submitting}
+            buscando={buscando}
             onRenovar={onRenovar}
             onMarcarNoRenueva={onMarcarNoRenueva}
             onDesmarcarNoRenueva={onDesmarcarNoRenueva}

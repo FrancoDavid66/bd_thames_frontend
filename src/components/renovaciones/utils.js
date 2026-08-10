@@ -84,6 +84,40 @@ export function getCompania(p) {
   return p?.compania_nombre || p?.compania || "—";
 }
 
+/* ---------- Situación de la póliza (etiqueta informativa) ---------- */
+
+// 🏷️ Devuelve una etiqueta corta con la SITUACIÓN de la póliza, o null si es
+// una póliza común y corriente. Se usa en el MODO BÚSQUEDA de Renovaciones:
+// ahí no se oculta NINGUNA póliza, así que este chip avisa qué estás por tocar
+// (ej: "Ya renovada", "Finalizada", "No renueva").
+//
+// Ejemplo fácil: es como el cartel de una góndola. No te esconde el producto,
+// te avisa "última unidad" o "vencido" y vos decidís.
+export function situacionPoliza(p) {
+  if (!p) return null;
+
+  const descartada = !!(
+    p.renovacion_descartada ||
+    p.no_renueva_manual ||
+    p.motivo_no_renueva ||
+    p.no_renueva
+  );
+  if (descartada) return { label: "No renueva", tono: "rojo" };
+
+  if (p.tiene_renovacion) return { label: "Ya renovada", tono: "violeta" };
+
+  const estado = String(p.estado || "").toLowerCase();
+  if (estado === "finalizada") return { label: "Finalizada", tono: "neutro" };
+  if (estado === "cancelada") return { label: "Cancelada", tono: "rojo" };
+  if (estado === "vencida") return { label: "Vencida", tono: "rojo" };
+
+  // Nació de una renovación y no tiene hija → es la vigente del cliente.
+  const esHija = !!(p.es_renovacion || p.poliza_origen || p.poliza_origen_id);
+  if (esHija) return { label: "Vigente", tono: "verde" };
+
+  return null;
+}
+
 /* ---------- Dinero ---------- */
 
 // Formatea a pesos argentinos. Devuelve null si no hay un número > 0
