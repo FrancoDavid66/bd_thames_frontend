@@ -397,7 +397,10 @@ export default function RenovacionesPage() {
           ? opts.oficina
           : oficina;
 
-      const q = (search || "").trim();
+      // ⚠️ El término se toma de opts PRIMERO: si alguien llama load({search:"X"})
+      //    el estado `search` puede no haberse actualizado todavía, y entonces
+      //    no mandaríamos include_finalizadas justo cuando más hace falta.
+      const q = String(opts.search ?? search ?? "").trim();
 
       const payload = {
         dias: 30,
@@ -424,10 +427,23 @@ export default function RenovacionesPage() {
         //    Vencidas) siguen mostrando la operación del día, sin llenarse de
         //    pólizas finalizadas de hace años. Pero si vos escribís una patente,
         //    aparece sí o sí, esté como esté.
-        ...(q ? { include_finalizadas: 1 } : {}),
-
         ...opts,
+
+        // 👇 va DESPUÉS de ...opts a propósito: nadie lo puede pisar sin querer.
+        //    `search` también se re-fija acá para que quede siempre coherente
+        //    con el valor que usamos para decidir include_finalizadas.
+        search: q,
+        ...(q ? { include_finalizadas: 1 } : {}),
       };
+
+      // 🔎 Log de diagnóstico: dejá la consola abierta (F12) y fijate qué se manda.
+      //    Si acá ves include_finalizadas:1 pero en la pestaña Network la URL NO
+      //    lo lleva, entonces el parámetro se pierde en el thunk fetchRenovaciones
+      //    (src/store/slices/renovacionesSlice.js), no acá.
+      if (q) {
+        // eslint-disable-next-line no-console
+        console.log("[Renovaciones] buscando:", payload);
+      }
 
       try {
         await dispatch(fetchRenovaciones(payload)).unwrap();

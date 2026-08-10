@@ -122,6 +122,16 @@ const normalizeOficinas = (data) => {
  * 🆕 Nuevos params:
  * - tab: pendientes | renovadas | no_renovaron
  * - include_renovadas: 0|1 (cuando tab=renovadas necesitamos verlas todas)
+ * - include_finalizadas: 0|1 (para poder BUSCAR y renovar pólizas ya finalizadas)
+ *
+ * ⚠️ ESTA LISTA ES UNA LISTA BLANCA (whitelist).
+ *    Lo que no esté en el array `entries` NO viaja al backend, aunque la página
+ *    lo mande. Si agregás un parámetro nuevo en una page y "no hace nada",
+ *    lo más probable es que te hayas olvidado de sumarlo acá.
+ *
+ * 📌 Ojo extra: esta query string es TAMBIÉN la clave del caché. Si un parámetro
+ *    no entra acá, dos búsquedas distintas comparten clave y la segunda te
+ *    devuelve el resultado cacheado de la primera.
  */
 export const buildRenovacionesQuery = (params = {}) => {
   const p0 = stripForce(params);
@@ -133,6 +143,7 @@ export const buildRenovacionesQuery = (params = {}) => {
 
   if (p.solo_pendientes != null) p.solo_pendientes = to01(p.solo_pendientes);
   if (p.include_renovadas != null) p.include_renovadas = to01(p.include_renovadas);
+  if (p.include_finalizadas != null) p.include_finalizadas = to01(p.include_finalizadas);
 
   const trimOrUndef = (x) => {
     if (x == null) return undefined;
@@ -143,6 +154,12 @@ export const buildRenovacionesQuery = (params = {}) => {
   const entries = [
     ["tab", trimOrUndef(p.tab)],
     ["include_renovadas", trimOrUndef(p.include_renovadas)],
+    // 🆕 El backend, en /polizas/renovaciones/, hace qs.exclude(estado="finalizada")
+    //    salvo que reciba este flag. Y auto_marcar_vencidas() pasa a "finalizada"
+    //    a toda póliza que pagó todas las cuotas y cuya cobertura ya venció.
+    //    Sin este parámetro, el cliente que pagó todo y se le venció hace 2 días
+    //    NO aparece al buscarlo por patente — justo el que hay que renovar.
+    ["include_finalizadas", trimOrUndef(p.include_finalizadas)],
     ["bucket", trimOrUndef(p.bucket)],
     ["dias", trimOrUndef(p.dias)],
     ["solo_pendientes", trimOrUndef(p.solo_pendientes)],
@@ -176,6 +193,7 @@ export const buildRenovacionesResumenQuery = (params = {}) => {
 
   if (p.dias == null || p.dias === "") p.dias = 30;
   if (p.solo_pendientes != null) p.solo_pendientes = to01(p.solo_pendientes);
+  if (p.include_finalizadas != null) p.include_finalizadas = to01(p.include_finalizadas);
 
   const trimOrUndef = (x) => {
     if (x == null) return undefined;
@@ -187,6 +205,9 @@ export const buildRenovacionesResumenQuery = (params = {}) => {
     ["dias", trimOrUndef(p.dias)],
     ["solo_pendientes", trimOrUndef(p.solo_pendientes)],
     ["search", trimOrUndef(p.search)],
+    // 🆕 Mismo flag que en la lista, para que los contadores de los tabs cuenten
+    //    lo mismo que muestra la tabla y no queden desfasados.
+    ["include_finalizadas", trimOrUndef(p.include_finalizadas)],
 
     ["estado", trimOrUndef(p.estado)],
     ["fase", trimOrUndef(p.fase)],
