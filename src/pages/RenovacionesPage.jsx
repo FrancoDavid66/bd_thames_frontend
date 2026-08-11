@@ -338,9 +338,16 @@ export default function RenovacionesPage() {
      página). Así los contadores de las pestañas y las filas mostradas salen
      siempre del mismo conjunto y nunca quedan desfasados.
 
-     🆕 Cuando hay búsqueda activa mandamos `dias` bien alto: el backend usa
-     ese número para marcar "necesita renovar", y así una póliza que vence
-     dentro de 8 meses también entra en el resultado.
+     🆕 Cuando hay búsqueda activa:
+       - `dias` bien alto: el backend usa ese número para marcar "necesita
+         renovar", así una póliza que vence dentro de 8 meses también entra.
+       - `include_finalizadas: 1` ← 🔴 CLAVE. Sin esto el backend
+         (polizas/views/poliza.py, get_queryset) hace
+         `qs.exclude(estado__iexact="finalizada")` ANTES de buscar, y toda
+         póliza ya renovada o con cobertura terminada queda afuera para
+         siempre. Era el motivo real de "no hay resultados".
+       - `oficina: undefined`: la búsqueda a mano es GLOBAL. Si buscás una
+         patente puntual no querés que el filtro de sucursal te la esconda.
   ============================================================== */
 
   const load = useCallback(
@@ -354,15 +361,20 @@ export default function RenovacionesPage() {
 
       const buscando = (search || "").trim().length >= MIN_CHARS_BUSQUEDA;
 
+      // Un empleado de sucursal SIEMPRE queda atado a su oficina (el backend
+      // igual lo blinda). El admin, buscando a mano, ve todas.
+      const oficinaFinal = buscando && isWebAdmin ? undefined : ofi || undefined;
+
       const payload = {
         dias: buscando ? 3650 : 30,
         solo_pendientes: false,
         search: (search || "").trim(),
         ordering: "vto_referencia",
-        oficina: ofi || undefined,
+        oficina: oficinaFinal,
         page: 1,
         page_size: 500,
         include_renovadas: 1, // siempre, para ver también las vencidas viejas
+        include_finalizadas: buscando ? 1 : 0, // 🆕 solo al buscar a mano
         ...opts,
       };
 
@@ -682,9 +694,9 @@ export default function RenovacionesPage() {
           <div className="flex items-center gap-2 text-sm font-bold text-duo-azul">
             <HiSearch className="text-lg shrink-0" />
             <span>
-              Buscando <span className="font-black">“{searchTrim}”</span> — se muestran{" "}
-              <span className="font-black">todas</span> las pólizas que coinciden,
-              venzan cuando venzan.
+              Buscando <span className="font-black">“{searchTrim}”</span> en{" "}
+              <span className="font-black">todas las sucursales</span> — venzan cuando
+              venzan, incluidas las ya renovadas y finalizadas.
             </span>
           </div>
           <button
@@ -774,6 +786,7 @@ export default function RenovacionesPage() {
         loading={loading}
         submitting={submitting}
         tab={modoBusqueda ? "busqueda" : tab}
+        buscando={modoBusqueda}
         onRenovar={(p) => {
           setSelected(p);
           setModalOpen(true);
