@@ -36,6 +36,7 @@ import {
   fetchRenovacionesOficinas,
   fetchRenovacionesResumen,
   fetchRenovacionesGlobalResumen,
+  buildRenovacionesQuery,
   selectRenovacionesItems,
   selectRenovacionesStatus,
   selectRenovacionesError,
@@ -188,6 +189,20 @@ function ResumenInline({ tab, kpis }) {
     <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
       <N>{kpis.total}</N> {label}
     </span>
+  );
+}
+
+/* 🔎 Cajita del panel de diagnóstico (temporal) */
+function DiagBox({ label, value }) {
+  return (
+    <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1.5">
+      <div className="text-[9px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+        {label}
+      </div>
+      <div className="text-base font-black tabular-nums text-titulo dark:text-titulo-dark">
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -350,8 +365,10 @@ export default function RenovacionesPage() {
          patente puntual no querés que el filtro de sucursal te la esconda.
   ============================================================== */
 
-  const load = useCallback(
-    async (opts = {}) => {
+  // 🔎 Payload de la consulta. Está separado de load() a propósito: el panel de
+  // diagnóstico lo reusa para mostrar la URL EXACTA que se le pidió al backend.
+  const buildLoadPayload = useCallback(
+    (opts = {}) => {
       const ofi =
         !isWebAdmin && user?.perfil?.oficina
           ? String(user.perfil.oficina.id || user.perfil.oficina)
@@ -365,7 +382,7 @@ export default function RenovacionesPage() {
       // igual lo blinda). El admin, buscando a mano, ve todas.
       const oficinaFinal = buscando && isWebAdmin ? undefined : ofi || undefined;
 
-      const payload = {
+      return {
         dias: buscando ? 3650 : 30,
         solo_pendientes: false,
         search: (search || "").trim(),
@@ -377,12 +394,25 @@ export default function RenovacionesPage() {
         include_finalizadas: buscando ? 1 : 0, // 🆕 solo al buscar a mano
         ...opts,
       };
+    },
+    [search, oficina, isWebAdmin, user]
+  );
+
+  const load = useCallback(
+    async (opts = {}) => {
+      const buscando = (search || "").trim().length >= MIN_CHARS_BUSQUEDA;
+
+      // Al buscar a mano NUNCA usamos el caché de 20 segundos del slice: si el
+      // resultado viejo quedó guardado, parecería que "no aparece" cuando en
+      // realidad nunca se volvió a preguntar.
+      const payload = buildLoadPayload(opts);
+      if (buscando) payload.force = true;
 
       try {
         await dispatch(fetchRenovaciones(payload)).unwrap();
       } catch {}
     },
-    [search, oficina, dispatch, isWebAdmin, user]
+    [search, dispatch, buildLoadPayload]
   );
 
   const loadResumen = useCallback(
@@ -707,6 +737,48 @@ export default function RenovacionesPage() {
             <HiX /> Limpiar
           </button>
         </div>
+      )}
+
+      {/* ====== 🔎 PANEL DE DIAGNÓSTICO (temporal — BORRAR cuando funcione) ======
+          Sirve para saber DÓNDE se pierde una póliza:
+            · "Backend devolvió 0"  → el problema está en el backend / los params.
+            · "Backend devolvió 2, en pantalla 0" → el problema está en el front.
+      ==================================================================== */}
+      {modoBusqueda && (
+        <details className="mt-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+          <summary className="cursor-pointer text-[12px] font-black uppercase tracking-wide text-suave dark:text-suave-dark select-none">
+            🔎 Diagnóstico de la búsqueda
+          </summary>
+
+          <div className="mt-2 space-y-2 text-[12px] font-bold text-titulo dark:text-titulo-dark">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <DiagBox label="Backend devolvió" value={itemsRaw.length} />
+              <DiagBox label="Count del backend" value={Number(count || 0)} />
+              <DiagBox label="En pantalla" value={itemsForTab.length} />
+              <DiagBox label="Sos ADMIN" value={isWebAdmin ? "SÍ" : "NO"} />
+            </div>
+
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-1">
+                URL pedida al backend
+              </div>
+              <code className="block break-all rounded-xl bg-surface dark:bg-surface-dark p-2 text-[11px] font-mono text-duo-azul">
+                polizas/renovaciones/
+                {buildRenovacionesQuery(buildLoadPayload())}
+              </code>
+            </div>
+
+            <div className="text-[11px] text-suave dark:text-suave-dark">
+              Sucursal del filtro: <strong>{oficina || "(todas)"}</strong> ·
+              Estados que llegaron:{" "}
+              <strong>
+                {itemsRaw.length
+                  ? Array.from(new Set(itemsRaw.map((x) => x?.estado || "?"))).join(", ")
+                  : "—"}
+              </strong>
+            </div>
+          </div>
+        </details>
       )}
 
       {!!error && (
