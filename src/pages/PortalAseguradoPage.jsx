@@ -1,28 +1,44 @@
 // src/pages/PortalAseguradoPage.jsx
 //
-// Portal del Asegurado (PÚBLICO, sin login). El cliente entra por el link único
-// que recibe por WhatsApp: /#/portal/<token>
-// 👁️ SOLO LECTURA. El cliente ve sus cupones, fechas, papeles y los
-// comprobantes que la oficina le fue cargando.
+// 📱 PORTAL DEL ASEGURADO — público, sin login.
+//    El cliente entra por el link único que recibe por WhatsApp:
+//    /#/portal/<token>
 //
-// Ya NO hay botón "Ya pagué": el circuito real es que el cliente paga en
-// Rapipago / Pago Fácil / Mercado Pago y manda la FOTO del comprobante por
-// WhatsApp (responde el recordatorio que le llegó). La oficina sube esa foto
-// y marca el cupón pagado. Un solo camino, no dos.
+// ── CÓMO ESTÁ ARMADO ────────────────────────────────────────────────────
+// 4 pestañas, como una app de banco:
+//   🏠 Inicio   → el total a pagar arriba y la lista de seguros
+//   💳 Pagos    → los cupones; al tocar uno se elige la forma de pago
+//   🛡️ Seguros  → detalle de cada póliza: qué cubre, suma asegurada, papeles
+//   📄 Papeles  → documentos y contacto
+//
+// 👁️ ES SOLO LECTURA. El cliente no marca nada como pagado: paga afuera y
+//    manda el comprobante por WhatsApp. La oficina lo sube.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import dayjs from "dayjs";
-import toast from "react-hot-toast";
-import { FaCar } from "react-icons/fa";
-import { ComprobanteVista } from "../components/pagos/Comprobante";
-import {
-  HiCheckCircle, HiClock, HiShieldCheck, HiDocumentText,
-  HiExclamationCircle, HiCash, HiDownload,
-} from "react-icons/hi";
+import { Toaster } from "react-hot-toast";
 
-// El portal vive FUERA de /api/ → armamos la base del backend sin /api
+import "../styles/portal.css";
+
+// 🅣 Logo del pie: el vertical, a 64px. Uno por tema — sobre fondo claro va
+//    el rojo con texto negro, sobre oscuro el rojo con texto blanco. Con uno
+//    solo, en alguno de los dos temas el texto desaparece.
+import logoPieClaro from "../assets/logos/vert-rojo-negro-sm.webp";
+import logoPieOscuro from "../assets/logos/vert-rojo-blanco-sm.webp";
+
+import PortalHeader from "../components/portal/PortalHeader";
+import TabsPortal from "../components/portal/TabsPortal";
+import ListaCupones from "../components/portal/ListaCupones";
+import Papeles, { nombreLindoDoc } from "../components/portal/Papeles";
+import VisorDocumento from "../components/portal/VisorDocumento";
+import { Seccion, Lista, Fila, Chip, Vacio } from "../components/portal/Lista";
+import { IconoTipo, IconDoc, IconAlerta, IconTick, IconAbajo, IconReloj } from "../components/portal/Iconos";
+import {
+  money, fmt, fmtLargo, situacionPago, contarVencidos, deudaTotal,
+  proximoPago, tituloSeguros, nombreBien, tipoIcono, waLink, capitalizar,
+} from "../components/portal/utils";
+
+// El portal vive FUERA de /api/ → se arma la base sin ese sufijo.
 const API_ORIGIN = String(
   import.meta.env.VITE_API_BASE ||
   import.meta.env.VITE_API_URL ||
@@ -30,118 +46,25 @@ const API_ORIGIN = String(
 ).trim().replace(/\/+$/g, "").replace(/\/api$/i, "");
 const PORTAL_BASE = `${API_ORIGIN}/public/portal`;
 
-// Tarjeta Duo (claro/oscuro)
-const CARD = "rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark";
-
-const ESTADO_POLIZA = {
-  activa:  { label: "Activa",  cls: "text-ingreso-fuerte dark:text-ingreso-claro border-ingreso/30 bg-ingreso/10", dot: "bg-ingreso" },
-  vencida: { label: "Con pago pendiente", cls: "text-[#d97706] dark:text-tarjeta-claro border-tarjeta/30 bg-tarjeta/10", dot: "bg-tarjeta" },
-};
-
-function fmt(d) {
-  return d ? dayjs(d).format("DD/MM/YYYY") : "—";
-}
-
-// Formatea pesos argentinos sin decimales: 35000 → "$35.000"
-function money(n) {
-  const v = Number(n || 0);
-  return "$" + v.toLocaleString("es-AR", { maximumFractionDigits: 0 });
-}
-
-// Nombre legible del documento. Prioriza el TIPO (dato confiable); el nombre del
-// archivo se usa solo como respaldo, y ahí Mercosur/cuponera/certificado se chequean
-// ANTES que "póliza" (porque muchos archivos llevan "poliza" en el nombre).
-function nombreLindoDoc(tipo, nombre) {
-  const t = String(tipo || "").toUpperCase().trim();
-  const n = String(nombre || "").toLowerCase();
-
-  // 1) Por tipo (lo que confiamos)
-  if (t.startsWith("MERCO")) return "Tarjeta Mercosur";
-  if (t.startsWith("CUPON")) return "Cuponera de robo";
-  if (t.startsWith("CERT")) return "Certificado";
-  if (t.startsWith("DNI")) return "DNI";
-  if (t.startsWith("POLIZA") || t === "PRP" || t.startsWith("FRENTE") || t.startsWith("PROPUESTA"))
-    return "Póliza";
-
-  // 2) Respaldo por nombre de archivo (Mercosur/cuponera/cert ANTES que póliza)
-  if (n.includes("merco")) return "Tarjeta Mercosur";
-  if (n.includes("cupon")) return "Cuponera de robo";
-  if (n.includes("cert")) return "Certificado";
-  if (n.includes("poliza") || n.includes("prp") || n.includes("propuesta") || n.includes("frente"))
-    return "Póliza";
-
-  // 3) Último recurso
-  if (t && t !== "OTRO") return t.charAt(0) + t.slice(1).toLowerCase();
-  return "Documento";
-}
-
-function Cuota({ c, onRecibo, busy }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b-2 border-linea px-3.5 py-2.5 last:border-0 dark:border-linea-dark">
-      <span className="flex items-center gap-2.5">
-        {c.pagado ? <HiCheckCircle className="h-4 w-4 text-ingreso" /> : <HiClock className="h-4 w-4 text-tarjeta" />}
-        <span className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">Cuota {c.cuota_nro}</span>
-      </span>
-      <span className="flex items-center gap-2.5">
-        <span className={`text-[11px] font-bold ${c.pagado ? "text-ingreso-fuerte dark:text-ingreso-claro" : "text-[#d97706] dark:text-tarjeta-claro"}`}>
-          {c.pagado ? `Pagada · ${fmt(c.fecha_pago)}` : `Vence ${fmt(c.fecha_vencimiento)}`}
-        </span>
-        {onRecibo ? (
-          <button
-            onClick={onRecibo}
-            disabled={busy}
-            className="inline-flex items-center gap-1 rounded-lg border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1 text-[11px] font-black text-titulo dark:text-titulo-dark transition hover:border-oficina disabled:opacity-50"
-          >
-            <HiDownload className="h-3.5 w-3.5" /> {busy ? "..." : "Recibo"}
-          </button>
-        ) : null}
-      </span>
-    </div>
-  );
-}
-
 export default function PortalAseguradoPage() {
   const { token } = useParams();
+
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
-  const [reciboBusy, setReciboBusy] = useState(null);
-  const [recibo, setRecibo] = useState(null);          // { cli, pol, cuota } recibo a previsualizar (HTML)
-  const [descargandoRecibo, setDescargandoRecibo] = useState(false);
-  const [verDoc, setVerDoc] = useState(null);          // { url, nombre } papel (PDF) a previsualizar
 
-  const cerrarRecibo = () => setRecibo(null);
+  const [tab, setTab] = useState("seguros");   // "seguros" es ahora la principal
+  const [polizaAbierta, setPolizaAbierta] = useState(null);
+  const [filtroPagos, setFiltroPagos] = useState(null);
+  const [verDoc, setVerDoc] = useState(null);
+  const [importesVisibles, setImportesVisibles] = useState(true);
+  const [verCobertura, setVerCobertura] = useState(false);
+  const [tema, setTema] = useState(null); // null = oscuro (el de arranque)
 
-  // Descarga el recibo como PDF (se genera on-demand con react-pdf)
-  const descargarReciboPDF = async () => {
-    if (!recibo) return;
-    setDescargandoRecibo(true);
-    try {
-      const [pdfMod, comprobanteMod] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("../components/pagos/Comprobante"),
-      ]);
-      const { pdf } = pdfMod;
-      const ComprobantePDF_A4 = comprobanteMod.ComprobantePDF_A4;
-      const doc = <ComprobantePDF_A4 cliente={recibo.cli} poliza={recibo.pol} cuota={recibo.cuota} />;
-      const blob = await pdf(doc).toBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Recibo_cuota_${recibo.cuota.cuota_nro}_${recibo.pol.patente || recibo.pol.id}.pdf`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (e) {
-      toast.error("No se pudo generar el PDF.");
-    } finally {
-      setDescargandoRecibo(false);
-    }
-  };
-
-  // Genera el recibo de una cuota pagada en el navegador del cliente (sin guardar nada).
-  const handleRecibo = (cli, pol, cuota) => {
-    setRecibo({ cli, pol, cuota });
-  };
+  /* ── Cargar los datos ──
+     `recargar` sube al subir un comprobante: así el cupón pasa a "Reportado"
+     y el cliente lo ve enseguida, sin refrescar la página. */
+  const [recargar, setRecargar] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -150,7 +73,13 @@ export default function PortalAseguradoPage() {
       setError("");
       try {
         const res = await fetch(`${PORTAL_BASE}/${token}/`);
-        if (!res.ok) throw new Error(res.status === 404 ? "Este link no es válido o expiró." : "No pudimos cargar tus datos.");
+        if (!res.ok) {
+          throw new Error(
+            res.status === 404
+              ? "Este link no es válido o ya venció."
+              : "No pudimos cargar tus datos."
+          );
+        }
         const json = await res.json();
         if (vivo) setData(json);
       } catch (e) {
@@ -160,365 +89,621 @@ export default function PortalAseguradoPage() {
       }
     })();
     return () => { vivo = false; };
-  }, [token]);
+  }, [token, recargar]);
 
-  // -------- Loading --------
-  if (cargando) {
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-surface dark:bg-surface-dark">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-linea border-t-oficina dark:border-linea-dark" />
-      </div>
-    );
-  }
+  /* ── Modo oscuro: sigue al sistema salvo que el cliente lo cambie ── */
+  /* ☀️ Arranca en CLARO.
+     El momento crítico del portal es cuando el cliente está PARADO EN LA CAJA
+     de Rapipago mostrándole el cupón al cajero: puede haber sol, luz de
+     local, reflejos. En oscuro esa pantalla se ve peor, y es justo cuando más
+     importa.
+     El resto del tiempo lo abre desde casa, donde da igual. El que prefiere
+     oscuro lo cambia desde el pie. */
+  const temaActivo = tema === "oscuro" ? "oscuro" : "claro";
 
-  // -------- Error --------
-  if (error) {
-    return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-surface px-6 text-center dark:bg-surface-dark">
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-egreso/10 text-egreso">
-          <HiExclamationCircle className="h-8 w-8" />
-        </div>
-        <h1 className="text-lg font-black text-titulo dark:text-titulo-dark">No pudimos abrir tu portal</h1>
-        <p className="max-w-xs text-sm text-suave dark:text-suave-dark">{error}</p>
-        <p className="mt-2 text-xs text-suave dark:text-suave-dark">Si creés que es un error, escribinos por WhatsApp.</p>
-      </div>
-    );
-  }
+  /* 🌓 El cambio de tema, con transición.
+     Los colores viven en variables CSS y las variables NO transicionan solas
+     en cascada. La solución: poner una clase JUSTO durante el cambio y
+     sacarla a los 340ms.
+
+     ¿Por qué no dejarla siempre? Porque `transition` en todos los elementos
+     obliga al navegador a vigilar cada uno en cada cuadro. Durante 340ms no
+     se nota; permanente, sí — sobre todo al scrollear. */
+  const cambiarTema = () => {
+    const nuevo = temaActivo === "oscuro" ? "claro" : "oscuro";
+    const raiz = document.querySelector(".portal");
+    if (raiz) {
+      raiz.classList.add("portal-cambiando");
+      setTimeout(() => raiz.classList.remove("portal-cambiando"), 340);
+    }
+    setTema(nuevo);
+  };
 
   const cliente = data?.cliente || {};
-  const polizas = data?.polizas || [];
+  // El token viaja adentro de cada póliza: FormasPago lo necesita para armar
+  // la URL del endpoint del comprobante.
+  const polizas = useMemo(
+    () => (data?.polizas || []).map((p) => ({ ...p, __token: token })),
+    [data, token]
+  );
+  // En la base los nombres van en MAYÚSCULAS. En pantalla gritan, así que se
+  // normalizan solo para mostrar.
+  const nombreCliente = capitalizar(cliente.nombre_completo || cliente.nombre || "");
+
+  const vencidos = useMemo(() => contarVencidos(polizas), [polizas]);
+  const deuda = useMemo(() => deudaTotal(polizas), [polizas]);
+  const prox = useMemo(() => proximoPago(polizas), [polizas]);
+
+  // La póliza que se está mirando (o la única, si hay una sola).
+  const detalle = useMemo(() => {
+    if (polizaAbierta) return polizas.find((p) => p.id === polizaAbierta) || null;
+    return null;
+  }, [polizaAbierta, polizas]);
+
+  /* ── Navegación ── */
+  const irA = (t) => {
+    setTab(t);
+    if (t !== "seguros") setPolizaAbierta(null);
+    if (t !== "pagos") setFiltroPagos(null);
+    window.scrollTo(0, 0);
+  };
+
+  const abrirPoliza = (p) => {
+    setPolizaAbierta(p.id);
+    setVerCobertura(false);
+    setTab("seguros");
+    window.scrollTo(0, 0);
+  };
+
+  const volver = () => {
+    if (polizaAbierta) { setPolizaAbierta(null); irA("seguros"); }
+    else irA("seguros");
+  };
+
+  // El botón "atrás" del celular vuelve a la lista en vez de salir del portal.
+  useEffect(() => {
+    const onPop = () => {
+      volver();
+      try { window.history.pushState(null, "", window.location.href); } catch { /* file:// lo bloquea */ }
+    };
+    try {
+      window.history.pushState(null, "", window.location.href);
+      window.addEventListener("popstate", onPop);
+    } catch { /* nada */ }
+    return () => window.removeEventListener("popstate", onPop);
+  }, [polizaAbierta, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Estados de carga y error ── */
+  /* ⏳ CARGANDO: el esqueleto de la pantalla, no una ruedita.
+     Se siente más rápido porque muestra la FORMA de lo que viene: el cliente
+     ya sabe dónde va a estar el total y dónde la lista. Una ruedita solo dice
+     "esperá" sin decir qué. */
+  if (cargando) {
+    return (
+      <div className="portal" data-tema={temaActivo}>
+        <div className="portal-frame">
+          <div style={{ padding: "calc(14px + env(safe-area-inset-top)) 18px 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+              <div className="portal-skeleton" style={{ height: 20, width: 130 }} />
+              <div className="portal-skeleton" style={{ height: 32, width: 72, borderRadius: 10 }} />
+            </div>
+            <div className="portal-skeleton" style={{ height: 152, borderRadius: 20 }} />
+          </div>
+          <div style={{ padding: "26px 20px 12px" }}>
+            <div className="portal-skeleton" style={{ height: 11, width: 90 }} />
+          </div>
+          <div style={{ margin: "0 15px", borderRadius: 16, overflow: "hidden" }}>
+            {[0, 1, 2].map((n) => (
+              <div
+                key={n}
+                className="portal-skeleton"
+                style={{ height: 70, borderRadius: 0, marginBottom: n < 2 ? 1 : 0 }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !polizas.length) {
+    return (
+      <div className="portal" data-tema={temaActivo}>
+        <div
+          className="portal-frame"
+          style={{ display: "grid", placeItems: "center", minHeight: "100dvh", padding: 28, textAlign: "center" }}
+        >
+          <div>
+            <img
+              src={logoPieClaro}
+              alt="Estudio Thames"
+              style={{ height: 60, width: "auto", opacity: 0.7, margin: "0 auto 24px", display: "block" }}
+            />
+            <div
+              style={{
+                height: 56, width: 56, borderRadius: "50%", background: "var(--al-bg)",
+                color: "var(--al)", display: "grid", placeItems: "center", margin: "0 auto 14px",
+              }}
+            >
+              <IconAlerta size={26} />
+            </div>
+            <h1 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>
+              {error ? "No pudimos abrir tu portal" : "No tenés seguros activos"}
+            </h1>
+            <p style={{ fontSize: 14, color: "var(--t2)", lineHeight: 1.6, margin: 0, maxWidth: 300 }}>
+              {error || "En este momento no hay nada para mostrar."}
+              <br />Si creés que es un error, escribinos.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Título del header según dónde esté ── */
+  // El título cambia al navegar. La clase `portal-titulo` le hace un fade
+  // corto para que no salte de golpe (ver portal.css).
+  // En la pestaña principal ("seguros" sin póliza abierta) va el nombre del
+  // cliente con el saludo, como antes hacía Inicio.
+  const esPrincipal = tab === "seguros" && !polizaAbierta;
+
+  const titulo =
+    esPrincipal ? nombreCliente
+    : tab === "pagos" ? "Tus pagos"
+    : tab === "papeles" ? "Tus papeles"
+    : detalle ? nombreBien(detalle)
+    : tituloSeguros(polizas.length);
+
+  const subtitulo = detalle
+    ? [detalle.patente, detalle.anio].filter(Boolean).join(" · ")
+    : null;
+
+  const resumen =
+    !esPrincipal ? null
+    : deuda > 0
+      ? { tipo: "deuda", label: "Total a pagar", monto: deuda,
+          sub: `${vencidos} pago${vencidos > 1 ? "s" : ""} vencido${vencidos > 1 ? "s" : ""}` }
+    : prox
+      ? { tipo: "proximo", label: "Próximo pago", monto: prox.sit.monto,
+          sub: `${nombreBien(prox.poliza)} · ${fmtLargo(prox.sit.fecha)}` }
+      : { tipo: "al_dia", label: "Tu situación", monto: 0, sub: "No tenés pagos pendientes" };
 
   return (
-    <div className="min-h-[100dvh] bg-surface text-titulo dark:bg-surface-dark dark:text-titulo-dark">
-      <div className="mx-auto w-full max-w-xl px-4 py-6">
+    <div className="portal" data-tema={temaActivo}>
+      <div className="portal-frame">
+        <PortalHeader
+          cliente={cliente}
+          titulo={titulo}
+          subtitulo={subtitulo}
+          mostrarSaludo={esPrincipal}
+          mostrarAtras={!!polizaAbierta}
+          onAtras={volver}
+          resumen={resumen}
+          importesVisibles={importesVisibles}
+          onToggleImportes={() => setImportesVisibles((v) => !v)}
+          onIrPagos={() => irA("pagos")}
+          waAyuda={waLink(polizas[0]?.oficina_whatsapp, `Hola, soy ${nombreCliente}.`)}
+          tema={temaActivo}
+          onCambiarTema={cambiarTema}
+        />
 
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-black">Hola, {cliente.nombre || "👋"}</h1>
-          <p className="mt-0.5 text-sm text-suave dark:text-suave-dark">
-            {polizas.length === 0 ? "No tenés pólizas vigentes en este momento." : "Estos son tus seguros."}
-          </p>
-        </div>
+        {/* ══════════ 💳 PAGOS ══════════ */}
+        {tab === "pagos" ? (
+          <div className="portal-pant">
+            {filtroPagos !== null ? (
+              <div
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 12, background: "var(--m-soft)", padding: "13px 20px",
+                  fontSize: 13.5, fontWeight: 600, color: "var(--m)",
+                }}
+              >
+                <span>{nombreBien(polizas.find((p) => p.id === filtroPagos) || {})}</span>
+                <button
+                  onClick={() => setFiltroPagos(null)}
+                  style={{
+                    background: "none", border: "none", fontSize: 13.5, fontWeight: 600,
+                    cursor: "pointer", fontFamily: "inherit", color: "var(--m)", flexShrink: 0,
+                  }}
+                >
+                  Ver todos
+                </button>
+              </div>
+            ) : null}
 
-        {/* Pólizas */}
-        {polizas.length === 0 ? (
-          <div className={`${CARD} px-5 py-10 text-center`}>
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border-2 border-linea bg-surface text-suave dark:border-linea-dark dark:bg-surface-dark dark:text-suave-dark">
-              <HiDocumentText className="h-6 w-6" />
-            </div>
-            <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">No tenés pólizas vigentes</p>
-            <p className="mt-1 text-[13px] leading-snug text-suave dark:text-suave-dark">
-              En este momento no hay seguros activos para mostrar. Si creés que es un error, escribinos.
+            {polizas
+              .filter((p) => (p.cupones_robo || []).length)
+              .filter((p) => filtroPagos === null || p.id === filtroPagos)
+              .map((p) => (
+                <div key={p.id}>
+                  <Seccion>{nombreBien(p)}</Seccion>
+                  <ListaCupones
+                    poliza={p}
+                    cupones={p.cupones_robo}
+                    onVerCuponera={(url, nombre) => setVerDoc({ url, nombre: nombre || "Tu cuponera" })}
+                    onComprobanteSubido={() => setRecargar((n) => n + 1)}
+                  />
+                </div>
+              ))}
+
+            <p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, textAlign: "center", padding: "22px 28px 0" }}>
+              Después de pagar, envianos el comprobante para que lo registremos en tu cuenta.
             </p>
           </div>
         ) : null}
 
-        <div className="space-y-5">
-          {polizas.map((p) => {
-            const est = ESTADO_POLIZA[String(p.estado).toLowerCase()] || ESTADO_POLIZA.activa;
-            const cupones = p.cupones_robo || [];
-            const docs = p.documentos || [];
-            return (
-              <div key={p.id} className={`${CARD} overflow-hidden`}>
-                {/* Hero de la póliza */}
-                <div className="flex items-center gap-3 border-b-2 border-linea p-4 dark:border-linea-dark">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro">
-                    <FaCar className="text-xl" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-[15px] font-black">{p.marca} {p.modelo}</span>
-                      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border-2 px-2 py-0.5 text-[10px] font-black ${est.cls}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${est.dot}`} /> {est.label}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-suave dark:text-suave-dark">
-                      {p.patente ? <span className="font-mono font-bold uppercase text-titulo dark:text-titulo-dark">{p.patente}</span> : null}
-                      {p.patente ? " · " : ""}{p.compania} · Cobertura {p.cobertura}
-                    </div>
-                  </div>
-                </div>
+        {/* ══════════ 🛡️ SEGUROS ══════════ */}
+        {tab === "seguros" ? (
+          <div className="portal-pant">
+          {detalle ? (
+            <DetallePoliza
+              p={detalle}
+              verCobertura={verCobertura}
+              onToggleCobertura={() => setVerCobertura((v) => !v)}
+              onVerPagos={() => { setFiltroPagos(detalle.id); irA("pagos"); }}
+              onVerDoc={setVerDoc}
+              nombreCliente={nombreCliente}
+            />
+          ) : (
+            <>
+              {/* Sin título de sección: el header ya dice "Hola Jorge" y
+                  abajo hay una lista de seguros. Nadie se pregunta qué es.
+                  Eran 37px de alto para no decir nada. */}
+              <div style={{ height: 14 }} />
+              <Lista>
+                {polizas.map((p, i) => (
+                  <FilaSeguro key={p.id} poliza={p} onClick={() => abrirPoliza(p)} />
+                ))}
+              </Lista>
+            </>
+          )}
+          </div>
+        ) : null}
 
-                {/* Tu cuota hoy + lo que pagás al renovar (NRE) */}
-                {(p.precio_actual > 0 || p.renovacion) ? (
-                  <div className="border-b-2 border-linea p-4 dark:border-linea-dark">
-                    {p.precio_actual > 0 ? (
-                      <div className="flex items-center justify-between rounded-xl border-2 border-linea bg-surface px-3.5 py-3 dark:border-linea-dark dark:bg-surface-dark">
-                        <div className="flex items-center gap-2">
-                          <HiCash className="h-4 w-4 text-oficina" />
-                          <span className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">Tu cuota</span>
-                        </div>
-                        <span className="text-[17px] font-black text-titulo dark:text-titulo-dark">{money(p.precio_actual)}</span>
-                      </div>
-                    ) : null}
+        {/* ══════════ 📄 PAPELES ══════════ */}
+        {tab === "papeles" ? (
+          <div className="portal-pant">
+            <Papeles polizas={polizas} onVerDoc={setVerDoc} nombreCliente={nombreCliente} />
+          </div>
+        ) : null}
 
-                    {p.renovacion ? (
-                      <div className="mt-3 rounded-xl border-2 border-tarjeta/30 bg-tarjeta/10 p-3.5">
-                        <div className="flex items-center gap-2 text-[#d97706] dark:text-tarjeta-claro">
-                          <HiClock className="h-4 w-4" />
-                          <span className="text-[12px] font-black">
-                            Al renovar (desde {fmt(p.renovacion.fecha)})
-                          </span>
-                        </div>
-
-                        {p.renovacion.con_oferta ? (
-                          <div className="mt-2.5 space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[12px] text-titulo dark:text-titulo-dark">1ra cuota</span>
-                              <span className="text-[15px] font-black text-ingreso-fuerte dark:text-ingreso-claro">{money(p.renovacion.primera_cuota)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[12px] text-titulo dark:text-titulo-dark">Resto de las cuotas</span>
-                              <span className="text-[15px] font-black text-titulo dark:text-titulo-dark">{money(p.renovacion.resto)}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2.5 flex items-center justify-between">
-                            <span className="text-[12px] text-titulo dark:text-titulo-dark">Todas las cuotas</span>
-                            <span className="text-[15px] font-black text-titulo dark:text-titulo-dark">{money(p.renovacion.resto)}</span>
-                          </div>
-                        )}
-
-                        <p className="mt-2.5 text-[11px] leading-snug text-suave dark:text-suave-dark">
-                          Sabemos que está difícil. Por eso ajustamos el precio de a poco
-                          {p.renovacion.con_oferta ? " y la primera cuota te queda más baja" : ""}, para acompañarte y que sigas cubierto.
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {/* Papeles */}
-                {docs.length > 0 ? (
-                  <div className="border-b-2 border-linea p-4 dark:border-linea-dark">
-                    <div className="mb-2 flex items-center gap-2">
-                      <HiDocumentText className="h-4 w-4 text-oficina" />
-                      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark">Papeles</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {docs.map((d, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setVerDoc({ url: d.url, nombre: nombreLindoDoc(d.tipo, d.nombre) })}
-                          className="inline-flex items-center gap-1.5 rounded-lg border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-[12px] font-semibold text-titulo dark:text-titulo-dark transition hover:border-oficina"
-                        >
-                          <HiDocumentText className="h-4 w-4 text-egreso" /> {nombreLindoDoc(d.tipo, d.nombre)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border-b-2 border-linea p-4 dark:border-linea-dark">
-                    <div className="mb-2 flex items-center gap-2">
-                      <HiDocumentText className="h-4 w-4 text-oficina" />
-                      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark">Papeles</span>
-                    </div>
-                    <div className="rounded-xl border-2 border-linea bg-surface p-3.5 dark:border-linea-dark dark:bg-surface-dark">
-                      <div className="flex items-center gap-2 text-[#d97706] dark:text-tarjeta-claro">
-                        <HiClock className="h-4 w-4" />
-                        <span className="text-[13px] font-black">Papeles en proceso de carga</span>
-                      </div>
-                      <p className="mt-1.5 text-[12px] leading-snug text-suave dark:text-suave-dark">
-                        Estamos cargando los papeles de esta póliza. Si los necesitás ahora, escribinos.
-                      </p>
-                      {p.oficina_whatsapp ? (
-                        <a
-                          href={`https://wa.me/${p.oficina_whatsapp}?text=${encodeURIComponent(
-                            `Hola, soy ${cliente?.nombre_completo || cliente?.nombre || ""}. Necesito los papeles de mi póliza del auto ${p.patente || ""}. ¿Me los pueden enviar? Gracias.`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-duo-verde px-3.5 py-2 text-[12px] font-black text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] transition hover:brightness-105"
-                        >
-                          Pedir mis papeles
-                        </a>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-
-                {/* Cuponera — lo que el cliente tiene que pagar */}
-                {cupones.length > 0 ? (
-                  <div className="border-b-2 border-linea p-4 dark:border-linea-dark">
-                    <div className="mb-2.5 flex items-center gap-2">
-                      <HiShieldCheck className="h-4 w-4 text-oficina" />
-                      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark">Tu cuponera</span>
-                    </div>
-                    <div className="space-y-2">
-                      {cupones.map((cp) => {
-                        const pagada = cp.pagado || cp.estado === "PAGADA";
-                        const vencido = !pagada && cp.fecha_vencimiento && dayjs(cp.fecha_vencimiento).isBefore(dayjs(), "day");
-                        const tieneComprobante = !!(cp.comprobante_url || "").trim();
-                        return (
-                          <div key={cp.id} className="rounded-xl border-2 border-linea bg-surface p-3 dark:border-linea-dark dark:bg-surface-dark">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">
-                                Vence {fmt(cp.fecha_vencimiento)}
-                              </span>
-                              {pagada ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-ingreso-fuerte dark:text-ingreso-claro">
-                                  <HiCheckCircle className="h-4 w-4" /> Pagada
-                                </span>
-                              ) : vencido ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-egreso">
-                                  <HiExclamationCircle className="h-4 w-4" /> Pendiente
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#d97706] dark:text-tarjeta-claro">
-                                  <HiClock className="h-4 w-4" /> A pagar
-                                </span>
-                              )}
-                            </div>
-
-                            {/* 📸 El comprobante que cargó la oficina: el respaldo del cliente */}
-                            {tieneComprobante ? (
-                              <button
-                                onClick={() => setVerDoc({ url: cp.comprobante_url, nombre: `Comprobante · vence ${fmt(cp.fecha_vencimiento)}` })}
-                                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-1.5 text-[11px] font-black text-titulo dark:text-titulo-dark transition hover:border-oficina"
-                              >
-                                <HiDocumentText className="h-4 w-4 text-ingreso" /> Ver comprobante
-                              </button>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Cómo pagar */}
-                    <div className="mt-3 rounded-xl border-2 border-oficina/30 bg-oficina/10 p-3">
-                      <div className="flex items-center gap-2 text-oficina-fuerte dark:text-oficina-claro">
-                        <HiCash className="h-4 w-4" />
-                        <span className="text-[12px] font-black">Cómo pagar</span>
-                      </div>
-                      <p className="mt-1 text-[12px] leading-snug text-titulo dark:text-titulo-dark">
-                        Podés abonar en <span className="font-black">Rapipago</span>,{" "}
-                        <span className="font-black">Pago Fácil</span> o{" "}
-                        <span className="font-black">Mercado Pago</span> (Pagar servicios) usando los datos de tu cuponera.
-                      </p>
-                      <p className="mt-2 text-[12px] leading-snug text-titulo dark:text-titulo-dark">
-                        📸 Cuando pagues, <span className="font-black">mandanos la foto del comprobante por WhatsApp</span> y lo cargamos acá.
-                      </p>
-                      {p.oficina_whatsapp ? (
-                        <a
-                          href={`https://wa.me/${p.oficina_whatsapp}?text=${encodeURIComponent(
-                            `Hola, soy ${cliente?.nombre_completo || cliente?.nombre || ""}. Te paso el comprobante de pago de mi cuponera del auto ${p.patente || ""}.`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-duo-verde px-3.5 py-2 text-[12px] font-black text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] transition hover:brightness-105"
-                        >
-                          Enviar mi comprobante
-                        </a>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Cuotas */}
-                {p.cuotas?.length > 0 ? (
-                  <div className="p-4">
-                    <div className="mb-2 flex items-center gap-2">
-                      <HiCash className="h-4 w-4 text-oficina" />
-                      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark">Cuotas</span>
-                    </div>
-                    <div className="rounded-xl border-2 border-linea bg-surface dark:border-linea-dark dark:bg-surface-dark">
-                      {p.cuotas.map((c) => (
-                        <Cuota
-                          key={`${p.id}-${c.cuota_nro}`}
-                          c={c}
-                          busy={reciboBusy === `${p.id}-${c.cuota_nro}`}
-                          onRecibo={c.pagado ? () => handleRecibo(cliente, p, c) : null}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+        <div
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 12, padding: "34px 20px 16px",
+          }}
+        >
+          <img
+            src={temaActivo === "oscuro" ? logoPieOscuro : logoPieClaro}
+            alt="Estudio Thames"
+            style={{ height: 64, width: "auto", display: "block", opacity: 0.9 }}
+          />
+          <p style={{ textAlign: "center", fontSize: 12, color: "var(--t3)", margin: 0, letterSpacing: ".02em" }}>
+            Estamos para ayudarte
+          </p>
         </div>
-
-        <p className="mt-8 text-center text-[11px] text-suave dark:text-suave-dark">
-          Portal del asegurado
-        </p>
       </div>
 
-      <AnimatePresence>
-        {recibo && (
-          <motion.div
-            key="recibo"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
-          >
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3">
-                <span className="text-sm font-black text-titulo dark:text-titulo-dark">Recibo</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={descargarReciboPDF}
-                    disabled={descargandoRecibo}
-                    className="inline-flex items-center gap-1 rounded-lg border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-xs font-black text-titulo dark:text-titulo-dark transition hover:border-oficina disabled:opacity-50"
-                  >
-                    <HiDownload className="h-4 w-4" /> {descargandoRecibo ? "..." : "Descargar"}
-                  </button>
-                  <button
-                    onClick={cerrarRecibo}
-                    className="inline-flex items-center gap-1 rounded-lg bg-duo-azul px-3 py-1.5 text-xs font-black text-white transition hover:brightness-105"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-auto bg-slate-200 p-3">
-                <ComprobanteVista cliente={recibo.cli} poliza={recibo.pol} cuota={recibo.cuota} ocultarNumeroPoliza />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <TabsPortal
+        activa={tab}
+        onChange={irA}
+        vencidos={vencidos}
+        totalSeguros={polizas.length}
+      />
 
-      <AnimatePresence>
-        {verDoc && (
-          <motion.div
-            key="verdoc"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
-          >
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3">
-                <span className="truncate text-sm font-black text-titulo dark:text-titulo-dark">{verDoc.nombre}</span>
-                <div className="flex items-center gap-2">
-                  <a
-                    href={verDoc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-lg border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-xs font-black text-titulo dark:text-titulo-dark transition hover:border-oficina"
-                  >
-                    <HiDownload className="h-4 w-4" /> Abrir
-                  </a>
-                  <button
-                    onClick={() => setVerDoc(null)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-duo-azul px-3 py-1.5 text-xs font-black text-white transition hover:brightness-105"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-              <iframe
-                src={`https://docs.google.com/viewer?url=${encodeURIComponent(verDoc.url)}&embedded=true`}
-                title="Documento"
-                className="w-full flex-1 bg-white"
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {verDoc ? <VisorDocumento doc={verDoc} onCerrar={() => setVerDoc(null)} /> : null}
+
+      <Toaster position="bottom-center" toastOptions={{ style: { marginBottom: 80 } }} />
     </div>
   );
+}
+
+/* ══════════════════ Fila de un seguro ══════════════════ */
+
+function FilaSeguro({ poliza, onClick, primera, i = 0 }) {
+  const s = situacionPago(poliza);
+  const montoFinal = s.estado === "vencido" && s.vencidos > 1 ? s.total : s.monto;
+  const sub = [poliza.patente, poliza.compania].filter(Boolean).join(" · ");
+  const debe = s.estado !== "al_dia";
+
+  // El color y el ícono del estado. En el mockup el estado va DEBAJO del
+  // monto con su ícono al lado, no como un chip suelto.
+  const tono =
+    s.estado === "vencido" ? "var(--al)"
+    : s.estado === "proximo" ? "var(--wa)"
+    : "var(--ok)";
+
+  const texto =
+    s.estado === "vencido"
+      ? (s.vencidos > 1 ? `${s.vencidos} vencidos` : "Vencido")
+      : s.estado === "proximo"
+      ? fmtLargo(s.fecha)
+      : "Al día";
+
+  /* 🤫 Si está al día, no muestra NADA a la derecha.
+     El chip "✓ Al día" ocupaba lugar y no decía nada nuevo: si no hay monto,
+     ya se entiende. Y sin él, los que sí deben saltan solos — que es a
+     dónde queremos que vaya el ojo. */
+  const derecha = !debe ? null : (
+    <span style={{ textAlign: "right", flexShrink: 0 }}>
+      <span
+        style={{
+          display: "block", fontSize: 16, fontWeight: 700,
+          letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {money(montoFinal)}
+      </span>
+      <span
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "flex-end",
+          gap: 4, marginTop: 3, fontSize: 12, fontWeight: 600, color: tono,
+        }}
+      >
+        {s.estado === "vencido" ? <IconAlerta size={13} w={2} /> : <IconReloj size={13} />}
+        <span>{texto}</span>
+      </span>
+    </span>
+  );
+
+  return (
+    <Fila
+      primera={primera}
+      i={i}
+      icono={<IconoTipo tipo={tipoIcono(poliza)} size={23} w={1.9} />}
+      tono="marca"
+      titulo={nombreBien(poliza)}
+      sub={sub}
+      derecha={derecha}
+      onClick={onClick}
+    />
+  );
+}
+
+/* ══════════════════ Detalle de una póliza ══════════════════ */
+
+function DetallePoliza({
+  p, verCobertura, onToggleCobertura,
+  onVerPagos, onVerDoc, nombreCliente,
+}) {
+  const s = situacionPago(p);
+  const docs = p.documentos || [];
+  const cubre = p.que_cubre || [];
+  const ojo = p.ojo_con || [];
+  const grua = p.asistencia || null;
+
+  return (
+    <>
+      {/* 🚨 LA GRÚA VA PRIMERO, ANTES QUE TODO.
+          Cuando el cliente abre el portal para llamar a la grúa está parado
+          en la banquina. No puede andar buscando el número entre las cuotas:
+          es lo primero que ve, y un toque llama.
+
+          Si todavía está en carencia (los primeros 15/16 días de una póliza
+          NUEVA — al renovar no corre), no se deja tocar y se le dice desde
+          cuándo. Mejor eso a que llame y le digan que no. */}
+      {grua ? (
+        <>
+          <Seccion>Si te quedaste en la calle</Seccion>
+          <Lista>
+            {grua.disponible ? (
+              <a href={`tel:${String(grua.telefono).replace(/[^0-9+]/g, "")}`} style={{ display: "block" }}>
+                <Fila
+                  primera
+                  icono={<IconAlerta />}
+                  tono="alerta"
+                  titulo="Llamar a la grúa"
+                  sub={grua.telefono}
+                  derecha={
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>
+                      Llamar
+                    </span>
+                  }
+                />
+              </a>
+            ) : (
+              <Fila
+                primera
+                icono={<IconReloj />}
+                tono="aviso"
+                titulo="Grúa"
+                sub={`Disponible a partir del ${fmtLargo(grua.disponible_desde)}`}
+              />
+            )}
+          </Lista>
+        </>
+      ) : null}
+
+      <Seccion>Tu cobertura</Seccion>
+      <Lista>
+        <FilaDato
+          primera
+          label="Cobertura"
+          valor={p.cobertura || "—"}
+          mas={(cubre.length || ojo.length) ? (verCobertura ? "Ocultar" : "Ver qué cubre") : null}
+          onClick={(cubre.length || ojo.length) ? onToggleCobertura : null}
+        />
+
+        {/* 🔑 El desplegable va ADENTRO del bloque, no debajo.
+            Antes quedaba suelto a todo el ancho, sin el fondo ni las esquinas
+            redondeadas — se veía como si se hubiera escapado de la tarjeta.
+
+            Usa el mismo acordeón que los cupones: se pliega a la altura real
+            del contenido, no contra un techo fijo. */}
+        {(cubre.length || ojo.length) ? (
+          <div className={`portal-panel${verCobertura ? " abierto" : ""}`}>
+            <div style={{ borderTop: "1px solid var(--div)", padding: "12px 16px 14px" }}>
+              {cubre.map((x, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex", gap: 11, alignItems: "flex-start",
+                    fontSize: 14, color: "var(--t2)", padding: "7px 0",
+                  }}
+                >
+                  <span style={{ color: "var(--ok)", marginTop: 1, flexShrink: 0 }}>
+                    <IconTick size={15} />
+                  </span>
+                  <span>{x}</span>
+                </div>
+              ))}
+
+              {/* ⚠️ LA LETRA CHICA, EN CRIOLLO.
+                  Todo esto está en la póliza, pero en las hojas de cláusulas
+                  que nadie lee. Sacarlo a la superficie evita la discusión en
+                  el mostrador: el cliente se entera ANTES, no cuando reclama.
+
+                  Sale del PDF (ver polizas/views/lector_pdf.py). Si el papel
+                  no lo dice, la línea no aparece: no se le advierte de más. */}
+              {ojo.length ? (
+                <div style={{ marginTop: 10, paddingTop: 12, borderTop: "1px solid var(--div)" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t3)", marginBottom: 6 }}>
+                    Tené en cuenta
+                  </div>
+                  {ojo.map((x, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex", gap: 11, alignItems: "flex-start",
+                        fontSize: 13.5, color: "var(--t3)", padding: "5px 0", lineHeight: 1.45,
+                      }}
+                    >
+                      <span style={{ flexShrink: 0, marginTop: 1 }}>·</span>
+                      <span>{x}</span>
+                    </div>
+                  ))}
+
+                  {/* El robo por partes no lista las piezas en NINGÚN lado de
+                      la póliza. Que pregunten: es más honesto que inventar. */}
+                  {p.oficina_whatsapp ? (
+                    <a
+                      href={waLink(
+                        p.oficina_whatsapp,
+                        `Hola, soy ${nombreCliente}. Quería saber qué partes me cubre el seguro de mi ${nombreBien(p)}.`
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-block", marginTop: 10, fontSize: 13.5,
+                        fontWeight: 600, color: "var(--m)",
+                      }}
+                    >
+                      Consultanos por WhatsApp
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <FilaDato label="Aseguradora" valor={p.compania || "—"} />
+        {/* 💰 El número COMPLETO, sin tener que tocar.
+            Antes mostraba "$21,5 millones" y había que tocar dos veces para
+            ver el número real. Entra perfecto en la fila.
+            Y la etiqueta dice QUÉ SIGNIFICA: "suma asegurada" es jerga. */}
+        {p.suma_asegurada ? (
+          <FilaDato label="Si te lo roban, cobrás" valor={money(p.suma_asegurada)} />
+        ) : null}
+        {p.fecha_emision ? <FilaDato label="Desde" valor={fmt(p.fecha_emision)} /> : null}
+      </Lista>
+
+      {/* Situación de pago: lleva directo a los cupones de esta póliza. */}
+      {s.estado !== "al_dia" && (p.cupones_robo || []).length ? (
+        <>
+          <Seccion>Estado de pago</Seccion>
+          <Lista>
+            <Fila
+              primera
+              icono={<IconAlerta />}
+              tono={s.estado === "vencido" ? "alerta" : "aviso"}
+              titulo={
+                s.estado === "vencido"
+                  ? (s.vencidos > 1 ? `${s.vencidos} pagos vencidos` : "Pago vencido")
+                  : "Próximo pago"
+              }
+              sub={fmtLargo(s.fecha)}
+              derecha={
+                <span style={{ fontSize: 15.5, fontWeight: 600, flexShrink: 0 }}>
+                  {money(s.estado === "vencido" && s.vencidos > 1 ? s.total : s.monto)}
+                </span>
+              }
+              onClick={onVerPagos}
+            />
+          </Lista>
+        </>
+      ) : null}
+
+      <Seccion>Documentos</Seccion>
+      {docs.length ? (
+        <Lista>
+          {docs.map((d, i) => (
+            <Fila
+              key={`${d.url}-${i}`}
+              primera={i === 0}
+              icono={<IconDoc />}
+              titulo={nombreLindoDoc(d.tipo, d.nombre)}
+              sub="Ver documento"
+              onClick={() => onVerDoc({ url: d.url, nombre: nombreLindoDoc(d.tipo, d.nombre) })}
+            />
+          ))}
+        </Lista>
+      ) : (
+        <Vacio
+          titulo="Todavía no están disponibles"
+          sub="Los estamos cargando."
+          boton={
+            p.oficina_whatsapp ? (
+              <a
+                href={waLink(p.oficina_whatsapp, `Hola, soy ${nombreCliente}. Necesito los papeles de mi ${nombreBien(p)}.`)}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block", marginTop: 12, background: "var(--m)", color: "#fff",
+                  borderRadius: 11, padding: 12, fontSize: 14, fontWeight: 600, textAlign: "center",
+                }}
+              >
+                Solicitarlos
+              </a>
+            ) : null
+          }
+        />
+      )}
+    </>
+  );
+}
+
+/** Fila de dato: etiqueta a la izquierda, valor a la derecha. */
+function FilaDato({ label, valor, mas, onClick, primera }) {
+  const contenido = (
+    <>
+      {!primera ? (
+        <span style={{ position: "absolute", top: 0, left: 20, right: 0, height: 1, background: "var(--div)" }} />
+      ) : null}
+      <span style={{ fontSize: 14, color: "var(--t2)" }}>{label}</span>
+      <span style={{ textAlign: "right" }}>
+        <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>{valor}</span>
+        {mas ? (
+          <span
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4,
+              fontSize: 12, fontWeight: 600, color: "var(--m)", marginTop: 2,
+            }}
+          >
+            {mas} <IconAbajo size={11} />
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
+
+  const estilo = {
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14,
+    padding: "14px 20px", position: "relative", background: "none", border: "none",
+    width: "100%", fontFamily: "inherit", color: "var(--t1)", textAlign: "left",
+    cursor: onClick ? "pointer" : "default",
+  };
+
+  if (onClick) return <button onClick={onClick} style={estilo}>{contenido}</button>;
+  return <div style={estilo}>{contenido}</div>;
 }

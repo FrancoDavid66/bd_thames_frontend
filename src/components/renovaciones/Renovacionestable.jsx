@@ -10,7 +10,7 @@
 //    ("Ya renovada", "Finalizada", "No renueva"…) para que se vea qué se está
 //    por tocar, y el botón "Renovar" queda SIEMPRE disponible.
 
-import { HiRefresh, HiX, HiEye, HiArrowLeft } from "react-icons/hi";
+import { HiRefresh, HiX, HiEye, HiArrowLeft, HiTicket, HiUpload } from "react-icons/hi";
 
 import Boton3D from "../ui/Boton3D";
 import Badge from "../ui/Badge";
@@ -21,6 +21,7 @@ import {
   getNombreCompleto,
   getCompania,
   situacionPoliza,
+  llevaCuponera,
 } from "./utils";
 
 // Nombre de oficina de la póliza (soporta oficina_nombre, o el objeto oficina).
@@ -68,16 +69,20 @@ function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, o
     );
   }
 
+  // 🎟️ Las de cuponera NO se renuevan solas: piden el PDF nuevo.
+  //    Botón violeta y otro texto, para que no se confundan con las de NRE.
+  const cuponera = llevaCuponera(p);
+
   return (
     <div className="flex items-center justify-end gap-2">
       <Boton3D
-        variant="verde"
+        variant={cuponera ? "violeta" : "verde"}
         size="sm"
         onClick={() => onRenovar?.(p)}
         disabled={submitting}
-        title="Renovar póliza"
+        title={cuponera ? "Renovar subiendo la póliza nueva" : "Renovar póliza"}
       >
-        <HiRefresh /> Renovar
+        {cuponera ? <><HiUpload /> Subir PDF</> : <><HiRefresh /> Renovar</>}
       </Boton3D>
 
       {/* No renueva */}
@@ -133,6 +138,10 @@ function FilaDesktop({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, on
       <td className={cx("p-4 text-sm font-black tracking-wider", textClass)}>
         <div className="flex items-center gap-2">
           <span>{p?.patente || "—"}</span>
+          {/* 🎟️ El chip avisa de un vistazo cuáles necesitan el PDF. */}
+          {llevaCuponera(p) && (
+            <Badge tono="violeta" size="sm"><HiTicket /> Cuponera</Badge>
+          )}
           {situacion && <Badge tono={situacion.tono} size="sm">{situacion.label}</Badge>}
         </div>
       </td>
@@ -168,17 +177,21 @@ function CardMobile({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onD
     : "text-titulo dark:text-titulo-dark";
 
   return (
+    // 🎟️ Borde violeta para las de cuponera: se distinguen de lejos, sin leer.
     <div
       className={cx(
         "rounded-2xl border-2 p-4",
         descartada
           ? "border-duo-rojo/40 bg-duo-rojo-soft/40 dark:bg-[var(--color-duo-rojo-soft-dark)]/40"
+          : llevaCuponera(p)
+          ? "border-duo-violeta bg-surface dark:bg-surface-dark"
           : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark"
       )}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className={cx("text-base font-black tracking-wider", textClass)}>{p?.patente || "—"}</span>
         <div className="flex items-center gap-1.5">
+          {llevaCuponera(p) && <Badge tono="violeta" size="sm"><HiTicket /> Cuponera</Badge>}
           {situacion && <Badge tono={situacion.tono} size="sm">{situacion.label}</Badge>}
           <Badge tono="azul" size="sm">{getOficina(p)}</Badge>
         </div>

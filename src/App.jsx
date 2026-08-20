@@ -55,6 +55,8 @@ import CierreCajaReminder from "./components/recaudacion/CierreCajaReminder";
 // 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
 import CuponPublicoPage from "./pages/CuponPublicoPage";
 import PortalAseguradoPage from "./pages/PortalAseguradoPage";
+// 🛠️ Panel de administración del Portal del Asegurado (lo usa la oficina).
+import PanelPortalPage from "./pages/PanelPortalPage";
 
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
@@ -577,6 +579,9 @@ function App() {
 
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/clientes/:id" element={<ClienteProfilePage />} />
+                {/* 🛠️ El portal de ESE cliente, visto desde adentro: lo mismo
+                    que ve él, con los botones de gestión al lado. */}
+                <Route path="/clientes/:clienteId/portal" element={<PanelPortalPage />} />
                 <Route path="/polizas" element={<PolizasPage />} />
                 <Route path="/polizas/renovaciones" element={<RenovacionesPage />} />
                 <Route path="/polizas/bajas" element={<BajasPage />} />

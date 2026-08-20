@@ -138,10 +138,21 @@ export function buildMenuGroups({
 //    barra inferior, sin abrir el menú). Estilo simple: ícono + texto chico.
 //    Cada uno lleva su color de acento (para el ícono cuando está activo).
 //    El resto del menú vive en la hoja (botón "Más").
+// 📱 LA BARRA DE ABAJO — los 5 accesos de un toque.
+//
+//    Son los que se usan TODO el día. El resto vive en "Más", que está al
+//    lado y no cuesta nada abrir.
+//
+//    🔄 "Clientes" salió y entró "Pólizas": en el día a día se busca una
+//       póliza (por patente, por vencimiento, para renovar) mucho más
+//       seguido que una ficha de cliente. Y desde la póliza se llega al
+//       cliente en un toque, no al revés.
+//
+//       Clientes sigue disponible en "Más" → Cartera.
 export const FOOTER_TABS = [
   { to: "/",            label: "Inicio",   icon: "home",   color: "var(--color-duo-azul)" },
   { to: "/solicitudes", label: "Emisión",  icon: "pencil", color: "var(--color-duo-violeta)" },
   { to: "/pagos",       label: "Pagos",    icon: "money",  color: "var(--color-duo-verde)" },
   { to: "/balanzes",    label: "Balances", icon: "db",     color: "var(--color-duo-azul)" },
-  { to: "/clientes",    label: "Clientes", icon: "users",  color: "var(--color-duo-violeta)" },
+  { to: "/polizas",     label: "Pólizas",  icon: "doc",    color: "var(--color-duo-violeta)" },
 ];

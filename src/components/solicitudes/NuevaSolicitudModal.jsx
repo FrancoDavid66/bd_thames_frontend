@@ -6,8 +6,9 @@
 //   Paso 2: ¿Cómo cargás? → 📄 Con PDF  /  ✍️ A mano.
 //
 //   ── Camino PDF ──
-//     Paso 3: Elegí compañía → botones NRE / AMCA (la compañía queda fijada).
-//     Paso 4: Subí el archivo (NRE = MERCOSUR · AMCA = Propuesta). Si sube el
+//     Paso 3: Elegí compañía → botones NRE / AMCA / EQUIDAD (queda fijada).
+//     Paso 4: Subí el archivo (NRE = MERCOSUR · AMCA = Propuesta ·
+//             EQUIDAD = Póliza completa, un solo PDF con todo). Si sube el
 //             equivocado, se lo avisa. Después, formulario + crear.
 //
 //   ── Camino Manual (wizard) ──
@@ -29,6 +30,7 @@ import {
   HiExclamationCircle,
   HiUser,
   HiIdentification,
+  HiPhone,
   HiTruck,
   HiSparkles,
   HiCash,
@@ -83,7 +85,33 @@ function matchCompania(detectada, companias) {
   return hit || detectada;
 }
 
+// 🚗 TIPO DE VEHÍCULO — texto libre, NO un select de 5 opciones.
+//
+// Los PDFs de las compañías no usan las palabras del sistema. AMCA dice
+// 'H - PICK-UP/JEEP "A" PARTICULAR'. Como no estaba en la lista, el select no
+// lo podía mostrar y caía en "Auto" (la primera opción): se perdía el dato real.
+//
+// Ahora se guarda TAL CUAL lo dice el PDF. El backend lo traduce al vuelo
+// cuando necesita la categoría (precio NRE, reporte) — ver precios_nre.py →
+// resolver_tipo(), que además corrige por modelo.
+//
+// Estos son ATAJOS para la carga manual, no una lista cerrada.
 const TIPOS_VEHICULO = ["Auto", "Camioneta", "Camion", "Moto", "Trailer"];
+
+// Traduce el texto libre a la categoría, SOLO para mostrar el chip en pantalla.
+function categoriaVehiculo(txt) {
+  const t = String(txt || "")
+    .toLowerCase()
+    .replace(/[áà]/g, "a").replace(/[éè]/g, "e").replace(/[íì]/g, "i")
+    .replace(/[óò]/g, "o").replace(/[úù]/g, "u");
+  if (!t.trim()) return "";
+  if (/moto|ciclomotor|scooter/.test(t)) return "Moto";
+  if (/camioneta|pick|furg|utilitar|jeep|suv|4x4|van/.test(t)) return "Camioneta";
+  if (/camion/.test(t)) return "Camion";
+  if (/acoplad|trailer|remolque|batan|casilla/.test(t)) return "Trailer";
+  if (/auto/.test(t)) return "Auto";
+  return "";
+}
 
 // Config de cada compañía "rápida" del camino PDF.
 const CIAS_PDF = {
@@ -93,12 +121,26 @@ const CIAS_PDF = {
     ayuda: "Subí el certificado MERCOSUR de NRE.",
     // palabras que deberían estar en el PDF correcto
     match: ["mercosur", "mercosul", "nre"],
+    // ¿El PDF de esta compañía tiene que traer cuponera sí o sí?
+    // NRE no: las cuotas son regulares y las calcula el sistema.
+    esperaCupones: false,
   },
   AMCA: {
     nombre: "AMCA",
     archivo: "Propuesta completa",
     ayuda: "Subí la Propuesta completa de AMCA (la que trae los cupones).",
     match: ["asociacion mutual", "amca", "rapipago", "cuota nro"],
+    esperaCupones: true,
+  },
+  // 🆕 LA EQUIDAD — manda UN solo PDF con TODO adentro (~19 hojas):
+  //    frente de póliza + liquidación de premio (las cuotas) + los cupones
+  //    + el MERCOSUR. No hay que subir nada más.
+  EQUIDAD: {
+    nombre: "Equidad",
+    archivo: "Póliza completa",
+    ayuda: "Subí la Póliza completa de La Equidad (el PDF largo, con los cupones).",
+    match: ["equidad", "recibimos de", "pagos link"],
+    esperaCupones: true,
   },
 };
 
@@ -146,9 +188,13 @@ export default function NuevaSolicitudModal({
   // PDF
   const [pdfTrajo, setPdfTrajo] = useState({});
   const [cuponesPdf, setCuponesPdf] = useState([]);
+  // 📦 Caja con lo que el lector saca del PDF y no tiene campo en el formulario:
+  //    clave de pago (PMC / Link), nº de certificado, qué cubre, CUIT, GNC.
+  //    Viaja tal cual al backend y se guarda en Poliza.datos_extra.
+  const [datosExtraPdf, setDatosExtraPdf] = useState({});
   const [datosDetectados, setDatosDetectados] = useState([]);
   const [companiaDetectada, setCompaniaDetectada] = useState("");
-  const [ciaElegida, setCiaElegida] = useState(null); // "NRE" | "AMCA" (camino PDF)
+  const [ciaElegida, setCiaElegida] = useState(null); // "NRE" | "AMCA" | "EQUIDAD" (camino PDF)
   const pdfInputRef = useRef(null);
   const [leyendoPdf, setLeyendoPdf] = useState(false);
   const [pdfSubido, setPdfSubido] = useState(null);
@@ -262,8 +308,30 @@ export default function NuevaSolicitudModal({
       : { marca: veh.marca || "", modelo: veh.modelo || "" };
 
     const trajo = {};
-    const chips = [];
     const clienteYaRegistrado = !!clienteExistente;
+
+    // 🐛 LOS CHIPS SE ARMAN ACÁ AFUERA, NO ADENTRO DEL setForm.
+    //
+    //    Antes se hacía `chips.push(...)` dentro del updater `setForm(prev => …)`.
+    //    React puede ejecutar ese updater MÁS DE UNA VEZ (lo hace siempre en
+    //    modo desarrollo con StrictMode), así que los chips se duplicaban:
+    //    "Compañía: Equidad" aparecía tres veces en pantalla.
+    //
+    //    Regla: el updater de setForm solo calcula el estado nuevo. Nada de
+    //    empujar arrays ni llamar a otros setState desde adentro.
+    const ciaDetectada =
+      pol.compania && String(pol.compania).trim()
+        ? matchCompania(pol.compania, companias)
+        : "";
+
+    const chips = [];
+    if (veh.patente) chips.push(`Patente: ${veh.patente}`);
+    if (marca || modelo) chips.push(`${marca} ${modelo}`.trim());
+    if (ciaDetectada) chips.push(`Compañía: ${ciaDetectada}`);
+    if (pol.cobertura) chips.push(`Cobertura: ${pol.cobertura}`);
+    if (cupones.length) {
+      chips.push(`${cupones.length} ${cupones.length === 1 ? "cupón" : "cupones"}`);
+    }
 
     setForm((prev) => {
       const next = { ...prev };
@@ -282,30 +350,28 @@ export default function NuevaSolicitudModal({
         poner("cli_provincia", cli.provincia); // 🆕 provincia del PDF
       }
       poner("patente", veh.patente);
-      if (veh.patente) chips.push(`Patente: ${veh.patente}`);
       poner("marca", marca);
       poner("modelo", modelo);
-      if (marca || modelo) chips.push(`${marca} ${modelo}`.trim());
       poner("anio", veh.anio);
       poner("numero_motor", veh.motor);
       poner("numero_chasis", veh.chasis);
       if (veh.tipo) poner("tipo", veh.tipo);
       poner("numero_poliza", pol.numero);
       // Compañía: si el PDF la trae, la matcheamos. Si no, queda la fijada por el botón.
-      if (pol.compania && String(pol.compania).trim()) {
-        const ciaFinal = matchCompania(pol.compania, companias);
-        next.compania = ciaFinal;
+      if (ciaDetectada) {
+        next.compania = ciaDetectada;
         trajo.compania = true;
-        chips.push(`Compañía: ${ciaFinal}`);
-        setCompaniaDetectada(ciaFinal);
       }
       poner("cobertura", pol.cobertura);
       return next;
     });
 
-    if (cupones.length) chips.push(`${cupones.length} cupones`);
+    if (ciaDetectada) setCompaniaDetectada(ciaDetectada);
     setPdfTrajo(trajo);
     setCuponesPdf(cupones);
+    if (datos?.datos_extra && typeof datos.datos_extra === "object") {
+      setDatosExtraPdf(datos.datos_extra);
+    }
     setDatosDetectados(chips);
 
     // ── Chequeo: ¿el PDF coincide con la compañía elegida? ──
@@ -313,9 +379,11 @@ export default function NuevaSolicitudModal({
       const cfg = CIAS_PDF[ciaElegida];
       const t = (textoPlano || "").toLowerCase();
       const coincide = cfg.match.some((kw) => t.includes(kw));
-      // AMCA sin cupones = probablemente el archivo equivocado
-      const amcaSinCupones = ciaElegida === "AMCA" && cupones.length === 0;
-      if (!coincide || amcaSinCupones) {
+      // Si la compañía tiene que traer cuponera y no vino ninguna, casi
+      // seguro subieron el archivo equivocado (AMCA: el certificado en vez
+      // de la propuesta · La Equidad: el carnet en vez de la póliza larga).
+      const faltanCupones = !!cfg.esperaCupones && cupones.length === 0;
+      if (!coincide || faltanCupones) {
         setAvisoArchivo(
           `Parece que este NO es el ${cfg.archivo} de ${cfg.nombre}. Revisá que hayas subido el archivo correcto.`
         );
@@ -345,15 +413,32 @@ export default function NuevaSolicitudModal({
       if (avisos.length) avisos.forEach((a) => toast(a, { icon: "⚠️", duration: 4500 }));
       else toast.success("PDF leído. Revisá los datos.");
 
+      // 📎 Guardar el PDF en Cloudinary para poder adjuntarlo a la póliza.
+      //
+      // ⚠️ ANTES ESTO ERA UN `catch {}` VACÍO: si Cloudinary fallaba, el PDF
+      //    quedaba sin subir y NADIE se enteraba. La póliza se creaba igual,
+      //    pero sin el documento adjunto — y eso frena el WhatsApp de
+      //    bienvenida, que pide tener la propuesta guardada.
+      //
+      //    Ahora avisa. Los datos ya se leyeron, así que el alta puede seguir:
+      //    solo falta el archivo, que se puede subir después desde la póliza.
       try {
+        console.log("[PDF] subiendo a Cloudinary…", files[0].name);
         const up = await uploadToCloudinary(files[0], "solicitudes/pdf");
+        console.log("[PDF] ✅ subió:", up.secure_url);
         setPdfSubido({
           url: up.secure_url,
           public_id: up.public_id,
           mime: up.mime || "application/pdf",
           nombre: files[0].name,
         });
-      } catch {}
+      } catch (errUp) {
+        console.error("[NuevaSolicitud] No se pudo guardar el PDF:", errUp);
+        toast(
+          "Leímos los datos, pero no se pudo guardar el archivo PDF. Podés subirlo después desde la póliza.",
+          { icon: "📎", duration: 6000 }
+        );
+      }
     } catch (err) {
       console.error("[NuevaSolicitud] PDF:", err);
       toast.error("No se pudo leer el PDF. Probá de nuevo.");
@@ -413,11 +498,23 @@ export default function NuevaSolicitudModal({
           vencimiento: c.vencimiento,
           importe: c.importe ? Number(soloDigitos(String(c.importe))) : null,
         }));
+      // ⚠️ Este map tiene que arrastrar TODO lo que trae el cupón del PDF.
+      //    Antes solo pasaba numero/vencimiento/importe y descartaba la
+      //    imagen recortada y el código de barras: el backend los generaba
+      //    y se perdían acá, en el camino de vuelta.
       const cuponesFinal = cuponesPdf.length
-        ? cuponesPdf.map((c) => ({ numero: c.numero, vencimiento: c.vencimiento, importe: c.importe }))
+        ? cuponesPdf.map((c) => ({
+            numero: c.numero,
+            vencimiento: c.vencimiento,
+            importe: c.importe,
+            imagen_url: c.imagen_url || "",      // el recorte de ESTE cupón
+            codigo_barras: c.codigo_barras || "", // los dígitos, para dictarlos
+          }))
         : cuponesManualValidos;
 
+
       const documentos = {};
+      console.log("[PDF] al guardar, pdfSubido =", pdfSubido);
       if (pdfSubido) {
         documentos.POLIZA_PDF = {
           url: pdfSubido.url,
@@ -456,6 +553,7 @@ export default function NuevaSolicitudModal({
           observaciones: form.observaciones.trim(),
           generar_cuotas_ahora: true,
           cupones: cuponesFinal,
+          datos_extra: datosExtraPdf,
         },
         solicitud: {
           responsable_empleado: responsable?.id ? Number(responsable.id) : null,
@@ -585,7 +683,7 @@ export default function NuevaSolicitudModal({
                   <BotonModo
                     emoji="📄"
                     titulo="Con PDF"
-                    desc="Subí el MERCOSUR (NRE) o la Propuesta (AMCA). Leemos casi todo solo."
+                    desc="MERCOSUR de NRE, Propuesta de AMCA o Póliza de Equidad. Leemos casi todo solo."
                     badge="⚡ Más rápido"
                     tono="azul"
                     onClick={() => setPaso("pdf_cia")}
@@ -607,7 +705,9 @@ export default function NuevaSolicitudModal({
                 <p className="text-center text-[14px] font-bold text-titulo dark:text-titulo-dark mb-2">
                   ¿De qué compañía es el PDF?
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-1">
+                {/* 3 tarjetas: en el celular van una debajo de otra, en
+                    pantalla grande las tres en fila. */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-1">
                   <BotonCia
                     nombre="NRE"
                     archivo="Subí el MERCOSUR"
@@ -619,6 +719,12 @@ export default function NuevaSolicitudModal({
                     archivo="Subí la Propuesta"
                     tono="violeta"
                     onClick={() => elegirCia("AMCA")}
+                  />
+                  <BotonCia
+                    nombre="EQUIDAD"
+                    archivo="Subí la Póliza"
+                    tono="verde"
+                    onClick={() => elegirCia("EQUIDAD")}
                   />
                 </div>
                 <BtnVolver onClick={() => setPaso("modo")}>Volver</BtnVolver>
@@ -648,7 +754,7 @@ export default function NuevaSolicitudModal({
                 />
 
                 {clienteExistente ? (
-                  <TarjetaClienteExistente cliente={clienteExistente} dniFallback={form.cli_dni} />
+                  <TarjetaClienteExistente cliente={clienteExistente} dniFallback={form.cli_dni} form={form} set={set} />
                 ) : (
                   <SeccionClienteCampos form={form} set={set} faltaCampo={faltaCampo} />
                 )}
@@ -673,7 +779,7 @@ export default function NuevaSolicitudModal({
                 <PasosWizard actual={1} />
                 <BtnVolver onClick={() => setPaso("modo")}>Volver</BtnVolver>
                 {clienteExistente ? (
-                  <TarjetaClienteExistente cliente={clienteExistente} dniFallback={form.cli_dni} />
+                  <TarjetaClienteExistente cliente={clienteExistente} dniFallback={form.cli_dni} form={form} set={set} />
                 ) : (
                   <SeccionClienteManual form={form} set={set} />
                 )}
@@ -944,19 +1050,21 @@ function BotonCia({ nombre, archivo, tono, onClick }) {
   const map = {
     azul: "hover:border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul",
     violeta: "hover:border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta",
+    // 🆕 Verde para La Equidad.
+    verde: "hover:border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde",
   };
   const chip = map[tono] || map.azul;
   return (
     <button
       onClick={onClick}
-      className={`rounded-3xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-7 text-center transition-all hover:-translate-y-1 ${chip.split(" ")[0]} shadow-[0_3px_0_var(--color-duo-linea)] dark:shadow-[0_3px_0_var(--color-linea-dark)]`}
+      className={`cursor-pointer rounded-3xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 sm:p-6 text-center transition-all hover:-translate-y-1 ${chip.split(" ")[0]} shadow-[0_3px_0_var(--color-duo-linea)] dark:shadow-[0_3px_0_var(--color-linea-dark)]`}
     >
-      <div className={`mx-auto mb-3 h-16 w-16 rounded-2xl flex items-center justify-center text-2xl font-black ${chip.split(" ").slice(1).join(" ")}`}>
+      <div className={`mx-auto mb-3 h-14 w-14 sm:h-16 sm:w-16 rounded-2xl flex items-center justify-center text-2xl font-black ${chip.split(" ").slice(1).join(" ")}`}>
         {nombre.charAt(0)}
       </div>
-      <div className="text-2xl font-black text-titulo dark:text-titulo-dark mb-1">{nombre}</div>
-      <div className="text-[13px] font-bold text-suave dark:text-suave-dark flex items-center justify-center gap-1.5">
-        <HiDocumentText /> {archivo}
+      <div className="text-xl sm:text-2xl font-black text-titulo dark:text-titulo-dark mb-1 truncate">{nombre}</div>
+      <div className="text-[12px] sm:text-[13px] font-bold text-suave dark:text-suave-dark flex items-center justify-center gap-1.5">
+        <HiDocumentText className="shrink-0" /> {archivo}
       </div>
     </button>
   );
@@ -1063,23 +1171,36 @@ function SeccionResponsable({ empleados, responsable, setResponsable, onGestiona
 }
 
 function SeccionClienteCampos({ form, set, faltaCampo }) {
+  // 📞 El teléfono va aparte, abajo de todo.
+  //
+  //    No es un campo más: de él dependen el link del portal y todos los avisos
+  //    de vencimiento. Si queda vacío, el cliente nunca se entera de nada.
+  //    Antes estaba perdido entre "DNI" y "Localidad" y era fácil saltearlo.
   return (
     <SeccionCard icon={<HiIdentification />} tono="azul" titulo="Cliente" sub="Todo opcional — se completa después">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
         <InputDuo label="Nombre" value={form.cli_nombre} onChange={set("cli_nombre")} placeholder="Ej: Juan" />
         <InputDuo label="Apellido" value={form.cli_apellido} onChange={set("cli_apellido")} placeholder="Ej: Pérez" />
         <InputDuo label="DNI / CUIT" value={form.cli_dni} onChange={set("cli_dni")} placeholder="Sin puntos" inputMode="numeric" />
+        <InputDuo label="Localidad" value={form.cli_localidad} onChange={set("cli_localidad")} placeholder="Ej: Ramos Mejía" />
+        <InputDuo label="Provincia" value={form.cli_provincia} onChange={set("cli_provincia")} placeholder="Ej: Buenos Aires" />
+        <InputDuo label="Dirección" value={form.cli_direccion} onChange={set("cli_direccion")} placeholder="Opcional" />
+      </div>
+
+      <div className="mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark">
+        <div className="flex items-center gap-1.5 mb-2 ml-1">
+          <HiPhone className="text-duo-azul shrink-0" />
+          <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+            Teléfono {faltaCampo("cli_telefono") && <TagFalta />}
+          </span>
+        </div>
         <InputDuo
-          label={<>Teléfono {faltaCampo("cli_telefono") && <TagFalta />}</>}
           value={form.cli_telefono}
           onChange={set("cli_telefono")}
           placeholder="11..."
           inputMode="tel"
           className={faltaCampo("cli_telefono") ? "[&_input]:border-duo-amarillo [&_input]:bg-duo-amarillo-soft [&_input]:!text-[#5a4600] [&_input]:placeholder:!text-[#5a4600]/50" : ""}
         />
-        <InputDuo label="Localidad" value={form.cli_localidad} onChange={set("cli_localidad")} placeholder="Ej: Ramos Mejía" />
-        <InputDuo label="Provincia" value={form.cli_provincia} onChange={set("cli_provincia")} placeholder="Ej: Buenos Aires" />
-        <InputDuo label="Dirección" value={form.cli_direccion} onChange={set("cli_direccion")} placeholder="Opcional" />
       </div>
     </SeccionCard>
   );
@@ -1135,12 +1256,29 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
         )}
       </div>
 
-      {/* Tipo de auto EN BOTONES */}
+      {/* Tipo de vehículo: texto libre + botones de atajo */}
       <div className="mt-3">
-        <div className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark mb-2 ml-1">
-          Tipo de auto
+        <div className="flex items-center gap-2 mb-2 ml-1">
+          <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+            Tipo de vehículo
+          </span>
+          {/* Categoría con la que se calcula el precio / reporte NRE */}
+          {categoriaVehiculo(form.tipo) && categoriaVehiculo(form.tipo) !== form.tipo ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-duo-azul-soft text-duo-azul-sombra">
+              {categoriaVehiculo(form.tipo)}
+            </span>
+          ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        {/* 📝 Acá cae el texto TAL CUAL del PDF. No se pisa con la categoría. */}
+        <input
+          value={form.tipo || ""}
+          onChange={(e) => set("tipo")(e.target.value)}
+          placeholder="Auto, Camioneta… o lo que diga el PDF"
+          className="w-full rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-2.5 text-[14px] font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul"
+        />
+
+        <div className="mt-2 flex flex-wrap gap-2">
           {TIPOS_VEHICULO.map((t) => {
             const on = form.tipo === t;
             return (
@@ -1238,7 +1376,8 @@ function SeccionVehiculo({ form, set, companias, coberturas, opcionesCompania, f
         <InputDuo label="Marca" value={form.marca} onChange={set("marca")} placeholder="Ford" />
         <InputDuo label="Modelo" value={form.modelo} onChange={set("modelo")} placeholder="Fiesta" />
         <InputDuo label="Año" value={form.anio} onChange={set("anio")} placeholder="2024" inputMode="numeric" />
-        <SelectDuo label="Tipo de auto" value={form.tipo} onChange={set("tipo")} options={TIPOS_VEHICULO.map((t) => ({ value: t, label: t }))} />
+        {/* 📝 Texto libre: guarda lo que dice el PDF, sin recortarlo a 5 opciones. */}
+        <InputDuo label="Tipo de vehículo" value={form.tipo} onChange={set("tipo")} placeholder="Auto, Camioneta…" />
         {companias.length ? (
           <SelectDuo
             label={<>Compañía <span className="text-duo-rojo">*</span></>}
@@ -1283,7 +1422,8 @@ function SeccionVehiculoCampos({ form, set, coberturas }) {
         <InputDuo label="Marca" value={form.marca} onChange={set("marca")} placeholder="Ford" />
         <InputDuo label="Modelo" value={form.modelo} onChange={set("modelo")} placeholder="Fiesta" />
         <InputDuo label="Año" value={form.anio} onChange={set("anio")} placeholder="2024" inputMode="numeric" />
-        <SelectDuo label="Tipo de auto" value={form.tipo} onChange={set("tipo")} options={TIPOS_VEHICULO.map((t) => ({ value: t, label: t }))} />
+        {/* 📝 Texto libre: guarda lo que dice el PDF, sin recortarlo a 5 opciones. */}
+        <InputDuo label="Tipo de vehículo" value={form.tipo} onChange={set("tipo")} placeholder="Auto, Camioneta…" />
       </div>
       <DetallesTecnicos form={form} set={set} coberturas={coberturas} />
     </SeccionCard>
@@ -1417,7 +1557,7 @@ function BannerCompania({ compania, detectada }) {
   );
 }
 
-function TarjetaClienteExistente({ cliente, dniFallback }) {
+function TarjetaClienteExistente({ cliente, dniFallback, form, set }) {
   const nombre = `${cliente?.nombre || ""} ${cliente?.apellido || ""}`.trim() || "Cliente";
   const dni = cliente?.dni_cuit_cuil || cliente?.dni || dniFallback || "—";
   const iniciales =
@@ -1446,6 +1586,28 @@ function TarjetaClienteExistente({ cliente, dniFallback }) {
           </Link>
         )}
       </div>
+
+      {/* 📞 CONFIRMAR EL TELÉFONO
+          Antes la tarjeta no lo mostraba: el operador tenía al cliente enfrente
+          y no podía chequear si el número guardado seguía siendo el bueno.
+          Y de ese número dependen el link del portal y los recordatorios de
+          pago — si está viejo, el cliente no se entera de nada. */}
+      {form && set ? (
+        <div className="mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark">
+          <div className="flex items-center gap-1.5 mb-2 ml-1">
+            <HiPhone className="text-duo-azul shrink-0" />
+            <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+              ¿Este es su teléfono?
+            </span>
+          </div>
+          <InputDuo
+            value={form.cli_telefono}
+            onChange={set("cli_telefono")}
+            placeholder="11..."
+            inputMode="tel"
+          />
+        </div>
+      ) : null}
     </CardDuo>
   );
 }

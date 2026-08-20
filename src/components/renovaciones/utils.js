@@ -118,6 +118,33 @@ export function situacionPoliza(p) {
   return null;
 }
 
+/* ---------- ¿Lleva cuponera? ---------- */
+
+// 🎟️ True si esta póliza se paga con CUPONERA (AMCA / Antártida / La Equidad).
+//
+// Es LA pregunta que parte en dos la pantalla de Renovaciones:
+//
+//   · Sin cuponera (NRE) → se renueva sola. Las cuotas son regulares y el
+//     sistema las calcula.
+//
+//   · Con cuponera → NO se renueva sola. Las fechas, los importes y los
+//     códigos de barras solo están en el papel. Hay que subir el PDF nuevo.
+//
+// Se mira la COMPAÑÍA y no el catálogo, a propósito: esto corre en el front,
+// sobre la lista ya cargada, y tiene que responder sin pedir nada al backend.
+// La regla fina (TipoCobertura.genera_cupones_robo) sigue viviendo en el
+// servidor; esto es solo para saber qué botón dibujar.
+const CIAS_CON_CUPONERA = ["amca", "antartida", "asociacion mutual", "equidad"];
+
+export function llevaCuponera(p) {
+  const cia = String(getCompania(p) || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+  if (!cia) return false;
+  return CIAS_CON_CUPONERA.some((c) => cia.includes(c));
+}
+
 /* ---------- Dinero ---------- */
 
 // Formatea a pesos argentinos. Devuelve null si no hay un número > 0

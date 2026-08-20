@@ -1,10 +1,10 @@
 // src/pages/ClienteProfilePage.jsx
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { HiShieldCheck, HiExclamationCircle, HiExternalLink, HiPencil, HiTrash } from 'react-icons/hi';
+import { HiShieldCheck, HiExclamationCircle, HiExternalLink, HiPencil, HiTrash, HiCog } from 'react-icons/hi';
 
 import { useAuth } from '../context/AuthContext';
 import { fetchClienteById, deleteCliente } from '../store/slices/clientesSlice';
@@ -218,6 +218,18 @@ const ClienteProfilePage = () => {
               <HiExternalLink className="text-base" />
               {cargandoPortal ? "Abriendo..." : "Ver portal"}
             </Boton3D>
+
+            {/* 🛠️ El portal del cliente visto DESDE ADENTRO: lo mismo que ve
+                él, pero con los botones de gestión al lado (marcar una cuota
+                pagada, subir el recibo que mandó por WhatsApp, corregir una
+                fecha). El botón de al lado, "Ver portal", abre lo que ve él;
+                este abre el panel para arreglarlo. */}
+            <Link to={`/clientes/${id}/portal`}>
+              <Boton3D variant="blanco" size="sm" title="Gestionar el portal de este cliente">
+                <HiCog className="text-base" />
+                Gestionar portal
+              </Boton3D>
+            </Link>
 
             <div onClick={() => setModalEditarAbierto(true)}>
               <Boton3D variant="blanco" size="sm">

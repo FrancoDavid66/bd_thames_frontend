@@ -47,6 +47,8 @@ import {
 } from "../store/slices/renovacionesSlice";
 
 import RenovacionModal from "../components/renovaciones/RenovacionModal";
+// 🎟️ AMCA y La Equidad no se renuevan solas: piden el PDF nuevo.
+import RenovacionConPdfModal from "../components/renovaciones/RenovacionConPdfModal";
 import RenovacionesToolbar from "../components/renovaciones/RenovacionesToolbar";
 import Renovacionestable from "../components/renovaciones/Renovacionestable";
 import DescartarRenovacionModal from "../components/renovaciones/DescartarRenovacionModal";
@@ -59,7 +61,7 @@ import PageContainer from "../components/ui/PageContainer";
 import Boton3D from "../components/ui/Boton3D";
 
 // Helpers compartidos (cx y getVencimiento antes estaban definidos acá)
-import { cx, getVencimiento } from "../components/renovaciones/utils";
+import { cx, getVencimiento, llevaCuponera } from "../components/renovaciones/utils";
 
 /* =========================================================
  * Helpers de detección de estado en frontend
@@ -867,7 +869,35 @@ export default function RenovacionesPage() {
         onDesmarcarNoRenueva={handleDesmarcarNoRenueva}
       />
 
-      {/* ============ Modal de renovación ============ */}
+      {/* ============ Modal de renovación ============
+
+          🔀 Hay DOS caminos y se elige por compañía:
+
+            · NRE → RenovacionModal (el de siempre). Cuotas regulares que el
+              sistema calcula solo. Un toque y listo.
+
+            · AMCA / La Equidad → RenovacionConPdfModal. Fechas e importes
+              irregulares, cupones con código de barras e imagen recortada:
+              todo eso SOLO está en el papel. Sin el PDF, el portal del
+              cliente queda con cuotas en cero y sin nada para pagar.
+      */}
+      {selected && llevaCuponera(selected) ? (
+        <RenovacionConPdfModal
+          open={modalOpen}
+          item={selected}
+          submitting={submitting}
+          onClose={() => {
+            if (submitting) return;
+            setModalOpen(false);
+            setSelected(null);
+            setRenovarError(null);
+          }}
+          onSubmit={(payload) => {
+            setUltimoPayload(payload);
+            ejecutarRenovacion(payload);
+          }}
+        />
+      ) : (
       <RenovacionModal
         open={modalOpen}
         item={selected}
@@ -886,6 +916,7 @@ export default function RenovacionesPage() {
         }}
         submitting={submitting}
       />
+      )}
 
       {/* ============ Modal "Póliza ya renovada" (AVISO Sí/No) ============ */}
       <PolizaYaRenovadaModal

@@ -1,0 +1,286 @@
+/* src/styles/portal.css
+ *
+ * 🎨 Estilos del Portal del Asegurado.
+ *
+ * Van en un CSS aparte —no en Tailwind— porque el portal tiene su propio
+ * lenguaje visual: es la cara pública, para clientes, y no comparte estilos
+ * con la app interna (que es Duo). Dos audiencias, dos diseños.
+ *
+ * Se importa UNA sola vez, desde PortalAseguradoPage.jsx.
+ */
+
+/* ── Paleta: rojo de marca + neutros cálidos ────────────────────────────
+   El rojo #B80000 es el de marca (tailwind.config → brand.primary).
+   El de alerta (--al) es OTRO rojo, más claro: nunca aparecen en el mismo
+   lugar. Es lo que hace Santander — rojo de marca y rojo de error conviven
+   sin confundirse.                                                        */
+.portal {
+  --m:#B80000; --m-head:#B80000; --m-deep:#8E0000; --m-soft:#FBEDEC; --m-line:#F0D6D4;
+  --al:#D0342C; --al-bg:#FDF0EF; --al-br:#F3CFCC;
+  --ok:#15704F; --ok-bg:#EAF5F0; --ok-br:#CBE5DA;
+  --wa:#8A5A12; --wa-bg:#FBF3E7; --wa-br:#EEDCBE;
+  --bg:#F2F3F5; --card:#FFFFFF; --div:#EFEFF2; --shell:#DFE0E4;
+  --t1:#17171A; --t2:#5C5C64; --t3:#8A8A92;
+
+  /* 🃏 La tarjeta grande del header — el objeto que el cliente reconoce.
+     Degradado propio y sombra de color, no negra: eso es lo que la hace
+     verse como una tarjeta de verdad y no como un rectángulo pintado. */
+  --tarj: linear-gradient(133deg, #C41818 0%, #8E0000 52%, #4A0000 100%);
+  --tarj-sombra: 0 12px 32px rgba(140,0,0,.28);
+  --lista-sombra: 0 1px 5px rgba(0,0,0,.07);
+  --lista-borde: none;
+
+  background: var(--shell);
+  color: var(--t1);
+  -webkit-font-smoothing: antialiased;
+  font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  overflow-x: hidden;
+  min-height: 100dvh;
+}
+
+.portal[data-tema="oscuro"] {
+  --m:#FF5A52; --m-head:#8E0000; --m-deep:#4A0000; --m-soft:#2B1413; --m-line:#3A1B19;
+  --al:#FF6B6B; --al-bg:#2D1616; --al-br:#43201E;
+  --ok:#3FD68C; --ok-bg:#10261D; --ok-br:#1D3A2C;
+  --wa:#F5B544; --wa-bg:#2A2011; --wa-br:#3D2F19;
+  --bg:#0E0E11; --card:#18181C; --div:rgba(255,255,255,.05); --shell:#000;
+  --t1:#F3F3F5; --t2:#79797F; --t3:#75757E;
+
+  /* En oscuro la sombra negra no se ve. Lo que despega la lista del fondo
+     es que la tarjeta sea MÁS CLARA (#18181C vs #0E0E11) más un borde
+     apenas visible. */
+  --tarj: linear-gradient(133deg, #C41818 0%, #8E0000 48%, #3D0000 100%);
+  --tarj-sombra: 0 14px 40px rgba(140,0,0,.42);
+  --lista-sombra: 0 6px 20px rgba(0,0,0,.5);
+  --lista-borde: 1px solid rgba(255,255,255,.05);
+}
+
+.portal *, .portal *::before, .portal *::after { box-sizing: border-box; }
+.portal button { -webkit-tap-highlight-color: transparent; }
+.portal svg { display: block; flex-shrink: 0; }
+.portal a { color: var(--m); text-decoration: none; }
+
+/* ── EL MARCO ──────────────────────────────────────────────────────────
+   A todo el ancho en el celular, centrado en pantallas grandes.
+
+   🎨 El fondo lleva DOS capas de gradiente, como Lemon:
+      1. Un halo rojo arriba, ancho y difuso — la "luz" de la marca
+      2. Una veladura vertical que apaga hacia abajo
+   Juntas dan profundidad sin que se note un degradado obvio.          */
+.portal-frame {
+  /* Fondo liso: la profundidad la da la TARJETA, no el fondo. Con halos
+     además la tarjeta perdía contraste contra lo de atrás. */
+  background-color: var(--bg);
+  min-height: 100dvh;
+  padding-bottom: 84px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* En oscuro el halo es más marcado: sobre negro el color se pierde, así que
+   necesita más presencia para que se vea la profundidad. */
+/* En pantallas grandes el portal se centra a 412px, como un emulador.
+   En el celular ocupa todo el ancho. */
+@media (min-width: 560px) {
+  .portal-frame {
+    max-width: 412px;
+    margin: 0 auto;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 24px 60px rgba(0,0,0,.22);
+  }
+}
+@media (min-width: 560px) {
+  .portal { background: var(--shell); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ANIMACIONES
+   ══════════════════════════════════════════════════════════════════════
+   🚀 REGLA DE ORO: solo `transform` y `opacity`.
+
+   Esas dos las resuelve la placa de video sin volver a calcular el layout
+   de la página. Animar `width`, `height`, `top`, `margin` o `padding`
+   obliga al navegador a recalcular TODO en cada cuadro — en un celular de
+   gama baja eso se ve como tirones.
+
+   La única excepción es `max-height` para los acordeones: no hay forma de
+   animar "de 0 a la altura que tenga el contenido" con transform.
+
+   ⏱️ Todo entre 120 y 320ms. Si el cliente nota que "tarda", ya es larga.  */
+
+@keyframes portal-fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes portal-pop    { from { opacity: 0; transform: scale(.97); }     to { opacity: 1; transform: none; } }
+@keyframes portal-sube   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes portal-hoja   { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+.portal-fadein { animation: portal-fadein .14s ease both; }
+.portal-pop    { animation: portal-pop .16s ease both; }
+.portal-hoja   { animation: portal-hoja .22s cubic-bezier(.3,.8,.3,1) both; }
+
+/* Al cambiar de pestaña, el contenido entra con un fade corto. */
+.portal-pant { animation: portal-fadein .18s ease both; }
+
+/* ── ENTRADA ESCALONADA ────────────────────────────────────────────────
+   Las filas de la lista no aparecen todas juntas: cada una entra 40ms
+   después de la anterior. El ojo las "cuenta" mientras aparecen, y eso hace
+   que la pantalla se sienta viva sin que nadie espere nada.
+
+   El retraso se pasa por `style` desde React (--i), no con :nth-child:
+   así funciona con cualquier cantidad de filas.                           */
+.portal-stagger {
+  animation: portal-sube .26s cubic-bezier(.25,.8,.35,1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* La tarjeta del header entra un toque antes que todo lo demás. */
+.portal-tarjeta { animation: portal-sube .32s cubic-bezier(.25,.85,.3,1) both; }
+
+/* ── AL TOCAR ──────────────────────────────────────────────────────────
+   La fila se hunde apenas y se pinta. Con :active pasa solo mientras el
+   dedo está apoyado — sin JavaScript, sin listeners, gratis.              */
+.portal-tap { transition: background-color .11s ease, transform .11s ease; }
+.portal-tap:active { background-color: var(--bg) !important; transform: scale(.985); }
+
+/* Los botones circulares se achican más: son chicos y necesitan un gesto
+   más marcado para que se note. */
+.portal-tap-ic { transition: transform .12s cubic-bezier(.3,.8,.3,1); }
+.portal-tap-ic:active { transform: scale(.9); }
+
+/* Las tarjetas grandes (la del total, las formas de pago). */
+/* Solo `transform`: animar `box-shadow` obliga al navegador a redibujar la
+   sombra en cada cuadro, y eso se nota en celulares de gama baja. */
+.portal-tap-card { transition: transform .13s cubic-bezier(.3,.8,.3,1); }
+.portal-tap-card:active { transform: scale(.98); }
+
+/* ── LA FLECHA DEL ACORDEÓN ───────────────────────────────────────────
+   Gira con una curva que arranca rápido y frena al final. Lineal se
+   sentiría mecánico, como un engranaje.                                   */
+.portal-flecha { transition: transform .2s cubic-bezier(.3,.8,.3,1); }
+.portal-flecha.abierta { transform: rotate(180deg); }
+
+/* ── EL ACORDEÓN ──────────────────────────────────────────────────────
+   🔑 Se anima con `grid-template-rows`, de 0fr a 1fr.
+
+   Antes se usaba `max-height: 0 → 1400px`. El problema: si el contenido mide
+   400px, la animación recorre 1000px INVISIBLES. Al abrir parece que termina
+   antes de tiempo; al cerrar tarda casi medio segundo en empezar a moverse.
+   Eso es lo que se siente "duro".
+
+   Con grid la animación va exactamente de 0 a la altura real del contenido,
+   sin medir nada con JavaScript y adaptándose solo si el contenido cambia
+   (por ejemplo al elegir otra forma de pago).
+
+   Necesita el div de adentro con `overflow: hidden` — sin eso el contenido
+   se desborda mientras se anima.                                           */
+.portal-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .34s cubic-bezier(.32,.72,.28,1);
+}
+.portal-panel > * {
+  overflow: hidden;
+  min-height: 0;                 /* sin esto grid no deja achicar debajo del contenido */
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity .2s ease .04s, transform .26s cubic-bezier(.32,.72,.28,1) .04s;
+}
+.portal-panel.abierto { grid-template-rows: 1fr; }
+.portal-panel.abierto > * { opacity: 1; transform: none; }
+
+/* Al cerrar, el contenido se desvanece PRIMERO y la altura después. Si fuera
+   al revés se vería el texto apretándose contra el borde. */
+.portal-panel:not(.abierto) > * {
+  transition: opacity .14s ease, transform .18s ease;
+}
+
+/* Respaldo para navegadores viejos que no animan grid-template-rows
+   (Safari < 16). Ahí queda el salto seco, pero funciona. */
+@supports not (grid-template-rows: 1fr) {
+  .portal-panel { display: block; max-height: 0; overflow: hidden;
+                  transition: max-height .3s ease; }
+  .portal-panel.abierto { max-height: 1400px; }
+}
+
+/* El título del header hace fade al cambiar: evita el salto brusco. */
+.portal-titulo { transition: opacity .18s ease; }
+
+/* ── 🌓 EL CAMBIO DE TEMA ──────────────────────────────────────────────
+   Los colores viven en variables CSS, y las variables NO transicionan solas
+   en cascada. La solución: una clase que se pone JUSTO durante el cambio y
+   se saca a los 320ms.
+
+   ¿Por qué no dejarla siempre? Porque `transition` en todos los elementos
+   hace que el navegador vigile cada uno en cada cuadro. Durante 320ms no se
+   nota; permanente, sí.                                                    */
+.portal-cambiando,
+.portal-cambiando *,
+.portal-cambiando *::before,
+.portal-cambiando *::after {
+  transition: background-color .3s ease, color .3s ease,
+              border-color .3s ease, fill .3s ease !important;
+}
+
+/* El ícono del botón gira y se achica al cambiar. */
+@keyframes portal-girasol {
+  0%   { transform: rotate(0) scale(1); }
+  45%  { transform: rotate(90deg) scale(.7); }
+  100% { transform: rotate(180deg) scale(1); }
+}
+.portal-tema-ico { animation: portal-girasol .42s cubic-bezier(.3,.8,.3,1); }
+
+/* ── EL GLOBITO DE LOS VENCIDOS ───────────────────────────────────────
+   Un latido lento. Llama la atención sin ser molesto: si parpadeara rápido
+   sería una alarma, y esto es un recordatorio.                             */
+@keyframes portal-latido {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+.portal-latido { animation: portal-latido 2.4s ease-in-out infinite; }
+
+/* ── EL PUNTO DE ESTADO ───────────────────────────────────────────────
+   El de "vencido" respira. Los otros quedan quietos: si todos se movieran,
+   ninguno llamaría la atención.                                            */
+@keyframes portal-respira {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .45; }
+}
+.portal-respira { animation: portal-respira 2s ease-in-out infinite; }
+
+/* ── CARGANDO ─────────────────────────────────────────────────────────
+   Un brillo que barre las cajas grises. Se siente más rápido que una
+   ruedita porque muestra la FORMA de lo que viene.                         */
+@keyframes portal-brillo {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.portal-skeleton {
+  position: relative; overflow: hidden;
+  background: var(--card); border-radius: 12px;
+}
+.portal-skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(128,128,128,.13), transparent);
+  animation: portal-brillo 1.4s ease-in-out infinite;
+}
+
+/* ── EL VISOR ─────────────────────────────────────────────────────────
+   El cupón gira con una curva suave. Es la animación más larga del portal
+   (250ms) porque el cambio es grande: si fuera instantáneo el ojo se pierde. */
+.portal-girar { transition: transform .25s cubic-bezier(.3,.8,.3,1); }
+
+/* Si el cliente deja el portal en segundo plano, las animaciones infinitas
+   se pausan solas. Es batería que no se gasta en algo que nadie está
+   mirando. */
+@media (prefers-reduced-motion: no-preference) {
+  .portal-latido, .portal-respira { will-change: transform, opacity; }
+}
+
+/* ── ACCESIBILIDAD ────────────────────────────────────────────────────
+   Si el cliente pidió menos movimiento —por mareos, epilepsia o simple
+   preferencia— se apaga todo. No es opcional: es la diferencia entre una
+   app usable y una que le hace mal a alguien.                              */
+@media (prefers-reduced-motion: reduce) {
+  .portal *, .portal *::before, .portal *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
