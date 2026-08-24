@@ -41,27 +41,34 @@ const FORMAS = [
   { k: "thames", nom: "Pagarnos a Thames",     sub: "En efectivo o por transferencia", Icono: IconEfectivo, tono: "ok", chip: "Ver",  tonoChip: "marca" },
 ];
 
-/* 🏪 NO TODAS LAS COMPAÑÍAS SE COBRAN EN RAPIPAGO.
-   ────────────────────────────────────────────────
-   Lo dice el propio cupón:
+/* 🏪 EXCEPCIONES DE FORMA DE PAGO — hoy no hay ninguna.
+   ────────────────────────────────────────────────────
+   TODAS las compañías con cuponera se cobran en Rapipago / Pago Fácil.
 
-     · AMCA      → "Datos Identificatorios para RAPIPAGO y PAGO FACIL",
-                   con los dos logos impresos arriba.
-     · La Equidad→ NO los menciona en ningún lado. Su cupón dice
-                   "RECIBIMOS DE" y "Pago Elec.", y abajo tiene los
-                   renglones "Nro. Cheque / Banco / Importe": es un recibo
-                   de cobranza, no un cupón de red.
+   🐛 ACÁ HUBO UN ERROR (agosto 2026):
+      Se había deducido, MIRANDO EL TEXTO DEL PDF, que La Equidad no iba por
+      Rapipago: su cupón no imprime los logos y dice "RECIBIMOS DE" y
+      "Pago Elec." en vez de "Datos Identificatorios para RAPIPAGO".
 
-   Ofrecerle Rapipago a un cliente de La Equidad es mandarlo a hacer la cola
-   para que le digan que no. Es como darle la boleta de la luz y decirle que
-   la pague en la farmacia: la boleta está bien, el lugar no.
+      Deducción equivocada. En la caja SÍ lo toman: es la red por la que el
+      cliente paga y por la que se le recuerda cada cupón con su cuota.
 
-   ⚠️ SI ESTO ESTÁ MAL Y LA EQUIDAD SÍ SE COBRA EN RAPIPAGO:
-      borrá la línea de "equidad" de acá abajo y vuelve a aparecer. Nada más.
+      La lección: lo que el PDF NO dice no prueba nada. Que no esté impreso
+      el logo no significa que el local no lo cobre — significa que la
+      compañía no lo imprimió. La única fuente válida de esta regla es la
+      oficina, no el papel.
 
-   Las compañías que no figuran en esta tabla muestran las tres formas. */
+   ── CÓMO SE USA ESTA TABLA ──────────────────────────────────────────
+   La compañía que NO figura acá muestra las tres formas (que es lo normal).
+   Para sacarle una forma a alguna, se agrega una línea:
+
+       equidad: ["mp", "thames"],     // le saca Rapipago
+
+   Claves válidas: "mp" (Mercado Pago) · "rp" (Rapipago) · "thames".
+   La clave se matchea por texto contenido en el nombre de la compañía
+   (ver formasDe): "equidad" matchea "La Equidad" y "Equidad". */
 const FORMAS_POR_COMPANIA = {
-  equidad: ["mp", "thames"],   // sin Rapipago: su cupón no es de esa red
+  // Vacío a propósito: hoy todas cobran por las tres vías.
 };
 
 function _norm(v) {

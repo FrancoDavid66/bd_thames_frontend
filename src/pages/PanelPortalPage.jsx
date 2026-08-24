@@ -62,6 +62,13 @@ export default function PanelPortalPage() {
   const fileRef = useRef(null);
   const [destino, setDestino] = useState(null); // {tipo:"recibo"|"imagen", cuponId}
 
+  // 🔄 Reprocesar el PDF. Input APARTE del de arriba: este solo acepta PDF y
+  //    lleva la póliza a la que hay que aplicárselo. Mezclarlos en uno solo
+  //    llevaba a subir el recibo de un cliente como si fuera su póliza.
+  const pdfRef = useRef(null);
+  const [polizaReproc, setPolizaReproc] = useState(null); // id de la póliza elegida
+  const [reprocesando, setReprocesando] = useState(null); // id mientras trabaja
+
   // 📅 Modal de cambio de fecha. Es el MISMO de la pantalla de Pagos: mismo
   //    diseño, mismo checkbox de "ajustar las siguientes". Si el operador ya
   //    lo usó allá, acá no tiene que aprender nada nuevo.
@@ -200,6 +207,65 @@ export default function PanelPortalPage() {
     }
   };
 
+  /* ---------- 🔄 reprocesar el PDF ---------- */
+
+  const pedirPdf = (polizaId) => {
+    setPolizaReproc(polizaId);
+    pdfRef.current?.click();
+  };
+
+  // Dos pasos, a propósito:
+  //   1. El PDF va al LECTOR de siempre (`/polizas/lector-pdf/`), que ya sabe
+  //      leerlo, recortar los cupones y subirlos a Cloudinary.
+  //   2. El resultado se manda al panel, que lo aplica a la póliza.
+  //
+  // Así el panel no reimplementa nada: el día que cambie el formato de una
+  // compañía se toca el lector y esta pantalla se entera sola.
+  const reprocesarPdf = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    const polizaId = polizaReproc;
+    setPolizaReproc(null);
+    if (!file || !polizaId) return;
+
+    setReprocesando(polizaId);
+    const aviso = toast.loading("Leyendo el PDF y recortando los cupones…");
+    try {
+      const fd = new FormData();
+      fd.append("archivos", file);
+      const lectura = await api.post("/polizas/lector-pdf/", fd);
+      if (!lectura?.data?.ok) throw new Error("El lector no pudo con el archivo.");
+
+      const res = await api.post("/polizas/panel-portal/reprocesar/", {
+        poliza_id: polizaId,
+        datos: lectura.data.datos || {},
+      });
+
+      // Resumen en una línea: solo lo que efectivamente cambió.
+      const r = res?.data?.resumen || {};
+      const partes = [];
+      const suma = (a, b) => (r[a] || 0) + (r[b] || 0);
+      if (suma("cuotas_actualizadas", "cuotas_creadas"))
+        partes.push(`${suma("cuotas_actualizadas", "cuotas_creadas")} cuota(s)`);
+      if (r.cuotas_borradas) partes.push(`${r.cuotas_borradas} cuota(s) de más borrada(s)`);
+      if (suma("cupones_actualizados", "cupones_creados"))
+        partes.push(`${suma("cupones_actualizados", "cupones_creados")} cupón(es)`);
+      if (r.imagenes) partes.push(`${r.imagenes} imagen(es)`);
+      if (r.intocables) partes.push(`${r.intocables} pagado(s) sin tocar`);
+
+      toast.success(partes.length ? `Listo: ${partes.join(" · ")}` : "El PDF ya coincidía. Nada que cambiar.", { id: aviso });
+      cargar();
+    } catch (err) {
+      console.error("[panel-portal] reprocesar:", err);
+      toast.error(
+        err?.response?.data?.detail || "No se pudo reprocesar el PDF.",
+        { id: aviso }
+      );
+    } finally {
+      setReprocesando(null);
+    }
+  };
+
   /* ---------- render ---------- */
 
   const cli = data?.cliente;
@@ -208,6 +274,8 @@ export default function PanelPortalPage() {
   return (
     <div className="min-h-screen bg-surface dark:bg-surface-dark px-4 py-6 sm:px-6 lg:px-8">
       <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={subirArchivo} />
+      {/* 🔄 Solo PDF: es la póliza completa que manda la compañía. */}
+      <input ref={pdfRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={reprocesarPdf} />
 
       <div className="max-w-3xl mx-auto">
 
@@ -298,6 +366,19 @@ export default function PanelPortalPage() {
               <span className="text-xs font-bold text-suave dark:text-suave-dark">
                 {p.compania} · {p.cobertura}
               </span>
+
+              {/* 🔄 La salida cuando la póliza entró mal. Vuelve a leer el PDF
+                     y acomoda fechas, montos e imágenes. Lo pagado no se toca. */}
+              <button
+                onClick={() => pedirPdf(p.id)}
+                disabled={reprocesando === p.id}
+                title="Volver a subir el PDF de la compañía y acomodar cuotas y cupones"
+                className="cursor-pointer text-xs font-black px-3 py-1.5 rounded-xl border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-1 disabled:opacity-50"
+              >
+                <HiRefresh className={`w-3.5 h-3.5 ${reprocesando === p.id ? "animate-spin" : ""}`} />
+                {reprocesando === p.id ? "Procesando…" : "Reprocesar PDF"}
+              </button>
+
               <Link
                 to={`/polizas/${p.id}`}
                 className="ml-auto text-xs font-black text-duo-azul inline-flex items-center gap-1"
