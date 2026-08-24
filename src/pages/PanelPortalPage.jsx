@@ -62,6 +62,13 @@ export default function PanelPortalPage() {
   const fileRef = useRef(null);
   const [destino, setDestino] = useState(null); // {tipo:"recibo"|"imagen", cuponId}
 
+  // 🖼️ Input APARTE para la imagen del cupón: solo acepta fotos.
+  //    El de arriba acepta PDF porque un recibo bien puede serlo. Pero la
+  //    imagen del cupón la muestra el portal con <img>, y un <img> no dibuja
+  //    un PDF: el cliente vería una imagen rota justo al ir a pagar.
+  const imgCuponRef = useRef(null);
+  const [cuponImagen, setCuponImagen] = useState(null); // id del cupón elegido
+
   // 🔄 Reprocesar el PDF. Input APARTE del de arriba: este solo acepta PDF y
   //    lleva la póliza a la que hay que aplicárselo. Mezclarlos en uno solo
   //    llevaba a subir el recibo de un cliente como si fuera su póliza.
@@ -169,11 +176,50 @@ export default function PanelPortalPage() {
     }
   };
 
-  // 📲 Subir el recibo que llegó por WhatsApp, o la imagen de un cupón que
-  //    quedó sin recortar. Los dos pasan por el mismo input.
+  // 📲 Subir el recibo que llegó por WhatsApp. Acepta foto o PDF: el cliente
+  //    manda lo que tiene a mano y esto no lo ve nadie más que la oficina.
   const pedirArchivo = (tipo, cuponId) => {
     setDestino({ tipo, cuponId });
     fileRef.current?.click();
+  };
+
+  // 🖼️ Elegir la imagen de un cupón (cargar la que falta o cambiar la que
+  //    quedó mal recortada).
+  const pedirImagenCupon = (cuponId) => {
+    setCuponImagen(cuponId);
+    imgCuponRef.current?.click();
+  };
+
+  const subirImagenCupon = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    const cuponId = cuponImagen;
+    setCuponImagen(null);
+    if (!file || !cuponId) return;
+
+    // Freno temprano: avisar ACÁ es mucho más claro que dejar que suba a
+    // Cloudinary y que después el backend lo rebote.
+    if (!String(file.type || "").startsWith("image/")) {
+      toast.error("Tiene que ser una foto (jpg o png). Un PDF no se ve en el portal.");
+      return;
+    }
+
+    setOcupado(`cupon-${cuponId}`);
+    try {
+      const up = await uploadToCloudinary(file, "polizas/cupones");
+      const res = await api.post("/polizas/panel-portal/imagen-cupon/", {
+        cupon_id: cuponId,
+        url: up.secure_url,
+        public_id: up.public_id,
+      });
+      toast.success(res?.data?.detail || "Imagen del cupón guardada.");
+      cargar();
+    } catch (err) {
+      console.error("[panel-portal] imagen cupón:", err);
+      toast.error(err?.response?.data?.detail || "No se pudo subir la imagen.");
+    } finally {
+      setOcupado(null);
+    }
   };
 
   const subirArchivo = async (e) => {
@@ -181,23 +227,20 @@ export default function PanelPortalPage() {
     e.target.value = "";
     if (!file || !destino) return;
 
-    const { tipo, cuponId } = destino;
+    // Este input quedó SOLO para recibos. La imagen del cupón tiene el suyo
+    // (`subirImagenCupon`), porque son cosas distintas: una la ve la oficina,
+    // la otra la ve el cliente en pantalla.
+    const { cuponId } = destino;
     setDestino(null);
     setOcupado(`cupon-${cuponId}`);
     try {
-      const up = await uploadToCloudinary(
-        file,
-        tipo === "recibo" ? "comprobantes" : "polizas/cupones"
-      );
-      const ruta = tipo === "recibo"
-        ? "/polizas/panel-portal/subir-recibo/"
-        : "/polizas/panel-portal/imagen-cupon/";
-      await api.post(ruta, {
+      const up = await uploadToCloudinary(file, "comprobantes");
+      await api.post("/polizas/panel-portal/subir-recibo/", {
         cupon_id: cuponId,
         url: up.secure_url,
         public_id: up.public_id,
       });
-      toast.success(tipo === "recibo" ? "Recibo guardado y pago confirmado" : "Imagen del cupón guardada");
+      toast.success("Recibo guardado y pago confirmado");
       cargar();
     } catch (err) {
       console.error("[panel-portal] subir:", err);
@@ -274,6 +317,8 @@ export default function PanelPortalPage() {
   return (
     <div className="min-h-screen bg-surface dark:bg-surface-dark px-4 py-6 sm:px-6 lg:px-8">
       <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={subirArchivo} />
+      {/* 🖼️ Solo fotos: el portal muestra esto con <img>. */}
+      <input ref={imgCuponRef} type="file" accept="image/*" className="hidden" onChange={subirImagenCupon} />
       {/* 🔄 Solo PDF: es la póliza completa que manda la compañía. */}
       <input ref={pdfRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={reprocesarPdf} />
 
@@ -412,6 +457,28 @@ export default function PanelPortalPage() {
                       className={`px-4 py-3 flex items-center gap-3 flex-wrap ${i ? "border-t-2 border-linea dark:border-linea-dark" : ""}`}
                     >
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${tono.punto}`} />
+
+                      {/* 🖼️ MINIATURA DEL RECORTE.
+                          Es lo que el cliente le muestra al cajero. Verlo acá
+                          evita el ida y vuelta de abrir el portal para revisar
+                          si quedó bien cortado. Se abre en grande al tocarla. */}
+                      {c.imagen_url ? (
+                        <a
+                          href={c.imagen_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Ver el cupón en grande"
+                          className="cursor-pointer shrink-0 w-16 h-10 rounded-lg overflow-hidden border-2 border-linea dark:border-linea-dark bg-white"
+                        >
+                          <img
+                            src={c.imagen_url}
+                            alt="Cupón"
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      ) : null}
+
                       <span className="flex-1 min-w-[110px]">
                         <span className="block text-sm font-black text-titulo dark:text-titulo-dark">
                           Vence {fecha(c.fecha_vencimiento)}
@@ -467,16 +534,25 @@ export default function PanelPortalPage() {
                         </button>
                       ) : null}
 
-                      {!c.imagen_url ? (
-                        <button
-                          onClick={() => pedirArchivo("imagen", c.id)}
-                          disabled={trabajando}
-                          aria-label="Cargar imagen del cupón"
-                          className="cursor-pointer w-9 h-9 rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50"
-                        >
-                          <HiPhotograph className="w-4 h-4" />
-                        </button>
-                      ) : null}
+                      {/* 🖼️ Cargar la imagen que falta o CAMBIAR la que quedó
+                          mal recortada. Antes el botón desaparecía apenas
+                          había una imagen, así que un recorte torcido no había
+                          forma de arreglarlo desde acá. */}
+                      <button
+                        onClick={() => pedirImagenCupon(c.id)}
+                        disabled={trabajando}
+                        title={c.imagen_url
+                          ? "Cambiar la foto del cupón"
+                          : "Cargar la foto del cupón"}
+                        className={`cursor-pointer h-9 rounded-xl border-2 border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1 disabled:opacity-50 ${
+                          c.imagen_url
+                            ? "w-9 text-suave dark:text-suave-dark"
+                            : "px-3 text-xs font-black text-titulo dark:text-titulo-dark"
+                        }`}
+                      >
+                        <HiPhotograph className="w-4 h-4" />
+                        {c.imagen_url ? null : "Foto"}
+                      </button>
                     </div>
                   );
                 })}
