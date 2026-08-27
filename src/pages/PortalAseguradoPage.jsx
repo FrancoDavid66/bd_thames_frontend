@@ -34,7 +34,7 @@ import VisorDocumento from "../components/portal/VisorDocumento";
 import { Seccion, Lista, Fila, Chip, Vacio } from "../components/portal/Lista";
 import { IconoTipo, IconDoc, IconAlerta, IconTick, IconAbajo, IconReloj } from "../components/portal/Iconos";
 import {
-  money, fmt, fmtLargo, situacionPago, contarVencidos, deudaTotal,
+  money, fmt, fmtLargo, situacionPago, contarVencidos, deudaTotal, hayDeudaSinPrecio,
   proximoPago, tituloSeguros, nombreBien, tipoIcono, waLink, capitalizar,
 } from "../components/portal/utils";
 
@@ -258,13 +258,25 @@ export default function PortalAseguradoPage() {
     ? [detalle.patente, detalle.anio].filter(Boolean).join(" · ")
     : null;
 
+  // 🙈 ¿Quedó algo por pagar cuyo importe no se puede mostrar?
+  //    Sin esto, un cliente de NRE con RC y una cuota vencida veía "No tenés
+  //    pagos pendientes": el total daba 0 porque esa póliza no suma.
+  //    Callar el monto es una cosa; callar la deuda sería otra.
+  const deudaOculta = useMemo(() => hayDeudaSinPrecio(polizas), [polizas]);
+
   const resumen =
     !esPrincipal ? null
     : deuda > 0
       ? { tipo: "deuda", label: "Total a pagar", monto: deuda,
           sub: `${vencidos} pago${vencidos > 1 ? "s" : ""} vencido${vencidos > 1 ? "s" : ""}` }
+    : deudaOculta
+      ? { tipo: "deuda", label: "Tenés un pago pendiente", monto: 0,
+          textoGrande: "Consultanos",
+          sub: "Escribinos y te pasamos el importe" }
     : prox
-      ? { tipo: "proximo", label: "Próximo pago", monto: prox.sit.monto,
+      ? { tipo: "proximo", label: "Próximo pago",
+          monto: prox.sit.monto,
+          textoGrande: prox.sit.sinPrecio ? "Consultanos" : null,
           sub: `${nombreBien(prox.poliza)} · ${fmtLargo(prox.sit.fecha)}` }
       : { tipo: "al_dia", label: "Tu situación", monto: 0, sub: "No tenés pagos pendientes" };
 
@@ -426,13 +438,19 @@ function FilaSeguro({ poliza, onClick, primera, i = 0 }) {
      dónde queremos que vaya el ojo. */
   const derecha = !debe ? null : (
     <span style={{ textAlign: "right", flexShrink: 0 }}>
+      {/* 🙈 Las coberturas sin precio publicado (NRE con RC) muestran una
+             invitación en vez del número: el importe lo pone la oficina y
+             se mueve. Un precio viejo en pantalla termina en discusión. */}
       <span
         style={{
-          display: "block", fontSize: 16, fontWeight: 700,
+          display: "block",
+          fontSize: s.sinPrecio ? 13.5 : 16,
+          fontWeight: s.sinPrecio ? 600 : 700,
+          color: s.sinPrecio ? "var(--m)" : undefined,
           letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums",
         }}
       >
-        {money(montoFinal)}
+        {s.sinPrecio ? "Consultanos" : money(montoFinal)}
       </span>
       <span
         style={{

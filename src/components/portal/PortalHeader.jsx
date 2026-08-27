@@ -170,7 +170,10 @@ export default function PortalHeader({
             >
               {resumen.label}
             </span>
-            {/* Ocultar importes: por si lo abre delante de otra persona. */}
+            {/* Ocultar importes: por si lo abre delante de otra persona.
+                No va cuando no hay importe que ocultar: un ojo tachado sobre
+                la palabra "Consultanos" es un botón que no hace nada. */}
+            {resumen.textoGrande ? null : (
             <button
               onClick={onToggleImportes}
               aria-label="Mostrar u ocultar importes"
@@ -184,15 +187,22 @@ export default function PortalHeader({
             >
               <IconOjo size={12} tachado={!importesVisibles} />
             </button>
+            )}
           </div>
 
+          {/* 💰 El número grande. Cuando la cobertura no publica precio
+                 (`textoGrande`), va una palabra en su lugar — y el botón de
+                 ocultar importes no aplica: no hay importe que ocultar. */}
           <div
             style={{
-              fontSize: 32, fontWeight: 500, letterSpacing: "-.032em",
+              fontSize: resumen.textoGrande ? 24 : 32,
+              fontWeight: 500, letterSpacing: "-.032em",
               marginTop: 8, position: "relative", fontVariantNumeric: "tabular-nums",
             }}
           >
-            {importesVisibles ? `$${num(resumen.monto)}` : "$ • • • •"}
+            {resumen.textoGrande
+              ? resumen.textoGrande
+              : importesVisibles ? `$${num(resumen.monto)}` : "$ • • • •"}
           </div>
 
           <div

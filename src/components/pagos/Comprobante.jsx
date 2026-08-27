@@ -120,11 +120,43 @@ const diaSiguiente = (refDate) => {
 const slug = (s) =>
   String(s || "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9-_]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .toLowerCase();
+
+/* 💳 CÓMO PAGÓ, EN CRIOLLO.
+   El backend guarda claves cortas ("ef", "tr", "mp") y a veces la palabra
+   entera. El recibo es papel que se lleva el cliente: ahí va el nombre. */
+const FORMAS_PAGO = {
+  ef: "Efectivo",
+  efectivo: "Efectivo",
+  tr: "Transferencia",
+  transferencia: "Transferencia",
+  mp: "Mercado Pago",
+  rp: "Rapipago",
+  deposito: "Depósito",
+  debito: "Débito",
+  tarjeta: "Tarjeta",
+};
+const nombreFormaPago = (v) => {
+  const k = String(v || "").trim().toLowerCase();
+  if (!k) return "";
+  return FORMAS_PAGO[k] || (k.charAt(0).toUpperCase() + k.slice(1));
+};
+
+/* 🔎 Un dato puede venir en la cuota, en el pago anidado o suelto.
+   Se busca en los tres lugares en vez de asumir uno: el objeto llega
+   armado distinto según desde dónde se abra el comprobante (cobro del
+   momento, detalle de póliza, portal del cliente). */
+const dato = (cuota, ...claves) => {
+  for (const k of claves) {
+    const v = cuota?.[k] ?? cuota?.pago?.[k] ?? cuota?.ultimo_pago?.[k];
+    if (v !== null && v !== undefined && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+};
 
 // Normaliza los datos que necesita cualquier formato, desde cliente/poliza/cuota.
 function useDatosComprobante(cliente = {}, poliza = {}, cuota = {}) {
@@ -141,6 +173,27 @@ function useDatosComprobante(cliente = {}, poliza = {}, cuota = {}) {
     const esPrimeraCuota = String(cuotaNro) === "1";
     const pagoFueraDeTermino = !esPrimeraCuota && isPagoAtrasado(cuota);
 
+    /* 💸 LOS DATOS DE LA TRANSFERENCIA.
+       ────────────────────────────────
+       Sin esto, el recibo de una transferencia era idéntico al de un pago
+       en efectivo: decía cuánto y cuándo, pero no cómo ni desde dónde.
+
+       Cuando aparece un movimiento sin identificar en el extracto, el
+       número de operación es lo único que lo ata a un cliente. Y el
+       "enviado por" importa porque muchas veces transfiere un familiar:
+       el nombre del banco no coincide con el del asegurado, y sin ese dato
+       nadie sabe de quién era la plata.
+
+       Todo esto es OPCIONAL: si el pago fue en efectivo no hay nada que
+       mostrar y las filas ni se dibujan. Un recibo con cuatro guiones es
+       peor que uno corto. */
+    const formaPago = nombreFormaPago(dato(cuota, "forma_pago", "metodo", "medio_pago"));
+    const nroOperacion = dato(cuota, "nro_operacion", "numero_operacion", "nro_op");
+    const enviadoPor = dato(cuota, "enviado_por", "remitente");
+    const cuitRemitente = dato(cuota, "cuit_remitente");
+    const billetera = dato(cuota, "billetera", "destino_cuenta", "medio_cobro_nombre", "medio_cobro");
+    const responsable = dato(cuota, "responsable_nombre", "responsable", "cobrado_por", "empleado_nombre");
+
     return {
       titular, dni, marca, modelo, patente, cuotaNro, monto,
       fechaHoraPago: fmtDateTimeHM(fechaPagoRef),
@@ -149,8 +202,23 @@ function useDatosComprobante(cliente = {}, poliza = {}, cuota = {}) {
       pagado: !!cuota.pagado,
       esPrimeraCuota,
       pagoFueraDeTermino,
+      formaPago, nroOperacion, enviadoPor, cuitRemitente, billetera, responsable,
     };
   }, [cliente, poliza, cuota]);
+}
+
+/* Las filas del detalle del cobro, ya filtradas. Se arma una sola vez y la
+   usan los tres formatos: pantalla, A4 y ticket. Así no hay forma de que
+   uno muestre el número de operación y otro se lo olvide. */
+function filasDelPago(d) {
+  return [
+    ["Forma de pago", d.formaPago],
+    ["Enviado por", d.enviadoPor],
+    ["CUIT del remitente", d.cuitRemitente],
+    ["N° de operación", d.nroOperacion],
+    ["Acreditado en", d.billetera],
+    ["Atendió", d.responsable],
+  ].filter(([, v]) => v);
 }
 
 /* =========================================================================
@@ -159,8 +227,16 @@ function useDatosComprobante(cliente = {}, poliza = {}, cuota = {}) {
    ========================================================================= */
 
 export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza = false }) {
+  // ⚠️ EL HOOK VA ANTES DEL RETURN, SIEMPRE.
+  //    Antes el `if (!cliente...) return null` estaba arriba y el useMemo
+  //    quedaba adentro del camino condicional. React exige que los hooks se
+  //    llamen siempre en el mismo orden: apenas el componente pasaba de "sin
+  //    datos" a "con datos", tiraba el error de cantidad de hooks y la
+  //    pantalla quedaba en blanco.
+  const d = useDatosComprobante(cliente || {}, poliza || {}, cuota || {});
   if (!cliente || !poliza || !cuota) return null;
-  const d = useDatosComprobante(cliente, poliza, cuota);
+
+  const detalle = filasDelPago(d);
 
   const Item = ({ label, value }) => (
     <li className="flex justify-between gap-2">
@@ -207,12 +283,21 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
               <HiOfficeBuilding className="w-5 h-5 text-duo-azul" />
               <h2 className="font-black text-titulo dark:text-titulo-dark">Datos del Auto</h2>
             </div>
+            {/* 🚗 LA PATENTE VA PRIMERO Y EN GRANDE.
+                   El número de póliza no se lo acuerda nadie — ni el cliente
+                   ni el mostrador. Todo el mundo busca por la patente, así
+                   que es el dato que tiene que saltar primero. */}
             <ul className="text-sm space-y-1 font-bold">
-              {!ocultarNumeroPoliza && <Item label="Póliza N°" value={safe(poliza.numero_poliza)} />}
+              <li className="flex justify-between gap-2 items-baseline">
+                <span className="text-suave dark:text-suave-dark">Patente:</span>
+                <span className="font-black font-mono text-base text-titulo dark:text-titulo-dark">
+                  {d.patente}
+                </span>
+              </li>
+              <Item label="Vehículo" value={`${d.marca} ${d.modelo}`} />
               <Item label="Compañía" value={safe(poliza.compania)} />
               <Item label="Cobertura" value={safe(poliza.cobertura)} />
-              <Item label="Vehículo" value={`${d.marca} ${d.modelo}`} />
-              <Item label="Patente" value={d.patente} />
+              {!ocultarNumeroPoliza && <Item label="Póliza N°" value={safe(poliza.numero_poliza)} />}
             </ul>
           </section>
         </div>
@@ -246,6 +331,15 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
               <p className="font-black">{d.pagado ? d.fechaHoraPago : "—"}</p>
             </div>
           </div>
+
+          {/* 💸 Cómo entró la plata. Solo si hay algo que contar. */}
+          {detalle.length > 0 && (
+            <ul className="mt-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 text-sm space-y-1 font-bold">
+              {detalle.map(([label, valor]) => (
+                <Item key={label} label={label} value={valor} />
+              ))}
+            </ul>
+          )}
         </section>
 
         {(d.esPrimeraCuota || d.pagoFueraDeTermino) && (
@@ -292,10 +386,14 @@ const a4 = StyleSheet.create({
   sectionBody: { padding: 12, backgroundColor: "#FFFFFF", flexGrow: 1 },
   label: { fontSize: 10, color: PRIMARY_DARK, fontWeight: "bold", marginTop: 8 },
   value: { fontSize: 11, marginTop: 3 },
+  patente: { fontSize: 16, marginTop: 3, fontWeight: "bold", letterSpacing: 1 },
   table: { marginTop: 8, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", marginBottom: 16 },
   tableHeader: { flexDirection: "row", justifyContent: "space-between", backgroundColor: PRIMARY, color: "#fff", paddingVertical: 8, paddingHorizontal: 12, fontSize: 11, fontWeight: "bold" },
   tableRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", fontSize: 11 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, paddingHorizontal: 12, fontSize: 13, fontWeight: "bold", backgroundColor: "#FCF7F9" },
+  pagoBox: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", marginBottom: 16 },
+  pagoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#F1E4E9", fontSize: 10 },
+  pagoLabel: { color: PRIMARY_DARK, fontWeight: "bold" },
   alertBox: { marginTop: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "#991B1B", backgroundColor: "#FEF2F2", padding: 16 },
   alertTitle: { fontSize: 13, color: "#991B1B", fontWeight: "bold", textAlign: "center", marginBottom: 10 },
   alertText: { fontSize: 11, color: "#991B1B", textAlign: "justify", lineHeight: 1.5 },
@@ -304,6 +402,7 @@ const a4 = StyleSheet.create({
 
 export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
   const d = useDatosComprobante(cliente, poliza, cuota);
+  const detalle = filasDelPago(d);
   return (
     <Document>
       <Page size={{ width: A4_WIDTH, height: A4_HEIGHT }} style={a4.page}>
@@ -336,10 +435,12 @@ export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
           <View style={[a4.section, a4.col]}>
             <Text style={a4.sectionHead}>Datos del Auto</Text>
             <View style={a4.sectionBody}>
+              {/* La patente arriba y más grande: es por donde busca todo el
+                  mundo, incluido el que atiende en el mostrador. */}
+              <Text style={a4.label}>Patente</Text>
+              <Text style={a4.patente}>{d.patente}</Text>
               <Text style={a4.label}>Marca / Modelo</Text>
               <Text style={a4.value}>{d.marca} {d.modelo}</Text>
-              <Text style={a4.label}>Patente</Text>
-              <Text style={a4.value}>{d.patente}</Text>
             </View>
           </View>
         </View>
@@ -358,6 +459,20 @@ export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
             <Text>{fmtMoney(d.monto)}</Text>
           </View>
         </View>
+
+        {/* 💸 Cómo entró la plata: forma de pago, quién transfirió, número de
+               operación. Sin filas vacías: lo que no vino, no se dibuja. */}
+        {detalle.length > 0 && (
+          <View style={a4.pagoBox}>
+            <Text style={a4.sectionHead}>Detalle del cobro</Text>
+            {detalle.map(([label, valor]) => (
+              <View key={label} style={a4.pagoRow}>
+                <Text style={a4.pagoLabel}>{label}</Text>
+                <Text>{valor}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {(d.esPrimeraCuota || d.pagoFueraDeTermino) && (
           <View style={a4.alertBox}>
@@ -394,6 +509,7 @@ const tk = StyleSheet.create({
   label: { fontSize: 10, fontWeight: "bold", width: "58%" },
   value: { fontSize: 10, width: "42%", textAlign: "right" },
   text: { fontSize: 10, lineHeight: 1.3 },
+  patente: { fontSize: 15, fontWeight: "bold", letterSpacing: 1, marginTop: 2 },
   table: { marginTop: 6, borderWidth: 1, borderColor: "#000" },
   tableHeader: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, paddingHorizontal: 8 },
   th: { fontSize: 10, fontWeight: "bold" },
@@ -409,6 +525,7 @@ const tk = StyleSheet.create({
 
 export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} }) {
   const d = useDatosComprobante(cliente, poliza, cuota);
+  const detalle = filasDelPago(d);
   return (
     <Document>
       <Page size={{ width: TICKET_WIDTH, height: TICKET_HEIGHT }} style={tk.page}>
@@ -444,8 +561,8 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
 
         <View style={tk.block}>
           <Text style={tk.sectionTitle}>Datos del Auto</Text>
-          <Text style={tk.text}>{d.marca} {d.modelo}</Text>
-          <Text style={[tk.text, { marginTop: 4 }]}>Patente: {d.patente}</Text>
+          <Text style={tk.patente}>{d.patente}</Text>
+          <Text style={[tk.text, { marginTop: 4 }]}>{d.marca} {d.modelo}</Text>
         </View>
 
         <View style={tk.table}>
@@ -462,6 +579,23 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
             <Text style={tk.totalLabel}>{fmtMoney(d.monto)}</Text>
           </View>
         </View>
+
+        {/* 💸 En el ticket también: es el papel que se lleva el cliente y el
+               que queda pegado en el talonario de la oficina. */}
+        {detalle.length > 0 && (
+          <>
+            <View style={tk.hr} />
+            <View style={tk.block}>
+              <Text style={tk.sectionTitle}>Detalle del cobro</Text>
+              {detalle.map(([label, valor]) => (
+                <View key={label} style={tk.line}>
+                  <Text style={tk.label}>{label}</Text>
+                  <Text style={tk.value}>{valor}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {(d.esPrimeraCuota || d.pagoFueraDeTermino) && (
           <View style={tk.legal}>

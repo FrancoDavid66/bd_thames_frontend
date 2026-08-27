@@ -30,8 +30,8 @@ import {
   IconCodigo, IconChevron, IconAtras, IconFoto, IconChat, IconClip, IconAbajo,
 } from "./Iconos";
 import {
-  money, montoEfectivo, recargoTransferencia,
-  DESCUENTO_EFECTIVO, RECARGO_TRANSFERENCIA, waLink, waCita, waFuerte,
+  money, montoEfectivo, recargoTransferencia, ajustesDe,
+  waLink, waCita, waFuerte,
 } from "./utils";
 
 /* Las tres de la pantalla principal. */
@@ -68,7 +68,21 @@ const FORMAS = [
    La clave se matchea por texto contenido en el nombre de la compañía
    (ver formasDe): "equidad" matchea "La Equidad" y "Equidad". */
 const FORMAS_POR_COMPANIA = {
-  // Vacío a propósito: hoy todas cobran por las tres vías.
+  // 🏢 NRE SE COBRA SOLO ACÁ: transferencia a nuestro alias o efectivo en
+  //    la oficina. Ni Rapipago ni Mercado Pago.
+  //
+  //    No es una preferencia nuestra, es que NO SE PUEDE: NRE no emite
+  //    cuponera. Sin cupón no hay código de barras, y sin código de barras
+  //    no hay nada que escanear en la caja ni que pegar en Mercado Pago.
+  //
+  //    Verificado sobre dos certificados y un frente de póliza reales
+  //    (12002174 y 12022568): cero cupones, cero códigos, cero importes
+  //    identificatorios de cobranza.
+  //
+  //    Ofrecerlas igual sería mandar al cliente a hacer la cola para que le
+  //    digan que no. Peor que no ofrecer nada: pierde el viaje y encima
+  //    llega tarde al vencimiento.
+  nre: ["thames"],
 };
 
 function _norm(v) {
@@ -284,10 +298,13 @@ function CodigoBarras({ codigo, vence }) {
 
 /* ══════════════════ Modal "Pagarnos a Thames" ══════════════════ */
 
-function ModalThames({ monto, onElegir, onCerrar }) {
-  const ef = montoEfectivo(monto);
+function ModalThames({ monto, compania, onElegir, onCerrar }) {
+  // 🏢 Los porcentajes salen de la COMPAÑÍA, no de una constante global.
+  //    NRE, por ejemplo, no cobra recargo por transferencia.
+  const { descuento, recargo } = ajustesDe(compania);
+  const ef = montoEfectivo(monto, compania);
   const ahorro = monto - ef;
-  const rec = recargoTransferencia(monto);
+  const rec = recargoTransferencia(monto, compania);
 
   return (
     <div
@@ -358,7 +375,7 @@ function ModalThames({ monto, onElegir, onCerrar }) {
                   En efectivo, en la oficina
                 </b>
                 <span style={{ display: "block", fontSize: 12.5, color: "var(--ok)", marginTop: 2 }}>
-                  Te hacemos {Math.round(DESCUENTO_EFECTIVO * 100)}% de descuento
+                  Te hacemos {Math.round(descuento * 100)}% de descuento
                 </span>
               </span>
             </span>
@@ -403,7 +420,9 @@ function ModalThames({ monto, onElegir, onCerrar }) {
                   Por transferencia
                 </b>
                 <span style={{ display: "block", fontSize: 12.5, color: "var(--t2)", marginTop: 2 }}>
-                  Se suma {Math.round(RECARGO_TRANSFERENCIA * 100)}% de gastos bancarios
+                  {recargo > 0
+                    ? `Se suma ${Math.round(recargo * 100)}% de gastos bancarios`
+                    : "Sin recargo"}
                 </span>
               </span>
             </span>
@@ -508,6 +527,11 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
   const [forma, setForma] = useState(null);
   const [modal, setModal] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  // 🏢 ¿Esta compañía acepta una sola vía de pago? (NRE: solo a nosotros.)
+  //    Cambia dos textos y a dónde lleva el botón de volver.
+  const unicaForma = formasDe(poliza?.compania).length === 1;
+  // 🏢 Descuento y recargo de ESTA compañía (ver ajustesDe en utils.js).
+  const _aj = ajustesDe(poliza?.compania);
   // 📷 Dos inputs distintos: uno abre la CÁMARA (`capture="environment"`) y el
   //    otro el selector de archivos. No alcanza con uno: si tiene `capture`,
   //    el celular abre la cámara directo y no deja elegir de la galería ni
@@ -569,16 +593,22 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
 
   /* ── Paso 1: elegir cómo ── */
   if (!forma) {
+    // 🏢 Cuando la compañía acepta UNA sola vía (NRE: solo a nosotros), no
+    //    hay nada que elegir. Decir "elegí cómo querés pagar" frente a un
+    //    único botón hace dudar: el cliente se pregunta si le falta cargar
+    //    algo o si la app está rota.
+    const _formas = formasDe(poliza?.compania);
+    const _unica = _formas.length === 1;
     return (
       <>
         <div style={{ padding: "18px 20px 20px" }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--t2)", marginBottom: 12 }}>
-            Elegí cómo querés pagar
+            {_unica ? "Esta póliza se paga así" : "Elegí cómo querés pagar"}
           </div>
           <div style={{ display: "grid", gap: 9 }}>
             {/* 🏪 Solo las formas que ESTA compañía acepta de verdad.
                    Ver FORMAS_POR_COMPANIA arriba. */}
-            {formasDe(poliza?.compania).map(({ k, nom, sub, Icono, tono, chip, tonoChip }) => {
+            {_formas.map(({ k, nom, sub, Icono, tono, chip, tonoChip }) => {
               const t = TONOS[tono];
               const tc = TONOS[tonoChip];
               return (
@@ -627,6 +657,7 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
         {modal ? (
           <ModalThames
             monto={monto}
+            compania={poliza?.compania}
             onElegir={(k) => { setForma(k); setModal(false); }}
             onCerrar={() => setModal(false)}
           />
@@ -777,7 +808,7 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
        Antes había una tabla de tres filas con el desglose del descuento; el
        cliente ya vio ese desglose en el modal donde eligió. Acá va el número
        solo, grande. */
-    const ef = montoEfectivo(monto);
+    const ef = montoEfectivo(monto, poliza?.compania);
     const ahorro = monto - ef;
     cuerpo.push(
       <div key="monto" style={{ textAlign: "center", padding: "16px 0 12px" }}>
@@ -801,18 +832,57 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
   }
 
   else if (forma === "tr") {
-    const r = recargoTransferencia(monto);
-    const pct = Math.round(RECARGO_TRANSFERENCIA * 100);
-    cuerpo.push(
-      <Nota key="n" tono="aviso"
-        titulo={`Si transferís, se suma un ${pct}%.`}
-        texto={`La plata pasa primero por nuestra cuenta y eso tiene un costo. Si venís a la oficina con efectivo, te hacemos ${Math.round(DESCUENTO_EFECTIVO * 100)}% de descuento.`} />,
-      <Totales key="t" filas={[
-        { label: "Cuota", valor: money(monto) },
-        { label: `Lo que se suma (${pct}%)`, valor: money(r) },
-        { label: "Total a transferir", valor: money(monto + r), fin: true },
-      ]} />,
-    );
+    const r = recargoTransferencia(monto, poliza?.compania);
+    const pct = Math.round(_aj.recargo * 100);
+    // ⚠️ Con recargo 0 (NRE) la nota amarilla no va: avisar de un costo que
+    //    no existe hace desconfiar del número de al lado.
+    if (r > 0) {
+      cuerpo.push(
+        <Nota key="n" tono="aviso"
+          titulo={`Si transferís, se suma un ${pct}%.`}
+          texto="La plata pasa primero por nuestra cuenta y eso tiene un costo." />,
+        <Totales key="t" filas={[
+          { label: "Cuota", valor: money(monto) },
+          { label: `Lo que se suma (${pct}%)`, valor: money(r) },
+          { label: "Total a transferir", valor: money(monto + r), fin: true },
+        ]} />,
+      );
+    } else {
+      cuerpo.push(
+        <Totales key="t" filas={[
+          { label: "Total a transferir", valor: money(monto), fin: true },
+        ]} />,
+      );
+    }
+
+    // 💵 EL DESCUENTO POR EFECTIVO, CON EL NÚMERO.
+    //
+    //    Antes esto era la última frase de un párrafo: "…si venís a la
+    //    oficina te hacemos 10% de descuento". Nadie la leía, y el que la
+    //    leía no sabía cuánto era 10% de su cuota.
+    //
+    //    Acá va el ahorro EN PESOS. "Ahorrás $10.200" mueve a alguien a
+    //    tomarse el colectivo; "10% de descuento" no le dice nada a nadie.
+    //
+    //    Y conviene a los dos: el cliente paga menos y la plata no pasa por
+    //    la cuenta, que es lo que tiene el costo.
+    const _ahorro = (monto + r) - montoEfectivo(monto, poliza?.compania);
+    if (_ahorro > 0) {
+      cuerpo.push(
+        <div key="ef-tip" style={{
+          marginTop: 12, padding: "12px 14px", borderRadius: 13,
+          background: "var(--ok-bg)", border: "1px solid var(--ok)",
+        }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ok)" }}>
+            Si venís a la oficina con efectivo, ahorrás {money(_ahorro)}
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--t2)", marginTop: 3, lineHeight: 1.45 }}>
+            Pagás {money(montoEfectivo(monto, poliza?.compania))} en vez de {money(monto + r)} ·
+            te hacemos {Math.round(_aj.descuento * 100)}% de descuento.
+          </div>
+        </div>,
+      );
+    }
     // 🚫 No se muestran alias ni CBU en el portal. El cliente los pide por
     //    WhatsApp y la oficina se los pasa: así controla a qué cuenta cobra
     //    y confirma el monto en el momento. El desglose SÍ queda, para que
@@ -845,24 +915,30 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
     waCita([
       `${waFuerte(bien)}${pat}`,
       `Cupón que vence el ${waFuerte(vto)}`,
-      `Pago: ${waFuerte(money(montoEfectivo(monto)))}`,
-      `(ya con el ${Math.round(DESCUENTO_EFECTIVO * 100)}% de descuento)`,
+      `Pago: ${waFuerte(money(montoEfectivo(monto, poliza?.compania)))}`,
+      `(ya con el ${Math.round(_aj.descuento * 100)}% de descuento)`,
     ].join("\n")),
   ].join("\n");
 
   const msgTransferencia = [
     `Hola, soy ${waFuerte(nombre)}`,
-    `Quiero pagar por transferencia:`,
+    // 💬 "Quiero pagar mi seguro" y no "quiero pagar por transferencia".
+    //    El que atiende recibe treinta mensajes por día: el primero le dice
+    //    QUÉ quiere el cliente, no cómo. Y el pedido del alias va explícito
+    //    arriba y abajo, para que se lea aunque el chat corte el mensaje.
+    `Quiero pagar mi seguro y necesito el alias para transferir:`,
     ``,
     waCita([
       `${waFuerte(bien)}${pat}`,
-      `Cupón que vence el ${waFuerte(vto)}`,
+      `Cuota que vence el ${waFuerte(vto)}`,
       `Cuota: ${money(monto)}`,
-      `Gastos (${Math.round(RECARGO_TRANSFERENCIA * 100)}%): ${money(recargoTransferencia(monto))}`,
-      `Total: ${waFuerte(money(monto + recargoTransferencia(monto)))}`,
+      ...(_aj.recargo > 0
+        ? [`Gastos (${Math.round(_aj.recargo * 100)}%): ${money(recargoTransferencia(monto, poliza?.compania))}`]
+        : []),
+      `Total a transferir: ${waFuerte(money(monto + recargoTransferencia(monto, poliza?.compania)))}`,
     ].join("\n")),
     ``,
-    `¿Me pasás los datos para transferir?`,
+    `¿Me pasás el alias?`,
   ].join("\n");
 
   return (
@@ -903,7 +979,7 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
               textAlign: "center", fontFamily: "inherit",
             }}
           >
-            Pedir los datos por WhatsApp
+            Pedir el alias por WhatsApp
           </a>
           <div
             style={{
@@ -949,8 +1025,12 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
         </>
       )}
 
+      {/* 🔙 Con UNA sola forma disponible, "cambiar forma de pago" llevaba a
+             una pantalla con un único botón: un clic para volver al mismo
+             lugar. Ahí abajo lo que sí se puede cambiar es efectivo por
+             transferencia, así que se abre esa elección directo. */}
       <button
-        onClick={() => setForma(null)}
+        onClick={() => (unicaForma ? setModal(true) : setForma(null))}
         style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           width: "100%", marginTop: 12, background: "none", border: "none",
@@ -958,7 +1038,7 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
           fontFamily: "inherit", padding: 8,
         }}
       >
-        <IconAtras size={15} /> Cambiar forma de pago
+        <IconAtras size={15} /> {unicaForma ? "Efectivo o transferencia" : "Cambiar forma de pago"}
       </button>
     </div>
   );

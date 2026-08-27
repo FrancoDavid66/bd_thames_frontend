@@ -20,6 +20,49 @@ export const DESCUENTO_EFECTIVO = 0.10;   // 10%
 export const RECARGO_TRANSFERENCIA = 0.05; // 5%
 export const REDONDEO_EFECTIVO = 1000;     // múltiplo
 
+/* 🏢 EXCEPCIONES POR COMPAÑÍA
+   ──────────────────────────
+   Los valores de arriba son los normales. Acá van las compañías donde el
+   número es distinto porque el negocio es distinto.
+
+   ⚠️ ANTES ESTO NO EXISTÍA y el recargo se le aplicaba a TODOS por igual.
+      A un cliente de NRE se le cobraba un 5% que la oficina no cobra:
+      pagaba de más y el número del portal no coincidía con el del
+      mostrador. Y al revés, si en alguna compañía el margen no da para el
+      10%, ese descuento sale del bolsillo de la oficina.
+
+   La clave se busca CONTENIDA en el nombre, igual que en FormasPago:
+   "nre" matchea "NRE" y "NRE Seguros S.A.".
+
+   Solo se escribe lo que cambia; lo que no está, hereda el valor normal. */
+const AJUSTES_POR_COMPANIA = {
+  // NRE no tiene recargo por transferencia: la oficina la recibe sin costo.
+  // El descuento del 10% por efectivo sí se mantiene.
+  nre: { recargo: 0 },
+};
+
+function _normCia(v) {
+  return String(v || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+/** Los ajustes que le tocan a esta compañía. */
+export function ajustesDe(compania) {
+  const base = {
+    descuento: DESCUENTO_EFECTIVO,
+    recargo: RECARGO_TRANSFERENCIA,
+    redondeo: REDONDEO_EFECTIVO,
+  };
+  const c = _normCia(compania);
+  if (!c) return base;
+  for (const [clave, cambios] of Object.entries(AJUSTES_POR_COMPANIA)) {
+    if (c.includes(clave)) return { ...base, ...cambios };
+  }
+  return base;
+}
+
 /**
  * 💵 Cuánto paga el cliente en efectivo, ya redondeado.
  *
@@ -34,15 +77,54 @@ export const REDONDEO_EFECTIVO = 1000;     // múltiplo
  *    en el portal es el mismo que paga en el mostrador, venga con un cupón
  *    o con los cuatro.
  */
-export function montoEfectivo(monto) {
+export function montoEfectivo(monto, compania) {
+  const { descuento, redondeo } = ajustesDe(compania);
   const n = Number(monto || 0);
-  return Math.floor((n * (1 - DESCUENTO_EFECTIVO)) / REDONDEO_EFECTIVO) * REDONDEO_EFECTIVO;
+  return Math.floor((n * (1 - descuento)) / redondeo) * redondeo;
 }
 
-/** Recargo en pesos por transferir. */
-export function recargoTransferencia(monto) {
-  return Math.round(Number(monto || 0) * RECARGO_TRANSFERENCIA);
+/** Recargo en pesos por transferir. 0 en las compañías que no lo cobran. */
+export function recargoTransferencia(monto, compania) {
+  const { recargo } = ajustesDe(compania);
+  return Math.round(Number(monto || 0) * recargo);
 }
+
+/* 🙈 COBERTURAS QUE NO MUESTRAN EL PRECIO EN EL PORTAL
+   ────────────────────────────────────────────────────
+   En algunas coberturas el importe que el cliente paga NO es el que dice el
+   papel de la compañía: lo pone la oficina y se mueve seguido.
+
+   NRE con cobertura A (responsabilidad civil) es el caso. Su frente de
+   póliza trae un plan de pago —"20/08/2026  64.000,00"— pero ese es el
+   precio de NRE, no el de Thames. Mostrarlo sería publicar un número que
+   no coincide con el del mostrador.
+
+   NRE con B1 (con robo) sí lo muestra: ahí el precio es el que se cobra.
+
+   ⚠️ NO ES OCULTAR LA DEUDA. La cuota sigue apareciendo con su fecha y su
+      estado — "vence el 20 de septiembre", "pagada". Lo único que no se
+      muestra es el número, y en su lugar se invita a consultarlo.
+
+      Un precio viejo en pantalla genera una discusión en el mostrador. Un
+      "consultanos" genera un WhatsApp, que es lo que se quiere.
+
+   Estructura: { clave_compania: [coberturas...] }. La clave y la cobertura
+   se comparan en minúscula y sin acentos. */
+const SIN_PRECIO_PUBLICO = {
+  nre: ["a"],
+};
+
+/** ¿Se puede mostrar el importe de esta póliza en el portal? */
+export function muestraPrecio(poliza) {
+  const cia = _normCia(poliza?.compania);
+  const cob = _normCia(poliza?.cobertura).trim();
+  if (!cia || !cob) return true;
+  for (const [clave, coberturas] of Object.entries(SIN_PRECIO_PUBLICO)) {
+    if (cia.includes(clave) && coberturas.includes(cob)) return false;
+  }
+  return true;
+}
+
 
 /* ══════════════════════════ FORMATOS ══════════════════════════ */
 
@@ -129,7 +211,13 @@ export function situacionPago(p) {
   const impagos = items.filter(
     (i) => i.estado !== "pagado" && i.estado !== "revisando" && i.fecha
   );
-  if (!impagos.length) return { estado: "al_dia", monto: 0, fecha: null, vencidos: 0, total: 0 };
+  // 🙈 ¿Esta póliza muestra el importe? (ver muestraPrecio arriba)
+  //    Se decide UNA vez acá y viaja con el resultado, así ningún render
+  //    tiene que volver a preguntárselo — ni olvidarse de hacerlo.
+  const sinPrecio = !muestraPrecio(p);
+  if (!impagos.length) {
+    return { estado: "al_dia", monto: 0, fecha: null, vencidos: 0, total: 0, sinPrecio };
+  }
 
   impagos.sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
   const vencidos = impagos.filter((i) => i.estado === "vencido");
@@ -142,6 +230,7 @@ export function situacionPago(p) {
     vencidos: vencidos.length,
     // Todo lo vencido junto, no solo el primero.
     total: vencidos.reduce((acc, i) => acc + Number(i.monto || 0), 0),
+    sinPrecio,
   };
 }
 
@@ -150,12 +239,33 @@ export function contarVencidos(polizas = []) {
   return polizas.reduce((acc, p) => acc + situacionPago(p).vencidos, 0);
 }
 
-/** Lo que debe en total (el número grande del header). */
+/** Lo que debe en total (el número grande del header).
+ *
+ *  ⚠️ Las pólizas sin precio publicado NO suman. Su cuota vale lo que diga
+ *     la oficina, y meter un número que no es el real haría que el total del
+ *     header no cierre con la suma de las tarjetas de abajo.
+ *
+ *     Para saber si quedaron afuera, ver `hayDeudaSinPrecio`.
+ */
 export function deudaTotal(polizas = []) {
   return polizas.reduce((acc, p) => {
     const s = situacionPago(p);
+    if (s.sinPrecio) return acc;
     return acc + (s.estado === "vencido" ? s.total : 0);
   }, 0);
+}
+
+/** ¿Hay algo por pagar cuyo importe no se puede mostrar?
+ *
+ *  Sirve para que el header no diga "no tenés pagos pendientes" cuando en
+ *  realidad hay uno, solo que sin número. Callar el monto es una cosa;
+ *  callar la deuda sería otra.
+ */
+export function hayDeudaSinPrecio(polizas = []) {
+  return polizas.some((p) => {
+    const s = situacionPago(p);
+    return s.sinPrecio && s.estado !== "al_dia";
+  });
 }
 
 /** El próximo pago que vence, cuando no hay nada vencido. */

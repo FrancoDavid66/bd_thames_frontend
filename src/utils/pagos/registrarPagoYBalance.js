@@ -56,6 +56,7 @@ export const registrarPagoYBalance = async ({
     if (!montoFinal || montoFinal <= 0) throw new Error("Monto inválido");
     if (!responsableEmpleadoId) throw new Error("Falta elegir quién cobra");
 
+
     const fechaPago = todayISO();
 
     // ── ÚNICO PASO: Marcar cuota como pagada — con todos los datos del wizard ──
@@ -85,7 +86,21 @@ export const registrarPagoYBalance = async ({
     // Callback de éxito
     onSuccess?.();
   } catch (error) {
-    console.error("Error en registrarPagoYBalance:", error);
+    // 🔎 EL DETALLE VA A LA CONSOLA, SIEMPRE.
+    //
+    //    Las validaciones de arriba tiran mensajes claros ("Falta elegir
+    //    quién cobra"), pero el toast se los come en dos segundos y el que
+    //    atiende solo ve "no se pudo cobrar". Un cobro que falla sin dejar
+    //    rastro se reporta como "la app anda mal" y no hay por dónde empezar.
+    //
+    //    Acá queda qué llegó y qué faltaba, con nombre y apellido.
+    console.error("[registrarPagoYBalance] falló:", error?.message || error, {
+      cuota_id: cuota?.id,
+      poliza: poliza?.numero_poliza,
+      forma_pago: formaPago,
+      monto,
+      responsable: responsableEmpleadoId ?? "(no vino)",
+    });
     toast.error(error?.message || "❌ Error al registrar el pago");
   }
 };

@@ -114,6 +114,30 @@ function categoriaVehiculo(txt) {
 }
 
 // Config de cada compañía "rápida" del camino PDF.
+/* 🪪 ¿ESTOS DOS DOCUMENTOS SON DE LA MISMA PERSONA?
+   ────────────────────────────────────────────────
+   No alcanza con comparar los números tal cual: el CUIT ES el DNI con un
+   prefijo y un verificador pegados.
+
+       DNI      94841586
+       CUIT   20 94841586 7
+
+   Si el operador cargó el CUIT y el PDF trae el DNI (o al revés), es el
+   MISMO cliente. Avisar de un conflicto ahí sería enseñarle a ignorar los
+   avisos — y el día que haya uno de verdad, lo va a saltear igual.
+
+   Devuelve true también cuando falta alguno: sin dos números no hay nada
+   que comparar, y una alerta sin motivo es peor que ninguna. */
+function mismoDocumento(a, b) {
+  const x = soloDigitos(a);
+  const y = soloDigitos(b);
+  if (!x || !y) return true;
+  if (x === y) return true;
+  const nucleo = (d) => (d.length === 11 ? d.slice(2, 10) : d);
+  return nucleo(x) === nucleo(y);
+}
+
+
 const CIAS_PDF = {
   NRE: {
     nombre: "NRE",
@@ -199,6 +223,15 @@ export default function NuevaSolicitudModal({
   const [leyendoPdf, setLeyendoPdf] = useState(false);
   const [pdfSubido, setPdfSubido] = useState(null);
   const [avisoArchivo, setAvisoArchivo] = useState(""); // "subiste el archivo equivocado"
+  // 📞 El teléfono se pregunta en su propio paso, justo después del DNI.
+  //    Arranca con el que ya tiene el cliente en la base, si existe.
+  const [telInput, setTelInput] = useState("");
+  // Lo que el lector encontró raro o no pudo leer. Queda a la vista hasta
+  // que se sube otro PDF: son las cosas a revisar antes de crear el alta.
+  const [avisosPdf, setAvisosPdf] = useState([]);
+  // 🪪 El DNI que trajo el PDF, cuando NO coincide con el que se cargó.
+  //    Vacío mientras todo cierre.
+  const [dniConflicto, setDniConflicto] = useState("");
 
   // Responsable (opcional)
   const [responsable, setResponsable] = useState(null);
@@ -261,19 +294,23 @@ export default function NuevaSolicitudModal({
           cli_localidad: match.localidad || "",
           cli_direccion: match.direccion || "",
         }));
+        // 📞 El teléfono que YA tenemos, listo para confirmar o corregir.
+        //    No hay que volver a preguntárselo al cliente si ya está.
+        setTelInput(match.telefono || "");
         toast.success(`Cliente encontrado: ${match.nombre || ""} ${match.apellido || ""}`.trim());
       } else {
         setClienteExistente(null);
         setForm((f) => ({ ...f, cli_dni: dni }));
+        setTelInput("");
         toast("DNI nuevo — vas a crear un cliente nuevo.", { icon: "🆕" });
       }
-      setPaso("modo");
+      setPaso("telefono");
     } catch (err) {
       console.error("[NuevaSolicitud] DNI:", err);
       setClienteExistente(null);
       setForm((f) => ({ ...f, cli_dni: dni }));
       toast("No se pudo verificar, pero podés seguir.", { icon: "⚠️" });
-      setPaso("modo");
+      setPaso("telefono");
     } finally {
       setVerificandoDni(false);
     }
@@ -282,6 +319,34 @@ export default function NuevaSolicitudModal({
   function saltearDni() {
     setClienteExistente(null);
     setForm((f) => ({ ...f, cli_dni: "" }));
+    setPaso("telefono");
+  }
+
+  /* ---------- 📞 teléfono ---------- */
+  //
+  // 📞 POR QUÉ EL TELÉFONO TIENE SU PROPIO PASO.
+  //
+  //    Es el dato del que dependen el link del portal y TODOS los avisos por
+  //    WhatsApp: recordatorios de cuota, bienvenida, aviso de vencimiento.
+  //    Sin él la póliza se crea igual y nadie se entera — hasta que el
+  //    cliente no paga porque nunca le llegó el recordatorio.
+  //
+  //    Perdido entre quince campos del formulario, se saltea. Solo, en su
+  //    propia pantalla, se completa.
+  //
+  //    Si el cliente ya está en la base, aparece el que tiene registrado y
+  //    solo hay que confirmarlo. Si lo edita, se actualiza en el cliente.
+  function confirmarTelefono() {
+    const tel = soloDigitos(telInput);
+    if (tel && tel.length < 8) {
+      toast.error("El teléfono parece corto. Revisalo o seguí sin número.");
+      return;
+    }
+    setForm((f) => ({ ...f, cli_telefono: tel }));
+    setPaso("modo");
+  }
+
+  function saltearTelefono() {
     setPaso("modo");
   }
 
@@ -293,7 +358,26 @@ export default function NuevaSolicitudModal({
     setForm((f) => ({ ...f, compania: nombre }));
     setCompaniaDetectada("");
     setAvisoArchivo("");
+    setAvisosPdf([]);
+    setDniConflicto("");
     setPaso("pdf_form");
+  }
+
+  /* ---------- 🪪 resolver el conflicto de DNI ---------- */
+  //
+  // Si el operador decide que el DNI bueno es el del PDF, se vuelve al paso 1
+  // con ese número cargado. No se pisa el campo y listo: hay que rehacer la
+  // búsqueda del cliente, y de ahí sale todo lo demás — si existe, sus datos;
+  // si no, un cliente nuevo; y su teléfono.
+  //
+  // Cambiar solo el número dejaría el formulario mostrando al cliente
+  // equivocado con el DNI correcto. Peor que el problema original.
+  function usarDniDelPdf() {
+    setDniInput(dniConflicto);
+    setDniConflicto("");
+    setClienteExistente(null);
+    setPaso("dni");
+    toast("Verificá el DNI del PDF y seguí desde ahí.", { icon: "🪪" });
   }
 
   /* ---------- aplicar datos del PDF ---------- */
@@ -349,6 +433,12 @@ export default function NuevaSolicitudModal({
         poner("cli_localidad", cli.localidad);
         poner("cli_provincia", cli.provincia); // 🆕 provincia del PDF
       }
+      // 📞 El teléfono se preguntó en su propio paso, ANTES de subir el PDF.
+      //    Lo que haya ahí manda: lo dijo el cliente hoy, el papel puede
+      //    tener uno viejo. Solo se completa si quedó vacío (se salteó el
+      //    paso) y el PDF trae alguno — así no se pierde un dato que está.
+      if (!prev.cli_telefono) poner("cli_telefono", cli.telefono);
+
       poner("patente", veh.patente);
       poner("marca", marca);
       poner("modelo", modelo);
@@ -368,6 +458,26 @@ export default function NuevaSolicitudModal({
 
     if (ciaDetectada) setCompaniaDetectada(ciaDetectada);
     setPdfTrajo(trajo);
+
+    // 🪪 ¿EL PDF ES DE OTRA PERSONA?
+    //
+    //    El DNI del paso 1 manda: lo tipeó alguien mirando el documento.
+    //    Por eso `aplicarDatosPdf` nunca lo pisa.
+    //
+    //    Pero antes tampoco lo MIRABA. Si el operador tipeaba un dígito de
+    //    más, o arrastraba el PDF del cliente anterior, la póliza quedaba
+    //    con el DNI de uno y el auto de otro. Sin un solo aviso.
+    //
+    //    Es el error más caro de todos: se descubre cuando hay un siniestro
+    //    y la compañía dice que ese auto no es de esa persona.
+    //
+    //    No se corrige solo. Se muestra el conflicto y decide el operador:
+    //    puede ser un PDF equivocado o un DNI mal tipeado, y desde acá no
+    //    hay forma de saber cuál.
+    const dniPdf = soloDigitos(cli.dni || cli.cuit || "");
+    setDniConflicto(
+      dniPdf && !mismoDocumento(dniPdf, form.cli_dni) ? dniPdf : ""
+    );
     setCuponesPdf(cupones);
     if (datos?.datos_extra && typeof datos.datos_extra === "object") {
       setDatosExtraPdf(datos.datos_extra);
@@ -410,6 +520,17 @@ export default function NuevaSolicitudModal({
       aplicarDatosPdf(data.datos || {}, textoPlano);
 
       const avisos = data.avisos || [];
+      // 📌 LOS AVISOS SE GUARDAN, NO SOLO SE ANUNCIAN.
+      //
+      //    Antes iban únicamente como toast: 4,5 segundos y se evaporaban.
+      //    Con los lectores nuevos pueden salir tres o cuatro juntos ("la
+      //    cuota 1 ya fue abonada", "confirmá el tipo del vehículo", "falta
+      //    el frente de póliza"), y si el operador estaba mirando el teclado
+      //    se los perdía todos.
+      //
+      //    Son justo los que hay que leer ANTES de apretar Crear, así que
+      //    quedan fijos en pantalla hasta que se sube otro PDF.
+      setAvisosPdf(avisos);
       if (avisos.length) avisos.forEach((a) => toast(a, { icon: "⚠️", duration: 4500 }));
       else toast.success("PDF leído. Revisá los datos.");
 
@@ -600,6 +721,8 @@ export default function NuevaSolicitudModal({
     ? "Alta creada"
     : paso === "dni"
     ? "Nueva Alta"
+    : paso === "telefono"
+    ? "Teléfono del cliente"
     : paso === "modo"
     ? "¿Cómo la cargás?"
     : paso === "pdf_cia"
@@ -612,7 +735,7 @@ export default function NuevaSolicitudModal({
     ? "A mano · Vehículo"
     : "A mano · Confirmar";
 
-  const iconoHeader = creado ? "🎉" : paso === "dni" ? "🪪" : paso.startsWith("man_") ? "✍️" : paso.startsWith("pdf_") ? "📄" : "✨";
+  const iconoHeader = creado ? "🎉" : paso === "dni" ? "🪪" : paso === "telefono" ? "📞" : paso.startsWith("man_") ? "✍️" : paso.startsWith("pdf_") ? "📄" : "✨";
 
   return (
     <AnimatePresence>
@@ -675,8 +798,19 @@ export default function NuevaSolicitudModal({
                 onVerificar={verificarDni}
                 onSaltear={saltearDni}
               />
+            ) : paso === "telefono" ? (
+              /* ══════ PASO 2: TELÉFONO ══════ */
+              <PantallaTelefono
+                telInput={telInput}
+                setTelInput={setTelInput}
+                clienteExistente={clienteExistente}
+                dni={form.cli_dni}
+                onSeguir={confirmarTelefono}
+                onSaltear={saltearTelefono}
+                onVolver={() => setPaso("dni")}
+              />
             ) : paso === "modo" ? (
-              /* ══════ PASO 2: PDF o Manual ══════ */
+              /* ══════ PASO 3: PDF o Manual ══════ */
               <>
                 <AvisoCliente clienteExistente={clienteExistente} dni={form.cli_dni} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
@@ -697,7 +831,7 @@ export default function NuevaSolicitudModal({
                     onClick={() => setPaso("man_cliente")}
                   />
                 </div>
-                <BtnVolver onClick={() => setPaso("dni")}>Volver al DNI</BtnVolver>
+                <BtnVolver onClick={() => setPaso("telefono")}>Volver al teléfono</BtnVolver>
               </>
             ) : paso === "pdf_cia" ? (
               /* ══════ PASO 3 (PDF): elegir compañía ══════ */
@@ -745,6 +879,22 @@ export default function NuevaSolicitudModal({
                 />
 
                 <BannerCompania compania={form.compania.trim()} detectada={!!companiaDetectada} />
+
+                {/* 🪪 El PDF es de otro documento. Va PRIMERO, antes que
+                    cualquier otro aviso: si esto está mal, todo lo demás
+                    también. */}
+                <PanelDniConflicto
+                  dniPdf={dniConflicto}
+                  dniCargado={form.cli_dni}
+                  clienteExistente={clienteExistente}
+                  onUsarPdf={usarDniDelPdf}
+                  onIgnorar={() => setDniConflicto("")}
+                />
+
+                {/* ⚠️ Lo que el lector no pudo leer o encontró raro.
+                    Va ARRIBA del formulario a propósito: es lo que hay que
+                    revisar mientras se completan los campos, no después. */}
+                <PanelAvisosPdf avisos={avisosPdf} />
 
                 <SeccionResponsable
                   empleados={empleados}
@@ -1005,6 +1155,112 @@ function PantallaDni({ dniInput, setDniInput, verificando, onVerificar, onSaltea
     </div>
   );
 }
+
+/* ── 📞 PASO 2: TELÉFONO ────────────────────────────────────────────────
+   Va solo, en su propia pantalla, y no perdido entre quince campos del
+   formulario. De este número dependen el link del portal y TODOS los
+   avisos por WhatsApp: recordatorio de cuota, bienvenida, vencimiento.
+
+   Sin él la póliza se crea igual y nadie se entera — hasta que el cliente
+   no paga porque nunca le llegó el aviso.
+
+   Si ya está en la base, aparece el que tenemos y solo hay que confirmarlo.
+   Es la diferencia entre "cargá el teléfono" y "¿sigue siendo este?". */
+function PantallaTelefono({
+  telInput, setTelInput, clienteExistente, dni, onSeguir, onSaltear, onVolver,
+}) {
+  const yaTenia = (clienteExistente?.telefono || "").trim();
+  const limpio = String(telInput || "").replace(/\D/g, "");
+  const cambio = yaTenia && limpio && limpio !== yaTenia.replace(/\D/g, "");
+  // El cliente está en la base pero nunca cargó teléfono. Es el caso que más
+  // importa: hoy no le llega ni el link del portal ni un recordatorio.
+  const sinNumero = !!clienteExistente && !yaTenia;
+  const vacio = !limpio;
+
+  return (
+    <div className="py-2">
+      <div className="text-center mb-5">
+        <div className="mx-auto mb-3 h-16 w-16 rounded-2xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center text-3xl">
+          📞
+        </div>
+        <h3 className="text-lg font-black text-titulo dark:text-titulo-dark">
+          {yaTenia
+            ? "¿Sigue siendo este el teléfono?"
+            : sinNumero
+            ? "Este cliente no tiene teléfono cargado"
+            : "¿Cuál es el teléfono?"}
+        </h3>
+        <p className="text-[13px] font-bold text-suave dark:text-suave-dark mt-1">
+          Con este número le llega el link de su portal y los recordatorios de pago.
+        </p>
+      </div>
+
+      <div className="max-w-sm mx-auto">
+        {clienteExistente ? (
+          <div className="mb-3 rounded-2xl border-2 border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-3 text-center">
+            <div className="text-[11px] font-black uppercase tracking-widest text-duo-verde-sombra dark:text-duo-verde">
+              Cliente en la base
+            </div>
+            <div className="text-[14px] font-black text-titulo dark:text-titulo-dark mt-0.5">
+              {clienteExistente.nombre} {clienteExistente.apellido || ""}
+            </div>
+          </div>
+        ) : dni ? (
+          <div className="mb-3 text-center text-[12px] font-bold text-suave dark:text-suave-dark">
+            Cliente nuevo · DNI {dni}
+          </div>
+        ) : null}
+
+        <div className="relative">
+          <HiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-lg pointer-events-none" />
+          <input
+            value={telInput}
+            onChange={(e) => setTelInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onSeguir()}
+            placeholder="11 2345 6789"
+            inputMode="tel"
+            autoFocus
+            className="w-full h-14 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[16px] font-black text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal outline-none focus:border-duo-verde transition-colors text-center"
+          />
+        </div>
+
+        {/* Que quede claro que se está PISANDO el número guardado. Sin este
+            aviso, corregir un dígito por error cambia el teléfono del cliente
+            en toda la base y nadie lo nota. */}
+        {cambio ? (
+          <p className="mt-2 text-center text-[12px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">
+            Vas a reemplazar el que tenía guardado ({yaTenia}). Se actualiza en su ficha.
+          </p>
+        ) : sinNumero && limpio ? (
+          <p className="mt-2 text-center text-[12px] font-bold text-duo-verde-sombra dark:text-duo-verde">
+            Se guarda en su ficha. Recién ahora va a poder recibir avisos.
+          </p>
+        ) : null}
+
+        <div className="mt-4">
+          <Boton3D variant="verde" full size="lg" onClick={onSeguir} disabled={vacio}>
+            {yaTenia && !cambio ? "Sí, es correcto" : "Guardar y seguir"}
+          </Boton3D>
+        </div>
+
+        <button
+          onClick={onSaltear}
+          className="mt-3 w-full text-center text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark hover:text-duo-azul"
+        >
+          {yaTenia ? "Dejar el que está → seguir igual" : "No lo tengo ahora → seguir igual"}
+        </button>
+
+        <button
+          onClick={onVolver}
+          className="mt-2 w-full text-center text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark hover:text-duo-azul"
+        >
+          ← Volver al DNI
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function AvisoCliente({ clienteExistente, dni }) {
   if (clienteExistente) {
@@ -1526,6 +1782,110 @@ function TagFalta() {
     </span>
   );
 }
+
+/* ── ⚠️ AVISOS DEL LECTOR ──────────────────────────────────────────────
+   Lo que el PDF no trajo, o trajo raro. Cada lector decide qué avisar:
+   "la cuota 1 ya fue abonada al emitir", "confirmá el tipo del vehículo",
+   "los códigos de barras de AMCA son imágenes y no se pueden leer".
+
+   Antes esto vivía solo en toasts de 4,5 segundos. Un aviso que hay que
+   leer ANTES de apretar Crear no puede evaporarse mientras el operador
+   tipea. Acá queda fijo hasta que se sube otro PDF.
+
+   Ámbar y no rojo: nada de esto frena el alta. Son cosas para mirar, no
+   errores. Si fuera rojo, a la tercera póliza dejaría de leerse. */
+/* ── 🪪 EL PDF ES DE OTRO DOCUMENTO ─────────────────────────────────────
+   Dos causas posibles y desde acá no se puede distinguir cuál:
+     · se tipeó mal el DNI en el paso 1
+     · se arrastró el PDF del cliente anterior
+
+   Por eso no se corrige solo. Se muestran los dos números y decide el
+   operador, que tiene el documento en la mano.
+
+   Rojo y no ámbar: esto no es "revisá esto". Es "algo está mal". Una
+   póliza con el DNI de uno y el auto de otro se descubre el día del
+   siniestro, cuando la compañía dice que ese auto no es de esa persona. */
+function PanelDniConflicto({ dniPdf, dniCargado, clienteExistente, onUsarPdf, onIgnorar }) {
+  if (!dniPdf) return null;
+  return (
+    <div className="rounded-2xl border-2 border-duo-rojo bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3.5">
+      <div className="flex items-center gap-2 mb-2">
+        <HiExclamationCircle className="text-duo-rojo text-lg shrink-0" />
+        <span className="text-[11px] font-black uppercase tracking-widest text-duo-rojo">
+          El PDF es de otro documento
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="rounded-xl bg-card dark:bg-card-dark p-2.5">
+          <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+            Cargaste
+          </div>
+          <div className="text-[15px] font-black text-titulo dark:text-titulo-dark font-mono mt-0.5">
+            {dniCargado || "—"}
+          </div>
+          {clienteExistente ? (
+            <div className="text-[11px] font-bold text-suave dark:text-suave-dark truncate mt-0.5">
+              {clienteExistente.nombre} {clienteExistente.apellido || ""}
+            </div>
+          ) : null}
+        </div>
+        <div className="rounded-xl bg-card dark:bg-card-dark p-2.5">
+          <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+            Dice el PDF
+          </div>
+          <div className="text-[15px] font-black text-duo-rojo font-mono mt-0.5">{dniPdf}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button
+          onClick={onUsarPdf}
+          className="flex-1 h-10 rounded-xl bg-duo-rojo text-white text-[12px] font-black uppercase tracking-wide"
+        >
+          Usar el del PDF
+        </button>
+        <button
+          onClick={onIgnorar}
+          className="flex-1 h-10 rounded-xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-[12px] font-black uppercase tracking-wide"
+        >
+          Dejar el que cargué
+        </button>
+      </div>
+
+      <p className="text-[11.5px] font-bold text-suave dark:text-suave-dark mt-2 leading-snug">
+        Mirá el documento del cliente. Puede ser un DNI mal tipeado o el PDF de otra persona.
+      </p>
+    </div>
+  );
+}
+
+
+function PanelAvisosPdf({ avisos = [] }) {
+  if (!avisos.length) return null;
+  return (
+    <div className="rounded-2xl border-2 border-duo-amarillo bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-3.5">
+      <div className="flex items-center gap-2 mb-2">
+        <HiExclamationCircle className="text-duo-amarillo-sombra dark:text-duo-amarillo text-lg shrink-0" />
+        <span className="text-[11px] font-black uppercase tracking-widest text-duo-amarillo-sombra dark:text-duo-amarillo">
+          Revisá antes de crear ({avisos.length})
+        </span>
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {avisos.map((a, i) => (
+          <li
+            key={i}
+            className="flex gap-2 text-[12.5px] font-bold text-titulo dark:text-titulo-dark leading-snug"
+          >
+            <span className="text-duo-amarillo-sombra dark:text-duo-amarillo shrink-0">·</span>
+            <span>{a}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 
 function BannerCompania({ compania, detectada }) {
   if (compania) {

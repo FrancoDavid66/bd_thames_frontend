@@ -113,16 +113,58 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
     return `${c.nombre || ""} ${c.apellido || ""}`.trim();
   }, [poliza]);
 
+  // 🔢 QUÉ CUOTA SE ESTÁ COBRANDO DE VERDAD.
+  //
+  //    Arriba se busca la primera IMPAGA, no la número 1. Está bien: en La
+  //    Equidad la cuota 1 nace saldada (la cobra la compañía con Pagos Link
+  //    al emitir), así que la primera por cobrar es la 2.
+  //
+  //    🐛 Pero el modal decía "Cuota 1" en cuatro lugares, hardcodeado. El
+  //       cliente se iba con un cupón que dice "Cuota 2 de 3" y un recibo
+  //       que dice "Cuota 1". Dos números para el mismo pago.
+  //
+  //    Ahora sale el número real de la cuota. Si por lo que sea no viniera,
+  //    cae a 1 — que es el caso de todas las compañías salvo Equidad.
+  const nroCuota = cuota?.cuota_nro ?? 1;
+  const etiquetaCuota = `Cuota ${nroCuota}`;
+
   if (!open) return null;
 
   const handleConfirmPago = async (payload) => {
     const formaPago = payload?.metodo || payload?.forma_pago || "efectivo";
+
+    // 👤 QUIÉN COBRÓ.
+    //
+    //    🐛 Antes esto no se pasaba, y `registrarPagoYBalance` lo valida:
+    //         if (!responsableEmpleadoId) throw new Error("Falta elegir quién cobra");
+    //       Con lo cual el cobro post-alta SIEMPRE moría en ese throw. El
+    //       modal pedía el responsable, el operador lo elegía… y el dato se
+    //       tiraba dos líneas después. Salía "Error al registrar el pago" sin
+    //       decir por qué.
+    //
+    //    Se busca en varios nombres porque el modal de cobro puede devolverlo
+    //    de distintas formas según por dónde se abra. Mejor probar cuatro
+    //    claves que asumir una y volver a romper en silencio.
+    const responsableId =
+      payload?.responsable_empleado ??
+      payload?.responsable_empleado_id ??
+      payload?.empleado_id ??
+      payload?.responsable_id ??
+      payload?.responsable?.id;
+
+    const responsableNombre =
+      payload?.responsable_nombre ||
+      payload?.responsable?.nombre ||
+      payload?.empleado_nombre ||
+      "";
+
     await registrarPagoYBalance({
       dispatch,
       cuota,
       poliza,
       formaPago,
       monto: payload?.monto,
+      responsableEmpleadoId: responsableId,
       // ⚠️ false a propósito: el backend YA crea el ingreso solo (señal
       //    crear_ingreso_automatico al registrar el Pago).
       registrarEnBalance: false,
@@ -143,6 +185,24 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
           pago_registrado_en: ahora.toISOString(),
           monto: payload?.monto ?? cuota?.monto,
           forma_pago: formaPago,
+          // 💸 LOS DATOS DE LA TRANSFERENCIA VIAJAN AL COMPROBANTE.
+          //
+          //    Se cargan en el modal de cobro y se mandan al backend, pero
+          //    antes se quedaban ahí: el recibo que se llevaba el cliente no
+          //    decía el número de operación ni quién había transferido.
+          //
+          //    Y ese número es lo único que ata un movimiento del extracto a
+          //    un cliente. Cuando aparece una transferencia sin identificar,
+          //    sin él no hay forma de saber de quién era.
+          //
+          //    Van desde acá y no desde la respuesta del backend porque el
+          //    comprobante se imprime en el momento, con lo que se acaba de
+          //    tipear. Si el guardado falla, el papel igual sale bien.
+          nro_operacion: payload?.nro_operacion || "",
+          enviado_por: payload?.enviado_por || "",
+          cuit_remitente: payload?.cuit_remitente || "",
+          billetera: payload?.destino_cuenta || "",
+          responsable_nombre: responsableNombre,
           pago_hm: hhmm(),
           pago_hm_full: `${ahora.toLocaleDateString("es-AR")} ${hhmm()}`,
         });
@@ -187,14 +247,14 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
 
                 <h3 className="text-xl font-black text-titulo dark:text-titulo-dark">Alta creada ✅</h3>
                 <p className="text-[13px] font-bold text-suave dark:text-suave-dark mt-1 mb-4">
-                  ¿Cobrás la primera cuota ahora?
+                  {cuota ? `¿Cobrás la ${etiquetaCuota.toLowerCase()} ahora?` : "¿Cobrás la primera cuota ahora?"}
                 </p>
 
                 {/* Tarjeta con datos de la cuota EN GRANDE */}
                 <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-5 text-left">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
-                      Cuota 1
+                      {etiquetaCuota}
                     </span>
                     <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-full">
                       <HiOfficeBuilding /> {poliza?.compania || "—"}
@@ -230,13 +290,13 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
         onClose={() => setStep("preguntar")}
         onConfirm={handleConfirmPago}
         defaultMonto={cuota?.monto}
-        title="Cobrar 1ª cuota"
+        title={`Cobrar ${etiquetaCuota.toLowerCase()}`}
         mediosCobro={mediosCobro}
         clienteNombreApellido={clienteNombreAp}
         clienteDni={poliza?.cliente?.dni || poliza?.cliente?.dni_cuit_cuil || ""}
         polizaCompania={poliza?.compania || ""}
         polizaCobertura={poliza?.cobertura || ""}
-        pagoCuota="Cuota 1"
+        pagoCuota={etiquetaCuota}
       />
 
       {/* ── Paso 3: listo + comprobante (diseño Duo + confetti) ── */}
