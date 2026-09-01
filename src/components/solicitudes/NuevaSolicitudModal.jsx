@@ -982,8 +982,8 @@ export default function NuevaSolicitudModal({
                   {/* 🎟️ Fechas de cuotas según la compañía */}
                   {esNRE && (
                     <Aviso tono="ok">
-                      <b>NRE es trimestral automático.</b> Se generan 3 cuotas venciendo el mismo día de cada mes
-                      desde hoy. No tenés que cargar fechas.
+                      <b>NRE es trimestral automático.</b> Se generan 3 cuotas. La 1ª se cobra hoy y vence
+                      dentro de un mes; las otras dos siguen mes a mes. No tenés que cargar fechas.
                     </Aviso>
                   )}
                 </CardDuo>
