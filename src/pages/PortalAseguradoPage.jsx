@@ -134,44 +134,158 @@ export default function PortalAseguradoPage() {
   const deuda = useMemo(() => deudaTotal(polizas), [polizas]);
   const prox = useMemo(() => proximoPago(polizas), [polizas]);
 
+  // 🙈 ¿Quedó algo por pagar cuyo importe no se puede mostrar?
+  //    Sin esto, un cliente de NRE con RC y una cuota vencida veía "No tenés
+  //    pagos pendientes": el total daba 0 porque esa póliza no suma.
+  //    Callar el monto es una cosa; callar la deuda sería otra.
+  //
+  // 🐛 EL BUG QUE ARREGLA — "Rendered more hooks than during the previous render"
+  //
+  //    Este `useMemo` estaba MÁS ABAJO, después de los dos `return` de
+  //    "cargando" y "error". Se usa recién en `resumen`, así que ahí parecía
+  //    su lugar natural. Pero los hooks no se pueden mover de lugar.
+  //
+  //      1er render → cargando = true  → sale por el return → 11 hooks
+  //      2do render → llegó la data    → sigue de largo     → 12 hooks 💥
+  //
+  //    React lleva la cuenta de los hooks como una lista del súper numerada:
+  //    siempre el mismo orden y la misma cantidad. Si en el segundo render
+  //    aparece un ítem 12 que antes no estaba, se pierde y corta.
+  //
+  //    Por eso el portal reventaba JUSTO cuando los datos cargaban bien:
+  //    mientras estaba cargando o daba error, nunca llegaba hasta acá.
+  //
+  //    🔒 REGLA: TODO hook (useState / useEffect / useMemo / useCallback) va
+  //       ARRIBA DE TODO, antes del primer `return`. Sin excepciones.
+  const deudaOculta = useMemo(() => hayDeudaSinPrecio(polizas), [polizas]);
+
+  /* 🚨 Los autos que TIENEN a quién llamar.
+     El backend manda `asistencia: null` cuando esa compañía no tiene grúa
+     cargada (NRE). Si la lista queda vacía, la pestaña no se muestra: un
+     botón que no llama a ningún lado es peor que no tenerlo.
+
+     ⚠️ VA ACÁ ARRIBA, con los otros `useMemo`, NO más abajo. Todos los hooks
+        tienen que correr siempre, antes del primer `return`. */
+  const conGrua = useMemo(() => polizas.filter((p) => p?.asistencia), [polizas]);
+
   // La póliza que se está mirando (o la única, si hay una sola).
   const detalle = useMemo(() => {
     if (polizaAbierta) return polizas.find((p) => p.id === polizaAbierta) || null;
     return null;
   }, [polizaAbierta, polizas]);
 
-  /* ── Navegación ── */
-  const irA = (t) => {
-    setTab(t);
-    if (t !== "seguros") setPolizaAbierta(null);
-    if (t !== "pagos") setFiltroPagos(null);
-    window.scrollTo(0, 0);
+  /* ══════════════ 🧭 NAVEGACIÓN ══════════════
+   *
+   * 🐛 LO QUE ESTABA MAL
+   *
+   *    El portal simulaba la navegación con variables y aparte le mentía al
+   *    navegador con `pushState` vacíos. Dos historiales que no se hablaban:
+   *    el que el cliente ve y el que el navegador guarda. Como poner marcas
+   *    en un mapa y caminar por otro.
+   *
+   *    Consecuencias reales:
+   *      · El visor de documentos NO se cerraba con "atrás": el PDF quedaba
+   *        arriba mientras la pantalla de abajo se movía sola.
+   *      · No se podía SALIR nunca. Cada "atrás" consumía una entrada y
+   *        reponía otra: saldo cero, para siempre. El cliente entraba desde
+   *        WhatsApp y tenía que cerrar la pestaña para volver.
+   *      · "Atrás" siempre tiraba a la lista de seguros, aunque vinieras de
+   *        otro lado.
+   *      · No existía "adelante": la URL nunca cambiaba.
+   *
+   * ✅ CÓMO FUNCIONA AHORA
+   *
+   *    Cada pantalla se guarda ADENTRO del historial del navegador
+   *    (`history.state.portalVista`). Una entrada por pantalla, ni una de
+   *    más. El navegador ya sabe apilar y desapilar: no hay que enseñarle.
+   *
+   *    Con eso salen gratis las tres cosas:
+   *      · atrás     → el navegador devuelve la vista anterior
+   *      · adelante  → devuelve la siguiente (antes no existía)
+   *      · salir     → cuando se acaban las nuestras, se va del portal
+   *
+   *    Es dejar que el navegador lleve la libreta en vez de llevar una
+   *    propia a escondidas.
+   */
+
+  /* ⬆️ Al cambiar de pantalla, arriba de todo.
+     Se prueban los TRES contenedores porque el scroll puede vivir en la
+     ventana o en `.portal-frame` según el tema y el navegador. Antes solo se
+     hacía `window.scrollTo(0,0)`: si el que scrollea es el frame, esa línea
+     no hacía nada y cada pantalla abría a media altura. */
+  const irArriba = () => {
+    try { window.scrollTo(0, 0); } catch { /* nada */ }
+    try { document.querySelector(".portal-frame")?.scrollTo?.(0, 0); } catch { /* nada */ }
+    try { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; } catch { /* nada */ }
   };
 
-  const abrirPoliza = (p) => {
-    setPolizaAbierta(p.id);
-    setVerCobertura(false);
-    setTab("seguros");
-    window.scrollTo(0, 0);
+  const VISTA_RAIZ = { tab: "seguros", poliza: null, filtro: null, doc: null };
+
+  const aplicarVista = (v) => {
+    const x = v || VISTA_RAIZ;
+    setTab(x.tab || "seguros");
+    setPolizaAbierta(x.poliza ?? null);
+    setFiltroPagos(x.filtro ?? null);
+    setVerDoc(x.doc ?? null);
   };
 
-  const volver = () => {
-    if (polizaAbierta) { setPolizaAbierta(null); irA("seguros"); }
-    else irA("seguros");
-  };
-
-  // El botón "atrás" del celular vuelve a la lista en vez de salir del portal.
-  useEffect(() => {
-    const onPop = () => {
-      volver();
-      try { window.history.pushState(null, "", window.location.href); } catch { /* file:// lo bloquea */ }
+  /* Ir a una pantalla nueva. Lo que no se pasa se hereda de la actual. */
+  const navegar = (cambios) => {
+    const v = {
+      tab, poliza: polizaAbierta, filtro: filtroPagos, doc: verDoc,
+      ...cambios,
     };
     try {
-      window.history.pushState(null, "", window.location.href);
-      window.addEventListener("popstate", onPop);
+      // Se CONSERVA lo que ya había en `history.state` (React Router guarda
+      // lo suyo ahí). Pisarlo le rompería su propio historial.
+      window.history.pushState(
+        { ...(window.history.state || {}), portalVista: v },
+        "",
+        window.location.href
+      );
+    } catch { /* file:// lo bloquea */ }
+    aplicarVista(v);
+    irArriba();
+  };
+
+  /* Atrás = el atrás DE VERDAD. El flechita del header y el botón del
+     teléfono hacen exactamente lo mismo, así no hay dos comportamientos
+     distintos para la misma intención. */
+  const atras = () => {
+    try { window.history.back(); } catch { aplicarVista(VISTA_RAIZ); }
+  };
+
+  const irA = (t) => navegar({ tab: t, poliza: null, filtro: null, doc: null });
+
+  const abrirPoliza = (p) => {
+    setVerCobertura(false);
+    navegar({ tab: "seguros", poliza: p.id, filtro: null, doc: null });
+  };
+
+  const verPagosDe = (id) => navegar({ tab: "pagos", poliza: null, filtro: id, doc: null });
+
+  /* 📄 Abrir un documento TAMBIÉN es navegar. Por eso entra al historial:
+     es lo que hace que "atrás" lo cierre en vez de dejarlo colgado arriba. */
+  const abrirDoc = (d) => navegar({ doc: d });
+
+  useEffect(() => {
+    // La entrada actual pasa a ser la raíz del portal. Es `replaceState`, no
+    // `pushState`: marcar dónde estamos parados no debe agregar un paso.
+    try {
+      window.history.replaceState(
+        { ...(window.history.state || {}), portalVista: VISTA_RAIZ },
+        "",
+        window.location.href
+      );
     } catch { /* nada */ }
+
+    const onPop = (e) => {
+      aplicarVista(e?.state?.portalVista);
+      irArriba();
+    };
+    window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [polizaAbierta, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Estados de carga y error ── */
   /* ⏳ CARGANDO: el esqueleto de la pantalla, no una ruedita.
@@ -250,6 +364,7 @@ export default function PortalAseguradoPage() {
   const titulo =
     esPrincipal ? nombreCliente
     : tab === "pagos" ? "Tus pagos"
+    : tab === "grua" ? "Grúa"
     : tab === "papeles" ? "Tus papeles"
     : detalle ? nombreBien(detalle)
     : tituloSeguros(polizas.length);
@@ -257,12 +372,6 @@ export default function PortalAseguradoPage() {
   const subtitulo = detalle
     ? [detalle.patente, detalle.anio].filter(Boolean).join(" · ")
     : null;
-
-  // 🙈 ¿Quedó algo por pagar cuyo importe no se puede mostrar?
-  //    Sin esto, un cliente de NRE con RC y una cuota vencida veía "No tenés
-  //    pagos pendientes": el total daba 0 porque esa póliza no suma.
-  //    Callar el monto es una cosa; callar la deuda sería otra.
-  const deudaOculta = useMemo(() => hayDeudaSinPrecio(polizas), [polizas]);
 
   const resumen =
     !esPrincipal ? null
@@ -288,8 +397,8 @@ export default function PortalAseguradoPage() {
           titulo={titulo}
           subtitulo={subtitulo}
           mostrarSaludo={esPrincipal}
-          mostrarAtras={!!polizaAbierta}
-          onAtras={volver}
+          mostrarAtras={!!polizaAbierta || filtroPagos !== null}
+          onAtras={atras}
           resumen={resumen}
           importesVisibles={importesVisibles}
           onToggleImportes={() => setImportesVisibles((v) => !v)}
@@ -312,7 +421,7 @@ export default function PortalAseguradoPage() {
               >
                 <span>{nombreBien(polizas.find((p) => p.id === filtroPagos) || {})}</span>
                 <button
-                  onClick={() => setFiltroPagos(null)}
+                  onClick={() => navegar({ filtro: null })}
                   style={{
                     background: "none", border: "none", fontSize: 13.5, fontWeight: 600,
                     cursor: "pointer", fontFamily: "inherit", color: "var(--m)", flexShrink: 0,
@@ -332,7 +441,7 @@ export default function PortalAseguradoPage() {
                   <ListaCupones
                     poliza={p}
                     cupones={p.cupones_robo}
-                    onVerCuponera={(url, nombre) => setVerDoc({ url, nombre: nombre || "Tu cuponera" })}
+                    onVerCuponera={(url, nombre) => abrirDoc({ url, nombre: nombre || "Tu cuponera" })}
                     onComprobanteSubido={() => setRecargar((n) => n + 1)}
                   />
                 </div>
@@ -352,8 +461,8 @@ export default function PortalAseguradoPage() {
               p={detalle}
               verCobertura={verCobertura}
               onToggleCobertura={() => setVerCobertura((v) => !v)}
-              onVerPagos={() => { setFiltroPagos(detalle.id); irA("pagos"); }}
-              onVerDoc={setVerDoc}
+              onVerPagos={() => verPagosDe(detalle.id)}
+              onVerDoc={abrirDoc}
               nombreCliente={nombreCliente}
             />
           ) : (
@@ -372,10 +481,17 @@ export default function PortalAseguradoPage() {
           </div>
         ) : null}
 
+        {/* ══════════ 🚨 GRÚA ══════════ */}
+        {tab === "grua" ? (
+          <div className="portal-pant">
+            <PantallaGrua polizas={conGrua} />
+          </div>
+        ) : null}
+
         {/* ══════════ 📄 PAPELES ══════════ */}
         {tab === "papeles" ? (
           <div className="portal-pant">
-            <Papeles polizas={polizas} onVerDoc={setVerDoc} nombreCliente={nombreCliente} />
+            <Papeles polizas={polizas} onVerDoc={abrirDoc} nombreCliente={nombreCliente} />
           </div>
         ) : null}
 
@@ -401,9 +517,10 @@ export default function PortalAseguradoPage() {
         onChange={irA}
         vencidos={vencidos}
         totalSeguros={polizas.length}
+        mostrarGrua={conGrua.length > 0}
       />
 
-      {verDoc ? <VisorDocumento doc={verDoc} onCerrar={() => setVerDoc(null)} /> : null}
+      {verDoc ? <VisorDocumento doc={verDoc} onCerrar={atras} /> : null}
 
       <Toaster position="bottom-center" toastOptions={{ style: { marginBottom: 80 } }} />
     </div>
@@ -478,6 +595,114 @@ function FilaSeguro({ poliza, onClick, primera, i = 0 }) {
   );
 }
 
+/* ══════════════════ 🚨 Grúa (pestaña propia) ══════════════════ */
+
+/* Antes esto vivía adentro de la ficha de cada auto. Para llegar había que
+   entrar al portal, elegir el auto y bajar hasta el bloque: tres pasos parado
+   en la banquina, con el auto cruzado.
+
+   Ahora tiene pestaña propia: un toque desde donde esté.
+
+   Con UN auto (el caso normal) va el botón grande y listo. Con varios, una
+   fila por auto: la grúa es POR PÓLIZA — cada compañía tiene su 0800 y su
+   carencia, así que un botón único no sabría a quién llamar. */
+function PantallaGrua({ polizas = [] }) {
+  const tel = (t) => `tel:${String(t || "").replace(/[^0-9+]/g, "")}`;
+
+  if (polizas.length === 1) {
+    const p = polizas[0];
+    const g = p.asistencia;
+
+    return (
+      <>
+        <Seccion>Si te quedaste en la calle</Seccion>
+
+        {g.disponible ? (
+          <a
+            href={tel(g.telefono)}
+            className="portal-tap"
+            style={{
+              display: "block", margin: "0 15px", padding: "24px 20px",
+              borderRadius: 16, background: "var(--al-bg)", color: "var(--al)",
+              textAlign: "center", textDecoration: "none",
+            }}
+          >
+            <span style={{ display: "block", fontSize: 19, fontWeight: 700, letterSpacing: "-.02em" }}>
+              Llamar a la grúa
+            </span>
+            <span style={{ display: "block", fontSize: 15, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+              {g.telefono}
+            </span>
+          </a>
+        ) : (
+          /* En carencia: no se deja tocar y se dice desde cuándo. Mejor eso a
+             que llame y le digan que no. */
+          <div
+            style={{
+              margin: "0 15px", padding: "22px 20px", borderRadius: 16,
+              background: "var(--wa-bg)", color: "var(--wa)", textAlign: "center",
+            }}
+          >
+            <span style={{ display: "block", fontSize: 17, fontWeight: 700, letterSpacing: "-.02em" }}>
+              Todavía no tenés grúa
+            </span>
+            <span style={{ display: "block", fontSize: 14, marginTop: 4 }}>
+              Disponible a partir del {fmtLargo(g.disponible_desde)}
+            </span>
+          </div>
+        )}
+
+        <div style={{ textAlign: "center", fontSize: 13, color: "var(--t2)", marginTop: 12 }}>
+          {nombreBien(p)} · {p.compania}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Seccion>Si te quedaste en la calle</Seccion>
+      <Lista>
+        {polizas.map((p, i) => {
+          const g = p.asistencia;
+          const fila = (
+            <Fila
+              primera={i === 0}
+              i={i}
+              icono={g.disponible ? <IconAlerta /> : <IconReloj />}
+              tono={g.disponible ? "alerta" : "aviso"}
+              resaltado
+              titulo={nombreBien(p)}
+              sub={
+                g.disponible
+                  ? `${p.compania} · ${g.telefono}`
+                  : `Disponible a partir del ${fmtLargo(g.disponible_desde)}`
+              }
+              derecha={
+                g.disponible ? (
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--al)", flexShrink: 0 }}>
+                    Llamar
+                  </span>
+                ) : null
+              }
+            />
+          );
+          // El `<a>` va por fuera (y no con la prop `href` de Fila) porque
+          // esa prop abre en pestaña nueva, y un `tel:` tiene que dispararle
+          // el marcador al teléfono, no abrir nada.
+          return g.disponible ? (
+            <a key={p.id} href={tel(g.telefono)} style={{ display: "block", textDecoration: "none" }}>
+              {fila}
+            </a>
+          ) : (
+            <div key={p.id}>{fila}</div>
+          );
+        })}
+      </Lista>
+    </>
+  );
+}
+
 /* ══════════════════ Detalle de una póliza ══════════════════ */
 
 function DetallePoliza({
@@ -488,153 +713,36 @@ function DetallePoliza({
   const docs = p.documentos || [];
   const cubre = p.que_cubre || [];
   const ojo = p.ojo_con || [];
-  const grua = p.asistencia || null;
 
   return (
     <>
-      {/* 🚨 LA GRÚA VA PRIMERO, ANTES QUE TODO.
-          Cuando el cliente abre el portal para llamar a la grúa está parado
-          en la banquina. No puede andar buscando el número entre las cuotas:
-          es lo primero que ve, y un toque llama.
+      {/* 🚨 LA GRÚA YA NO VIVE ACÁ.
+          Se mudó a su propia pestaña del menú de abajo (ver PantallaGrua).
+          Adentro de la ficha del auto quedaba a tres pasos: entrar, elegir el
+          auto y bajar. Parado en la banquina eso es una eternidad.
 
-          Si todavía está en carencia (los primeros 15/16 días de una póliza
-          NUEVA — al renovar no corre), no se deja tocar y se le dice desde
-          cuándo. Mejor eso a que llame y le digan que no. */}
-      {grua ? (
-        <>
-          <Seccion>Si te quedaste en la calle</Seccion>
-          <Lista>
-            {grua.disponible ? (
-              <a href={`tel:${String(grua.telefono).replace(/[^0-9+]/g, "")}`} style={{ display: "block" }}>
-                <Fila
-                  primera
-                  icono={<IconAlerta />}
-                  tono="alerta"
-                  titulo="Llamar a la grúa"
-                  sub={grua.telefono}
-                  derecha={
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>
-                      Llamar
-                    </span>
-                  }
-                />
-              </a>
-            ) : (
-              <Fila
-                primera
-                icono={<IconReloj />}
-                tono="aviso"
-                titulo="Grúa"
-                sub={`Disponible a partir del ${fmtLargo(grua.disponible_desde)}`}
-              />
-            )}
-          </Lista>
-        </>
-      ) : null}
+          Y sacarla de acá deja el ESTADO DE PAGO arriba de todo, que es lo
+          que tiene que pesar cuando el cliente entra tranquilo. */}
 
-      <Seccion>Tu cobertura</Seccion>
-      <Lista>
-        <FilaDato
-          primera
-          label="Cobertura"
-          valor={p.cobertura || "—"}
-          mas={(cubre.length || ojo.length) ? (verCobertura ? "Ocultar" : "Ver qué cubre") : null}
-          onClick={(cubre.length || ojo.length) ? onToggleCobertura : null}
-        />
+      {/* 💳 ESTADO DE PAGO — PRIMERO DE TODO.
+          Es lo único de esta pantalla que tiene fecha límite. Antes venía
+          después de la grúa y de cuatro filas de cobertura: el cliente
+          scrolleaba media pantalla de dato fijo para llegar a lo urgente.
 
-        {/* 🔑 El desplegable va ADENTRO del bloque, no debajo.
-            Antes quedaba suelto a todo el ancho, sin el fondo ni las esquinas
-            redondeadas — se veía como si se hubiera escapado de la tarjeta.
+          El título va en rojo (tono="alerta") y el ícono también
+          (`resaltado`). Es la ÚNICA fila del portal que se pinta así: si
+          todas gritaran, ninguna se escucharía.
 
-            Usa el mismo acordeón que los cupones: se pliega a la altura real
-            del contenido, no contra un techo fijo. */}
-        {(cubre.length || ojo.length) ? (
-          <div className={`portal-panel${verCobertura ? " abierto" : ""}`}>
-            <div style={{ borderTop: "1px solid var(--div)", padding: "12px 16px 14px" }}>
-              {cubre.map((x, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex", gap: 11, alignItems: "flex-start",
-                    fontSize: 14, color: "var(--t2)", padding: "7px 0",
-                  }}
-                >
-                  <span style={{ color: "var(--ok)", marginTop: 1, flexShrink: 0 }}>
-                    <IconTick size={15} />
-                  </span>
-                  <span>{x}</span>
-                </div>
-              ))}
-
-              {/* ⚠️ LA LETRA CHICA, EN CRIOLLO.
-                  Todo esto está en la póliza, pero en las hojas de cláusulas
-                  que nadie lee. Sacarlo a la superficie evita la discusión en
-                  el mostrador: el cliente se entera ANTES, no cuando reclama.
-
-                  Sale del PDF (ver polizas/views/lector_pdf.py). Si el papel
-                  no lo dice, la línea no aparece: no se le advierte de más. */}
-              {ojo.length ? (
-                <div style={{ marginTop: 10, paddingTop: 12, borderTop: "1px solid var(--div)" }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t3)", marginBottom: 6 }}>
-                    Tené en cuenta
-                  </div>
-                  {ojo.map((x, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex", gap: 11, alignItems: "flex-start",
-                        fontSize: 13.5, color: "var(--t3)", padding: "5px 0", lineHeight: 1.45,
-                      }}
-                    >
-                      <span style={{ flexShrink: 0, marginTop: 1 }}>·</span>
-                      <span>{x}</span>
-                    </div>
-                  ))}
-
-                  {/* El robo por partes no lista las piezas en NINGÚN lado de
-                      la póliza. Que pregunten: es más honesto que inventar. */}
-                  {p.oficina_whatsapp ? (
-                    <a
-                      href={waLink(
-                        p.oficina_whatsapp,
-                        `Hola, soy ${nombreCliente}. Quería saber qué partes me cubre el seguro de mi ${nombreBien(p)}.`
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "inline-block", marginTop: 10, fontSize: 13.5,
-                        fontWeight: 600, color: "var(--m)",
-                      }}
-                    >
-                      Consultanos por WhatsApp
-                    </a>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        <FilaDato label="Aseguradora" valor={p.compania || "—"} />
-        {/* 💰 El número COMPLETO, sin tener que tocar.
-            Antes mostraba "$21,5 millones" y había que tocar dos veces para
-            ver el número real. Entra perfecto en la fila.
-            Y la etiqueta dice QUÉ SIGNIFICA: "suma asegurada" es jerga. */}
-        {p.suma_asegurada ? (
-          <FilaDato label="Si te lo roban, cobrás" valor={money(p.suma_asegurada)} />
-        ) : null}
-        {p.fecha_emision ? <FilaDato label="Desde" valor={fmt(p.fecha_emision)} /> : null}
-      </Lista>
-
-      {/* Situación de pago: lleva directo a los cupones de esta póliza. */}
+          Lleva directo a los cupones de esta póliza. */}
       {s.estado !== "al_dia" && (p.cupones_robo || []).length ? (
         <>
-          <Seccion>Estado de pago</Seccion>
+          <Seccion tono={s.estado === "vencido" ? "alerta" : undefined}>Estado de pago</Seccion>
           <Lista>
             <Fila
               primera
               icono={<IconAlerta />}
               tono={s.estado === "vencido" ? "alerta" : "aviso"}
+              resaltado={s.estado === "vencido"}
               titulo={
                 s.estado === "vencido"
                   ? (s.vencidos > 1 ? `${s.vencidos} pagos vencidos` : "Pago vencido")
@@ -651,6 +759,96 @@ function DetallePoliza({
           </Lista>
         </>
       ) : null}
+
+      <Seccion>Tu cobertura</Seccion>
+      <Lista>
+        <FilaDato
+          primera
+          label="Cobertura"
+          valor={p.cobertura || "—"}
+          mas={verCobertura ? "Ocultar" : "Ver detalle"}
+          onClick={onToggleCobertura}
+        />
+
+        <div className={`portal-panel${verCobertura ? " abierto" : ""}`}>
+          <div>
+            {(cubre.length || ojo.length) ? (
+              <div style={{ borderTop: "1px solid var(--div)", padding: "12px 16px 14px" }}>
+                {cubre.map((x, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex", gap: 11, alignItems: "flex-start",
+                      fontSize: 14, color: "var(--t2)", padding: "7px 0",
+                    }}
+                  >
+                    <span style={{ color: "var(--ok)", marginTop: 1, flexShrink: 0 }}>
+                      <IconTick size={15} />
+                    </span>
+                    <span>{x}</span>
+                  </div>
+                ))}
+
+                {/* ⚠️ LA LETRA CHICA, EN CRIOLLO.
+                    Todo esto está en la póliza, pero en las hojas de cláusulas
+                    que nadie lee. Sacarlo a la superficie evita la discusión en
+                    el mostrador: el cliente se entera ANTES, no cuando reclama.
+
+                    Sale del PDF (ver polizas/views/lector_pdf.py). Si el papel
+                    no lo dice, la línea no aparece: no se le advierte de más. */}
+                {ojo.length ? (
+                  <div style={{ marginTop: 10, paddingTop: 12, borderTop: "1px solid var(--div)" }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t3)", marginBottom: 6 }}>
+                      Tené en cuenta
+                    </div>
+                    {ojo.map((x, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: "flex", gap: 11, alignItems: "flex-start",
+                          fontSize: 13.5, color: "var(--t3)", padding: "5px 0", lineHeight: 1.45,
+                        }}
+                      >
+                        <span style={{ flexShrink: 0, marginTop: 1 }}>·</span>
+                        <span>{x}</span>
+                      </div>
+                    ))}
+
+                    {/* El robo por partes no lista las piezas en NINGÚN lado de
+                        la póliza. Que pregunten: es más honesto que inventar. */}
+                    {p.oficina_whatsapp ? (
+                      <a
+                        href={waLink(
+                          p.oficina_whatsapp,
+                          `Hola, soy ${nombreCliente}. Quería saber qué partes me cubre el seguro de mi ${nombreBien(p)}.`
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "inline-block", marginTop: 10, fontSize: 13.5,
+                          fontWeight: 600, color: "var(--m)",
+                        }}
+                      >
+                        Consultanos por WhatsApp
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <FilaDato label="Aseguradora" valor={p.compania || "—"} />
+            {/* 💰 El número COMPLETO, sin tener que tocar.
+                Antes mostraba "$21,5 millones" y había que tocar dos veces para
+                ver el número real. Entra perfecto en la fila.
+                Y la etiqueta dice QUÉ SIGNIFICA: "suma asegurada" es jerga. */}
+            {p.suma_asegurada ? (
+              <FilaDato label="Si te lo roban, cobrás" valor={money(p.suma_asegurada)} />
+            ) : null}
+            {p.fecha_emision ? <FilaDato label="Desde" valor={fmt(p.fecha_emision)} /> : null}
+          </div>
+        </div>
+      </Lista>
 
       <Seccion>Documentos</Seccion>
       {docs.length ? (

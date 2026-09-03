@@ -27,9 +27,11 @@ import dayjs from "dayjs";
 import {
   HiArrowLeft, HiExternalLink, HiClipboardCopy, HiCheck, HiX,
   HiUpload, HiPhotograph, HiCalendar, HiExclamation, HiEye, HiRefresh,
+  HiPhone, HiClock, HiLightningBolt,
 } from "react-icons/hi";
 
 import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 
 /* ═══════════════ helpers ═══════════════ */
@@ -53,9 +55,21 @@ const TONO_CUPON = {
 export default function PanelPortalPage() {
   const { clienteId } = useParams();
 
+  // 🔒 La grúa solo la toca el ADMIN: prenderla antes de tiempo es prometerle
+  //    al cliente un servicio que la compañía todavía puede rechazar.
+  const { user } = useAuth();
+  const esAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
+
   const [data, setData] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(null); // id de la fila que está trabajando
+
+  // 🚨 Días de carencia que el operador está escribiendo, por póliza:
+  //    { [polizaId]: "15" }. Solo guarda lo TOCADO — lo que no está acá se
+  //    lee del backend. Así, al recargar, el valor nuevo aparece solo y no
+  //    queda una copia vieja pisando la buena.
+  const [gruaDias, setGruaDias] = useState({});
+  const [gruaGuardando, setGruaGuardando] = useState(null); // id de la póliza
 
   // Un input de archivo escondido, reusado para todo lo que se sube.
   // `destino` guarda qué se está subiendo y para qué cupón.
@@ -100,6 +114,30 @@ export default function PanelPortalPage() {
   useEffect(() => { cargar(); }, [cargar]);
 
   /* ---------- acciones ---------- */
+
+  // 🚨 Guardar la grúa de UNA póliza (días y/o estado).
+  //    Se manda solo lo que cambió: el backend deja el resto como está.
+  const guardarGrua = async (poliza, cambios) => {
+    setGruaGuardando(poliza.id);
+    try {
+      await api.post("/polizas/panel-portal/asistencia/", {
+        poliza_id: poliza.id,
+        ...cambios,
+      });
+      toast.success("Grúa actualizada");
+      // Se limpia el borrador de ese input: a partir de acá manda el backend.
+      setGruaDias((d) => {
+        const { [poliza.id]: _fuera, ...resto } = d;
+        return resto;
+      });
+      cargar();
+    } catch (err) {
+      console.error("[panel-portal] grúa:", err);
+      toast.error(err?.response?.data?.detail || "No se pudo guardar la grúa.");
+    } finally {
+      setGruaGuardando(null);
+    }
+  };
 
   const copiarLink = () => {
     if (!data?.portal_url) return;
@@ -279,9 +317,39 @@ export default function PanelPortalPage() {
       const lectura = await api.post("/polizas/lector-pdf/", fd);
       if (!lectura?.data?.ok) throw new Error("El lector no pudo con el archivo.");
 
+      // 📎 EL PDF TAMBIÉN SE GUARDA, NO SOLO SE LEE.
+      //
+      // 🐛 EL BUG QUE ARREGLA:
+      //    Antes el archivo se mandaba SOLO al lector, que saca los datos y lo
+      //    tira. La póliza quedaba con las cuotas bien pero SIN el papel.
+      //
+      //    Y ese papel es lo que el portal le muestra al cliente en Rapipago
+      //    (`cuponera_url`). Sin él, el cliente veía "Todavía no tenemos tu
+      //    papel de pago" para siempre: reprocesar mil veces no lo arreglaba,
+      //    porque este camino nunca guardaba nada.
+      //
+      //    Es leer una carta y tirarla: te enterás de lo que dice, pero
+      //    después no tenés qué mostrar.
+      //
+      //    Si Cloudinary falla, el reproceso SIGUE: las cuotas y los recortes
+      //    son lo más importante y el archivo se puede subir después.
+      let documentoPdf = null;
+      try {
+        const up = await uploadToCloudinary(file, "polizas/reprocesadas");
+        documentoPdf = {
+          url: up.secure_url,
+          public_id: up.public_id,
+          mime: up.mime || "application/pdf",
+          nombre: file.name,
+        };
+      } catch (errUp) {
+        console.error("[panel-portal] no se pudo guardar el PDF:", errUp);
+      }
+
       const res = await api.post("/polizas/panel-portal/reprocesar/", {
         poliza_id: polizaId,
         datos: lectura.data.datos || {},
+        documento_pdf: documentoPdf || undefined,
       });
 
       // Resumen en una línea: solo lo que efectivamente cambió.
@@ -294,9 +362,14 @@ export default function PanelPortalPage() {
       if (suma("cupones_actualizados", "cupones_creados"))
         partes.push(`${suma("cupones_actualizados", "cupones_creados")} cupón(es)`);
       if (r.imagenes) partes.push(`${r.imagenes} imagen(es)`);
+      if (r.documento) partes.push("PDF adjuntado");
       if (r.intocables) partes.push(`${r.intocables} pagado(s) sin tocar`);
 
       toast.success(partes.length ? `Listo: ${partes.join(" · ")}` : "El PDF ya coincidía. Nada que cambiar.", { id: aviso });
+      if (!documentoPdf) {
+        toast("Los datos se acomodaron, pero no se pudo guardar el archivo PDF.",
+              { icon: "📎", duration: 6000 });
+      }
       cargar();
     } catch (err) {
       console.error("[panel-portal] reprocesar:", err);
@@ -442,6 +515,120 @@ export default function PanelPortalPage() {
                     <span>{x}</span>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {/* ── 🚨 GRÚA ──
+                Va ARRIBA de los cupones a propósito: es lo único de esta
+                pantalla que el cliente puede necesitar HOY, parado en la
+                banquina. Los cupones esperan; una grúa mal bloqueada, no.
+
+                Solo aparece si la compañía tiene grúa cargada (AMCA y
+                Equidad sí, NRE no). */}
+            {p.asistencia ? (
+              <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-2">
+
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  <HiPhone className="w-4 h-4 shrink-0 text-suave dark:text-suave-dark" />
+                  <span className="text-sm font-black text-titulo dark:text-titulo-dark">Grúa</span>
+                  <span className="text-xs font-mono font-bold text-suave dark:text-suave-dark">
+                    {p.asistencia.telefono}
+                  </span>
+
+                  {/* Lo que ve el cliente AHORA MISMO. Es el resultado, no la
+                      configuración: el operador tiene que poder confirmarlo
+                      de un vistazo sin abrir el portal. */}
+                  <span
+                    className={`ml-auto rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide ${
+                      p.asistencia.disponible
+                        ? "bg-duo-verde-soft text-duo-verde-sombra"
+                        : "bg-duo-amarillo-soft text-duo-amarillo-sombra"
+                    }`}
+                  >
+                    {p.asistencia.disponible
+                      ? "El cliente puede llamar"
+                      : `Bloqueada hasta ${fecha(p.asistencia.disponible_desde)}`}
+                  </span>
+                </div>
+
+                {esAdmin ? (
+                  <>
+                    {/* Los 3 modos. Es un termostato: normalmente decide solo,
+                        pero si la oficina sabe algo que el sistema no sabe
+                        (la póliza ya venía andando), se pone a mano. */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "auto", txt: "Automático", Icono: HiLightningBolt,
+                          ayuda: "Cuenta los días desde la emisión (lo normal)" },
+                        { id: "activa", txt: "Activa ya", Icono: HiCheck,
+                          ayuda: "Hay grúa, sin importar la fecha de emisión" },
+                        { id: "espera", txt: "En espera", Icono: HiClock,
+                          ayuda: "Sin grúa, aunque la cuenta diga que ya pasó" },
+                      ].map(({ id, txt, Icono, ayuda }) => {
+                        const activo = (p.asistencia.estado_manual || "auto") === id;
+                        return (
+                          <button
+                            key={id}
+                            title={ayuda}
+                            disabled={gruaGuardando === p.id || activo}
+                            onClick={() => guardarGrua(p, { estado_manual: id })}
+                            className={`cursor-pointer h-11 rounded-2xl border-2 inline-flex items-center justify-center gap-1.5 text-xs font-black transition-all disabled:opacity-100 ${
+                              activo
+                                ? "border-duo-verde bg-duo-verde/10 text-duo-verde-sombra dark:text-duo-verde"
+                                : "border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark active:translate-y-0.5"
+                            }`}
+                          >
+                            <Icono className="w-3.5 h-3.5 shrink-0" />
+                            {txt}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Días de carencia. El botón de guardar aparece solo si
+                        el número cambió: sin cambios no hay nada que guardar. */}
+                    <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark">
+                      <span className="text-xs font-bold text-suave dark:text-suave-dark">
+                        Días de carencia
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="90"
+                        value={gruaDias[p.id] ?? String(p.asistencia.carencia_dias ?? 0)}
+                        onChange={(e) =>
+                          setGruaDias((d) => ({ ...d, [p.id]: e.target.value }))
+                        }
+                        className="w-20 h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-center text-sm font-black text-titulo dark:text-titulo-dark"
+                      />
+                      <span className="text-[11px] font-bold text-suave dark:text-suave-dark">
+                        Equidad 15 · AMCA 16
+                      </span>
+
+                      {gruaDias[p.id] != null &&
+                       gruaDias[p.id] !== String(p.asistencia.carencia_dias ?? 0) ? (
+                        <button
+                          onClick={() =>
+                            guardarGrua(p, { carencia_dias: gruaDias[p.id] })
+                          }
+                          disabled={gruaGuardando === p.id}
+                          className="cursor-pointer ml-auto h-10 px-4 rounded-2xl bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 inline-flex items-center justify-center gap-1.5 text-xs font-black disabled:opacity-50"
+                        >
+                          <HiCheck className="w-4 h-4" />
+                          {gruaGuardando === p.id ? "Guardando…" : "Guardar"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xs font-bold text-suave dark:text-suave-dark">
+                    Carencia de {p.asistencia.carencia_dias} días
+                    {p.asistencia.estado_manual && p.asistencia.estado_manual !== "auto"
+                      ? " · fijada a mano por el administrador"
+                      : ""}
+                    . Solo el administrador puede cambiarla.
+                  </div>
+                )}
               </div>
             ) : null}
 

@@ -12,8 +12,22 @@
 
 import { IconChevron } from "./Iconos";
 
-/** Título de sección, con contador opcional a la derecha. */
-export function Seccion({ children, extra }) {
+/* Los colores del portal, en un solo lado. Los usan `Seccion`, `Fila` y `Chip`. */
+const TONOS = {
+  marca:  { bg: "var(--m-soft)",  fg: "var(--m)" },
+  ok:     { bg: "var(--ok-bg)",   fg: "var(--ok)" },
+  alerta: { bg: "var(--al-bg)",   fg: "var(--al)" },
+  aviso:  { bg: "var(--wa-bg)",   fg: "var(--wa)" },
+};
+
+/** Título de sección, con contador opcional a la derecha.
+ *
+ * `tono` pinta el título. Sin tono va gris, que es lo normal: si todos los
+ * títulos gritaran, ninguno se escucharía. Se reserva para el que tiene que
+ * saltar a la vista — hoy, "Estado de pago" cuando hay algo vencido.
+ */
+export function Seccion({ children, extra, tono }) {
+  const color = TONOS[tono]?.fg || "var(--t3)";
   return (
     <div
       style={{
@@ -24,7 +38,7 @@ export function Seccion({ children, extra }) {
       <span
         style={{
           fontSize: 11, fontWeight: 700, letterSpacing: ".1em",
-          textTransform: "uppercase", color: "var(--t3)",
+          textTransform: "uppercase", color,
         }}
       >
         {children}
@@ -57,16 +71,16 @@ export function Lista({ children }) {
   );
 }
 
-const TONOS = {
-  marca:  { bg: "var(--m-soft)",  fg: "var(--m)" },
-  ok:     { bg: "var(--ok-bg)",   fg: "var(--ok)" },
-  alerta: { bg: "var(--al-bg)",   fg: "var(--al)" },
-  aviso:  { bg: "var(--wa-bg)",   fg: "var(--wa)" },
-};
-
-/** Una fila de la lista. */
+/** Una fila de la lista.
+ *
+ * `resaltado` (opcional) pinta el ícono con el color del `tono` en vez del
+ * gris de siempre. Es OPT-IN a propósito: si todas las filas tuvieran el
+ * ícono de color, ninguna resaltaría y competirían con el monto.
+ * Se usa en la fila del pago vencido, que es la única que tiene que gritar.
+ */
 export function Fila({
-  icono, tono = "marca", titulo, sub, derecha, onClick, href, primera = false, i = 0,
+  icono, tono = "marca", titulo, sub, derecha, onClick, href,
+  primera = false, i = 0, resaltado = false,
 }) {
   const t = TONOS[tono] || TONOS.marca;
 
@@ -77,9 +91,11 @@ export function Fila({
           style={{
             height: 41, width: 41, borderRadius: 12, display: "flex",
             alignItems: "center", justifyContent: "center", flexShrink: 0,
-            // Fondo neutro: el color se reserva para el estado (el monto y
-            // el "vencido"). Si el ícono también fuera de color, competirían.
-            background: "var(--bg)", color: "var(--t2)",
+            // Fondo neutro por defecto: el color se reserva para el estado (el
+            // monto y el "vencido"). Si el ícono también fuera de color,
+            // competirían. Con `resaltado` sí toma el color del tono.
+            background: resaltado ? t.bg : "var(--bg)",
+            color: resaltado ? t.fg : "var(--t2)",
           }}
         >
           {icono}
@@ -91,6 +107,7 @@ export function Fila({
           style={{
             display: "block", fontSize: 15.5, fontWeight: 600,
             letterSpacing: "-.015em", lineHeight: 1.3,
+            color: resaltado ? t.fg : undefined,
           }}
         >
           {titulo}

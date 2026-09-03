@@ -191,6 +191,9 @@ function formVacio() {
   };
 }
 
+/* Los 4 pasos del camino por PDF. El manual usa los 3 por defecto. */
+const PASOS_PDF = ["Archivo", "Cliente", "Vehículo", "Confirmar"];
+
 /* ═══════════════ componente ═══════════════ */
 
 export default function NuevaSolicitudModal({
@@ -203,7 +206,17 @@ export default function NuevaSolicitudModal({
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
-  // Pasos: "dni" | "modo" | "pdf_cia" | "pdf_form" | "man_cliente" | "man_vehiculo" | "man_confirmar"
+  // Pasos del wizard. Los dos caminos comparten el arranque y después se
+  // abren:
+  //   común  : "dni" → "telefono" → "modo"
+  //   PDF    : "pdf_cia" → "pdf_archivo" → "pdf_cliente" → "pdf_vehiculo" → "pdf_confirmar"
+  //   a mano : "man_cliente" → "man_vehiculo" → "man_confirmar"
+  //
+  // 🐛 El camino de PDF era UN SOLO paso ("pdf_form") con todo adentro: subir
+  //    el archivo, los avisos, el responsable, el cliente, el vehículo, la
+  //    compañía, la cobertura y la sucursal. Un scroll interminable donde no
+  //    se sabía dónde estabas ni qué faltaba, y con el botón "Crear" activo
+  //    desde el primer segundo.
   const [paso, setPaso] = useState("dni");
 
   const [form, setForm] = useState(formVacio());
@@ -360,7 +373,7 @@ export default function NuevaSolicitudModal({
     setAvisoArchivo("");
     setAvisosPdf([]);
     setDniConflicto("");
-    setPaso("pdf_form");
+    setPaso("pdf_archivo");
   }
 
   /* ---------- 🪪 resolver el conflicto de DNI ---------- */
@@ -583,7 +596,7 @@ export default function NuevaSolicitudModal({
     return base;
   }, [companias, form.compania]);
 
-  const faltaCampo = (k) => paso === "pdf_form" && ciaElegida && !pdfTrajo[k];
+  const faltaCampo = (k) => paso.startsWith("pdf_") && ciaElegida && !pdfTrajo[k];
 
   // ¿La compañía elegida es "regular" (NRE) o "irregular" (AMCA y afines)?
   //   NRE → cuotas automáticas (no se cargan fechas).
@@ -715,7 +728,9 @@ export default function NuevaSolicitudModal({
     "Sucursal";
 
   // ¿En qué pasos se muestra el botón "Crear" en el footer?
-  const mostrarCrear = (paso === "pdf_form" || paso === "man_confirmar") && !creado;
+  // El botón "Crear" solo en el último paso de cada camino. Antes, en el
+  // camino de PDF, estaba disponible desde que se abría la pantalla.
+  const mostrarCrear = (paso === "pdf_confirmar" || paso === "man_confirmar") && !creado;
 
   const tituloHeader = creado
     ? "Alta creada"
@@ -727,8 +742,14 @@ export default function NuevaSolicitudModal({
     ? "¿Cómo la cargás?"
     : paso === "pdf_cia"
     ? "¿De qué compañía?"
-    : paso === "pdf_form"
-    ? `Desde PDF · ${ciaElegida || ""}`
+    : paso === "pdf_archivo"
+    ? `${ciaElegida || "PDF"} · Archivo`
+    : paso === "pdf_cliente"
+    ? `${ciaElegida || "PDF"} · Cliente`
+    : paso === "pdf_vehiculo"
+    ? `${ciaElegida || "PDF"} · Vehículo`
+    : paso === "pdf_confirmar"
+    ? `${ciaElegida || "PDF"} · Confirmar`
     : paso === "man_cliente"
     ? "A mano · Cliente"
     : paso === "man_vehiculo"
@@ -863,9 +884,12 @@ export default function NuevaSolicitudModal({
                 </div>
                 <BtnVolver onClick={() => setPaso("modo")}>Volver</BtnVolver>
               </>
-            ) : paso === "pdf_form" ? (
-              /* ══════ PASO 4 (PDF): subir archivo + formulario ══════ */
+            ) : paso === "pdf_archivo" ? (
+              /* ══════ PDF — Paso 1: el archivo ══════
+                 Solo el PDF y lo que salió de él. Nada de campos todavía:
+                 si el archivo está mal, todo lo demás sobra. */
               <>
+                <PasosWizard actual={1} labels={PASOS_PDF} />
                 <BtnVolver onClick={() => setPaso("pdf_cia")}>Cambiar compañía</BtnVolver>
 
                 <BloquePdf
@@ -892,9 +916,15 @@ export default function NuevaSolicitudModal({
                 />
 
                 {/* ⚠️ Lo que el lector no pudo leer o encontró raro.
-                    Va ARRIBA del formulario a propósito: es lo que hay que
-                    revisar mientras se completan los campos, no después. */}
+                    Va acá, en el paso del archivo, porque es de acá que sale:
+                    se lee ANTES de avanzar, no cuando ya cargaste todo. */}
                 <PanelAvisosPdf avisos={avisosPdf} />
+              </>
+            ) : paso === "pdf_cliente" ? (
+              /* ══════ PDF — Paso 2: cliente ══════ */
+              <>
+                <PasosWizard actual={2} labels={PASOS_PDF} />
+                <BtnVolver onClick={() => setPaso("pdf_archivo")}>Volver al archivo</BtnVolver>
 
                 <SeccionResponsable
                   empleados={empleados}
@@ -908,6 +938,12 @@ export default function NuevaSolicitudModal({
                 ) : (
                   <SeccionClienteCampos form={form} set={set} faltaCampo={faltaCampo} />
                 )}
+              </>
+            ) : paso === "pdf_vehiculo" ? (
+              /* ══════ PDF — Paso 3: vehículo y póliza ══════ */
+              <>
+                <PasosWizard actual={3} labels={PASOS_PDF} />
+                <BtnVolver onClick={() => setPaso("pdf_cliente")}>Volver al cliente</BtnVolver>
 
                 <SeccionVehiculo
                   form={form}
@@ -922,6 +958,17 @@ export default function NuevaSolicitudModal({
                   oficinaId={oficinaId}
                   setOficinaId={setOficinaId}
                 />
+              </>
+            ) : paso === "pdf_confirmar" ? (
+              /* ══════ PDF — Paso 4: confirmar ══════
+                 Recién acá aparece el botón Crear. Antes estaba disponible
+                 desde el minuto uno, con medio formulario vacío. */
+              <>
+                <PasosWizard actual={4} labels={PASOS_PDF} />
+                <BtnVolver onClick={() => setPaso("pdf_vehiculo")}>Volver al vehículo</BtnVolver>
+                <ResumenConfirmar form={form} clienteExistente={clienteExistente} responsable={responsable} />
+                <ResumenCuotasPdf cupones={cuponesPdf} />
+                <PanelAvisosPdf avisos={avisosPdf} />
               </>
             ) : paso === "man_cliente" ? (
               /* ══════ WIZARD MANUAL — Paso 1: Cliente ══════ */
@@ -1031,6 +1078,14 @@ export default function NuevaSolicitudModal({
             faltaCobertura={faltaCobertura}
             mostrarCrear={mostrarCrear}
             onCrear={crear}
+            leyendoPdf={leyendoPdf}
+            onSiguiente={() =>
+              setPaso(
+                paso === "pdf_archivo" ? "pdf_cliente"
+                : paso === "pdf_cliente" ? "pdf_vehiculo"
+                : "pdf_confirmar"
+              )
+            }
             onSiguienteCliente={() => setPaso("man_vehiculo")}
             onSiguienteVehiculo={() => setPaso("man_confirmar")}
           />
@@ -1068,17 +1123,63 @@ export default function NuevaSolicitudModal({
 
 /* ═══════════════ sub-componentes ═══════════════ */
 
-function FooterNav({ paso, creado, guardando, faltaCompania, faltaCobertura, mostrarCrear, onCrear, onSiguienteCliente, onSiguienteVehiculo }) {
+function FooterNav({
+  paso, creado, guardando, faltaCompania, faltaCobertura, mostrarCrear,
+  onCrear, onSiguienteCliente, onSiguienteVehiculo, onSiguiente, leyendoPdf,
+}) {
   if (creado) return null;
 
-  // Wizard manual: paso cliente → siguiente
+  const Barra = ({ children }) => (
+    <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+      {children}
+    </div>
+  );
+
+  /* ── Camino PDF ──
+     Cada paso valida lo suyo antes de dejar avanzar. Antes estaba todo en una
+     pantalla y los faltantes recién se veían al final, al apretar Crear. */
+
+  // Paso 1: no se puede avanzar mientras el lector trabaja. Si se avanzara,
+  // el resultado del PDF pisaría campos que el operador ya estaría tocando.
+  if (paso === "pdf_archivo") {
+    return (
+      <Barra>
+        <Boton3D variant="azul" full size="lg" onClick={onSiguiente} disabled={leyendoPdf}>
+          {leyendoPdf ? "Leyendo el archivo…" : "Siguiente: Cliente →"}
+        </Boton3D>
+      </Barra>
+    );
+  }
+
+  if (paso === "pdf_cliente") {
+    return (
+      <Barra>
+        <Boton3D variant="azul" full size="lg" onClick={onSiguiente}>
+          Siguiente: Vehículo →
+        </Boton3D>
+      </Barra>
+    );
+  }
+
+  // Paso 3: la compañía es obligatoria — de ahí salen las cuotas y los cupones.
+  if (paso === "pdf_vehiculo") {
+    return (
+      <Barra>
+        <Boton3D variant="azul" full size="lg" onClick={onSiguiente} disabled={faltaCompania}>
+          {faltaCompania ? "Elegí la compañía" : "Siguiente: Confirmar →"}
+        </Boton3D>
+      </Barra>
+    );
+  }
+
+  /* ── Camino manual ── */
   if (paso === "man_cliente") {
     return (
-      <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+      <Barra>
         <Boton3D variant="azul" full size="lg" onClick={onSiguienteCliente}>
           Siguiente: Vehículo →
         </Boton3D>
-      </div>
+      </Barra>
     );
   }
   // Wizard manual: paso vehículo → siguiente (requiere compañía Y cobertura)
@@ -1086,11 +1187,11 @@ function FooterNav({ paso, creado, guardando, faltaCompania, faltaCobertura, mos
     const bloquea = faltaCompania || faltaCobertura;
     const texto = faltaCompania ? "Elegí la compañía" : faltaCobertura ? "Elegí la cobertura" : "Siguiente: Confirmar →";
     return (
-      <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+      <Barra>
         <Boton3D variant="azul" full size="lg" onClick={onSiguienteVehiculo} disabled={bloquea}>
           {texto}
         </Boton3D>
-      </div>
+      </Barra>
     );
   }
   // Crear. En manual (man_confirmar) también exige cobertura; en PDF solo compañía.
@@ -1105,11 +1206,11 @@ function FooterNav({ paso, creado, guardando, faltaCompania, faltaCobertura, mos
       ? "Falta la cobertura"
       : "Crear Alta";
     return (
-      <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+      <Barra>
         <Boton3D variant="verde" full size="lg" onClick={onCrear} disabled={bloquea}>
           <HiSparkles /> {texto}
         </Boton3D>
-      </div>
+      </Barra>
     );
   }
   return null;
@@ -1330,15 +1431,35 @@ function BloquePdf({ cfg, inputRef, leyendo, onPick, onFile, chips, avisoArchivo
   return (
     <CardDuo className="p-4">
       <input ref={inputRef} type="file" accept=".pdf" multiple className="hidden" onChange={onFile} />
-      {chips.length === 0 ? (
+
+      {/* ⏳ LEYENDO — PANTALLA PROPIA, NO UN TEXTO CHIQUITO.
+          Antes lo único que cambiaba era la etiqueta del botón ("Leyendo
+          PDF…"). Con un PDF de La Equidad el lector tarda varios segundos
+          —extrae el texto, busca la cuponera, recorta cada cupón y los sube
+          a Cloudinary— y en ese rato la pantalla parecía colgada. El
+          operador volvía a tocar el botón y subía el archivo dos veces.
+
+          Ahora ocupa el bloque entero, con la rueda girando y diciendo qué
+          está haciendo. Es la diferencia entre un cartel de "en obra" y una
+          calle cortada sin explicación. */}
+      {leyendo ? (
+        <div className="rounded-2xl border-[3px] border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center">
+          <div className="mx-auto mb-3 h-11 w-11 rounded-full border-4 border-duo-azul/25 border-t-duo-azul animate-spin" />
+          <div className="font-black text-duo-azul text-[15px]">Leyendo el archivo…</div>
+          <div className="text-[12px] font-bold text-suave dark:text-suave-dark mt-1.5 leading-relaxed">
+            Sacando los datos y recortando los cupones.
+            <br />
+            Puede tardar unos segundos. No cierres la ventana.
+          </div>
+        </div>
+      ) : chips.length === 0 ? (
         <button
           onClick={onPick}
-          disabled={leyendo}
-          className="w-full rounded-2xl border-[3px] border-dashed border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center transition-all hover:brightness-105 disabled:opacity-60"
+          className="w-full rounded-2xl border-[3px] border-dashed border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center transition-all hover:brightness-105"
         >
           <div className="text-4xl mb-1">📄</div>
           <div className="font-black text-duo-azul text-[15px] flex items-center justify-center gap-2">
-            {leyendo ? "Leyendo PDF…" : (<><HiUpload /> Subir {cfg?.archivo}</>)}
+            <HiUpload /> Subir {cfg?.archivo}
           </div>
           <div className="text-[12px] font-bold text-suave dark:text-suave-dark mt-1">{cfg?.ayuda}</div>
         </button>
@@ -1357,8 +1478,8 @@ function BloquePdf({ cfg, inputRef, leyendo, onPick, onFile, chips, avisoArchivo
             </div>
           </div>
           {avisoArchivo && <Aviso tono="warn"><b>⚠️ {avisoArchivo}</b></Aviso>}
-          <button onClick={onPick} disabled={leyendo} className="mt-2 text-[12px] font-extrabold uppercase tracking-wide text-duo-azul hover:opacity-80">
-            {leyendo ? "Leyendo…" : "↻ Subir otro PDF"}
+          <button onClick={onPick} className="mt-2 text-[12px] font-extrabold uppercase tracking-wide text-duo-azul hover:opacity-80">
+            ↻ Subir otro PDF
           </button>
         </>
       )}
@@ -1366,18 +1487,18 @@ function BloquePdf({ cfg, inputRef, leyendo, onPick, onFile, chips, avisoArchivo
   );
 }
 
-function PasosWizard({ actual }) {
-  const pasos = [
-    { n: 1, label: "Cliente" },
-    { n: 2, label: "Vehículo" },
-    { n: 3, label: "Confirmar" },
-  ];
+/* La barra de pasos. Sirve para los DOS caminos: el manual tiene 3 y el de
+   PDF tiene 4 (le suma "Archivo" al principio). Antes estaba clavada en 3 y
+   por eso el camino de PDF no la podía usar — y terminó siendo una sola
+   pantalla larguísima sin ninguna referencia de dónde estabas parado. */
+function PasosWizard({ actual, labels = ["Cliente", "Vehículo", "Confirmar"] }) {
+  const pasos = labels.map((label, i) => ({ n: i + 1, label }));
   return (
     <div className="flex items-center gap-2">
       {pasos.map((p, i) => (
         <div key={p.n} className="flex items-center gap-2 flex-1">
           <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide whitespace-nowrap ${
               p.n === actual
                 ? "bg-duo-azul text-white"
                 : p.n < actual
@@ -1709,6 +1830,38 @@ function DetallesTecnicos({ form, set, coberturas }) {
         <InputDuo label="N° Chasis" value={form.numero_chasis} onChange={set("numero_chasis")} placeholder="Opcional" />
       </div>
     </details>
+  );
+}
+
+/* 🎟️ Las cuotas que salieron del PDF, en el paso de confirmar.
+   Antes no se veían en ningún lado antes de crear: el operador apretaba
+   Crear y recién en la póliza descubría si eran 2 o 3, o si las fechas
+   estaban corridas. Verlas acá es el último control barato. */
+function ResumenCuotasPdf({ cupones = [] }) {
+  if (!cupones.length) return null;
+  const fmt = (f) => {
+    const [a, m, d] = String(f || "").split("-");
+    return d && m ? `${d}/${m}/${a}` : (f || "—");
+  };
+  return (
+    <SeccionCard
+      icon={<HiCheckCircle />}
+      tono="verde"
+      titulo={`${cupones.length} cuota${cupones.length > 1 ? "s" : ""} leída${cupones.length > 1 ? "s" : ""}`}
+      sub="Del PDF. Si algo no cuadra, volvé al archivo."
+    >
+      <div className="flex flex-wrap gap-2">
+        {cupones.map((c, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-[12px] font-bold text-titulo dark:text-titulo-dark"
+          >
+            <span className="text-suave dark:text-suave-dark">#{c.numero ?? i + 1}</span>
+            {fmt(c.vencimiento)}
+          </span>
+        ))}
+      </div>
+    </SeccionCard>
   );
 }
 

@@ -11,19 +11,46 @@
 
 import { IconPagos, IconSeguros, IconPapeles } from "./Iconos";
 
-/* 🎯 TRES pestañas, no cuatro.
+/* 🚨 El ícono de la grúa: un teléfono.
+   Se define acá y no en Iconos.jsx porque solo lo usa este menú. Y es un
+   teléfono, no una grúa: dice QUÉ HACÉS (llamar), no qué viene. Parado en la
+   banquina eso se lee más rápido. */
+function IconTelefono({ size = 22, w = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z" />
+    </svg>
+  );
+}
+
+/* 🎯 TRES pestañas fijas + la grúa, que va solo si hay a quién llamar.
    "Inicio" y "Seguros" mostraban la misma lista — Inicio le agregaba el
    resumen arriba y nada más. Fusionadas: el resumen queda en el header y
    los seguros abajo.
-   Además de sacar una pestaña repetida, entran los 4 seguros sin scrollear
-   y cada pestaña queda más ancha (más fácil de tocar). */
+
+   🚨 LA GRÚA TIENE PESTAÑA PROPIA.
+      Antes vivía adentro de la ficha de cada auto: para llegar había que
+      entrar al portal, elegir el auto y bajar. Tres pasos parado en la
+      banquina. Ahora es un toque desde donde esté.
+
+      Y de paso, sacarla del detalle deja el pago vencido arriba de todo,
+      que es lo que tiene que pesar cuando el cliente entra tranquilo.
+
+      Si NINGÚN auto tiene grúa cargada (todo NRE), la pestaña no aparece:
+      un botón que no llama a ningún lado es peor que no tenerlo. */
 const TABS = [
-  { id: "seguros", Icono: IconSeguros, label: "Mis seguros" },
-  { id: "pagos",   Icono: IconPagos,   label: "Pagos" },
-  { id: "papeles", Icono: IconPapeles, label: "Papeles" },
+  { id: "seguros", Icono: IconSeguros,  label: "Mis seguros" },
+  { id: "pagos",   Icono: IconPagos,    label: "Pagos" },
+  { id: "grua",    Icono: IconTelefono, label: "Grúa" },
+  { id: "papeles", Icono: IconPapeles,  label: "Papeles" },
 ];
 
-export default function TabsPortal({ activa, onChange, vencidos = 0, totalSeguros = 1 }) {
+export default function TabsPortal({
+  activa, onChange, vencidos = 0, totalSeguros = 1, mostrarGrua = false,
+}) {
+  const tabs = mostrarGrua ? TABS : TABS.filter((t) => t.id !== "grua");
+
   return (
     <nav
       style={{
@@ -34,7 +61,7 @@ export default function TabsPortal({ activa, onChange, vencidos = 0, totalSeguro
         boxShadow: "0 -6px 20px rgba(0,0,0,.09)",
       }}
     >
-      {TABS.map(({ id, Icono, label }) => {
+      {tabs.map(({ id, Icono, label }) => {
         const on = activa === id;
         // Con un solo seguro, el plural suena raro.
         const texto = id === "seguros" && totalSeguros === 1 ? "Mi seguro" : label;
