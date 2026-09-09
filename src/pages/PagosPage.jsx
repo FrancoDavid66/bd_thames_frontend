@@ -1,4 +1,4 @@
-/* src/pages/PagosPage.jsx — Panel de Cobranza (buscar + cobrar) · diseño Duo */
+/* src/pages/PagosPage.jsx — Panel de Cobranza (buscar + cobrar) */
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,6 +12,9 @@ import {
   HiUserGroup,
   HiIdentification,
   HiChevronRight as HiChevronRightMini,
+  HiCurrencyDollar,
+  HiDocumentReport,
+  HiPaperAirplane,
 } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
@@ -21,6 +24,8 @@ import PagosSearch from "../components/pagos/PagosSearch";
 import PagosList from "../components/pagos/PagosList";
 // 🧾 Medios de cobro unificado (Recordatorios + Panel de envío + Cuentas de cobro)
 import RecordatoriosCuotasModal, { CuentasCobroModal } from "../components/pagos/MediosCobro";
+// 📋 Reporte de contactos pendientes (PDF/Excel) — para gestión manual si falla el envío automático
+import ReporteContactosModal from "../components/notificaciones/ReporteContactosModal";
 // 🚨 Sistema unificado de alertas del cliente (siniestros + póliza + cuotas)
 import {
   AlertasClienteBadges,
@@ -267,6 +272,7 @@ const PagosPage = () => {
 
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
+  const [showReporteContactosModal, setShowReporteContactosModal] = useState(false);
 
   // 🚨 Aviso de alertas: el usuario debe confirmar "Entendido" para poder cobrar.
   const [avisoAlertasConfirmado, setAvisoAlertasConfirmado] = useState(false);
@@ -367,35 +373,58 @@ const PagosPage = () => {
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-10 2xl:px-12 py-4 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center text-2xl shrink-0">💰</div>
+            <div className="h-11 w-11 rounded-lg bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center shrink-0">
+              <HiCurrencyDollar className="text-duo-verde-sombra dark:text-duo-verde text-xl" />
+            </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2 flex-wrap">
                 <span>Cobranza</span>
-                <span className="inline-flex items-center rounded-full bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-xs font-black px-2 py-0.5">
+                <span className="inline-flex items-center rounded-full bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-[11px] font-medium px-2 py-0.5">
                   <HiSparkles className="mr-1" />
                   <span>Panel operativo</span>
                 </span>
               </h1>
-              <p className="text-suave dark:text-suave-dark text-sm sm:text-base mt-1 font-bold">
+              <p className="text-suave dark:text-suave-dark text-[13px] mt-1">
                 Buscá al cliente, revisá sus cuotas y cobrá.
-                {!isWebAdmin && <span className="text-duo-verde ml-2 font-black tracking-wide text-xs uppercase">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
+                {!isWebAdmin && <span className="text-duo-verde-sombra dark:text-duo-verde ml-2 font-medium text-[12px]">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
               </p>
             </div>
           </div>
 
-          {/* 🚀 ESCUDO ADMIN: Solo el admin ve el botón de medios de cobro */}
-          {isWebAdmin && (
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <button
-                type="button"
-                onClick={() => setShowCuentasModal(true)}
-                className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-2xl bg-duo-azul text-white px-4 h-11 text-sm font-black shadow-[0_4px_0_var(--color-duo-azul-sombra)] active:shadow-[0_0_0_var(--color-duo-azul-sombra)] active:translate-y-0.5 transition-all cursor-pointer"
-              >
-                <HiCog className="text-lg" />
-                <span>Medios de cobro</span>
-              </button>
-            </div>
-          )}
+          {/* 📋 Reporte de contactos: para TODOS — lo usan los empleados para
+              contactar a mano según su oficina. Recordatorios/Medios de cobro
+              siguen siendo solo del admin. */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={() => setShowReporteContactosModal(true)}
+              className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg bg-duo-azul text-white px-4 h-10 text-[13px] font-medium hover:brightness-110 transition-colors cursor-pointer"
+            >
+              <HiDocumentReport className="text-base" />
+              <span>Reporte de contactos</span>
+            </button>
+
+            {isWebAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowRecordatoriosModal(true)}
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark px-4 h-10 text-[13px] font-medium hover:border-duo-azul transition-colors cursor-pointer"
+                >
+                  <HiPaperAirplane className="text-base" />
+                  <span>Recordatorios</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCuentasModal(true)}
+                  className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark px-4 h-10 text-[13px] font-medium hover:border-duo-azul transition-colors cursor-pointer"
+                >
+                  <HiCog className="text-base" />
+                  <span>Medios de cobro</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <motion.div
@@ -403,15 +432,15 @@ const PagosPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-3 sm:space-y-4"
         >
-          <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 sm:p-6 space-y-3">
+          <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 sm:p-6 space-y-3">
             <PagosSearch onBuscar={handleBuscarPolizas} />
             <button
               type="button"
               onClick={() => setOcultarPagadas((v) => !v)}
-              className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark cursor-pointer"
+              className="inline-flex items-center gap-2 text-[13px] text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark cursor-pointer"
             >
               <span
-                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                   ocultarPagadas ? "bg-duo-azul border-duo-azul" : "border-linea dark:border-linea-dark"
                 }`}
               >
@@ -422,22 +451,22 @@ const PagosPage = () => {
             </button>
           </div>
 
-          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-3 sm:p-4">
+          <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul">
-                  <HiUserGroup className="w-5 h-5" />
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul">
+                  <HiUserGroup className="w-4 h-4" />
                 </span>
                 <div>
-                  <div className="text-sm font-black text-titulo dark:text-titulo-dark">Resultados por cliente</div>
-                  <div className="text-xs text-suave dark:text-suave-dark font-bold">Elegí un cliente para ver todas sus cuotas.</div>
+                  <div className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">Resultados por cliente</div>
+                  <div className="text-[12px] text-suave dark:text-suave-dark">Elegí un cliente para ver todas sus cuotas.</div>
                 </div>
               </div>
               {clienteSeleccionado && (
                 <button
                   type="button"
                   onClick={() => setClienteSeleccionado(null)}
-                  className="h-9 px-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-duo-azul cursor-pointer text-xs font-black"
+                  className="h-9 px-3 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-duo-azul cursor-pointer text-[12px] font-medium transition-colors"
                 >
                   Volver
                 </button>
@@ -445,11 +474,11 @@ const PagosPage = () => {
             </div>
 
             {clienteGroups.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-8 text-center text-suave dark:text-suave-dark font-bold">
+              <div className="rounded-xl border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-8 text-center text-suave dark:text-suave-dark text-[13px]">
                 Buscá por cliente, patente o póliza para ver resultados.
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
                 {clienteGroups.map((g) => {
                   const hasPend = g.pendientes > 0;
                   return (
@@ -457,37 +486,37 @@ const PagosPage = () => {
                       key={g.key}
                       type="button"
                       onClick={() => abrirCliente(g)}
-                      className={`text-left rounded-2xl border-2 px-3 py-3 sm:px-4 sm:py-4 transition-colors cursor-pointer bg-surface dark:bg-surface-dark ${
+                      className={`text-left rounded-xl border px-3 py-3 sm:px-4 sm:py-4 transition-colors cursor-pointer bg-surface dark:bg-surface-dark ${
                         hasPend ? "hover:border-duo-rojo" : "hover:border-duo-azul"
                       } border-linea dark:border-linea-dark`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark">
-                              <HiIdentification className="w-5 h-5" />
+                            <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark">
+                              <HiIdentification className="w-4 h-4" />
                             </span>
                             <div className="min-w-0">
-                              <div className="text-sm sm:text-base font-black text-titulo dark:text-titulo-dark truncate flex items-center gap-2 flex-wrap">
+                              <div className="text-[14px] font-semibold text-titulo dark:text-titulo-dark truncate flex items-center gap-2 flex-wrap">
                                 {g.label}
                                 {g.cliente_id && (
                                   <AlertasClienteBadges clienteId={g.cliente_id} cuotas={g.cuotas} max={4} />
                                 )}
                                 {isWebAdmin && g.oficinasLabel && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde whitespace-nowrap">
                                     {g.oficinasLabel}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-xs text-suave dark:text-suave-dark truncate font-bold">
-                                DNI: <span className="text-titulo dark:text-titulo-dark">{safe(g.dni, "—")}</span> • Cuotas:{" "}
+                              <div className="text-[12px] text-suave dark:text-suave-dark truncate">
+                                DNI: <span className="text-titulo dark:text-titulo-dark">{safe(g.dni, "—")}</span> · Cuotas:{" "}
                                 <span className="text-titulo dark:text-titulo-dark">{g.total}</span>
                               </div>
                             </div>
                           </div>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <span
-                              className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-black ${
+                              className={`inline-flex items-center rounded-full px-2.5 h-7 text-[11px] font-medium ${
                                 g.vencidas > 0
                                   ? "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo"
                                   : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark"
@@ -496,7 +525,7 @@ const PagosPage = () => {
                               Vencidas: <span className="ml-1">{g.vencidas}</span>
                             </span>
                             <span
-                              className={`inline-flex items-center rounded-full px-3 h-8 text-xs font-black ${
+                              className={`inline-flex items-center rounded-full px-2.5 h-7 text-[11px] font-medium ${
                                 g.pendientes > 0
                                   ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
                                   : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark"
@@ -504,13 +533,13 @@ const PagosPage = () => {
                             >
                               Pendientes: <span className="ml-1">{g.pendientes}</span>
                             </span>
-                            <span className="inline-flex items-center rounded-full px-3 h-8 text-xs font-black bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
+                            <span className="inline-flex items-center rounded-full px-2.5 h-7 text-[11px] font-medium bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
                               Cobrar: <span className="ml-1">{fmtMoney(g.totalMontoPendiente)}</span>
                             </span>
                           </div>
                         </div>
-                        <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark">
-                          <HiChevronRightMini className="w-5 h-5" />
+                        <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark">
+                          <HiChevronRightMini className="w-4 h-4" />
                         </span>
                       </div>
                     </button>
@@ -528,39 +557,39 @@ const PagosPage = () => {
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center"
               >
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={cerrarClienteModal} />
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={cerrarClienteModal} />
 
                 <motion.div
                   initial={{ y: 22, opacity: 0, scale: 0.98 }}
                   animate={{ y: 0, opacity: 1, scale: 1 }}
                   exit={{ y: 22, opacity: 0, scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 260, damping: 26 }}
-                  className="relative z-[81] w-full h-[95dvh] sm:h-auto sm:w-[min(980px,92vw)] sm:max-h-[90vh] flex flex-col bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+                  className="relative z-[81] w-full h-[95dvh] sm:h-auto sm:w-[min(980px,92vw)] sm:max-h-[90vh] flex flex-col bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden"
                   role="dialog"
                   aria-modal="true"
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shrink-0">
+                  <div className="px-4 sm:px-6 py-4 border-b border-linea dark:border-linea-dark bg-card dark:bg-card-dark shrink-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-base sm:text-lg font-black text-titulo dark:text-titulo-dark truncate flex items-center gap-2 flex-wrap">
+                        <div className="text-[15px] sm:text-[16px] font-semibold text-titulo dark:text-titulo-dark truncate flex items-center gap-2 flex-wrap">
                           {clienteSeleccionado?.label || "Cliente"}
                           {isWebAdmin && clienteSeleccionado?.oficinasLabel && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde whitespace-nowrap">
-                              🏢 {clienteSeleccionado.oficinasLabel}
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde whitespace-nowrap">
+                              {clienteSeleccionado.oficinasLabel}
                             </span>
                           )}
                         </div>
-                        <div className="mt-1 text-xs sm:text-sm text-suave dark:text-suave-dark font-bold flex flex-wrap gap-x-3 gap-y-1">
-                          <span>DNI: <span className="text-titulo dark:text-titulo-dark font-black">{safe(clienteSeleccionado?.dni, "—")}</span></span>
-                          <span>• Cuotas: <span className="text-titulo dark:text-titulo-dark font-black">{clienteSeleccionado?.total ?? 0}</span></span>
+                        <div className="mt-1 text-[12px] sm:text-[13px] text-suave dark:text-suave-dark flex flex-wrap gap-x-3 gap-y-1">
+                          <span>DNI: <span className="text-titulo dark:text-titulo-dark font-medium">{safe(clienteSeleccionado?.dni, "—")}</span></span>
+                          <span>· Cuotas: <span className="text-titulo dark:text-titulo-dark font-medium">{clienteSeleccionado?.total ?? 0}</span></span>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={cerrarClienteModal}
-                        className="h-10 px-3 rounded-2xl bg-surface dark:bg-surface-dark hover:brightness-95 border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-2 cursor-pointer font-black"
+                        className="h-9 px-3 rounded-lg bg-surface dark:bg-surface-dark hover:bg-linea dark:hover:bg-linea-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-2 cursor-pointer text-[13px] font-medium transition-colors"
                       >
-                        <HiX className="w-5 h-5" />
+                        <HiX className="w-4 h-4" />
                         <span className="hidden sm:inline">Cerrar</span>
                       </button>
                     </div>
@@ -605,6 +634,7 @@ const PagosPage = () => {
 
       <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
       <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} isWebAdmin={isWebAdmin} userOficina={userOficina} />
+      <ReporteContactosModal open={showReporteContactosModal} onClose={() => setShowReporteContactosModal(false)} />
     </div>
   );
 };

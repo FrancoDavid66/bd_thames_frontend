@@ -1,4 +1,4 @@
-// src/components/estadisticas/CalidadDatosPanel.jsx  (diseño Duo)
+// src/components/estadisticas/CalidadDatosPanel.jsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -16,23 +16,22 @@ const vacio = (v) => v === null || v === undefined || String(v).trim() === "";
 
 /* ──────────────────────────────────────────────────────────────
    CAMPOS DEL CLIENTE QUE AUDITAMOS.
-   Colores unificados a tokens Duo (con variedad para distinguirlos).
    ────────────────────────────────────────────────────────────── */
 const CAMPOS_CLIENTE = [
-  { key: "telefono",         label: "Sin teléfono",      short: "teléfono",   icon: HiPhone,          color: "text-egreso",                          bg: "bg-egreso/8 border-egreso/25" },
-  { key: "email",            label: "Sin email",         short: "email",      icon: HiMail,           color: "text-transferencia",                   bg: "bg-transferencia/8 border-transferencia/25" },
-  { key: "dni",              label: "Sin DNI/CUIT",      short: "DNI",        icon: HiIdentification, color: "text-egreso",                          bg: "bg-egreso/8 border-egreso/25" },
-  { key: "fecha_nacimiento", label: "Sin fecha de nac.", short: "fecha nac.", icon: HiCake,           color: "text-transferencia",                   bg: "bg-transferencia/8 border-transferencia/25" },
-  { key: "direccion",        label: "Sin dirección",     short: "dirección",  icon: HiHome,           color: "text-oficina",                         bg: "bg-oficina/8 border-oficina/25" },
-  { key: "localidad",        label: "Sin localidad",     short: "localidad",  icon: HiLocationMarker, color: "text-oficina",                         bg: "bg-oficina/8 border-oficina/25" },
-  { key: "dni_frente",       label: "Sin DNI frente",    short: "DNI frente", icon: HiPhotograph,     color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/25" },
-  { key: "dni_dorso",        label: "Sin DNI dorso",     short: "DNI dorso",  icon: HiPhotograph,     color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/25" },
+  { key: "telefono",         label: "Sin teléfono",      short: "teléfono",   icon: HiPhone,          color: "text-egreso",                          bg: "bg-egreso/8 border-egreso/20" },
+  { key: "email",            label: "Sin email",         short: "email",      icon: HiMail,           color: "text-transferencia",                   bg: "bg-transferencia/8 border-transferencia/20" },
+  { key: "dni",              label: "Sin DNI/CUIT",      short: "DNI",        icon: HiIdentification, color: "text-egreso",                          bg: "bg-egreso/8 border-egreso/20" },
+  { key: "fecha_nacimiento", label: "Sin fecha de nac.", short: "fecha nac.", icon: HiCake,           color: "text-transferencia",                   bg: "bg-transferencia/8 border-transferencia/20" },
+  { key: "direccion",        label: "Sin dirección",     short: "dirección",  icon: HiHome,           color: "text-oficina",                         bg: "bg-oficina/8 border-oficina/20" },
+  { key: "localidad",        label: "Sin localidad",     short: "localidad",  icon: HiLocationMarker, color: "text-oficina",                         bg: "bg-oficina/8 border-oficina/20" },
+  { key: "dni_frente",       label: "Sin DNI frente",    short: "DNI frente", icon: HiPhotograph,     color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/20" },
+  { key: "dni_dorso",        label: "Sin DNI dorso",     short: "DNI dorso",  icon: HiPhotograph,     color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/20" },
 ];
 
 // KPIs de pólizas (vienen del endpoint de estadísticas, no se pueden clickear)
 const CAMPOS_POLIZA = [
-  { key: "sin_patente",  label: "Pólizas sin patente",  icon: HiShieldExclamation, color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/25" },
-  { key: "sin_vehiculo", label: "Pólizas sin vehículo", icon: HiExclamationCircle, color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/25" },
+  { key: "sin_patente",  label: "Pólizas sin patente",  icon: HiShieldExclamation, color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/20" },
+  { key: "sin_vehiculo", label: "Pólizas sin vehículo", icon: HiExclamationCircle, color: "text-[#d97706] dark:text-tarjeta-claro", bg: "bg-tarjeta/8 border-tarjeta/20" },
   { key: "sin_compania", label: "Pólizas sin compañía", icon: HiExclamationCircle, color: "text-suave dark:text-suave-dark",        bg: "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark" },
 ];
 
@@ -168,23 +167,23 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
 
   const Celda = ({ value }) =>
     vacio(value)
-      ? <span className="text-egreso font-black">Falta</span>
-      : <span className="text-suave dark:text-suave-dark font-bold">{value}</span>;
+      ? <span className="text-egreso font-medium">Falta</span>
+      : <span className="text-suave dark:text-suave-dark">{value}</span>;
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Auditoría de calidad</h2>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <h2 className="text-base font-semibold text-titulo dark:text-titulo-dark">Auditoría de calidad</h2>
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             Perfiles incompletos que dificultan la gestión y el contacto
           </p>
         </div>
         <button
           onClick={() => { fetchKpis(); fetchList(); }}
           disabled={loadingKpis}
-          className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+          className="h-9 w-9 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
         >
           <HiRefresh className={`text-sm ${loadingKpis ? "animate-spin" : ""}`} />
         </button>
@@ -196,21 +195,21 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
         onClick={() => setCampoActivo("incompleto")}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`w-full text-left rounded-3xl border-2 p-4 transition-all bg-egreso/[0.06] border-egreso/25 ${
-          campoActivo === "incompleto" ? "ring-2 ring-egreso/50" : "hover:brightness-105"
+        className={`w-full text-left rounded-xl border p-4 transition-colors bg-egreso/[0.06] border-egreso/20 ${
+          campoActivo === "incompleto" ? "ring-2 ring-egreso/40" : "hover:brightness-105"
         }`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <HiClipboardList className="text-egreso text-base shrink-0" />
             <div>
-              <div className="text-[11px] font-black uppercase tracking-wider text-titulo dark:text-titulo-dark">
+              <div className="text-[12px] text-titulo dark:text-titulo-dark">
                 Clientes incompletos
               </div>
-              <div className="text-[10px] font-bold text-suave dark:text-suave-dark">Les falta al menos un dato</div>
+              <div className="text-[11px] text-suave dark:text-suave-dark">Les falta al menos un dato</div>
             </div>
           </div>
-          <div className={`text-3xl font-black tabular-nums ${loadingKpis ? "text-suave dark:text-suave-dark" : "text-egreso"}`}>
+          <div className={`text-3xl font-semibold tabular-nums ${loadingKpis ? "text-suave dark:text-suave-dark" : "text-egreso"}`}>
             {loadingKpis ? "—" : Number(kpis.incompletos || 0).toLocaleString("es-AR")}
           </div>
         </div>
@@ -218,7 +217,7 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
 
       {/* KPIs de CLIENTE (clickeables) */}
       <div>
-        <p className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-2 ml-0.5">
+        <p className="text-[11px] text-suave dark:text-suave-dark mb-2 ml-0.5">
           Por dato puntual — tocá una tarjeta para filtrar el listado
         </p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -232,17 +231,17 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: i * 0.04 }}
-                className={`text-left rounded-2xl border-2 p-4 transition-all ${k.bg} ${
-                  activo ? "ring-2 ring-oficina/50 scale-[1.01]" : "hover:brightness-105"
+                className={`text-left rounded-xl border p-4 transition-colors ${k.bg} ${
+                  activo ? "ring-2 ring-oficina/40 scale-[1.01]" : "hover:brightness-105"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-3">
                   <k.icon className={`text-sm shrink-0 ${k.color}`} />
-                  <span className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+                  <span className="text-[11px] text-suave dark:text-suave-dark">
                     {k.label}
                   </span>
                 </div>
-                <div className={`text-3xl font-black tabular-nums ${loadingKpis ? "text-suave dark:text-suave-dark" : k.color}`}>
+                <div className={`text-3xl font-semibold tabular-nums ${loadingKpis ? "text-suave dark:text-suave-dark" : k.color}`}>
                   {loadingKpis ? "—" : Number(kpis[`sin_${k.key}`] || 0).toLocaleString("es-AR")}
                 </div>
               </motion.button>
@@ -253,7 +252,7 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
 
       {/* KPIs de PÓLIZA (informativos) */}
       <div>
-        <p className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-2 ml-0.5">
+        <p className="text-[11px] text-suave dark:text-suave-dark mb-2 ml-0.5">
           Datos faltantes de pólizas
         </p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -263,15 +262,15 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: i * 0.04 }}
-              className={`rounded-2xl border-2 p-4 ${k.bg}`}
+              className={`rounded-xl border p-4 ${k.bg}`}
             >
               <div className="flex items-center gap-2 mb-3">
                 <k.icon className={`text-sm shrink-0 ${k.color}`} />
-                <span className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+                <span className="text-[11px] text-suave dark:text-suave-dark">
                   {k.label}
                 </span>
               </div>
-              <div className={`text-3xl font-black tabular-nums ${loadingKpis ? "text-suave dark:text-suave-dark" : k.color}`}>
+              <div className={`text-3xl font-semibold tabular-nums ${loadingKpis ? "text-suave dark:text-suave-dark" : k.color}`}>
                 {loadingKpis ? "—" : Number(kpis[k.key] || 0).toLocaleString("es-AR")}
               </div>
             </motion.div>
@@ -280,30 +279,30 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
       </div>
 
       {/* Listado de clientes según el campo activo */}
-      <div className="rounded-2xl border-2 border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+      <div className="rounded-xl border border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
           <div>
-            <span className="text-xs font-black text-titulo dark:text-titulo-dark">
+            <span className="text-xs font-medium text-titulo dark:text-titulo-dark">
               Clientes — {labelPorKey(campoActivo)}
             </span>
-            <span className="ml-2 text-[10px] font-bold text-suave dark:text-suave-dark">
+            <span className="ml-2 text-[11px] text-suave dark:text-suave-dark">
               {count.toLocaleString("es-AR")} encontrados
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 h-9 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-xl px-2.5 focus-within:border-oficina transition-colors">
+            <div className="flex items-center gap-1.5 h-9 bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-lg px-2.5 focus-within:border-oficina transition-colors">
               <HiSearch className="text-suave dark:text-suave-dark text-xs shrink-0" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar..."
-                className="bg-transparent text-xs font-bold text-titulo dark:text-titulo-dark outline-none w-32 placeholder:text-suave dark:placeholder:text-suave-dark"
+                className="bg-transparent text-xs text-titulo dark:text-titulo-dark outline-none w-32 placeholder:text-suave dark:placeholder:text-suave-dark"
               />
             </div>
             <button
               onClick={downloadCsv}
               disabled={!items.length}
-              className="h-9 flex items-center gap-1.5 px-3 rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors disabled:opacity-30 text-xs font-black"
+              className="h-9 flex items-center gap-1.5 px-3 rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors disabled:opacity-30 text-xs font-medium"
             >
               <HiDownload className="text-xs" /> CSV
             </button>
@@ -313,22 +312,22 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead>
-              <tr className="border-b-2 border-linea dark:border-linea-dark">
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Asegurado</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">DNI / CUIT</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Teléfono</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Email</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">F. Nac.</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Localidad</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Qué le falta</th>
-                <th className="px-4 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark"></th>
+              <tr className="border-b border-linea dark:border-linea-dark">
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Asegurado</th>
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">DNI / CUIT</th>
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Teléfono</th>
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Email</th>
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">F. Nac.</th>
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Localidad</th>
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Qué le falta</th>
+                <th className="px-4 py-2.5 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-linea/40 dark:divide-linea-dark/40">
+            <tbody className="divide-y divide-linea/40 dark:divide-linea-dark/40">
               {loadingList ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-suave dark:text-suave-dark font-bold">Cargando...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-suave dark:text-suave-dark">Cargando...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-suave dark:text-suave-dark font-bold">
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-suave dark:text-suave-dark">
                   {search ? "Sin resultados para esa búsqueda." : "¡Todo en orden! No hay clientes para este filtro."}
                 </td></tr>
               ) : items.map((c) => {
@@ -341,7 +340,7 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
                     className="hover:bg-oficina/5 transition-colors group align-top"
                   >
                     <td className="px-4 py-3">
-                      <span className="font-black text-titulo dark:text-titulo-dark">
+                      <span className="font-medium text-titulo dark:text-titulo-dark">
                         {`${c.apellido || ""} ${c.nombre || ""}`.trim() || "—"}
                       </span>
                     </td>
@@ -352,13 +351,13 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
                     <td className="px-4 py-3"><Celda value={c.localidad} /></td>
                     <td className="px-4 py-3">
                       {faltan.length === 0 ? (
-                        <span className="text-ingreso font-black text-[11px]">Completo ✓</span>
+                        <span className="text-ingreso font-medium text-[11px]">Completo ✓</span>
                       ) : (
                         <div className="flex flex-wrap gap-1 max-w-[260px]">
                           {faltan.map((f) => (
                             <span
                               key={f.key}
-                              className={`inline-flex items-center rounded-md border-2 px-1.5 py-0.5 text-[10px] font-black ${f.bg} ${f.color}`}
+                              className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${f.bg} ${f.color}`}
                             >
                               {f.short}
                             </span>
@@ -369,7 +368,7 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => navigate(`/clientes/${c.id}`)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[10px] font-black"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[11px] font-medium"
                       >
                         Ver perfil <HiArrowRight className="text-xs" />
                       </button>
@@ -382,15 +381,15 @@ export default function CalidadDatosPanel({ apiBase, oficina, getOficinaNombre, 
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-            <span className="text-[10px] font-bold text-suave dark:text-suave-dark">Página {page} de {totalPages}</span>
+          <div className="flex items-center justify-between px-5 py-3 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <span className="text-[11px] text-suave dark:text-suave-dark">Página {page} de {totalPages}</span>
             <div className="flex items-center gap-1.5">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
-                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors">
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors">
                 <HiChevronLeft className="text-xs" />
               </button>
               <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors">
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors">
                 <HiChevronRight className="text-xs" />
               </button>
             </div>

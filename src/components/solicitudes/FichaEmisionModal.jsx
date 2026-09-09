@@ -127,7 +127,7 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
             <Link
               to={`/polizas/${solicitud.poliza_id}`}
               target="_blank"
-              className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-duo-azul hover:opacity-80"
+              className="inline-flex items-center gap-1 text-[11px] text-duo-azul hover:opacity-80"
             >
               Póliza #{solicitud.poliza_id} <HiExternalLink />
             </Link>
@@ -160,8 +160,8 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
         </Bloque>
 
         {solicitud?.observaciones && (
-          <div className="rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark p-4">
-            <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-2">
+          <div className="rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark p-4">
+            <div className="text-[11px] text-suave dark:text-suave-dark mb-2">
               Observaciones
             </div>
             <CopyValue text={solicitud.observaciones} />
@@ -172,11 +172,11 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <HiPhotograph className="text-duo-rojo text-lg" />
-            <h4 className="text-titulo dark:text-titulo-dark font-black text-[13px] uppercase tracking-wide">
+            <h4 className="text-titulo dark:text-titulo-dark font-medium text-[13px]">
               Evidencia ({imagenes.length})
             </h4>
             {otros.length > 0 && (
-              <span className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+              <span className="text-[11px] text-suave dark:text-suave-dark">
                 · {otros.length} docs
               </span>
             )}
@@ -185,11 +185,11 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
           {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="aspect-video rounded-2xl bg-surface dark:bg-surface-dark animate-pulse" />
+                <div key={i} className="aspect-video rounded-xl bg-surface dark:bg-surface-dark animate-pulse" />
               ))}
             </div>
           ) : imagenes.length === 0 && otros.length === 0 ? (
-            <p className="text-[13px] font-bold text-suave dark:text-suave-dark text-center py-6">
+            <p className="text-[13px] text-suave dark:text-suave-dark text-center py-6">
               Sin documentos cargados.
             </p>
           ) : (
@@ -201,9 +201,9 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
                     href={d.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="group relative block aspect-video rounded-2xl overflow-hidden border-2 border-linea dark:border-linea-dark"
+                    className="group relative block aspect-video rounded-xl overflow-hidden border border-linea dark:border-linea-dark"
                   >
-                    <img src={d.url} alt="" className="w-full h-full object-cover transition group-hover:scale-105" />
+                    <img src={d.url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                     <div className="absolute top-2 right-2 h-6 w-6 rounded-lg bg-black/50 flex items-center justify-center text-white">
                       <HiExternalLink />
                     </div>
@@ -218,7 +218,7 @@ export default function FichaEmisionModal({ solicitud, onClose }) {
                       href={d.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-[12px] font-black"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-[12px] font-medium"
                     >
                       <HiExternalLink /> {d.nombre || d.tipo || "Documento"}
                     </a>
@@ -241,12 +241,12 @@ function Bloque({ icon, tono = "azul", titulo, cols = 2, children }) {
     amarillo: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
   };
   return (
-    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-base ${tonos[tono] || tonos.azul}`}>
           {icon}
         </div>
-        <h4 className="text-titulo dark:text-titulo-dark font-black text-[13px] uppercase tracking-wide">{titulo}</h4>
+        <h4 className="text-titulo dark:text-titulo-dark font-medium text-[13px]">{titulo}</h4>
       </div>
       <div className={`grid gap-3 ${cols === 2 ? "grid-cols-2" : "grid-cols-1"}`}>{children}</div>
     </div>
@@ -256,10 +256,10 @@ function Bloque({ icon, tono = "azul", titulo, cols = 2, children }) {
 function Dato({ label, value, linkTo, mono = false }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark ml-1">
+      <span className="text-[11px] text-suave dark:text-suave-dark ml-1">
         {label}
       </span>
-      <div className={`p-2.5 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark ${mono ? "font-mono" : ""}`}>
+      <div className={`p-2.5 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark ${mono ? "font-mono" : ""}`}>
         <CopyValue text={value} linkTo={linkTo} />
       </div>
     </div>
@@ -287,17 +287,17 @@ function CopyValue({ text, linkTo }) {
           to={linkTo}
           target="_blank"
           rel="noopener noreferrer"
-          className="truncate text-[13px] font-black text-duo-azul hover:opacity-80"
+          className="truncate text-[13px] font-medium text-duo-azul hover:opacity-80"
         >
           {String(display)}
         </Link>
       ) : (
-        <span className="truncate text-[13px] font-bold text-titulo dark:text-titulo-dark">{String(display)}</span>
+        <span className="truncate text-[13px] text-titulo dark:text-titulo-dark">{String(display)}</span>
       )}
       <button
         onClick={onCopy}
         title="Copiar"
-        className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center transition ${
+        className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${
           ok ? "bg-duo-verde text-white" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark group-hover/copy:text-titulo dark:group-hover/copy:text-titulo-dark"
         }`}
       >
@@ -305,4 +305,4 @@ function CopyValue({ text, linkTo }) {
       </button>
     </div>
   );
-}
+}

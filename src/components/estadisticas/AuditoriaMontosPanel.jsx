@@ -1,4 +1,4 @@
-// src/components/estadisticas/AuditoriaMontosPanel.jsx  (diseño Duo)
+// src/components/estadisticas/AuditoriaMontosPanel.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -20,7 +20,7 @@ const fmtMoney = (n) => {
   return "$ " + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 });
 };
 
-// Definición visual de cada tipo de hallazgo (colores Duo)
+// Definición visual de cada tipo de hallazgo
 const SECCIONES = [
   {
     key: "pagadas_cero",
@@ -45,10 +45,10 @@ const SECCIONES = [
   },
 ];
 
-// Clases Duo por color de sección
+// Clases por color de sección
 const COLORS = {
-  egreso:  { text: "text-egreso",                          border: "border-egreso/30",  bg: "bg-egreso/[0.06]" },
-  tarjeta: { text: "text-[#d97706] dark:text-tarjeta-claro", border: "border-tarjeta/30", bg: "bg-tarjeta/[0.06]" },
+  egreso:  { text: "text-egreso",                          border: "border-egreso/25",  bg: "bg-egreso/[0.06]" },
+  tarjeta: { text: "text-[#d97706] dark:text-tarjeta-claro", border: "border-tarjeta/25", bg: "bg-tarjeta/[0.06]" },
 };
 
 export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombre }) {
@@ -88,15 +88,15 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Auditoría de montos</h2>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <h2 className="text-base font-semibold text-titulo dark:text-titulo-dark">Auditoría de montos</h2>
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             Cuotas con montos sospechosos para revisar — no acusa, solo marca lo que se sale de lo normal
           </p>
         </div>
         <button
           onClick={fetchData}
           disabled={loading}
-          className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+          className="h-9 w-9 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
           title="Actualizar"
         >
           <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
@@ -109,11 +109,11 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
           const c = COLORS[s.color];
           const Icon = s.icon;
           return (
-            <div key={s.key} className={`rounded-2xl border-2 ${c.border} ${c.bg} p-3.5`}>
-              <div className={`text-[11px] font-black flex items-center gap-1.5 uppercase tracking-wide ${c.text}`}>
+            <div key={s.key} className={`rounded-xl border ${c.border} ${c.bg} p-3.5`}>
+              <div className={`text-[11px] flex items-center gap-1.5 ${c.text}`}>
                 <Icon className="text-sm" /> {s.titulo}
               </div>
-              <div className={`text-2xl font-black mt-0.5 ${c.text}`}>
+              <div className={`text-2xl font-semibold mt-0.5 ${c.text}`}>
                 {resumen[s.key] ?? 0}
               </div>
             </div>
@@ -123,7 +123,7 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl border-2 border-egreso/40 bg-egreso/10 px-3 py-2 text-xs font-bold text-egreso dark:text-egreso-claro flex items-center gap-2">
+        <div className="rounded-lg border border-egreso/35 bg-egreso/10 px-3 py-2 text-xs text-egreso dark:text-egreso-claro flex items-center gap-2">
           <HiExclamationCircle className="text-base shrink-0" />
           {error}
         </div>
@@ -131,8 +131,8 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
 
       {/* Todo limpio */}
       {!loading && !error && resumen.total === 0 && (
-        <div className="rounded-3xl border-2 border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-8 text-center text-sm font-bold text-suave dark:text-suave-dark">
-          ✅ No se detectaron montos anómalos con los criterios actuales.
+        <div className="rounded-xl border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-8 text-center text-sm text-suave dark:text-suave-dark">
+          No se detectaron montos anómalos con los criterios actuales.
         </div>
       )}
 
@@ -147,12 +147,12 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
           <div key={s.key} className="space-y-2">
             <div className="flex items-center gap-2">
               <Icon className={`text-base ${c.text}`} />
-              <h3 className={`text-sm font-black ${c.text}`}>{s.titulo}</h3>
-              <span className="text-[11px] font-bold text-suave dark:text-suave-dark">({lista.length})</span>
+              <h3 className={`text-sm font-semibold ${c.text}`}>{s.titulo}</h3>
+              <span className="text-[11px] text-suave dark:text-suave-dark">({lista.length})</span>
             </div>
-            <p className="text-[11px] font-bold text-suave dark:text-suave-dark -mt-1">{s.desc}</p>
+            <p className="text-[11px] text-suave dark:text-suave-dark -mt-1">{s.desc}</p>
 
-            <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden divide-y-2 divide-linea/50 dark:divide-linea-dark/50">
+            <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden divide-y divide-linea/50 dark:divide-linea-dark/50">
               {lista.map((row, idx) => (
                 <motion.div
                   key={`${row.cuota_id}-${idx}`}
@@ -162,20 +162,20 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
                   className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-oficina/5 transition-colors"
                 >
                   <div className="min-w-0">
-                    <div className="text-sm font-black text-titulo dark:text-titulo-dark truncate">
+                    <div className="text-sm font-medium text-titulo dark:text-titulo-dark truncate">
                       {row.cliente || "Sin nombre"}
-                      <span className="ml-2 text-[10px] font-mono font-bold text-suave dark:text-suave-dark">
+                      <span className="ml-2 text-[11px] font-mono text-suave dark:text-suave-dark">
                         Cuota #{row.cuota_nro} · {row.patente || row.numero_poliza || `Pól ${row.poliza_id}`}
                       </span>
                     </div>
-                    <div className="text-[11px] font-bold text-suave dark:text-suave-dark mt-0.5 flex flex-wrap items-center gap-x-2">
-                      <span className={`font-mono font-black ${c.text}`}>{fmtMoney(row.monto)}</span>
+                    <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5 flex flex-wrap items-center gap-x-2">
+                      <span className={`font-mono font-medium ${c.text}`}>{fmtMoney(row.monto)}</span>
                       <span className="text-suave/60 dark:text-suave-dark/60">·</span>
                       <span>{row.motivo}</span>
                       {row.oficina_nombre && (
                         <>
                           <span className="text-suave/60 dark:text-suave-dark/60">·</span>
-                          <span className="text-[10px] font-mono font-black border-2 border-linea dark:border-linea-dark rounded-md px-1.5 py-0.5 text-suave dark:text-suave-dark">
+                          <span className="text-[11px] font-mono border border-linea dark:border-linea-dark rounded-md px-1.5 py-0.5 text-suave dark:text-suave-dark">
                             {row.oficina_nombre}
                           </span>
                         </>
@@ -184,7 +184,7 @@ export default function AuditoriaMontosPanel({ apiBase, oficina, getOficinaNombr
                   </div>
                   <button
                     onClick={() => navigate(`/polizas/${row.poliza_id}`)}
-                    className="shrink-0 inline-flex items-center gap-1 text-xs font-black text-ingreso hover:text-ingreso-fuerte transition-colors"
+                    className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-ingreso hover:text-ingreso-fuerte transition-colors"
                     title="Ver póliza"
                   >
                     Ver <HiArrowRight className="text-xs" />

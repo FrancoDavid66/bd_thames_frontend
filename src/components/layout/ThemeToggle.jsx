@@ -11,7 +11,7 @@ export default function ThemeToggle({ small = false }) {
   return (
     <button
       onClick={toggleTheme}
-      className={`inline-flex items-center justify-center rounded-full border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-tarjeta-claro dark:text-duo-amarillo transition hover:border-duo-amarillo hover:text-duo-amarillo-sombra dark:hover:text-duo-amarillo ${sizeClasses}`}
+      className={`inline-flex items-center justify-center rounded-full border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark transition-colors hover:border-duo-violeta hover:text-duo-violeta ${sizeClasses}`}
       aria-label="Cambiar tema"
       title={isDark ? "Modo claro" : "Modo oscuro"}
     >

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaTrash, FaCheck } from 'react-icons/fa';
+import { HiTrash, HiCheck } from 'react-icons/hi';
 
 const BotonBorrarCliente = ({ onClick }) => {
   const [confirmado, setConfirmado] = useState(false);
@@ -14,12 +14,9 @@ const BotonBorrarCliente = ({ onClick }) => {
   return (
     <motion.button
       onClick={handleClick}
-      whileTap={{ scale: 0.9 }}
-      whileHover={{
-        scale: 1.1,
-        boxShadow: '0 0 12px rgba(239, 68, 68, 0.8)',
-      }}
-      className="relative overflow-hidden p-3 min-w-[80px] h-16 bg-red-600 text-white rounded-full shadow-md transition-all flex items-center justify-center cursor-pointer"
+      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.05 }}
+      className="relative overflow-hidden p-3 min-w-[80px] h-16 bg-duo-rojo text-white rounded-full transition-colors hover:brightness-110 flex items-center justify-center cursor-pointer"
       title="Eliminar cliente"
     >
       <AnimatePresence mode="wait">
@@ -31,7 +28,7 @@ const BotonBorrarCliente = ({ onClick }) => {
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: 0.3 }}
           >
-            <FaCheck className="text-white text-xl" />
+            <HiCheck className="text-white text-xl" />
           </motion.div>
         ) : (
           <motion.div
@@ -41,7 +38,7 @@ const BotonBorrarCliente = ({ onClick }) => {
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: 0.3 }}
           >
-            <FaTrash className="text-white text-xl" />
+            <HiTrash className="text-white text-xl" />
           </motion.div>
         )}
       </AnimatePresence>

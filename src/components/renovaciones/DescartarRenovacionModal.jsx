@@ -11,12 +11,12 @@ import Boton3D from "../ui/Boton3D";
 import { cx } from "./utils";
 
 const MOTIVOS = [
-  { value: "CAMBIO_COMPANIA", label: "Cambió de compañía", emoji: "🏢" },
-  { value: "VENDIO_AUTO",     label: "Vendió el auto",     emoji: "🚗" },
-  { value: "NO_QUIERE",       label: "No quiere seguir",   emoji: "🙅" },
-  { value: "NO_CONTESTA",     label: "No contesta",        emoji: "📵" },
-  { value: "NO_PAGO",         label: "No pagó",            emoji: "💸" },
-  { value: "OTRO",            label: "Otro motivo",        emoji: "❓" },
+  { value: "CAMBIO_COMPANIA", label: "Cambió de compañía" },
+  { value: "VENDIO_AUTO",     label: "Vendió el auto" },
+  { value: "NO_QUIERE",       label: "No quiere seguir" },
+  { value: "NO_CONTESTA",     label: "No contesta" },
+  { value: "NO_PAGO",         label: "No pagó" },
+  { value: "OTRO",            label: "Otro motivo" },
 ];
 
 export default function DescartarRenovacionModal({
@@ -68,7 +68,7 @@ export default function DescartarRenovacionModal({
         </>
       }
     >
-      <p className="text-sm font-bold text-titulo dark:text-titulo-dark mb-3">
+      <p className="text-sm text-titulo dark:text-titulo-dark mb-3">
         ¿Por qué este cliente no va a renovar?
       </p>
 
@@ -82,14 +82,13 @@ export default function DescartarRenovacionModal({
               onClick={() => setMotivo(m.value)}
               disabled={submitting}
               className={cx(
-                "flex items-center gap-2 rounded-2xl border-2 px-3 py-2.5 text-xs font-black text-left transition-all disabled:opacity-50",
+                "rounded-xl border px-3 py-2.5 text-xs font-medium text-left transition-colors disabled:opacity-50",
                 active
                   ? "border-duo-rojo bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo"
                   : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-rojo/40"
               )}
             >
-              <span className="text-base">{m.emoji}</span>
-              <span>{m.label}</span>
+              {m.label}
             </button>
           );
         })}
@@ -97,7 +96,7 @@ export default function DescartarRenovacionModal({
 
       {/* Detalle */}
       <div className="mt-3">
-        <label className="text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-1 block">
+        <label className="text-[11px] text-suave dark:text-suave-dark mb-1 block">
           Detalle {isOtro ? <span className="text-duo-rojo">*</span> : <span className="text-suave/60 dark:text-suave-dark/60">(opcional)</span>}
         </label>
         <textarea
@@ -107,21 +106,21 @@ export default function DescartarRenovacionModal({
           rows={2}
           maxLength={300}
           placeholder={isOtro ? "Especificá el motivo…" : "Notas adicionales (ej: 'llamar en 30 días')"}
-          className="w-full rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-colors disabled:opacity-50 resize-none"
+          className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-colors disabled:opacity-50 resize-none"
         />
-        <div className="mt-0.5 text-right text-[10px] font-bold text-suave dark:text-suave-dark">
+        <div className="mt-0.5 text-right text-[10px] text-suave dark:text-suave-dark">
           {detalle.length}/300
         </div>
       </div>
 
       {/* Aviso */}
-      <div className="mt-3 flex items-start gap-2 rounded-2xl border-2 border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-2.5">
+      <div className="mt-3 flex items-start gap-2 rounded-xl border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-2.5">
         <HiExclamation className="mt-0.5 shrink-0 text-duo-amarillo-sombra dark:text-duo-amarillo" />
-        <div className="text-[11px] font-bold leading-relaxed text-duo-amarillo-sombra dark:text-duo-amarillo">
+        <div className="text-[11px] leading-relaxed text-duo-amarillo-sombra dark:text-duo-amarillo">
           Esto <strong>no cancela ni da de baja</strong> la póliza. Solo marca que el cliente no va a renovar.
           Podés revertirlo en cualquier momento.
         </div>
       </div>
     </ModalDuo>
   );
-}
+}

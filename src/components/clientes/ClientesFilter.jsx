@@ -28,7 +28,7 @@ const ClientesFilter = memo(function ClientesFilter({ onFilterText, onFilterEsta
 
   return (
     <motion.section
-      className="rounded-2xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark p-4 sm:p-5 shadow-2xl backdrop-blur-md"
+      className="rounded-xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark p-4 sm:p-5"
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
@@ -41,10 +41,10 @@ const ClientesFilter = memo(function ClientesFilter({ onFilterText, onFilterEsta
              <HiFilter className="text-sm" />
            </div>
            <div>
-             <h3 className="text-xs font-black uppercase tracking-widest text-titulo dark:text-titulo-dark">
+             <h3 className="text-[12px] font-medium text-titulo dark:text-titulo-dark">
                Filtros de Búsqueda
              </h3>
-             <p className="text-[10px] text-suave dark:text-suave-dark font-bold uppercase tracking-wider mt-0.5">
+             <p className="text-[11px] text-suave dark:text-suave-dark mt-0.5">
                Localizá clientes rápidamente en tu base de datos.
              </p>
            </div>
@@ -59,7 +59,7 @@ const ClientesFilter = memo(function ClientesFilter({ onFilterText, onFilterEsta
             <input
               type="text"
               placeholder="Buscar por Nombre, Apellido, DNI o CUIT..."
-              className="w-full h-12 pl-11 pr-4 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-sm font-bold text-titulo dark:text-titulo-dark placeholder:text-suave/50 dark:placeholder:text-suave-dark/50 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-oficina/50 focus:border-oficina/30 transition-all shadow-inner"
+              className="w-full h-12 pl-11 pr-4 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-sm text-titulo dark:text-titulo-dark placeholder:text-suave/50 dark:placeholder:text-suave-dark/50 focus:outline-none focus:border-oficina transition-colors"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
@@ -67,7 +67,7 @@ const ClientesFilter = memo(function ClientesFilter({ onFilterText, onFilterEsta
 
           {/* Filtro por estado (Chips) */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <span className="hidden sm:inline-block text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mr-2">Estado:</span>
+            <span className="hidden sm:inline-block text-[11px] text-suave dark:text-suave-dark mr-2">Estado:</span>
             {estados.map((opt) => {
               const active = estado === opt.value;
               return (
@@ -75,9 +75,9 @@ const ClientesFilter = memo(function ClientesFilter({ onFilterText, onFilterEsta
                   key={opt.value}
                   type="button"
                   onClick={() => setEstado(opt.value)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  className={`px-4 py-2 rounded-lg text-[11px] font-medium transition-colors ${
                     active
-                      ? "bg-oficina text-white shadow-lg shadow-oficina/40 hover:bg-oficina-fuerte"
+                      ? "bg-oficina text-white hover:bg-oficina-fuerte"
                       : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
                   }`}
                 >

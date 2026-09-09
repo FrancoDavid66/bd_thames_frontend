@@ -1,9 +1,9 @@
 // src/components/solicitudes/CobrarPrimeraCuotaModal.jsx
 //
 // Post-alta: pregunta si se cobra la 1ª cuota.
-//   1) "¿Cobrás la primera cuota ahora?"  (Sí / Ahora no)  ← diseño Duo
+//   1) "¿Cobrás la primera cuota ahora?"  (Sí / Ahora no)
 //   2) Si Sí → abre el modal de cobro (reutiliza ModalFormaPago de Pagos).
-//   3) Al pagar → 🎉 confetti + ofrece descargar el comprobante.
+//   3) Al pagar → confetti + ofrece descargar el comprobante.
 //
 // Reutiliza TODA la lógica de pago existente: no crea endpoints ni lógica nueva.
 
@@ -216,7 +216,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
 
   return (
     <>
-      {/* ── Paso 1: preguntar (diseño Duo) ── */}
+      {/* ── Paso 1: preguntar ── */}
       <AnimatePresence>
         {step === "preguntar" && (
           <motion.div
@@ -227,7 +227,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
             onClick={() => onClose?.()}
           >
             <motion.div
-              className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden"
+              className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden"
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
@@ -237,7 +237,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
               <div className="p-6 text-center">
                 {/* Ícono grande */}
                 <motion.div
-                  className="mx-auto mb-4 h-20 w-20 rounded-3xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde flex items-center justify-center"
+                  className="mx-auto mb-4 h-20 w-20 rounded-2xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border border-duo-verde flex items-center justify-center"
                   initial={{ scale: 0.6, rotate: -8 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: "spring", damping: 12, stiffness: 200 }}
@@ -245,26 +245,26 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
                   <HiCash className="text-duo-verde-sombra dark:text-duo-verde text-5xl" />
                 </motion.div>
 
-                <h3 className="text-xl font-black text-titulo dark:text-titulo-dark">Alta creada ✅</h3>
-                <p className="text-[13px] font-bold text-suave dark:text-suave-dark mt-1 mb-4">
+                <h3 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Alta creada</h3>
+                <p className="text-[13px] text-suave dark:text-suave-dark mt-1 mb-4">
                   {cuota ? `¿Cobrás la ${etiquetaCuota.toLowerCase()} ahora?` : "¿Cobrás la primera cuota ahora?"}
                 </p>
 
                 {/* Tarjeta con datos de la cuota EN GRANDE */}
-                <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-5 text-left">
+                <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-5 text-left">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+                    <span className="text-[11px] text-suave dark:text-suave-dark">
                       {etiquetaCuota}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-full">
                       <HiOfficeBuilding /> {poliza?.compania || "—"}
                     </span>
                   </div>
-                  <div className="text-3xl font-black text-titulo dark:text-titulo-dark leading-none">
+                  <div className="text-3xl font-semibold text-titulo dark:text-titulo-dark leading-none">
                     {montoCuota || "$ a definir"}
                   </div>
                   {clienteNombreAp && (
-                    <div className="flex items-center gap-1.5 text-[12px] font-bold text-suave dark:text-suave-dark mt-2">
+                    <div className="flex items-center gap-1.5 text-[12px] text-suave dark:text-suave-dark mt-2">
                       <HiUser /> {clienteNombreAp}
                     </div>
                   )}
@@ -299,7 +299,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
         pagoCuota={etiquetaCuota}
       />
 
-      {/* ── Paso 3: listo + comprobante (diseño Duo + confetti) ── */}
+      {/* ── Paso 3: listo + comprobante (confetti) ── */}
       <AnimatePresence>
         {step === "listo" && (
           <motion.div
@@ -310,7 +310,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
             onClick={() => onClose?.()}
           >
             <motion.div
-              className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden text-center"
+              className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden text-center"
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
@@ -319,7 +319,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
             >
               <div className="p-6">
                 <motion.div
-                  className="mx-auto mb-4 h-24 w-24 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde flex items-center justify-center"
+                  className="mx-auto mb-4 h-24 w-24 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border border-duo-verde flex items-center justify-center"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", damping: 10, stiffness: 180 }}
@@ -327,13 +327,13 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
                   <HiCheckCircle className="text-duo-verde-sombra dark:text-duo-verde text-6xl" />
                 </motion.div>
 
-                <h3 className="text-2xl font-black text-titulo dark:text-titulo-dark mb-1">¡Cuota cobrada! 🎉</h3>
+                <h3 className="text-2xl font-semibold text-titulo dark:text-titulo-dark mb-1">¡Cuota cobrada!</h3>
                 {fmtMonto(cuotaPagada?.monto) && (
-                  <p className="text-[15px] font-black text-duo-verde-sombra dark:text-duo-verde mb-1">
+                  <p className="text-[15px] font-medium text-duo-verde-sombra dark:text-duo-verde mb-1">
                     {fmtMonto(cuotaPagada?.monto)} · {cuotaPagada?.forma_pago || "efectivo"}
                   </p>
                 )}
-                <p className="text-[13px] font-bold text-suave dark:text-suave-dark mb-5">
+                <p className="text-[13px] text-suave dark:text-suave-dark mb-5">
                   Descargá el comprobante para el cliente.
                 </p>
 

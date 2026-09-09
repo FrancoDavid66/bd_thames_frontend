@@ -1,4 +1,13 @@
-// src/pages/ServiciosPage.jsx  (diseño Duo)
+// src/pages/ServiciosPage.jsx
+//
+// 🐛 FIX: este archivo importaba `toast` de "react-toastify" — la única
+// pantalla de toda la app que usa esa librería en vez de "react-hot-toast"
+// (la que usás en todos lados). Si "react-toastify" no está instalada,
+// esta pantalla se rompe entera al cargar. Se corrigió el import y el
+// único toast.info() (que react-hot-toast no tiene) por un toast() normal.
+//
+// 🆕 Rediseño "profesional": bordes de 1px, esquinas menos redondeadas,
+// sin botones con relieve 3D, sin MAYÚSCULA+tracking ancho, sin emojis.
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,7 +32,7 @@ import {
   HiOutlineCloud,
   HiCheckCircle,
 } from "react-icons/hi";
-import { toast } from "react-toastify";
+import { toast } from "react-hot-toast";
 
 import {
   fetchPagosMes,
@@ -109,7 +118,7 @@ export default function ServiciosPage() {
       const res = await dispatch(generarPagosMes({ anio: Number(anio), mes: Number(mes) })).unwrap();
       if (res.creados > 0) {
         const periodoLabelLocal = dayjs(periodo + "-01").format("MMMM YYYY");
-        toast.info(`✨ ${res.creados} pago${res.creados !== 1 ? "s" : ""} generado${res.creados !== 1 ? "s" : ""} para ${periodoLabelLocal}`);
+        toast(`${res.creados} pago${res.creados !== 1 ? "s" : ""} generado${res.creados !== 1 ? "s" : ""} para ${periodoLabelLocal}`);
         dispatch(fetchPagosMes({ periodo }));
         dispatch(fetchResumenMes({ periodo }));
       }
@@ -181,10 +190,10 @@ export default function ServiciosPage() {
         {/* ═══════════ HEADER ═══════════ */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-titulo dark:text-titulo-dark">
-              Servicios y Gastos Fijos
+            <h1 className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark">
+              Servicios y gastos fijos
             </h1>
-            <p className="text-sm font-bold text-suave dark:text-suave-dark mt-0.5">
+            <p className="text-[13px] text-suave dark:text-suave-dark mt-0.5">
               Pagos recurrentes mensuales
             </p>
           </div>
@@ -192,12 +201,12 @@ export default function ServiciosPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setCrudOpen(true)}
-              className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark hover:border-oficina text-titulo dark:text-titulo-dark transition-colors"
+              className="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-[13px] font-medium bg-card dark:bg-card-dark border border-linea dark:border-linea-dark hover:border-oficina text-titulo dark:text-titulo-dark transition-colors"
             >
               <HiOutlineCog className="w-4 h-4" />
               Servicios
               {servicios.length > 0 && (
-                <span className="ml-1 text-[10px] bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded-lg px-1.5 py-0.5 font-black">
+                <span className="ml-1 text-[11px] bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded px-1.5 py-0.5 font-medium">
                   {servicios.filter((s) => s.activo).length}
                 </span>
               )}
@@ -205,7 +214,7 @@ export default function ServiciosPage() {
             <button
               onClick={handleGenerarManual}
               disabled={autoGenerating}
-              className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0"
+              className="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-[13px] font-medium bg-oficina text-white hover:brightness-110 transition-colors disabled:opacity-50"
             >
               <HiOutlineRefresh className={`w-4 h-4 ${autoGenerating ? "animate-spin" : ""}`} />
               Generar pagos
@@ -247,29 +256,29 @@ export default function ServiciosPage() {
 
         {/* ═══════════ SELECTOR DE MES ═══════════ */}
         <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-1 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-1">
+          <div className="flex items-center gap-1 bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-lg p-1">
             <button
               onClick={mesAnterior}
-              className="p-2 rounded-xl hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
+              className="p-2 rounded-md hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
             >
               <HiOutlineChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={mesActual}
-              className="px-3 py-1 text-sm font-black text-titulo dark:text-titulo-dark min-w-[140px] text-center hover:text-oficina transition-colors"
+              className="px-3 py-1 text-[13px] font-medium text-titulo dark:text-titulo-dark min-w-[140px] text-center hover:text-oficina transition-colors"
             >
               <HiOutlineCalendar className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
               {periodoLabel}
             </button>
             <button
               onClick={mesSiguiente}
-              className="p-2 rounded-xl hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
+              className="p-2 rounded-md hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
             >
               <HiOutlineChevronRight className="w-4 h-4" />
             </button>
           </div>
           {!esMesActual && (
-            <button onClick={mesActual} className="text-xs font-black text-oficina hover:underline">
+            <button onClick={mesActual} className="text-[12px] font-medium text-oficina hover:underline">
               Volver al mes actual
             </button>
           )}
@@ -277,9 +286,9 @@ export default function ServiciosPage() {
 
         {/* ═══════════ CARGANDO / GENERANDO / SIN SERVICIOS ═══════════ */}
         {pagosStatus === "loading" || autoGenerating ? (
-          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl py-16 text-center">
-            <div className="w-8 h-8 mx-auto mb-3 border-2 border-oficina/30 border-t-oficina rounded-full animate-spin" />
-            <p className="text-sm font-bold text-suave dark:text-suave-dark">
+          <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-16 text-center">
+            <div className="w-7 h-7 mx-auto mb-3 border-2 border-oficina/30 border-t-oficina rounded-full animate-spin" />
+            <p className="text-[13px] text-suave dark:text-suave-dark">
               {autoGenerating ? `Generando pagos de ${periodoLabel}...` : "Cargando..."}
             </p>
           </div>
@@ -318,14 +327,14 @@ export default function ServiciosPage() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 bg-ingreso/10 border-2 border-ingreso/30 rounded-3xl p-4 flex items-center gap-3"
+                className="mt-4 bg-ingreso/10 border border-ingreso/25 rounded-xl p-4 flex items-center gap-3"
               >
-                <HiCheckCircle className="w-6 h-6 text-ingreso shrink-0" />
+                <HiCheckCircle className="w-5 h-5 text-ingreso shrink-0" />
                 <div>
-                  <p className="text-sm font-black text-ingreso dark:text-ingreso-claro">
-                    ¡Todo pagado en {periodoLabel}! 🎉
+                  <p className="text-[14px] font-semibold text-ingreso dark:text-ingreso-claro">
+                    Todo pagado en {periodoLabel}
                   </p>
-                  <p className="text-xs font-bold text-ingreso dark:text-ingreso-claro/80 mt-0.5">
+                  <p className="text-[12px] text-ingreso dark:text-ingreso-claro/80 mt-0.5">
                     No tenés cuentas pendientes
                   </p>
                 </div>
@@ -357,21 +366,21 @@ export default function ServiciosPage() {
 // ════════════════════════════════════════════════════════════
 function Seccion({ titulo, count, tone, icon: Icon, children }) {
   const pin = {
-    sky: "text-oficina border-oficina/35 bg-oficina/10",
-    emerald: "text-ingreso border-ingreso/35 bg-ingreso/10",
+    sky: "text-oficina border-oficina/30 bg-oficina/10",
+    emerald: "text-ingreso border-ingreso/30 bg-ingreso/10",
   };
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <Icon className={`w-5 h-5 ${tone === "sky" ? "text-oficina" : "text-ingreso"}`} />
-        <h2 className="text-sm font-black uppercase tracking-[0.08em] text-titulo dark:text-titulo-dark">
+        <Icon className={`w-4 h-4 ${tone === "sky" ? "text-oficina" : "text-ingreso"}`} />
+        <h2 className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
           {titulo}
         </h2>
-        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border-2 ${pin[tone]}`}>
+        <span className={`text-[12px] font-medium px-2 py-0.5 rounded-full border ${pin[tone]}`}>
           {count}
         </span>
       </div>
-      <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl overflow-hidden">
+      <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl overflow-hidden">
         {children}
       </div>
     </div>
@@ -386,20 +395,20 @@ function Tabla({ pagos, onClick, pagados = false }) {
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+          <tr className="border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <th className="text-left px-4 py-3 text-[12px] text-suave dark:text-suave-dark">
               Servicio
             </th>
-            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark hidden md:table-cell">
+            <th className="text-left px-4 py-3 text-[12px] text-suave dark:text-suave-dark hidden md:table-cell">
               Categoría
             </th>
-            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+            <th className="text-left px-4 py-3 text-[12px] text-suave dark:text-suave-dark">
               {pagados ? "Fecha pago" : "Vencimiento"}
             </th>
-            <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+            <th className="text-left px-4 py-3 text-[12px] text-suave dark:text-suave-dark">
               Estado
             </th>
-            <th className="text-right px-4 py-3 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+            <th className="text-right px-4 py-3 text-[12px] text-suave dark:text-suave-dark">
               Monto
             </th>
             <th className="text-right px-4 py-3 w-20"></th>
@@ -430,33 +439,33 @@ function Fila({ pago, index, onClick, pagado }) {
 
   if (pagado) {
     estadoBadge = "Pagado";
-    estadoColor = "text-ingreso border-ingreso/35 bg-ingreso/10";
+    estadoColor = "text-ingreso border-ingreso/30 bg-ingreso/10";
     estadoIcon = <HiOutlineCheck className="w-3 h-3" />;
-    iconBg = "bg-ingreso/10 text-ingreso border-ingreso/30";
+    iconBg = "bg-ingreso/10 text-ingreso border-ingreso/25";
     fechaMostrar = dayjs(pago.fecha_pago).format("DD/MM");
   } else if (vencido) {
     estadoBadge = `Vencido (${Math.abs(dias)}d)`;
-    estadoColor = "text-egreso border-egreso/35 bg-egreso/10";
+    estadoColor = "text-egreso border-egreso/30 bg-egreso/10";
     estadoIcon = <HiOutlineExclamationCircle className="w-3 h-3" />;
-    iconBg = "bg-egreso/10 text-egreso border-egreso/30";
+    iconBg = "bg-egreso/10 text-egreso border-egreso/25";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   } else if (dias === 0) {
-    estadoBadge = "Vence HOY";
-    estadoColor = "text-tarjeta border-tarjeta/35 bg-tarjeta/10";
+    estadoBadge = "Vence hoy";
+    estadoColor = "text-tarjeta border-tarjeta/30 bg-tarjeta/10";
     estadoIcon = <HiOutlineClock className="w-3 h-3" />;
-    iconBg = "bg-tarjeta/10 text-tarjeta border-tarjeta/30";
+    iconBg = "bg-tarjeta/10 text-tarjeta border-tarjeta/25";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   } else if (urgente) {
     estadoBadge = `En ${dias} día${dias !== 1 ? "s" : ""}`;
-    estadoColor = "text-tarjeta border-tarjeta/35 bg-tarjeta/10";
+    estadoColor = "text-tarjeta border-tarjeta/30 bg-tarjeta/10";
     estadoIcon = <HiOutlineClock className="w-3 h-3" />;
-    iconBg = "bg-tarjeta/10 text-tarjeta border-tarjeta/30";
+    iconBg = "bg-tarjeta/10 text-tarjeta border-tarjeta/25";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   } else {
     estadoBadge = "Pendiente";
     estadoColor = "text-suave dark:text-suave-dark border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark";
     estadoIcon = null;
-    iconBg = "bg-oficina/10 text-oficina border-oficina/30";
+    iconBg = "bg-oficina/10 text-oficina border-oficina/25";
     fechaMostrar = dayjs(pago.fecha_vencimiento).format("DD/MM");
   }
 
@@ -464,7 +473,7 @@ function Fila({ pago, index, onClick, pagado }) {
 
   // Franja de color al inicio de la fila según estado
   const franja = pagado
-    ? "border-l-4 border-ingreso/60"
+    ? "border-l-4 border-ingreso/50"
     : vencido
       ? "border-l-4 border-egreso"
       : "border-l-4 border-egreso-claro";
@@ -476,51 +485,51 @@ function Fila({ pago, index, onClick, pagado }) {
       exit={{ opacity: 0 }}
       transition={{ delay: index * 0.02 }}
       onClick={onClick}
-      className={`border-b-2 border-linea/50 dark:border-linea-dark/50 cursor-pointer transition group ${
+      className={`border-b border-linea/50 dark:border-linea-dark/50 cursor-pointer transition-colors group ${
         pagado
           ? "hover:bg-surface dark:hover:bg-surface-dark"
           : vencido
-            ? "bg-egreso/[0.06] hover:bg-egreso/10"
+            ? "bg-egreso/[0.05] hover:bg-egreso/10"
             : "hover:bg-surface dark:hover:bg-surface-dark"
       }`}
     >
       <td className={`px-4 py-3 ${franja}`}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border-2 ${iconBg}`}>
-            <Icon className="w-5 h-5" />
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${iconBg}`}>
+            <Icon className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <p className={`font-black truncate text-sm ${pagado ? "text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
+            <p className={`font-medium truncate text-[14px] ${pagado ? "text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
               {pago.servicio_nombre}
             </p>
             {pago.servicio_proveedor && (
-              <p className="text-xs font-bold text-suave dark:text-suave-dark truncate">{pago.servicio_proveedor}</p>
+              <p className="text-[12px] text-suave dark:text-suave-dark truncate">{pago.servicio_proveedor}</p>
             )}
           </div>
         </div>
       </td>
 
       <td className="px-4 py-3 hidden md:table-cell">
-        <span className="text-xs font-bold text-suave dark:text-suave-dark">
+        <span className="text-[12px] text-suave dark:text-suave-dark">
           {pago.servicio_categoria || "—"}
         </span>
       </td>
 
       <td className="px-4 py-3">
-        <span className="text-sm font-black text-titulo dark:text-titulo-dark tabular-nums">
+        <span className="text-[14px] font-medium text-titulo dark:text-titulo-dark tabular-nums">
           {fechaMostrar}
         </span>
       </td>
 
       <td className="px-4 py-3">
-        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black border-2 ${estadoColor}`}>
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border ${estadoColor}`}>
           {estadoIcon}
           {estadoBadge}
         </span>
       </td>
 
       <td className="px-4 py-3 text-right">
-        <span className={`text-base font-mono font-black tabular-nums ${pagado ? "text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
+        <span className={`text-[15px] font-mono font-semibold tabular-nums ${pagado ? "text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
           ${Number(monto || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
         </span>
       </td>
@@ -528,10 +537,10 @@ function Fila({ pago, index, onClick, pagado }) {
       <td className="px-4 py-3 text-right">
         <button
           onClick={(e) => { e.stopPropagation(); onClick(); }}
-          className={`text-xs font-black px-3.5 py-1.5 rounded-xl transition-all border-2 ${
+          className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors border ${
             pagado
               ? "text-suave dark:text-suave-dark border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:border-oficina hover:text-oficina"
-              : "bg-oficina text-white border-oficina shadow-[0_3px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5"
+              : "bg-oficina text-white border-oficina hover:brightness-110"
           }`}
         >
           {pagado ? "Ver" : "Pagar"}
@@ -546,34 +555,34 @@ function Fila({ pago, index, onClick, pagado }) {
 // ════════════════════════════════════════════════════════════
 function StatCard({ label, value, sub, icon: Icon, tone }) {
   const tones = {
-    sky: "border-oficina/35",
-    emerald: "border-ingreso/35",
-    amber: "border-tarjeta/35",
-    rose: "border-egreso/35",
+    sky: "border-oficina/30",
+    emerald: "border-ingreso/30",
+    amber: "border-tarjeta/30",
+    rose: "border-egreso/30",
   };
   const iconTones = {
-    sky: "bg-oficina text-white shadow-[0_4px_0_var(--color-oficina-fuerte)]",
-    emerald: "bg-ingreso text-white shadow-[0_4px_0_var(--color-ingreso-fuerte)]",
-    amber: "bg-tarjeta text-white shadow-[0_4px_0_#d97706]",
-    rose: "bg-egreso text-white shadow-[0_4px_0_var(--color-egreso-fuerte)]",
+    sky: "bg-oficina text-white",
+    emerald: "bg-ingreso text-white",
+    amber: "bg-tarjeta text-white",
+    rose: "bg-egreso text-white",
   };
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`bg-card dark:bg-card-dark rounded-2xl border-2 ${tones[tone]} p-4 flex items-start gap-3`}
+      className={`bg-card dark:bg-card-dark rounded-lg border ${tones[tone]} p-4 flex items-start gap-3`}
     >
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconTones[tone]}`}>
-        <Icon className="w-5 h-5" />
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${iconTones[tone]}`}>
+        <Icon className="w-4 h-4" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+        <p className="text-[11px] text-suave dark:text-suave-dark">
           {label}
         </p>
-        <p className="text-xl sm:text-2xl font-black text-titulo dark:text-titulo-dark tabular-nums mt-0.5 leading-none">
+        <p className="text-xl font-semibold text-titulo dark:text-titulo-dark tabular-nums mt-0.5 leading-none">
           {value}
         </p>
-        <p className="text-[10px] font-bold text-suave dark:text-suave-dark mt-1">{sub}</p>
+        <p className="text-[11px] text-suave dark:text-suave-dark mt-1">{sub}</p>
       </div>
     </motion.div>
   );
@@ -584,19 +593,19 @@ function StatCard({ label, value, sub, icon: Icon, tone }) {
 // ════════════════════════════════════════════════════════════
 function EmptyNoServicios({ onOpen }) {
   return (
-    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl py-16 px-6 text-center">
-      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-oficina/10 border-2 border-oficina/30 flex items-center justify-center">
-        <HiOutlineCash className="w-7 h-7 text-oficina" />
+    <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-16 px-6 text-center">
+      <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-oficina/10 border border-oficina/25 flex items-center justify-center">
+        <HiOutlineCash className="w-6 h-6 text-oficina" />
       </div>
-      <h3 className="text-base font-black text-titulo dark:text-titulo-dark mb-1">
+      <h3 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark mb-1">
         Sin servicios cargados
       </h3>
-      <p className="text-sm font-bold text-suave dark:text-suave-dark mb-5 max-w-sm mx-auto">
+      <p className="text-[13px] text-suave dark:text-suave-dark mb-5 max-w-sm mx-auto">
         Cargá tus gastos fijos una sola vez y te aviso 3 días antes de cada vencimiento.
       </p>
       <button
         onClick={onOpen}
-        className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
+        className="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-[13px] font-medium bg-oficina text-white hover:brightness-110 transition-colors"
       >
         <HiOutlinePlus className="w-4 h-4" />
         Agregar primer servicio
@@ -607,13 +616,13 @@ function EmptyNoServicios({ onOpen }) {
 
 function EmptySinPagos({ onGenerar, periodoLabel }) {
   return (
-    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl py-16 px-6 text-center">
-      <p className="text-sm font-bold text-suave dark:text-suave-dark mb-4">
+    <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-16 px-6 text-center">
+      <p className="text-[13px] text-suave dark:text-suave-dark mb-4">
         No hay pagos para {periodoLabel}
       </p>
       <button
         onClick={onGenerar}
-        className="inline-flex items-center gap-2 px-4 h-10 rounded-xl text-xs font-black bg-oficina text-white border-2 border-oficina shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
+        className="inline-flex items-center gap-2 px-4 h-9 rounded-lg text-[12px] font-medium bg-oficina text-white hover:brightness-110 transition-colors"
       >
         <HiOutlineRefresh className="w-3.5 h-3.5" />
         Generar pagos del mes

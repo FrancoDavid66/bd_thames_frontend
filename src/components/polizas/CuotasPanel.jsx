@@ -199,10 +199,10 @@ export default function CuotasPanel({ poliza }) {
       {/* Cobertura real (hasta cuándo está cubierto) */}
       {coberturaResumen ? (
         <div
-          className={`flex items-center gap-3 rounded-2xl border-2 p-4 ${
+          className={`flex items-center gap-3 rounded-xl border p-4 ${
             coberturaResumen.vigente
-              ? "border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]"
-              : "border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]"
+              ? "border-duo-verde/30 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]"
+              : "border-duo-rojo/30 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]"
           }`}
         >
           {coberturaResumen.vigente ? (
@@ -212,14 +212,14 @@ export default function CuotasPanel({ poliza }) {
           )}
           <div>
             <div
-              className={`text-[10px] font-black uppercase tracking-wide ${
+              className={`text-[11px] ${
                 coberturaResumen.vigente ? "text-duo-verde-sombra/70 dark:text-duo-verde/70" : "text-duo-rojo/70"
               }`}
             >
               {coberturaResumen.vigente ? "Cobertura vigente hasta" : "Cobertura vencida desde"}
             </div>
             <div
-              className={`text-lg font-black ${
+              className={`text-lg font-semibold ${
                 coberturaResumen.vigente ? "text-duo-verde-sombra dark:text-duo-verde" : "text-duo-rojo"
               }`}
             >
@@ -228,7 +228,7 @@ export default function CuotasPanel({ poliza }) {
           </div>
         </div>
       ) : (
-        <CardDuo className="p-4 text-sm font-bold text-suave dark:text-suave-dark">
+        <CardDuo className="p-4 text-sm text-suave dark:text-suave-dark">
           Sin pagos registrados todavía · no hay cobertura activa.
         </CardDuo>
       )}
@@ -239,23 +239,23 @@ export default function CuotasPanel({ poliza }) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2.5">
         <CardDuo className="p-3 text-center">
-          <div className="text-lg font-black text-duo-verde-sombra dark:text-duo-verde">{resumen.pagadas}</div>
-          <div className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Pagadas</div>
+          <div className="text-lg font-semibold text-duo-verde-sombra dark:text-duo-verde">{resumen.pagadas}</div>
+          <div className="text-[11px] text-suave dark:text-suave-dark">Pagadas</div>
         </CardDuo>
         <CardDuo className="p-3 text-center">
-          <div className="text-lg font-black text-duo-amarillo-sombra dark:text-duo-amarillo">{resumen.pendientes}</div>
-          <div className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Pendientes</div>
+          <div className="text-lg font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo">{resumen.pendientes}</div>
+          <div className="text-[11px] text-suave dark:text-suave-dark">Pendientes</div>
         </CardDuo>
         <CardDuo className="p-3 text-center">
-          <div className="text-lg font-black text-duo-rojo">{resumen.vencidas}</div>
-          <div className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Vencidas</div>
+          <div className="text-lg font-semibold text-duo-rojo">{resumen.vencidas}</div>
+          <div className="text-[11px] text-suave dark:text-suave-dark">Vencidas</div>
         </CardDuo>
       </div>
 
       {/* Lista de cuotas */}
-      <CardDuo className="overflow-hidden divide-y-2 divide-linea dark:divide-linea-dark">
+      <CardDuo className="overflow-hidden divide-y divide-linea dark:divide-linea-dark">
         {cuotasOrdenadas.length === 0 ? (
-          <div className="p-8 text-center text-sm font-bold text-suave dark:text-suave-dark">
+          <div className="p-8 text-center text-sm text-suave dark:text-suave-dark">
             Esta póliza no tiene cuotas registradas.
           </div>
         ) : (
@@ -310,14 +310,14 @@ export default function CuotasPanel({ poliza }) {
             value={nuevaFecha}
             onChange={(e) => setNuevaFecha(e.target.value)}
           />
-          <label className="flex items-start gap-3 cursor-pointer rounded-2xl border-2 border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3">
+          <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-duo-azul/25 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3">
             <input
               type="checkbox"
               checked={ajustarSiguientes}
               onChange={(e) => setAjustarSiguientes(e.target.checked)}
               className="mt-1 accent-duo-azul w-4 h-4"
             />
-            <span className="text-sm font-bold text-duo-azul">
+            <span className="text-sm text-duo-azul">
               Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).
             </span>
           </label>

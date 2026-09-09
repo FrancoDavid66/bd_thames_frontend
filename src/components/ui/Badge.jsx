@@ -1,6 +1,11 @@
 // src/components/ui/Badge.jsx
 /**
- * 🏷️ Badge de estado estilo Duolingo (pastilla redonda con fondo tenue).
+ * 🏷️ Badge de estado de THAMES (pastilla con fondo tenue).
+ *
+ * 🆕 Rediseño "profesional": se sacó el MAYÚSCULA + tracking ancho +
+ * negrita extrema — ahora es texto normal en peso medio, como los
+ * badges de Stripe. Sigue siendo una píldora de color (eso no era
+ * "Duolingo", es un patrón sano que Stripe también usa).
  *
  * Props:
  *   tono: "verde" | "amarillo" | "rojo" | "azul" | "violeta" | "neutro"  (default "neutro")
@@ -24,15 +29,15 @@ const TONOS = {
 };
 
 const TAMANOS = {
-  sm: "text-[9px] px-2 py-0.5",
-  md: "text-[11px] px-3 py-1",
+  sm: "text-[10px] px-2 py-0.5",
+  md: "text-[12px] px-2.5 py-1",
 };
 
 export default function Badge({ tono = "neutro", size = "md", className = "", children }) {
   const t = TONOS[tono] || TONOS.neutro;
   const s = TAMANOS[size] || TAMANOS.md;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full font-extrabold uppercase tracking-wide ${t} ${s} ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full font-medium ${t} ${s} ${className}`}>
       {children}
     </span>
   );

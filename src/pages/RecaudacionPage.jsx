@@ -1,11 +1,11 @@
-// src/pages/RecaudacionPage.jsx  (diseño Duo · responsive)
+// src/pages/RecaudacionPage.jsx  (responsive)
 //
-// 📱 RESPONSIVE (esta pasada):
-//   - VISTA EMPLEADO: la barra de 3 pasos (StepsBar) queda más compacta en
-//     mobile sin aplastarse; inputs/botones ya a 44-48px.
-//   - VISTA ADMIN: toolbar de filtros (fecha/oficina/actualizar) se apila a lo
-//     ancho en mobile; KPIs y grilla 1 col en celu (2-4 en desktop, como antes);
-//     paginación con botones ≥44px; modal ticket y foto ampliada full-width.
+// 🆕 Rediseño "profesional": bordes de 1px (antes 2), esquinas menos
+// redondeadas, sin botones con relieve 3D, sin MAYÚSCULA+tracking ancho.
+// El ticket que se IMPRIME (HTML aparte, para la impresora térmica) no se
+// tocó: es un papel, no pantalla — no tiene nada que ver con este rediseño.
+// Toda la lógica (compresión de imagen, subida, impresión, paginación,
+// filtros) está intacta.
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -88,30 +88,30 @@ const comprimirImagen = (file) =>
     } catch { cerrar(file); }
   });
 
-/* ─── badge auditoría (diseño Duo) ──────────────────────────────
+/* ─── badge auditoría ──────────────────────────
    OK → ingreso (verde) · FALTANTE → egreso (rojo) · SOBRANTE → tarjeta (ámbar) · Pendiente → suave (gris) */
 const BadgeAuditoria = memo(function BadgeAuditoria({ estado, diferencia }) {
   const diff = fmtNum(Math.abs(diferencia || 0));
   if (estado === "OK")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-black border-2 border-ingreso/40 bg-ingreso/10 text-ingreso dark:text-ingreso-claro rounded-lg px-2 py-0.5">
+      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium border border-ingreso/30 bg-ingreso/10 text-ingreso dark:text-ingreso-claro rounded px-1.5 py-0.5">
         <HiCheckCircle className="w-3 h-3" /> OK
       </span>
     );
   if (estado === "FALTANTE")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-black border-2 border-egreso/40 bg-egreso/10 text-egreso dark:text-egreso-claro rounded-lg px-2 py-0.5">
+      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium border border-egreso/30 bg-egreso/10 text-egreso dark:text-egreso-claro rounded px-1.5 py-0.5">
         <HiChevronDoubleDown className="w-3 h-3" /> -{diff}
       </span>
     );
   if (estado === "SOBRANTE")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-black border-2 border-tarjeta/40 bg-tarjeta/10 text-tarjeta dark:text-tarjeta-claro rounded-lg px-2 py-0.5">
+      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium border border-tarjeta/30 bg-tarjeta/10 text-tarjeta dark:text-tarjeta-claro rounded px-1.5 py-0.5">
         <HiChevronDoubleUp className="w-3 h-3" /> +{diff}
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark rounded-lg px-2 py-0.5">
+    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark rounded px-1.5 py-0.5">
       <HiExclamationCircle className="w-3 h-3" /> Pendiente
     </span>
   );
@@ -126,12 +126,14 @@ export default function RecaudacionPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-2xl bg-oficina/15 flex items-center justify-center text-2xl shrink-0">💵</div>
+        <div className="h-10 w-10 rounded-lg bg-oficina/15 flex items-center justify-center shrink-0">
+          <HiCurrencyDollar className="text-oficina text-lg" />
+        </div>
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-titulo dark:text-titulo-dark tracking-tight">
-            Caja y Recaudación
+          <h1 className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark">
+            Caja y recaudación
           </h1>
-          <p className="text-sm font-bold text-suave dark:text-suave-dark mt-0.5">
+          <p className="text-[13px] text-suave dark:text-suave-dark mt-0.5">
             {isAdmin
               ? "Panel de auditoría — cierres de todas las sucursales"
               : "Registrá el cierre de caja diario en 3 pasos"}
@@ -367,21 +369,21 @@ function UserView({ user }) {
   if (enviado) {
     return (
       <div className="space-y-4 max-w-2xl">
-        <div className="rounded-2xl border-2 border-ingreso/40 bg-ingreso/10 p-8 text-center flex flex-col items-center gap-3">
-          <span className="h-16 w-16 rounded-full bg-ingreso text-white flex items-center justify-center">
-            <HiCheck className="w-9 h-9" />
+        <div className="rounded-xl border border-ingreso/30 bg-ingreso/10 p-8 text-center flex flex-col items-center gap-3">
+          <span className="h-14 w-14 rounded-full bg-ingreso text-white flex items-center justify-center">
+            <HiCheck className="w-7 h-7" />
           </span>
           <div>
-            <p className="text-lg font-black text-titulo dark:text-titulo-dark">Cierre enviado</p>
-            <p className="text-sm font-bold text-suave dark:text-suave-dark mt-1">Se registró correctamente el cierre de caja.</p>
+            <p className="text-[16px] font-semibold text-titulo dark:text-titulo-dark">Cierre enviado</p>
+            <p className="text-[13px] text-suave dark:text-suave-dark mt-1">Se registró correctamente el cierre de caja.</p>
           </div>
-          <div className="mt-1 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-6 py-3">
-            <p className="text-[11px] uppercase tracking-wide font-black text-suave dark:text-suave-dark">Monto declarado</p>
-            <p className="text-2xl font-black font-mono text-ingreso dark:text-ingreso-claro mt-0.5">${enviado}</p>
+          <div className="mt-1 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-3">
+            <p className="text-[11px] text-suave dark:text-suave-dark">Monto declarado</p>
+            <p className="text-xl font-semibold font-mono text-ingreso dark:text-ingreso-claro mt-0.5">${enviado}</p>
           </div>
           <button
             onClick={() => setEnviado(null)}
-            className="mt-3 h-11 px-5 rounded-2xl bg-oficina text-white text-sm font-black shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all inline-flex items-center justify-center gap-2"
+            className="mt-3 h-10 px-4 rounded-lg bg-oficina text-white text-[13px] font-medium hover:brightness-110 transition-colors inline-flex items-center justify-center gap-2"
           >
             <HiRefresh className="w-4 h-4" /> Cargar otro cierre
           </button>
@@ -412,7 +414,7 @@ function UserView({ user }) {
           <select
             value={empleado}
             onChange={(e) => setEmpleado(e.target.value)}
-            className="w-full h-11 pl-9 pr-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-sm font-bold text-titulo dark:text-titulo-dark focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark] cursor-pointer"
+            className="w-full h-10 pl-9 pr-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[14px] text-titulo dark:text-titulo-dark focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark] cursor-pointer"
           >
             <option value="" disabled>
               {loadingEmpleados ? "Cargando..." : "Seleccioná el responsable..."}
@@ -427,11 +429,11 @@ function UserView({ user }) {
       {/* ── Paso 2: Ticket ──────────────────────────────────── */}
       <StepCard number={2} title="Imprimir ticket de cierre" desc="Imprimí y colocalo sobre los billetes" tone="tarjeta" done={step2Done}>
         {/* Ejemplo colapsable */}
-        <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark overflow-hidden">
+        <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark overflow-hidden">
           <button
             type="button"
             onClick={() => setShowEjemplo((v) => !v)}
-            className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2.5 text-[12px] font-medium text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
           >
             <span>Ver ejemplo de cómo sacar la foto</span>
             <span>{showEjemplo ? "▲" : "▼"}</span>
@@ -441,30 +443,30 @@ function UserView({ user }) {
               <img
                 src={EjemploDineroImg}
                 alt="Ejemplo"
-                className="w-28 h-20 object-cover rounded-xl border-2 border-linea dark:border-linea-dark shrink-0 cursor-pointer"
+                className="w-28 h-20 object-cover rounded-lg border border-linea dark:border-linea-dark shrink-0 cursor-pointer"
                 onClick={() => setShowTicket(false)}
               />
-              <p className="text-xs font-bold text-suave dark:text-suave-dark leading-relaxed">
-                El ticket impreso tiene que estar <strong className="text-titulo dark:text-titulo-dark">arriba</strong> de los billetes y verse <strong className="text-titulo dark:text-titulo-dark">claramente</strong> en la foto.
+              <p className="text-[12px] text-suave dark:text-suave-dark leading-relaxed">
+                El ticket impreso tiene que estar <strong className="text-titulo dark:text-titulo-dark font-medium">arriba</strong> de los billetes y verse <strong className="text-titulo dark:text-titulo-dark font-medium">claramente</strong> en la foto.
               </p>
             </div>
           )}
         </div>
 
         {loadingBal ? (
-          <p className="text-xs font-bold text-suave dark:text-suave-dark text-center py-2 animate-pulse">Calculando balance...</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark text-center py-2 animate-pulse">Calculando balance...</p>
         ) : balanceDia ? (
           <button
             onClick={() => {
               if (!empleado) return toast.error("Elegí el responsable primero.");
               setShowTicket(true);
             }}
-            className="w-full h-11 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-tarjeta text-titulo dark:text-titulo-dark text-sm font-black transition-colors inline-flex items-center justify-center gap-2"
+            className="w-full h-10 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-tarjeta text-titulo dark:text-titulo-dark text-[13px] font-medium transition-colors inline-flex items-center justify-center gap-2"
           >
             <HiPrinter className="w-4 h-4" /> Ver e imprimir ticket
           </button>
         ) : (
-          <p className="text-xs font-bold text-suave dark:text-suave-dark text-center py-2">No se pudo cargar el balance del día.</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark text-center py-2">No se pudo cargar el balance del día.</p>
         )}
       </StepCard>
 
@@ -475,17 +477,17 @@ function UserView({ user }) {
           {!preview ? (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="h-36 rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark hover:border-oficina bg-surface dark:bg-surface-dark flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
+              className="h-32 rounded-xl border border-dashed border-linea dark:border-linea-dark hover:border-oficina bg-surface dark:bg-surface-dark flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
             >
-              <HiCamera className="w-7 h-7 text-suave dark:text-suave-dark" />
-              <p className="text-sm font-bold text-suave dark:text-suave-dark">Tocar para abrir la cámara</p>
+              <HiCamera className="w-6 h-6 text-suave dark:text-suave-dark" />
+              <p className="text-[13px] text-suave dark:text-suave-dark">Tocar para abrir la cámara</p>
             </div>
           ) : (
-            <div className="relative h-36 rounded-2xl overflow-hidden border-2 border-linea dark:border-linea-dark bg-black">
+            <div className="relative h-32 rounded-xl overflow-hidden border border-linea dark:border-linea-dark bg-black">
               <img src={preview} alt="Preview" className="w-full h-full object-contain" />
               <button
                 onClick={limpiarFoto}
-                className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 hover:bg-egreso text-white flex items-center justify-center transition-colors"
+                className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 hover:bg-egreso text-white flex items-center justify-center transition-colors"
               >
                 <HiX className="w-4 h-4" />
               </button>
@@ -495,21 +497,21 @@ function UserView({ user }) {
 
           {/* Monto — el dato más importante: input grande y protagonista */}
           <div>
-            <label className="block text-[11px] uppercase tracking-wide font-black text-suave dark:text-suave-dark mb-1.5">
+            <label className="block text-[13px] font-medium text-suave dark:text-suave-dark mb-1.5">
               Monto físico contado
             </label>
-            <div className="flex items-center gap-2 w-full rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark focus-within:border-ingreso px-3 h-14 transition-colors">
-              <HiCurrencyDollar className="w-5 h-5 text-ingreso dark:text-ingreso-claro shrink-0" />
+            <div className="flex items-center gap-2 w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark focus-within:border-ingreso px-3 h-12 transition-colors">
+              <HiCurrencyDollar className="w-4 h-4 text-ingreso dark:text-ingreso-claro shrink-0" />
               <input
                 type="text"
                 inputMode="numeric"
                 placeholder="Ej: 100.000"
                 value={fmtInput(monto)}
                 onChange={(e) => setMonto(e.target.value.replace(/\D/g, ""))}
-                className="flex-1 min-w-0 bg-transparent text-xl font-mono font-black text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none"
+                className="flex-1 min-w-0 bg-transparent text-[18px] font-mono font-semibold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none"
               />
             </div>
-            <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-1">
+            <p className="text-[11px] text-suave dark:text-suave-dark mt-1">
               Ingresá exactamente lo que contaste a mano.
             </p>
           </div>
@@ -518,7 +520,7 @@ function UserView({ user }) {
           <button
             onClick={handleUpload}
             disabled={!canSubmit}
-            className="w-full h-12 rounded-2xl bg-ingreso text-white text-sm font-black shadow-[0_5px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all inline-flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-lg bg-ingreso text-white text-[13px] font-medium hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
           >
             {(uploading || enviando) ? (
               <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/50 border-t-transparent animate-spin" /> Enviando...</>
@@ -529,9 +531,9 @@ function UserView({ user }) {
 
           {/* 🆕 Guía: qué falta / todo listo */}
           {!canSubmit && !uploading && faltanTexto ? (
-            <p className="text-suave dark:text-suave-dark text-xs font-bold text-center">{faltanTexto}</p>
+            <p className="text-suave dark:text-suave-dark text-[12px] text-center">{faltanTexto}</p>
           ) : canSubmit ? (
-            <p className="text-ingreso dark:text-ingreso-claro text-xs font-black text-center inline-flex items-center justify-center gap-1 w-full">
+            <p className="text-ingreso dark:text-ingreso-claro text-[12px] font-medium text-center inline-flex items-center justify-center gap-1 w-full">
               <HiCheck className="w-3.5 h-3.5" /> Todo listo para enviar
             </p>
           ) : null}
@@ -544,11 +546,11 @@ function UserView({ user }) {
       {/* ── Modal ticket ────────────────────────────────────── */}
       {showTicket && balanceDia && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-opacity"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity"
           onClick={() => setShowTicket(false)}
         >
           <div
-            className="bg-white text-black p-5 shadow-2xl max-w-[300px] w-full font-mono text-sm relative rounded-lg"
+            className="bg-white text-black p-5 shadow-xl max-w-[300px] w-full font-mono text-sm relative rounded-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -558,30 +560,30 @@ function UserView({ user }) {
               <HiX className="w-4 h-4" />
             </button>
 
-            <div className="text-center mb-3 pb-3 border-b-2 border-dashed border-gray-400">
-              <p className="text-lg font-black uppercase tracking-widest">THAMES SEGUROS</p>
-              <p className="font-bold uppercase text-xs mt-1">{balanceDia.scope?.oficina_nombre || "Sucursal"}</p>
+            <div className="text-center mb-3 pb-3 border-b border-dashed border-gray-400">
+              <p className="text-[16px] font-semibold tracking-tight">THAMES SEGUROS</p>
+              <p className="font-medium uppercase text-[11px] mt-1">{balanceDia.scope?.oficina_nombre || "Sucursal"}</p>
               <p className="text-[10px] mt-2">{balanceDia.fecha_hum}</p>
-              <p className="text-[10px] font-bold uppercase mt-1">Ticket Cierre de Caja</p>
+              <p className="text-[10px] font-medium uppercase mt-1">Ticket Cierre de Caja</p>
             </div>
 
-            <div className="text-center mb-3 pb-3 border-b-2 border-dashed border-gray-400">
-              <p className="text-[10px] font-bold uppercase mb-1">Total a rendir (Físico)</p>
-              <p className="text-4xl font-black tracking-tighter">
+            <div className="text-center mb-3 pb-3 border-b border-dashed border-gray-400">
+              <p className="text-[10px] font-medium uppercase mb-1">Total a rendir (Físico)</p>
+              <p className="text-3xl font-semibold tracking-tighter">
                 ${fmtNum(balanceDia.totales?.saldo_caja_chica)}
               </p>
               <p className="text-[10px] mt-2 uppercase">Responsable</p>
-              <p className="font-black text-base mt-0.5">
+              <p className="font-semibold text-[15px] mt-0.5">
                 {empleados.find((e) => e.id === Number(empleado))?.nombre || "—"}
               </p>
             </div>
 
-            <div className="space-y-1 text-xs mb-3 pb-3 border-b-2 border-dashed border-gray-400">
-              <div className="flex justify-between font-bold">
+            <div className="space-y-1 text-[12px] mb-3 pb-3 border-b border-dashed border-gray-400">
+              <div className="flex justify-between font-medium">
                 <span>Ingresos Efe:</span>
                 <span>${fmtNum(balanceDia.ingresos?.por_forma_pago?.find((f) => f.forma_pago === "EFECTIVO")?.total)}</span>
               </div>
-              <div className="flex justify-between font-bold">
+              <div className="flex justify-between font-medium">
                 <span>Egresos Efe:</span>
                 <span>-${fmtNum(balanceDia.egresos?.por_forma_pago?.find((f) => f.forma_pago === "EFECTIVO")?.total)}</span>
               </div>
@@ -590,12 +592,12 @@ function UserView({ user }) {
             <div className="text-center text-[10px]">
               <p>{(user?.username || "").toUpperCase()}</p>
               <p>{dayjs().format("DD/MM/YYYY HH:mm:ss")}</p>
-              <p className="font-black mt-2 text-xs">--- CIERRE VÁLIDO ---</p>
+              <p className="font-semibold mt-2 text-[12px]">--- CIERRE VÁLIDO ---</p>
             </div>
 
             <button
               onClick={handlePrint}
-              className="mt-4 w-full h-10 rounded-xl bg-oficina hover:bg-oficina-fuerte text-white text-xs font-black transition-colors inline-flex items-center justify-center gap-1.5"
+              className="mt-4 w-full h-9 rounded-lg bg-oficina hover:brightness-110 text-white text-[12px] font-medium transition-colors inline-flex items-center justify-center gap-1.5"
             >
               <HiPrinter className="w-4 h-4" /> Imprimir
             </button>
@@ -610,26 +612,26 @@ function UserView({ user }) {
 function MisCierres({ misCierres }) {
   if (!misCierres.length) return null;
   return (
-    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
-      <div className="px-4 py-3 border-b-2 border-linea dark:border-linea-dark">
-        <h3 className="text-xs font-black text-suave dark:text-suave-dark uppercase tracking-wide">Mis últimos cierres</h3>
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+      <div className="px-4 py-3 border-b border-linea dark:border-linea-dark">
+        <h3 className="text-[12px] text-suave dark:text-suave-dark">Mis últimos cierres</h3>
       </div>
-      <div className="divide-y-2 divide-linea dark:divide-linea-dark">
+      <div className="divide-y divide-linea dark:divide-linea-dark">
         {misCierres.map((r) => (
           <div key={r.id} className="flex items-center justify-between px-4 py-3 gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <img
                 src={r.foto_url}
                 alt="cierre"
-                className="w-10 h-10 rounded-lg object-cover border-2 border-linea dark:border-linea-dark shrink-0"
+                className="w-9 h-9 rounded-lg object-cover border border-linea dark:border-linea-dark shrink-0"
               />
               <div className="min-w-0">
-                <p className="text-xs text-titulo dark:text-titulo-dark font-mono font-bold">{fmtDate(r.creado_en)} · {fmtTime(r.creado_en)}</p>
-                <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-0.5">{r.empleado_nombre || "—"}</p>
+                <p className="text-[12px] text-titulo dark:text-titulo-dark font-mono font-medium">{fmtDate(r.creado_en)} · {fmtTime(r.creado_en)}</p>
+                <p className="text-[11px] text-suave dark:text-suave-dark mt-0.5">{r.empleado_nombre || "—"}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-mono font-bold text-titulo dark:text-titulo-dark">
+              <span className="text-[12px] font-mono font-medium text-titulo dark:text-titulo-dark">
                 ${fmtNum(r.monto_declarado)}
               </span>
               <BadgeAuditoria estado={r.estado_auditoria} diferencia={r.diferencia} />
@@ -641,7 +643,7 @@ function MisCierres({ misCierres }) {
   );
 }
 
-/* ── StepsBar helper (diseño Duo) ───────────────────────────── */
+/* ── StepsBar helper ───────────────────────── */
 function StepsBar({ steps }) {
   return (
     <div className="flex items-center">
@@ -649,20 +651,20 @@ function StepsBar({ steps }) {
         <div key={i} className="flex items-center flex-1 last:flex-none">
           <div className="flex flex-col items-center gap-1.5 shrink-0 w-16 sm:w-auto">
             <span
-              className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-black border-2 transition-colors ${
+              className={`h-9 w-9 rounded-full flex items-center justify-center text-[13px] font-medium border transition-colors ${
                 s.done
                   ? "bg-ingreso border-ingreso text-white"
                   : "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark"
               }`}
             >
-              {s.done ? <HiCheck className="w-5 h-5" /> : i + 1}
+              {s.done ? <HiCheck className="w-4 h-4" /> : i + 1}
             </span>
-            <span className={`text-[10px] sm:text-[11px] text-center leading-tight font-black ${s.done ? "text-ingreso dark:text-ingreso-claro" : "text-suave dark:text-suave-dark"}`}>
+            <span className={`text-[10px] sm:text-[11px] text-center leading-tight font-medium ${s.done ? "text-ingreso dark:text-ingreso-claro" : "text-suave dark:text-suave-dark"}`}>
               {s.label}
             </span>
           </div>
           {i < steps.length - 1 && (
-            <span className={`h-1 flex-1 mx-2 -mt-5 rounded-full transition-colors ${s.done ? "bg-ingreso" : "bg-linea dark:bg-linea-dark"}`} />
+            <span className={`h-0.5 flex-1 mx-2 -mt-5 rounded-full transition-colors ${s.done ? "bg-ingreso" : "bg-linea dark:bg-linea-dark"}`} />
           )}
         </div>
       ))}
@@ -670,25 +672,25 @@ function StepsBar({ steps }) {
   );
 }
 
-/* ── StepCard helper (diseño Duo) ───────────────────────────── */
+/* ── StepCard helper ───────────────────────── */
 const StepCard = memo(function StepCard({ number, title, desc, children, tone = "oficina", done = false }) {
   const tones = {
-    oficina: "bg-oficina/10 text-oficina dark:text-oficina-claro border-oficina/40",
-    tarjeta: "bg-tarjeta/10 text-tarjeta dark:text-tarjeta-claro border-tarjeta/40",
-    ingreso: "bg-ingreso/10 text-ingreso dark:text-ingreso-claro border-ingreso/40",
+    oficina: "bg-oficina/10 text-oficina dark:text-oficina-claro border-oficina/30",
+    tarjeta: "bg-tarjeta/10 text-tarjeta dark:text-tarjeta-claro border-tarjeta/30",
+    ingreso: "bg-ingreso/10 text-ingreso dark:text-ingreso-claro border-ingreso/30",
   };
   const cls = done
     ? "bg-ingreso border-ingreso text-white"
     : (tones[tone] || tones.oficina);
   return (
-    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 space-y-3">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 space-y-3">
       <div className="flex items-center gap-3">
-        <span className={`h-9 w-9 shrink-0 rounded-xl border-2 text-sm font-mono font-black flex items-center justify-center transition-colors ${cls}`}>
-          {done ? <HiCheck className="w-5 h-5" /> : number}
+        <span className={`h-8 w-8 shrink-0 rounded-lg border text-[13px] font-mono font-medium flex items-center justify-center transition-colors ${cls}`}>
+          {done ? <HiCheck className="w-4 h-4" /> : number}
         </span>
         <div>
-          <p className="text-sm font-black text-titulo dark:text-titulo-dark leading-none">{title}</p>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">{desc}</p>
+          <p className="text-[14px] font-semibold text-titulo dark:text-titulo-dark leading-none">{title}</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark mt-0.5">{desc}</p>
         </div>
       </div>
       {children}
@@ -786,33 +788,33 @@ function AdminView() {
     <div className="space-y-4">
       {/* 🆕 RESUMEN: KPIs grandes del día filtrado */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="rounded-2xl border-2 border-oficina/30 bg-gradient-to-br from-oficina/15 to-transparent p-4">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide font-black text-suave dark:text-suave-dark">
+        <div className="rounded-xl border border-oficina/25 bg-oficina/[0.06] p-4">
+          <div className="flex items-center gap-2 text-[12px] text-suave dark:text-suave-dark">
             <HiCamera className="w-4 h-4 text-oficina dark:text-oficina-claro" />
             Cierres encontrados
           </div>
-          <p className="text-3xl font-black text-titulo dark:text-titulo-dark mt-1.5">{count}</p>
-          <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-0.5">del {fmtDate(filtroFecha)}{filtroOficina ? " · sucursal filtrada" : ""}</p>
+          <p className="text-2xl font-semibold text-titulo dark:text-titulo-dark mt-1.5">{count}</p>
+          <p className="text-[11px] text-suave dark:text-suave-dark mt-0.5">del {fmtDate(filtroFecha)}{filtroOficina ? " · sucursal filtrada" : ""}</p>
         </div>
-        <div className="rounded-2xl border-2 border-ingreso/30 bg-gradient-to-br from-ingreso/15 to-transparent p-4">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide font-black text-suave dark:text-suave-dark">
+        <div className="rounded-xl border border-ingreso/25 bg-ingreso/[0.06] p-4">
+          <div className="flex items-center gap-2 text-[12px] text-suave dark:text-suave-dark">
             <HiCurrencyDollar className="w-4 h-4 text-ingreso dark:text-ingreso-claro" />
             Efectivo esperado total
           </div>
-          <p className="text-3xl font-black text-ingreso dark:text-ingreso-claro mt-1.5 font-mono">
+          <p className="text-2xl font-semibold text-ingreso dark:text-ingreso-claro mt-1.5 font-mono">
             {loadingEsperado ? "…" : `$ ${fmtNum(efectivoEsperadoTotal)}`}
           </p>
-          <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-0.5">todas las sucursales · sin arrastre</p>
+          <p className="text-[11px] text-suave dark:text-suave-dark mt-0.5">todas las sucursales · sin arrastre</p>
         </div>
       </div>
 
-      {/* ⏰ Panel para configurar el horario de cierre por oficina. */}
+      {/* Panel para configurar el horario de cierre por oficina. */}
       <details
-        className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4"
+        className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4"
         onToggle={(e) => setHorariosOpen(e.currentTarget.open)}
       >
-        <summary className="cursor-pointer text-sm sm:text-base font-black text-titulo dark:text-titulo-dark">
-          ⏰ Horarios de cierre de caja (por oficina)
+        <summary className="cursor-pointer text-[14px] font-semibold text-titulo dark:text-titulo-dark">
+          Horarios de cierre de caja (por oficina)
         </summary>
         <div className="mt-3">
           {horariosOpen && <AdminHorariosCierre />}
@@ -821,7 +823,7 @@ function AdminView() {
 
       {/* 🚀 Quién cerró / no cerró en un día */}
       <div>
-        <h3 className="text-xs font-black text-suave dark:text-suave-dark uppercase tracking-wide mb-2">
+        <h3 className="text-[12px] text-suave dark:text-suave-dark mb-2">
           Estado de cierres del día
         </h3>
         <EstadoCierresDia />
@@ -834,12 +836,12 @@ function AdminView() {
             type="date"
             value={filtroFecha}
             onChange={onChangeFecha}
-            className="h-11 w-full sm:w-auto rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]"
+            className="h-10 w-full sm:w-auto rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-[14px] px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]"
           />
           <select
             value={filtroOficina}
             onChange={onChangeOficina}
-            className="h-11 w-full sm:w-auto rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark] cursor-pointer"
+            className="h-10 w-full sm:w-auto rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-[14px] px-3 focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark] cursor-pointer"
           >
             <option value="">Todas las sucursales</option>
             {oficinas.map((o) => (
@@ -850,7 +852,7 @@ function AdminView() {
         <button
           onClick={refresh}
           disabled={loading}
-          className="h-11 w-full sm:w-auto px-4 rounded-xl bg-oficina text-white text-sm font-black shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
+          className="h-10 w-full sm:w-auto px-4 rounded-lg bg-oficina text-white text-[13px] font-medium hover:brightness-110 transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
         >
           <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           {loading ? "Cargando..." : "Actualizar"}
@@ -858,60 +860,60 @@ function AdminView() {
       </div>
 
       {/* 🆕 Efectivo esperado para el cierre, por sucursal */}
-      <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
+      <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
         <div className="flex items-center gap-2 mb-1">
-          <HiCurrencyDollar className="w-5 h-5 text-ingreso dark:text-ingreso-claro" />
-          <h3 className="text-sm font-black text-titulo dark:text-titulo-dark">
+          <HiCurrencyDollar className="w-4 h-4 text-ingreso dark:text-ingreso-claro" />
+          <h3 className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
             Efectivo esperado para el cierre
           </h3>
         </div>
         {filtroOficina && (
-          <p className="text-suave dark:text-suave-dark text-[11px] font-bold mb-1">
+          <p className="text-suave dark:text-suave-dark text-[11px] mb-1">
             (muestra todas las sucursales, no solo la filtrada)
           </p>
         )}
-        <p className="text-[11px] font-bold text-suave dark:text-suave-dark mb-3">
+        <p className="text-[11px] text-suave dark:text-suave-dark mb-3">
           Efectivo que entró menos el que salió el {fmtDate(filtroFecha)}. No incluye el saldo arrastrado de días anteriores.
         </p>
 
         {loadingEsperado ? (
-          <div className="text-xs font-bold text-suave dark:text-suave-dark">Calculando…</div>
+          <div className="text-[12px] text-suave dark:text-suave-dark">Calculando…</div>
         ) : (esperado?.por_oficina?.length || esperado?.sin_oficina) ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {(esperado?.por_oficina || []).map((o) => (
               <div
                 key={o.scope?.oficina ?? o.scope?.oficina_nombre}
-                className="rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3"
+                className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3"
               >
-                <div className="text-[11px] font-bold text-suave dark:text-suave-dark truncate" title={o.scope?.oficina_nombre}>
+                <div className="text-[11px] text-suave dark:text-suave-dark truncate" title={o.scope?.oficina_nombre}>
                   {o.scope?.oficina_nombre || "—"}
                 </div>
-                <div className="text-lg font-black text-ingreso dark:text-ingreso-claro font-mono">
+                <div className="text-[16px] font-semibold text-ingreso dark:text-ingreso-claro font-mono">
                   $ {fmtNum(o.totales?.saldo_caja_chica || 0)}
                 </div>
               </div>
             ))}
             {esperado?.sin_oficina && (
-              <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
-                <div className="text-[11px] font-bold text-suave dark:text-suave-dark truncate">Sin sucursal</div>
-                <div className="text-lg font-black text-suave dark:text-suave-dark font-mono">
+              <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
+                <div className="text-[11px] text-suave dark:text-suave-dark truncate">Sin sucursal</div>
+                <div className="text-[16px] font-semibold text-suave dark:text-suave-dark font-mono">
                   $ {fmtNum(esperado.sin_oficina.totales?.saldo_caja_chica || 0)}
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="text-xs font-bold text-suave dark:text-suave-dark">Sin movimientos de efectivo para esa fecha.</div>
+          <div className="text-[12px] text-suave dark:text-suave-dark">Sin movimientos de efectivo para esa fecha.</div>
         )}
       </div>
 
       {/* Conteo */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-suave dark:text-suave-dark">
+        <span className="text-[12px] text-suave dark:text-suave-dark">
           {count} cierre{count !== 1 ? "s" : ""} encontrado{count !== 1 ? "s" : ""}
         </span>
         {totalPages > 1 && (
-          <span className="text-xs font-mono font-bold text-suave dark:text-suave-dark">
+          <span className="text-[12px] font-mono text-suave dark:text-suave-dark">
             Página {page} de {totalPages}
           </span>
         )}
@@ -921,39 +923,39 @@ function AdminView() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark h-64 animate-pulse" />
+            <div key={i} className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark h-64 animate-pulse" />
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-2xl border-2 border-dashed border-egreso/40 bg-egreso/10 py-16 text-center">
-          <HiExclamationCircle className="mx-auto w-8 h-8 text-egreso dark:text-egreso-claro mb-3" />
-          <p className="text-sm font-black text-egreso dark:text-egreso-claro">No se pudieron cargar los cierres.</p>
+        <div className="rounded-xl border border-dashed border-egreso/30 bg-egreso/10 py-16 text-center">
+          <HiExclamationCircle className="mx-auto w-7 h-7 text-egreso dark:text-egreso-claro mb-3" />
+          <p className="text-[14px] font-semibold text-egreso dark:text-egreso-claro">No se pudieron cargar los cierres.</p>
           <button
             onClick={refresh}
-            className="mt-4 h-10 px-4 rounded-xl border-2 border-egreso/40 bg-egreso/10 hover:bg-egreso/20 text-egreso dark:text-egreso-claro text-sm font-black transition-colors inline-flex items-center gap-2"
+            className="mt-4 h-9 px-4 rounded-lg border border-egreso/30 bg-egreso/10 hover:bg-egreso/20 text-egreso dark:text-egreso-claro text-[13px] font-medium transition-colors inline-flex items-center gap-2"
           >
             <HiRefresh className="w-4 h-4" /> Reintentar
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark bg-card dark:bg-card-dark py-16 text-center">
-          <HiCamera className="mx-auto w-8 h-8 text-suave dark:text-suave-dark mb-3" />
-          <p className="text-sm font-bold text-suave dark:text-suave-dark">No hay cierres para estos filtros.</p>
+        <div className="rounded-xl border border-dashed border-linea dark:border-linea-dark bg-card dark:bg-card-dark py-16 text-center">
+          <HiCamera className="mx-auto w-7 h-7 text-suave dark:text-suave-dark mb-3" />
+          <p className="text-[14px] text-suave dark:text-suave-dark">No hay cierres para estos filtros.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {items.map((reg) => {
             // Color del borde/acento según el estado de auditoría del cierre.
             const acento =
-              reg.estado_auditoria === "OK"       ? "border-ingreso/40" :
-              reg.estado_auditoria === "FALTANTE" ? "border-egreso/40"  :
-              reg.estado_auditoria === "SOBRANTE" ? "border-tarjeta/40" :
+              reg.estado_auditoria === "OK"       ? "border-ingreso/30" :
+              reg.estado_auditoria === "FALTANTE" ? "border-egreso/30"  :
+              reg.estado_auditoria === "SOBRANTE" ? "border-tarjeta/30" :
               "border-linea dark:border-linea-dark";
             return (
-            <div key={reg.id} className={`rounded-2xl border-2 ${acento} bg-card dark:bg-card-dark overflow-hidden flex flex-col`}>
+            <div key={reg.id} className={`rounded-xl border ${acento} bg-card dark:bg-card-dark overflow-hidden flex flex-col`}>
               {/* Foto */}
               <div
-                className="relative h-44 bg-black cursor-pointer group shrink-0"
+                className="relative h-40 bg-black cursor-pointer group shrink-0"
                 onClick={() => setFotoAmpliada(reg.foto_url)}
               >
                 <img
@@ -962,7 +964,7 @@ function AdminView() {
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <HiZoomIn className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <HiZoomIn className="text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="absolute top-2 left-2">
                   <BadgeAuditoria estado={reg.estado_auditoria} diferencia={reg.diferencia} />
@@ -972,24 +974,24 @@ function AdminView() {
               {/* Info */}
               <div className="p-3 flex-1 space-y-2.5">
                 {/* Montos */}
-                <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark divide-y-2 divide-linea dark:divide-linea-dark">
-                  <div className="flex justify-between px-3 py-1.5 text-xs">
-                    <span className="font-bold text-suave dark:text-suave-dark">Declarado</span>
-                    <span className="font-mono font-bold text-titulo dark:text-titulo-dark">${fmtNum(reg.monto_declarado)}</span>
+                <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark divide-y divide-linea dark:divide-linea-dark">
+                  <div className="flex justify-between px-3 py-1.5 text-[12px]">
+                    <span className="text-suave dark:text-suave-dark">Declarado</span>
+                    <span className="font-mono font-medium text-titulo dark:text-titulo-dark">${fmtNum(reg.monto_declarado)}</span>
                   </div>
-                  <div className="flex justify-between px-3 py-1.5 text-xs">
-                    <span className="font-bold text-suave dark:text-suave-dark">Sistema</span>
-                    <span className="font-mono font-bold text-suave dark:text-suave-dark">${fmtNum(reg.monto_sistema)}</span>
+                  <div className="flex justify-between px-3 py-1.5 text-[12px]">
+                    <span className="text-suave dark:text-suave-dark">Sistema</span>
+                    <span className="font-mono text-suave dark:text-suave-dark">${fmtNum(reg.monto_sistema)}</span>
                   </div>
                 </div>
 
                 {/* Meta */}
                 <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs text-suave dark:text-suave-dark">
+                  <div className="flex items-center gap-1.5 text-[12px] text-suave dark:text-suave-dark">
                     <HiOfficeBuilding className="w-3.5 h-3.5 text-oficina dark:text-oficina-claro shrink-0" />
-                    <span className="text-oficina dark:text-oficina-claro font-black truncate">{reg.oficina_nombre || "Sucursal"}</span>
+                    <span className="text-oficina dark:text-oficina-claro font-medium truncate">{reg.oficina_nombre || "Sucursal"}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-suave dark:text-suave-dark">
+                  <div className="flex items-center gap-1.5 text-[12px] font-mono text-suave dark:text-suave-dark">
                     <HiCalendar className="w-3.5 h-3.5 shrink-0" />
                     {fmtDate(reg.creado_en)}
                     <HiClock className="w-3.5 h-3.5 ml-1 shrink-0" />
@@ -998,12 +1000,12 @@ function AdminView() {
                 </div>
 
                 {/* Footer */}
-                <div className="pt-2 border-t-2 border-linea dark:border-linea-dark flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold text-suave dark:text-suave-dark truncate">
+                <div className="pt-2 border-t border-linea dark:border-linea-dark flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-suave dark:text-suave-dark truncate">
                     {reg.usuario_nombre}
                   </span>
                   {reg.empleado_nombre && (
-                    <span className="text-[10px] font-mono font-black border-2 border-oficina/40 bg-oficina/10 text-oficina dark:text-oficina-claro rounded-lg px-1.5 py-0.5 truncate max-w-[80px]">
+                    <span className="text-[10px] font-mono font-medium border border-oficina/30 bg-oficina/10 text-oficina dark:text-oficina-claro rounded px-1.5 py-0.5 truncate max-w-[80px]">
                       {reg.empleado_nombre}
                     </span>
                   )}
@@ -1022,18 +1024,18 @@ function AdminView() {
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
             aria-label="Página anterior"
-            className="h-11 w-11 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
+            className="h-10 w-10 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
           >
-            <HiChevronLeft className="w-5 h-5" />
+            <HiChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-mono font-bold text-suave dark:text-suave-dark px-2 min-w-[60px] text-center">{page} / {totalPages}</span>
+          <span className="text-[12px] font-mono text-suave dark:text-suave-dark px-2 min-w-[60px] text-center">{page} / {totalPages}</span>
           <button
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
             aria-label="Página siguiente"
-            className="h-11 w-11 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
+            className="h-10 w-10 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina text-titulo dark:text-titulo-dark disabled:opacity-40 transition-colors inline-flex items-center justify-center"
           >
-            <HiChevronRight className="w-5 h-5" />
+            <HiChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -1044,13 +1046,13 @@ function AdminView() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 transition-opacity"
           onClick={() => setFotoAmpliada(null)}
         >
-          <button className="absolute top-5 right-5 h-10 w-10 rounded-full bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark text-titulo dark:text-titulo-dark flex items-center justify-center transition-colors">
-            <HiX className="w-5 h-5" />
+          <button className="absolute top-5 right-5 h-9 w-9 rounded-full bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark text-titulo dark:text-titulo-dark flex items-center justify-center transition-colors">
+            <HiX className="w-4 h-4" />
           </button>
           <img
             src={fotoAmpliada}
             alt="Cierre ampliado"
-            className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+            className="max-w-full max-h-[90vh] rounded-xl shadow-xl object-contain"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

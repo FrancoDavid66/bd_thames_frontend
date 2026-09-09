@@ -32,7 +32,7 @@ import {
 import BajasTable from "../components/bajas/BajasTable";
 import { useAuth } from "../context/AuthContext";
 
-// 🦉 Componentes del design system Duo
+// 🦉 Componentes del design system de Thames
 import PageContainer from "../components/ui/PageContainer";
 import CardDuo from "../components/ui/CardDuo";
 import Boton3D from "../components/ui/Boton3D";
@@ -70,7 +70,7 @@ function formatDateTime(isoString) {
   });
 }
 
-// Estado del historial → tono Badge Duo.
+// Estado del historial → tono del Badge.
 function estadoHistorialTono(status) {
   const s = String(status || "");
   if (s === "ENVIADA") return "amarillo";
@@ -93,7 +93,7 @@ const MODAL_CONFIG = {
   },
   EXCEL: {
     title: "Confirmar descarga",
-    desc: "Generar Excel profesional con las pólizas seleccionadas.",
+    desc: "Generar Excel con las pólizas seleccionadas.",
     btnText: "Descargar Excel",
     variant: "verde", iconTono: "verde", icon: <HiDownload />,
   },
@@ -286,7 +286,7 @@ export default function BajasPage() {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Bajas por Mora");
     sheet.addRow(["Nombre y Apellido", "Patente", "Número de Póliza", "Compañía"]).eachCell((cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF58CC02" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF16A34A" } };
       cell.font = { color: { argb: "FFFFFFFF" }, bold: true };
     });
     rows.forEach((p) => sheet.addRow([p._clienteNombre || "Asegurado", p.patente || "S/D", p.numero_poliza || "S/N", p.compania || "S/D"]));
@@ -344,7 +344,7 @@ export default function BajasPage() {
       { id: GRUPO_DADAS, label: "Dadas de baja", val: (kpisData?.enviada || 0) + (kpisData?.realizada || 0), tono: "verde" },
     ];
     return (
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-2.5 flex-wrap">
         {chips.map((t) => {
           const isActive = !isGlobal && activeTab === t.id;
           const dotCls = t.tono === "rojo" ? "bg-duo-rojo" : "bg-duo-verde";
@@ -359,11 +359,11 @@ export default function BajasPage() {
               key={t.id}
               type="button"
               onClick={() => { if (!isGlobal) { setActiveTab(t.id); setPage(1); setSelectedIds(new Set()); } }}
-              className={`flex-1 min-w-[160px] flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all ${activeCls} ${isGlobal ? "cursor-default" : "cursor-pointer"}`}
+              className={`flex-1 min-w-[160px] flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border transition-colors ${activeCls} ${isGlobal ? "cursor-default" : "cursor-pointer"}`}
             >
-              <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${dotCls}`} />
-              <span className={`text-2xl font-black leading-none ${numCls}`}>{t.val}</span>
-              <span className="text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark text-left leading-tight">{t.label}</span>
+              <span className={`h-2 w-2 rounded-full shrink-0 ${dotCls}`} />
+              <span className={`text-xl font-semibold leading-none ${numCls}`}>{t.val}</span>
+              <span className="text-[11px] text-suave dark:text-suave-dark text-left leading-tight">{t.label}</span>
             </button>
           );
         })}
@@ -374,26 +374,26 @@ export default function BajasPage() {
   const pageSizeOptions = [15, 30, 50, 100];
 
   // Clases compartidas para los inputs/selects compactos de la barra de filtros.
-  const inpCompact = "h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-[13px] font-bold outline-none focus:border-duo-azul transition-colors";
+  const inpCompact = "h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-[13px] outline-none focus:border-duo-azul transition-colors";
 
   return (
     <PageContainer width="lg">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-titulo dark:text-titulo-dark tracking-tight flex items-center gap-3">
-            <span className="h-11 w-11 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center">
-              <HiLightningBolt className="text-duo-rojo text-2xl" />
+          <h1 className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark flex items-center gap-3">
+            <span className="h-10 w-10 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center">
+              <HiLightningBolt className="text-duo-rojo text-lg" />
             </span>
-            Bajas por Mora
+            Bajas por mora
           </h1>
-          <p className="text-suave dark:text-suave-dark font-bold mt-1 ml-1 text-sm">
+          <p className="text-suave dark:text-suave-dark mt-1 ml-1 text-[13px]">
             Pólizas candidatas a baja por deuda vencida.
-            {!isWebAdmin && <span className="text-duo-azul ml-2 font-black uppercase tracking-widest text-[10px]">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
+            {!isWebAdmin && <span className="text-duo-azul ml-2 font-medium text-[12px]">({user?.perfil?.oficina_nombre || "Tu Sucursal"})</span>}
           </p>
         </div>
         <Boton3D variant="blanco" size="sm" onClick={handleOpenHistory}>
-          <HiClipboardList className="text-lg" /> Ver Historial
+          <HiClipboardList className="text-base" /> Ver historial
         </Boton3D>
       </div>
 
@@ -401,11 +401,11 @@ export default function BajasPage() {
       {isWebAdmin ? (
         <div className="space-y-3 mb-5">
           <div>
-            <h3 className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-[0.2em] mb-2 ml-1">Global (Toda la Empresa)</h3>
+            <h3 className="text-[12px] text-suave dark:text-suave-dark mb-2 ml-1">Global (toda la empresa)</h3>
             {renderKpiChips(adminGlobalKpis, true)}
           </div>
           <div>
-            <h3 className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-[0.2em] mb-2 ml-1">Sucursal (Según filtro)</h3>
+            <h3 className="text-[12px] text-suave dark:text-suave-dark mb-2 ml-1">Sucursal (según filtro)</h3>
             {renderKpiChips(sucursalKpis, false)}
           </div>
         </div>
@@ -429,7 +429,7 @@ export default function BajasPage() {
               disabled={!selectedIds.size}
               onClick={() => openConfirmModal("DAR_BAJA", Array.from(selectedIds))}
             >
-              <HiPaperAirplane className="text-base" /> Dar de baja ({selectedIds.size})
+              <HiPaperAirplane className="text-sm" /> Dar de baja ({selectedIds.size})
             </Boton3D>
             <Boton3D
               variant="blanco"
@@ -437,13 +437,13 @@ export default function BajasPage() {
               disabled={!selectedIds.size}
               onClick={() => openConfirmModal("EXCEL", Array.from(selectedIds))}
             >
-              <HiDownload className="text-base" /> Solo Excel
+              <HiDownload className="text-sm" /> Solo Excel
             </Boton3D>
             {selectedIds.size > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="px-3 py-2 text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark text-xs font-black uppercase transition-colors cursor-pointer"
+                className="px-3 py-2 text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark text-[12px] font-medium transition-colors cursor-pointer"
               >
                 Limpiar
               </button>
@@ -452,7 +452,7 @@ export default function BajasPage() {
         </div>
 
         {/* Filtros compactos (barra baja) */}
-        <div className="flex flex-wrap items-center gap-2.5 p-3 bg-surface dark:bg-surface-dark rounded-2xl border-2 border-linea dark:border-linea-dark">
+        <div className="flex flex-wrap items-center gap-2.5 p-3 bg-surface dark:bg-surface-dark rounded-lg border border-linea dark:border-linea-dark">
           {/* Búsqueda (se estira) */}
           <div className="relative flex-1 min-w-[200px]">
             <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark pointer-events-none" />
@@ -460,7 +460,7 @@ export default function BajasPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar patente, nombre o póliza..."
-              className={`${inpCompact} w-full pl-9 pr-3 placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal`}
+              className={`${inpCompact} w-full pl-9 pr-3 placeholder:text-suave dark:placeholder:text-suave-dark`}
             />
           </div>
 
@@ -470,7 +470,7 @@ export default function BajasPage() {
               onChange={(e) => { setOficina(e.target.value); setPage(1); loadTableData({ force: true, overrides: { oficina: e.target.value, page: 1 } }); }}
               className={`${inpCompact} min-w-[150px] px-3 cursor-pointer`}
             >
-              <option value="">Todas las Oficinas</option>
+              <option value="">Todas las oficinas</option>
               {oficinas.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
             </select>
           )}
@@ -480,7 +480,7 @@ export default function BajasPage() {
             onChange={(e) => { setCompania(e.target.value); setPage(1); loadTableData({ force: true, overrides: { compania: e.target.value, page: 1 } }); }}
             className={`${inpCompact} min-w-[150px] px-3 cursor-pointer`}
           >
-            <option value="">Todas las Compañías</option>
+            <option value="">Todas las compañías</option>
             {companiasUnicas.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
 
@@ -491,7 +491,7 @@ export default function BajasPage() {
               onChange={(e) => { setUmbralDias(Number(e.target.value)); setPage(1); loadTableData({ force: true, overrides: { umbralDias: Number(e.target.value), page: 1 } }); }}
               className={`${inpCompact} w-[70px] px-3 text-center`}
             />
-            <span className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wide">días</span>
+            <span className="text-[11px] text-suave dark:text-suave-dark">días</span>
           </div>
         </div>
 
@@ -508,22 +508,22 @@ export default function BajasPage() {
         </div>
 
         {/* Paginación */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t-2 border-linea dark:border-linea-dark">
-          <div className="flex items-center gap-3 bg-surface dark:bg-surface-dark px-4 py-2.5 rounded-2xl border-2 border-linea dark:border-linea-dark">
-            <span className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-[0.2em]">Mostrar</span>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-linea dark:border-linea-dark">
+          <div className="flex items-center gap-3 bg-surface dark:bg-surface-dark px-3.5 py-2 rounded-lg border border-linea dark:border-linea-dark">
+            <span className="text-[11px] text-suave dark:text-suave-dark">Mostrar</span>
             <select
               value={pageSize}
               onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-              className="bg-transparent text-titulo dark:text-titulo-dark text-sm font-black outline-none cursor-pointer"
+              className="bg-transparent text-titulo dark:text-titulo-dark text-[13px] font-medium outline-none cursor-pointer"
             >
               {pageSizeOptions.map((n) => <option key={n} value={n}>{n} filas</option>)}
               <option value={100000}>Todas</option>
             </select>
-            <span className="w-px h-5 bg-linea dark:bg-linea-dark" />
-            <span className="text-[11px] font-bold text-suave dark:text-suave-dark">
+            <span className="w-px h-4 bg-linea dark:bg-linea-dark" />
+            <span className="text-[12px] text-suave dark:text-suave-dark">
               {totalFiltered === 0
                 ? "Sin resultados"
-                : <>Mostrando <span className="text-titulo dark:text-titulo-dark">{desdeRow}–{hastaRow}</span> de <span className="text-duo-azul">{totalFiltered}</span></>}
+                : <>Mostrando <span className="text-titulo dark:text-titulo-dark font-medium">{desdeRow}–{hastaRow}</span> de <span className="text-duo-azul font-medium">{totalFiltered}</span></>}
             </span>
           </div>
 
@@ -533,14 +533,14 @@ export default function BajasPage() {
                 type="button"
                 disabled={safePage === 1}
                 onClick={() => setPage(Math.max(1, safePage - 1))}
-                className="h-11 w-11 flex items-center justify-center bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl hover:border-duo-azul disabled:opacity-30 text-titulo dark:text-titulo-dark transition-all cursor-pointer disabled:cursor-not-allowed"
+                className="h-9 w-9 flex items-center justify-center bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg hover:border-duo-azul disabled:opacity-30 text-titulo dark:text-titulo-dark transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
-                <HiChevronLeft size={20} />
+                <HiChevronLeft size={18} />
               </button>
 
-              <div className="flex flex-col items-center min-w-[80px]">
-                <span className="text-[10px] font-black text-suave dark:text-suave-dark uppercase mb-0.5 tracking-widest">Página</span>
-                <div className="text-base font-black text-titulo dark:text-titulo-dark">
+              <div className="flex flex-col items-center min-w-[70px]">
+                <span className="text-[11px] text-suave dark:text-suave-dark mb-0.5">Página</span>
+                <div className="text-[14px] font-medium text-titulo dark:text-titulo-dark">
                   {safePage} <span className="text-suave dark:text-suave-dark mx-1">/</span> {totalPages}
                 </div>
               </div>
@@ -549,9 +549,9 @@ export default function BajasPage() {
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-                className="h-11 w-11 flex items-center justify-center bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl hover:border-duo-azul disabled:opacity-30 text-titulo dark:text-titulo-dark transition-all cursor-pointer disabled:cursor-not-allowed"
+                className="h-9 w-9 flex items-center justify-center bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg hover:border-duo-azul disabled:opacity-30 text-titulo dark:text-titulo-dark transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
-                <HiChevronRight size={20} />
+                <HiChevronRight size={18} />
               </button>
             </div>
           )}
@@ -562,7 +562,7 @@ export default function BajasPage() {
       <ModalDuo
         isOpen={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
-        title="Registro Maestro"
+        title="Registro maestro"
         subtitle="Historial de estados de baja"
         icon={<HiClipboardList />}
         iconTono="azul"
@@ -570,30 +570,30 @@ export default function BajasPage() {
       >
         {isHistoryLoading ? (
           <div className="flex flex-col justify-center items-center h-60 gap-4">
-            <div className="w-12 h-12 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
-            <span className="text-[11px] font-black text-duo-azul uppercase tracking-[0.3em]">Obteniendo logs...</span>
+            <div className="w-10 h-10 border-2 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
+            <span className="text-[12px] font-medium text-duo-azul">Obteniendo registros...</span>
           </div>
         ) : historyData.length === 0 ? (
-          <div className="text-center text-suave dark:text-suave-dark py-24 font-black uppercase tracking-widest text-sm">Sin datos registrados.</div>
+          <div className="text-center text-suave dark:text-suave-dark py-24 text-[14px]">Sin datos registrados.</div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {historyData.map((mov) => (
-              <CardDuo key={mov.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <CardDuo key={mov.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <div className="text-[11px] text-suave dark:text-suave-dark mb-2 flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-duo-azul" />
                     {formatDateTime(mov.fecha)}
                   </div>
-                  <div className="font-black text-titulo dark:text-titulo-dark text-base">
-                    {mov.cliente_nombre} <span className="text-suave dark:text-suave-dark font-bold text-sm ml-2">| {mov.compania}</span>
+                  <div className="font-medium text-titulo dark:text-titulo-dark text-[15px]">
+                    {mov.cliente_nombre} <span className="text-suave dark:text-suave-dark font-normal text-[13px] ml-2">| {mov.compania}</span>
                   </div>
-                  <div className="text-xs text-duo-azul font-black mt-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] w-fit px-3 py-1 rounded-lg uppercase tracking-tight">
-                    Póliza: {mov.poliza_numero || "S/N"} • Patente: {mov.patente || "S/D"}
+                  <div className="text-[12px] text-duo-azul font-medium mt-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] w-fit px-2.5 py-1 rounded">
+                    Póliza: {mov.poliza_numero || "S/N"} · Patente: {mov.patente || "S/D"}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <Badge tono={estadoHistorialTono(mov.estado_anterior)} size="sm">{estadoHistorialLabel(mov.estado_anterior)}</Badge>
-                  <HiChevronRight className="text-suave dark:text-suave-dark text-lg" />
+                  <HiChevronRight className="text-suave dark:text-suave-dark text-base" />
                   <Badge tono={estadoHistorialTono(mov.estado_nuevo)} size="sm">{estadoHistorialLabel(mov.estado_nuevo)}</Badge>
                 </div>
               </CardDuo>
@@ -620,16 +620,16 @@ export default function BajasPage() {
           </>
         }
       >
-        <p className="text-[15px] text-suave dark:text-suave-dark leading-relaxed font-bold">{activeModalConfig.desc}</p>
+        <p className="text-[14px] text-suave dark:text-suave-dark leading-relaxed">{activeModalConfig.desc}</p>
         {(confirmModal.type === "ENVIADA" || confirmModal.type === "REALIZADA") && (
-          <label className="mt-5 flex items-center gap-4 p-4 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] rounded-2xl cursor-pointer">
+          <label className="mt-5 flex items-center gap-3 p-3.5 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] rounded-lg cursor-pointer">
             <input
               type="checkbox"
               checked={includeExcel}
               onChange={(e) => setIncludeExcel(e.target.checked)}
-              className="w-6 h-6 accent-duo-verde rounded-lg cursor-pointer"
+              className="w-5 h-5 accent-duo-verde rounded cursor-pointer"
             />
-            <span className="text-[13px] text-duo-verde-sombra dark:text-duo-verde font-black uppercase tracking-tight">
+            <span className="text-[13px] text-duo-verde-sombra dark:text-duo-verde font-medium">
               Generar reporte Excel simultáneamente
             </span>
           </label>

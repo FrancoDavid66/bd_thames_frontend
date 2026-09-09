@@ -1,4 +1,4 @@
-// src/components/balanzes/MovimientoCreateModal.jsx  (diseño Duo — WIZARD 3 PASOS · responsive)
+// src/components/balanzes/MovimientoCreateModal.jsx  (WIZARD 3 PASOS · responsive)
 //
 // 🚀 Componente ÚNICO para cargar un INGRESO o un EGRESO.
 //    Reemplaza a IngresoCreateModal.jsx y EgresoCreateModal.jsx.
@@ -57,8 +57,8 @@ const THEME = {
     inputFocus: "focus:border-duo-verde",
     resumenMonto: "text-duo-verde dark:text-duo-verde",
     barra: "bg-duo-verde",
-    cardOn: "border-duo-verde bg-duo-verde/10 text-duo-verde dark:text-duo-verde shadow-[0_4px_0_var(--color-duo-verde-sombra)]",
-    btnOk: "bg-duo-verde text-white shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5",
+    cardOn: "border-duo-verde bg-duo-verde/10 text-duo-verde dark:text-duo-verde",
+    btnOk: "bg-duo-verde text-white hover:brightness-110",
     btnDisabled: "bg-duo-verde/30 text-white/50 cursor-not-allowed",
   },
   EGRESO: {
@@ -67,8 +67,8 @@ const THEME = {
     inputFocus: "focus:border-duo-rojo",
     resumenMonto: "text-duo-rojo dark:text-duo-rojo",
     barra: "bg-duo-rojo",
-    cardOn: "border-duo-rojo bg-duo-rojo/10 text-duo-rojo dark:text-duo-rojo shadow-[0_4px_0_var(--color-duo-rojo-sombra)]",
-    btnOk: "bg-duo-rojo text-white shadow-[0_5px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5",
+    cardOn: "border-duo-rojo bg-duo-rojo/10 text-duo-rojo dark:text-duo-rojo",
+    btnOk: "bg-duo-rojo text-white hover:brightness-110",
     btnDisabled: "bg-duo-rojo/30 text-white/50 cursor-not-allowed",
   },
 };
@@ -98,7 +98,7 @@ const montoFromInput = (text) => {
 
 // Etiqueta de sección (título chico)
 const SectionLabel = ({ children }) => (
-  <p className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+  <p className="text-[11px] text-suave dark:text-suave-dark">
     {children}
   </p>
 );
@@ -188,8 +188,8 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
   const isTransferencia = form.forma_pago === "TRANSFERENCIA";
 
   // 📱 h-12 (48px) + text-base en mobile (sin zoom de iOS).
-  const inputBase = `w-full h-12 px-3 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none ${T.inputFocus} transition-colors`;
-  const selectBase = `w-full h-12 px-3 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold focus:outline-none ${T.inputFocus} transition-colors cursor-pointer dark:[color-scheme:dark]`;
+  const inputBase = `w-full h-12 px-3 border rounded-lg bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none ${T.inputFocus} transition-colors`;
+  const selectBase = `w-full h-12 px-3 border rounded-lg bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-base sm:text-sm focus:outline-none ${T.inputFocus} transition-colors cursor-pointer dark:[color-scheme:dark]`;
 
   // ── Validación por PASO ────────────────────────────────────────
   const validarPaso = (n) => {
@@ -313,7 +313,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose} title={tituloPaso}>
-      {/* 🚀 BARRA DE PROGRESO (3 segmentos estilo Duo) */}
+      {/* 🚀 BARRA DE PROGRESO (3 segmentos) */}
       <div className="flex items-center gap-1.5 mb-5">
         {[1, 2, 3].map((n) => (
           <div key={n} className="flex-1 h-2 rounded-full bg-linea dark:bg-linea-dark overflow-hidden">
@@ -340,7 +340,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 <button
                   type="button"
                   onClick={() => cambiarTipo("INGRESO")}
-                  className={`flex flex-col items-center justify-center gap-2 py-5 sm:py-6 rounded-2xl border-2 font-black transition-all ${
+                  className={`flex flex-col items-center justify-center gap-2 py-5 sm:py-6 rounded-xl border font-semibold transition-colors ${
                     esIngreso
                       ? THEME.INGRESO.cardOn
                       : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -348,14 +348,14 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 >
                   <span className="text-3xl leading-none">↓</span>
                   <span className="text-base">Ingreso</span>
-                  <span className="text-[11px] font-bold opacity-70">Entra plata</span>
+                  <span className="text-[11px] opacity-70">Entra plata</span>
                 </button>
 
                 {/* EGRESO */}
                 <button
                   type="button"
                   onClick={() => cambiarTipo("EGRESO")}
-                  className={`flex flex-col items-center justify-center gap-2 py-5 sm:py-6 rounded-2xl border-2 font-black transition-all ${
+                  className={`flex flex-col items-center justify-center gap-2 py-5 sm:py-6 rounded-xl border font-semibold transition-colors ${
                     !esIngreso
                       ? THEME.EGRESO.cardOn
                       : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -363,16 +363,16 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 >
                   <span className="text-3xl leading-none">↑</span>
                   <span className="text-base">Egreso</span>
-                  <span className="text-[11px] font-bold opacity-70">Sale plata</span>
+                  <span className="text-[11px] opacity-70">Sale plata</span>
                 </button>
               </div>
             </div>
 
             {/* MONTO */}
             <div>
-              <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">Monto <span className="text-duo-rojo">*</span></label>
-              <div className={`flex items-center gap-2 w-full px-3 h-12 border-2 rounded-xl bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark transition-colors ${esIngreso ? "focus-within:border-duo-verde" : "focus-within:border-duo-rojo"}`}>
-                <span className="text-suave dark:text-suave-dark font-black shrink-0">$</span>
+              <label className="block text-xs mb-1.5 text-suave dark:text-suave-dark">Monto <span className="text-duo-rojo">*</span></label>
+              <div className={`flex items-center gap-2 w-full px-3 h-12 border rounded-lg bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark transition-colors ${esIngreso ? "focus-within:border-duo-verde" : "focus-within:border-duo-rojo"}`}>
+                <span className="text-suave dark:text-suave-dark font-medium shrink-0">$</span>
                 <input
                   ref={montoRef}
                   name="monto"
@@ -380,11 +380,11 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                   inputMode="decimal"
                   value={montoToDisplay(form.monto)}
                   onChange={(e) => setForm((p) => ({ ...p, monto: montoFromInput(e.target.value) }))}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-lg font-mono font-black text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-lg font-mono font-semibold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark"
                   placeholder="0"
                 />
               </div>
-              {errors.monto && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.monto}</p>}
+              {errors.monto && <p className="text-[11px] text-duo-rojo mt-1">{errors.monto}</p>}
             </div>
           </div>
         )}
@@ -395,14 +395,14 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
         {paso === 2 && (
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-black mb-2 text-suave dark:text-suave-dark">Forma de pago <span className="text-duo-rojo">*</span></label>
+              <label className="block text-xs mb-2 text-suave dark:text-suave-dark">Forma de pago <span className="text-duo-rojo">*</span></label>
               <div className="grid grid-cols-2 gap-2">
                 {["EFECTIVO", "TRANSFERENCIA"].map((fp) => (
                   <button
                     key={fp}
                     type="button"
                     onClick={() => setFormaPago(fp)}
-                    className={`min-h-[48px] px-4 py-2.5 text-sm rounded-xl font-black transition-colors border-2 ${
+                    className={`min-h-[48px] px-4 py-2.5 text-sm rounded-lg font-medium transition-colors border ${
                       form.forma_pago === fp
                         ? T.formaOn
                         : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -416,7 +416,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
               {/* Billetera: solo en transferencia (texto libre) */}
               {isTransferencia ? (
                 <div className="mt-3">
-                  <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
+                  <label className="block text-xs mb-1.5 text-suave dark:text-suave-dark">
                     ¿De qué billetera / cuenta? <span className="text-duo-rojo">*</span>
                   </label>
                   <input
@@ -426,12 +426,12 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                     placeholder="Ej: Mercado Pago Franco, Santander…"
                     className={inputBase}
                   />
-                  {errors.billetera && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.billetera}</p>}
+                  {errors.billetera && <p className="text-[11px] text-duo-rojo mt-1">{errors.billetera}</p>}
                 </div>
               ) : (
-                <div className="mt-3 rounded-xl border-2 border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-4 text-center">
-                  <p className="text-[13px] font-bold text-suave dark:text-suave-dark italic">
-                    Pago en efectivo: no hace falta indicar cuenta. 👍
+                <div className="mt-3 rounded-lg border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-4 text-center">
+                  <p className="text-[13px] text-suave dark:text-suave-dark italic">
+                    Pago en efectivo: no hace falta indicar cuenta.
                   </p>
                 </div>
               )}
@@ -446,7 +446,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
           <div className="space-y-5">
             {/* MOTIVO */}
             <div>
-              <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">
+              <label className="block text-xs mb-1.5 text-suave dark:text-suave-dark">
                 Motivo del {esIngreso ? "ingreso" : "egreso"} <span className="text-duo-rojo">*</span>
               </label>
               <input
@@ -456,13 +456,13 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 placeholder={esIngreso ? "Ej: Cobro seña, venta póliza…" : "Ej: Artículos de limpieza, luz…"}
                 className={inputBase}
               />
-              {errors.descripcion && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.descripcion}</p>}
+              {errors.descripcion && <p className="text-[11px] text-duo-rojo mt-1">{errors.descripcion}</p>}
             </div>
 
             {/* SUCURSAL (solo admin) */}
             {isWebAdmin && (
               <div>
-                <label className="block text-xs font-black mb-1.5 text-suave dark:text-suave-dark">Sucursal <span className="text-duo-rojo">*</span></label>
+                <label className="block text-xs mb-1.5 text-suave dark:text-suave-dark">Sucursal <span className="text-duo-rojo">*</span></label>
                 <select name="oficina" value={form.oficina} onChange={handleChange} className={selectBase}>
                   <option value="">Seleccioná la sucursal…</option>
                   {oficinas.map((o) => (
@@ -471,32 +471,32 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                     </option>
                   ))}
                 </select>
-                {errors.oficina && <p className="text-[11px] font-bold text-duo-rojo mt-1">{errors.oficina}</p>}
+                {errors.oficina && <p className="text-[11px] text-duo-rojo mt-1">{errors.oficina}</p>}
               </div>
             )}
 
             {/* RESUMEN */}
-            <div className="bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-3 space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+            <div className="bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-xl p-3 space-y-2">
+              <p className="text-[11px] text-suave dark:text-suave-dark">
                 Resumen · {esIngreso ? "Ingreso" : "Egreso"}
               </p>
               <div className="flex justify-between">
-                <span className="font-bold text-suave dark:text-suave-dark">Monto</span>
-                <span className={`font-mono font-black ${T.resumenMonto}`}>{esIngreso ? "+" : "−"} {fmtMoney(form.monto)}</span>
+                <span className="text-suave dark:text-suave-dark">Monto</span>
+                <span className={`font-mono font-semibold ${T.resumenMonto}`}>{esIngreso ? "+" : "−"} {fmtMoney(form.monto)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="font-bold text-suave dark:text-suave-dark">Forma de pago</span>
-                <span className="font-bold text-titulo dark:text-titulo-dark">{labelFormaPago(form.forma_pago)}</span>
+                <span className="text-suave dark:text-suave-dark">Forma de pago</span>
+                <span className="font-medium text-titulo dark:text-titulo-dark">{labelFormaPago(form.forma_pago)}</span>
               </div>
               {isTransferencia && (
                 <div className="flex justify-between">
-                  <span className="font-bold text-suave dark:text-suave-dark">Cuenta</span>
-                  <span className="font-bold text-titulo dark:text-titulo-dark truncate ml-3 text-right">{form.billetera || "—"}</span>
+                  <span className="text-suave dark:text-suave-dark">Cuenta</span>
+                  <span className="font-medium text-titulo dark:text-titulo-dark truncate ml-3 text-right">{form.billetera || "—"}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="font-bold text-suave dark:text-suave-dark">Motivo</span>
-                <span className="font-bold text-titulo dark:text-titulo-dark truncate ml-3 text-right">{form.descripcion || "—"}</span>
+                <span className="text-suave dark:text-suave-dark">Motivo</span>
+                <span className="font-medium text-titulo dark:text-titulo-dark truncate ml-3 text-right">{form.descripcion || "—"}</span>
               </div>
             </div>
           </div>
@@ -506,14 +506,14 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
         {/* FOOTER · navegación                                          */}
         {/* 📱 En mobile se apila (principal arriba, Atrás/Cancelar abajo) */}
         {/* ============================================================ */}
-        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t-2 border-linea dark:border-linea-dark">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-linea dark:border-linea-dark">
           {/* Botón izquierdo: Cancelar (paso 1) o Atrás (pasos 2 y 3) */}
           {paso === 1 ? (
-            <button type="button" onClick={onClose} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
+            <button type="button" onClick={onClose} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-lg text-sm font-medium border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
               Cancelar
             </button>
           ) : (
-            <button type="button" onClick={irAtras} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl text-sm font-black border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
+            <button type="button" onClick={irAtras} className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-lg text-sm font-medium border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors">
               ← Atrás
             </button>
           )}
@@ -524,12 +524,12 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
               type="button"
               onClick={irSiguiente}
               disabled={siguienteDisabled}
-              className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${siguienteDisabled ? T.btnDisabled : T.btnOk}`}
+              className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${siguienteDisabled ? T.btnDisabled : T.btnOk}`}
             >
               Siguiente →
             </button>
           ) : (
-            <button type="submit" disabled={finalDisabled} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm font-black text-white transition-all ${finalDisabled ? T.btnDisabled : T.btnOk}`}>
+            <button type="submit" disabled={finalDisabled} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${finalDisabled ? T.btnDisabled : T.btnOk}`}>
               {submitting ? "Guardando…" : `Guardar ${esIngreso ? "ingreso" : "egreso"}`}
             </button>
           )}

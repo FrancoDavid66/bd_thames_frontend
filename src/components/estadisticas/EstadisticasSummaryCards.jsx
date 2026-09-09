@@ -1,4 +1,4 @@
-// src/components/estadisticas/EstadisticasSummaryCards.jsx  (diseño Duo)
+// src/components/estadisticas/EstadisticasSummaryCards.jsx
 import React from "react";
 import {
   HiDownload,
@@ -9,7 +9,7 @@ import {
   HiOutlineTrendingDown,
 } from "react-icons/hi";
 
-/* Cada tarjeta con su color Duo:
+/* Cada tarjeta con su color:
    - TOTALES  → oficina (celeste)
    - ACTIVAS  → ingreso (verde)
    - ALTAS    → ingreso (verde)
@@ -55,10 +55,10 @@ const CARD_META = {
 
 // Clases por tono (borde + ícono + link). Ámbar usa el hex directo (no hay token -fuerte).
 const TONE = {
-  oficina: { border: "border-oficina/35", accent: "text-oficina" },
-  ingreso: { border: "border-ingreso/35", accent: "text-ingreso" },
-  tarjeta: { border: "border-tarjeta/40", accent: "text-[#d97706] dark:text-tarjeta-claro" },
-  egreso: { border: "border-egreso/35", accent: "text-egreso" },
+  oficina: { border: "border-oficina/30", accent: "text-oficina" },
+  ingreso: { border: "border-ingreso/30", accent: "text-ingreso" },
+  tarjeta: { border: "border-tarjeta/35", accent: "text-[#d97706] dark:text-tarjeta-claro" },
+  egreso: { border: "border-egreso/30", accent: "text-egreso" },
 };
 
 const DEFAULT_ORDER = ["TOTALES", "ACTIVAS", "ALTAS", "VENCIDAS", "BAJAS"];
@@ -121,12 +121,12 @@ export default function EstadisticasSummaryCards({
             key={type}
             type="button"
             onClick={() => handleOpenList(type)}
-            className={`group relative w-full text-left rounded-3xl bg-card dark:bg-card-dark border-2 ${tone.border} hover:-translate-y-1 transition-all duration-200 px-6 py-6 min-h-[204px] focus:outline-none`}
+            className={`group relative w-full text-left rounded-xl bg-card dark:bg-card-dark border ${tone.border} hover:-translate-y-0.5 transition-transform duration-200 px-6 py-6 min-h-[204px] focus:outline-none`}
             title={`Ver lista ${type.toLowerCase()}`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="text-[13px] font-black tracking-wide text-suave dark:text-suave-dark whitespace-pre-line uppercase leading-5">
+                <h3 className="text-[13px] font-medium tracking-wide text-suave dark:text-suave-dark whitespace-pre-line leading-5">
                   {meta.title}
                 </h3>
               </div>
@@ -143,7 +143,7 @@ export default function EstadisticasSummaryCards({
                       handleDownload(event, type);
                     }
                   }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
                 >
                   {isDownloading ? (
                     <span className="h-4 w-4 rounded-full border-2 border-linea dark:border-linea-dark border-t-oficina animate-spin" />
@@ -156,12 +156,12 @@ export default function EstadisticasSummaryCards({
             </div>
 
             <div className="mt-5 flex items-end gap-2">
-              <span className="text-3xl font-black tracking-tight text-titulo dark:text-titulo-dark">
+              <span className="text-3xl font-semibold tracking-tight text-titulo dark:text-titulo-dark">
                 {loading ? "—" : formatNumber(value)}
               </span>
 
               {type === "BAJAS" && (
-                <span className="pb-1 text-sm font-black text-egreso">
+                <span className="pb-1 text-sm font-medium text-egreso">
                   ({Number(churnGlobal || churnPromedio || 0).toFixed(1)}% Churn)
                 </span>
               )}
@@ -173,7 +173,7 @@ export default function EstadisticasSummaryCards({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); if (typeof onCardClick === "function") onCardClick("ACTIVAS_EN_MORA"); }}
-                  className="inline-flex items-center gap-1 text-[11px] font-mono font-black border-2 border-tarjeta/40 bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro rounded-lg px-2 py-0.5 hover:bg-tarjeta/20 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-[11px] font-mono font-medium border border-tarjeta/35 bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro rounded-md px-2 py-0.5 hover:bg-tarjeta/20 transition-colors cursor-pointer"
                 >
                   {formatNumber(enMora)} con cuota vencida →
                 </button>
@@ -188,11 +188,11 @@ export default function EstadisticasSummaryCards({
               </div>
             )}
 
-            <p className="mt-4 text-sm font-semibold leading-5 text-suave dark:text-suave-dark max-w-[190px]">
+            <p className="mt-4 text-sm leading-5 text-suave dark:text-suave-dark max-w-[190px]">
               {meta.description}
             </p>
 
-            <span className={`mt-1 inline-block text-sm font-black ${tone.accent}`}>
+            <span className={`mt-1 inline-block text-sm font-medium ${tone.accent}`}>
               {meta.linkText}
             </span>
           </button>

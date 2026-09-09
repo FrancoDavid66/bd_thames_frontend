@@ -3,7 +3,7 @@ const PrimaryButton = ({ children, onClick, type = 'button' }) => {
       <button
         type={type}
         onClick={onClick}
-        className="bg-brand-primary hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white px-5 py-2 rounded-lg font-semibold shadow transition"
+        className="bg-duo-azul hover:brightness-110 text-white px-5 py-2 rounded-lg font-medium transition-colors"
       >
         {children}
       </button>
@@ -11,4 +11,4 @@ const PrimaryButton = ({ children, onClick, type = 'button' }) => {
   }
   
   export default PrimaryButton
-  
+  

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   HiRefresh, HiSearch, HiChevronRight, HiChatAlt2,
-  HiCheckCircle, HiPhotograph, HiX,
+  HiCheckCircle, HiPhotograph, HiX, HiTicket,
 } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -13,7 +13,7 @@ import toast from "react-hot-toast";
 import { actualizarEstadoCuponRobo } from "../store/slices/cuponesRoboSlice";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
-// 🦉 Design system Duo
+// 🦉 Design system de Thames
 import PageContainer from "../components/ui/PageContainer";
 import CardDuo from "../components/ui/CardDuo";
 import Boton3D from "../components/ui/Boton3D";
@@ -107,7 +107,7 @@ function buildWaUrl(phone, c) {
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 }
 
-// Estado del cupón → tono del Badge Duo.
+// Estado del cupón → tono del Badge.
 function badgeDe(visual) {
   const map = {
     PAGADA:     { tono: "verde",    label: "Pagada" },
@@ -177,31 +177,31 @@ function MarcarPagadoModal({ cupon, onClose, onConfirm, procesando }) {
       }
     >
       {reportado && (
-        <div className="mb-4 rounded-2xl border-2 border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-4 py-3 text-sm font-bold text-duo-azul">
+        <div className="mb-4 rounded-lg border border-duo-azul/25 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-4 py-3 text-[13px] font-medium text-duo-azul">
           El cliente avisó que ya pagó esta cuponera.
         </div>
       )}
 
-      <p className="text-[15px] text-suave dark:text-suave-dark leading-relaxed font-bold mb-4">
+      <p className="text-[14px] text-suave dark:text-suave-dark leading-relaxed mb-4">
         Marcá esta cuponera como pagada. Podés adjuntar el comprobante (Pago Fácil / Mercado Pago) — es opcional.
       </p>
 
       {preview ? (
-        <div className="relative rounded-2xl border-2 border-linea dark:border-linea-dark overflow-hidden">
+        <div className="relative rounded-lg border border-linea dark:border-linea-dark overflow-hidden">
           <img src={preview} alt="Comprobante" className="w-full max-h-64 object-contain bg-surface dark:bg-surface-dark" />
           <button
             type="button"
             onClick={() => { setFile(null); setPreview(""); }}
             disabled={procesando}
-            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark flex items-center justify-center text-suave hover:text-duo-rojo transition-colors"
+            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-card dark:bg-card-dark border border-linea dark:border-linea-dark flex items-center justify-center text-suave hover:text-duo-rojo transition-colors"
           >
             <HiX />
           </button>
         </div>
       ) : (
-        <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark cursor-pointer hover:border-duo-azul transition-colors">
-          <HiPhotograph className="text-3xl text-suave dark:text-suave-dark" />
-          <span className="text-xs font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+        <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark cursor-pointer hover:border-duo-azul transition-colors">
+          <HiPhotograph className="text-2xl text-suave dark:text-suave-dark" />
+          <span className="text-[12px] font-medium text-suave dark:text-suave-dark">
             Adjuntar comprobante (opcional)
           </span>
           <input type="file" accept="image/*" onChange={onPickFile} className="hidden" disabled={procesando} />
@@ -222,7 +222,7 @@ function CuotasClienteModal({ grupo, onClose, onPagar }) {
       onClose={onClose}
       title={grupo.asegurado}
       subtitle={`${grupo.vehiculo} · ${grupo.patente}`}
-      icon={<span className="text-xl font-black">{inicialDe(grupo.asegurado)}</span>}
+      icon={<span className="text-[15px] font-semibold">{inicialDe(grupo.asegurado)}</span>}
       iconTono="violeta"
       size="sm"
       footer={
@@ -230,7 +230,7 @@ function CuotasClienteModal({ grupo, onClose, onPagar }) {
           {grupo.polizaId && (
             <Link
               to={`/polizas/${grupo.polizaId}`}
-              className="flex-1 flex items-center justify-center gap-1.5 h-11 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-xs font-black uppercase hover:border-duo-azul transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-[12px] font-medium hover:border-duo-azul transition-colors"
             >
               Ver ficha
             </Link>
@@ -240,7 +240,7 @@ function CuotasClienteModal({ grupo, onClose, onPagar }) {
               href={buildWaUrl(phone, grupo.cupones[0])}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-1.5 h-11 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-duo-verde-sombra dark:text-duo-verde text-xs font-black uppercase hover:border-duo-verde transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-duo-verde-sombra dark:text-duo-verde text-[12px] font-medium hover:border-duo-verde transition-colors"
             >
               <HiChatAlt2 className="w-4 h-4" /> WhatsApp
             </a>
@@ -258,14 +258,14 @@ function CuotasClienteModal({ grupo, onClose, onPagar }) {
           return (
             <div
               key={c.id}
-              className={`flex items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3 bg-card dark:bg-card-dark ${
+              className={`flex items-center justify-between gap-2 rounded-lg border px-4 py-3 bg-card dark:bg-card-dark ${
                 visual === "VENCIDA" ? "border-duo-rojo/40" : esReportado ? "border-duo-azul/40" : "border-linea dark:border-linea-dark"
               }`}
             >
               <div className="min-w-0">
-                <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">Vence {fmtDate(c.fecha_vencimiento)}</p>
+                <p className="text-[14px] font-medium text-titulo dark:text-titulo-dark">Vence {fmtDate(c.fecha_vencimiento)}</p>
                 {!isPagada && dias !== null && (
-                  <p className={`text-[11px] font-bold ${dias < 0 ? "text-duo-rojo" : "text-suave dark:text-suave-dark"}`}>
+                  <p className={`text-[12px] ${dias < 0 ? "text-duo-rojo" : "text-suave dark:text-suave-dark"}`}>
                     {textoDias(c)}
                   </p>
                 )}
@@ -447,13 +447,13 @@ export default function CuponerasPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-titulo dark:text-titulo-dark tracking-tight flex items-center gap-3">
-            <span className="h-11 w-11 rounded-2xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center text-duo-violeta text-2xl">
-              🎟️
+          <h1 className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark flex items-center gap-3">
+            <span className="h-10 w-10 rounded-lg bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center text-duo-violeta">
+              <HiTicket className="text-lg" />
             </span>
             Cuponeras de robo
           </h1>
-          <p className="text-suave dark:text-suave-dark font-bold mt-1 ml-1 text-sm">
+          <p className="text-suave dark:text-suave-dark mt-1 ml-1 text-[13px]">
             Vencidas y las que vencen este mes. Tocá al cliente para ver y confirmar sus cuotas.
           </p>
         </div>
@@ -463,7 +463,7 @@ export default function CuponerasPage() {
       </div>
 
       {/* KPIs compactos (chips) */}
-      <div className="flex gap-3 flex-wrap mb-5">
+      <div className="flex gap-2.5 flex-wrap mb-5">
         {KPIS.map((k) => {
           const isActive = scope === k.sc;
           const activeBorder = isActive ? "border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:border-suave dark:hover:border-suave-dark";
@@ -472,11 +472,11 @@ export default function CuponerasPage() {
               key={k.sc}
               type="button"
               onClick={() => setScope(k.sc)}
-              className={`flex-1 min-w-[130px] flex items-center gap-2.5 px-4 py-3 rounded-2xl border-2 transition-all cursor-pointer ${activeBorder}`}
+              className={`flex-1 min-w-[130px] flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border transition-colors cursor-pointer ${activeBorder}`}
             >
-              <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${dotCls[k.tono]}`} />
-              <span className={`text-2xl font-black leading-none ${numCls[k.tono]}`}>{k.value}</span>
-              <span className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark text-left leading-tight">{k.label}</span>
+              <span className={`h-2 w-2 rounded-full shrink-0 ${dotCls[k.tono]}`} />
+              <span className={`text-xl font-semibold leading-none ${numCls[k.tono]}`}>{k.value}</span>
+              <span className="text-[11px] text-suave dark:text-suave-dark text-left leading-tight">{k.label}</span>
             </button>
           );
         })}
@@ -484,18 +484,18 @@ export default function CuponerasPage() {
 
       {/* Buscador */}
       <div className="relative mb-4">
-        <HiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-lg pointer-events-none" />
+        <HiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-base pointer-events-none" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar cliente por nombre o patente..."
-          className="w-full h-13 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-[15px] font-bold pl-12 pr-4 outline-none focus:border-duo-azul transition-colors placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal"
+          className="w-full h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-[14px] pl-10 pr-4 outline-none focus:border-duo-azul transition-colors placeholder:text-suave dark:placeholder:text-suave-dark"
         />
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 rounded-2xl border-2 border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 text-sm font-bold text-duo-rojo">
+        <div className="mb-4 rounded-lg border border-duo-rojo/30 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 text-[13px] font-medium text-duo-rojo">
           {error}
         </div>
       )}
@@ -503,14 +503,14 @@ export default function CuponerasPage() {
       {/* Lista de clientes */}
       {!loading && clientes.length === 0 ? (
         <CardDuo className="flex flex-col items-center justify-center py-14 text-center">
-          <div className="text-5xl mb-3">🎟️</div>
-          <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">
+          <HiTicket className="text-4xl text-suave dark:text-suave-dark mb-3" />
+          <p className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
             {error ? "Error al cargar datos." : "No hay cuponeras vencidas ni por vencer este mes."}
           </p>
         </CardDuo>
       ) : (
         <CardDuo className="overflow-hidden">
-          <div className="divide-y-2 divide-linea dark:divide-linea-dark">
+          <div className="divide-y divide-linea dark:divide-linea-dark">
             {clientes.map((g) => {
               const r = resumenCliente(g.cupones);
               return (
@@ -518,17 +518,17 @@ export default function CuponerasPage() {
                   key={g.polizaId}
                   type="button"
                   onClick={() => setClienteModal(g)}
-                  className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-4 px-4 sm:px-5 py-3.5 text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors cursor-pointer"
                 >
-                  <span className="h-11 w-11 rounded-full bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center text-duo-violeta font-black text-lg shrink-0">
+                  <span className="h-10 w-10 rounded-full bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center text-duo-violeta font-medium text-[15px] shrink-0">
                     {inicialDe(g.asegurado)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-black text-titulo dark:text-titulo-dark truncate">{g.asegurado}</p>
-                    <p className="text-xs text-suave dark:text-suave-dark font-bold truncate mt-0.5">{g.vehiculo} · {g.patente}</p>
+                    <p className="text-[14px] font-medium text-titulo dark:text-titulo-dark truncate">{g.asegurado}</p>
+                    <p className="text-[12px] text-suave dark:text-suave-dark truncate mt-0.5">{g.vehiculo} · {g.patente}</p>
                   </div>
                   <Badge tono={r.tono} size="sm">{r.label}</Badge>
-                  <HiChevronRight className="w-5 h-5 text-suave dark:text-suave-dark shrink-0" />
+                  <HiChevronRight className="w-4 h-4 text-suave dark:text-suave-dark shrink-0" />
                 </button>
               );
             })}

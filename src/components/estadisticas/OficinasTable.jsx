@@ -1,4 +1,4 @@
-// src/components/estadisticas/OficinasTable.jsx  (diseño Duo)
+// src/components/estadisticas/OficinasTable.jsx
 import { motion } from "framer-motion";
 import { HiOfficeBuilding } from "react-icons/hi";
 import AnimatedCard from "./AnimatedCard";
@@ -11,44 +11,44 @@ export default function OficinasTable({
   return (
     <AnimatedCard index={7} interactive={false}>
       <div>
-        <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark pb-2.5 mb-2">
-          <div className="flex items-center gap-2 text-sm font-black text-titulo dark:text-titulo-dark">
+        <div className="flex items-center justify-between border-b border-linea dark:border-linea-dark pb-2.5 mb-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-titulo dark:text-titulo-dark">
             <HiOfficeBuilding className="text-oficina" />
             <span>Detalle por oficina</span>
           </div>
-          <span className="text-[11px] font-bold text-suave dark:text-suave-dark">
+          <span className="text-[12px] text-suave dark:text-suave-dark">
             {oficinasData.length} oficinas encontradas
           </span>
         </div>
 
         {oficinasData.length === 0 ? (
-          <div className="px-1 py-4 text-sm font-bold text-suave dark:text-suave-dark">
+          <div className="px-1 py-4 text-sm text-suave dark:text-suave-dark">
             No hay datos para los filtros seleccionados.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-xs sm:text-sm">
-              <thead className="bg-surface dark:bg-surface-dark border-b-2 border-linea dark:border-linea-dark">
+              <thead className="bg-surface dark:bg-surface-dark border-b border-linea dark:border-linea-dark">
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                  <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">
                     Oficina
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                  <th className="px-3 py-2.5 text-right text-[11px] text-suave dark:text-suave-dark">
                     Pólizas totales
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wide text-ingreso">
+                  <th className="px-3 py-2.5 text-right text-[11px] text-ingreso">
                     Al día
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wide text-ingreso">
+                  <th className="px-3 py-2.5 text-right text-[11px] text-ingreso">
                     Altas mes
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wide text-egreso">
+                  <th className="px-3 py-2.5 text-right text-[11px] text-egreso">
                     Bajas (Canceladas)
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wide text-[#d97706] dark:text-tarjeta-claro">
+                  <th className="px-3 py-2.5 text-right text-[11px] text-[#d97706] dark:text-tarjeta-claro">
                     En Mora (Vencidas)
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                  <th className="px-3 py-2.5 text-right text-[11px] text-suave dark:text-suave-dark">
                     Churn %
                   </th>
                 </tr>
@@ -99,47 +99,47 @@ export default function OficinasTable({
                   return (
                     <motion.tr
                       key={`${o.oficina || "SIN"}-${idx}`}
-                      className="border-b-2 border-linea/50 dark:border-linea-dark/50"
+                      className="border-b border-linea/50 dark:border-linea-dark/50"
                       whileHover={{ backgroundColor: "rgba(14,165,233,0.06)" }}
                       transition={{ duration: 0.15 }}
                     >
                       <td className="px-3 py-2.5 whitespace-nowrap align-top">
                         {/* El Nombre Principal */}
-                        <div className="font-black text-oficina">{oficinaNombre}</div>
+                        <div className="font-medium text-oficina">{oficinaNombre}</div>
 
                         {/* El Código/ID chiquito abajo */}
                         {o.oficina && String(o.oficina) !== "SIN_OFICINA" && String(o.oficina) !== "OTRAS" ? (
-                          <div className="mt-0.5 text-[10px] font-bold text-suave dark:text-suave-dark">
+                          <div className="mt-0.5 text-[11px] text-suave dark:text-suave-dark">
                             Código / ID: {String(o.oficina)}
                           </div>
                         ) : null}
 
-                        <div className="mt-1.5 text-[10px] font-semibold text-suave dark:text-suave-dark space-y-0.5">
+                        <div className="mt-1.5 text-[11px] text-suave dark:text-suave-dark space-y-0.5">
                           {cobResumen && <div>Coberturas: {cobResumen}</div>}
                           {compResumen && <div>Compañías: {compResumen}</div>}
                           {antigResumen && <div>Antigüedad (años): {antigResumen}</div>}
                         </div>
                       </td>
 
-                      <td className="px-3 py-2.5 text-right align-top font-mono font-black text-titulo dark:text-titulo-dark">
+                      <td className="px-3 py-2.5 text-right align-top font-mono font-medium text-titulo dark:text-titulo-dark">
                         {totalOf.toLocaleString("es-AR")}
                       </td>
                       {/* Al día — activas SIN cuotas vencidas */}
                       <td className="px-3 py-2.5 text-right align-top">
-                        <span className="font-mono font-black text-ingreso">
+                        <span className="font-mono font-medium text-ingreso">
                           {(o.activas_al_dia ?? o.polizas_activas ?? 0).toLocaleString("es-AR")}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-ingreso align-top">
+                      <td className="px-3 py-2.5 text-right font-mono text-ingreso align-top">
                         {(o.nuevas_mes || 0).toLocaleString("es-AR")}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-egreso align-top">
+                      <td className="px-3 py-2.5 text-right font-mono text-egreso align-top">
                         {bajasOf.toLocaleString("es-AR")}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-black text-[#d97706] dark:text-tarjeta-claro align-top">
+                      <td className="px-3 py-2.5 text-right font-mono font-medium text-[#d97706] dark:text-tarjeta-claro align-top">
                         {vencidasOf.toLocaleString("es-AR")}
                       </td>
-                      <td className={`px-3 py-2.5 text-right align-top font-mono font-black tracking-wide ${churnColor}`}>
+                      <td className={`px-3 py-2.5 text-right align-top font-mono font-medium tracking-wide ${churnColor}`}>
                         {churnPct.toFixed(1)}%
                       </td>
                     </motion.tr>

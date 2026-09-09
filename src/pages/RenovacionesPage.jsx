@@ -11,6 +11,11 @@
 //   cuándo vencen ni si ya se renovaron. Así se puede renovar CUALQUIER póliza
 //   buscándola por patente, nombre, DNI, número o compañía.
 //   Al limpiar el buscador, vuelven las pestañas normales.
+//
+// 🆕 Rediseño "profesional": bordes de 1px (antes 2), esquinas menos
+// redondeadas, sin MAYÚSCULA+tracking ancho. Ninguna función de lógica de
+// negocio (clasificación de pestañas, ejecutar renovación, códigos de
+// error del backend) se tocó — es exactamente la misma.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -158,13 +163,13 @@ function ResumenInline({ tab, kpis }) {
       rojo: "text-duo-rojo",
       azul: "text-duo-azul",
     };
-    return <span className={cx("font-black tabular-nums", map[tone])}>{children}</span>;
+    return <span className={cx("font-semibold tabular-nums", map[tone])}>{children}</span>;
   };
 
   // 🆕 Modo búsqueda: no hay "vencen hoy / en 3 días", hay resultados.
   if (tab === "busqueda") {
     return (
-      <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
+      <span className="text-[13px] text-suave dark:text-suave-dark">
         <N tone="azul">{kpis.total}</N>{" "}
         {kpis.total === 1 ? "póliza encontrada" : "pólizas encontradas"}
         {kpis.yaRenovadas > 0 && (
@@ -180,7 +185,7 @@ function ResumenInline({ tab, kpis }) {
 
   if (tab === "vencidas") {
     return (
-      <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
+      <span className="text-[13px] text-suave dark:text-suave-dark">
         <N tone="rojo">{kpis.total}</N> sin renovar · <N tone="amarillo">{kpis.masDe30}</N> hace 30+ días
       </span>
     );
@@ -188,20 +193,20 @@ function ResumenInline({ tab, kpis }) {
 
   const label = tab === "renovar_hoy" ? "que vencen hoy" : "para los próximos 3 días";
   return (
-    <span className="text-[13px] font-bold text-suave dark:text-suave-dark">
+    <span className="text-[13px] text-suave dark:text-suave-dark">
       <N>{kpis.total}</N> {label}
     </span>
   );
 }
 
-/* 🔎 Cajita del panel de diagnóstico (temporal) */
+/* Cajita del panel de diagnóstico (temporal) */
 function DiagBox({ label, value }) {
   return (
-    <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1.5">
-      <div className="text-[9px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+    <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1.5">
+      <div className="text-[10px] text-suave dark:text-suave-dark">
         {label}
       </div>
-      <div className="text-base font-black tabular-nums text-titulo dark:text-titulo-dark">
+      <div className="text-[15px] font-semibold tabular-nums text-titulo dark:text-titulo-dark">
         {value}
       </div>
     </div>
@@ -682,7 +687,7 @@ export default function RenovacionesPage() {
     <PageContainer width="lg">
       {/* ============ Header ============ */}
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-titulo dark:text-titulo-dark flex items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark flex items-center gap-2">
           <HiClipboardCheck className="text-duo-verde" />
           Renovaciones
         </h1>
@@ -722,37 +727,37 @@ export default function RenovacionesPage() {
 
       {/* ============ 🆕 Aviso de MODO BÚSQUEDA ============ */}
       {modoBusqueda && (
-        <div className="mt-4 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-2 border-duo-azul/40 p-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm font-bold text-duo-azul">
-            <HiSearch className="text-lg shrink-0" />
+        <div className="mt-4 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border border-duo-azul/30 p-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-[13px] text-duo-azul">
+            <HiSearch className="text-base shrink-0" />
             <span>
-              Buscando <span className="font-black">“{searchTrim}”</span> en{" "}
-              <span className="font-black">todas las sucursales</span> — venzan cuando
+              Buscando <span className="font-medium">"{searchTrim}"</span> en{" "}
+              <span className="font-medium">todas las sucursales</span> — venzan cuando
               venzan, incluidas las ya renovadas y finalizadas.
             </span>
           </div>
           <button
             type="button"
             onClick={() => setSearch("")}
-            className="inline-flex items-center gap-1 rounded-xl border-2 border-duo-azul/40 px-3 py-1.5 text-[13px] font-extrabold text-duo-azul transition-transform active:scale-95"
+            className="inline-flex items-center gap-1 rounded-lg border border-duo-azul/30 px-3 py-1.5 text-[12px] font-medium text-duo-azul transition-transform active:scale-95"
           >
             <HiX /> Limpiar
           </button>
         </div>
       )}
 
-      {/* ====== 🔎 PANEL DE DIAGNÓSTICO (temporal — BORRAR cuando funcione) ======
+      {/* ====== PANEL DE DIAGNÓSTICO (temporal — BORRAR cuando funcione) ======
           Sirve para saber DÓNDE se pierde una póliza:
             · "Backend devolvió 0"  → el problema está en el backend / los params.
             · "Backend devolvió 2, en pantalla 0" → el problema está en el front.
       ==================================================================== */}
       {modoBusqueda && (
-        <details className="mt-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-          <summary className="cursor-pointer text-[12px] font-black uppercase tracking-wide text-suave dark:text-suave-dark select-none">
-            🔎 Diagnóstico de la búsqueda
+        <details className="mt-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+          <summary className="cursor-pointer text-[12px] text-suave dark:text-suave-dark select-none">
+            Diagnóstico de la búsqueda
           </summary>
 
-          <div className="mt-2 space-y-2 text-[12px] font-bold text-titulo dark:text-titulo-dark">
+          <div className="mt-2 space-y-2 text-[12px] text-titulo dark:text-titulo-dark">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <DiagBox label="Backend devolvió" value={itemsRaw.length} />
               <DiagBox label="Count del backend" value={Number(count || 0)} />
@@ -761,19 +766,19 @@ export default function RenovacionesPage() {
             </div>
 
             <div>
-              <div className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-1">
+              <div className="text-[11px] text-suave dark:text-suave-dark mb-1">
                 URL pedida al backend
               </div>
-              <code className="block break-all rounded-xl bg-surface dark:bg-surface-dark p-2 text-[11px] font-mono text-duo-azul">
+              <code className="block break-all rounded-lg bg-surface dark:bg-surface-dark p-2 text-[11px] font-mono text-duo-azul">
                 polizas/renovaciones/
                 {buildRenovacionesQuery(buildLoadPayload())}
               </code>
             </div>
 
             <div className="text-[11px] text-suave dark:text-suave-dark">
-              Sucursal del filtro: <strong>{oficina || "(todas)"}</strong> ·
+              Sucursal del filtro: <strong className="font-medium">{oficina || "(todas)"}</strong> ·
               Estados que llegaron:{" "}
-              <strong>
+              <strong className="font-medium">
                 {itemsRaw.length
                   ? Array.from(new Set(itemsRaw.map((x) => x?.estado || "?"))).join(", ")
                   : "—"}
@@ -784,8 +789,8 @@ export default function RenovacionesPage() {
       )}
 
       {!!error && (
-        <div className="mt-4 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-2 border-duo-rojo/40 p-3 text-sm font-bold text-duo-rojo flex items-center gap-2">
-          <HiExclamation className="text-lg" />
+        <div className="mt-4 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border border-duo-rojo/30 p-3 text-[13px] font-medium text-duo-rojo flex items-center gap-2">
+          <HiExclamation className="text-base" />
           No se pudieron cargar las pólizas. Intentá actualizar.
         </div>
       )}
@@ -797,36 +802,36 @@ export default function RenovacionesPage() {
 
       {/* ============ Paginación ============ */}
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="text-[13px] font-bold text-suave dark:text-suave-dark">
+        <div className="text-[13px] text-suave dark:text-suave-dark">
           {modoBusqueda ? (
             <span>
-              Mostrando <span className="text-titulo dark:text-titulo-dark">{receivedCount}</span>{" "}
-              de <span className="text-titulo dark:text-titulo-dark">{totalCount}</span> resultados
+              Mostrando <span className="text-titulo dark:text-titulo-dark font-medium">{receivedCount}</span>{" "}
+              de <span className="text-titulo dark:text-titulo-dark font-medium">{totalCount}</span> resultados
             </span>
           ) : tab === "vencidas" ? (
             <span>
-              Mostrando <span className="text-titulo dark:text-titulo-dark">{receivedCount}</span>{" "}
+              Mostrando <span className="text-titulo dark:text-titulo-dark font-medium">{receivedCount}</span>{" "}
               sin renovar de{" "}
-              <span className="text-titulo dark:text-titulo-dark">{totalCount}</span> en pantalla
+              <span className="text-titulo dark:text-titulo-dark font-medium">{totalCount}</span> en pantalla
             </span>
           ) : (
             <span>
-              Página <span className="text-titulo dark:text-titulo-dark">{safePage}</span> de{" "}
-              <span className="text-titulo dark:text-titulo-dark">{totalPages}</span>
+              Página <span className="text-titulo dark:text-titulo-dark font-medium">{safePage}</span> de{" "}
+              <span className="text-titulo dark:text-titulo-dark font-medium">{totalPages}</span>
             </span>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-1.5">
-            <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">Ver:</span>
+          <div className="flex items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-1.5">
+            <span className="text-[11px] text-suave dark:text-suave-dark">Ver:</span>
             <select
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value || 25));
                 setPage(1);
               }}
-              className="bg-transparent text-sm font-bold text-titulo dark:text-titulo-dark outline-none cursor-pointer"
+              className="bg-transparent text-[13px] font-medium text-titulo dark:text-titulo-dark outline-none cursor-pointer"
               aria-label="Tamaño de página"
             >
               {[10, 25, 50, 100].map((n) => (
@@ -838,14 +843,14 @@ export default function RenovacionesPage() {
           </div>
 
           <button
-            className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-1.5 text-sm font-extrabold text-titulo dark:text-titulo-dark hover:border-duo-azul/40 disabled:opacity-40 transition-colors"
+            className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3.5 py-1.5 text-[13px] font-medium text-titulo dark:text-titulo-dark hover:border-duo-azul/40 disabled:opacity-40 transition-colors"
             disabled={!canPrev || loading}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             Anterior
           </button>
           <button
-            className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-1.5 text-sm font-extrabold text-titulo dark:text-titulo-dark hover:border-duo-azul/40 disabled:opacity-40 transition-colors"
+            className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3.5 py-1.5 text-[13px] font-medium text-titulo dark:text-titulo-dark hover:border-duo-azul/40 disabled:opacity-40 transition-colors"
             disabled={!canNext || loading}
             onClick={() => setPage((p) => p + 1)}
           >

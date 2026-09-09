@@ -1,6 +1,6 @@
 // src/components/pagos/MediosCobro.jsx
 // ─────────────────────────────────────────────────────────────
-// ARCHIVO UNIFICADO (diseño Duo) — junta los 2 componentes de "medios de cobro":
+// ARCHIVO UNIFICADO — junta los 2 componentes de "medios de cobro":
 //   · RecordatoriosCuotasModal  → export { RecordatoriosCuotasModal } (y default)
 //   · CuentasCobroModal         → export { CuentasCobroModal }
 //
@@ -55,44 +55,44 @@ function ResultadoPanel({ result, oficinaNombre, onDownload }) {
   return (
     <div className="space-y-3">
       {/* Resumen principal */}
-      <div className="rounded-2xl border-2 border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-4">
+      <div className="rounded-xl border border-duo-verde/30 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-sm font-black text-duo-verde-sombra dark:text-duo-verde">Envío finalizado</div>
-            <div className="text-xs text-suave dark:text-suave-dark mt-0.5 font-bold">{oficinaNombre}</div>
+            <div className="text-sm font-semibold text-duo-verde-sombra dark:text-duo-verde">Envío finalizado</div>
+            <div className="text-xs text-suave dark:text-suave-dark mt-0.5">{oficinaNombre}</div>
           </div>
           <button onClick={onDownload}
-            className="flex items-center gap-1.5 text-xs font-black text-duo-azul hover:brightness-110 border-2 border-duo-azul/30 bg-card dark:bg-card-dark px-3 py-2 rounded-xl transition-all">
+            className="flex items-center gap-1.5 text-xs font-medium text-duo-azul hover:brightness-110 border border-duo-azul/25 bg-card dark:bg-card-dark px-3 py-2 rounded-lg transition-colors">
             <HiDownload className="w-4 h-4" /> CSV
           </button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-card dark:bg-card-dark p-2.5 text-center">
-            <div className="text-xl font-black text-duo-verde">{enviados}</div>
-            <div className="text-[10px] text-suave dark:text-suave-dark uppercase tracking-wide mt-0.5 font-bold">Enviados</div>
+          <div className="rounded-lg bg-card dark:bg-card-dark p-2.5 text-center">
+            <div className="text-xl font-semibold text-duo-verde">{enviados}</div>
+            <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5">Enviados</div>
           </div>
-          <div className="rounded-xl bg-card dark:bg-card-dark p-2.5 text-center">
-            <div className="text-xl font-black text-duo-amarillo-sombra dark:text-duo-amarillo">{omitidos.length}</div>
-            <div className="text-[10px] text-suave dark:text-suave-dark uppercase tracking-wide mt-0.5 font-bold">Omitidos</div>
+          <div className="rounded-lg bg-card dark:bg-card-dark p-2.5 text-center">
+            <div className="text-xl font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo">{omitidos.length}</div>
+            <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5">Omitidos</div>
           </div>
-          <div className="rounded-xl bg-card dark:bg-card-dark p-2.5 text-center">
-            <div className="text-xl font-black text-duo-azul">{reintentos}</div>
-            <div className="text-[10px] text-suave dark:text-suave-dark uppercase tracking-wide mt-0.5 font-bold">Reintentos OK</div>
+          <div className="rounded-lg bg-card dark:bg-card-dark p-2.5 text-center">
+            <div className="text-xl font-semibold text-duo-azul">{reintentos}</div>
+            <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5">Reintentos OK</div>
           </div>
         </div>
       </div>
 
       {/* Panel de omitidos */}
       {omitidos.length > 0 && (
-        <div className="rounded-2xl border-2 border-duo-amarillo/30 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] overflow-hidden">
+        <div className="rounded-xl border border-duo-amarillo/25 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] overflow-hidden">
           <button
             onClick={() => setShowOmitidos(v => !v)}
             className="w-full flex items-center justify-between px-4 py-3 text-left"
           >
             <div className="flex items-center gap-2">
               <HiExclamationCircle className="text-duo-amarillo-sombra dark:text-duo-amarillo text-sm shrink-0" />
-              <span className="text-xs font-black text-duo-amarillo-sombra dark:text-duo-amarillo">
+              <span className="text-xs font-medium text-duo-amarillo-sombra dark:text-duo-amarillo">
                 {omitidos.length} cliente{omitidos.length !== 1 ? "s" : ""} no recibió mensaje
               </span>
             </div>
@@ -108,20 +108,20 @@ function ResultadoPanel({ result, oficinaNombre, onDownload }) {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="px-4 pb-4 space-y-2 border-t-2 border-duo-amarillo/20">
+                <div className="px-4 pb-4 space-y-2 border-t border-duo-amarillo/20">
                   {sinTel.length > 0 && (
                     <div className="mt-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <HiPhone className="text-duo-rojo text-xs" />
-                        <span className="text-[10px] font-black uppercase tracking-wide text-duo-rojo">
+                        <span className="text-[11px] text-duo-rojo">
                           Sin teléfono ({sinTel.length})
                         </span>
                       </div>
                       <div className="space-y-1">
                         {sinTel.map((o, i) => (
                           <div key={i} className="flex items-center justify-between rounded-lg bg-card dark:bg-card-dark px-3 py-2">
-                            <span className="text-xs text-titulo dark:text-titulo-dark font-bold">{o.nombre || `Cliente #${o.cliente_id}`}</span>
-                            <span className="text-[10px] text-suave dark:text-suave-dark">{o.cuotas?.length || 0} cuota{(o.cuotas?.length || 0) !== 1 ? "s" : ""}</span>
+                            <span className="text-xs text-titulo dark:text-titulo-dark">{o.nombre || `Cliente #${o.cliente_id}`}</span>
+                            <span className="text-[11px] text-suave dark:text-suave-dark">{o.cuotas?.length || 0} cuota{(o.cuotas?.length || 0) !== 1 ? "s" : ""}</span>
                           </div>
                         ))}
                       </div>
@@ -132,7 +132,7 @@ function ResultadoPanel({ result, oficinaNombre, onDownload }) {
                     <div className="mt-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <HiRefresh className="text-duo-amarillo-sombra dark:text-duo-amarillo text-xs" />
-                        <span className="text-[10px] font-black uppercase tracking-wide text-duo-amarillo-sombra dark:text-duo-amarillo">
+                        <span className="text-[11px] text-duo-amarillo-sombra dark:text-duo-amarillo">
                           Falló WhatsApp con reintentos ({falloWsp.length})
                         </span>
                       </div>
@@ -140,11 +140,11 @@ function ResultadoPanel({ result, oficinaNombre, onDownload }) {
                         {falloWsp.map((o, i) => (
                           <div key={i} className="rounded-lg bg-card dark:bg-card-dark px-3 py-2">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-titulo dark:text-titulo-dark font-bold">{o.nombre || `Cliente #${o.cliente_id}`}</span>
-                              <span className="text-[10px] text-duo-amarillo-sombra dark:text-duo-amarillo">{o.intentos} intento{o.intentos !== 1 ? "s" : ""}</span>
+                              <span className="text-xs text-titulo dark:text-titulo-dark">{o.nombre || `Cliente #${o.cliente_id}`}</span>
+                              <span className="text-[11px] text-duo-amarillo-sombra dark:text-duo-amarillo">{o.intentos} intento{o.intentos !== 1 ? "s" : ""}</span>
                             </div>
                             {o.ultimo_error && (
-                              <div className="text-[10px] text-suave dark:text-suave-dark mt-0.5 truncate">{o.ultimo_error}</div>
+                              <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5 truncate">{o.ultimo_error}</div>
                             )}
                           </div>
                         ))}
@@ -152,7 +152,7 @@ function ResultadoPanel({ result, oficinaNombre, onDownload }) {
                     </div>
                   )}
 
-                  <p className="text-[10px] text-suave dark:text-suave-dark pt-1 font-bold">
+                  <p className="text-[11px] text-suave dark:text-suave-dark pt-1">
                     Cargá el teléfono en la ficha del cliente para que reciban el próximo recordatorio.
                   </p>
                 </div>
@@ -327,8 +327,8 @@ export function RecordatoriosCuotasModal({
     a.click();
   };
 
-  const selInput = "h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark px-2 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul dark:[color-scheme:dark] cursor-pointer";
-  const txtInput = "h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark px-3 text-xs font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul";
+  const selInput = "h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-2 text-xs text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul dark:[color-scheme:dark] cursor-pointer";
+  const txtInput = "h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-3 text-xs text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul";
 
   return (
     <Transition appear show={!!isOpen} as={Fragment}>
@@ -340,7 +340,7 @@ export function RecordatoriosCuotasModal({
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
             <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 translate-y-2 scale-95" enterTo="opacity-100 translate-y-0 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0 scale-100" leaveTo="opacity-0 translate-y-2 scale-95">
-              <Dialog.Panel className="w-full max-w-lg rounded-3xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden relative">
+              <Dialog.Panel className="w-full max-w-lg rounded-xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden relative">
 
                 {/* Loading overlay */}
                 <AnimatePresence>
@@ -352,9 +352,9 @@ export function RecordatoriosCuotasModal({
                         <div className="absolute inset-0 rounded-full border-4 border-t-duo-verde animate-spin" />
                         <HiSpeakerphone className="absolute inset-0 m-auto w-8 h-8 text-duo-verde animate-pulse" />
                       </div>
-                      <h3 className="text-xl font-black text-titulo dark:text-titulo-dark mb-2">Enviando recordatorios...</h3>
-                      <p className="text-sm text-suave dark:text-suave-dark max-w-[280px] font-bold">
-                        Notificando a los clientes de <strong className="text-titulo dark:text-titulo-dark">{getOficinaNombre(oficinaSeleccionada)}</strong>.
+                      <h3 className="text-xl font-semibold text-titulo dark:text-titulo-dark mb-2">Enviando recordatorios...</h3>
+                      <p className="text-sm text-suave dark:text-suave-dark max-w-[280px]">
+                        Notificando a los clientes de <strong className="text-titulo dark:text-titulo-dark font-medium">{getOficinaNombre(oficinaSeleccionada)}</strong>.
                         No cierres esta ventana.
                       </p>
                     </motion.div>
@@ -362,16 +362,16 @@ export function RecordatoriosCuotasModal({
                 </AnimatePresence>
 
                 {/* Header */}
-                <div className="relative px-6 pt-6 pb-4 border-b-2 border-linea dark:border-linea-dark">
+                <div className="relative px-6 pt-6 pb-4 border-b border-linea dark:border-linea-dark">
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isWebAdmin ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde" : "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isWebAdmin ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde" : "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"}`}>
                       {isWebAdmin ? <HiSpeakerphone className="w-5 h-5" /> : <HiCreditCard className="w-5 h-5" />}
                     </div>
                     <div>
-                      <Dialog.Title className="text-lg font-black text-titulo dark:text-titulo-dark">
+                      <Dialog.Title className="text-lg font-semibold text-titulo dark:text-titulo-dark">
                         {isWebAdmin ? "Panel de Recordatorios" : "Billeteras Autorizadas"}
                       </Dialog.Title>
-                      <p className="mt-1 text-xs text-suave dark:text-suave-dark font-bold">
+                      <p className="mt-1 text-xs text-suave dark:text-suave-dark">
                         {isWebAdmin ? "Gestión centralizada de envíos masivos." : `Medios de pago para ${getOficinaNombre(userOficina)}.`}
                       </p>
                     </div>
@@ -396,12 +396,12 @@ export function RecordatoriosCuotasModal({
 
                   {/* Form nueva billetera (solo admin) */}
                   {isWebAdmin && (
-                    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
+                    <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                        <h3 className="text-xs text-suave dark:text-suave-dark">
                           {editingId ? "Editar billetera" : "Nueva billetera"}
                         </h3>
-                        {editingId && <button onClick={resetForm} className="text-[10px] font-black text-duo-azul hover:brightness-110">Cancelar</button>}
+                        {editingId && <button onClick={resetForm} className="text-[11px] font-medium text-duo-azul hover:brightness-110">Cancelar</button>}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <select className={selInput} value={form.proveedor} onChange={e => setForm({ ...form, proveedor: e.target.value })}>
@@ -418,7 +418,7 @@ export function RecordatoriosCuotasModal({
                         <input type="text" placeholder="Titular de la cuenta" value={form.titular} onChange={e => setForm({ ...form, titular: e.target.value })} className={txtInput} />
                       </div>
                       <div className="flex justify-end pt-1">
-                        <button onClick={handleSave} disabled={saving} className="h-10 px-4 rounded-xl bg-duo-verde text-white text-xs font-black shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all flex items-center gap-2">
+                        <button onClick={handleSave} disabled={saving} className="h-10 px-4 rounded-lg bg-duo-verde text-white text-xs font-medium transition-colors hover:brightness-110 flex items-center gap-2">
                           {saving ? "Guardando..." : <><HiPlus className="w-4 h-4" />{editingId ? "Actualizar" : "Guardar"}</>}
                         </button>
                       </div>
@@ -427,10 +427,10 @@ export function RecordatoriosCuotasModal({
 
                   {/* Lock para no-admin */}
                   {!isWebAdmin && (
-                    <div className="p-3 bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl flex items-center gap-3 text-suave dark:text-suave-dark">
+                    <div className="p-3 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-xl flex items-center gap-3 text-suave dark:text-suave-dark">
                       <div className="p-2 bg-card dark:bg-card-dark rounded-lg shrink-0"><HiLockClosed className="w-5 h-5 text-suave dark:text-suave-dark" /></div>
                       <div className="text-[11px] leading-tight">
-                        <span className="font-black text-titulo dark:text-titulo-dark block mb-0.5">Gestión Restringida</span>
+                        <span className="font-medium text-titulo dark:text-titulo-dark block mb-0.5">Gestión Restringida</span>
                         Las cuentas bancarias son administradas centralmente.
                       </div>
                     </div>
@@ -438,25 +438,25 @@ export function RecordatoriosCuotasModal({
 
                   {/* Lista de medios de cobro */}
                   <div className="space-y-2">
-                    <p className="text-[10px] font-black text-suave dark:text-suave-dark uppercase px-1">
+                    <p className="text-[11px] text-suave dark:text-suave-dark px-1">
                       {isWebAdmin ? "Seleccioná la billetera para el mensaje:" : "Cuentas habilitadas:"}
                     </p>
                     {mediosAptos.length === 0 ? (
-                      <div className="py-10 text-center text-xs text-suave dark:text-suave-dark border-2 border-dashed border-linea dark:border-linea-dark rounded-2xl bg-surface dark:bg-surface-dark font-bold">
+                      <div className="py-10 text-center text-xs text-suave dark:text-suave-dark border border-dashed border-linea dark:border-linea-dark rounded-xl bg-surface dark:bg-surface-dark">
                         No hay billeteras para {getOficinaNombre(isWebAdmin ? oficinaSeleccionada : userOficina)}.
                       </div>
                     ) : mediosAptos.map(m => {
                       const sel = selectedId === m.id;
                       return (
                         <div key={m.id} onClick={() => isWebAdmin && !sending && setSelectedId(m.id)}
-                          className={`group relative flex items-center justify-between rounded-2xl border-2 p-4 transition-all ${isWebAdmin && !sending ? "cursor-pointer hover:border-duo-verde" : ""} ${sel && isWebAdmin ? "border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark"} ${sending ? "opacity-50 pointer-events-none" : ""}`}>
+                          className={`group relative flex items-center justify-between rounded-xl border p-4 transition-colors ${isWebAdmin && !sending ? "cursor-pointer hover:border-duo-verde" : ""} ${sel && isWebAdmin ? "border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark"} ${sending ? "opacity-50 pointer-events-none" : ""}`}>
                           <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${sel && isWebAdmin ? "bg-duo-verde text-white" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark"}`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${sel && isWebAdmin ? "bg-duo-verde text-white" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark"}`}>
                               {m.proveedor === "mercado_pago" ? <HiCreditCard className="w-5 h-5" /> : <HiCash className="w-5 h-5" />}
                             </div>
                             <div>
-                              <div className="text-sm font-black text-titulo dark:text-titulo-dark">{m.valor}</div>
-                              <div className="text-[11px] text-suave dark:text-suave-dark font-bold">{m.titular_nombre}</div>
+                              <div className="text-sm font-medium text-titulo dark:text-titulo-dark">{m.valor}</div>
+                              <div className="text-[11px] text-suave dark:text-suave-dark">{m.titular_nombre}</div>
                             </div>
                           </div>
                           {isWebAdmin && (
@@ -472,12 +472,12 @@ export function RecordatoriosCuotasModal({
 
                   {/* Selector de oficina (solo admin) */}
                   {isWebAdmin && (
-                    <div className="mt-2 space-y-3 pt-4 border-t-2 border-linea dark:border-linea-dark">
-                      <p className="text-[11px] font-black text-suave dark:text-suave-dark uppercase tracking-wide">¿Qué oficina notificás ahora?</p>
+                    <div className="mt-2 space-y-3 pt-4 border-t border-linea dark:border-linea-dark">
+                      <p className="text-[11px] text-suave dark:text-suave-dark">¿Qué oficina notificás ahora?</p>
                       <div className="flex flex-col gap-2">
                         {oficinasReal.map(ofi => (
                           <button key={ofi.id} onClick={() => setOfi(ofi.id)} disabled={sending}
-                            className={`w-full py-3 px-4 rounded-2xl border-2 text-left text-xs font-black transition-all flex items-center justify-between ${String(oficinaSeleccionada) === String(ofi.id) ? "border-duo-verde bg-duo-verde text-white" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-verde"} ${sending ? "opacity-50" : ""}`}>
+                            className={`w-full py-3 px-4 rounded-xl border text-left text-xs font-medium transition-colors flex items-center justify-between ${String(oficinaSeleccionada) === String(ofi.id) ? "border-duo-verde bg-duo-verde text-white" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-verde"} ${sending ? "opacity-50" : ""}`}>
                             <span>{ofi.nombre} ({ofi.id})</span>
                             {String(oficinaSeleccionada) === String(ofi.id) && <HiCheckCircle className="w-5 h-5" />}
                           </button>
@@ -489,17 +489,17 @@ export function RecordatoriosCuotasModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-5 bg-surface dark:bg-surface-dark border-t-2 border-linea dark:border-linea-dark flex items-center justify-between">
-                  <div className="text-[10px] text-suave dark:text-suave-dark leading-tight max-w-[150px] font-bold">
+                <div className="px-6 py-5 bg-surface dark:bg-surface-dark border-t border-linea dark:border-linea-dark flex items-center justify-between">
+                  <div className="text-[11px] text-suave dark:text-suave-dark leading-tight max-w-[150px]">
                     {isWebAdmin ? "Central operativa de cobranzas." : "Información de cuentas de cobro."}
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={onClose} disabled={sending} className="px-5 py-2.5 text-sm font-black text-suave dark:text-suave-dark hover:brightness-95 transition-colors disabled:opacity-50 bg-card dark:bg-card-dark rounded-xl">
+                    <button onClick={onClose} disabled={sending} className="px-5 py-2.5 text-sm font-medium text-suave dark:text-suave-dark hover:brightness-95 transition-colors disabled:opacity-50 bg-card dark:bg-card-dark rounded-lg">
                       Cerrar
                     </button>
                     {isWebAdmin && (
                       <button onClick={handleConfirm} disabled={sending || !selectedId || mediosAptos.length === 0}
-                        className="px-6 py-2.5 rounded-2xl bg-duo-verde text-white text-sm font-black shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed">
+                        className="px-6 py-2.5 rounded-lg bg-duo-verde text-white text-sm font-medium transition-colors hover:brightness-110 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed">
                         {sending ? "Procesando..." : <><HiSpeakerphone className="w-4 h-4" /> Enviar Masivo</>}
                       </button>
                     )}
@@ -609,8 +609,8 @@ export function CuentasCobroModal({
     }
   };
 
-  const selInput = "h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark px-2 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul dark:[color-scheme:dark] cursor-pointer";
-  const txtInput = "h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark px-3 text-xs font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul";
+  const selInput = "h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-2 text-xs text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul dark:[color-scheme:dark] cursor-pointer";
+  const txtInput = "h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-3 text-xs text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul";
 
   return (
     <Transition appear show={!!open} as={Fragment}>
@@ -632,19 +632,19 @@ export function CuentasCobroModal({
               leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0 scale-100"
               leaveTo="opacity-0 translate-y-2 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-lg rounded-3xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden">
+              <Dialog.Panel className="w-full max-w-lg rounded-xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden">
 
                 {/* Header */}
-                <div className="relative px-6 pt-6 pb-4 border-b-2 border-linea dark:border-linea-dark">
+                <div className="relative px-6 pt-6 pb-4 border-b border-linea dark:border-linea-dark">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul flex items-center justify-center">
                       <HiCollection className="w-5 h-5" />
                     </div>
                     <div>
-                      <Dialog.Title className="text-lg font-black text-titulo dark:text-titulo-dark">
+                      <Dialog.Title className="text-lg font-semibold text-titulo dark:text-titulo-dark">
                         Cuentas de cobro
                       </Dialog.Title>
-                      <p className="mt-1 text-xs text-suave dark:text-suave-dark font-bold">
+                      <p className="mt-1 text-xs text-suave dark:text-suave-dark">
                         Mercado Pago y billeteras donde recibís las transferencias.
                       </p>
                     </div>
@@ -662,13 +662,13 @@ export function CuentasCobroModal({
                 <div className="px-6 py-5 space-y-5">
 
                   {/* Form alta/edición */}
-                  <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
+                  <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                      <h3 className="text-xs text-suave dark:text-suave-dark">
                         {editingId ? "Editar cuenta" : "Agregar cuenta"}
                       </h3>
                       {editingId && (
-                        <button onClick={resetFormCuentas} className="text-[10px] font-black text-duo-azul hover:brightness-110">
+                        <button onClick={resetFormCuentas} className="text-[11px] font-medium text-duo-azul hover:brightness-110">
                           Cancelar
                         </button>
                       )}
@@ -685,7 +685,7 @@ export function CuentasCobroModal({
                       <button
                         onClick={handleSaveCuenta}
                         disabled={saving || !form.aliasCbu.trim() || !form.titular.trim()}
-                        className="h-10 px-4 rounded-xl bg-duo-verde text-white text-xs font-black shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all disabled:opacity-50 flex items-center gap-2"
+                        className="h-10 px-4 rounded-lg bg-duo-verde text-white text-xs font-medium transition-colors hover:brightness-110 disabled:opacity-50 flex items-center gap-2"
                       >
                         {saving ? "Guardando..." : <><HiPlus className="w-4 h-4" />{editingId ? "Actualizar" : "Agregar"}</>}
                       </button>
@@ -694,23 +694,23 @@ export function CuentasCobroModal({
 
                   {/* Lista de cuentas */}
                   <div className="space-y-2">
-                    <p className="text-[10px] font-black text-suave dark:text-suave-dark uppercase px-1">
+                    <p className="text-[11px] text-suave dark:text-suave-dark px-1">
                       Cuentas cargadas
                     </p>
                     {medios.length === 0 ? (
-                      <div className="py-10 text-center text-xs text-suave dark:text-suave-dark border-2 border-dashed border-linea dark:border-linea-dark rounded-2xl bg-surface dark:bg-surface-dark font-bold">
+                      <div className="py-10 text-center text-xs text-suave dark:text-suave-dark border border-dashed border-linea dark:border-linea-dark rounded-xl bg-surface dark:bg-surface-dark">
                         No hay cuentas cargadas todavía.
                       </div>
                     ) : (
                       medios.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
+                        <div key={m.id} className="flex items-center justify-between rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
                           <div className="flex items-center gap-4 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-card dark:bg-card-dark text-suave dark:text-suave-dark flex items-center justify-center shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-card dark:bg-card-dark text-suave dark:text-suave-dark flex items-center justify-center shrink-0">
                               {m.proveedor === "mercado_pago" ? <HiCreditCard className="w-5 h-5" /> : <HiCash className="w-5 h-5" />}
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-black text-titulo dark:text-titulo-dark truncate">{m.valor}</div>
-                              <div className="text-[11px] text-suave dark:text-suave-dark font-bold">
+                              <div className="text-sm font-medium text-titulo dark:text-titulo-dark truncate">{m.valor}</div>
+                              <div className="text-[11px] text-suave dark:text-suave-dark">
                                 {proveedorLabel(m.proveedor)}
                                 {m.titular_nombre ? ` · ${m.titular_nombre}` : ""}
                               </div>
@@ -733,8 +733,8 @@ export function CuentasCobroModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-5 bg-surface dark:bg-surface-dark border-t-2 border-linea dark:border-linea-dark flex items-center justify-end">
-                  <button onClick={onClose} className="px-5 py-2.5 text-sm font-black text-suave dark:text-suave-dark hover:brightness-95 transition-colors bg-card dark:bg-card-dark rounded-xl">
+                <div className="px-6 py-5 bg-surface dark:bg-surface-dark border-t border-linea dark:border-linea-dark flex items-center justify-end">
+                  <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-suave dark:text-suave-dark hover:brightness-95 transition-colors bg-card dark:bg-card-dark rounded-lg">
                     Cerrar
                   </button>
                 </div>

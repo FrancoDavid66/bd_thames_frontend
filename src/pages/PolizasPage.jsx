@@ -1,4 +1,4 @@
-/* src/pages/PolizasPage.jsx — Lista de pólizas (rediseño THAMES) */
+/* src/pages/PolizasPage.jsx — Lista de pólizas */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { batch, useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
@@ -228,8 +228,8 @@ export default function PolizasPage() {
     <PageContainer>
       {/* Header */}
       <div className="mb-4">
-        <h1 className="text-2xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-3xl">Pólizas</h1>
-        <p className="text-xs font-bold text-suave dark:text-suave-dark sm:text-sm">
+        <h1 className="text-xl font-semibold text-titulo dark:text-titulo-dark sm:text-2xl">Pólizas</h1>
+        <p className="text-[12px] text-suave dark:text-suave-dark sm:text-[13px]">
           {isWebAdmin ? "Buscá y filtrá sin cargar todo el universo." : `Gestionando cartera de: ${user?.perfil?.oficina_nombre || "Sucursal"}`}
         </p>
       </div>
@@ -271,14 +271,14 @@ export default function PolizasPage() {
       />
 
       {error && status === "failed" && (
-        <div className="mt-2 rounded-2xl border-2 border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 text-xs font-bold text-duo-rojo">
+        <div className="mt-2 rounded-lg border border-duo-rojo/30 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 text-[12px] font-medium text-duo-rojo">
           {typeof error === "string" ? error : JSON.stringify(error)}
         </div>
       )}
 
-      <div className="mt-2 text-xs font-bold text-suave dark:text-suave-dark sm:text-sm">
+      <div className="mt-2 text-[12px] text-suave dark:text-suave-dark sm:text-[13px]">
         Mostrando {listFiltrada.length} de {totalLabel} pólizas ({pagingLabel})
-        {companiaLocal ? <span className="ml-1 text-duo-azul">· filtrado por “{companiaLocal}”</span> : null}
+        {companiaLocal ? <span className="ml-1 text-duo-azul">· filtrado por "{companiaLocal}"</span> : null}
       </div>
 
       <div className="mt-2 sm:mt-3">

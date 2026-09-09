@@ -1,4 +1,4 @@
-// src/components/estadisticas/ControlFechasPanel.jsx  (diseño Duo)
+// src/components/estadisticas/ControlFechasPanel.jsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -152,8 +152,8 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Control de Fechas</h2>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <h2 className="text-base font-semibold text-titulo dark:text-titulo-dark">Control de Fechas</h2>
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             Pólizas cuya fecha de emisión es igual al vencimiento de su 1ª cuota
           </p>
         </div>
@@ -161,14 +161,14 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
           <button
             onClick={descargarTodo}
             disabled={downloading || loading}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 rounded-xl border-2 border-ingreso bg-ingreso text-white text-xs font-black hover:bg-ingreso-fuerte shadow-[0_4px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all"
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 rounded-lg bg-ingreso text-white text-xs font-medium transition-colors hover:brightness-110 disabled:opacity-50"
           >
             {downloading ? "Descargando…" : "Descargar todo"}
           </button>
           <button
             onClick={fetchListado}
             disabled={loading}
-            className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+            className="h-9 w-9 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
           >
             <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -177,54 +177,54 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border-2 border-egreso/30 bg-egreso/10 px-4 py-3 text-xs font-bold text-egreso dark:text-egreso-claro">
+        <div className="flex items-center gap-2 rounded-lg border border-egreso/25 bg-egreso/10 px-4 py-3 text-xs text-egreso dark:text-egreso-claro">
           <HiExclamationCircle className="shrink-0" /> {error}
         </div>
       )}
 
       {/* KPI */}
-      <div className="rounded-3xl border-2 border-egreso/30 bg-egreso/[0.06] p-5">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-egreso mb-2">
+      <div className="rounded-xl border border-egreso/25 bg-egreso/[0.06] p-5">
+        <div className="flex items-center gap-2 text-[11px] text-egreso mb-2">
           <HiCalendar className="text-sm" /> Emisión = Vto. 1ª cuota
         </div>
-        <div className="text-4xl font-black tabular-nums text-egreso">
+        <div className="text-4xl font-semibold tabular-nums text-egreso">
           {loading ? "—" : count.toLocaleString("es-AR")}
         </div>
-        <div className="text-[11px] font-bold text-suave dark:text-suave-dark mt-1">
+        <div className="text-[11px] text-suave dark:text-suave-dark mt-1">
           pólizas con este problema (cobertura de 0 días en la 1ª cuota)
         </div>
       </div>
 
       {/* Tabla */}
-      <div className="rounded-2xl border-2 border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-          <span className="text-xs font-black text-titulo dark:text-titulo-dark">Pólizas detectadas</span>
-          <span className="text-[10px] font-bold text-suave dark:text-suave-dark">{count.toLocaleString("es-AR")} en total</span>
+      <div className="rounded-xl border border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+          <span className="text-xs font-medium text-titulo dark:text-titulo-dark">Pólizas detectadas</span>
+          <span className="text-[11px] text-suave dark:text-suave-dark">{count.toLocaleString("es-AR")} en total</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead>
-              <tr className="border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Póliza</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Cliente</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Patente</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Compañía</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Oficina</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Emisión</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Vto. 1ª cuota</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wider">Estado</th>
+              <tr className="border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Póliza</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Cliente</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Patente</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Compañía</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Oficina</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Emisión</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Vto. 1ª cuota</th>
+                <th className="px-3 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">Estado</th>
                 <th className="px-3 py-2.5 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-linea/50 dark:divide-linea-dark/50">
+            <tbody className="divide-y divide-linea/50 dark:divide-linea-dark/50">
               {loading ? (
-                <tr><td colSpan={9} className="px-3 py-10 text-center text-suave dark:text-suave-dark text-[11px] font-bold">Cargando...</td></tr>
+                <tr><td colSpan={9} className="px-3 py-10 text-center text-suave dark:text-suave-dark text-[11px]">Cargando...</td></tr>
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-3 py-12 text-center">
-                    <p className="text-sm text-ingreso font-black">¡Sin problemas!</p>
-                    <p className="text-[11px] font-bold text-suave dark:text-suave-dark mt-1">No hay pólizas con la emisión igual al vencimiento de su 1ª cuota.</p>
+                    <p className="text-sm text-ingreso font-medium">¡Sin problemas!</p>
+                    <p className="text-[11px] text-suave dark:text-suave-dark mt-1">No hay pólizas con la emisión igual al vencimiento de su 1ª cuota.</p>
                   </td>
                 </tr>
               ) : (
@@ -235,22 +235,22 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
                         href={`/polizas/${it.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-black text-oficina hover:text-oficina-fuerte transition-colors"
+                        className="font-medium text-oficina hover:text-oficina-fuerte transition-colors"
                       >
                         #{it.id}{it.numero_poliza ? ` · ${it.numero_poliza}` : ""}
                       </a>
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="font-bold text-titulo dark:text-titulo-dark">{it.cliente || "—"}</div>
-                      {it.cliente_dni && <div className="text-[10px] font-bold text-suave dark:text-suave-dark">{it.cliente_dni}</div>}
+                      <div className="text-titulo dark:text-titulo-dark">{it.cliente || "—"}</div>
+                      {it.cliente_dni && <div className="text-[11px] text-suave dark:text-suave-dark">{it.cliente_dni}</div>}
                     </td>
-                    <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.patente || "—"}</td>
-                    <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.compania || "—"}</td>
-                    <td className="px-3 py-2.5 font-bold text-suave dark:text-suave-dark">{it.oficina_nombre || ofiName(it.oficina)}</td>
-                    <td className="px-3 py-2.5 text-egreso font-mono font-black tabular-nums">{fmtFecha(it.fecha_emision)}</td>
-                    <td className="px-3 py-2.5 text-egreso font-mono font-black tabular-nums">{fmtFecha(it.vto_primera_cuota)}</td>
+                    <td className="px-3 py-2.5 text-suave dark:text-suave-dark">{it.patente || "—"}</td>
+                    <td className="px-3 py-2.5 text-suave dark:text-suave-dark">{it.compania || "—"}</td>
+                    <td className="px-3 py-2.5 text-suave dark:text-suave-dark">{it.oficina_nombre || ofiName(it.oficina)}</td>
+                    <td className="px-3 py-2.5 text-egreso font-mono font-medium tabular-nums">{fmtFecha(it.fecha_emision)}</td>
+                    <td className="px-3 py-2.5 text-egreso font-mono font-medium tabular-nums">{fmtFecha(it.vto_primera_cuota)}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`text-[10px] font-black ${it.estado === "activa" ? "text-ingreso" : "text-suave dark:text-suave-dark"}`}>
+                      <span className={`text-[11px] ${it.estado === "activa" ? "text-ingreso" : "text-suave dark:text-suave-dark"}`}>
                         {it.estado || "—"}
                       </span>
                     </td>
@@ -259,7 +259,7 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
                         href={`/polizas/${it.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[10px] font-black"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[11px] font-medium"
                       >
                         Ver <HiArrowRight className="text-xs" />
                       </a>
@@ -273,20 +273,20 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
 
         {/* Paginación */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-            <span className="text-[10px] font-bold text-suave dark:text-suave-dark">Página {page} de {totalPages}</span>
+          <div className="flex items-center justify-between px-5 py-3 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <span className="text-[11px] text-suave dark:text-suave-dark">Página {page} de {totalPages}</span>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors"
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors"
               >
                 <HiChevronLeft className="text-xs" />
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="h-8 w-8 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors"
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina disabled:opacity-30 transition-colors"
               >
                 <HiChevronRight className="text-xs" />
               </button>

@@ -1,6 +1,6 @@
-// src/components/admin/AdminHorariosCierre.jsx  (diseño Duo · responsive)
+// src/components/admin/AdminHorariosCierre.jsx  (responsive)
 //
-// Panel para configurar el horario de cierre de caja de cada oficina (diseño Duo).
+// Panel para configurar el horario de cierre de caja de cada oficina.
 // Lo usa el ADMIN. Este horario dispara el pop-up recordatorio de los cajeros.
 //
 // 📱 RESPONSIVE: los 3 inputs (hora/aviso/tolerancia) ya van en grid (1 col en
@@ -12,8 +12,8 @@ import toast from "react-hot-toast";
 import api from "../../services/api";
 
 const INPUT =
-  "w-full h-12 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark " +
-  "px-3 text-base sm:text-sm font-bold text-titulo dark:text-titulo-dark outline-none " +
+  "w-full h-12 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark " +
+  "px-3 text-base sm:text-[14px] text-titulo dark:text-titulo-dark outline-none " +
   "focus:border-oficina transition-colors dark:[color-scheme:dark]";
 
 export default function AdminHorariosCierre() {
@@ -76,24 +76,24 @@ export default function AdminHorariosCierre() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <span className="h-8 w-8 animate-spin rounded-full border-4 border-linea dark:border-linea-dark border-t-oficina" />
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-linea dark:border-linea-dark border-t-oficina" />
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
-      <p className="px-5 pt-5 text-[13px] leading-relaxed font-bold text-suave dark:text-suave-dark">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+      <p className="px-5 pt-5 text-[13px] leading-relaxed text-suave dark:text-suave-dark">
         Configurá el horario de cierre por oficina. El sistema avisa con un pop-up
-        <strong className="text-titulo dark:text-titulo-dark"> {filas[0]?.aviso_min ?? 30} min antes</strong> y da
-        <strong className="text-titulo dark:text-titulo-dark"> {filas[0]?.tolerancia_min ?? 5} min de tolerancia</strong>.
+        <strong className="text-titulo dark:text-titulo-dark font-medium"> {filas[0]?.aviso_min ?? 30} min antes</strong> y da
+        <strong className="text-titulo dark:text-titulo-dark font-medium"> {filas[0]?.tolerancia_min ?? 5} min de tolerancia</strong>.
         Dejá vacío si esa oficina no tiene un horario fijo.
       </p>
 
-      <div className="divide-y-2 divide-linea dark:divide-linea-dark">
+      <div className="divide-y divide-linea dark:divide-linea-dark">
         {filas.map((f, i) => (
           <div key={f.oficina} className="px-5 py-6">
-            <div className="mb-4 flex items-center gap-2 text-[15px] font-black text-titulo dark:text-titulo-dark">
+            <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-titulo dark:text-titulo-dark">
               <HiClock className="text-oficina" />
               {f.oficina_nombre}
             </div>
@@ -113,7 +113,7 @@ export default function AdminHorariosCierre() {
             <button
               onClick={() => guardar(f)}
               disabled={guardando === f.oficina}
-              className="mt-4 w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-1.5 rounded-xl bg-oficina px-4 py-2.5 text-sm font-black text-white shadow-[0_4px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all disabled:opacity-50"
+              className="mt-4 w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg bg-oficina px-4 py-2.5 text-[13px] font-medium text-white hover:brightness-110 transition-colors disabled:opacity-50"
             >
               {guardando === f.oficina
                 ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -130,7 +130,7 @@ export default function AdminHorariosCierre() {
 function Campo({ label, children }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+      <label className="mb-1.5 block text-[12px] text-suave dark:text-suave-dark">
         {label}
       </label>
       {children}

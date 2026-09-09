@@ -1,8 +1,11 @@
 // src/components/ui/CardDuo.jsx
 /**
- * 🦉 Tarjeta redonda estilo Duolingo.
- * Bordes muy redondeados + borde de 2px + una sombra inferior sutil (0 2px 0)
- * que le da la sensación "física" de las cards de Duo. Funciona en claro/oscuro.
+ * 🗂️ Tarjeta base de THAMES.
+ *
+ * 🆕 Rediseño "profesional": borde de 1px (antes 2px) y una sombra apenas
+ * perceptible en vez del "borde grueso + sombra plana de 2px" estilo
+ * Duolingo. Menos redondeada (antes rounded-3xl). El objetivo es que la
+ * tarjeta se note por el borde/sombra, no por gritar con color.
  *
  * Props:
  *   as: etiqueta a renderizar ("div" por defecto; podés pasar "section", "li", etc.)
@@ -14,9 +17,9 @@
 export default function CardDuo({ as: Tag = "div", hover = false, className = "", children, ...rest }) {
   return (
     <Tag
-      className={`bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark
-        rounded-3xl shadow-[0_2px_0_var(--color-duo-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)]
-        ${hover ? "transition-transform duration-100 hover:-translate-y-0.5 cursor-pointer" : ""}
+      className={`bg-card dark:bg-card-dark border border-linea dark:border-linea-dark
+        rounded-xl shadow-sm
+        ${hover ? "transition-shadow duration-150 hover:shadow-md cursor-pointer" : ""}
         ${className}`}
       {...rest}
     >

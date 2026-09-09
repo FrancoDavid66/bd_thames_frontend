@@ -268,7 +268,7 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
       <form id="form-editar-poliza" onSubmit={handleSubmit} className="space-y-8">
         {/* ── Bloque 1: Datos de la póliza ── */}
         <div>
-          <h3 className="text-[11px] font-black text-duo-verde-sombra dark:text-duo-verde uppercase tracking-wide mb-4 ml-1">
+          <h3 className="text-[11px] font-medium text-duo-verde-sombra dark:text-duo-verde mb-4 ml-1">
             Datos de la Póliza
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -278,7 +278,7 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
 
         {/* ── Bloque 2: Datos técnicos del vehículo ── */}
         <div>
-          <h3 className="text-[11px] font-black text-duo-azul uppercase tracking-wide mb-4 ml-1">
+          <h3 className="text-[11px] font-medium text-duo-azul mb-4 ml-1">
             Datos Técnicos del Vehículo
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -320,7 +320,7 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
 
             {/* Observaciones (ocupa las 2 columnas) */}
             <div className="flex flex-col gap-2 sm:col-span-2">
-              <label className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark ml-1">
+              <label className="text-[11px] text-suave dark:text-suave-dark ml-1">
                 {LABELS.observaciones}
               </label>
               <textarea
@@ -328,7 +328,7 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
                 value={formData.observaciones ?? ""}
                 onChange={handleChange}
                 rows={3}
-                className="w-full rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-[15px] font-bold text-titulo dark:text-titulo-dark outline-none transition-colors resize-none focus:border-duo-azul placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal"
+                className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-sm text-titulo dark:text-titulo-dark outline-none transition-colors resize-none focus:border-duo-azul placeholder:text-suave dark:placeholder:text-suave-dark"
                 placeholder="Notas adicionales del vehículo…"
               />
             </div>

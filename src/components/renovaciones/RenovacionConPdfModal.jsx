@@ -73,8 +73,8 @@ function Barra({ paso }) {
           />
           <div
             className={cx(
-              "mt-1.5 text-[10px] font-black uppercase tracking-wide truncate",
-              i === paso ? "text-duo-violeta" : "text-suave dark:text-suave-dark"
+              "mt-1.5 text-[10px] truncate",
+              i === paso ? "text-duo-violeta font-medium" : "text-suave dark:text-suave-dark"
             )}
           >
             {p}
@@ -88,12 +88,12 @@ function Barra({ paso }) {
 function Dato({ label, valor, alerta = false }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 border-b border-linea dark:border-linea-dark last:border-0">
-      <span className="text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark shrink-0">
+      <span className="text-[12px] text-suave dark:text-suave-dark shrink-0">
         {label}
       </span>
       <span
         className={cx(
-          "text-sm font-black text-right min-w-0",
+          "text-sm font-semibold text-right min-w-0",
           alerta ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-titulo dark:text-titulo-dark"
         )}
       >
@@ -109,13 +109,13 @@ function Aviso({ tono = "amarillo", children }) {
       ? "border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde"
       : "border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo";
   return (
-    <div className={cx("flex items-start gap-2.5 rounded-2xl border-2 p-3", c)}>
+    <div className={cx("flex items-start gap-2.5 rounded-xl border p-3", c)}>
       {tono === "verde" ? (
         <HiCheckCircle className="mt-0.5 shrink-0 text-lg" />
       ) : (
         <HiExclamation className="mt-0.5 shrink-0 text-lg" />
       )}
-      <div className="text-[12.5px] font-bold leading-relaxed">{children}</div>
+      <div className="text-[12.5px] leading-relaxed">{children}</div>
     </div>
   );
 }
@@ -286,13 +286,13 @@ export default function RenovacionConPdfModal({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="w-full rounded-3xl border-[3px] border-dashed border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] p-8 text-center transition-all hover:brightness-105 cursor-pointer"
+              className="w-full rounded-2xl border-2 border-dashed border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] p-8 text-center transition-colors hover:brightness-105 cursor-pointer"
             >
               <HiDocumentText className="mx-auto text-5xl text-duo-violeta" />
-              <div className="mt-2 text-[15px] font-black text-duo-violeta flex items-center justify-center gap-2">
+              <div className="mt-2 text-[15px] font-semibold text-duo-violeta flex items-center justify-center gap-2">
                 <HiUpload /> Subir la póliza nueva
               </div>
-              <div className="mt-1 text-[12px] font-bold text-suave dark:text-suave-dark">
+              <div className="mt-1 text-[12px] text-suave dark:text-suave-dark">
                 {String(cia).toUpperCase().includes("EQUIDAD")
                   ? "La póliza completa de La Equidad (el PDF largo)"
                   : "La propuesta completa de AMCA (la que trae los cupones)"}
@@ -300,7 +300,7 @@ export default function RenovacionConPdfModal({
             </button>
 
             <Aviso>
-              <strong className="block text-[13px] font-black mb-0.5">
+              <strong className="block text-[13px] font-semibold mb-0.5">
                 Esta compañía no se renueva sola
               </strong>
               Las fechas, los importes y los cupones con su código de barras
@@ -329,7 +329,7 @@ export default function RenovacionConPdfModal({
               <InputDuo label="Compañía" value={form.compania} onChange={set("compania")} />
             </div>
 
-            <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2">
+            <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2">
               <Dato label="Vigencia" valor={`${fmtFecha(datos?.poliza?.vigencia_desde)} — ${fmtFecha(datos?.poliza?.vigencia_hasta)}`} />
               <Dato label="Asegurado" valor={datos?.cliente?.nombre || "—"} />
               <Dato label="Motor" valor={datos?.vehiculo?.motor || "—"} />
@@ -352,10 +352,10 @@ export default function RenovacionConPdfModal({
             {cupones.length ? (
               <>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+                  <span className="text-[12px] text-suave dark:text-suave-dark">
                     {cupones.length} {cupones.length === 1 ? "cuota" : "cuotas"}
                   </span>
-                  <span className="text-[12px] font-black text-duo-violeta">
+                  <span className="text-[12px] font-medium text-duo-violeta">
                     {cupones.length - sinImagen} con imagen
                   </span>
                 </div>
@@ -364,21 +364,21 @@ export default function RenovacionConPdfModal({
                   {cupones.map((c, i) => (
                     <div
                       key={c.numero ?? i}
-                      className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark overflow-hidden"
+                      className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark overflow-hidden"
                     >
                       <div className="flex items-center gap-3 px-4 py-3">
-                        <span className="h-9 w-9 rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta flex items-center justify-center text-sm font-black shrink-0">
+                        <span className="h-9 w-9 rounded-lg bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta flex items-center justify-center text-sm font-semibold shrink-0">
                           {c.numero ?? i + 1}
                         </span>
                         <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-black text-titulo dark:text-titulo-dark">
+                          <span className="block text-sm font-semibold text-titulo dark:text-titulo-dark">
                             Vence {fmtFecha(c.vencimiento)}
                           </span>
-                          <span className="block text-[11px] font-bold text-suave dark:text-suave-dark truncate">
+                          <span className="block text-[11px] text-suave dark:text-suave-dark truncate">
                             {c.codigo_barras ? `Código ${c.codigo_barras.slice(0, 12)}…` : "Sin código de barras"}
                           </span>
                         </span>
-                        <span className="text-sm font-black text-titulo dark:text-titulo-dark shrink-0">
+                        <span className="text-sm font-semibold text-titulo dark:text-titulo-dark shrink-0">
                           {fmtMoney(c.importe) || "$0"}
                         </span>
                       </div>
@@ -387,7 +387,7 @@ export default function RenovacionConPdfModal({
                              al cajero. Verla acá evita descubrir que falta
                              cuando ya está en la caja. */}
                       {c.imagen_url ? (
-                        <div className="border-t-2 border-linea dark:border-linea-dark bg-white p-2">
+                        <div className="border-t border-linea dark:border-linea-dark bg-white p-2">
                           <img
                             src={c.imagen_url}
                             alt={`Cupón ${c.numero ?? i + 1}`}
@@ -396,7 +396,7 @@ export default function RenovacionConPdfModal({
                           />
                         </div>
                       ) : (
-                        <div className="border-t-2 border-linea dark:border-linea-dark px-4 py-2.5 flex items-center gap-2 text-[12px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">
+                        <div className="border-t border-linea dark:border-linea-dark px-4 py-2.5 flex items-center gap-2 text-[12px] text-duo-amarillo-sombra dark:text-duo-amarillo">
                           <HiPhotograph className="shrink-0" />
                           Sin imagen recortada. Se puede cargar después desde el panel del portal.
                         </div>
@@ -420,7 +420,7 @@ export default function RenovacionConPdfModal({
               </>
             ) : (
               <Aviso>
-                <strong className="block text-[13px] font-black mb-0.5">
+                <strong className="block text-[13px] font-semibold mb-0.5">
                   El PDF no trajo cupones
                 </strong>
                 Casi seguro es el archivo equivocado. Volvé atrás y subí la
@@ -433,21 +433,21 @@ export default function RenovacionConPdfModal({
         {/* ═══ PASO 4 — Lo que ve el cliente ═══ */}
         {paso === 3 && (
           <div className="grid gap-4">
-            <div className="rounded-2xl border-2 border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] p-4">
-              <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-wide text-duo-violeta mb-2">
+            <div className="rounded-xl border border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] p-4">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-duo-violeta mb-2">
                 <HiShieldCheck /> Qué cubre
               </div>
               {(cobertura.que_cubre || []).length ? (
                 <div className="grid gap-1.5">
                   {cobertura.que_cubre.map((x, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[13px] font-bold text-titulo dark:text-titulo-dark">
+                    <div key={i} className="flex items-start gap-2 text-[13px] text-titulo dark:text-titulo-dark">
                       <HiCheckCircle className="mt-0.5 shrink-0 text-duo-verde" />
                       <span>{x}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-[12.5px] font-bold text-suave dark:text-suave-dark">
+                <p className="text-[12.5px] text-suave dark:text-suave-dark">
                   El PDF no trae el detalle de cobertura. El portal va a mostrar
                   solo el código.
                 </p>
@@ -455,13 +455,13 @@ export default function RenovacionConPdfModal({
             </div>
 
             {(cobertura.ojo_con || []).length ? (
-              <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
-                <div className="text-[12px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-2">
+              <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
+                <div className="text-[12px] text-suave dark:text-suave-dark mb-2">
                   Tené en cuenta
                 </div>
                 <div className="grid gap-1.5">
                   {cobertura.ojo_con.map((x, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[12.5px] font-bold text-suave dark:text-suave-dark">
+                    <div key={i} className="flex items-start gap-2 text-[12.5px] text-suave dark:text-suave-dark">
                       <span className="shrink-0">·</span>
                       <span>{x}</span>
                     </div>
@@ -470,7 +470,7 @@ export default function RenovacionConPdfModal({
               </div>
             ) : null}
 
-            <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2">
+            <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2">
               <Dato label="Cobertura" valor={cobertura.codigo || form.cobertura || "—"} />
               <Dato label="Cuotas" valor={cupones.length || "—"} />
               <Dato label="Grúa" valor={asistencia?.telefono || "—"} alerta={!asistencia} />
@@ -488,4 +488,4 @@ export default function RenovacionConPdfModal({
       </ModalDuo>
     </>
   );
-}
+}

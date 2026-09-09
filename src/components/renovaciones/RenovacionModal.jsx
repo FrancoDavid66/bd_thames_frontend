@@ -124,8 +124,8 @@ export default function RenovacionModal({
         {error && (
           <ErrorBanner error={error}>
             {necesitaOverride && (
-              <div className="bg-surface dark:bg-surface-dark rounded-xl p-3 mt-1">
-                <label className="text-xs font-black text-titulo dark:text-titulo-dark mb-1.5 block">
+              <div className="bg-surface dark:bg-surface-dark rounded-lg p-3 mt-1">
+                <label className="text-xs text-titulo dark:text-titulo-dark mb-1.5 block">
                   Cantidad de cuotas (manual)
                 </label>
                 <div className="flex items-center gap-2">
@@ -137,9 +137,9 @@ export default function RenovacionModal({
                     onChange={(e) => setCantidadCuotasOverride(e.target.value)}
                     disabled={submitting}
                     placeholder="Ej: 6"
-                    className="w-24 rounded-xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-titulo dark:text-titulo-dark text-sm font-bold outline-none focus:border-duo-amarillo transition-colors disabled:opacity-50"
+                    className="w-24 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-titulo dark:text-titulo-dark text-sm outline-none focus:border-duo-amarillo transition-colors disabled:opacity-50"
                   />
-                  <span className="text-[11px] font-bold text-suave dark:text-suave-dark">
+                  <span className="text-[11px] text-suave dark:text-suave-dark">
                     cuotas mensuales se van a generar
                   </span>
                 </div>
@@ -180,15 +180,15 @@ export default function RenovacionModal({
           value={nuevaFecha}
           onChange={(e) => setNuevaFecha(e.target.value)}
         />
-        <p className="-mt-2 text-[11px] font-bold text-suave dark:text-suave-dark ml-1">
+        <p className="-mt-2 text-[11px] text-suave dark:text-suave-dark ml-1">
           Es el día que <strong className="text-titulo dark:text-titulo-dark">arranca la cobertura</strong>. Por defecto, el día que vence la última cuota actual (así no queda hueco). La <strong className="text-titulo dark:text-titulo-dark">1ª cuota vence un mes después</strong>.
         </p>
 
         {/* Aviso */}
-        <div className="flex items-start gap-3 rounded-2xl border-2 border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-3.5">
+        <div className="flex items-start gap-3 rounded-xl border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-3.5">
           <HiExclamation className="mt-0.5 shrink-0 text-xl text-duo-amarillo-sombra dark:text-duo-amarillo" />
-          <div className="text-[13px] font-bold leading-relaxed text-duo-amarillo-sombra dark:text-duo-amarillo">
-            <strong className="block text-sm font-black mb-0.5">Atención</strong>
+          <div className="text-[13px] leading-relaxed text-duo-amarillo-sombra dark:text-duo-amarillo">
+            <strong className="block text-sm font-semibold mb-0.5">Atención</strong>
             La póliza actual pasará a <strong>FINALIZADA</strong> y se creará una nueva versión <strong>ACTIVA</strong>.
             <span className="mt-1 block opacity-90">No te olvides de emitir/subir la póliza en la web de la aseguradora si corresponde.</span>
           </div>
@@ -196,4 +196,4 @@ export default function RenovacionModal({
       </div>
     </ModalDuo>
   );
-}
+}

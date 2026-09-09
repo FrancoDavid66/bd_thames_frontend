@@ -74,11 +74,11 @@ export default function SetFotoPerfilButton({ polizaId, onPerfilActualizado }) {
                     hover:bg-white/10 transition shadow-lg
                     disabled:opacity-60 disabled:cursor-not-allowed`}
       >
-        <HiCamera className="h-4 w-4 text-primary-300" />
+        <HiCamera className="h-4 w-4 text-white" />
         <span className="hidden sm:inline">
           {busy ? "Subiendo..." : "Cambiar foto"}
         </span>
       </button>
     </>
   );
-}
+}

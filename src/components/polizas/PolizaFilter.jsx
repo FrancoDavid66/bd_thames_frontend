@@ -65,7 +65,7 @@ export default function PolizaFilter({
   const clearSearch = () => setLocalValue("");
 
   return (
-    <div className="space-y-3 rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 shadow-[0_2px_0_var(--color-duo-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)] md:p-4">
+    <div className="space-y-3 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 md:p-4">
       {/* ===== Buscador ===== */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex-1">
@@ -112,8 +112,8 @@ export default function PolizaFilter({
 
       {/* ===== Fila de estado (búsqueda aplicada + resultados) ===== */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-suave dark:text-suave-dark md:text-xs">
-        <span className="flex items-center gap-2 font-bold">
-          <span>Sucursal: <strong className="uppercase text-duo-verde-sombra dark:text-duo-verde">{user?.perfil?.oficina_nombre || "Local"}</strong></span>
+        <span className="flex items-center gap-2">
+          <span>Sucursal: <strong className="font-medium text-duo-verde-sombra dark:text-duo-verde">{user?.perfil?.oficina_nombre || "Local"}</strong></span>
           {typeof totalFiltradas === "number" && (
             <>
               <span className="opacity-40">|</span>
@@ -132,4 +132,4 @@ export default function PolizaFilter({
       </div>
     </div>
   );
-}
+}

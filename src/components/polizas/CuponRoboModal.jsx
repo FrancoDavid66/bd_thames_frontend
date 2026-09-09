@@ -138,8 +138,8 @@ export default function CuponRoboModal({ isOpen, onClose, poliza }) {
         />
 
         {isPagada && (
-          <div className="space-y-3 rounded-2xl border-2 border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-3 py-4">
-            <p className="text-[10px] font-black text-duo-azul uppercase tracking-widest text-center">
+          <div className="space-y-3 rounded-xl border border-duo-azul/25 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-3 py-4">
+            <p className="text-[11px] font-medium text-duo-azul text-center">
               Registro de Egreso (Compañía)
             </p>
             <InputDuo

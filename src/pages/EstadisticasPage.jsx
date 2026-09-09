@@ -1,4 +1,4 @@
-// src/pages/EstadisticasPage.jsx  (diseño Duo)
+// src/pages/EstadisticasPage.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiShieldCheck, HiTruck, HiChartBar } from "react-icons/hi";
@@ -60,15 +60,16 @@ const formatMixPercent = (value, total) => {
   return `${pct.toFixed(0)}%`;
 };
 
+// 🆕 Rediseño "profesional": sin sombra 3D, borde de 1px.
 function TabButton({ active, onClick, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "relative rounded-xl px-3.5 py-2 text-[12px] font-black transition-all border-2",
+        "relative rounded-lg px-3.5 py-2 text-[12px] font-medium transition-colors border",
         active
-          ? "bg-oficina text-white border-oficina shadow-[0_3px_0_var(--color-oficina-fuerte)]"
+          ? "bg-oficina text-white border-oficina"
           : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark border-transparent hover:border-linea dark:hover:border-linea-dark",
       ].join(" ")}
     >
@@ -105,23 +106,23 @@ function DistribucionPanel({ apiBase, oficina }) {
   const total = data?.total_polizas || 0;
 
   const RankingCard = ({ title, items = {}, icon: Icon, color = "bg-oficina" }) => (
-    <div className="flex flex-col gap-4 rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
-      <div className="flex items-center gap-2 border-b-2 border-linea dark:border-linea-dark pb-3">
-        <Icon className="text-oficina text-lg" />
-        <h3 className="text-xs font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">{title}</h3>
+    <div className="flex flex-col gap-4 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+      <div className="flex items-center gap-2 border-b border-linea dark:border-linea-dark pb-3">
+        <Icon className="text-oficina text-base" />
+        <h3 className="text-[12px] font-medium text-titulo dark:text-titulo-dark">{title}</h3>
       </div>
       <div className="space-y-4">
         {Object.entries(items || {}).length > 0 ? (
           Object.entries(items).map(([key, value]) => (
             <div key={key} className="group flex flex-col gap-1.5">
               <div className="flex justify-between items-end px-0.5">
-                <span className="text-[13px] font-bold text-titulo dark:text-titulo-dark">{key}</span>
+                <span className="text-[13px] font-medium text-titulo dark:text-titulo-dark">{key}</span>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-black text-titulo dark:text-titulo-dark">{value.toLocaleString("es-AR")}</span>
-                  <span className="text-[10px] font-bold text-suave dark:text-suave-dark">{formatMixPercent(value, total)}</span>
+                  <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">{value.toLocaleString("es-AR")}</span>
+                  <span className="text-[11px] text-suave dark:text-suave-dark">{formatMixPercent(value, total)}</span>
                 </div>
               </div>
-              <div className="h-2.5 w-full rounded-full bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: formatMixPercent(value, total) }}
@@ -132,7 +133,7 @@ function DistribucionPanel({ apiBase, oficina }) {
             </div>
           ))
         ) : (
-          <div className="py-10 text-center text-xs font-bold text-suave dark:text-suave-dark italic">Sin datos disponibles.</div>
+          <div className="py-10 text-center text-[12px] text-suave dark:text-suave-dark italic">Sin datos disponibles.</div>
         )}
       </div>
     </div>
@@ -140,31 +141,31 @@ function DistribucionPanel({ apiBase, oficina }) {
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-col gap-4 rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oficina text-white shadow-[0_4px_0_var(--color-oficina-fuerte)]">
-            <HiChartBar className="text-xl" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-oficina text-white">
+            <HiChartBar className="text-lg" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-titulo dark:text-titulo-dark tracking-tight">Distribución de Cartera</h2>
-            <p className="text-[11px] font-bold text-suave dark:text-suave-dark">Desglose detallado por compañía y tipo de cobertura.</p>
+            <h2 className="text-[16px] font-semibold text-titulo dark:text-titulo-dark">Distribución de cartera</h2>
+            <p className="text-[12px] text-suave dark:text-suave-dark">Desglose detallado por compañía y tipo de cobertura.</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="flex cursor-pointer select-none items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition hover:border-oficina">
+          <label className="flex cursor-pointer select-none items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina">
             <input
               type="checkbox"
               checked={soloActivas}
               onChange={e => setSoloActivas(e.target.checked)}
               className="w-4 h-4 accent-[var(--color-oficina)]"
             />
-            <span className="text-xs font-black text-titulo dark:text-titulo-dark">Solo Activas</span>
+            <span className="text-[12px] font-medium text-titulo dark:text-titulo-dark">Solo activas</span>
           </label>
           <button
             onClick={fetchDistribucion}
             disabled={loading}
-            className="h-11 rounded-2xl bg-oficina px-5 text-xs font-black text-white border-2 border-oficina transition shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 disabled:opacity-50"
+            className="h-10 rounded-lg bg-oficina px-4 text-[12px] font-medium text-white transition-colors hover:brightness-110 disabled:opacity-50"
           >
             {loading ? "Cargando..." : "Actualizar"}
           </button>
@@ -172,8 +173,8 @@ function DistribucionPanel({ apiBase, oficina }) {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <RankingCard title="Ranking por Compañía" items={data?.por_compania} icon={HiTruck} color="bg-oficina" />
-        <RankingCard title="Distribución por Cobertura" items={data?.por_cobertura} icon={HiShieldCheck} color="bg-ingreso" />
+        <RankingCard title="Ranking por compañía" items={data?.por_compania} icon={HiTruck} color="bg-oficina" />
+        <RankingCard title="Distribución por cobertura" items={data?.por_cobertura} icon={HiShieldCheck} color="bg-ingreso" />
       </div>
     </div>
   );
@@ -300,7 +301,7 @@ function EstadisticasGeneralPanel({ apiBase, oficina, oficinasList, getOficinaNo
     <>
       <EstadisticasHeader periodoLabel={periodoLabel} fuenteRespuesta={fuenteRespuesta} loading={loading} onRefresh={fetchEstadisticas} onOpenExport={() => setShowExport(true)} />
 
-      {error && <AnimatedCard index={2}><div className="rounded-2xl border-2 border-egreso/40 bg-egreso/10 px-3 py-2 text-xs font-bold text-egreso dark:text-egreso-claro">{error}</div></AnimatedCard>}
+      {error && <AnimatedCard index={2}><div className="rounded-lg border border-egreso/30 bg-egreso/10 px-3 py-2 text-[12px] font-medium text-egreso dark:text-egreso-claro">{error}</div></AnimatedCard>}
 
       {/* 🚀 PASAMOS EL HANDLER A LAS TARJETAS */}
       <EstadisticasSummaryCards
@@ -408,11 +409,11 @@ export default function EstadisticasPage() {
           getOficinaNombre={getOficinaNombre}
         />
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
           <TabButton active={tab === "general"} onClick={() => setTab("general")}>General</TabButton>
           <TabButton active={tab === "calidad"} onClick={() => setTab("calidad")}>Calidad de datos</TabButton>
           <TabButton active={tab === "duplicados"} onClick={() => setTab("duplicados")}>Duplicados</TabButton>
-          <TabButton active={tab === "fechas"} onClick={() => setTab("fechas")}>Control de Fechas</TabButton>
+          <TabButton active={tab === "fechas"} onClick={() => setTab("fechas")}>Control de fechas</TabButton>
           <TabButton active={tab === "asegurados"} onClick={() => setTab("asegurados")}>Asegurados</TabButton>
           <TabButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")}>Contabilidad</TabButton>
           <TabButton active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>Cobranzas</TabButton>
@@ -445,7 +446,7 @@ export default function EstadisticasPage() {
           {tab === "duplicados" && (
             <motion.div key="duplicados" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
               {/* Sub-solapas: Clientes / Pólizas */}
-              <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
                 <TabButton active={dupSub === "clientes"} onClick={() => { setDupSub("clientes"); localStorage.setItem("estadisticas.dupSub", "clientes"); }}>
                   Clientes duplicados
                 </TabButton>

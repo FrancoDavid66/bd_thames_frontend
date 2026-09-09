@@ -164,7 +164,7 @@ export default function AdminTareasFijas() {
     if (!oficinaSel) return toast.error("Elegí una oficina");
     const existentes = new Set(tareasOficina.map((t) => t.nombre.toLowerCase()));
     const aCrear = TAREAS_BASE.filter((t) => !existentes.has(t.nombre.toLowerCase()));
-    if (aCrear.length === 0) return toast("Ya están todas las base", { icon: "👍" });
+    if (aCrear.length === 0) return toast("Ya están todas las base");
     setCargandoBase(true);
     try {
       await Promise.all(
@@ -191,13 +191,13 @@ export default function AdminTareasFijas() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-4 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-5">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-transferencia)] text-2xl text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)]">
+      <div className="flex items-center gap-4 rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-5">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--color-transferencia)] text-xl text-white">
           <HiClipboardCheck />
         </div>
         <div>
-          <h2 className="text-xl font-black tracking-tight text-[var(--color-titulo)]">Control diario por oficina</h2>
-          <p className="mt-0.5 text-[11px] font-bold text-[var(--color-suave)]">Tareas, horarios y días de cada sucursal</p>
+          <h2 className="text-[17px] font-semibold text-[var(--color-titulo)]">Control diario por oficina</h2>
+          <p className="mt-0.5 text-[12px] text-[var(--color-suave)]">Tareas, horarios y días de cada sucursal</p>
         </div>
       </div>
 
@@ -207,9 +207,9 @@ export default function AdminTareasFijas() {
           <button
             key={o.id}
             onClick={() => setOficinaSel(String(o.id))}
-            className={`shrink-0 flex items-center gap-1.5 rounded-xl border-2 px-4 min-h-[44px] text-sm font-black transition ${
+            className={`shrink-0 flex items-center gap-1.5 rounded-lg border px-4 min-h-[40px] text-[13px] font-medium transition-colors ${
               String(oficinaSel) === String(o.id)
-                ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white shadow-[0_3px_0_var(--color-transferencia-fuerte)]"
+                ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white"
                 : "border-[var(--color-linea)] bg-[var(--color-card)] text-[var(--color-suave)] hover:text-[var(--color-titulo)]"
             }`}
           >
@@ -223,20 +223,20 @@ export default function AdminTareasFijas() {
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-linea)] border-t-[var(--color-transferencia)]" />
         </div>
       ) : !oficinaSel ? (
-        <div className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-6 text-center font-semibold text-[var(--color-suave)]">
+        <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-6 text-center text-[13px] text-[var(--color-suave)]">
           No hay oficinas cargadas.
         </div>
       ) : (
         <>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <span className="text-sm font-semibold text-[var(--color-suave)]">
-              {tareasOficina.length} tarea{tareasOficina.length === 1 ? "" : "s"} en <strong className="text-[var(--color-titulo)]">{ofiActual?.nombre}</strong>
+            <span className="text-[13px] text-[var(--color-suave)]">
+              {tareasOficina.length} tarea{tareasOficina.length === 1 ? "" : "s"} en <strong className="text-[var(--color-titulo)] font-medium">{ofiActual?.nombre}</strong>
             </span>
             <div className="flex gap-2">
               {tareasOficina.length === 0 && (
                 <button
                   onClick={cargarBase} disabled={cargandoBase}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--color-transferencia)] px-3 min-h-[44px] text-[13px] font-black text-[var(--color-transferencia)] transition hover:bg-[var(--color-transferencia)]/10 disabled:opacity-50"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--color-transferencia)] px-3 min-h-[40px] text-[12px] font-medium text-[var(--color-transferencia)] transition-colors hover:bg-[var(--color-transferencia)]/10 disabled:opacity-50"
                 >
                   {cargandoBase ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-transferencia)]/40 border-t-[var(--color-transferencia)]" /> : <HiTemplate />}
                   Cargar lista base
@@ -244,7 +244,7 @@ export default function AdminTareasFijas() {
               )}
               <button
                 onClick={() => abrir()}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--color-transferencia)] px-4 min-h-[44px] text-[13px] font-black text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-transferencia-fuerte)]"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--color-transferencia)] px-4 min-h-[40px] text-[12px] font-medium text-white hover:brightness-110 transition-colors"
               >
                 <HiPlus /> Nueva
               </button>
@@ -252,19 +252,19 @@ export default function AdminTareasFijas() {
           </div>
 
           {tareasOficina.length === 0 ? (
-            <div className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-8 text-center font-semibold text-[var(--color-suave)]">
-              Esta oficina no tiene tareas. Tocá <strong className="text-[var(--color-transferencia)]">Cargar lista base</strong> para las 7 típicas, o <strong className="text-[var(--color-transferencia)]">Nueva</strong> para crear una.
+            <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-8 text-center text-[13px] text-[var(--color-suave)]">
+              Esta oficina no tiene tareas. Tocá <strong className="text-[var(--color-transferencia)] font-medium">Cargar lista base</strong> para las 7 típicas, o <strong className="text-[var(--color-transferencia)] font-medium">Nueva</strong> para crear una.
             </div>
           ) : (
             <div className="space-y-2">
               {tareasOficina.map((it) => (
-                <div key={it.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-4 py-3">
+                <div key={it.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-black text-[var(--color-titulo)]">{it.nombre}</span>
-                      {!it.activa && <span className="rounded bg-[var(--color-linea)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-suave)]">inactiva</span>}
+                      <span className="truncate text-[14px] font-medium text-[var(--color-titulo)]">{it.nombre}</span>
+                      {!it.activa && <span className="rounded bg-[var(--color-linea)] px-1.5 py-0.5 text-[10px] text-[var(--color-suave)]">inactiva</span>}
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[var(--color-suave)]">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-suave)]">
                       {it.responsable_nombre && <span>{it.responsable_nombre}</span>}
                       <span>{it.frecuencia}</span>
                       {it.hora_esperada && (
@@ -277,10 +277,10 @@ export default function AdminTareasFijas() {
                   </div>
                   {/* 📱 En mobile: botones a lo ancho con texto. En sm+: íconos a la derecha. */}
                   <div className="flex gap-2 shrink-0">
-                    <button onClick={() => abrir(it)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:h-10 sm:w-10 px-3 sm:px-0 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] font-black text-[13px] transition hover:border-[var(--color-oficina)] hover:text-[var(--color-oficina)]">
+                    <button onClick={() => abrir(it)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 sm:w-9 px-3 sm:px-0 rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] font-medium text-[12px] transition-colors hover:border-[var(--color-oficina)] hover:text-[var(--color-oficina)]">
                       <HiPencil /> <span className="sm:hidden">Editar</span>
                     </button>
-                    <button onClick={() => borrar(it)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:h-10 sm:w-10 px-3 sm:px-0 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] font-black text-[13px] transition hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]">
+                    <button onClick={() => borrar(it)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 sm:w-9 px-3 sm:px-0 rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] text-[var(--color-suave)] font-medium text-[12px] transition-colors hover:border-[var(--color-egreso)] hover:text-[var(--color-egreso)]">
                       <HiTrash /> <span className="sm:hidden">Borrar</span>
                     </button>
                   </div>
@@ -293,16 +293,16 @@ export default function AdminTareasFijas() {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-[170] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setModalOpen(false)}>
+        <div className="fixed inset-0 z-[170] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setModalOpen(false)}>
           <div
-            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-5 sm:rounded-3xl"
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-5 sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-lg font-black text-[var(--color-titulo)]">{editingId ? "Editar tarea" : "Nueva tarea"}</h3>
-              <button onClick={() => setModalOpen(false)} aria-label="Cerrar" className="inline-flex items-center justify-center w-11 h-11 rounded-lg text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX className="text-xl" /></button>
+              <h3 className="text-[16px] font-semibold text-[var(--color-titulo)]">{editingId ? "Editar tarea" : "Nueva tarea"}</h3>
+              <button onClick={() => setModalOpen(false)} aria-label="Cerrar" className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX className="text-lg" /></button>
             </div>
-            <p className="mb-4 text-[12px] font-black text-[var(--color-transferencia)]">{ofiActual?.nombre}</p>
+            <p className="mb-4 text-[12px] font-medium text-[var(--color-transferencia)]">{ofiActual?.nombre}</p>
 
             <div className="space-y-3">
               <Campo label="Nombre">
@@ -320,7 +320,7 @@ export default function AdminTareasFijas() {
                 <div className="flex gap-2">
                   {[["diaria", "Diaria"], ["semanal", "Semanal"]].map(([k, l]) => (
                     <button key={k} type="button" onClick={() => setForm({ ...form, frecuencia: k })}
-                      className={`flex-1 rounded-xl border-2 py-2 text-sm font-black ${form.frecuencia === k ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white" : "border-[var(--color-linea)] text-[var(--color-suave)]"}`}>{l}</button>
+                      className={`flex-1 rounded-lg border py-2 text-[13px] font-medium transition-colors ${form.frecuencia === k ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white" : "border-[var(--color-linea)] text-[var(--color-suave)]"}`}>{l}</button>
                   ))}
                 </div>
               </Campo>
@@ -332,7 +332,7 @@ export default function AdminTareasFijas() {
                       const on = (form.dias_semana || "").split(",").includes(d);
                       return (
                         <button key={d} type="button" onClick={() => toggleDia(d)}
-                          className={`rounded-xl border-2 px-2.5 py-1.5 text-[12px] font-black ${on ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white" : "border-[var(--color-linea)] text-[var(--color-suave)]"}`}>{l}</button>
+                          className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${on ? "border-[var(--color-transferencia-fuerte)] bg-[var(--color-transferencia)] text-white" : "border-[var(--color-linea)] text-[var(--color-suave)]"}`}>{l}</button>
                       );
                     })}
                   </div>
@@ -348,19 +348,19 @@ export default function AdminTareasFijas() {
                     onChange={(e) => setForm({ ...form, margen_alerta: e.target.value })} className="inp disabled:opacity-40" />
                 </Campo>
               </div>
-              <p className="-mt-1 text-[11px] font-medium text-[var(--color-suave)]">Si dejás la hora vacía, no alerta ni resta puntos por horario.</p>
+              <p className="-mt-1 text-[11px] text-[var(--color-suave)]">Si dejás la hora vacía, no alerta ni resta puntos por horario.</p>
 
               <div className="flex items-center gap-4 pt-1">
-                <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-titulo)]">
+                <label className="flex items-center gap-2 text-[13px] text-[var(--color-titulo)]">
                   <input type="checkbox" checked={form.requiere_foto} onChange={(e) => setForm({ ...form, requiere_foto: e.target.checked })} className="h-4 w-4 accent-[var(--color-transferencia)]" /> Pide foto
                 </label>
-                <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-titulo)]">
+                <label className="flex items-center gap-2 text-[13px] text-[var(--color-titulo)]">
                   <input type="checkbox" checked={form.activa} onChange={(e) => setForm({ ...form, activa: e.target.checked })} className="h-4 w-4 accent-[var(--color-transferencia)]" /> Activa
                 </label>
               </div>
 
               {form.hora_esperada && (
-                <label className="flex items-start gap-2 rounded-xl border-2 border-[var(--color-ingreso)]/30 bg-[var(--color-ingreso)]/10 p-2.5 text-sm font-semibold text-[var(--color-ingreso-fuerte)]">
+                <label className="flex items-start gap-2 rounded-lg border border-[var(--color-ingreso)]/25 bg-[var(--color-ingreso)]/10 p-2.5 text-[13px] text-[var(--color-ingreso-fuerte)]">
                   <input
                     type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-ingreso)]"
                     checked={form.premia_demora}
@@ -377,20 +377,20 @@ export default function AdminTareasFijas() {
 
               {form.requiere_foto && (
                 <div>
-                  <label className="mb-1 block text-[11px] font-black uppercase tracking-wide text-[var(--color-suave)]">¿Qué hay que fotografiar?</label>
+                  <label className="mb-1 block text-[12px] text-[var(--color-suave)]">¿Qué hay que fotografiar?</label>
                   <input
                     value={form.instruccion_foto}
                     onChange={(e) => setForm({ ...form, instruccion_foto: e.target.value })}
                     placeholder="Ej: la cortina abierta"
                     className="inp"
                   />
-                  <p className="mt-1 text-[11px] font-medium text-[var(--color-suave)]">Se le muestra al empleado cuando va a sacar la foto.</p>
+                  <p className="mt-1 text-[11px] text-[var(--color-suave)]">Se le muestra al empleado cuando va a sacar la foto.</p>
                 </div>
               )}
             </div>
 
             <button onClick={guardar} disabled={saving}
-              className="mt-5 flex w-full min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[var(--color-transferencia)] py-3 text-sm font-black text-white shadow-[0_4px_0_var(--color-transferencia-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-transferencia-fuerte)] disabled:opacity-50">
+              className="mt-5 flex w-full min-h-[48px] items-center justify-center gap-2 rounded-lg bg-[var(--color-transferencia)] py-3 text-[13px] font-medium text-white hover:brightness-110 transition-colors disabled:opacity-50">
               {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <HiSave />}
               {editingId ? "Guardar cambios" : "Crear tarea"}
             </button>
@@ -400,10 +400,11 @@ export default function AdminTareasFijas() {
 
       <style>{`
         /* 📱 h-12 (48px) + font 16px → tap target cómodo y sin zoom de iOS al enfocar.
-           En sm+ el texto baja a 0.85rem para mantener el look compacto de escritorio. */
-        .inp { width:100%; height:3rem; border-radius:0.75rem; border:2px solid var(--color-linea);
+           En sm+ el texto baja a 0.85rem para mantener el look compacto de escritorio.
+           🆕 Borde de 1px (antes 2) y esquinas menos redondeadas. */
+        .inp { width:100%; height:3rem; border-radius:0.5rem; border:1px solid var(--color-linea);
           background:var(--color-surface); padding:0 0.9rem; font-size:1rem;
-          font-weight:600; color:var(--color-titulo); outline:none; }
+          font-weight:500; color:var(--color-titulo); outline:none; }
         .inp:focus { border-color:var(--color-transferencia); }
         .dark .inp { color-scheme: dark; }
         @media (min-width: 640px) { .inp { font-size:0.85rem; } }
@@ -415,7 +416,7 @@ export default function AdminTareasFijas() {
 function Campo({ label, children }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-black uppercase tracking-wide text-[var(--color-suave)]">{label}</label>
+      <label className="mb-1 block text-[12px] text-[var(--color-suave)]">{label}</label>
       {children}
     </div>
   );

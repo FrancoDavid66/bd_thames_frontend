@@ -1,4 +1,4 @@
-// src/components/estadisticas/ListadoClientesModal.jsx  (diseño Duo)
+// src/components/estadisticas/ListadoClientesModal.jsx
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
@@ -141,8 +141,8 @@ export default function ListadoClientesModal({
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       toast.success(`${label} copiado: ${text}`, {
-        style: { background: '#10b981', color: '#fff', fontWeight: 'bold' },
-        iconTheme: { primary: '#fff', secondary: '#10b981' }
+        style: { background: '#16a34a', color: '#fff', fontWeight: '500' },
+        iconTheme: { primary: '#fff', secondary: '#16a34a' }
       });
     }).catch(() => {
       toast.error("Error al copiar");
@@ -184,24 +184,24 @@ export default function ListadoClientesModal({
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-[100]" onClose={onClose}>
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md" />
 
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
-            <Dialog.Panel className={`w-full max-w-5xl overflow-hidden rounded-3xl border-2 ${config.accent} bg-card dark:bg-card-dark shadow-2xl transition-all`}>
+            <Dialog.Panel className={`w-full max-w-5xl overflow-hidden rounded-xl border ${config.accent} bg-card dark:bg-card-dark shadow-xl transition-all`}>
 
               {/* Header */}
-              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark px-6 py-4">
+              <div className="flex items-center justify-between border-b border-linea dark:border-linea-dark px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-xl">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-xl">
                     {config.icon}
                   </div>
                   <div>
-                    <Dialog.Title className="text-lg font-black text-titulo dark:text-titulo-dark leading-none">
+                    <Dialog.Title className="text-lg font-semibold text-titulo dark:text-titulo-dark leading-none">
                       {config.title}
                     </Dialog.Title>
-                    <p className="mt-1 text-xs font-bold text-suave dark:text-suave-dark">
-                      Total encontrados: <span className="font-black text-titulo dark:text-titulo-dark">{Number(data.count).toLocaleString("es-AR")}</span> registros.
+                    <p className="mt-1 text-xs text-suave dark:text-suave-dark">
+                      Total encontrados: <span className="font-medium text-titulo dark:text-titulo-dark">{Number(data.count).toLocaleString("es-AR")}</span> registros.
                     </p>
                   </div>
                 </div>
@@ -210,11 +210,11 @@ export default function ListadoClientesModal({
                   <button
                     onClick={downloadCsv}
                     disabled={data.results.length === 0}
-                    className={`hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-linea dark:border-linea-dark text-xs font-black transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-titulo dark:text-titulo-dark ${config.btn}`}
+                    className={`hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-linea dark:border-linea-dark text-xs font-medium transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-titulo dark:text-titulo-dark ${config.btn}`}
                   >
                     <HiDownload className="text-sm" /> Exportar a Excel
                   </button>
-                  <button onClick={onClose} className="rounded-xl border-2 border-linea dark:border-linea-dark p-2 text-suave dark:text-suave-dark hover:border-egreso hover:text-egreso transition-colors cursor-pointer">
+                  <button onClick={onClose} className="rounded-lg border border-linea dark:border-linea-dark p-2 text-suave dark:text-suave-dark hover:border-egreso hover:text-egreso transition-colors cursor-pointer">
                     <HiX className="h-5 w-5" />
                   </button>
                 </div>
@@ -225,21 +225,21 @@ export default function ListadoClientesModal({
                 {error ? (
                   <div className="flex flex-col items-center justify-center py-10 text-egreso">
                     <HiExclamation className="h-10 w-10 mb-2" />
-                    <p className="font-black">{error}</p>
+                    <p className="font-medium">{error}</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                  <div className="overflow-x-auto rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
                     <table className="min-w-full text-sm">
                       <thead>
-                        <tr className="border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
-                          <th className="px-4 py-3 text-left font-black text-suave dark:text-suave-dark uppercase tracking-tight text-[10px]">Asegurado</th>
-                          <th className="px-4 py-3 text-left font-black text-suave dark:text-suave-dark uppercase tracking-tight text-[10px]">Póliza / Cía</th>
-                          <th className="px-4 py-3 text-left font-black text-suave dark:text-suave-dark uppercase tracking-tight text-[10px]">Vehículo</th>
-                          <th className="px-4 py-3 text-left font-black text-suave dark:text-suave-dark uppercase tracking-tight text-[10px]">Oficina</th>
-                          <th className="px-4 py-3 text-right font-black text-suave dark:text-suave-dark uppercase tracking-tight text-[10px]">Estado</th>
+                        <tr className="border-b border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+                          <th className="px-4 py-3 text-left text-suave dark:text-suave-dark text-[11px]">Asegurado</th>
+                          <th className="px-4 py-3 text-left text-suave dark:text-suave-dark text-[11px]">Póliza / Cía</th>
+                          <th className="px-4 py-3 text-left text-suave dark:text-suave-dark text-[11px]">Vehículo</th>
+                          <th className="px-4 py-3 text-left text-suave dark:text-suave-dark text-[11px]">Oficina</th>
+                          <th className="px-4 py-3 text-right text-suave dark:text-suave-dark text-[11px]">Estado</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y-2 divide-linea/50 dark:divide-linea-dark/50">
+                      <tbody className="divide-y divide-linea/50 dark:divide-linea-dark/50">
                         {loading ? (
                           <tr>
                             <td colSpan={5} className="px-4 py-20 text-center text-suave dark:text-suave-dark">
@@ -249,7 +249,7 @@ export default function ListadoClientesModal({
                           </tr>
                         ) : data.results.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-10 text-center text-suave dark:text-suave-dark italic font-bold">No se encontraron registros para este filtro.</td>
+                            <td colSpan={5} className="px-4 py-10 text-center text-suave dark:text-suave-dark italic">No se encontraron registros para este filtro.</td>
                           </tr>
                         ) : (
                           data.results.map((item, idx) => {
@@ -262,13 +262,13 @@ export default function ListadoClientesModal({
                               <tr key={item.id || idx} className="hover:bg-oficina/5 transition-colors">
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-1.5">
-                                    <div className="font-black text-titulo dark:text-titulo-dark">{clienteNombre}</div>
+                                    <div className="font-medium text-titulo dark:text-titulo-dark">{clienteNombre}</div>
                                     <button onClick={() => handleCopy(clienteNombre, "Asegurado")} className="cursor-pointer text-suave dark:text-suave-dark hover:text-ingreso transition-colors" title="Copiar Asegurado">
                                       <HiOutlineClipboardCopy size={14} />
                                     </button>
                                   </div>
                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                    <div className="text-[11px] font-bold text-suave dark:text-suave-dark">DNI: {dni}</div>
+                                    <div className="text-[11px] text-suave dark:text-suave-dark">DNI: {dni}</div>
                                     {dni !== "—" && (
                                       <button onClick={() => handleCopy(dni, "DNI")} className="cursor-pointer text-suave dark:text-suave-dark hover:text-ingreso transition-colors" title="Copiar DNI">
                                         <HiOutlineClipboardCopy size={12} />
@@ -278,19 +278,19 @@ export default function ListadoClientesModal({
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-1.5">
-                                    <div className="font-black text-titulo dark:text-titulo-dark">N° {nroPoliza}</div>
+                                    <div className="font-medium text-titulo dark:text-titulo-dark">N° {nroPoliza}</div>
                                     {nroPoliza !== "—" && (
                                       <button onClick={() => handleCopy(nroPoliza, "N° de Póliza")} className="cursor-pointer text-suave dark:text-suave-dark hover:text-ingreso transition-colors" title="Copiar Póliza">
                                         <HiOutlineClipboardCopy size={14} />
                                       </button>
                                     )}
                                   </div>
-                                  <div className="text-[11px] font-bold text-suave dark:text-suave-dark">{compania}</div>
+                                  <div className="text-[11px] text-suave dark:text-suave-dark">{compania}</div>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <div className="font-bold text-titulo dark:text-titulo-dark">{item.marca} {item.modelo}</div>
+                                  <div className="text-titulo dark:text-titulo-dark">{item.marca} {item.modelo}</div>
                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                    <div className="text-[11px] font-mono font-black text-oficina">{item.patente || "SIN PATENTE"}</div>
+                                    <div className="text-[11px] font-mono font-medium text-oficina">{item.patente || "SIN PATENTE"}</div>
                                     {item.patente && (
                                       <button onClick={() => handleCopy(item.patente, "Patente")} className="cursor-pointer text-suave dark:text-suave-dark hover:text-ingreso transition-colors" title="Copiar Patente">
                                         <HiOutlineClipboardCopy size={14} />
@@ -298,14 +298,14 @@ export default function ListadoClientesModal({
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 text-xs font-bold text-suave dark:text-suave-dark">
+                                <td className="px-4 py-3 text-xs text-suave dark:text-suave-dark">
                                   {item.oficina_nombre || getOficinaNombre(item.oficina)}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  <span className={`inline-flex rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest border-2 ${
-                                    String(item.estado).toUpperCase() === 'ACTIVA' ? 'bg-ingreso/10 text-ingreso border-ingreso/30' :
-                                    String(item.estado).toUpperCase() === 'VENCIDA' ? 'bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro border-tarjeta/30' :
-                                    item.estado === 'CANCELADA' || item.estado === 'ANULADA' ? 'bg-egreso/10 text-egreso border-egreso/30' :
+                                  <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-medium border ${
+                                    String(item.estado).toUpperCase() === 'ACTIVA' ? 'bg-ingreso/10 text-ingreso border-ingreso/25' :
+                                    String(item.estado).toUpperCase() === 'VENCIDA' ? 'bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro border-tarjeta/25' :
+                                    item.estado === 'CANCELADA' || item.estado === 'ANULADA' ? 'bg-egreso/10 text-egreso border-egreso/25' :
                                     'bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark'
                                   }`}>
                                     {item.estado}
@@ -322,21 +322,21 @@ export default function ListadoClientesModal({
 
                 {/* Paginación */}
                 <div className="mt-4 flex items-center justify-between">
-                  <p className="text-xs font-bold text-suave dark:text-suave-dark">
-                    Página <span className="font-black text-titulo dark:text-titulo-dark">{page}</span> de {data.total_pages}
+                  <p className="text-xs text-suave dark:text-suave-dark">
+                    Página <span className="font-medium text-titulo dark:text-titulo-dark">{page}</span> de {data.total_pages}
                   </p>
                   <div className="flex gap-2">
                     <button
                       disabled={page === 1 || loading}
                       onClick={() => setPage(p => p - 1)}
-                      className="inline-flex items-center gap-1 rounded-xl border-2 border-linea dark:border-linea-dark px-3 py-2 text-xs font-black text-titulo dark:text-titulo-dark hover:border-oficina hover:text-oficina disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed transition-colors"
+                      className="inline-flex items-center gap-1 rounded-lg border border-linea dark:border-linea-dark px-3 py-2 text-xs font-medium text-titulo dark:text-titulo-dark hover:border-oficina hover:text-oficina disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed transition-colors"
                     >
                       <HiChevronLeft /> Anterior
                     </button>
                     <button
                       disabled={page >= data.total_pages || loading}
                       onClick={() => setPage(p => p + 1)}
-                      className="inline-flex items-center gap-1 rounded-xl border-2 border-linea dark:border-linea-dark px-3 py-2 text-xs font-black text-titulo dark:text-titulo-dark hover:border-oficina hover:text-oficina disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed transition-colors"
+                      className="inline-flex items-center gap-1 rounded-lg border border-linea dark:border-linea-dark px-3 py-2 text-xs font-medium text-titulo dark:text-titulo-dark hover:border-oficina hover:text-oficina disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed transition-colors"
                     >
                       Siguiente <HiChevronRight />
                     </button>

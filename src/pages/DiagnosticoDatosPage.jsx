@@ -1,4 +1,10 @@
 // src/pages/admin/DiagnosticoDatosPage.jsx
+//
+// 🆕 Este archivo usaba colores "slate-*" fijos (pensados para fondo
+// oscuro siempre) — en modo claro las tarjetas quedaban oscuras flotando
+// sobre una página clara. Se llevó a los tokens reales de la app
+// (surface/card/linea/titulo/suave + ingreso/egreso/tarjeta para los
+// semáforos de estado), así responde bien a los dos modos.
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
@@ -57,38 +63,38 @@ const CATEGORIAS_META = {
 };
 
 // ════════════════════════════════════════════════════
-// Helpers de color según cantidad
+// Helpers de color según cantidad (usa los semáforos reales de la app)
 // ════════════════════════════════════════════════════
 function getColorByCount(count) {
   if (count === 0) {
     return {
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/40",
-      text: "text-emerald-300",
-      number: "text-emerald-100",
-      hint: "text-emerald-400",
-      iconBg: "bg-emerald-500/20",
+      bg: "bg-ingreso/10",
+      border: "border-ingreso/30",
+      text: "text-ingreso-fuerte dark:text-ingreso-claro",
+      number: "text-titulo dark:text-titulo-dark",
+      hint: "text-ingreso-fuerte dark:text-ingreso-claro",
+      iconBg: "bg-ingreso/15",
       label: "Sin problemas",
     };
   }
   if (count <= 5) {
     return {
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/40",
-      text: "text-amber-300",
-      number: "text-amber-100",
-      hint: "text-amber-400",
-      iconBg: "bg-amber-500/20",
+      bg: "bg-tarjeta/10",
+      border: "border-tarjeta/30",
+      text: "text-[#b45309] dark:text-tarjeta-claro",
+      number: "text-titulo dark:text-titulo-dark",
+      hint: "text-[#b45309] dark:text-tarjeta-claro",
+      iconBg: "bg-tarjeta/15",
       label: "Pocos casos · revisar a mano",
     };
   }
   return {
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/40",
-    text: "text-rose-300",
-    number: "text-rose-100",
-    hint: "text-rose-400",
-    iconBg: "bg-rose-500/20",
+    bg: "bg-egreso/10",
+    border: "border-egreso/30",
+    text: "text-egreso-fuerte dark:text-egreso-claro",
+    number: "text-titulo dark:text-titulo-dark",
+    hint: "text-egreso-fuerte dark:text-egreso-claro",
+    iconBg: "bg-egreso/15",
     label: "Muchos casos · necesita corrección masiva",
   };
 }
@@ -110,7 +116,7 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
       : meta.label;
 
   return (
-    <div className={`rounded-xl border ${colors.border} ${colors.bg} p-4`}>
+    <div className={`rounded-lg border ${colors.border} ${colors.bg} p-4`}>
       <div className="flex items-start gap-3">
         <div
           className={`${colors.iconBg} rounded-lg p-2 flex-shrink-0`}
@@ -122,23 +128,23 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3 mb-1">
             <div className="min-w-0">
-              <div className={`text-xs ${colors.text} truncate`}>
+              <div className={`text-[12px] ${colors.text} truncate`}>
                 {labelMostrado}
               </div>
-              <div className={`text-3xl font-semibold ${colors.number} mt-0.5`}>
+              <div className={`text-[26px] font-semibold ${colors.number} mt-0.5`}>
                 {data.count}
               </div>
             </div>
           </div>
 
-          <p className={`text-xs ${colors.hint} mt-1`}>{colors.label}</p>
-          <p className="text-xs text-slate-500 mt-2">{meta.descripcion}</p>
+          <p className={`text-[12px] ${colors.hint} mt-1`}>{colors.label}</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark mt-2">{meta.descripcion}</p>
 
           {data.count > 0 && (
             <div className="flex items-center gap-2 mt-3">
               <button
                 onClick={() => onToggleDetalle(categoria)}
-                className="text-xs cursor-pointer inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900/60 hover:bg-slate-800 px-2.5 py-1.5 text-slate-200 transition-colors"
+                className="text-[12px] cursor-pointer inline-flex items-center gap-1 rounded-md border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark px-2.5 py-1.5 text-titulo dark:text-titulo-dark transition-colors"
                 title={expandido ? "Ocultar detalle" : "Ver ejemplos"}
               >
                 {expandido ? (
@@ -154,7 +160,7 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
 
               <button
                 onClick={() => onExportar(categoria, "csv")}
-                className="text-xs cursor-pointer inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900/60 hover:bg-slate-800 px-2.5 py-1.5 text-slate-200 transition-colors"
+                className="text-[12px] cursor-pointer inline-flex items-center gap-1 rounded-md border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark px-2.5 py-1.5 text-titulo dark:text-titulo-dark transition-colors"
                 title="Descargar como CSV"
               >
                 <HiOutlineDownload className="w-3.5 h-3.5" /> CSV
@@ -162,7 +168,7 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
 
               <button
                 onClick={() => onExportar(categoria, "xlsx")}
-                className="text-xs cursor-pointer inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900/60 hover:bg-slate-800 px-2.5 py-1.5 text-slate-200 transition-colors"
+                className="text-[12px] cursor-pointer inline-flex items-center gap-1 rounded-md border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark px-2.5 py-1.5 text-titulo dark:text-titulo-dark transition-colors"
                 title="Descargar como Excel"
               >
                 <HiOutlineDownload className="w-3.5 h-3.5" /> Excel
@@ -172,15 +178,15 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
 
           {/* Detalle expandido */}
           {expandido && data.count > 0 && (
-            <div className="mt-3 rounded-md border border-slate-800 bg-slate-950/60 p-3">
-              <div className="text-[11px] text-slate-500 mb-2">
+            <div className="mt-3 rounded-md border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
+              <div className="text-[11px] text-suave dark:text-suave-dark mb-2">
                 Primeros {data.ejemplos?.length || 0} casos (de {data.count} totales):
               </div>
               <ul className="space-y-1">
                 {(data.ejemplos || []).map((item) => (
                   <li
                     key={item.id}
-                    className="text-xs text-slate-300 font-mono leading-relaxed border-b border-slate-800/60 pb-1 last:border-0"
+                    className="text-[12px] text-titulo dark:text-titulo-dark font-mono leading-relaxed border-b border-linea dark:border-linea-dark pb-1 last:border-0"
                   >
                     {categoria === "clientes_sin_oficina" ? (
                       <>
@@ -198,7 +204,7 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
                 ))}
               </ul>
               {data.count > (data.ejemplos?.length || 0) && (
-                <p className="text-[11px] text-slate-500 mt-2 italic">
+                <p className="text-[11px] text-suave dark:text-suave-dark mt-2 italic">
                   Para ver TODOS los casos, exportá a CSV o Excel.
                 </p>
               )}
@@ -215,23 +221,23 @@ function CategoriaCard({ categoria, data, onExportar, onToggleDetalle, expandido
 // ════════════════════════════════════════════════════
 function EstadoInicial({ onEjecutar, cargando }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-8 text-center">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500/10 text-primary-400 mb-4">
-        <HiOutlineDocumentSearch className="w-8 h-8" />
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-8 text-center">
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta mb-4">
+        <HiOutlineDocumentSearch className="w-7 h-7" />
       </div>
-      <h2 className="text-xl font-semibold text-slate-100 mb-2">
+      <h2 className="text-[18px] font-semibold text-titulo dark:text-titulo-dark mb-2">
         Diagnóstico de datos
       </h2>
-      <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+      <p className="text-[13px] text-suave dark:text-suave-dark max-w-md mx-auto mb-6">
         Esta herramienta analiza la base de datos en busca de inconsistencias.
-        <span className="block mt-2 text-xs text-slate-500">
+        <span className="block mt-2 text-[12px] text-suave dark:text-suave-dark">
           Solo lee información — no modifica nada.
         </span>
       </p>
       <button
         onClick={onEjecutar}
         disabled={cargando}
-        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-white text-sm font-semibold transition-colors ${
+        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-duo-violeta hover:brightness-110 text-white text-[13px] font-medium transition-colors ${
           cargando ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
         }`}
       >
@@ -270,10 +276,10 @@ export default function DiagnosticoDatosPage() {
   // ── Escudo: solo admin ──
   if (!isAdmin) {
     return (
-      <div className="px-3 sm:px-6 py-6">
-        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-6 text-rose-200">
+      <div className="px-3 sm:px-6 py-6 bg-surface dark:bg-surface-dark min-h-[100dvh]">
+        <div className="rounded-xl border border-egreso/30 bg-egreso/10 p-6 text-egreso-fuerte dark:text-egreso-claro">
           <h2 className="font-semibold mb-2">Acceso denegado</h2>
-          <p className="text-sm">
+          <p className="text-[13px]">
             Esta sección está reservada para administradores.
           </p>
         </div>
@@ -360,22 +366,22 @@ export default function DiagnosticoDatosPage() {
 
   // ── Render ──
   return (
-    <div className="px-3 sm:px-6 py-6 max-w-6xl mx-auto">
+    <div className="px-3 sm:px-6 py-6 max-w-6xl mx-auto bg-surface dark:bg-surface-dark min-h-[100dvh]">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 min-w-0">
           <Link
             to="/admin"
-            className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 transition-colors"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors"
             title="Volver a Configuración"
           >
             <HiArrowLeft className="w-4 h-4" />
           </Link>
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-slate-100 truncate">
-              🩺 Salud de los datos
+            <h1 className="text-[18px] font-semibold text-titulo dark:text-titulo-dark truncate">
+              Salud de los datos
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-[12px] text-suave dark:text-suave-dark mt-0.5">
               Diagnóstico de inconsistencias en la base de datos
             </p>
           </div>
@@ -385,7 +391,7 @@ export default function DiagnosticoDatosPage() {
           <button
             onClick={ejecutarDiagnostico}
             disabled={cargando}
-            className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-sm text-slate-200 transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark text-[13px] text-titulo dark:text-titulo-dark transition-colors ${
               cargando ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
             }`}
             title="Volver a analizar"
@@ -400,15 +406,15 @@ export default function DiagnosticoDatosPage() {
 
       {/* Settings */}
       {!resultado && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 mb-4">
+        <div className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-xs text-slate-400">
+            <label className="text-[13px] text-suave dark:text-suave-dark">
               Umbral de mora considerado problemático:
             </label>
             <select
               value={diasMora}
               onChange={(e) => setDiasMora(Number(e.target.value))}
-              className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm text-slate-200 cursor-pointer"
+              className="bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-md px-2 py-1.5 text-[13px] text-titulo dark:text-titulo-dark cursor-pointer outline-none focus:border-duo-violeta dark:[color-scheme:dark]"
             >
               <option value={15}>15 días</option>
               <option value={30}>30 días (recomendado)</option>
@@ -426,12 +432,12 @@ export default function DiagnosticoDatosPage() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-rose-200 mb-4">
+        <div className="rounded-xl border border-egreso/30 bg-egreso/10 p-4 text-egreso-fuerte dark:text-egreso-claro mb-4">
           <div className="flex items-start gap-3">
             <HiOutlineExclamation className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-semibold mb-1">Error al ejecutar diagnóstico</p>
-              <p className="text-sm">{error}</p>
+              <p className="text-[13px]">{error}</p>
             </div>
           </div>
         </div>
@@ -446,21 +452,21 @@ export default function DiagnosticoDatosPage() {
           className="space-y-6"
         >
           {/* Resumen general */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+          <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div>
                 <div className="flex items-center gap-2">
                   {resultado.totales.problemas_detectados === 0 ? (
                     <>
-                      <HiOutlineCheckCircle className="w-5 h-5 text-emerald-400" />
-                      <span className="font-semibold text-emerald-300">
+                      <HiOutlineCheckCircle className="w-5 h-5 text-ingreso" />
+                      <span className="font-semibold text-ingreso-fuerte dark:text-ingreso-claro">
                         Base de datos limpia
                       </span>
                     </>
                   ) : (
                     <>
-                      <HiOutlineClipboardCheck className="w-5 h-5 text-amber-400" />
-                      <span className="font-semibold text-slate-100">
+                      <HiOutlineClipboardCheck className="w-5 h-5 text-[#d97706] dark:text-tarjeta-claro" />
+                      <span className="font-semibold text-titulo dark:text-titulo-dark">
                         {resultado.totales.problemas_detectados} caso
                         {resultado.totales.problemas_detectados !== 1 ? "s" : ""}{" "}
                         detectado
@@ -469,13 +475,13 @@ export default function DiagnosticoDatosPage() {
                     </>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-[12px] text-suave dark:text-suave-dark mt-1">
                   Pólizas en base: {resultado.totales.polizas_en_base} ·
                   Clientes: {resultado.totales.clientes_en_base} · Umbral mora:{" "}
                   {resultado.dias_mora} días
                 </p>
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-[12px] text-suave dark:text-suave-dark">
                 Ejecutado:{" "}
                 {new Date(resultado.ejecutado_en).toLocaleString("es-AR")}
               </div>
@@ -484,8 +490,8 @@ export default function DiagnosticoDatosPage() {
 
           {/* Grupo: Oficinas huérfanas */}
           <div>
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
-              🏢 Oficinas huérfanas
+            <h2 className="text-[12px] font-medium text-suave dark:text-suave-dark mb-3 px-1">
+              Oficinas huérfanas
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <CategoriaCard
@@ -509,8 +515,8 @@ export default function DiagnosticoDatosPage() {
 
           {/* Grupo: Estados inconsistentes */}
           <div>
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
-              📋 Estados inconsistentes
+            <h2 className="text-[12px] font-medium text-suave dark:text-suave-dark mb-3 px-1">
+              Estados inconsistentes
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <CategoriaCard
@@ -541,20 +547,20 @@ export default function DiagnosticoDatosPage() {
           </div>
 
           {/* Distribución de estados */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              📈 Distribución actual de pólizas
+          <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
+            <h2 className="text-[12px] font-medium text-suave dark:text-suave-dark mb-3">
+              Distribución actual de pólizas
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {resultado.distribucion_estados.map((row) => (
                 <div
                   key={row.estado}
-                  className="rounded-md border border-slate-800 bg-slate-950/60 p-2.5"
+                  className="rounded-md border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-2.5"
                 >
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500 truncate">
+                  <div className="text-[11px] text-suave dark:text-suave-dark truncate">
                     {row.estado}
                   </div>
-                  <div className="text-lg font-semibold text-slate-100 mt-1">
+                  <div className="text-[16px] font-semibold text-titulo dark:text-titulo-dark mt-1">
                     {row.total}
                   </div>
                 </div>
@@ -563,11 +569,11 @@ export default function DiagnosticoDatosPage() {
           </div>
 
           {/* Aviso */}
-          <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-3">
-            <div className="flex items-start gap-2 text-xs text-slate-400">
-              <HiOutlineInformationCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-500" />
+          <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
+            <div className="flex items-start gap-2 text-[12px] text-suave dark:text-suave-dark">
+              <HiOutlineInformationCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>
-                Este reporte es <strong className="text-slate-300">solo lectura</strong>.
+                Este reporte es <strong className="text-titulo dark:text-titulo-dark">solo lectura</strong>.
                 No modifica la base. Para corregir los casos detectados, hay que hacerlo manualmente desde cada pantalla o solicitar un script de corrección masiva.
               </span>
             </div>

@@ -18,6 +18,11 @@
 // No reimplementa nada. Marcar pagada, cambiar fecha y confirmar
 // comprobante llaman a los endpoints de siempre. Si mañana cambia la regla
 // de pago, cambia en un solo lado y esta pantalla la hereda.
+//
+// 🆕 Rediseño "profesional": bordes de 1px (antes 2px), esquinas menos
+// redondeadas, sin botones con relieve 3D, sin MAYÚSCULA+tracking ancho.
+// La lógica de todas las acciones (marcar pagada, cambiar fecha, subir
+// recibo, reprocesar PDF, grúa) no se tocó.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
@@ -368,7 +373,7 @@ export default function PanelPortalPage() {
       toast.success(partes.length ? `Listo: ${partes.join(" · ")}` : "El PDF ya coincidía. Nada que cambiar.", { id: aviso });
       if (!documentoPdf) {
         toast("Los datos se acomodaron, pero no se pudo guardar el archivo PDF.",
-              { icon: "📎", duration: 6000 });
+              { duration: 6000 });
       }
       cargar();
     } catch (err) {
@@ -401,23 +406,23 @@ export default function PanelPortalPage() {
         <div className="flex items-center gap-3 mb-5">
           <Link
             to={`/clientes/${clienteId}`}
-            className="w-10 h-10 shrink-0 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark inline-flex items-center justify-center"
+            className="w-9 h-9 shrink-0 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark inline-flex items-center justify-center"
             aria-label="Volver al cliente"
           >
-            <HiArrowLeft className="w-5 h-5 text-titulo dark:text-titulo-dark" />
+            <HiArrowLeft className="w-4 h-4 text-titulo dark:text-titulo-dark" />
           </Link>
           <div className="min-w-0">
-            <div className="text-xs font-bold uppercase tracking-wide text-suave dark:text-suave-dark">
+            <div className="text-[12px] text-suave dark:text-suave-dark">
               Portal del asegurado
             </div>
-            <div className="text-lg font-black truncate text-titulo dark:text-titulo-dark">
+            <div className="text-[16px] font-semibold truncate text-titulo dark:text-titulo-dark">
               {cargando ? "Cargando…" : (cli?.nombre_completo || "—")}
             </div>
           </div>
           <button
             onClick={cargar}
             aria-label="Actualizar"
-            className="cursor-pointer ml-auto shrink-0 w-10 h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark inline-flex items-center justify-center text-suave dark:text-suave-dark"
+            className="cursor-pointer ml-auto shrink-0 w-9 h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark inline-flex items-center justify-center text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors"
           >
             <HiRefresh className={`w-4 h-4 ${cargando ? "animate-spin" : ""}`} />
           </button>
@@ -428,26 +433,26 @@ export default function PanelPortalPage() {
                WhatsApp. Es la forma más rápida de entender un reclamo:
                en vez de imaginarte qué ve, lo ves. */}
         {data ? (
-          <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-4">
+          <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-4">
             {data.portal_activo ? (
               <div className="flex items-center gap-2 flex-wrap">
                 <a
                   href={data.portal_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="cursor-pointer flex-1 min-w-[150px] h-11 rounded-2xl bg-duo-azul text-white shadow-[0_3px_0_var(--color-duo-azul-sombra)] active:translate-y-0.5 inline-flex items-center justify-center gap-1.5 text-sm font-black transition-all"
+                  className="cursor-pointer flex-1 min-w-[150px] h-10 rounded-lg bg-duo-azul text-white hover:brightness-110 inline-flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
                 >
                   <HiEye className="w-4 h-4" /> Ver como el cliente
                 </a>
                 <button
                   onClick={copiarLink}
-                  className="cursor-pointer h-11 px-4 rounded-2xl border-2 border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1.5 text-sm font-black text-titulo dark:text-titulo-dark"
+                  className="cursor-pointer h-10 px-4 rounded-lg border border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1.5 text-[13px] font-medium text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors"
                 >
                   <HiClipboardCopy className="w-4 h-4" /> Copiar link
                 </button>
               </div>
             ) : (
-              <div className="flex items-start gap-2 text-sm text-suave dark:text-suave-dark">
+              <div className="flex items-start gap-2 text-[13px] text-suave dark:text-suave-dark">
                 <HiExclamation className="w-5 h-5 shrink-0 text-duo-amarillo" />
                 <span>
                   Este cliente todavía no tiene portal. Se le crea cuando se le manda
@@ -460,9 +465,9 @@ export default function PanelPortalPage() {
 
         {/* ── Pólizas ── */}
         {!cargando && !polizas.length ? (
-          <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-6 py-12 text-center">
-            <div className="text-base font-black text-titulo dark:text-titulo-dark">Sin pólizas activas</div>
-            <div className="mt-1 text-sm text-suave dark:text-suave-dark">
+          <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-6 py-12 text-center">
+            <div className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">Sin pólizas activas</div>
+            <div className="mt-1 text-[13px] text-suave dark:text-suave-dark">
               El cliente no tiene nada para ver en el portal.
             </div>
           </div>
@@ -473,15 +478,15 @@ export default function PanelPortalPage() {
 
             {/* Encabezado de la póliza */}
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="text-[15px] font-black text-titulo dark:text-titulo-dark">
+              <span className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">
                 {[p.marca, p.modelo].filter(Boolean).join(" ") || "Vehículo"}
               </span>
               {p.patente ? (
-                <span className="rounded-md bg-duo-azul/15 text-duo-azul px-1.5 py-0.5 text-[11px] font-mono font-bold">
+                <span className="rounded bg-duo-azul/15 text-duo-azul px-1.5 py-0.5 text-[11px] font-mono font-medium">
                   {p.patente}
                 </span>
               ) : null}
-              <span className="text-xs font-bold text-suave dark:text-suave-dark">
+              <span className="text-[12px] text-suave dark:text-suave-dark">
                 {p.compania} · {p.cobertura}
               </span>
 
@@ -491,7 +496,7 @@ export default function PanelPortalPage() {
                 onClick={() => pedirPdf(p.id)}
                 disabled={reprocesando === p.id}
                 title="Volver a subir el PDF de la compañía y acomodar cuotas y cupones"
-                className="cursor-pointer text-xs font-black px-3 py-1.5 rounded-xl border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-1 disabled:opacity-50"
+                className="cursor-pointer text-[12px] font-medium px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-1 disabled:opacity-50 hover:bg-surface dark:hover:bg-surface-dark transition-colors"
               >
                 <HiRefresh className={`w-3.5 h-3.5 ${reprocesando === p.id ? "animate-spin" : ""}`} />
                 {reprocesando === p.id ? "Procesando…" : "Reprocesar PDF"}
@@ -499,7 +504,7 @@ export default function PanelPortalPage() {
 
               <Link
                 to={`/polizas/${p.id}`}
-                className="ml-auto text-xs font-black text-duo-azul inline-flex items-center gap-1"
+                className="ml-auto text-[12px] font-medium text-duo-azul inline-flex items-center gap-1"
               >
                 Abrir póliza <HiExternalLink className="w-3.5 h-3.5" />
               </Link>
@@ -508,9 +513,9 @@ export default function PanelPortalPage() {
             {/* ⚠️ Lo que está mal o falta.
                 Es la lista de "por qué te va a llamar este cliente". */}
             {p.problemas?.length ? (
-              <div className="rounded-2xl border-2 border-duo-amarillo bg-duo-amarillo/10 px-4 py-3 mb-2">
+              <div className="rounded-lg border border-duo-amarillo/40 bg-duo-amarillo/10 px-4 py-3 mb-2">
                 {p.problemas.map((x, i) => (
-                  <div key={i} className="flex items-start gap-2 text-[13px] font-bold text-titulo dark:text-titulo-dark py-0.5">
+                  <div key={i} className="flex items-start gap-2 text-[13px] font-medium text-titulo dark:text-titulo-dark py-0.5">
                     <HiExclamation className="w-4 h-4 shrink-0 mt-0.5 text-duo-amarillo" />
                     <span>{x}</span>
                   </div>
@@ -526,12 +531,12 @@ export default function PanelPortalPage() {
                 Solo aparece si la compañía tiene grúa cargada (AMCA y
                 Equidad sí, NRE no). */}
             {p.asistencia ? (
-              <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-2">
+              <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-2">
 
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <HiPhone className="w-4 h-4 shrink-0 text-suave dark:text-suave-dark" />
-                  <span className="text-sm font-black text-titulo dark:text-titulo-dark">Grúa</span>
-                  <span className="text-xs font-mono font-bold text-suave dark:text-suave-dark">
+                  <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">Grúa</span>
+                  <span className="text-[12px] font-mono text-suave dark:text-suave-dark">
                     {p.asistencia.telefono}
                   </span>
 
@@ -539,7 +544,7 @@ export default function PanelPortalPage() {
                       configuración: el operador tiene que poder confirmarlo
                       de un vistazo sin abrir el portal. */}
                   <span
-                    className={`ml-auto rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide ${
+                    className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ${
                       p.asistencia.disponible
                         ? "bg-duo-verde-soft text-duo-verde-sombra"
                         : "bg-duo-amarillo-soft text-duo-amarillo-sombra"
@@ -572,10 +577,10 @@ export default function PanelPortalPage() {
                             title={ayuda}
                             disabled={gruaGuardando === p.id || activo}
                             onClick={() => guardarGrua(p, { estado_manual: id })}
-                            className={`cursor-pointer h-11 rounded-2xl border-2 inline-flex items-center justify-center gap-1.5 text-xs font-black transition-all disabled:opacity-100 ${
+                            className={`cursor-pointer h-10 rounded-lg border inline-flex items-center justify-center gap-1.5 text-[12px] font-medium transition-colors disabled:opacity-100 ${
                               activo
                                 ? "border-duo-verde bg-duo-verde/10 text-duo-verde-sombra dark:text-duo-verde"
-                                : "border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark active:translate-y-0.5"
+                                : "border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark"
                             }`}
                           >
                             <Icono className="w-3.5 h-3.5 shrink-0" />
@@ -587,8 +592,8 @@ export default function PanelPortalPage() {
 
                     {/* Días de carencia. El botón de guardar aparece solo si
                         el número cambió: sin cambios no hay nada que guardar. */}
-                    <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark">
-                      <span className="text-xs font-bold text-suave dark:text-suave-dark">
+                    <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-linea dark:border-linea-dark">
+                      <span className="text-[12px] text-suave dark:text-suave-dark">
                         Días de carencia
                       </span>
                       <input
@@ -599,9 +604,9 @@ export default function PanelPortalPage() {
                         onChange={(e) =>
                           setGruaDias((d) => ({ ...d, [p.id]: e.target.value }))
                         }
-                        className="w-20 h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-center text-sm font-black text-titulo dark:text-titulo-dark"
+                        className="w-16 h-9 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-center text-[13px] font-medium text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul"
                       />
-                      <span className="text-[11px] font-bold text-suave dark:text-suave-dark">
+                      <span className="text-[11px] text-suave dark:text-suave-dark">
                         Equidad 15 · AMCA 16
                       </span>
 
@@ -612,7 +617,7 @@ export default function PanelPortalPage() {
                             guardarGrua(p, { carencia_dias: gruaDias[p.id] })
                           }
                           disabled={gruaGuardando === p.id}
-                          className="cursor-pointer ml-auto h-10 px-4 rounded-2xl bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 inline-flex items-center justify-center gap-1.5 text-xs font-black disabled:opacity-50"
+                          className="cursor-pointer ml-auto h-9 px-3.5 rounded-lg bg-duo-verde text-white hover:brightness-110 inline-flex items-center justify-center gap-1.5 text-[12px] font-medium disabled:opacity-50 transition-colors"
                         >
                           <HiCheck className="w-4 h-4" />
                           {gruaGuardando === p.id ? "Guardando…" : "Guardar"}
@@ -621,7 +626,7 @@ export default function PanelPortalPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="text-xs font-bold text-suave dark:text-suave-dark">
+                  <div className="text-[12px] text-suave dark:text-suave-dark">
                     Carencia de {p.asistencia.carencia_dias} días
                     {p.asistencia.estado_manual && p.asistencia.estado_manual !== "auto"
                       ? " · fijada a mano por el administrador"
@@ -634,14 +639,14 @@ export default function PanelPortalPage() {
 
             {/* ── Cupones (lo que el cliente paga) ── */}
             {p.cupones?.length ? (
-              <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden mb-2">
+              <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden mb-2">
                 {p.cupones.map((c, i) => {
                   const tono = TONO_CUPON[c.estado] || TONO_CUPON.PENDIENTE;
                   const trabajando = ocupado === `cupon-${c.id}`;
                   return (
                     <div
                       key={c.id}
-                      className={`px-4 py-3 flex items-center gap-3 flex-wrap ${i ? "border-t-2 border-linea dark:border-linea-dark" : ""}`}
+                      className={`px-4 py-3 flex items-center gap-3 flex-wrap ${i ? "border-t border-linea dark:border-linea-dark" : ""}`}
                     >
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${tono.punto}`} />
 
@@ -655,7 +660,7 @@ export default function PanelPortalPage() {
                           target="_blank"
                           rel="noreferrer"
                           title="Ver el cupón en grande"
-                          className="cursor-pointer shrink-0 w-16 h-10 rounded-lg overflow-hidden border-2 border-linea dark:border-linea-dark bg-white"
+                          className="cursor-pointer shrink-0 w-16 h-10 rounded-lg overflow-hidden border border-linea dark:border-linea-dark bg-white"
                         >
                           <img
                             src={c.imagen_url}
@@ -667,10 +672,10 @@ export default function PanelPortalPage() {
                       ) : null}
 
                       <span className="flex-1 min-w-[110px]">
-                        <span className="block text-sm font-black text-titulo dark:text-titulo-dark">
+                        <span className="block text-[14px] font-medium text-titulo dark:text-titulo-dark">
                           Vence {fecha(c.fecha_vencimiento)}
                         </span>
-                        <span className="block text-xs font-bold text-suave dark:text-suave-dark">
+                        <span className="block text-[12px] text-suave dark:text-suave-dark">
                           {tono.texto}
                           {c.monto ? ` · ${money(c.monto)}` : ""}
                           {c.imagen_url ? "" : " · sin imagen"}
@@ -682,7 +687,7 @@ export default function PanelPortalPage() {
                           href={c.comprobante_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="cursor-pointer text-xs font-black px-3 py-1.5 rounded-xl border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark"
+                          className="cursor-pointer text-[12px] font-medium px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors"
                         >
                           Ver recibo
                         </a>
@@ -695,7 +700,7 @@ export default function PanelPortalPage() {
                             onClick={() => resolverComprobante(c, false)}
                             disabled={trabajando}
                             aria-label="Rechazar comprobante"
-                            className="cursor-pointer w-9 h-9 rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50"
+                            className="cursor-pointer w-9 h-9 rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50 hover:bg-surface dark:hover:bg-surface-dark transition-colors"
                           >
                             <HiX className="w-4 h-4" />
                           </button>
@@ -703,7 +708,7 @@ export default function PanelPortalPage() {
                             onClick={() => resolverComprobante(c, true)}
                             disabled={trabajando}
                             aria-label="Confirmar pago"
-                            className="cursor-pointer w-9 h-9 rounded-xl bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 inline-flex items-center justify-center disabled:opacity-50"
+                            className="cursor-pointer w-9 h-9 rounded-lg bg-duo-verde text-white hover:brightness-110 inline-flex items-center justify-center disabled:opacity-50 transition-colors"
                           >
                             <HiCheck className="w-5 h-5" />
                           </button>
@@ -715,7 +720,7 @@ export default function PanelPortalPage() {
                         <button
                           onClick={() => pedirArchivo("recibo", c.id)}
                           disabled={trabajando}
-                          className="cursor-pointer text-xs font-black px-3 py-1.5 rounded-xl border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-1 disabled:opacity-50"
+                          className="cursor-pointer text-[12px] font-medium px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark inline-flex items-center gap-1 disabled:opacity-50 hover:bg-surface dark:hover:bg-surface-dark transition-colors"
                         >
                           <HiUpload className="w-3.5 h-3.5" /> Subir recibo
                         </button>
@@ -731,10 +736,10 @@ export default function PanelPortalPage() {
                         title={c.imagen_url
                           ? "Cambiar la foto del cupón"
                           : "Cargar la foto del cupón"}
-                        className={`cursor-pointer h-9 rounded-xl border-2 border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1 disabled:opacity-50 ${
+                        className={`cursor-pointer h-9 rounded-lg border border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1 disabled:opacity-50 hover:bg-surface dark:hover:bg-surface-dark transition-colors ${
                           c.imagen_url
                             ? "w-9 text-suave dark:text-suave-dark"
-                            : "px-3 text-xs font-black text-titulo dark:text-titulo-dark"
+                            : "px-2.5 text-[12px] font-medium text-titulo dark:text-titulo-dark"
                         }`}
                       >
                         <HiPhotograph className="w-4 h-4" />
@@ -748,20 +753,20 @@ export default function PanelPortalPage() {
 
             {/* ── Cuotas (lo que el sistema cobra) ── */}
             {p.cuotas?.length ? (
-              <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden">
+              <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden">
                 {p.cuotas.map((c, i) => {
                   const trabajando = ocupado === `cuota-${c.id}`;
                   return (
                     <div
                       key={c.id}
-                      className={`px-4 py-3 flex items-center gap-3 flex-wrap ${i ? "border-t-2 border-linea dark:border-linea-dark" : ""}`}
+                      className={`px-4 py-3 flex items-center gap-3 flex-wrap ${i ? "border-t border-linea dark:border-linea-dark" : ""}`}
                     >
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.pagado ? "bg-duo-verde" : "bg-linea dark:bg-linea-dark"}`} />
                       <span className="flex-1 min-w-[110px]">
-                        <span className="block text-sm font-black text-titulo dark:text-titulo-dark">
+                        <span className="block text-[14px] font-medium text-titulo dark:text-titulo-dark">
                           Cuota {c.cuota_nro} · {fecha(c.fecha_vencimiento)}
                         </span>
-                        <span className="block text-xs font-bold text-suave dark:text-suave-dark">
+                        <span className="block text-[12px] text-suave dark:text-suave-dark">
                           {c.pagado ? `Pagada ${fecha(c.fecha_pago)}` : "Pendiente"}
                           {c.monto ? ` · ${money(c.monto)}` : ""}
                         </span>
@@ -771,7 +776,7 @@ export default function PanelPortalPage() {
                         onClick={() => abrirModalFecha(c)}
                         disabled={trabajando}
                         aria-label="Cambiar fecha"
-                        className="cursor-pointer w-9 h-9 rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50"
+                        className="cursor-pointer w-9 h-9 rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50 hover:bg-surface dark:hover:bg-surface-dark transition-colors"
                       >
                         <HiCalendar className="w-4 h-4" />
                       </button>
@@ -780,7 +785,7 @@ export default function PanelPortalPage() {
                         <button
                           onClick={() => marcarPagada(c)}
                           disabled={trabajando}
-                          className="cursor-pointer text-xs font-black px-3 py-1.5 rounded-xl bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 disabled:opacity-50"
+                          className="cursor-pointer text-[12px] font-medium px-2.5 py-1.5 rounded-lg bg-duo-verde text-white hover:brightness-110 disabled:opacity-50 transition-colors"
                         >
                           Marcar pagada
                         </button>
@@ -806,7 +811,7 @@ export default function PanelPortalPage() {
             className="fixed inset-0 z-[70] flex items-center justify-center px-3"
           >
             <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
               onClick={guardandoFecha ? undefined : cerrarModalFecha}
             />
             <motion.div
@@ -814,47 +819,47 @@ export default function PanelPortalPage() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 12 }}
               transition={{ type: "spring", stiffness: 300, damping: 26 }}
-              className="relative z-[71] w-full max-w-sm rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-5 sm:px-6 sm:py-6 shadow-2xl"
+              className="relative z-[71] w-full max-w-sm rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-5 sm:px-6 sm:py-6 shadow-xl"
             >
               <div className="flex items-start justify-between gap-3 mb-4">
-                <h3 className="text-base sm:text-lg font-black text-titulo dark:text-titulo-dark">
+                <h3 className="text-[15px] sm:text-[16px] font-semibold text-titulo dark:text-titulo-dark">
                   Cambiar vencimiento
                 </h3>
                 <button
                   onClick={cerrarModalFecha}
                   disabled={guardandoFecha}
                   aria-label="Cerrar"
-                  className="cursor-pointer h-8 w-8 rounded-xl border-2 flex items-center justify-center text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark"
+                  className="cursor-pointer h-8 w-8 rounded-lg border flex items-center justify-center text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark hover:bg-linea dark:hover:bg-linea-dark transition-colors"
                 >
                   <HiX className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="space-y-4">
-                <p className="text-sm font-bold text-titulo dark:text-titulo-dark">
-                  Cuota <span className="font-black text-duo-verde">#{modalFecha.cuota_nro}</span>
+                <p className="text-[14px] font-medium text-titulo dark:text-titulo-dark">
+                  Cuota <span className="font-semibold text-duo-verde-sombra dark:text-duo-verde">#{modalFecha.cuota_nro}</span>
                 </p>
 
                 <div>
-                  <label className="block text-sm font-black text-suave dark:text-suave-dark mb-1">
+                  <label className="block text-[13px] font-medium text-suave dark:text-suave-dark mb-1">
                     Nueva fecha
                   </label>
                   <input
                     type="date"
                     value={nuevaFecha}
                     onChange={(e) => setNuevaFecha(e.target.value)}
-                    className="w-full h-11 px-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark font-bold outline-none focus:border-duo-azul dark:[color-scheme:dark]"
+                    className="w-full h-10 px-3 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-[14px] outline-none focus:border-duo-azul dark:[color-scheme:dark]"
                   />
                 </div>
 
-                <label className="flex items-start gap-3 cursor-pointer mt-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3 rounded-xl border-2 border-duo-azul/30">
+                <label className="flex items-start gap-3 cursor-pointer mt-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3 rounded-lg border border-duo-azul/25">
                   <input
                     type="checkbox"
                     checked={ajustarSiguientes}
                     onChange={(e) => setAjustarSiguientes(e.target.checked)}
                     className="mt-1 accent-duo-azul w-4 h-4"
                   />
-                  <span className="text-sm font-bold text-titulo dark:text-titulo-dark">
+                  <span className="text-[13px] text-titulo dark:text-titulo-dark">
                     Ajustar también los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).
                   </span>
                 </label>
@@ -863,14 +868,14 @@ export default function PanelPortalPage() {
                   <button
                     onClick={cerrarModalFecha}
                     disabled={guardandoFecha}
-                    className="cursor-pointer h-11 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-sm text-titulo dark:text-titulo-dark font-black"
+                    className="cursor-pointer h-10 px-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] text-titulo dark:text-titulo-dark font-medium hover:bg-linea dark:hover:bg-linea-dark transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={guardarFecha}
                     disabled={guardandoFecha || !nuevaFecha}
-                    className="cursor-pointer h-11 px-4 rounded-xl bg-duo-azul text-sm font-black text-white flex items-center gap-2 shadow-[0_4px_0_var(--color-duo-azul-sombra)] active:shadow-[0_0_0_var(--color-duo-azul-sombra)] active:translate-y-0.5 disabled:opacity-50"
+                    className="cursor-pointer h-10 px-4 rounded-lg bg-duo-azul text-[13px] font-medium text-white flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-colors"
                   >
                     {guardandoFecha ? "Guardando…" : "Guardar cambios"}
                   </button>

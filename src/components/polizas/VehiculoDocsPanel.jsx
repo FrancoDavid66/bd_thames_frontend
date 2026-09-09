@@ -333,8 +333,8 @@ export default function VehiculoDocsPanel({ polizaId }) {
       {/* Header */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-titulo dark:text-titulo-dark0">Vehículo & documentos</div>
-          <div className="truncate text-base font-semibold text-white">{title}</div>
+          <div className="text-[11px] text-suave dark:text-suave-dark">Vehículo & documentos</div>
+          <div className="truncate text-base font-semibold text-titulo dark:text-titulo-dark">{title}</div>
           {poliza?.cobertura ? (
             <div className="mt-0.5 text-xs text-suave dark:text-suave-dark">
               Cobertura: <b className="text-titulo dark:text-titulo-dark">{String(poliza.cobertura).replace(/_/g, " ")}</b>
@@ -345,14 +345,14 @@ export default function VehiculoDocsPanel({ polizaId }) {
           <button
             onClick={() => openUploader("FOTO")}
             disabled={uploading}
-            className="inline-flex items-center gap-2 rounded-xl bg-duo-azul px-3 py-2 text-sm font-semibold text-white transition hover:brightness-105 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-duo-azul px-3 py-2 text-sm font-medium text-white transition-colors hover:brightness-110 disabled:opacity-50"
           >
             <HiUpload /> Agregar foto
           </button>
           <button
             onClick={() => fetchVehiculoDocs()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-semibold text-titulo dark:text-titulo-dark transition hover:brightness-105 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-medium text-titulo dark:text-titulo-dark transition-colors hover:brightness-95 disabled:opacity-50"
           >
             <HiRefresh className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
@@ -361,7 +361,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ===== Galería ===== */}
-        <section className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+        <section className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
           <header className="mb-3 flex items-center gap-2 text-titulo dark:text-titulo-dark">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul">
               <HiPhotograph className="text-lg" />
@@ -383,7 +383,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                     <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
                       <img src={item.url} alt={item.label} className="aspect-video w-full object-cover" loading="lazy" />
                     </a>
-                    <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/70 via-black/0 to-black/0 opacity-0 transition group-hover:opacity-100">
+                    <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/70 via-black/0 to-black/0 opacity-0 transition-opacity group-hover:opacity-100">
                       <figcaption className="px-2 py-1 text-xs text-white">
                         <span className="inline-block max-w-[10rem] truncate" title={item.label}>{item.label}</span>
                       </figcaption>
@@ -399,7 +399,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
 
                 <button
                   onClick={() => openUploader("FOTO")}
-                  className="flex aspect-video flex-col items-center justify-center rounded-lg border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-xs text-titulo dark:text-titulo-dark0 transition hover:border-duo-azul hover:text-duo-azul"
+                  className="flex aspect-video flex-col items-center justify-center rounded-lg border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-xs text-suave dark:text-suave-dark transition-colors hover:border-duo-azul hover:text-duo-azul"
                 >
                   <HiPlus className="mb-1 text-lg" /> Agregar foto
                 </button>
@@ -409,7 +409,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
         </section>
 
         {/* ===== Documentos ===== */}
-        <section className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+        <section className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
           <header className="mb-3 flex items-center justify-between text-titulo dark:text-titulo-dark">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo">
@@ -417,7 +417,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
               </span>
               <h3 className="text-sm font-semibold">Documentos</h3>
             </div>
-            <button onClick={() => openUploader("DOC")} className="inline-flex items-center gap-1 rounded-lg bg-surface dark:bg-surface-dark px-2.5 py-1.5 text-xs font-semibold text-titulo dark:text-titulo-dark hover:brightness-105">
+            <button onClick={() => openUploader("DOC")} className="inline-flex items-center gap-1 rounded-lg bg-surface dark:bg-surface-dark px-2.5 py-1.5 text-xs font-medium text-titulo dark:text-titulo-dark hover:brightness-95">
               <HiPlus /> Agregar
             </button>
           </header>
@@ -431,12 +431,12 @@ export default function VehiculoDocsPanel({ polizaId }) {
               <motion.div className="space-y-3">
                 {docsAgrupados.imgDocs.length > 0 && (
                   <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-titulo dark:text-titulo-dark0">Imágenes</div>
+                    <div className="mb-1 text-[11px] text-suave dark:text-suave-dark">Imágenes</div>
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {docsAgrupados.imgDocs.map((d) => (
                         <figure key={d.url} className="overflow-hidden rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
                           <a href={d.url} target="_blank" rel="noopener noreferrer" className="block">
-                            <img src={d.url} alt={d.label} className="aspect-video w-full object-cover transition hover:opacity-90" loading="lazy" />
+                            <img src={d.url} alt={d.label} className="aspect-video w-full object-cover transition-opacity hover:opacity-90" loading="lazy" />
                           </a>
                           <figcaption className="flex items-center justify-between px-2 py-1 text-xs text-suave dark:text-suave-dark">
                             <span className="truncate" title={d.label}>{d.label}</span>
@@ -452,10 +452,10 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 )}
                 {docsAgrupados.pdfDocs.length > 0 && (
                   <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-titulo dark:text-titulo-dark0">PDFs</div>
+                    <div className="mb-1 text-[11px] text-suave dark:text-suave-dark">PDFs</div>
                     <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {docsAgrupados.pdfDocs.map((d) => (
-                        <li key={d.url} className="flex items-center justify-between gap-2 rounded-lg border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-2">
+                        <li key={d.url} className="flex items-center justify-between gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-2">
                           <button type="button" onClick={() => setPreviewDoc(d)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" title="Previsualizar">
                             <PdfThumb url={d.url} alt={d.label} />
                             <span className="min-w-0">
@@ -475,7 +475,7 @@ export default function VehiculoDocsPanel({ polizaId }) {
                 )}
               </motion.div>
             ) : (
-              <motion.div className="rounded-lg border border-dashed border-linea dark:border-linea-dark py-8 text-center text-sm text-titulo dark:text-titulo-dark0">
+              <motion.div className="rounded-lg border border-dashed border-linea dark:border-linea-dark py-8 text-center text-sm text-suave dark:text-suave-dark">
                 No hay documentos cargados.
               </motion.div>
             )}
@@ -512,22 +512,22 @@ export default function VehiculoDocsPanel({ polizaId }) {
       <AnimatePresence>
         {uploaderOpen && (
           <motion.div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="w-full max-w-md rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 shadow-2xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+            <motion.div className="w-full max-w-md rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 shadow-xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
               <div className="mb-5 flex justify-between">
-                <h4 className="font-bold uppercase tracking-tight text-white">
+                <h4 className="font-semibold text-titulo dark:text-titulo-dark">
                   Subir {uploaderMode === "FOTO" ? "foto" : "documento"}
                 </h4>
-                <button onClick={() => setUploaderOpen(false)}><HiX className="text-xl text-titulo dark:text-titulo-dark0 hover:text-white" /></button>
+                <button onClick={() => setUploaderOpen(false)}><HiX className="text-xl text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark" /></button>
               </div>
               <div className="grid gap-4">
                 <label className="block">
-                  <span className="mb-1.5 ml-1 block text-[10px] font-bold uppercase text-titulo dark:text-titulo-dark0">Etiqueta / Tipo</span>
+                  <span className="mb-1.5 ml-1 block text-[11px] text-suave dark:text-suave-dark">Etiqueta / Tipo</span>
                   <input
                     list="tags-sug"
                     value={uploaderTag}
                     onChange={(e) => setUploaderTag(e.target.value)}
                     placeholder={uploaderMode === "FOTO" ? "Ej: FRENTE, MOTOR..." : "Ej: CONTRATO, VTV..."}
-                    className="w-full rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-sm font-bold uppercase text-white outline-none focus:ring-2 focus:ring-duo-azul/50"
+                    className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-sm uppercase text-titulo dark:text-titulo-dark outline-none focus:ring-2 focus:ring-duo-azul/50"
                   />
                   <datalist id="tags-sug">
                     {uploaderMode === "FOTO" ? (
@@ -538,19 +538,19 @@ export default function VehiculoDocsPanel({ polizaId }) {
                   </datalist>
                 </label>
                 <label className="group block">
-                  <span className="mb-1.5 ml-1 block text-[10px] font-bold uppercase text-titulo dark:text-titulo-dark0 transition-colors group-hover:text-suave dark:text-suave-dark">Seleccionar archivo</span>
+                  <span className="mb-1.5 ml-1 block text-[11px] text-suave dark:text-suave-dark transition-colors">Seleccionar archivo</span>
                   <input
                     ref={uploaderFileRef}
                     type="file"
                     accept={uploaderMode === "FOTO" ? "image/*" : "image/*,.pdf"}
                     onChange={(e) => setUploaderFile(e.target.files?.[0] || null)}
-                    className="w-full cursor-pointer text-xs text-suave dark:text-suave-dark file:mr-4 file:rounded-xl file:border-0 file:bg-surface dark:bg-surface-dark file:px-4 file:py-2.5 file:text-[10px] file:font-black file:uppercase file:text-white hover:file:bg-surface dark:bg-surface-dark"
+                    className="w-full cursor-pointer text-xs text-suave dark:text-suave-dark file:mr-4 file:rounded-lg file:border-0 file:bg-surface dark:file:bg-surface-dark file:px-4 file:py-2.5 file:text-[11px] file:font-medium file:text-titulo dark:file:text-titulo-dark hover:file:brightness-95"
                   />
                 </label>
               </div>
               <div className="mt-8 flex gap-3">
-                <button onClick={() => setUploaderOpen(false)} className="flex-1 rounded-xl border border-linea dark:border-linea-dark py-3 text-xs font-bold uppercase text-suave dark:text-suave-dark transition hover:bg-surface dark:bg-surface-dark">Cancelar</button>
-                <button onClick={doUpload} disabled={uploading} className="flex-1 rounded-xl bg-duo-azul py-3 text-xs font-black uppercase text-white shadow-lg shadow-[0_4px_0_var(--color-duo-azul-sombra)] transition hover:brightness-105 active:scale-95 disabled:opacity-50">
+                <button onClick={() => setUploaderOpen(false)} className="flex-1 rounded-lg border border-linea dark:border-linea-dark py-3 text-xs font-medium text-suave dark:text-suave-dark transition-colors hover:bg-surface dark:hover:bg-surface-dark">Cancelar</button>
+                <button onClick={doUpload} disabled={uploading} className="flex-1 rounded-lg bg-duo-azul py-3 text-xs font-medium text-white transition-colors hover:brightness-110 disabled:opacity-50">
                   {uploading ? "Subiendo..." : "Subir"}
                 </button>
               </div>

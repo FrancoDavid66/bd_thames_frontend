@@ -1,4 +1,4 @@
-// src/components/servicios/ServiciosCrudModal.jsx  (diseño Duo)
+// src/components/servicios/ServiciosCrudModal.jsx
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -148,29 +148,29 @@ export default function ServiciosCrudModal({ isOpen, onClose }) {
           exit={{ y: 40, opacity: 0 }}
           transition={{ type: "spring", damping: 28, stiffness: 320 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full sm:max-w-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[95vh] flex flex-col overflow-hidden"
+          className="w-full sm:max-w-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark sm:rounded-2xl rounded-t-2xl shadow-xl max-h-[95vh] flex flex-col overflow-hidden"
         >
           {/* HEADER */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b-2 border-linea dark:border-linea-dark shrink-0">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-linea dark:border-linea-dark shrink-0">
             {enForm && (
               <button
                 onClick={() => setVista("lista")}
-                className="w-10 h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-oficina flex items-center justify-center text-suave dark:text-suave-dark hover:text-oficina transition-colors shrink-0"
+                className="w-10 h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-oficina flex items-center justify-center text-suave dark:text-suave-dark hover:text-oficina transition-colors shrink-0"
               >
                 <HiArrowLeft className="w-4 h-4" />
               </button>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-suave dark:text-suave-dark uppercase tracking-wider mb-0.5 font-black">
+              <p className="text-[11px] text-suave dark:text-suave-dark mb-0.5">
                 {tituloVista}
               </p>
-              <h2 className="text-lg font-black text-titulo dark:text-titulo-dark truncate">
+              <h2 className="text-lg font-semibold text-titulo dark:text-titulo-dark truncate">
                 {subtitulo}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso flex items-center justify-center text-suave dark:text-suave-dark transition-colors shrink-0"
+              className="w-10 h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso flex items-center justify-center text-suave dark:text-suave-dark transition-colors shrink-0"
             >
               <HiX className="w-4 h-4" />
             </button>
@@ -178,10 +178,10 @@ export default function ServiciosCrudModal({ isOpen, onClose }) {
 
           {/* TABS (solo en vista lista) */}
           {vista === "lista" && (
-            <div className="flex gap-1 px-5 pt-3 border-b-2 border-linea dark:border-linea-dark shrink-0">
+            <div className="flex gap-1 px-5 pt-3 border-b border-linea dark:border-linea-dark shrink-0">
               <button
                 onClick={() => setTab("servicios")}
-                className={`flex items-center gap-2 px-3 py-2 text-sm font-black border-b-[3px] transition ${
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                   tab === "servicios"
                     ? "border-oficina text-oficina"
                     : "border-transparent text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -189,13 +189,13 @@ export default function ServiciosCrudModal({ isOpen, onClose }) {
               >
                 <HiCog className="w-4 h-4" />
                 Servicios
-                <span className="text-[10px] bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded-lg px-1.5 py-0.5 font-black">
+                <span className="text-[10px] bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded-lg px-1.5 py-0.5 font-medium">
                   {servicios.length}
                 </span>
               </button>
               <button
                 onClick={() => setTab("categorias")}
-                className={`flex items-center gap-2 px-3 py-2 text-sm font-black border-b-[3px] transition ${
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                   tab === "categorias"
                     ? "border-oficina text-oficina"
                     : "border-transparent text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -203,7 +203,7 @@ export default function ServiciosCrudModal({ isOpen, onClose }) {
               >
                 <HiTag className="w-4 h-4" />
                 Categorías
-                <span className="text-[10px] bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded-lg px-1.5 py-0.5 font-black">
+                <span className="text-[10px] bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark rounded-lg px-1.5 py-0.5 font-medium">
                   {categorias.length}
                 </span>
               </button>
@@ -262,13 +262,13 @@ function ListaServicios({ servicios, onNuevo, onEditar, onEliminar }) {
   if (servicios.length === 0) {
     return (
       <div className="px-6 py-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-oficina/10 border-2 border-oficina/30 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-oficina/10 border border-oficina/30 flex items-center justify-center">
           <HiOutlineCash className="w-7 h-7 text-oficina" />
         </div>
-        <p className="text-sm font-bold text-suave dark:text-suave-dark mb-5">Sin servicios cargados</p>
+        <p className="text-sm text-suave dark:text-suave-dark mb-5">Sin servicios cargados</p>
         <button
           onClick={onNuevo}
-          className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
+          className="inline-flex items-center gap-2 px-4 h-11 rounded-xl text-sm font-medium bg-oficina text-white hover:brightness-110 transition-colors"
         >
           <HiPlus className="w-4 h-4" />
           Agregar primero
@@ -285,9 +285,9 @@ function ListaServicios({ servicios, onNuevo, onEditar, onEliminar }) {
           return (
             <div
               key={s.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-surface dark:bg-surface-dark hover:bg-oficina/5 border-2 border-linea dark:border-linea-dark transition group"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface dark:bg-surface-dark hover:bg-oficina/5 border border-linea dark:border-linea-dark transition-colors group"
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border-2 ${
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
                 s.activo
                   ? "bg-oficina/10 text-oficina border-oficina/30"
                   : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
@@ -296,34 +296,34 @@ function ListaServicios({ servicios, onNuevo, onEditar, onEliminar }) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className={`font-black truncate text-sm ${
-                    s.activo ? "text-titulo dark:text-titulo-dark" : "text-suave dark:text-suave-dark"
+                  <p className={`truncate text-sm ${
+                    s.activo ? "text-titulo dark:text-titulo-dark font-medium" : "text-suave dark:text-suave-dark"
                   }`}>
                     {s.nombre}
                   </p>
                   {!s.activo && (
-                    <span className="text-[9px] bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark px-1.5 py-0.5 rounded uppercase tracking-wider font-black">
+                    <span className="text-[10px] bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark px-1.5 py-0.5 rounded font-medium">
                       Pausado
                     </span>
                   )}
                 </div>
-                <p className="text-xs font-bold text-suave dark:text-suave-dark">
+                <p className="text-xs text-suave dark:text-suave-dark">
                   Día {s.dia_vencimiento} · {s.categoria || "Sin categoría"}
                   {s.monto_estimado > 0 && (
                     <span className="ml-1">· ${Number(s.monto_estimado).toLocaleString("es-AR", { maximumFractionDigits: 0 })}</span>
                   )}
                 </p>
               </div>
-              <div className="flex items-center gap-0.5 opacity-50 group-hover:opacity-100 transition">
+              <div className="flex items-center gap-0.5 opacity-50 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => onEditar(s)}
-                  className="w-9 h-9 rounded-xl hover:bg-oficina/10 hover:text-oficina flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
+                  className="w-9 h-9 rounded-lg hover:bg-oficina/10 hover:text-oficina flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
                 >
                   <HiPencil className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => onEliminar(s)}
-                  className="w-9 h-9 rounded-xl hover:bg-egreso/10 hover:text-egreso flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
+                  className="w-9 h-9 rounded-lg hover:bg-egreso/10 hover:text-egreso flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
                 >
                   <HiTrash className="w-4 h-4" />
                 </button>
@@ -335,7 +335,7 @@ function ListaServicios({ servicios, onNuevo, onEditar, onEliminar }) {
 
       <button
         onClick={onNuevo}
-        className="w-full py-3 rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark hover:border-oficina hover:bg-oficina/5 text-sm font-black text-suave dark:text-suave-dark hover:text-oficina transition-colors flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-xl border-2 border-dashed border-linea dark:border-linea-dark hover:border-oficina hover:bg-oficina/5 text-sm text-suave dark:text-suave-dark hover:text-oficina transition-colors flex items-center justify-center gap-2"
       >
         <HiPlus className="w-4 h-4" />
         Agregar servicio
@@ -351,16 +351,16 @@ function ListaCategorias({ categorias, onNueva, onEditar, onEliminar }) {
   if (categorias.length === 0) {
     return (
       <div className="px-6 py-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-oficina/10 border-2 border-oficina/30 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-oficina/10 border border-oficina/30 flex items-center justify-center">
           <HiTag className="w-7 h-7 text-oficina" />
         </div>
-        <p className="text-sm font-black text-titulo dark:text-titulo-dark mb-2">Sin categorías</p>
-        <p className="text-xs font-bold text-suave dark:text-suave-dark mb-5 max-w-xs mx-auto">
+        <p className="text-sm font-medium text-titulo dark:text-titulo-dark mb-2">Sin categorías</p>
+        <p className="text-xs text-suave dark:text-suave-dark mb-5 max-w-xs mx-auto">
           Creá categorías para organizar tus servicios (Ej: Servicios Públicos, Alquileres, Internet)
         </p>
         <button
           onClick={onNueva}
-          className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
+          className="inline-flex items-center gap-2 px-4 h-11 rounded-xl text-sm font-medium bg-oficina text-white hover:brightness-110 transition-colors"
         >
           <HiPlus className="w-4 h-4" />
           Crear primera categoría
@@ -375,30 +375,30 @@ function ListaCategorias({ categorias, onNueva, onEditar, onEliminar }) {
         {categorias.map((c) => (
           <div
             key={c.id}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-surface dark:bg-surface-dark hover:bg-oficina/5 border-2 border-linea dark:border-linea-dark transition group"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface dark:bg-surface-dark hover:bg-oficina/5 border border-linea dark:border-linea-dark transition-colors group"
           >
             <div className={`w-3 h-10 rounded-full shrink-0 ${COLOR_MAP[c.color] || "bg-sky-500"}`} />
             <div className="flex-1 min-w-0">
-              <p className={`font-black truncate text-sm ${
-                c.activo ? "text-titulo dark:text-titulo-dark" : "text-suave dark:text-suave-dark"
+              <p className={`truncate text-sm ${
+                c.activo ? "text-titulo dark:text-titulo-dark font-medium" : "text-suave dark:text-suave-dark"
               }`}>
                 {c.nombre}
               </p>
-              <p className="text-xs font-bold text-suave dark:text-suave-dark">
+              <p className="text-xs text-suave dark:text-suave-dark">
                 {c.cantidad_servicios} servicio{c.cantidad_servicios !== 1 ? "s" : ""} usándola
                 {!c.activo && " · pausada"}
               </p>
             </div>
-            <div className="flex items-center gap-0.5 opacity-50 group-hover:opacity-100 transition">
+            <div className="flex items-center gap-0.5 opacity-50 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => onEditar(c)}
-                className="w-9 h-9 rounded-xl hover:bg-oficina/10 hover:text-oficina flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
+                className="w-9 h-9 rounded-lg hover:bg-oficina/10 hover:text-oficina flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
               >
                 <HiPencil className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onEliminar(c)}
-                className="w-9 h-9 rounded-xl hover:bg-egreso/10 hover:text-egreso flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
+                className="w-9 h-9 rounded-lg hover:bg-egreso/10 hover:text-egreso flex items-center justify-center text-suave dark:text-suave-dark transition-colors"
               >
                 <HiTrash className="w-4 h-4" />
               </button>
@@ -409,7 +409,7 @@ function ListaCategorias({ categorias, onNueva, onEditar, onEliminar }) {
 
       <button
         onClick={onNueva}
-        className="w-full py-3 rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark hover:border-oficina hover:bg-oficina/5 text-sm font-black text-suave dark:text-suave-dark hover:text-oficina transition-colors flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-xl border-2 border-dashed border-linea dark:border-linea-dark hover:border-oficina hover:bg-oficina/5 text-sm text-suave dark:text-suave-dark hover:text-oficina transition-colors flex items-center justify-center gap-2"
       >
         <HiPlus className="w-4 h-4" />
         Agregar categoría
@@ -492,7 +492,7 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
         try {
           const res = await dispatch(generarPagosMes({ anio: hoy.year(), mes: hoy.month() + 1 })).unwrap();
           if (res.creados > 0) {
-            toast("✨ Pago del mes generado automáticamente");
+            toast("Pago del mes generado automáticamente");
             dispatch(fetchPagosMes({ periodo }));
             dispatch(fetchResumenMes({ periodo }));
           }
@@ -506,7 +506,7 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
     }
   };
 
-  const inputCls = "w-full px-3 h-11 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark focus:border-oficina focus:outline-none text-sm font-bold text-titulo dark:text-titulo-dark transition-colors dark:[color-scheme:dark]";
+  const inputCls = "w-full px-3 h-11 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark focus:border-oficina focus:outline-none text-sm text-titulo dark:text-titulo-dark transition-colors dark:[color-scheme:dark]";
 
   return (
     <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -529,18 +529,18 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
         ) : (
           <>
             <input type="text" value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Sin categorías cargadas..." className={inputCls} />
-            <button type="button" onClick={onIrACategorias} className="text-[11px] font-black text-oficina hover:underline mt-1 inline-flex items-center gap-1">
-              💡 Crear categorías para reutilizar
+            <button type="button" onClick={onIrACategorias} className="text-[11px] font-medium text-oficina hover:underline mt-1 inline-flex items-center gap-1">
+              Crear categorías para reutilizar
             </button>
           </>
         )}
       </Field>
 
       <Field label="Día de vencimiento" required>
-        <input type="number" min={1} max={31} value={diaVencimiento} onChange={(e) => setDiaVencimiento(e.target.value)} className={`${inputCls} text-center font-black text-lg`} />
+        <input type="number" min={1} max={31} value={diaVencimiento} onChange={(e) => setDiaVencimiento(e.target.value)} className={`${inputCls} text-center font-semibold text-lg`} />
       </Field>
-      <p className="text-[11px] font-bold text-suave dark:text-suave-dark italic -mt-2">
-        Te avisamos 3 días antes del vencimiento ✨ · El monto lo cargás al pagar (estos gastos suelen variar).
+      <p className="text-[11px] text-suave dark:text-suave-dark italic -mt-2">
+        Te avisamos 3 días antes del vencimiento · El monto lo cargás al pagar (estos gastos suelen variar).
       </p>
 
       {ofiList.length > 0 && (
@@ -555,15 +555,15 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
       )}
 
       {!oficinaId && (
-        <div className="rounded-2xl border-2 border-tarjeta/40 bg-tarjeta/10 px-3 py-2 text-[11px] font-bold text-tarjeta dark:text-tarjeta-claro">
-          ⚠️ Sin sucursal, el gasto no va a sumar en la caja de ninguna oficina.
+        <div className="rounded-xl border border-tarjeta/40 bg-tarjeta/10 px-3 py-2 text-[11px] text-tarjeta dark:text-tarjeta-claro">
+          Sin sucursal, el gasto no va a sumar en la caja de ninguna oficina.
         </div>
       )}
 
-      <label className="flex items-center justify-between p-3 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark cursor-pointer hover:border-oficina transition-colors">
+      <label className="flex items-center justify-between p-3 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark cursor-pointer hover:border-oficina transition-colors">
         <div>
-          <p className="font-black text-sm text-titulo dark:text-titulo-dark">Servicio activo</p>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <p className="text-sm font-medium text-titulo dark:text-titulo-dark">Servicio activo</p>
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             {activo ? "Se generan pagos cada mes" : "No se generan pagos"}
           </p>
         </div>
@@ -572,10 +572,10 @@ function FormServicio({ servicio, oficinas, categorias, onCancel, onSaved, onIrA
 
       {/* Footer */}
       <div className="flex gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="flex-1 h-11 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso text-titulo dark:text-titulo-dark font-black text-sm transition-colors">
+        <button type="button" onClick={onCancel} className="flex-1 h-11 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso text-titulo dark:text-titulo-dark font-medium text-sm transition-colors">
           Cancelar
         </button>
-        <button type="submit" disabled={guardando} className="flex-1 h-11 rounded-2xl bg-oficina text-white border-2 border-oficina font-black text-sm shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2">
+        <button type="submit" disabled={guardando} className="flex-1 h-11 rounded-xl bg-oficina text-white font-medium text-sm hover:brightness-110 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
           {guardando ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
@@ -626,7 +626,7 @@ function FormCategoria({ categoria, onCancel, onSaved }) {
     }
   };
 
-  const inputCls = "w-full px-3 h-11 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark focus:border-oficina focus:outline-none text-sm font-bold text-titulo dark:text-titulo-dark transition-colors";
+  const inputCls = "w-full px-3 h-11 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark focus:border-oficina focus:outline-none text-sm text-titulo dark:text-titulo-dark transition-colors";
 
   return (
     <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -648,7 +648,7 @@ function FormCategoria({ categoria, onCancel, onSaved }) {
               key={c.value}
               type="button"
               onClick={() => setColor(c.value)}
-              className={`flex items-center gap-2 px-3 h-11 rounded-xl text-xs font-black transition border-2 ${
+              className={`flex items-center gap-2 px-3 h-11 rounded-lg text-xs font-medium transition-colors border ${
                 color === c.value
                   ? "bg-surface dark:bg-surface-dark border-oficina text-titulo dark:text-titulo-dark"
                   : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina/50"
@@ -661,10 +661,10 @@ function FormCategoria({ categoria, onCancel, onSaved }) {
         </div>
       </Field>
 
-      <label className="flex items-center justify-between p-3 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark cursor-pointer hover:border-oficina transition-colors">
+      <label className="flex items-center justify-between p-3 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark cursor-pointer hover:border-oficina transition-colors">
         <div>
-          <p className="font-black text-sm text-titulo dark:text-titulo-dark">Activa</p>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <p className="text-sm font-medium text-titulo dark:text-titulo-dark">Activa</p>
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             {activo ? "Disponible en el selector" : "No aparece en el selector"}
           </p>
         </div>
@@ -680,14 +680,14 @@ function FormCategoria({ categoria, onCancel, onSaved }) {
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 h-11 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso text-titulo dark:text-titulo-dark font-black text-sm transition-colors"
+          className="flex-1 h-11 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso text-titulo dark:text-titulo-dark font-medium text-sm transition-colors"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={guardando}
-          className="flex-1 h-11 rounded-2xl bg-oficina text-white border-2 border-oficina font-black text-sm shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2"
+          className="flex-1 h-11 rounded-xl bg-oficina text-white font-medium text-sm hover:brightness-110 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {guardando ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -706,10 +706,10 @@ function FormCategoria({ categoria, onCancel, onSaved }) {
 function Field({ label, required, children }) {
   return (
     <div>
-      <label className="block text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-1.5">
+      <label className="block text-[11px] text-suave dark:text-suave-dark mb-1.5">
         {label} {required && <span className="text-egreso">*</span>}
       </label>
       {children}
     </div>
   );
-}
+}

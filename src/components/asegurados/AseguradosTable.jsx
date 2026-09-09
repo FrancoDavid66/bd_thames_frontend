@@ -13,21 +13,21 @@ const onlyDigits = (s) => String(s ?? "").replace(/\D/g, "");
 const estadoPerfilTone = (estado) => {
   const v = normalize(estado);
   if (v.includes("completo"))
-    return { label: "COMPLETO", cls: "bg-green-500/10 text-green-400 ring-1 ring-green-500/30" };
+    return { label: "Completo", cls: "bg-duo-verde/10 text-duo-verde ring-1 ring-duo-verde/25" };
   if (v.includes("borrador"))
-    return { label: "BORRADOR", cls: "bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/30" };
-  return { label: estado || "—", cls: "bg-blue-500/10 text-blue-300 ring-1 ring-blue-500/30" };
+    return { label: "Borrador", cls: "bg-duo-amarillo/10 text-duo-amarillo ring-1 ring-duo-amarillo/25" };
+  return { label: estado || "—", cls: "bg-duo-azul/10 text-duo-azul ring-1 ring-duo-azul/25" };
 };
 
 const HeaderCell = ({ children, sortable, active, dir, onClick, className = "" }) => (
   <th
-    className={`p-3 border-b border-gray-700 ${sortable ? "cursor-pointer select-none" : ""} ${className}`}
+    className={`p-3 border-b border-linea dark:border-linea-dark ${sortable ? "cursor-pointer select-none" : ""} ${className}`}
     onClick={sortable ? onClick : undefined}
     title={sortable ? "Ordenar" : undefined}
   >
     <span className="inline-flex items-center gap-1">
       {children}
-      {sortable && <span className="text-xs text-gray-400">{active ? (dir === "asc" ? "▲" : "▼") : "↕"}</span>}
+      {sortable && <span className="text-[11px] text-suave dark:text-suave-dark">{active ? (dir === "asc" ? "▲" : "▼") : "↕"}</span>}
     </span>
   </th>
 );
@@ -154,16 +154,16 @@ export default function AseguradosTable({
   };
 
   if (!loading && !pageRows.length) {
-    return <div className="text-center text-gray-400 mt-6">No hay asegurados para mostrar.</div>;
+    return <div className="text-center text-suave dark:text-suave-dark mt-6 text-[13px]">No hay asegurados para mostrar.</div>;
   }
 
   return (
-    <div className="rounded shadow bg-gray-900 text-white">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark overflow-hidden">
       {/* Tabla (md y arriba) */}
       <div className="overflow-x-auto hidden md:block">
         <table className="min-w-full text-left border-collapse">
-          <thead className="bg-gray-800 sticky top-0 z-10">
-            <tr className="text-xs uppercase tracking-wide text-gray-300">
+          <thead className="bg-surface dark:bg-surface-dark sticky top-0 z-10">
+            <tr className="text-[12px] text-suave dark:text-suave-dark">
               <HeaderCell
                 sortable
                 active={serverMode ? ordering?.replace("-", "") === "cliente__apellido" : sortBy === "asegurado"}
@@ -180,7 +180,7 @@ export default function AseguradosTable({
               >
                 DNI
               </HeaderCell>
-              <th className="p-3 border-b border-gray-700">Teléfono</th>
+              <th className="p-3 border-b border-linea dark:border-linea-dark">Teléfono</th>
               <HeaderCell
                 sortable
                 active={serverMode ? ordering?.replace("-", "") === "cliente__estado" : sortBy === "estado_perfil"}
@@ -227,7 +227,7 @@ export default function AseguradosTable({
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-sm text-gray-400">
+                <td colSpan={8} className="p-6 text-center text-[13px] text-suave dark:text-suave-dark">
                   Cargando…
                 </td>
               </tr>
@@ -245,14 +245,14 @@ export default function AseguradosTable({
                 return (
                   <tr
                     key={r.id}
-                    className={`hover:bg-gray-800 transition-colors ${
-                      idx % 2 === 0 ? "bg-gray-900" : "bg-gray-900/80"
+                    className={`hover:bg-surface dark:hover:bg-surface-dark transition-colors ${
+                      idx % 2 === 0 ? "bg-card dark:bg-card-dark" : "bg-surface/50 dark:bg-surface-dark/50"
                     }`}
                   >
-                    <td className="p-3 border-b border-gray-800 font-medium">
+                    <td className="p-3 border-b border-linea dark:border-linea-dark font-medium">
                       <Link
                         to={`/clientes/${r.id}`}
-                        className="text-blue-400 hover:underline underline-offset-2"
+                        className="text-duo-azul hover:underline underline-offset-2"
                         title="Ver detalle del asegurado"
                       >
                         {nombre}
@@ -262,54 +262,54 @@ export default function AseguradosTable({
                           <img
                             src={avatar}
                             alt={nombre}
-                            className="h-8 w-8 rounded-full border border-gray-700 object-cover"
+                            className="h-8 w-8 rounded-full border border-linea dark:border-linea-dark object-cover"
                           />
                         </div>
                       )}
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
-                      {r.dni || <span className="text-gray-400">-</span>}
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
+                      {r.dni || <span className="text-suave dark:text-suave-dark">-</span>}
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
                       {r.telefono_e164 || r.telefono ? (
                         <a
                           href={`tel:${r.telefono_e164 || r.telefono}`}
-                          className="text-blue-400 hover:underline underline-offset-2"
+                          className="text-duo-azul hover:underline underline-offset-2"
                           title={`Llamar a ${nombre}`}
                         >
                           {r.telefono_e164 || r.telefono}
                         </a>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-suave dark:text-suave-dark">-</span>
                       )}
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${tone.cls}`}>
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${tone.cls}`}>
                         {tone.label}
                       </span>
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
-                      {r.ultima_poliza?.numero || <span className="text-gray-400">-</span>}
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
+                      {r.ultima_poliza?.numero || <span className="text-suave dark:text-suave-dark">-</span>}
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
-                      {r.ultima_poliza?.compania || <span className="text-gray-400">-</span>}
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
+                      {r.ultima_poliza?.compania || <span className="text-suave dark:text-suave-dark">-</span>}
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
                       {Number.isFinite(Number(r?.kpis?.cuotas_vencidas))
                         ? r.kpis.cuotas_vencidas
-                        : <span className="text-gray-400">-</span>}
+                        : <span className="text-suave dark:text-suave-dark">-</span>}
                     </td>
 
-                    <td className="p-3 border-b border-gray-800">
+                    <td className="p-3 border-b border-linea dark:border-linea-dark">
                       {r?.kpis?.proximo_vto
                         ? new Date(r.kpis.proximo_vto).toLocaleDateString()
-                        : <span className="text-gray-400">-</span>}
+                        : <span className="text-suave dark:text-suave-dark">-</span>}
                     </td>
                   </tr>
                 );
@@ -319,7 +319,7 @@ export default function AseguradosTable({
       </div>
 
       {/* Lista responsiva (mobile) */}
-      <div className="md:hidden divide-y divide-gray-800">
+      <div className="md:hidden divide-y divide-linea dark:divide-linea-dark">
         {pageRows.map((r) => {
           const nombre =
             r.nombre_completo ||
@@ -331,31 +331,31 @@ export default function AseguradosTable({
             <div key={r.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm text-gray-300">Asegurado</div>
+                  <div className="text-[13px] text-suave dark:text-suave-dark">Asegurado</div>
                   <Link
                     to={`/clientes/${r.id}`}
-                    className="font-semibold text-blue-400 hover:underline underline-offset-2"
+                    className="font-medium text-duo-azul hover:underline underline-offset-2"
                   >
                     {nombre}
                   </Link>
                 </div>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${tone.cls}`}>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${tone.cls}`}>
                   {tone.label}
                 </span>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div className="mt-3 grid grid-cols-2 gap-3 text-[13px]">
                 <div>
-                  <div className="text-gray-400">DNI</div>
+                  <div className="text-suave dark:text-suave-dark">DNI</div>
                   <div>{r.dni || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400">Teléfono</div>
+                  <div className="text-suave dark:text-suave-dark">Teléfono</div>
                   <div>
                     {r.telefono_e164 || r.telefono ? (
                       <a
                         href={`tel:${r.telefono_e164 || r.telefono}`}
-                        className="text-blue-400 hover:underline underline-offset-2"
+                        className="text-duo-azul hover:underline underline-offset-2"
                       >
                         {r.telefono_e164 || r.telefono}
                       </a>
@@ -365,19 +365,19 @@ export default function AseguradosTable({
                   </div>
                 </div>
                 <div>
-                  <div className="text-gray-400">Nº Póliza</div>
+                  <div className="text-suave dark:text-suave-dark">Nº Póliza</div>
                   <div>{r.ultima_poliza?.numero || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400">Compañía</div>
+                  <div className="text-suave dark:text-suave-dark">Compañía</div>
                   <div>{r.ultima_poliza?.compania || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400">Cuotas vencidas</div>
+                  <div className="text-suave dark:text-suave-dark">Cuotas vencidas</div>
                   <div>{Number.isFinite(Number(r?.kpis?.cuotas_vencidas)) ? r.kpis.cuotas_vencidas : "-"}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400">Próx. vto</div>
+                  <div className="text-suave dark:text-suave-dark">Próx. vto</div>
                   <div>{r?.kpis?.proximo_vto ? new Date(r.kpis.proximo_vto).toLocaleDateString() : "-"}</div>
                 </div>
               </div>
@@ -388,14 +388,14 @@ export default function AseguradosTable({
 
       {/* Footer de paginación */}
       {showFooter && (
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 p-3 border-t border-gray-800">
-          <div className="text-sm text-gray-300">
-            Página <strong>{currPage}</strong> de <strong>{totalPages}</strong>
-            <span className="text-gray-500"> • {totalItems} asegurados</span>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 p-3 border-t border-linea dark:border-linea-dark">
+          <div className="text-[13px] text-suave dark:text-suave-dark">
+            Página <strong className="text-titulo dark:text-titulo-dark font-medium">{currPage}</strong> de <strong className="text-titulo dark:text-titulo-dark font-medium">{totalPages}</strong>
+            <span> • {totalItems} asegurados</span>
           </div>
           <div className="flex items-center gap-2">
             <button
-              className="px-2 py-1 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors disabled:opacity-40"
               onClick={() => gotoPage(1)}
               disabled={currPage <= 1}
               aria-label="Primera página"
@@ -404,7 +404,7 @@ export default function AseguradosTable({
               «
             </button>
             <button
-              className="px-2 py-1 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors disabled:opacity-40"
               onClick={() => gotoPage(currPage - 1)}
               disabled={currPage <= 1}
               aria-label="Página anterior"
@@ -413,7 +413,7 @@ export default function AseguradosTable({
               ‹
             </button>
             <button
-              className="px-2 py-1 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors disabled:opacity-40"
               onClick={() => gotoPage(currPage + 1)}
               disabled={currPage >= totalPages}
               aria-label="Página siguiente"
@@ -422,7 +422,7 @@ export default function AseguradosTable({
               ›
             </button>
             <button
-              className="px-2 py-1 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors disabled:opacity-40"
               onClick={() => gotoPage(totalPages)}
               disabled={currPage >= totalPages}
               aria-label="Última página"
@@ -433,7 +433,7 @@ export default function AseguradosTable({
             <select
               value={currSize}
               onChange={(e) => changeSize(Number(e.target.value))}
-              className="ml-2 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm"
+              className="ml-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2 py-1.5 text-[13px] text-titulo dark:text-titulo-dark outline-none dark:[color-scheme:dark]"
               aria-label="Tamaño de página"
               title="Tamaño de página"
             >

@@ -1,4 +1,4 @@
-// src/components/estadisticas/AltasPolizasPanel.jsx  (diseño Duo)
+// src/components/estadisticas/AltasPolizasPanel.jsx
 import { useState, useMemo, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import {
@@ -74,7 +74,7 @@ const monthRangeFrom = (anio, mes) => {
   }
 };
 
-// 🎨 Tono Duo por oficina (chips): unificado a tus tokens.
+// 🎨 Tono por oficina (chips): unificado a los tokens del panel.
 const oficinaTone = (ofi) => {
   const map = {
     "1": "border-oficina/40 bg-oficina/10 text-oficina",
@@ -210,20 +210,20 @@ function ExportExcelModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !loading) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b-2 border-linea dark:border-linea-dark p-4">
+        <div className="flex items-start justify-between gap-3 border-b border-linea dark:border-linea-dark p-4">
           <div>
-            <div className="text-base font-black text-titulo dark:text-titulo-dark flex items-center gap-2">
+            <div className="text-base font-semibold text-titulo dark:text-titulo-dark flex items-center gap-2">
               <HiTable className="text-ingreso" />
               Exportar Emisiones a Excel
             </div>
-            <p className="mt-1 text-[11px] font-bold text-suave dark:text-suave-dark">
+            <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">
               Descargá las pólizas emitidas con todos sus datos para análisis.
             </p>
           </div>
@@ -231,7 +231,7 @@ function ExportExcelModal({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="rounded-xl border-2 border-linea dark:border-linea-dark px-2 py-1 text-suave dark:text-suave-dark hover:border-egreso hover:text-egreso disabled:opacity-50 transition-colors"
+            className="rounded-lg border border-linea dark:border-linea-dark px-2 py-1 text-suave dark:text-suave-dark hover:border-egreso hover:text-egreso disabled:opacity-50 transition-colors"
           >
             <HiX />
           </button>
@@ -242,7 +242,7 @@ function ExportExcelModal({
           {/* Fechas */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-1">
+              <label className="block text-[11px] text-suave dark:text-suave-dark mb-1">
                 Desde
               </label>
               <input
@@ -250,11 +250,11 @@ function ExportExcelModal({
                 value={desde}
                 onChange={(e) => setDesde(e.target.value)}
                 disabled={loading}
-                className="w-full rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-ingreso dark:[color-scheme:dark]"
+                className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-ingreso dark:[color-scheme:dark]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-1">
+              <label className="block text-[11px] text-suave dark:text-suave-dark mb-1">
                 Hasta
               </label>
               <input
@@ -262,7 +262,7 @@ function ExportExcelModal({
                 value={hasta}
                 onChange={(e) => setHasta(e.target.value)}
                 disabled={loading}
-                className="w-full rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-ingreso dark:[color-scheme:dark]"
+                className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-ingreso dark:[color-scheme:dark]"
               />
             </div>
           </div>
@@ -276,7 +276,7 @@ function ExportExcelModal({
                 setDesde(dayjs().startOf("month").format("YYYY-MM-DD"));
                 setHasta(dayjs().endOf("month").format("YYYY-MM-DD"));
               }}
-              className="text-[10px] font-black px-2.5 py-1 rounded-lg border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
             >
               Mes actual
             </button>
@@ -287,7 +287,7 @@ function ExportExcelModal({
                 setDesde(dayjs().subtract(1, "month").startOf("month").format("YYYY-MM-DD"));
                 setHasta(dayjs().subtract(1, "month").endOf("month").format("YYYY-MM-DD"));
               }}
-              className="text-[10px] font-black px-2.5 py-1 rounded-lg border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
             >
               Mes anterior
             </button>
@@ -298,7 +298,7 @@ function ExportExcelModal({
                 setDesde(dayjs().subtract(30, "day").format("YYYY-MM-DD"));
                 setHasta(dayjs().format("YYYY-MM-DD"));
               }}
-              className="text-[10px] font-black px-2.5 py-1 rounded-lg border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
             >
               Últimos 30 días
             </button>
@@ -309,7 +309,7 @@ function ExportExcelModal({
                 setDesde(dayjs().startOf("year").format("YYYY-MM-DD"));
                 setHasta(dayjs().format("YYYY-MM-DD"));
               }}
-              className="text-[10px] font-black px-2.5 py-1 rounded-lg border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
             >
               Año actual
             </button>
@@ -317,7 +317,7 @@ function ExportExcelModal({
 
           {/* Tipo de alta */}
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-1.5">
+            <label className="block text-[11px] text-suave dark:text-suave-dark mb-1.5">
               Tipo
             </label>
             <div className="grid grid-cols-3 gap-1.5">
@@ -331,7 +331,7 @@ function ExportExcelModal({
                   type="button"
                   disabled={loading}
                   onClick={() => setTipo(opt.id)}
-                  className={`text-[11px] font-black py-2 rounded-xl border-2 transition-all ${
+                  className={`text-[12px] font-medium py-2 rounded-lg border transition-colors ${
                     tipo === opt.id
                       ? "border-ingreso bg-ingreso/10 text-ingreso"
                       : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-ingreso/50"
@@ -345,14 +345,14 @@ function ExportExcelModal({
 
           {/* Oficina */}
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-1">
+            <label className="block text-[11px] text-suave dark:text-suave-dark mb-1">
               Oficina (opcional)
             </label>
             <select
               value={oficina}
               onChange={(e) => setOficina(e.target.value)}
               disabled={loading}
-              className="w-full rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-ingreso cursor-pointer dark:[color-scheme:dark]"
+              className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-ingreso cursor-pointer dark:[color-scheme:dark]"
             >
               <option value="">Todas las oficinas</option>
               {oficinasOptions.map((o) => {
@@ -372,7 +372,7 @@ function ExportExcelModal({
 
           {/* Compañía */}
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark mb-1">
+            <label className="block text-[11px] text-suave dark:text-suave-dark mb-1">
               Compañía (opcional)
             </label>
             <input
@@ -381,30 +381,30 @@ function ExportExcelModal({
               onChange={(e) => setCompania(e.target.value)}
               disabled={loading}
               placeholder="Ej: RUS, SANCOR, La Caja…"
-              className="w-full rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-ingreso placeholder:text-suave dark:placeholder:text-suave-dark"
+              className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-ingreso placeholder:text-suave dark:placeholder:text-suave-dark"
             />
           </div>
 
           {/* Mensajes */}
           {error && (
-            <div className="rounded-xl border-2 border-egreso/30 bg-egreso/10 px-3 py-2 text-[11px] font-bold text-egreso dark:text-egreso-claro">
+            <div className="rounded-lg border border-egreso/25 bg-egreso/10 px-3 py-2 text-[11px] text-egreso dark:text-egreso-claro">
               {error}
             </div>
           )}
           {okMsg && (
-            <div className="rounded-xl border-2 border-ingreso/30 bg-ingreso/10 px-3 py-2 text-[11px] font-bold text-ingreso dark:text-ingreso-claro flex items-center gap-1.5">
+            <div className="rounded-lg border border-ingreso/25 bg-ingreso/10 px-3 py-2 text-[11px] text-ingreso dark:text-ingreso-claro flex items-center gap-1.5">
               <HiCheckCircle /> {okMsg}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t-2 border-linea dark:border-linea-dark p-4">
+        <div className="flex justify-end gap-2 border-t border-linea dark:border-linea-dark p-4">
           <button
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="rounded-xl border-2 border-linea dark:border-linea-dark px-4 py-2 text-sm font-black text-titulo dark:text-titulo-dark hover:border-egreso hover:text-egreso disabled:opacity-50 transition-colors"
+            className="rounded-lg border border-linea dark:border-linea-dark px-4 py-2 text-sm font-medium text-titulo dark:text-titulo-dark hover:border-egreso hover:text-egreso disabled:opacity-50 transition-colors"
           >
             Cancelar
           </button>
@@ -412,7 +412,7 @@ function ExportExcelModal({
             type="button"
             onClick={handleDescargar}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl bg-ingreso border-2 border-ingreso px-4 py-2 text-sm font-black text-white shadow-[0_4px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all"
+            className="inline-flex items-center gap-2 rounded-lg bg-ingreso px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110 disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -436,7 +436,7 @@ function ExportExcelModal({
 function OficinaChip({ oficina, oficina_nombre, total, pct }) {
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-0.5 text-[11px] font-black ${oficinaTone(oficina)}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${oficinaTone(oficina)}`}
     >
       <span>{oficina_nombre}</span>
       <span className="opacity-50">·</span>
@@ -722,11 +722,11 @@ export default function AltasPolizasPanel({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-black text-titulo dark:text-titulo-dark flex items-center gap-2">
+          <h2 className="text-base font-semibold text-titulo dark:text-titulo-dark flex items-center gap-2">
             <HiChartBar className="text-ingreso text-sm" />
             Emisiones por oficina
           </h2>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             Pólizas por <span className="text-titulo dark:text-titulo-dark">fecha_emision</span> · agrupadas por{" "}
             {footerAgr}
           </p>
@@ -740,7 +740,7 @@ export default function AltasPolizasPanel({
               setDesde(dayjs().startOf("month").format("YYYY-MM-DD"));
               setHasta(dayjs().endOf("month").startOf("day").format("YYYY-MM-DD"));
             }}
-            className="h-9 flex items-center gap-1.5 px-3 rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors text-xs font-black"
+            className="h-9 flex items-center gap-1.5 px-3 rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors text-xs font-medium"
           >
             <HiCalendar className="text-xs" />
             Mes actual
@@ -750,7 +750,7 @@ export default function AltasPolizasPanel({
             type="button"
             onClick={fetchSerie}
             disabled={loading}
-            className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
+            className="h-9 w-9 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors"
             title="Refrescar"
           >
             <HiRefresh className={`text-xs ${loading ? "animate-spin" : ""}`} />
@@ -760,7 +760,7 @@ export default function AltasPolizasPanel({
             type="button"
             onClick={onExportCSV}
             disabled={!canExport}
-            className={`h-9 flex items-center gap-1.5 px-3 rounded-xl border-2 text-xs font-black transition-colors ${
+            className={`h-9 flex items-center gap-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${
               canExport
                 ? "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark hover:border-oficina hover:text-oficina"
                 : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark cursor-not-allowed opacity-50"
@@ -781,7 +781,7 @@ export default function AltasPolizasPanel({
           <button
             type="button"
             onClick={() => setExcelModalOpen(true)}
-            className="h-9 flex items-center gap-1.5 px-3.5 rounded-xl border-2 border-ingreso bg-ingreso/10 text-ingreso hover:bg-ingreso/20 transition-colors text-xs font-black"
+            className="h-9 flex items-center gap-1.5 px-3.5 rounded-lg border border-ingreso bg-ingreso/10 text-ingreso hover:bg-ingreso/20 transition-colors text-xs font-medium"
             title="Descargar Excel detallado con todas las pólizas y sus datos"
           >
             <HiTable className="text-sm" />
@@ -792,13 +792,13 @@ export default function AltasPolizasPanel({
 
       {/* Controles secundarios */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-1 py-1">
+        <div className="flex items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-1 py-1">
           {["hora", "dia", "semana", "mes"].map((agr) => (
             <button
               key={agr}
               type="button"
               onClick={() => setAgrupacion(agr)}
-              className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg transition-colors ${
+              className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-colors ${
                 agrupacion === agr
                   ? "bg-oficina text-white"
                   : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -816,7 +816,7 @@ export default function AltasPolizasPanel({
             setDesde(e.target.value);
             setUsarMesSeleccionado(false);
           }}
-          className="h-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-oficina dark:[color-scheme:dark]"
+          className="h-9 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 text-xs text-titulo dark:text-titulo-dark outline-none focus:border-oficina dark:[color-scheme:dark]"
         />
         <span className="text-xs text-suave dark:text-suave-dark">→</span>
         <input
@@ -826,13 +826,13 @@ export default function AltasPolizasPanel({
             setHasta(e.target.value);
             setUsarMesSeleccionado(false);
           }}
-          className="h-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-oficina dark:[color-scheme:dark]"
+          className="h-9 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 text-xs text-titulo dark:text-titulo-dark outline-none focus:border-oficina dark:[color-scheme:dark]"
         />
 
         <select
           value={oficina}
           onChange={(e) => setOficina(e.target.value)}
-          className="h-9 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 text-xs font-bold text-titulo dark:text-titulo-dark outline-none focus:border-oficina cursor-pointer dark:[color-scheme:dark]"
+          className="h-9 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 text-xs text-titulo dark:text-titulo-dark outline-none focus:border-oficina cursor-pointer dark:[color-scheme:dark]"
         >
           <option value="">Todas las oficinas</option>
           {oficinasOptions.map((o) => {
@@ -847,7 +847,7 @@ export default function AltasPolizasPanel({
           })}
         </select>
 
-        <label className="flex items-center gap-1.5 text-[11px] font-bold text-suave dark:text-suave-dark cursor-pointer select-none">
+        <label className="flex items-center gap-1.5 text-[11px] text-suave dark:text-suave-dark cursor-pointer select-none">
           <input
             type="checkbox"
             checked={excluirRenovaciones}
@@ -869,50 +869,50 @@ export default function AltasPolizasPanel({
 
       {/* Mensajes */}
       {error && (
-        <div className="rounded-xl border-2 border-egreso/30 bg-egreso/10 px-3 py-2 text-[11px] font-bold text-egreso dark:text-egreso-claro">
+        <div className="rounded-lg border border-egreso/25 bg-egreso/10 px-3 py-2 text-[11px] text-egreso dark:text-egreso-claro">
           {error}
         </div>
       )}
 
       {/* Total */}
       <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-black tabular-nums text-titulo dark:text-titulo-dark">
+        <span className="text-3xl font-semibold tabular-nums text-titulo dark:text-titulo-dark">
           {totalGeneral.toLocaleString("es-AR")}
         </span>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-suave dark:text-suave-dark">
+        <span className="text-[11px] text-suave dark:text-suave-dark">
           emisiones en el rango
         </span>
       </div>
 
       {/* Tabla */}
-      <div className="rounded-2xl border-2 border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
+      <div className="rounded-xl border border-linea dark:border-linea-dark overflow-hidden bg-card dark:bg-card-dark">
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead>
-              <tr className="border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-                <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+              <tr className="border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                <th className="px-4 py-2.5 text-left text-[11px] text-suave dark:text-suave-dark">
                   Período
                 </th>
                 {table.colMeta.map((c) => (
                   <th key={c.oficina} className="px-4 py-2.5 text-right">
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 border-2 text-[10px] font-black ${oficinaTone(c.oficina)}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 border text-[11px] font-medium ${oficinaTone(c.oficina)}`}
                     >
                       {c.oficina_nombre}
                     </span>
                   </th>
                 ))}
-                <th className="px-4 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+                <th className="px-4 py-2.5 text-right text-[11px] text-suave dark:text-suave-dark">
                   Total
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-linea/50 dark:divide-linea-dark/50">
+            <tbody className="divide-y divide-linea/50 dark:divide-linea-dark/50">
               {table.rows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={table.colMeta.length + 2}
-                    className="px-4 py-8 text-center text-suave dark:text-suave-dark font-bold"
+                    className="px-4 py-8 text-center text-suave dark:text-suave-dark"
                   >
                     {loading ? "Cargando..." : "Sin datos para el rango seleccionado."}
                   </td>
@@ -924,7 +924,7 @@ export default function AltasPolizasPanel({
                       key={r.periodo}
                       className="hover:bg-oficina/5 transition-colors"
                     >
-                      <td className="px-4 py-2 text-suave dark:text-suave-dark font-bold">
+                      <td className="px-4 py-2 text-suave dark:text-suave-dark">
                         {labelPeriodo(agrupacion, r.periodo)}
                       </td>
                       {table.cols.map((ofi) => (
@@ -935,24 +935,24 @@ export default function AltasPolizasPanel({
                           {Number(r[ofi] || 0) > 0 ? r[ofi] : "—"}
                         </td>
                       ))}
-                      <td className="px-4 py-2 text-right font-mono tabular-nums font-black text-titulo dark:text-titulo-dark">
+                      <td className="px-4 py-2 text-right font-mono tabular-nums font-medium text-titulo dark:text-titulo-dark">
                         {r.total}
                       </td>
                     </tr>
                   ))}
-                  <tr className="border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-                    <td className="px-4 py-2.5 text-[10px] uppercase tracking-wider text-suave dark:text-suave-dark font-black">
+                  <tr className="border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                    <td className="px-4 py-2.5 text-[11px] text-suave dark:text-suave-dark font-medium">
                       TOTAL
                     </td>
                     {table.cols.map((ofi) => (
                       <td
                         key={ofi}
-                        className="px-4 py-2.5 text-right font-mono tabular-nums font-black text-titulo dark:text-titulo-dark"
+                        className="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-titulo dark:text-titulo-dark"
                       >
                         {table.totalsRow[ofi] || 0}
                       </td>
                     ))}
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums font-black text-ingreso">
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-ingreso">
                       {table.totalsRow.total}
                     </td>
                   </tr>

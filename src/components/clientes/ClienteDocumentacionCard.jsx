@@ -93,13 +93,13 @@ export default function ClienteDocumentacionCard({ cliente }) {
   // 🧩 Mini-lado del DNI (COMPACTO): miniatura chica + acciones pequeñas.
   //    El DNI ya NO es obligatorio, así que ocupa poco espacio.
   const MiniLado = ({ title, url, inputRef, uploading, onFile, onRemove }) => (
-    <div className="flex items-center gap-3 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark p-2.5">
+    <div className="flex items-center gap-3 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark p-2.5">
       {/* Miniatura chica (o placeholder) */}
       {url ? (
         <button
           type="button"
           onClick={() => setPreview(url)}
-          className="relative group h-12 w-16 rounded-xl overflow-hidden border-2 border-duo-verde/40 hover:border-duo-azul transition-all shrink-0 bg-black"
+          className="relative group h-12 w-16 rounded-lg overflow-hidden border border-duo-verde/35 hover:border-duo-azul transition-colors shrink-0 bg-black"
           title="Ampliar"
         >
           <img src={url} alt={title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onError={(e) => (e.currentTarget.style.display = "none")} />
@@ -108,7 +108,7 @@ export default function ClienteDocumentacionCard({ cliente }) {
           </span>
         </button>
       ) : (
-        <div className="h-12 w-16 rounded-xl border-2 border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex items-center justify-center shrink-0">
+        <div className="h-12 w-16 rounded-lg border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex items-center justify-center shrink-0">
           <HiOutlinePhotograph className="text-lg text-suave dark:text-suave-dark opacity-60" />
         </div>
       )}
@@ -116,7 +116,7 @@ export default function ClienteDocumentacionCard({ cliente }) {
       {/* Título + estado + acciones */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wide text-titulo dark:text-titulo-dark truncate">{title}</span>
+          <span className="text-[11px] font-medium text-titulo dark:text-titulo-dark truncate">{title}</span>
           {url && <HiCheckCircle className="text-duo-verde text-sm shrink-0" title="Cargado" />}
         </div>
         <div className="flex items-center gap-2 mt-1">
@@ -124,7 +124,7 @@ export default function ClienteDocumentacionCard({ cliente }) {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-duo-azul hover:underline disabled:opacity-50"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-duo-azul hover:underline disabled:opacity-50"
           >
             {uploading ? (
               <span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -137,7 +137,7 @@ export default function ClienteDocumentacionCard({ cliente }) {
               type="button"
               onClick={onRemove}
               disabled={uploading}
-              className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-duo-rojo hover:underline disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-duo-rojo hover:underline disabled:opacity-50"
             >
               <HiTrash className="text-xs" /> Quitar
             </button>
@@ -171,14 +171,14 @@ export default function ClienteDocumentacionCard({ cliente }) {
       <div className="p-4 sm:p-5">
         {/* Header compacto en una línea */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="h-10 w-10 rounded-2xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center text-duo-violeta shrink-0">
+          <div className="h-10 w-10 rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center text-duo-violeta shrink-0">
             <HiOutlinePhotograph className="text-xl" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-black text-titulo dark:text-titulo-dark leading-tight">
+            <h2 className="text-sm font-semibold text-titulo dark:text-titulo-dark leading-tight">
               Documentación (DNI)
             </h2>
-            <p className="text-[10px] text-suave dark:text-suave-dark font-bold uppercase tracking-wide">
+            <p className="text-[11px] text-suave dark:text-suave-dark">
               Opcional · Frente y dorso
             </p>
           </div>
@@ -253,7 +253,7 @@ export default function ClienteDocumentacionCard({ cliente }) {
             <button
               type="button"
               onClick={() => setPreview(null)}
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 p-3 rounded-2xl bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition-all border border-white/10 backdrop-blur-lg"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 p-3 rounded-xl bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition-colors border border-white/10 backdrop-blur-lg"
             >
               <HiX className="text-xl" />
             </button>
@@ -266,7 +266,7 @@ export default function ClienteDocumentacionCard({ cliente }) {
               transition={{ type: "spring", stiffness: 200, damping: 25 }}
               className="relative w-full max-w-4xl flex items-center justify-center"
             >
-              <div className="rounded-3xl overflow-hidden bg-black border border-white/10 shadow-2xl shadow-black">
+              <div className="rounded-xl overflow-hidden bg-black border border-white/10 shadow-xl shadow-black">
                 <img
                   src={preview}
                   alt="Ampliación del documento"

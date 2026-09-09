@@ -43,17 +43,17 @@ function NotificationsDropdown({ items, total, onClose }) {
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-2xl"
+      className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-lg"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark px-4 py-3">
+      <div className="flex items-center justify-between border-b border-linea dark:border-linea-dark px-4 py-3">
         <div className="flex items-center gap-2">
           <HiBell className="h-4 w-4 text-suave dark:text-suave-dark" />
-          <span className="text-sm font-black text-titulo dark:text-titulo-dark">
+          <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
             Pendientes
           </span>
           {total > 0 && (
-            <span className="rounded-full bg-duo-rojo px-1.5 py-0.5 text-[10px] font-black text-white">
+            <span className="rounded-full bg-duo-rojo px-1.5 py-0.5 text-[10px] font-medium text-white">
               {total}
             </span>
           )}
@@ -67,10 +67,10 @@ function NotificationsDropdown({ items, total, onClose }) {
       </div>
 
       {/* Items */}
-      <div className="divide-y-2 divide-linea dark:divide-linea-dark">
+      <div className="divide-y divide-linea dark:divide-linea-dark">
         {items.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm font-semibold text-suave dark:text-suave-dark">
-            Sin pendientes por ahora 🎉
+          <div className="px-4 py-8 text-center text-[13px] text-suave dark:text-suave-dark">
+            Sin pendientes por ahora
           </div>
         ) : (
           items.map((item, i) => (
@@ -83,15 +83,15 @@ function NotificationsDropdown({ items, total, onClose }) {
               <div className="flex min-w-0 items-center gap-3">
                 <div className={`h-2 w-2 shrink-0 rounded-full ${item.dotColor}`} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-titulo dark:text-titulo-dark transition-colors group-hover:text-oficina">
+                  <p className="truncate text-[13px] font-medium text-titulo dark:text-titulo-dark transition-colors group-hover:text-duo-violeta">
                     {item.label}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-suave dark:text-suave-dark">
+                  <p className="mt-0.5 truncate text-[12px] text-suave dark:text-suave-dark">
                     {item.desc}
                   </p>
                 </div>
               </div>
-              <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-xs font-black ${item.badgeCls}`}>
+              <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium ${item.badgeCls}`}>
                 {item.count}
               </span>
             </Link>
@@ -101,7 +101,7 @@ function NotificationsDropdown({ items, total, onClose }) {
 
       {/* Footer */}
       {items.length > 0 && (
-        <div className="border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5">
+        <div className="border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5">
           <p className="text-center text-[11px] text-suave dark:text-suave-dark">
             Se actualiza automáticamente cada 2 minutos
           </p>
@@ -129,18 +129,18 @@ function PreciosModal({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg overflow-hidden rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl"
       >
         {/* Encabezado */}
         <div className="flex items-center justify-between bg-marca px-5 py-4">
           <div className="flex items-center gap-2">
             <HiCurrencyDollar className="h-5 w-5 text-white" />
-            <span className="text-base font-black text-white">Lista de precios NRE</span>
+            <span className="text-[15px] font-semibold text-white">Lista de precios NRE</span>
           </div>
           <button
             onClick={onClose}
@@ -152,40 +152,40 @@ function PreciosModal({ onClose }) {
 
         {/* Tabla */}
         <div className="p-5">
-          <p className="mb-3 text-xs text-suave dark:text-suave-dark">
-            Precios de NRE. Si el cliente <span className="font-black text-titulo dark:text-titulo-dark">ya tiene vehículos asegurados</span>, el 2do y el 3ro o más llevan <span className="font-black text-ingreso-fuerte dark:text-ingreso-claro">oferta</span>:
+          <p className="mb-3 text-[12px] text-suave dark:text-suave-dark">
+            Precios de NRE. Si el cliente <span className="font-semibold text-titulo dark:text-titulo-dark">ya tiene vehículos asegurados</span>, el 2do y el 3ro o más llevan <span className="font-semibold text-ingreso-fuerte dark:text-ingreso-claro">oferta</span>:
           </p>
-          <table className="w-full text-sm">
+          <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b-2 border-linea dark:border-linea-dark text-left text-suave dark:text-suave-dark">
-                <th className="py-2 font-black">Vehículo</th>
-                <th className="py-2 text-right font-black">1er</th>
-                <th className="py-2 text-right font-black text-ingreso-fuerte dark:text-ingreso-claro">2do 🏷️</th>
-                <th className="py-2 text-right font-black text-ingreso-fuerte dark:text-ingreso-claro">3ro+ 🏷️</th>
+              <tr className="border-b border-linea dark:border-linea-dark text-left text-suave dark:text-suave-dark">
+                <th className="py-2 font-medium">Vehículo</th>
+                <th className="py-2 text-right font-medium">1er</th>
+                <th className="py-2 text-right font-medium text-ingreso-fuerte dark:text-ingreso-claro">2do</th>
+                <th className="py-2 text-right font-medium text-ingreso-fuerte dark:text-ingreso-claro">3ro+</th>
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-linea dark:divide-linea-dark">
+            <tbody className="divide-y divide-linea dark:divide-linea-dark">
               {PRECIOS_LISTA.map((p) => (
                 <tr key={p.tipo}>
-                  <td className="py-2.5 font-bold text-titulo dark:text-titulo-dark">{p.tipo}</td>
-                  <td className="py-2.5 text-right font-black text-titulo dark:text-titulo-dark">${p.base}</td>
-                  <td className="py-2.5 text-right font-bold text-ingreso-fuerte dark:text-ingreso-claro">${p.seg}</td>
-                  <td className="py-2.5 text-right font-bold text-ingreso-fuerte dark:text-ingreso-claro">${p.ter}</td>
+                  <td className="py-2.5 font-medium text-titulo dark:text-titulo-dark">{p.tipo}</td>
+                  <td className="py-2.5 text-right font-semibold text-titulo dark:text-titulo-dark">${p.base}</td>
+                  <td className="py-2.5 text-right font-medium text-ingreso-fuerte dark:text-ingreso-claro">${p.seg}</td>
+                  <td className="py-2.5 text-right font-medium text-ingreso-fuerte dark:text-ingreso-claro">${p.ter}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* El Talita */}
-          <div className="mt-4 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3">
-            <p className="mb-1 text-xs font-black uppercase tracking-wider text-oficina">El Talita</p>
-            <p className="text-sm text-titulo dark:text-titulo-dark">
-              Auto: <span className="font-black">$25.000</span> (alta) / <span className="font-black">$30.000</span> (renovación). El resto, igual que arriba.
+          <div className="mt-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3">
+            <p className="mb-1 text-[12px] font-medium text-duo-violeta">El Talita</p>
+            <p className="text-[13px] text-titulo dark:text-titulo-dark">
+              Auto: <span className="font-semibold">$25.000</span> (alta) / <span className="font-semibold">$30.000</span> (renovación). El resto, igual que arriba.
             </p>
           </div>
 
-          <p className="mt-3 text-xs text-suave dark:text-suave-dark">
-            🏷️ La oferta del 2do/3ro se aplica sola al cargar la póliza, según los vehículos que ya tenga el cliente. Sin promo: todas las cuotas al mismo precio.
+          <p className="mt-3 text-[12px] text-suave dark:text-suave-dark">
+            La oferta del 2do/3ro se aplica sola al cargar la póliza, según los vehículos que ya tenga el cliente. Sin promo: todas las cuotas al mismo precio.
           </p>
         </div>
       </div>
@@ -349,8 +349,7 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
   // ── Render ───────────────────────────────────────────────────
   return (
     <>
-      {/* 🦉 Pantalla de DESCONEXIÓN (Duo) — al cerrar sesión.
-          Tu LOGO ORIGINAL en un cuadrado Duo 3D + barra que se vacía. Claro/oscuro. */}
+      {/* Pantalla de DESCONEXIÓN — al cerrar sesión. */}
       <AnimatePresence>
         {isLoggingOut && (
           <motion.div
@@ -360,9 +359,8 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {/* Cuadrado Duo 3D con el logo horizontal adentro (el logo NO se toca) */}
             <motion.div
-              className="flex items-center justify-center rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-7 py-6 shadow-[0_6px_0_var(--color-linea)] dark:shadow-[0_6px_0_var(--color-linea-dark)]"
+              className="flex items-center justify-center rounded-2xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-7 py-6"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
@@ -377,15 +375,15 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
             </motion.div>
 
             <div className="text-center">
-              <div className="text-xl font-black tracking-tight text-titulo dark:text-titulo-dark">
+              <div className="text-lg font-semibold text-titulo dark:text-titulo-dark">
                 Cerrando sesión…
               </div>
-              <div className="mt-1 text-[11px] font-bold uppercase tracking-widest text-suave dark:text-suave-dark">
+              <div className="mt-1 text-[12px] text-suave dark:text-suave-dark">
                 Cerrando canal seguro de {nombreOficina}
               </div>
             </div>
 
-            <div className="h-2.5 w-52 overflow-hidden rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+            <div className="h-1.5 w-52 overflow-hidden rounded-full border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
               <motion.div
                 className="h-full rounded-full bg-marca"
                 initial={{ width: "100%" }}
@@ -397,18 +395,18 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
         )}
       </AnimatePresence>
 
-      {/* 🚀 Banner pulsante de pagos en atención — encima del header */}
+      {/* 🚀 Banner de pagos en atención — encima del header */}
       <div className={`fixed inset-x-0 z-[45] ${shiftForSidebar ? "lg:pl-64" : ""}`} style={{ top: 0 }}>
         <AtencionBanner />
       </div>
 
-      {/* Header normal (Duo) */}
+      {/* Header normal */}
       <header
         role="banner"
         className={`
           fixed inset-x-0 z-40
           bg-card/95 dark:bg-card-dark/95 backdrop-blur
-          border-b-2 border-linea dark:border-linea-dark
+          border-b border-linea dark:border-linea-dark
           h-16 flex items-center
           transition-all duration-300
           ${shiftForSidebar ? "lg:pl-64" : ""}
@@ -420,11 +418,11 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
           {/* Izquierda: logo (la hamburguesa se quitó — el sidebar se abre con la lengüeta lateral) */}
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="hidden items-center gap-2.5 sm:flex">
-              {/* Isotipo (columna) en cuadradito Duo */}
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1.5">
+              {/* Isotipo (columna) en cuadradito */}
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1.5">
                 <img src={logoThames} alt="Thames" className="h-full w-full object-contain" />
               </span>
-              <span className="text-xl font-black tracking-tight text-titulo dark:text-titulo-dark">
+              <span className="text-[16px] font-semibold text-titulo dark:text-titulo-dark">
                 THAMES <span className="text-marca">APP</span>
               </span>
             </div>
@@ -432,8 +430,8 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
 
           {/* Centro: logo mobile */}
           <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 sm:hidden">
-            <img src={logoThames} alt="Thames" className="h-7 w-auto object-contain" />
-            <span className="text-lg font-black tracking-tight text-titulo dark:text-titulo-dark">
+            <img src={logoThames} alt="Thames" className="h-6 w-auto object-contain" />
+            <span className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">
               THAMES
             </span>
           </div>
@@ -446,26 +444,26 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
               <button
                 onClick={() => setModalTipo("INGRESO")}
                 title="Cargar Ingreso"
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-2 text-ingreso-fuerte dark:text-ingreso-claro transition-colors hover:bg-ingreso/10 focus:outline-none"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-ingreso-fuerte dark:text-ingreso-claro transition-colors hover:bg-ingreso/10 focus:outline-none"
               >
-                <HiArrowCircleDown className="text-xl" />
-                <span className="hidden text-sm font-black sm:inline">Ingreso</span>
+                <HiArrowCircleDown className="text-lg" />
+                <span className="hidden text-[13px] font-medium sm:inline">Ingreso</span>
               </button>
               <button
                 onClick={() => setModalTipo("EGRESO")}
                 title="Cargar Egreso"
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-2 text-egreso-fuerte dark:text-egreso-claro transition-colors hover:bg-egreso/10 focus:outline-none"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-egreso-fuerte dark:text-egreso-claro transition-colors hover:bg-egreso/10 focus:outline-none"
               >
-                <HiArrowCircleUp className="text-xl" />
-                <span className="hidden text-sm font-black sm:inline">Egreso</span>
+                <HiArrowCircleUp className="text-lg" />
+                <span className="hidden text-[13px] font-medium sm:inline">Egreso</span>
               </button>
               <button
                 onClick={() => setModalPreciosAbierto(true)}
                 title="Ver lista de precios"
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-marca px-3 py-2 font-black text-white shadow-[0_4px_0_#8a0000] transition-all active:translate-y-0.5 active:shadow-[0_0_0_#8a0000] focus:outline-none"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-marca px-3 py-2 text-[13px] font-medium text-white transition-colors hover:brightness-110 focus:outline-none"
               >
-                <HiCurrencyDollar className="text-xl" />
-                <span className="hidden text-sm sm:inline">Precios</span>
+                <HiCurrencyDollar className="text-lg" />
+                <span className="hidden sm:inline">Precios</span>
               </button>
             </div>
 
@@ -474,16 +472,16 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications((v) => !v)}
-                  className={`relative rounded-xl p-2.5 transition-colors focus:outline-none ${
+                  className={`relative rounded-lg p-2.5 transition-colors focus:outline-none ${
                     showNotifications
-                      ? "bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro"
+                      ? "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta"
                       : "text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark"
                   }`}
                   title="Notificaciones"
                 >
-                  <HiBell className="text-xl" />
+                  <HiBell className="text-lg" />
                   {totalNotif > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-duo-rojo px-1 text-[10px] font-black leading-none text-white">
+                    <span className="absolute -right-0.5 -top-0.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-duo-rojo px-1 text-[9px] font-medium leading-none text-white">
                       {totalNotif > 99 ? "99+" : totalNotif}
                     </span>
                   )}
@@ -500,16 +498,16 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
             )}
 
             {/* Píldora usuario */}
-            <div className="flex items-center rounded-full border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark py-1.5 pl-4 pr-1.5">
+            <div className="flex items-center rounded-full border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark py-1.5 pl-4 pr-1.5">
               <div className="mr-3 hidden flex-col items-end sm:flex">
-                <span className="text-xs font-black uppercase tracking-wider text-oficina">
+                <span className="text-[12px] font-medium text-duo-violeta">
                   {nombreOficina}
                 </span>
-                <span className="max-w-[120px] truncate text-[11px] font-bold text-suave dark:text-suave-dark">
+                <span className="max-w-[120px] truncate text-[11px] text-suave dark:text-suave-dark">
                   {user?.username}
                 </span>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-marca text-base font-black text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-marca text-[13px] font-semibold text-white">
                 {avatarLetter}
               </div>
             </div>
@@ -519,9 +517,9 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
               onClick={handleLogoutSequence}
               disabled={isLoggingOut}
               title="Cerrar Sesión"
-              className="cursor-pointer rounded-full border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-suave dark:text-suave-dark transition-colors hover:bg-duo-rojo hover:text-white disabled:opacity-50"
+              className="cursor-pointer rounded-full border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-2.5 text-suave dark:text-suave-dark transition-colors hover:bg-duo-rojo hover:text-white disabled:opacity-50"
             >
-              <FaPowerOff className="text-lg" />
+              <FaPowerOff className="text-base" />
             </button>
 
           </div>

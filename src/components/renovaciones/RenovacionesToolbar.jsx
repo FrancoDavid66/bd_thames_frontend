@@ -23,17 +23,17 @@ const TABS = [
 // Clases del pill de pestaña, según tono + activa/inactiva.
 function tabClasses(tono, active) {
   if (!active) {
-    return "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-2 border-linea dark:border-linea-dark hover:border-duo-azul/40";
+    return "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark hover:border-duo-azul/40";
   }
   switch (tono) {
     case "amarillo":
-      return "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo border-2 border-duo-amarillo";
+      return "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo border border-duo-amarillo";
     case "azul":
-      return "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul border-2 border-duo-azul";
+      return "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul border border-duo-azul";
     case "rojo":
-      return "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo border-2 border-duo-rojo";
+      return "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo border border-duo-rojo";
     default:
-      return "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-2 border-linea dark:border-linea-dark";
+      return "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border border-linea dark:border-linea-dark";
   }
 }
 
@@ -80,7 +80,7 @@ export default function RenovacionesToolbar({
   }, [loading, localSearch, totalCount]);
 
   const oficinaOpts = [
-    { value: "", label: "🏢 Todas las sucursales" },
+    { value: "", label: "Todas las sucursales" },
     ...(Array.isArray(oficinasOptions) ? oficinasOptions : []),
   ];
 
@@ -99,13 +99,13 @@ export default function RenovacionesToolbar({
               onClick={() => onChangeTab?.(t.id)}
               aria-pressed={active}
               className={cx(
-                "inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold uppercase tracking-wide transition-colors",
+                "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors",
                 tabClasses(t.tono, active)
               )}
             >
               <Icon className="text-base" />
               <span>{t.label}</span>
-              <span className="rounded-full bg-black/10 dark:bg-white/10 px-2 py-0 text-[11px] font-black min-w-[22px] text-center tabular-nums">
+              <span className="rounded-full bg-black/10 dark:bg-white/10 px-2 py-0 text-[11px] font-medium min-w-[22px] text-center tabular-nums">
                 {count}
               </span>
             </button>
@@ -129,7 +129,7 @@ export default function RenovacionesToolbar({
             icon={<HiSearch />}
           />
           {searchHint && (
-            <p className={cx("text-[11px] font-extrabold mt-1 ml-1", searchHint.cls)}>{searchHint.text}</p>
+            <p className={cx("text-[11px] font-medium mt-1 ml-1", searchHint.cls)}>{searchHint.text}</p>
           )}
         </div>
 
@@ -142,4 +142,4 @@ export default function RenovacionesToolbar({
       </div>
     </div>
   );
-}
+}

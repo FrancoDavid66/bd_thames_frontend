@@ -3,7 +3,7 @@
 // 🆕 NUEVA SOLICITUD — flujo guiado, no se traba.
 //
 //   Paso 1: DNI (verifica si el cliente ya existe).
-//   Paso 2: ¿Cómo cargás? → 📄 Con PDF  /  ✍️ A mano.
+//   Paso 2: ¿Cómo cargás? → Con PDF  /  A mano.
 //
 //   ── Camino PDF ──
 //     Paso 3: Elegí compañía → botones NRE / AMCA / EQUIDAD (queda fijada).
@@ -38,6 +38,9 @@ import {
   HiExternalLink,
   HiDocumentText,
   HiPencilAlt,
+  HiTicket,
+  HiTrash,
+  HiInformationCircle,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
@@ -756,7 +759,7 @@ export default function NuevaSolicitudModal({
     ? "A mano · Vehículo"
     : "A mano · Confirmar";
 
-  const iconoHeader = creado ? "🎉" : paso === "dni" ? "🪪" : paso === "telefono" ? "📞" : paso.startsWith("man_") ? "✍️" : paso.startsWith("pdf_") ? "📄" : "✨";
+  const IconoHeader = creado ? HiSparkles : paso === "dni" ? HiIdentification : paso === "telefono" ? HiPhone : paso.startsWith("man_") ? HiPencilAlt : paso.startsWith("pdf_") ? HiDocumentText : HiSparkles;
 
   return (
     <AnimatePresence>
@@ -768,7 +771,7 @@ export default function NuevaSolicitudModal({
         onClick={onClose}
       >
         <motion.div
-          className="w-full max-w-2xl rounded-t-3xl sm:rounded-3xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]"
+          className="w-full max-w-2xl rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]"
           initial={{ y: "100%", opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "100%", opacity: 0 }}
@@ -776,24 +779,24 @@ export default function NuevaSolicitudModal({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="h-11 w-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]">
-                {iconoHeader}
+              <div className="h-11 w-11 rounded-xl flex items-center justify-center text-xl shrink-0 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
+                <IconoHeader />
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg font-black text-titulo dark:text-titulo-dark tracking-tight leading-none truncate">
+                <h2 className="text-lg font-semibold text-titulo dark:text-titulo-dark tracking-tight leading-none truncate">
                   {tituloHeader}
                 </h2>
-                <p className="text-[11px] text-suave dark:text-suave-dark uppercase tracking-wide font-extrabold mt-1 truncate">
-                  📍 {nombreOficina}
+                <p className="text-[11px] text-suave dark:text-suave-dark mt-1 truncate">
+                  {nombreOficina}
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-all active:scale-90 shrink-0 text-2xl font-black"
+              className="h-10 w-10 flex items-center justify-center rounded-lg bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors active:scale-90 shrink-0 text-2xl"
               aria-label="Cerrar"
             >
               ×
@@ -836,18 +839,18 @@ export default function NuevaSolicitudModal({
                 <AvisoCliente clienteExistente={clienteExistente} dni={form.cli_dni} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
                   <BotonModo
-                    emoji="📄"
+                    Icon={HiDocumentText}
                     titulo="Con PDF"
                     desc="MERCOSUR de NRE, Propuesta de AMCA o Póliza de Equidad. Leemos casi todo solo."
-                    badge="⚡ Más rápido"
+                    badge="Más rápido"
                     tono="azul"
                     onClick={() => setPaso("pdf_cia")}
                   />
                   <BotonModo
-                    emoji="✍️"
+                    Icon={HiPencilAlt}
                     titulo="A mano"
                     desc="Cargá los datos paso a paso. Ideal si no tenés PDF."
-                    badge="✓ Siempre disponible"
+                    badge="Siempre disponible"
                     tono="verde"
                     onClick={() => setPaso("man_cliente")}
                   />
@@ -857,7 +860,7 @@ export default function NuevaSolicitudModal({
             ) : paso === "pdf_cia" ? (
               /* ══════ PASO 3 (PDF): elegir compañía ══════ */
               <>
-                <p className="text-center text-[14px] font-bold text-titulo dark:text-titulo-dark mb-2">
+                <p className="text-center text-[14px] text-titulo dark:text-titulo-dark mb-2">
                   ¿De qué compañía es el PDF?
                 </p>
                 {/* 3 tarjetas: en el celular van una debajo de otra, en
@@ -995,7 +998,7 @@ export default function NuevaSolicitudModal({
 
                 {/* Compañía en BOTONES */}
                 <CardDuo className="p-4">
-                  <div className="text-[13px] font-black text-titulo dark:text-titulo-dark mb-2">
+                  <div className="text-[13px] text-titulo dark:text-titulo-dark mb-2">
                     Compañía <span className="text-duo-rojo">*</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1008,10 +1011,10 @@ export default function NuevaSolicitudModal({
                         <button
                           key={nom}
                           onClick={() => setForm((f) => ({ ...f, compania: nom }))}
-                          className={`px-4 py-2.5 rounded-2xl border-2 font-extrabold text-[13px] transition-all ${
+                          className={`px-4 py-2.5 rounded-lg border text-[13px] font-medium transition-colors ${
                             on
-                              ? "bg-duo-azul text-white border-duo-azul-sombra shadow-[0_3px_0_var(--color-duo-azul-sombra)]"
-                              : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:-translate-y-0.5"
+                              ? "bg-duo-azul text-white border-duo-azul"
+                              : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:border-duo-azul/50"
                           }`}
                         >
                           {on ? "✓ " : ""}
@@ -1130,7 +1133,7 @@ function FooterNav({
   if (creado) return null;
 
   const Barra = ({ children }) => (
-    <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+    <div className="px-5 py-4 border-t border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
       {children}
     </div>
   );
@@ -1220,11 +1223,11 @@ function PantallaDni({ dniInput, setDniInput, verificando, onVerificar, onSaltea
   return (
     <div className="py-2">
       <div className="text-center mb-5">
-        <div className="mx-auto mb-3 h-16 w-16 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] flex items-center justify-center text-3xl">
-          🪪
+        <div className="mx-auto mb-3 h-16 w-16 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul flex items-center justify-center text-2xl">
+          <HiIdentification />
         </div>
-        <h3 className="text-lg font-black text-titulo dark:text-titulo-dark">Empezá por el DNI</h3>
-        <p className="text-[13px] font-bold text-suave dark:text-suave-dark mt-1">
+        <h3 className="text-lg font-semibold text-titulo dark:text-titulo-dark">Empezá por el DNI</h3>
+        <p className="text-[13px] text-suave dark:text-suave-dark mt-1">
           Verificamos si el cliente ya está en la base para no duplicarlo.
         </p>
       </div>
@@ -1238,7 +1241,7 @@ function PantallaDni({ dniInput, setDniInput, verificando, onVerificar, onSaltea
             placeholder="DNI o CUIT (sin puntos)"
             inputMode="numeric"
             autoFocus
-            className="w-full h-14 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[16px] font-black text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal outline-none focus:border-duo-azul transition-colors text-center"
+            className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[16px] font-medium text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal outline-none focus:border-duo-azul transition-colors text-center"
           />
         </div>
         <div className="mt-4">
@@ -1248,7 +1251,7 @@ function PantallaDni({ dniInput, setDniInput, verificando, onVerificar, onSaltea
         </div>
         <button
           onClick={onSaltear}
-          className="mt-3 w-full text-center text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark hover:text-duo-azul"
+          className="mt-3 w-full text-center text-[12px] font-medium text-suave dark:text-suave-dark hover:text-duo-azul"
         >
           No tengo el DNI ahora → seguir igual
         </button>
@@ -1281,33 +1284,33 @@ function PantallaTelefono({
   return (
     <div className="py-2">
       <div className="text-center mb-5">
-        <div className="mx-auto mb-3 h-16 w-16 rounded-2xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center text-3xl">
-          📞
+        <div className="mx-auto mb-3 h-16 w-16 rounded-xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde flex items-center justify-center text-2xl">
+          <HiPhone />
         </div>
-        <h3 className="text-lg font-black text-titulo dark:text-titulo-dark">
+        <h3 className="text-lg font-semibold text-titulo dark:text-titulo-dark">
           {yaTenia
             ? "¿Sigue siendo este el teléfono?"
             : sinNumero
             ? "Este cliente no tiene teléfono cargado"
             : "¿Cuál es el teléfono?"}
         </h3>
-        <p className="text-[13px] font-bold text-suave dark:text-suave-dark mt-1">
+        <p className="text-[13px] text-suave dark:text-suave-dark mt-1">
           Con este número le llega el link de su portal y los recordatorios de pago.
         </p>
       </div>
 
       <div className="max-w-sm mx-auto">
         {clienteExistente ? (
-          <div className="mb-3 rounded-2xl border-2 border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-3 text-center">
-            <div className="text-[11px] font-black uppercase tracking-widest text-duo-verde-sombra dark:text-duo-verde">
+          <div className="mb-3 rounded-xl border border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-3 text-center">
+            <div className="text-[11px] text-duo-verde-sombra dark:text-duo-verde">
               Cliente en la base
             </div>
-            <div className="text-[14px] font-black text-titulo dark:text-titulo-dark mt-0.5">
+            <div className="text-[14px] font-semibold text-titulo dark:text-titulo-dark mt-0.5">
               {clienteExistente.nombre} {clienteExistente.apellido || ""}
             </div>
           </div>
         ) : dni ? (
-          <div className="mb-3 text-center text-[12px] font-bold text-suave dark:text-suave-dark">
+          <div className="mb-3 text-center text-[12px] text-suave dark:text-suave-dark">
             Cliente nuevo · DNI {dni}
           </div>
         ) : null}
@@ -1321,7 +1324,7 @@ function PantallaTelefono({
             placeholder="11 2345 6789"
             inputMode="tel"
             autoFocus
-            className="w-full h-14 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[16px] font-black text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal outline-none focus:border-duo-verde transition-colors text-center"
+            className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[16px] font-medium text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal outline-none focus:border-duo-verde transition-colors text-center"
           />
         </div>
 
@@ -1329,11 +1332,11 @@ function PantallaTelefono({
             aviso, corregir un dígito por error cambia el teléfono del cliente
             en toda la base y nadie lo nota. */}
         {cambio ? (
-          <p className="mt-2 text-center text-[12px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">
+          <p className="mt-2 text-center text-[12px] text-duo-amarillo-sombra dark:text-duo-amarillo">
             Vas a reemplazar el que tenía guardado ({yaTenia}). Se actualiza en su ficha.
           </p>
         ) : sinNumero && limpio ? (
-          <p className="mt-2 text-center text-[12px] font-bold text-duo-verde-sombra dark:text-duo-verde">
+          <p className="mt-2 text-center text-[12px] text-duo-verde-sombra dark:text-duo-verde">
             Se guarda en su ficha. Recién ahora va a poder recibir avisos.
           </p>
         ) : null}
@@ -1346,14 +1349,14 @@ function PantallaTelefono({
 
         <button
           onClick={onSaltear}
-          className="mt-3 w-full text-center text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark hover:text-duo-azul"
+          className="mt-3 w-full text-center text-[12px] font-medium text-suave dark:text-suave-dark hover:text-duo-azul"
         >
           {yaTenia ? "Dejar el que está → seguir igual" : "No lo tengo ahora → seguir igual"}
         </button>
 
         <button
           onClick={onVolver}
-          className="mt-2 w-full text-center text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark hover:text-duo-azul"
+          className="mt-2 w-full text-center text-[12px] font-medium text-suave dark:text-suave-dark hover:text-duo-azul"
         >
           ← Volver al DNI
         </button>
@@ -1382,8 +1385,9 @@ function AvisoCliente({ clienteExistente, dni }) {
   return <Aviso tono="neutro">Sin DNI. Podés cargarlo después desde el cliente.</Aviso>;
 }
 
-function BotonModo({ emoji, titulo, desc, badge, tono, onClick }) {
+function BotonModo({ Icon, titulo, desc, badge, tono, onClick }) {
   const hover = tono === "azul" ? "hover:border-duo-azul" : "hover:border-duo-verde";
+  const iconCls = tono === "azul" ? "text-duo-azul" : "text-duo-verde-sombra dark:text-duo-verde";
   const badgeCls =
     tono === "azul"
       ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
@@ -1391,12 +1395,12 @@ function BotonModo({ emoji, titulo, desc, badge, tono, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-3xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-7 text-center transition-all hover:-translate-y-1 ${hover} shadow-[0_3px_0_var(--color-duo-linea)] dark:shadow-[0_3px_0_var(--color-linea-dark)]`}
+      className={`rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-7 text-center transition-colors ${hover}`}
     >
-      <div className="text-5xl mb-3">{emoji}</div>
-      <div className="text-lg font-black text-titulo dark:text-titulo-dark mb-1.5">{titulo}</div>
-      <div className="text-[13px] font-bold text-suave dark:text-suave-dark leading-snug">{desc}</div>
-      <span className={`inline-block mt-3 text-[10px] font-black uppercase tracking-wide px-3 py-1 rounded-full ${badgeCls}`}>
+      <Icon className={`text-4xl mb-3 mx-auto ${iconCls}`} />
+      <div className="text-lg font-semibold text-titulo dark:text-titulo-dark mb-1.5">{titulo}</div>
+      <div className="text-[13px] text-suave dark:text-suave-dark leading-snug">{desc}</div>
+      <span className={`inline-block mt-3 text-[10px] font-medium px-3 py-1 rounded-full ${badgeCls}`}>
         {badge}
       </span>
     </button>
@@ -1414,13 +1418,13 @@ function BotonCia({ nombre, archivo, tono, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`cursor-pointer rounded-3xl border-[3px] border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 sm:p-6 text-center transition-all hover:-translate-y-1 ${chip.split(" ")[0]} shadow-[0_3px_0_var(--color-duo-linea)] dark:shadow-[0_3px_0_var(--color-linea-dark)]`}
+      className={`cursor-pointer rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 sm:p-6 text-center transition-colors ${chip.split(" ")[0]}`}
     >
-      <div className={`mx-auto mb-3 h-14 w-14 sm:h-16 sm:w-16 rounded-2xl flex items-center justify-center text-2xl font-black ${chip.split(" ").slice(1).join(" ")}`}>
+      <div className={`mx-auto mb-3 h-14 w-14 sm:h-16 sm:w-16 rounded-xl flex items-center justify-center text-2xl font-semibold ${chip.split(" ").slice(1).join(" ")}`}>
         {nombre.charAt(0)}
       </div>
-      <div className="text-xl sm:text-2xl font-black text-titulo dark:text-titulo-dark mb-1 truncate">{nombre}</div>
-      <div className="text-[12px] sm:text-[13px] font-bold text-suave dark:text-suave-dark flex items-center justify-center gap-1.5">
+      <div className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark mb-1 truncate">{nombre}</div>
+      <div className="text-[12px] sm:text-[13px] text-suave dark:text-suave-dark flex items-center justify-center gap-1.5">
         <HiDocumentText className="shrink-0" /> {archivo}
       </div>
     </button>
@@ -1443,10 +1447,10 @@ function BloquePdf({ cfg, inputRef, leyendo, onPick, onFile, chips, avisoArchivo
           está haciendo. Es la diferencia entre un cartel de "en obra" y una
           calle cortada sin explicación. */}
       {leyendo ? (
-        <div className="rounded-2xl border-[3px] border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center">
+        <div className="rounded-xl border-2 border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center">
           <div className="mx-auto mb-3 h-11 w-11 rounded-full border-4 border-duo-azul/25 border-t-duo-azul animate-spin" />
-          <div className="font-black text-duo-azul text-[15px]">Leyendo el archivo…</div>
-          <div className="text-[12px] font-bold text-suave dark:text-suave-dark mt-1.5 leading-relaxed">
+          <div className="font-semibold text-duo-azul text-[15px]">Leyendo el archivo…</div>
+          <div className="text-[12px] text-suave dark:text-suave-dark mt-1.5 leading-relaxed">
             Sacando los datos y recortando los cupones.
             <br />
             Puede tardar unos segundos. No cierres la ventana.
@@ -1455,30 +1459,30 @@ function BloquePdf({ cfg, inputRef, leyendo, onPick, onFile, chips, avisoArchivo
       ) : chips.length === 0 ? (
         <button
           onClick={onPick}
-          className="w-full rounded-2xl border-[3px] border-dashed border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center transition-all hover:brightness-105"
+          className="w-full rounded-xl border-2 border-dashed border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-6 text-center transition-colors hover:brightness-105"
         >
-          <div className="text-4xl mb-1">📄</div>
-          <div className="font-black text-duo-azul text-[15px] flex items-center justify-center gap-2">
+          <HiDocumentText className="text-3xl mb-1 mx-auto text-duo-azul" />
+          <div className="font-semibold text-duo-azul text-[15px] flex items-center justify-center gap-2">
             <HiUpload /> Subir {cfg?.archivo}
           </div>
-          <div className="text-[12px] font-bold text-suave dark:text-suave-dark mt-1">{cfg?.ayuda}</div>
+          <div className="text-[12px] text-suave dark:text-suave-dark mt-1">{cfg?.ayuda}</div>
         </button>
       ) : (
         <>
-          <div className="rounded-2xl border-2 border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-3">
-            <div className="text-[11px] font-black uppercase tracking-wide text-duo-verde-sombra dark:text-duo-verde mb-1.5 flex items-center gap-1.5">
+          <div className="rounded-xl border border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-3">
+            <div className="text-[11px] text-duo-verde-sombra dark:text-duo-verde mb-1.5 flex items-center gap-1.5">
               <HiCheckCircle /> Datos leídos del PDF
             </div>
             <div className="flex flex-wrap gap-1.5">
               {chips.map((c, i) => (
-                <span key={i} className="inline-block bg-card dark:bg-card-dark border border-duo-verde rounded-lg px-2 py-0.5 text-[12px] font-bold text-titulo dark:text-titulo-dark">
+                <span key={i} className="inline-block bg-card dark:bg-card-dark border border-duo-verde rounded-lg px-2 py-0.5 text-[12px] text-titulo dark:text-titulo-dark">
                   {c}
                 </span>
               ))}
             </div>
           </div>
-          {avisoArchivo && <Aviso tono="warn"><b>⚠️ {avisoArchivo}</b></Aviso>}
-          <button onClick={onPick} className="mt-2 text-[12px] font-extrabold uppercase tracking-wide text-duo-azul hover:opacity-80">
+          {avisoArchivo && <Aviso tono="warn"><b>{avisoArchivo}</b></Aviso>}
+          <button onClick={onPick} className="mt-2 text-[12px] font-medium text-duo-azul hover:opacity-80">
             ↻ Subir otro PDF
           </button>
         </>
@@ -1498,7 +1502,7 @@ function PasosWizard({ actual, labels = ["Cliente", "Vehículo", "Confirmar"] })
       {pasos.map((p, i) => (
         <div key={p.n} className="flex items-center gap-2 flex-1">
           <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap ${
               p.n === actual
                 ? "bg-duo-azul text-white"
                 : p.n < actual
@@ -1525,10 +1529,10 @@ function SeccionResponsable({ empleados, responsable, setResponsable, onGestiona
             <button
               key={emp.id}
               onClick={() => setResponsable(on ? null : emp)}
-              className={`px-4 py-2.5 rounded-2xl border-2 font-extrabold text-[13px] transition-all ${
+              className={`px-4 py-2.5 rounded-lg border text-[13px] font-medium transition-colors ${
                 on
-                  ? "bg-duo-violeta text-white border-duo-violeta-sombra shadow-[0_3px_0_var(--color-duo-violeta-sombra)]"
-                  : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:-translate-y-0.5"
+                  ? "bg-duo-violeta text-white border-duo-violeta"
+                  : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:border-duo-violeta/50"
               }`}
             >
               {on ? "✓ " : ""}
@@ -1538,7 +1542,7 @@ function SeccionResponsable({ empleados, responsable, setResponsable, onGestiona
         })}
         <button
           onClick={onGestionar}
-          className="px-4 py-2.5 rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark text-suave dark:text-suave-dark font-extrabold text-[13px] hover:border-duo-violeta hover:text-duo-violeta transition-all"
+          className="px-4 py-2.5 rounded-lg border border-dashed border-linea dark:border-linea-dark text-suave dark:text-suave-dark text-[13px] font-medium hover:border-duo-violeta hover:text-duo-violeta transition-colors"
         >
           + Gestionar
         </button>
@@ -1564,10 +1568,10 @@ function SeccionClienteCampos({ form, set, faltaCampo }) {
         <InputDuo label="Dirección" value={form.cli_direccion} onChange={set("cli_direccion")} placeholder="Opcional" />
       </div>
 
-      <div className="mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark">
+      <div className="mt-3 pt-3 border-t border-linea dark:border-linea-dark">
         <div className="flex items-center gap-1.5 mb-2 ml-1">
           <HiPhone className="text-duo-azul shrink-0" />
-          <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+          <span className="text-[11px] text-suave dark:text-suave-dark">
             Teléfono {faltaCampo("cli_telefono") && <TagFalta />}
           </span>
         </div>
@@ -1594,8 +1598,8 @@ function SeccionClienteManual({ form, set }) {
         <InputDuo label="Teléfono" value={form.cli_telefono} onChange={set("cli_telefono")} placeholder="11..." inputMode="tel" className="sm:col-span-2" />
       </div>
       {form.cli_dni && (
-        <p className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark mt-2 ml-1">
-          🪪 DNI: {form.cli_dni}
+        <p className="text-[11px] text-suave dark:text-suave-dark mt-2 ml-1">
+          DNI: {form.cli_dni}
         </p>
       )}
     </SeccionCard>
@@ -1636,12 +1640,12 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
       {/* Tipo de vehículo: texto libre + botones de atajo */}
       <div className="mt-3">
         <div className="flex items-center gap-2 mb-2 ml-1">
-          <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+          <span className="text-[11px] text-suave dark:text-suave-dark">
             Tipo de vehículo
           </span>
           {/* Categoría con la que se calcula el precio / reporte NRE */}
           {categoriaVehiculo(form.tipo) && categoriaVehiculo(form.tipo) !== form.tipo ? (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-duo-azul-soft text-duo-azul-sombra">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-duo-azul-soft text-duo-azul-sombra">
               {categoriaVehiculo(form.tipo)}
             </span>
           ) : null}
@@ -1652,7 +1656,7 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
           value={form.tipo || ""}
           onChange={(e) => set("tipo")(e.target.value)}
           placeholder="Auto, Camioneta… o lo que diga el PDF"
-          className="w-full rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-2.5 text-[14px] font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul"
+          className="w-full rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-2.5 text-[14px] text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul"
         />
 
         <div className="mt-2 flex flex-wrap gap-2">
@@ -1662,10 +1666,10 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
               <button
                 key={t}
                 onClick={() => set("tipo")(t)}
-                className={`px-4 py-2.5 rounded-2xl border-2 font-extrabold text-[13px] transition-all ${
+                className={`px-4 py-2.5 rounded-lg border text-[13px] font-medium transition-colors ${
                   on
-                    ? "bg-duo-amarillo text-duo-amarillo-sombra border-duo-amarillo-sombra shadow-[0_3px_0_var(--color-duo-amarillo-sombra)]"
-                    : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:-translate-y-0.5"
+                    ? "bg-duo-amarillo text-duo-amarillo-sombra border-duo-amarillo-sombra"
+                    : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:border-duo-amarillo/50"
                 }`}
               >
                 {on ? "✓ " : ""}
@@ -1683,7 +1687,7 @@ function SeccionVehiculoManual({ form, set, coberturas, faltaCobertura }) {
    Cada fila: fecha de vencimiento + importe opcional. */
 function CuotasManual({ cuotas, onAgregar, onQuitar, onEditar }) {
   return (
-    <SeccionCard icon={<span>🎟️</span>} tono="violeta" titulo="Fechas de las cuotas" sub={`${cuotas.length} cargada${cuotas.length === 1 ? "" : "s"}`}>
+    <SeccionCard icon={<HiTicket />} tono="violeta" titulo="Fechas de las cuotas" sub={`${cuotas.length} cargada${cuotas.length === 1 ? "" : "s"}`}>
       <Aviso tono="warn">
         <b>Las fechas de AMCA son distintas cada mes.</b> Miralas en el portal de AMCA (vencimientos de este
         cliente) o volvé atrás y subí la Propuesta completa.
@@ -1692,35 +1696,35 @@ function CuotasManual({ cuotas, onAgregar, onQuitar, onEditar }) {
       {cuotas.length > 0 && (
         <div className="mt-3">
           <div className="grid grid-cols-[36px_1fr_1fr_40px] gap-2 px-1 mb-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">#</span>
-            <span className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">Vencimiento</span>
-            <span className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">Importe (opc.)</span>
+            <span className="text-[10px] text-suave dark:text-suave-dark">#</span>
+            <span className="text-[10px] text-suave dark:text-suave-dark">Vencimiento</span>
+            <span className="text-[10px] text-suave dark:text-suave-dark">Importe (opc.)</span>
             <span></span>
           </div>
           {cuotas.map((c, i) => (
             <div key={i} className="grid grid-cols-[36px_1fr_1fr_40px] gap-2 items-center mb-2">
-              <div className="h-10 w-9 rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta flex items-center justify-center font-black text-[13px]">
+              <div className="h-10 w-9 rounded-lg bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta flex items-center justify-center font-semibold text-[13px]">
                 {i + 1}
               </div>
               <input
                 type="date"
                 value={c.vencimiento}
                 onChange={(e) => onEditar(i, "vencimiento", e.target.value)}
-                className="h-10 px-2 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-violeta [color-scheme:light] dark:[color-scheme:dark]"
+                className="h-10 px-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] text-titulo dark:text-titulo-dark outline-none focus:border-duo-violeta [color-scheme:light] dark:[color-scheme:dark]"
               />
               <input
                 inputMode="numeric"
                 placeholder="$ opcional"
                 value={c.importe}
                 onChange={(e) => onEditar(i, "importe", e.target.value)}
-                className="h-10 px-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta"
+                className="h-10 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta"
               />
               <button
                 onClick={() => onQuitar(i)}
-                className="h-10 w-9 rounded-xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo flex items-center justify-center hover:brightness-105 active:scale-90 transition"
+                className="h-10 w-9 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo flex items-center justify-center hover:brightness-105 active:scale-90 transition-all"
                 title="Quitar"
               >
-                🗑
+                <HiTrash className="w-4 h-4" />
               </button>
             </div>
           ))}
@@ -1729,7 +1733,7 @@ function CuotasManual({ cuotas, onAgregar, onQuitar, onEditar }) {
 
       <button
         onClick={onAgregar}
-        className="mt-1 w-full py-3 rounded-2xl border-2 border-dashed border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta font-black uppercase text-[12px] tracking-wide hover:brightness-105 transition"
+        className="mt-1 w-full py-3 rounded-xl border-2 border-dashed border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta font-medium text-[12px] hover:brightness-105 transition-colors"
       >
         + Agregar cuota
       </button>
@@ -1810,7 +1814,7 @@ function SeccionVehiculoCampos({ form, set, coberturas }) {
 function DetallesTecnicos({ form, set, coberturas }) {
   return (
     <details className="mt-3 group">
-      <summary className="cursor-pointer text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark hover:text-duo-azul list-none">
+      <summary className="cursor-pointer text-[12px] text-suave dark:text-suave-dark hover:text-duo-azul list-none">
         ▸ Cobertura y datos técnicos (opcional)
       </summary>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
@@ -1854,7 +1858,7 @@ function ResumenCuotasPdf({ cupones = [] }) {
         {cupones.map((c, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-[12px] font-bold text-titulo dark:text-titulo-dark"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-1.5 text-[12px] text-titulo dark:text-titulo-dark"
           >
             <span className="text-suave dark:text-suave-dark">#{c.numero ?? i + 1}</span>
             {fmt(c.vencimiento)}
@@ -1871,17 +1875,17 @@ function ResumenConfirmar({ form, clienteExistente, responsable }) {
     : `${form.cli_nombre} ${form.cli_apellido}`.trim() || "Sin nombre";
   const fila = (label, valor) => (
     <div className="flex justify-between gap-3 py-1.5 border-b border-linea dark:border-linea-dark last:border-0">
-      <span className="text-[12px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">{label}</span>
-      <span className="text-[13px] font-black text-titulo dark:text-titulo-dark text-right truncate">{valor || "—"}</span>
+      <span className="text-[12px] text-suave dark:text-suave-dark">{label}</span>
+      <span className="text-[13px] font-medium text-titulo dark:text-titulo-dark text-right truncate">{valor || "—"}</span>
     </div>
   );
   return (
     <>
       <div className="text-center py-2">
-        <div className="mx-auto mb-2 h-14 w-14 rounded-2xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center text-2xl">
-          ✓
+        <div className="mx-auto mb-2 h-14 w-14 rounded-xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde flex items-center justify-center text-xl">
+          <HiCheckCircle />
         </div>
-        <h3 className="text-[15px] font-black text-titulo dark:text-titulo-dark">Revisá antes de crear</h3>
+        <h3 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">Revisá antes de crear</h3>
       </div>
       <CardDuo className="p-4">
         {fila("Cliente", cliente)}
@@ -1900,7 +1904,7 @@ function BtnVolver({ onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 text-[12px] font-extrabold uppercase tracking-wide text-duo-azul hover:opacity-80"
+      className="inline-flex items-center gap-1.5 text-[12px] font-medium text-duo-azul hover:opacity-80"
     >
       <HiArrowLeft /> {children}
     </button>
@@ -1917,10 +1921,10 @@ function SeccionCard({ icon, tono = "azul", titulo, sub, children }) {
   return (
     <CardDuo className="p-4">
       <div className="flex items-center gap-2.5 mb-3">
-        <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-lg shrink-0 ${tonos[tono] || tonos.azul}`}>{icon}</div>
+        <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg shrink-0 ${tonos[tono] || tonos.azul}`}>{icon}</div>
         <div>
-          <div className="text-[15px] font-black text-titulo dark:text-titulo-dark leading-none">{titulo}</div>
-          {sub && <div className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark mt-1">{sub}</div>}
+          <div className="text-[15px] font-semibold text-titulo dark:text-titulo-dark leading-none">{titulo}</div>
+          {sub && <div className="text-[11px] text-suave dark:text-suave-dark mt-1">{sub}</div>}
         </div>
       </div>
       {children}
@@ -1930,7 +1934,7 @@ function SeccionCard({ icon, tono = "azul", titulo, sub, children }) {
 
 function TagFalta() {
   return (
-    <span className="inline-block align-middle bg-duo-amarillo text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md ml-1" style={{ color: "#5a4600" }}>
+    <span className="inline-block align-middle bg-duo-amarillo text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md ml-1" style={{ color: "#5a4600" }}>
       Faltó en PDF
     </span>
   );
@@ -1961,52 +1965,52 @@ function TagFalta() {
 function PanelDniConflicto({ dniPdf, dniCargado, clienteExistente, onUsarPdf, onIgnorar }) {
   if (!dniPdf) return null;
   return (
-    <div className="rounded-2xl border-2 border-duo-rojo bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3.5">
+    <div className="rounded-xl border-2 border-duo-rojo bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3.5">
       <div className="flex items-center gap-2 mb-2">
         <HiExclamationCircle className="text-duo-rojo text-lg shrink-0" />
-        <span className="text-[11px] font-black uppercase tracking-widest text-duo-rojo">
+        <span className="text-[11px] font-semibold text-duo-rojo">
           El PDF es de otro documento
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3">
-        <div className="rounded-xl bg-card dark:bg-card-dark p-2.5">
-          <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+        <div className="rounded-lg bg-card dark:bg-card-dark p-2.5">
+          <div className="text-[10px] text-suave dark:text-suave-dark">
             Cargaste
           </div>
-          <div className="text-[15px] font-black text-titulo dark:text-titulo-dark font-mono mt-0.5">
+          <div className="text-[15px] font-semibold text-titulo dark:text-titulo-dark font-mono mt-0.5">
             {dniCargado || "—"}
           </div>
           {clienteExistente ? (
-            <div className="text-[11px] font-bold text-suave dark:text-suave-dark truncate mt-0.5">
+            <div className="text-[11px] text-suave dark:text-suave-dark truncate mt-0.5">
               {clienteExistente.nombre} {clienteExistente.apellido || ""}
             </div>
           ) : null}
         </div>
-        <div className="rounded-xl bg-card dark:bg-card-dark p-2.5">
-          <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">
+        <div className="rounded-lg bg-card dark:bg-card-dark p-2.5">
+          <div className="text-[10px] text-suave dark:text-suave-dark">
             Dice el PDF
           </div>
-          <div className="text-[15px] font-black text-duo-rojo font-mono mt-0.5">{dniPdf}</div>
+          <div className="text-[15px] font-semibold text-duo-rojo font-mono mt-0.5">{dniPdf}</div>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
         <button
           onClick={onUsarPdf}
-          className="flex-1 h-10 rounded-xl bg-duo-rojo text-white text-[12px] font-black uppercase tracking-wide"
+          className="flex-1 h-10 rounded-lg bg-duo-rojo text-white text-[12px] font-medium"
         >
           Usar el del PDF
         </button>
         <button
           onClick={onIgnorar}
-          className="flex-1 h-10 rounded-xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-[12px] font-black uppercase tracking-wide"
+          className="flex-1 h-10 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark text-[12px] font-medium"
         >
           Dejar el que cargué
         </button>
       </div>
 
-      <p className="text-[11.5px] font-bold text-suave dark:text-suave-dark mt-2 leading-snug">
+      <p className="text-[11.5px] text-suave dark:text-suave-dark mt-2 leading-snug">
         Mirá el documento del cliente. Puede ser un DNI mal tipeado o el PDF de otra persona.
       </p>
     </div>
@@ -2017,10 +2021,10 @@ function PanelDniConflicto({ dniPdf, dniCargado, clienteExistente, onUsarPdf, on
 function PanelAvisosPdf({ avisos = [] }) {
   if (!avisos.length) return null;
   return (
-    <div className="rounded-2xl border-2 border-duo-amarillo bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-3.5">
+    <div className="rounded-xl border-2 border-duo-amarillo bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-3.5">
       <div className="flex items-center gap-2 mb-2">
         <HiExclamationCircle className="text-duo-amarillo-sombra dark:text-duo-amarillo text-lg shrink-0" />
-        <span className="text-[11px] font-black uppercase tracking-widest text-duo-amarillo-sombra dark:text-duo-amarillo">
+        <span className="text-[11px] font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo">
           Revisá antes de crear ({avisos.length})
         </span>
       </div>
@@ -2028,7 +2032,7 @@ function PanelAvisosPdf({ avisos = [] }) {
         {avisos.map((a, i) => (
           <li
             key={i}
-            className="flex gap-2 text-[12.5px] font-bold text-titulo dark:text-titulo-dark leading-snug"
+            className="flex gap-2 text-[12.5px] text-titulo dark:text-titulo-dark leading-snug"
           >
             <span className="text-duo-amarillo-sombra dark:text-duo-amarillo shrink-0">·</span>
             <span>{a}</span>
@@ -2044,27 +2048,27 @@ function BannerCompania({ compania, detectada }) {
   if (compania) {
     const inicial = String(compania).trim().charAt(0).toUpperCase() || "?";
     return (
-      <div className="rounded-3xl border-[3px] border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-4 flex items-center gap-4">
-        <div className="h-16 w-16 rounded-2xl bg-duo-verde text-white flex items-center justify-center text-3xl font-black shrink-0 shadow-[0_4px_0_var(--color-duo-verde-sombra)]">
+      <div className="rounded-2xl border-2 border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-4 flex items-center gap-4">
+        <div className="h-16 w-16 rounded-xl bg-duo-verde text-white flex items-center justify-center text-3xl font-semibold shrink-0">
           {inicial}
         </div>
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-duo-verde-sombra dark:text-duo-verde">
+          <div className="flex items-center gap-1.5 text-[11px] text-duo-verde-sombra dark:text-duo-verde">
             <HiCheckCircle /> {detectada ? "Compañía detectada" : "Compañía"}
           </div>
-          <div className="text-3xl sm:text-4xl font-black text-titulo dark:text-titulo-dark leading-none mt-1 truncate">{compania}</div>
+          <div className="text-3xl sm:text-4xl font-semibold text-titulo dark:text-titulo-dark leading-none mt-1 truncate">{compania}</div>
         </div>
       </div>
     );
   }
   return (
-    <div className="rounded-3xl border-[3px] border-duo-amarillo bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-4 flex items-center gap-4">
-      <div className="h-16 w-16 rounded-2xl bg-duo-amarillo flex items-center justify-center text-3xl shrink-0" style={{ color: "#5a4600" }}>
+    <div className="rounded-2xl border-2 border-duo-amarillo bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-4 flex items-center gap-4">
+      <div className="h-16 w-16 rounded-xl bg-duo-amarillo flex items-center justify-center text-3xl shrink-0" style={{ color: "#5a4600" }}>
         <HiExclamationCircle />
       </div>
       <div className="min-w-0">
-        <div className="text-[11px] font-black uppercase tracking-widest text-duo-amarillo-sombra dark:text-duo-amarillo">Falta la compañía</div>
-        <div className="text-xl sm:text-2xl font-black text-titulo dark:text-titulo-dark leading-tight mt-1">Cargala abajo 👇</div>
+        <div className="text-[11px] text-duo-amarillo-sombra dark:text-duo-amarillo">Falta la compañía</div>
+        <div className="text-xl sm:text-2xl font-semibold text-titulo dark:text-titulo-dark leading-tight mt-1">Cargala abajo</div>
       </div>
     </div>
   );
@@ -2078,22 +2082,22 @@ function TarjetaClienteExistente({ cliente, dniFallback, form, set }) {
   return (
     <CardDuo className="p-4">
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-2xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde flex items-center justify-center font-black text-base shrink-0">
+        <div className="h-12 w-12 rounded-xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde flex items-center justify-center font-semibold text-base shrink-0">
           {iniciales}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <HiCheckCircle className="text-duo-verde-sombra dark:text-duo-verde shrink-0" />
-            <span className="text-[10px] font-black uppercase tracking-wide text-duo-verde-sombra dark:text-duo-verde">Cliente ya registrado</span>
+            <span className="text-[11px] text-duo-verde-sombra dark:text-duo-verde">Cliente ya registrado</span>
           </div>
-          <p className="text-[16px] font-black text-titulo dark:text-titulo-dark truncate mt-0.5">{nombre}</p>
-          <p className="text-[12px] font-bold text-suave dark:text-suave-dark">DNI {dni}</p>
+          <p className="text-[16px] font-semibold text-titulo dark:text-titulo-dark truncate mt-0.5">{nombre}</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark">DNI {dni}</p>
         </div>
         {cliente?.id && (
           <Link
             to={`/clientes/${cliente.id}`}
             target="_blank"
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-[11px] font-black uppercase tracking-wide hover:brightness-105 transition shrink-0"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul text-[11px] font-medium hover:brightness-105 transition-colors shrink-0"
           >
             Ver perfil <HiExternalLink />
           </Link>
@@ -2106,10 +2110,10 @@ function TarjetaClienteExistente({ cliente, dniFallback, form, set }) {
           Y de ese número dependen el link del portal y los recordatorios de
           pago — si está viejo, el cliente no se entera de nada. */}
       {form && set ? (
-        <div className="mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark">
+        <div className="mt-3 pt-3 border-t border-linea dark:border-linea-dark">
           <div className="flex items-center gap-1.5 mb-2 ml-1">
             <HiPhone className="text-duo-azul shrink-0" />
-            <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+            <span className="text-[11px] text-suave dark:text-suave-dark">
               ¿Este es su teléfono?
             </span>
           </div>
@@ -2132,9 +2136,9 @@ function Aviso({ tono = "ok", children }) {
     neutro: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark",
   };
   return (
-    <div className={`mt-3 rounded-2xl border-2 px-4 py-2.5 text-[13px] font-bold flex items-start gap-2 ${estilos[tono] || estilos.ok}`}>
+    <div className={`mt-3 rounded-xl border px-4 py-2.5 text-[13px] flex items-start gap-2 ${estilos[tono] || estilos.ok}`}>
       <span className="text-base shrink-0 mt-0.5">
-        {tono === "warn" ? <HiExclamationCircle /> : tono === "ok" ? <HiCheckCircle /> : "ℹ️"}
+        {tono === "warn" ? <HiExclamationCircle /> : tono === "ok" ? <HiCheckCircle /> : <HiInformationCircle />}
       </span>
       <div>{children}</div>
     </div>
@@ -2144,17 +2148,17 @@ function Aviso({ tono = "ok", children }) {
 function PantallaExito({ creado, tieneCuponera, onCobrar, onCerrar }) {
   return (
     <div className="text-center py-4">
-      <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde flex items-center justify-center">
+      <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border border-duo-verde flex items-center justify-center">
         <HiCheckCircle className="text-duo-verde-sombra dark:text-duo-verde text-5xl" />
       </div>
-      <h3 className="text-xl font-black text-titulo dark:text-titulo-dark mb-1">¡Alta creada! 🎉</h3>
+      <h3 className="text-xl font-semibold text-titulo dark:text-titulo-dark mb-1">¡Alta creada!</h3>
       {tieneCuponera ? (
-        <p className="text-[13px] font-bold text-suave dark:text-suave-dark mb-6">
+        <p className="text-[13px] text-suave dark:text-suave-dark mb-6">
           Ya quedó cargada con su <b className="text-titulo dark:text-titulo-dark">cuponera</b>. El cliente paga los
           cupones y ustedes le recuerdan los vencimientos. No hay que cobrar acá.
         </p>
       ) : (
-        <p className="text-[13px] font-bold text-suave dark:text-suave-dark mb-6">
+        <p className="text-[13px] text-suave dark:text-suave-dark mb-6">
           Ya quedó cargada. Lo que falte lo completás después desde el perfil. ¿Cobrás la primera cuota ahora?
         </p>
       )}

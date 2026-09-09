@@ -3,7 +3,6 @@
  * Componente HIJO de RankingPage: muestra cómo cerró el ranking cada MES
  * pasado (podio + tabla completa). Cada mes es una tarjeta desplegable.
  * Usa la paleta semántica real (surface/card/titulo/marca) — claro + oscuro.
- * Look Duo marcado: border-2.
  */
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,13 +23,13 @@ function MesCard({ mes, abierto, onToggle }) {
       {/* Cabecera del mes (siempre visible) */}
       <button onClick={onToggle}
         className="flex w-full items-center gap-3 px-4 py-3 text-left">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-marca/15 text-lg">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-marca/15 text-lg">
           🏆
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-[14px] font-black capitalize ${UI.txtTitulo}`}>{mes.mes_nombre}</div>
+          <div className={`text-[14px] font-semibold capitalize ${UI.txtTitulo}`}>{mes.mes_nombre}</div>
           <div className={`text-[12px] ${UI.txtSuave}`}>
-            Ganó <span className="font-bold text-marca">{mes.ganador || "—"}</span> · {mes.total_puntos} pts en total
+            Ganó <span className="font-medium text-marca">{mes.ganador || "—"}</span> · {mes.total_puntos} pts en total
           </div>
         </div>
         <HiChevronDown className={`shrink-0 text-lg text-suave dark:text-suave-dark transition-transform ${abierto ? "rotate-180" : ""}`} />
@@ -52,16 +51,16 @@ function MesCard({ mes, abierto, onToggle }) {
                   const bgs = ["bg-titulo/5 dark:bg-white/5", "bg-marca/15", "bg-tarjeta/15"];
                   return (
                     <div key={pos} className="flex-1 text-center">
-                      <div className={`mx-auto mb-1 flex h-10 w-10 items-center justify-center rounded-full text-sm font-black ${
-                        pos === 0 ? "bg-marca text-white shadow-[0_3px_0_#8a0000]" : "bg-titulo/10 dark:bg-white/10 " + UI.txtTitulo
+                      <div className={`mx-auto mb-1 flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
+                        pos === 0 ? "bg-marca text-white" : "bg-titulo/10 dark:bg-white/10 " + UI.txtTitulo
                       }`}>
                         {inicial(r.usuario)}
                       </div>
-                      <div className={`truncate text-[11px] font-bold ${UI.txtTitulo}`}>{r.usuario}</div>
+                      <div className={`truncate text-[11px] font-medium ${UI.txtTitulo}`}>{r.usuario}</div>
                       {r.oficina && <div className={`truncate text-[9px] ${UI.txtSuave}`}>{r.oficina}</div>}
-                      <div className={`mt-1 rounded-t-xl border-2 border-b-0 border-linea dark:border-linea-dark ${bgs[pos]} ${alturas[pos]}`}>
+                      <div className={`mt-1 rounded-t-lg border border-b-0 border-linea dark:border-linea-dark ${bgs[pos]} ${alturas[pos]}`}>
                         <div className="text-base">{MEDALLAS[pos]}</div>
-                        <div className={`text-[15px] font-black ${UI.txtTitulo}`}>{r.puntos}</div>
+                        <div className={`text-[15px] font-semibold ${UI.txtTitulo}`}>{r.puntos}</div>
                       </div>
                     </div>
                   );
@@ -70,17 +69,17 @@ function MesCard({ mes, abierto, onToggle }) {
 
               {/* Resto (4º en adelante) */}
               {resto.length > 0 && (
-                <div className="overflow-hidden rounded-xl border-2 border-linea dark:border-linea-dark">
+                <div className="overflow-hidden rounded-lg border border-linea dark:border-linea-dark">
                   {resto.map((r, i) => (
                     <div key={r.usuario_id || i}
-                      className="flex items-center gap-3 border-t-2 border-linea dark:border-linea-dark px-3 py-2 first:border-t-0">
-                      <span className={`w-5 text-[12px] font-bold ${UI.txtSuave}`}>{r.puesto}</span>
+                      className="flex items-center gap-3 border-t border-linea dark:border-linea-dark px-3 py-2 first:border-t-0">
+                      <span className={`w-5 text-[12px] font-medium ${UI.txtSuave}`}>{r.puesto}</span>
                       <div className="min-w-0 flex-1">
-                        <div className={`truncate text-[13px] font-semibold ${UI.txtTitulo}`}>{r.usuario}</div>
+                        <div className={`truncate text-[13px] font-medium ${UI.txtTitulo}`}>{r.usuario}</div>
                         {r.oficina && <div className={`truncate text-[10px] ${UI.txtSuave}`}>{r.oficina}</div>}
                       </div>
                       <span className={`text-[10px] ${UI.txtSuave}`}>{r.acciones} acc.</span>
-                      <span className={`text-[14px] font-black ${r.puntos >= 0 ? "text-ingreso" : "text-marca"}`}>{r.puntos}</span>
+                      <span className={`text-[14px] font-semibold ${r.puntos >= 0 ? "text-ingreso" : "text-marca"}`}>{r.puntos}</span>
                     </div>
                   ))}
                 </div>
@@ -134,7 +133,7 @@ export default function HistorialRanking({ categoria = "" }) {
     <div className="mt-5">
       {/* Botón para abrir/cerrar el historial */}
       <button onClick={() => setAbierto((v) => !v)}
-        className={`flex w-full items-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3 text-[14px] font-black ${UI.txtTitulo}`}>
+        className={`flex w-full items-center gap-2 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3 text-[14px] font-medium ${UI.txtTitulo}`}>
         <HiClock className="text-marca text-lg" />
         Meses anteriores
         <HiChevronDown className={`ml-auto text-suave dark:text-suave-dark transition-transform ${abierto ? "rotate-180" : ""}`} />
@@ -151,7 +150,7 @@ export default function HistorialRanking({ categoria = "" }) {
                   <span className="h-6 w-6 animate-spin rounded-full border-2 border-linea dark:border-linea-dark border-t-marca" />
                 </div>
               ) : meses.length === 0 ? (
-                <div className={`rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 text-center text-[13px] ${UI.txtSuave}`}>
+                <div className={`rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 text-center text-[13px] ${UI.txtSuave}`}>
                   Todavía no hay meses cerrados con puntos.
                 </div>
               ) : (

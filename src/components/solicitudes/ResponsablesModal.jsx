@@ -172,7 +172,7 @@ export default function ResponsablesModal({
     >
       {/* Alta (solo ABM) */}
       {!selectMode && (
-        <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-4">
+        <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-4">
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             <div className={isWebAdmin ? "sm:col-span-5" : "sm:col-span-9"}>
               <InputDuo
@@ -210,12 +210,12 @@ export default function ResponsablesModal({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar…"
-            className="w-full h-12 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[14px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+            className="w-full h-12 pl-12 pr-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[14px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
           />
         </div>
         <button
           onClick={() => setOnlyActive(!onlyActive)}
-          className={`px-4 h-12 rounded-2xl text-[11px] font-black uppercase tracking-wide border-2 transition ${
+          className={`px-4 h-12 rounded-xl text-[11px] font-medium border transition-colors ${
             onlyActive
               ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde border-duo-verde"
               : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
@@ -226,13 +226,13 @@ export default function ResponsablesModal({
       </div>
 
       {/* Lista */}
-      <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden divide-y-2 divide-linea dark:divide-[var(--color-linea-dark)]">
+      <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden divide-y divide-linea dark:divide-[var(--color-linea-dark)]">
         {loading ? (
-          <div className="p-10 text-center text-duo-azul text-[11px] font-black uppercase tracking-widest animate-pulse">
+          <div className="p-10 text-center text-duo-azul text-[11px] animate-pulse">
             Cargando…
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-10 text-center text-suave dark:text-suave-dark text-[11px] font-black uppercase tracking-widest">
+          <div className="p-10 text-center text-suave dark:text-suave-dark text-[11px]">
             Sin registros
           </div>
         ) : (
@@ -251,22 +251,22 @@ export default function ResponsablesModal({
                     <input
                       value={editNombre}
                       onChange={(e) => setEditNombre(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border-2 border-duo-azul bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark font-bold outline-none"
+                      className="w-full h-10 px-3 rounded-lg border border-duo-azul bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark outline-none"
                       autoFocus
                     />
                   ) : (
                     <div className="flex flex-col">
                       <p
-                        className={`font-black text-[14px] uppercase truncate ${
+                        className={`text-[14px] truncate ${
                           !emp.activo
                             ? "text-suave dark:text-suave-dark line-through"
-                            : "text-titulo dark:text-titulo-dark"
+                            : "text-titulo dark:text-titulo-dark font-medium"
                         }`}
                       >
                         {emp.nombre}
                       </p>
                       {isWebAdmin && (
-                        <div className="flex items-center gap-1 text-[10px] font-black text-duo-violeta uppercase mt-0.5">
+                        <div className="flex items-center gap-1 text-[11px] text-duo-violeta mt-0.5">
                           <HiOfficeBuilding /> {emp.oficina_nombre || "S/A"}
                         </div>
                       )}
@@ -282,20 +282,20 @@ export default function ResponsablesModal({
                         onSelect?.(emp);
                         onClose?.();
                       }}
-                      className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide transition ${
+                      className={`px-4 py-2 rounded-lg text-[11px] font-medium transition-colors ${
                         isSelected
                           ? "bg-duo-violeta text-white"
-                          : "bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-duo-violeta"
+                          : "bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-duo-violeta"
                       }`}
                     >
                       Elegir
                     </button>
                   ) : editing ? (
                     <>
-                      <button onClick={guardarEdicion} className="p-2.5 rounded-xl text-duo-verde-sombra dark:text-duo-verde hover:bg-duo-verde-soft dark:hover:bg-[var(--color-duo-verde-soft-dark)]">
+                      <button onClick={guardarEdicion} className="p-2.5 rounded-lg text-duo-verde-sombra dark:text-duo-verde hover:bg-duo-verde-soft dark:hover:bg-[var(--color-duo-verde-soft-dark)]">
                         <HiCheck />
                       </button>
-                      <button onClick={() => setEditId(null)} className="p-2.5 rounded-xl text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]">
+                      <button onClick={() => setEditId(null)} className="p-2.5 rounded-lg text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]">
                         <HiBan />
                       </button>
                     </>
@@ -306,14 +306,14 @@ export default function ResponsablesModal({
                           setEditId(emp.id);
                           setEditNombre(emp.nombre);
                         }}
-                        className="p-2.5 rounded-xl text-suave dark:text-suave-dark hover:text-duo-azul hover:bg-duo-azul-soft dark:hover:bg-[var(--color-duo-azul-soft-dark)]"
+                        className="p-2.5 rounded-lg text-suave dark:text-suave-dark hover:text-duo-azul hover:bg-duo-azul-soft dark:hover:bg-[var(--color-duo-azul-soft-dark)]"
                         title="Editar"
                       >
                         <HiPencil />
                       </button>
                       <button
                         onClick={() => activar(emp, !emp.activo)}
-                        className={`p-2.5 rounded-xl ${
+                        className={`p-2.5 rounded-lg ${
                           emp.activo ? "text-duo-verde-sombra dark:text-duo-verde" : "text-duo-amarillo-sombra dark:text-duo-amarillo"
                         } hover:bg-surface dark:hover:bg-surface-dark`}
                         title={emp.activo ? "Desactivar" : "Activar"}
@@ -322,7 +322,7 @@ export default function ResponsablesModal({
                       </button>
                       <button
                         onClick={() => eliminar(emp)}
-                        className="p-2.5 rounded-xl text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]"
+                        className="p-2.5 rounded-lg text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]"
                         title="Eliminar"
                       >
                         <HiTrash />
@@ -337,4 +337,4 @@ export default function ResponsablesModal({
       </div>
     </ModalDuo>
   );
-}
+}

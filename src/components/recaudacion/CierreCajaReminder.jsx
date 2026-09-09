@@ -1,4 +1,4 @@
-/* src/components/recaudacion/CierreCajaReminder.jsx  (diseño Duo)
+/* src/components/recaudacion/CierreCajaReminder.jsx
  *
  * Pop-up global que avisa a los cajeros cuándo cerrar caja.
  * Aparece "aviso_min" antes (default 30), con cuenta regresiva y sonido tipo caja.
@@ -125,16 +125,16 @@ export default function CierreCajaReminder() {
 
   // Tokens de estado según urgencia (aviso previo = ámbar / tolerancia = rojo)
   const acento = enTolerancia ? "text-egreso dark:text-egreso-claro" : "text-tarjeta dark:text-tarjeta-claro";
-  const borde = enTolerancia ? "border-egreso/50" : "border-tarjeta/50";
+  const borde = enTolerancia ? "border-egreso/40" : "border-tarjeta/40";
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       <div
-        className={`w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl border-2 ${borde} bg-card dark:bg-card-dark p-6 pb-8 sm:pb-6 text-center shadow-2xl`}
+        className={`w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border ${borde} bg-card dark:bg-card-dark p-6 pb-8 sm:pb-6 text-center shadow-xl`}
       >
         {/* Encabezado */}
         <div className="mb-5 flex items-center justify-between">
-          <span className={`flex items-center gap-2 text-sm font-black ${acento}`}>
+          <span className={`flex items-center gap-2 text-sm font-semibold ${acento}`}>
             <HiCash className="text-base" /> Cierre de caja
           </span>
           <button
@@ -147,31 +147,31 @@ export default function CierreCajaReminder() {
         </div>
 
         {/* Contexto */}
-        <p className="text-[13px] font-bold text-suave dark:text-suave-dark">
+        <p className="text-[13px] text-suave dark:text-suave-dark">
           {enTolerancia
             ? "¡Se cumplió la hora! Cerrá YA (tolerancia):"
             : `Tenés que cerrar la caja a las ${aviso.hora.getHours()}:${String(aviso.hora.getMinutes()).padStart(2, "0")}`}
         </p>
 
         {/* Protagonista: countdown grande */}
-        <div className={`my-4 font-mono text-6xl font-black tabular-nums ${acento}`}>
+        <div className={`my-4 font-mono text-6xl font-bold tabular-nums ${acento}`}>
           {fmt(restante)}
         </div>
 
-        <p className="flex items-center justify-center gap-1 text-[12px] font-bold text-suave dark:text-suave-dark">
+        <p className="flex items-center justify-center gap-1 text-[12px] text-suave dark:text-suave-dark">
           <HiClock /> {enTolerancia ? "Tiempo de tolerancia restante" : "Tiempo hasta el cierre"}
         </p>
 
         {/* Acciones */}
         <button
           onClick={() => { navigate(RUTA_CIERRE); descartar(); }}
-          className="mt-6 w-full min-h-[52px] rounded-2xl bg-oficina py-3.5 text-sm font-black text-white shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all"
+          className="mt-6 w-full min-h-[52px] rounded-xl bg-oficina py-3.5 text-sm font-medium text-white hover:brightness-110 transition-colors"
         >
           Ir a cerrar caja
         </button>
         <button
           onClick={descartar}
-          className="mt-2 w-full min-h-[44px] rounded-xl py-2.5 text-[12px] font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+          className="mt-2 w-full min-h-[44px] rounded-lg py-2.5 text-[12px] text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
         >
           Ahora no
         </button>

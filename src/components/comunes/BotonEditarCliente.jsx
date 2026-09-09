@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaEdit, FaCheck } from 'react-icons/fa';
+import { HiPencilAlt, HiCheck } from 'react-icons/hi';
 
 const BotonEditarCliente = ({ onClick }) => {
   const [confirmado, setConfirmado] = useState(false);
@@ -14,12 +14,9 @@ const BotonEditarCliente = ({ onClick }) => {
   return (
     <motion.button
       onClick={handleClick}
-      whileTap={{ scale: 0.9 }}
-      whileHover={{
-        scale: 1.1,
-        boxShadow: '0 0 12px rgba(234, 179, 8, 0.8)',
-      }}
-      className="relative overflow-hidden p-3 min-w-[80px] h-16 bg-yellow-500 text-white rounded-full shadow-md transition-all flex items-center justify-center cursor-pointer"
+      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.05 }}
+      className="relative overflow-hidden p-3 min-w-[80px] h-16 bg-duo-amarillo text-white rounded-full transition-colors hover:brightness-110 flex items-center justify-center cursor-pointer"
     >
       <AnimatePresence mode="wait">
         {confirmado ? (
@@ -30,7 +27,7 @@ const BotonEditarCliente = ({ onClick }) => {
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: 0.3 }}
           >
-            <FaCheck className="text-white text-xl" />
+            <HiCheck className="text-white text-xl" />
           </motion.div>
         ) : (
           <motion.div
@@ -40,7 +37,7 @@ const BotonEditarCliente = ({ onClick }) => {
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: 0.3 }}
           >
-            <FaEdit className="text-white text-xl" />
+            <HiPencilAlt className="text-white text-xl" />
           </motion.div>
         )}
       </AnimatePresence>

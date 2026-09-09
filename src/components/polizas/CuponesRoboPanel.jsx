@@ -14,7 +14,7 @@ import {
   HiInformationCircle,
 } from "react-icons/hi";
 
-const shell = "rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark";
+const shell = "rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark";
 
 const badgeByEstado = {
   AL_DIA:  "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo border border-duo-amarillo/30",
@@ -39,13 +39,13 @@ export default function CuponesRoboPanel({ poliza, cupones: cuponesProp }) {
         <HiInformationCircle className="mt-0.5 h-4 w-4 shrink-0 text-duo-azul" />
         <p className="text-[11px] leading-snug text-suave dark:text-suave-dark">
           Cupones de las cuotas de la compañía (solo lectura). Para marcar un pago, andá a la
-          sección <span className="font-black text-duo-azul">Cuponeras</span>.
+          sección <span className="font-medium text-duo-azul">Cuponeras</span>.
         </p>
       </div>
 
       <div className="space-y-3 px-4 py-3">
         {cupones.length === 0 && (
-          <div className="flex items-start gap-2 rounded-xl border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-3 text-[11px] text-suave dark:text-suave-dark">
+          <div className="flex items-start gap-2 rounded-lg border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-3 text-[11px] text-suave dark:text-suave-dark">
             <HiClock className="mt-0.5 h-4 w-4" />
             <span>Todavía no hay cupones de robo para esta póliza. Se generan en base a las cuotas de la compañía.</span>
           </div>
@@ -81,10 +81,10 @@ export default function CuponesRoboPanel({ poliza, cupones: cuponesProp }) {
                 return (
                   <div
                     key={cupon.id}
-                    className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 ${cardTone}`}
+                    className={`flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:px-4 sm:py-3 ${cardTone}`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-bold uppercase tracking-tight text-titulo dark:text-titulo-dark">{tituloCupon}</span>
+                      <span className="text-sm font-medium text-titulo dark:text-titulo-dark">{tituloCupon}</span>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${badgeClass}`}>
                         {visualEstado === "PAGADA" && <HiBadgeCheck className="h-3 w-3" />}
                         {visualEstado === "AL_DIA" && <HiClock className="h-3 w-3" />}
@@ -117,7 +117,7 @@ export default function CuponesRoboPanel({ poliza, cupones: cuponesProp }) {
                         href={comprobante}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex w-fit items-center gap-1 text-[11px] font-bold text-duo-azul hover:underline"
+                        className="inline-flex w-fit items-center gap-1 text-[11px] font-medium text-duo-azul hover:underline"
                       >
                         <HiPhotograph className="h-3.5 w-3.5" /> Ver comprobante
                       </a>

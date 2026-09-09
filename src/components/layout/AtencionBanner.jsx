@@ -1,7 +1,12 @@
 // src/components/layout/AtencionBanner.jsx
 // ============================================================
-// Banner pulsante para pagos que requieren atención de Micaela.
+// Banner para pagos que requieren atención de Micaela.
 // Se monta DENTRO del Header. Solo aparece si hay pendientes.
+//
+// 🆕 Rediseño "profesional": antes tenía un pulso de fondo, un brillo
+// deslizante y el ícono temblando — se saca todo eso. Una barra sólida,
+// quieta, sigue siendo notoria (color de alerta) sin la sensación de
+// cartel de casino.
 // ============================================================
 
 import { useEffect, useState } from "react";
@@ -69,46 +74,26 @@ export default function AtencionBanner() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
-        className="relative w-full overflow-hidden"
+        className="w-full bg-duo-rojo"
       >
-        {/* Pulso de fondo */}
-        <motion.div
-          animate={{ opacity: [0.85, 1, 0.85] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute inset-0 bg-gradient-to-r from-rose-600 via-red-500 to-rose-600"
-        />
-
-        {/* Brillo deslizante */}
-        <motion.div
-          animate={{ x: ["-100%", "200%"] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-        />
-
-        {/* Contenido */}
         <Link
           to="/pagos?tab=atencion"
-          className="relative flex items-center justify-center gap-3 px-4 py-2.5 text-white"
+          className="flex items-center justify-center gap-2.5 px-4 py-2 text-white"
         >
-          <motion.div
-            animate={{ rotate: [0, -10, 10, -10, 0] }}
-            transition={{ duration: 1, repeat: Infinity, repeatDelay: 1.5 }}
-          >
-            <HiExclamation className="text-2xl drop-shadow-lg" />
-          </motion.div>
+          <HiExclamation className="text-lg shrink-0" />
 
-          <span className="text-sm sm:text-base font-black tracking-wide uppercase">
+          <span className="text-[13px] font-medium">
             {data.total} {data.total === 1 ? "pago requiere" : "pagos requieren"} atención
           </span>
 
           {oficinaTop && topCount > 0 && (
-            <span className="hidden sm:inline-block text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full">
+            <span className="hidden sm:inline-block text-[12px] font-medium bg-white/15 px-2 py-0.5 rounded">
               {topCount} de {oficinaTop}
             </span>
           )}
 
-          <span className="hidden md:inline-flex items-center gap-1 ml-2 text-xs font-bold tracking-widest">
-            Ver lista <HiArrowRight />
+          <span className="hidden md:inline-flex items-center gap-1 ml-1 text-[12px] font-medium">
+            Ver lista <HiArrowRight className="text-sm" />
           </span>
         </Link>
       </motion.div>

@@ -1,4 +1,4 @@
-// src/components/siniestros/SiniestroFotosPanel.jsx  (responsive)
+// src/components/siniestros/SiniestroFotosPanel.jsx
 //
 // 📱 RESPONSIVE: los botones de cada foto (Ver 🔍 / Borrar 🗑) HOY aparecen solo
 //    con hover, que en el celu no existe → en mobile quedan SIEMPRE visibles
@@ -19,7 +19,7 @@ import {
 } from "../../store/slices/siniestrosSlice";
 
 /**
- * Galería de fotos del siniestro (diseño Duo).
+ * Galería de fotos del siniestro.
  * - Modo PERSISTENTE: se pasa siniestroId → usa el slice (fotos guardadas).
  * - Modo BORRADOR: sin siniestroId → guarda en memoria (draftFotos/onDraftChange).
  *   Se usa en el wizard: las fotos se suben al crear el siniestro.
@@ -133,9 +133,9 @@ export default function SiniestroFotosPanel({
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <HiPhotograph className="w-5 h-5 text-duo-azul" />
-        <h3 className="text-[15px] font-black text-titulo dark:text-titulo-dark">Fotos del siniestro</h3>
+        <h3 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">Fotos del siniestro</h3>
         {fotos.length > 0 && (
-          <span className="text-xs font-black text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg">
+          <span className="text-xs font-medium text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg">
             {fotos.length}
           </span>
         )}
@@ -148,23 +148,23 @@ export default function SiniestroFotosPanel({
             type="button"
             onClick={() => camaraRef.current?.click()}
             disabled={uploading}
-            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-azul transition-colors disabled:opacity-50"
+            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-azul transition-colors disabled:opacity-50"
           >
             {uploading ? (
               <div className="w-6 h-6 border-2 border-duo-azul border-t-transparent rounded-full animate-spin" />
             ) : (
               <HiCamera className="text-2xl text-duo-azul" />
             )}
-            <span className="text-[11px] font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Sacar foto</span>
+            <span className="text-[11px] font-medium text-titulo dark:text-titulo-dark">Sacar foto</span>
           </button>
           <button
             type="button"
             onClick={() => galeriaRef.current?.click()}
             disabled={uploading}
-            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-violeta transition-colors disabled:opacity-50"
+            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-violeta transition-colors disabled:opacity-50"
           >
             <HiPhotograph className="text-2xl text-duo-violeta" />
-            <span className="text-[11px] font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Elegir de galería</span>
+            <span className="text-[11px] font-medium text-titulo dark:text-titulo-dark">Elegir de galería</span>
           </button>
         </div>
       )}
@@ -179,9 +179,9 @@ export default function SiniestroFotosPanel({
           <div className="w-6 h-6 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
         </div>
       ) : fotos.length === 0 ? (
-        <div className="py-8 text-center border-2 border-dashed border-linea dark:border-linea-dark rounded-2xl">
+        <div className="py-8 text-center border-2 border-dashed border-linea dark:border-linea-dark rounded-xl">
           <HiPhotograph className="w-9 h-9 text-suave dark:text-suave-dark mx-auto mb-2" />
-          <p className="text-sm font-bold text-suave dark:text-suave-dark">
+          <p className="text-sm text-suave dark:text-suave-dark">
             {readOnly ? "Sin fotos" : "Todavía no agregaste fotos"}
           </p>
         </div>
@@ -194,7 +194,7 @@ export default function SiniestroFotosPanel({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="relative group aspect-square rounded-xl overflow-hidden bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark"
+              className="relative group aspect-square rounded-lg overflow-hidden bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark"
             >
               <img src={foto.url} alt={foto.nombre || "Foto"} loading="lazy" className="w-full h-full object-cover" />
               {/* 📱 En mobile: velo suave + botones siempre visibles. En sm+: hover. */}
@@ -221,7 +221,7 @@ export default function SiniestroFotosPanel({
                 )}
               </div>
               {foto._isDraft && (
-                <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-duo-amarillo text-duo-texto">
+                <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-medium uppercase bg-duo-amarillo text-duo-texto">
                   Nueva
                 </span>
               )}
@@ -251,7 +251,7 @@ export default function SiniestroFotosPanel({
               exit={{ scale: 0.9, opacity: 0 }}
               src={previewUrl}
               alt="Vista previa"
-              className="max-w-full max-h-full rounded-2xl shadow-2xl"
+              className="max-w-full max-h-full rounded-xl shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             />
           </motion.div>

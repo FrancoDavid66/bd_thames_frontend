@@ -1,4 +1,4 @@
-// src/components/estadisticas/ContabilidadPanel.jsx  (diseño Duo)
+// src/components/estadisticas/ContabilidadPanel.jsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { HiCash, HiCreditCard, HiExclamationCircle, HiTrendingUp, HiRefresh } from "react-icons/hi";
@@ -11,9 +11,9 @@ const fmtFull = (n) => new Intl.NumberFormat("es-AR", { style: "currency", curre
 
 function StatRow({ label, value, accent }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b-2 border-linea/50 dark:border-linea-dark/50 last:border-0">
-      <span className="text-xs font-bold text-suave dark:text-suave-dark">{label}</span>
-      <span className={`text-sm font-mono font-black tabular-nums ${accent}`}>{value}</span>
+    <div className="flex items-center justify-between py-2.5 border-b border-linea/50 dark:border-linea-dark/50 last:border-0">
+      <span className="text-xs text-suave dark:text-suave-dark">{label}</span>
+      <span className={`text-sm font-mono font-semibold tabular-nums ${accent}`}>{value}</span>
     </div>
   );
 }
@@ -48,26 +48,26 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-black text-titulo dark:text-titulo-dark">Contabilidad</h2>
-          <p className="text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+          <h2 className="text-base font-semibold text-titulo dark:text-titulo-dark">Contabilidad</h2>
+          <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
             {oficina ? getOficinaNombre(oficina) : "Todas las sucursales"} · {mes}/{anio}
           </p>
         </div>
         <button onClick={fetch_} disabled={loading}
-          className="h-9 w-9 flex items-center justify-center rounded-xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors">
+          className="h-9 w-9 flex items-center justify-center rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-oficina hover:text-oficina transition-colors">
           <HiRefresh className={`text-sm ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border-2 border-egreso/30 bg-egreso/10 px-4 py-3 text-xs font-bold text-egreso dark:text-egreso-claro">
+        <div className="flex items-center gap-2 rounded-lg border border-egreso/25 bg-egreso/10 px-4 py-3 text-xs text-egreso dark:text-egreso-claro">
           <HiExclamationCircle className="shrink-0" /> {error}
-          <button onClick={fetch_} className="ml-auto underline font-black">Reintentar</button>
+          <button onClick={fetch_} className="ml-auto underline font-medium">Reintentar</button>
         </div>
       )}
 
       {loading && !data && (
-        <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-8 flex items-center justify-center">
+        <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-8 flex items-center justify-center">
           <div className="w-6 h-6 rounded-full border-2 border-linea dark:border-linea-dark border-t-oficina animate-spin" />
         </div>
       )}
@@ -80,29 +80,29 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
-            className="md:col-span-1 rounded-3xl border-2 border-ingreso/30 bg-ingreso/[0.06] p-5 flex flex-col gap-3"
+            className="md:col-span-1 rounded-xl border border-ingreso/25 bg-ingreso/[0.06] p-5 flex flex-col gap-3"
           >
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-ingreso/15 border-2 border-ingreso/30 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-lg bg-ingreso/15 border border-ingreso/25 flex items-center justify-center">
                 <HiCash className="text-ingreso text-sm" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-ingreso">Recaudación del mes</span>
+              <span className="text-[11px] text-ingreso">Recaudación del mes</span>
             </div>
-            <div className="text-4xl font-black text-ingreso tabular-nums leading-none">
+            <div className="text-4xl font-semibold text-ingreso tabular-nums leading-none">
               {fmt(rec.total)}
             </div>
-            <div className="space-y-2 pt-2 border-t-2 border-ingreso/15">
+            <div className="space-y-2 pt-2 border-t border-ingreso/15">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold text-suave dark:text-suave-dark">
+                <span className="flex items-center gap-1.5 text-[11px] text-suave dark:text-suave-dark">
                   <HiCash className="text-suave dark:text-suave-dark" /> Efectivo
                 </span>
-                <span className="text-xs font-mono font-black text-ingreso tabular-nums">{fmt(rec.efectivo)}</span>
+                <span className="text-xs font-mono font-medium text-ingreso tabular-nums">{fmt(rec.efectivo)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold text-suave dark:text-suave-dark">
+                <span className="flex items-center gap-1.5 text-[11px] text-suave dark:text-suave-dark">
                   <HiCreditCard className="text-suave dark:text-suave-dark" /> Transferencia
                 </span>
-                <span className="text-xs font-mono font-black text-oficina tabular-nums">{fmt(rec.transferencia)}</span>
+                <span className="text-xs font-mono font-medium text-oficina tabular-nums">{fmt(rec.transferencia)}</span>
               </div>
             </div>
           </motion.div>
@@ -112,20 +112,20 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: 0.05 }}
-            className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 flex flex-col gap-4"
+            className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 flex flex-col gap-4"
           >
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-oficina/10 border-2 border-oficina/30 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-lg bg-oficina/10 border border-oficina/25 flex items-center justify-center">
                 <HiTrendingUp className="text-oficina text-sm" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">Proyección del mes</span>
+              <span className="text-[11px] text-suave dark:text-suave-dark">Proyección del mes</span>
             </div>
 
             {/* Barra de cobro */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] font-bold text-suave dark:text-suave-dark">
+              <div className="flex items-center justify-between text-[11px] text-suave dark:text-suave-dark">
                 <span>Cobrado</span>
-                <span className="text-titulo dark:text-titulo-dark font-black">{cobradoPct.toFixed(0)}%</span>
+                <span className="text-titulo dark:text-titulo-dark font-medium">{cobradoPct.toFixed(0)}%</span>
               </div>
               <div className="h-2.5 rounded-full bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark overflow-hidden">
                 <motion.div
@@ -149,22 +149,22 @@ export default function ContabilidadPanel({ apiBase, oficina, anio, mes, getOfic
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: 0.1 }}
-            className="rounded-3xl border-2 border-egreso/30 bg-egreso/[0.06] p-5 flex flex-col gap-4"
+            className="rounded-xl border border-egreso/25 bg-egreso/[0.06] p-5 flex flex-col gap-4"
           >
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-egreso/10 border-2 border-egreso/30 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-lg bg-egreso/10 border border-egreso/25 flex items-center justify-center">
                 <HiExclamationCircle className="text-egreso text-sm" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-egreso">Plata en la calle</span>
+              <span className="text-[11px] text-egreso">Plata en la calle</span>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-suave dark:text-suave-dark mb-3">Cuotas vencidas e impagas acumuladas hasta hoy</p>
-              <div className="text-3xl font-black text-egreso tabular-nums leading-none">
+              <p className="text-[11px] text-suave dark:text-suave-dark mb-3">Cuotas vencidas e impagas acumuladas hasta hoy</p>
+              <div className="text-3xl font-semibold text-egreso tabular-nums leading-none">
                 {fmt(data.morosidad_historica)}
               </div>
             </div>
-            <div className="pt-2 border-t-2 border-egreso/15">
-              <p className="text-[10px] font-bold text-suave dark:text-suave-dark leading-relaxed">
+            <div className="pt-2 border-t border-egreso/15">
+              <p className="text-[11px] text-suave dark:text-suave-dark leading-relaxed">
                 Este monto no se cobra en el período actual. Representa deuda acumulada de períodos anteriores.
               </p>
             </div>

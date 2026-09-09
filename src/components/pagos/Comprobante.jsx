@@ -21,7 +21,7 @@
 // ⚠️ NOTA DE DISEÑO: los PDF (A4 + ticket) usan su propio StyleSheet de
 //    @react-pdf con los colores de marca del recibo impreso. Eso NO se toca
 //    (es el papel que se imprime, no la app). Solo los BOTONES y la vista en
-//    pantalla usan el diseño Duo (claro/oscuro).
+//    pantalla usan el diseño de la app (claro/oscuro).
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -222,7 +222,7 @@ function filasDelPago(d) {
 }
 
 /* =========================================================================
-   1) VISTA EN PANTALLA (HTML) — diseño Duo (claro/oscuro)
+   1) VISTA EN PANTALLA (HTML)
       La usa el portal del cliente para previsualizar el recibo.
    ========================================================================= */
 
@@ -241,56 +241,56 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
   const Item = ({ label, value }) => (
     <li className="flex justify-between gap-2">
       <span className="text-suave dark:text-suave-dark">{label}:</span>
-      <span className="font-black text-titulo dark:text-titulo-dark text-right">{value}</span>
+      <span className="font-medium text-titulo dark:text-titulo-dark text-right">{value}</span>
     </li>
   );
 
   return (
-    <div className="max-w-3xl mx-auto rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark overflow-hidden">
+    <div className="max-w-3xl mx-auto rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark overflow-hidden">
       {/* Header */}
       <div className="bg-duo-azul text-white px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/15">
+          <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white/15">
             <HiReceiptTax className="w-6 h-6" />
           </span>
           <div className="leading-tight">
-            <h1 className="text-base font-black">Comprobante de Pago de Cuota</h1>
-            <p className="text-xs text-white/70 font-bold">Emitido el {fmtDateOnly(new Date())}</p>
+            <h1 className="text-base font-semibold">Comprobante de Pago de Cuota</h1>
+            <p className="text-xs text-white/70">Emitido el {fmtDateOnly(new Date())}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-white/70 font-bold">N°</p>
-          <p className="text-base font-black font-mono">{String(cuota.id ?? "").padStart(6, "0")}</p>
+          <p className="text-[11px] text-white/70">N°</p>
+          <p className="text-base font-semibold font-mono">{String(cuota.id ?? "").padStart(6, "0")}</p>
         </div>
       </div>
 
       <div className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <section className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
+          <section className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
             <div className="flex items-center gap-2 mb-2">
               <HiUser className="w-5 h-5 text-duo-azul" />
-              <h2 className="font-black text-titulo dark:text-titulo-dark">Datos del Cliente</h2>
+              <h2 className="font-semibold text-titulo dark:text-titulo-dark">Datos del Cliente</h2>
             </div>
-            <ul className="text-sm space-y-1 font-bold">
+            <ul className="text-sm space-y-1">
               <Item label="Nombre" value={d.titular} />
               <Item label="DNI / CUIT" value={d.dni} />
               <Item label="Teléfono" value={safe(cliente.telefono)} />
             </ul>
           </section>
 
-          <section className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
+          <section className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
             <div className="flex items-center gap-2 mb-2">
               <HiOfficeBuilding className="w-5 h-5 text-duo-azul" />
-              <h2 className="font-black text-titulo dark:text-titulo-dark">Datos del Auto</h2>
+              <h2 className="font-semibold text-titulo dark:text-titulo-dark">Datos del Auto</h2>
             </div>
             {/* 🚗 LA PATENTE VA PRIMERO Y EN GRANDE.
                    El número de póliza no se lo acuerda nadie — ni el cliente
                    ni el mostrador. Todo el mundo busca por la patente, así
                    que es el dato que tiene que saltar primero. */}
-            <ul className="text-sm space-y-1 font-bold">
+            <ul className="text-sm space-y-1">
               <li className="flex justify-between gap-2 items-baseline">
                 <span className="text-suave dark:text-suave-dark">Patente:</span>
-                <span className="font-black font-mono text-base text-titulo dark:text-titulo-dark">
+                <span className="font-semibold font-mono text-base text-titulo dark:text-titulo-dark">
                   {d.patente}
                 </span>
               </li>
@@ -302,39 +302,39 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
           </section>
         </div>
 
-        <section className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
+        <section className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
           <div className="flex items-center gap-2 mb-2">
             <HiCash className="w-5 h-5 text-duo-verde" />
-            <h2 className="font-black text-titulo dark:text-titulo-dark">Detalle del Pago</h2>
+            <h2 className="font-semibold text-titulo dark:text-titulo-dark">Detalle del Pago</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-              <p className="text-suave dark:text-suave-dark font-bold text-xs uppercase">Cuota</p>
-              <p className="text-lg font-black">#{d.cuotaNro}</p>
+            <div className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+              <p className="text-suave dark:text-suave-dark text-xs">Cuota</p>
+              <p className="text-lg font-semibold">#{d.cuotaNro}</p>
             </div>
-            <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-              <p className="text-suave dark:text-suave-dark font-bold text-xs uppercase">Monto</p>
-              <p className="text-lg font-black text-duo-verde">{fmtMoney(d.monto)}</p>
+            <div className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+              <p className="text-suave dark:text-suave-dark text-xs">Monto</p>
+              <p className="text-lg font-semibold text-duo-verde">{fmtMoney(d.monto)}</p>
             </div>
-            <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-              <p className="text-suave dark:text-suave-dark font-bold text-xs uppercase">Estado</p>
-              <p className="text-lg font-black">{d.pagado ? "Pagada" : "Pendiente"}</p>
+            <div className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+              <p className="text-suave dark:text-suave-dark text-xs">Estado</p>
+              <p className="text-lg font-semibold">{d.pagado ? "Pagada" : "Pendiente"}</p>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-              <p className="flex items-center gap-1 text-suave dark:text-suave-dark font-bold text-xs uppercase"><HiCalendar className="w-4 h-4" /> Vencimiento</p>
-              <p className="font-black">{d.vencimiento}</p>
+            <div className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+              <p className="flex items-center gap-1 text-suave dark:text-suave-dark text-xs"><HiCalendar className="w-4 h-4" /> Vencimiento</p>
+              <p className="font-semibold">{d.vencimiento}</p>
             </div>
-            <div className="rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-              <p className="flex items-center gap-1 text-suave dark:text-suave-dark font-bold text-xs uppercase"><HiCalendar className="w-4 h-4" /> Fecha de pago</p>
-              <p className="font-black">{d.pagado ? d.fechaHoraPago : "—"}</p>
+            <div className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+              <p className="flex items-center gap-1 text-suave dark:text-suave-dark text-xs"><HiCalendar className="w-4 h-4" /> Fecha de pago</p>
+              <p className="font-semibold">{d.pagado ? d.fechaHoraPago : "—"}</p>
             </div>
           </div>
 
           {/* 💸 Cómo entró la plata. Solo si hay algo que contar. */}
           {detalle.length > 0 && (
-            <ul className="mt-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 text-sm space-y-1 font-bold">
+            <ul className="mt-3 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 text-sm space-y-1">
               {detalle.map(([label, valor]) => (
                 <Item key={label} label={label} value={valor} />
               ))}
@@ -343,18 +343,18 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
         </section>
 
         {(d.esPrimeraCuota || d.pagoFueraDeTermino) && (
-          <div className="rounded-2xl border-2 border-duo-azul/40 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-titulo dark:text-titulo-dark text-sm px-4 py-3">
-            <p className="font-black uppercase text-xs tracking-wide mb-2 text-center text-duo-azul">
-              Aviso Legal: Inicio de Cobertura
+          <div className="rounded-xl border border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-titulo dark:text-titulo-dark text-sm px-4 py-3">
+            <p className="font-medium text-xs mb-2 text-center text-duo-azul">
+              Aviso legal: inicio de cobertura
             </p>
-            <p className="font-bold text-center">
+            <p className="text-center">
               La cobertura comienza a partir del <strong>día siguiente</strong> a este pago
               (fecha estimada: <strong>{d.fechaCobertura}</strong>).
             </p>
           </div>
         )}
 
-        <div className="text-center text-xs text-suave dark:text-suave-dark font-bold">Gracias por confiar en nosotros.</div>
+        <div className="text-center text-xs text-suave dark:text-suave-dark">Gracias por confiar en nosotros.</div>
       </div>
     </div>
   );
@@ -612,7 +612,7 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
 }
 
 /* =========================================================================
-   4) BOTÓN: DESCARGAR PDF A4 — diseño Duo
+   4) BOTÓN: DESCARGAR PDF A4
    ========================================================================= */
 
 export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar PDF", className = "" }) {
@@ -647,8 +647,8 @@ export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar P
       onClick={handleDownload}
       disabled={downloading}
       className={[
-        "h-10 px-3 rounded-xl inline-flex items-center justify-center gap-2 text-sm font-black transition-colors",
-        "bg-surface dark:bg-surface-dark hover:brightness-95 border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark",
+        "h-10 px-3 rounded-lg inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors",
+        "bg-surface dark:bg-surface-dark hover:brightness-95 border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark",
         "disabled:opacity-60 disabled:cursor-not-allowed",
         className,
       ].join(" ")}
@@ -661,7 +661,7 @@ export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar P
 }
 
 /* =========================================================================
-   5) BOTÓN: IMPRIMIR TICKET (impresora térmica de calor) — diseño Duo
+   5) BOTÓN: IMPRIMIR TICKET (impresora térmica de calor)
    ========================================================================= */
 
 export function BotonImprimirTicket({ cliente, poliza, cuota, label = "Imprimir ticket", className = "" }) {
@@ -738,7 +738,7 @@ export function BotonImprimirTicket({ cliente, poliza, cuota, label = "Imprimir 
       onClick={handlePrint}
       disabled={printing}
       className={[
-        "inline-flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-xs font-black",
+        "inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
         "bg-surface dark:bg-surface-dark hover:brightness-95 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark",
         printing ? "opacity-70 cursor-not-allowed" : "cursor-pointer",
         className,

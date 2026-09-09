@@ -9,13 +9,13 @@
 // Todo soporta modo CLARO y OSCURO con dark:. Un solo lugar para estilos,
 // iconos y textos, así los componentes no repiten nada.
 //
-// 🦉 BOTONES 3D (estilo Duolingo): btnPrimary y btnGhost traen relieve de 4px
-//    (borde inferior sólido que se "hunde" al apretar). Como se aplican en TODA
-//    la app de Tareas y Control diario, con tocar acá quedan todos en 3D.
+// 🆕 Rediseño "profesional": btnPrimary y btnGhost ya NO tienen el relieve
+// 3D de Duolingo (el borde de 4px que se hundía al apretar) — ahora son
+// botones planos, como Stripe/Linear. Como esto se usa en TODA la app de
+// Tareas y Control diario, con tocar acá quedan todos actualizados.
 //
-// 📱 RESPONSIVE: los tokens `input` y los botones ya usan h-12 (48px), buen tap
-//    target para mobile. `input` trae text-base implícito por el tamaño; si algún
-//    componente necesitara un input más chico, que use text-base en mobile aparte.
+// 📱 RESPONSIVE: los tokens `input` y los botones mantienen h-12 (48px),
+// buen tap target para mobile — eso no cambió.
 import {
   HiPaperAirplane, HiDocumentText, HiUser, HiIdentification,
   HiCamera, HiCloudUpload,
@@ -25,37 +25,33 @@ import {
 export const UI = {
   // Superficies (claro + oscuro automático)
   screen: "min-h-screen bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark",
-  card: "rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark",
+  card: "rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark",
   cardHover: "hover:border-marca/40 transition-colors",
-  sheet: "bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark",
+  sheet: "bg-card dark:bg-card-dark border border-linea dark:border-linea-dark",
 
-  // 🦉 Acción principal (rojo marca) — botón 3D profundo (4px)
+  // Acción principal (rojo marca) — plano, sin relieve 3D
   btnPrimary:
-    "bg-marca text-white font-black " +
-    "shadow-[0_4px_0_#8a0000] active:translate-y-[3px] active:shadow-[0_1px_0_#8a0000] " +
-    "disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-[0_4px_0_#8a0000] disabled:active:translate-y-0 " +
-    "transition-all",
-  // 🦉 Acción secundaria (gris) — botón 3D 4px
+    "bg-marca text-white font-medium hover:brightness-110 transition-colors " +
+    "disabled:opacity-40 disabled:cursor-not-allowed",
+  // Acción secundaria (gris) — plano
   btnGhost:
-    "bg-titulo/5 dark:bg-white/5 text-suave dark:text-suave-dark font-black " +
-    "shadow-[0_4px_0_rgba(0,0,0,0.15)] dark:shadow-[0_4px_0_rgba(0,0,0,0.5)] " +
-    "active:translate-y-[3px] active:shadow-[0_1px_0_rgba(0,0,0,0.15)] dark:active:shadow-[0_1px_0_rgba(0,0,0,0.5)] " +
-    "hover:bg-titulo/10 dark:hover:bg-white/10 disabled:opacity-40 transition-all",
+    "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark font-medium border border-linea dark:border-linea-dark " +
+    "hover:bg-titulo/5 dark:hover:bg-white/5 disabled:opacity-40 transition-colors",
 
-  // Inputs (h-12 = 48px → buen tap target en mobile)
+  // Inputs (h-12 = 48px → buen tap target en mobile, sin cambios)
   input:
-    "h-12 w-full rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea " +
-    "dark:border-linea-dark px-4 text-sm font-bold text-titulo dark:text-titulo-dark " +
-    "placeholder:text-suave/50 focus:outline-none focus:ring-2 focus:ring-marca/50 dark:[color-scheme:dark]",
-  label: "text-[11px] font-bold text-suave dark:text-suave-dark uppercase tracking-widest",
+    "h-12 w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea " +
+    "dark:border-linea-dark px-4 text-[14px] text-titulo dark:text-titulo-dark " +
+    "placeholder:text-suave/50 focus:outline-none focus:border-marca dark:[color-scheme:dark]",
+  label: "text-[13px] font-medium text-suave dark:text-suave-dark",
 
   // Textos
   txtTitulo: "text-titulo dark:text-titulo-dark",
   txtSuave: "text-suave dark:text-suave-dark",
 
   // Chips de estado
-  chipOk: "bg-ingreso/10 text-ingreso border-2 border-ingreso/25",
-  chipPend: "bg-marca/10 text-marca border-2 border-marca/25",
+  chipOk: "bg-ingreso/10 text-ingreso border border-ingreso/25",
+  chipPend: "bg-marca/10 text-marca border border-marca/25",
 };
 
 /* Definición de cada tipo de tarea del día.
@@ -78,13 +74,13 @@ export const SECCION_ENVIAR = {
 /* Todas las secciones que cuentan para el total (incluye enviar). */
 export const TODAS_SECCIONES = [SECCION_ENVIAR, ...SECCIONES];
 
-/* Mensaje motivacional del header según el progreso. */
+/* Mensaje del header según el progreso. */
 export function mensajeProgreso(pct, total) {
-  if (total === 0) return "¡Todo listo por hoy! 🎉";
-  if (pct >= 75) return "¡Ya casi! Última milla 💪";
-  if (pct >= 40) return "¡Buen ritmo, seguí así!";
-  if (pct > 0) return "¡Arrancaste, dale que se puede!";
-  return "¡A darle al día!";
+  if (total === 0) return "Todo listo por hoy";
+  if (pct >= 75) return "Ya casi, última milla";
+  if (pct >= 40) return "Buen ritmo, seguí así";
+  if (pct > 0) return "Arrancaste, dale que se puede";
+  return "A darle al día";
 }
 
 /* Key única para cada item de lista (póliza o cliente). */

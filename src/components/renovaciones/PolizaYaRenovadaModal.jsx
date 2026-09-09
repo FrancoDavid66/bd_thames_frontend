@@ -43,30 +43,30 @@ export default function PolizaYaRenovadaModal({
         </>
       }
     >
-      <p className="text-sm font-bold text-titulo dark:text-titulo-dark leading-relaxed">
+      <p className="text-sm text-titulo dark:text-titulo-dark leading-relaxed">
         Ya existe una versión renovada de esta póliza en el sistema. Podés
         renovarla igual si estás seguro (por ejemplo, el cliente pagó antes de
         tiempo), pero revisá que no estés duplicando por error.
       </p>
 
       {nuevaId && (
-        <div className="mt-3 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
-          <div className="text-[10px] uppercase tracking-wider text-suave dark:text-suave-dark font-black mb-1.5">
+        <div className="mt-3 rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
+          <div className="text-[11px] text-suave dark:text-suave-dark mb-1.5">
             Renovación existente
           </div>
           <div className="space-y-1 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-suave dark:text-suave-dark font-bold">N° de póliza:</span>
-              <span className="font-black text-titulo dark:text-titulo-dark tabular-nums">{nuevoNumero}</span>
+              <span className="text-suave dark:text-suave-dark">N° de póliza:</span>
+              <span className="font-medium text-titulo dark:text-titulo-dark tabular-nums">{nuevoNumero}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-suave dark:text-suave-dark font-bold">ID interno:</span>
-              <span className="font-mono font-bold text-titulo dark:text-titulo-dark tabular-nums">#{nuevaId}</span>
+              <span className="text-suave dark:text-suave-dark">ID interno:</span>
+              <span className="font-mono text-titulo dark:text-titulo-dark tabular-nums">#{nuevaId}</span>
             </div>
             {nuevaFecha && (
               <div className="flex items-center justify-between">
-                <span className="text-suave dark:text-suave-dark font-bold">Fecha de emisión:</span>
-                <span className="font-bold text-titulo dark:text-titulo-dark tabular-nums">{nuevaFecha}</span>
+                <span className="text-suave dark:text-suave-dark">Fecha de emisión:</span>
+                <span className="text-titulo dark:text-titulo-dark tabular-nums">{nuevaFecha}</span>
               </div>
             )}
           </div>
@@ -74,7 +74,7 @@ export default function PolizaYaRenovadaModal({
             href={`/polizas/${nuevaId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-black text-duo-azul hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-duo-azul hover:underline"
           >
             Ver la renovación existente <HiArrowRight />
           </a>
@@ -82,4 +82,4 @@ export default function PolizaYaRenovadaModal({
       )}
     </ModalDuo>
   );
-}
+}

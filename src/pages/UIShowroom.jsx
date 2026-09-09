@@ -1,10 +1,10 @@
 // src/pages/UIShowroom.jsx
-// 🎨 Showroom de la librería UI de THAMES.
+// Showroom de la librería UI de THAMES.
 // Montá esta página en una ruta (ej: /ui) para ver y probar todos los componentes.
 // Sirve de documentación viva para vos y tu equipo.
 import { useState } from "react";
 import {
-  HiUserAdd, HiPhone, HiOfficeBuilding, HiCheck, HiTrash, HiPencilAlt, HiSun, HiMoon,
+  HiUserAdd, HiPhone, HiCheck, HiTrash, HiSun, HiMoon,
 } from "react-icons/hi";
 
 import Boton3D from "../components/ui/Boton3D";
@@ -17,8 +17,8 @@ import ModalDuo from "../components/ui/ModalDuo";
 import TablaDuo from "../components/ui/TablaDuo";
 
 const Seccion = ({ titulo, children }) => (
-  <section className="mb-8">
-    <h2 className="inline-block bg-marca text-white text-[13px] font-black uppercase tracking-wide px-4 py-1.5 rounded-full mb-4">
+  <section className="mb-6">
+    <h2 className="inline-block bg-marca text-white text-[12px] font-medium px-3 py-1 rounded-full mb-3">
       {titulo}
     </h2>
     <CardDuo className="p-5">{children}</CardDuo>
@@ -49,20 +49,20 @@ export default function UIShowroom() {
     <div className="min-h-[100dvh] bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark p-6 pb-24">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-7">
           <div>
-            <h1 className="text-3xl font-black">🎨 Librería UI · THAMES</h1>
-            <p className="text-suave dark:text-suave-dark font-extrabold text-sm mt-1">
+            <h1 className="text-2xl font-semibold">Librería UI · THAMES</h1>
+            <p className="text-suave dark:text-suave-dark text-[13px] mt-1">
               Todos los componentes reutilizables. Probá el modo oscuro →
             </p>
           </div>
           <Boton3D variant={dark ? "amarillo" : "azul"} size="sm" onClick={toggleTema}>
-            {dark ? <><HiSun className="text-lg" /> Claro</> : <><HiMoon className="text-lg" /> Oscuro</>}
+            {dark ? <><HiSun className="text-base" /> Claro</> : <><HiMoon className="text-base" /> Oscuro</>}
           </Boton3D>
         </div>
 
         {/* BOTONES */}
-        <Seccion titulo="🔘 Boton3D">
+        <Seccion titulo="Boton3D">
           <div className="flex flex-wrap gap-3">
             <Boton3D variant="verde">Verde</Boton3D>
             <Boton3D variant="azul">Azul</Boton3D>
@@ -80,7 +80,7 @@ export default function UIShowroom() {
         </Seccion>
 
         {/* BADGES */}
-        <Seccion titulo="🏷️ Badge">
+        <Seccion titulo="Badge">
           <div className="flex flex-wrap gap-2 items-center">
             <Badge tono="verde">Completo</Badge>
             <Badge tono="amarillo">Pendiente</Badge>
@@ -89,7 +89,7 @@ export default function UIShowroom() {
             <Badge tono="violeta">Extra</Badge>
             <Badge tono="neutro">Neutro</Badge>
           </div>
-          <p className="text-suave dark:text-suave-dark text-xs font-extrabold mt-4">
+          <p className="text-suave dark:text-suave-dark text-[12px] mt-4">
             Con helper automático: <code>estadoATono("COMPLETO")</code> →{" "}
             <Badge tono={estadoATono("COMPLETO")}>Completo</Badge>{" "}
             <Badge tono={estadoATono("vencida")}>Vencida</Badge>
@@ -97,7 +97,7 @@ export default function UIShowroom() {
         </Seccion>
 
         {/* INPUTS */}
-        <Seccion titulo="⌨️ InputDuo / SelectDuo">
+        <Seccion titulo="InputDuo / SelectDuo">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InputDuo label="Nombre" required placeholder="Escribí un nombre…" />
             <InputDuo label="Teléfono" icon={<HiPhone />} placeholder="11 5555-1234" />
@@ -111,12 +111,12 @@ export default function UIShowroom() {
         </Seccion>
 
         {/* BARRA DE PROGRESO */}
-        <Seccion titulo="📊 BarraProgreso (pasos o %)">
+        <Seccion titulo="BarraProgreso (pasos o %)">
           <div className="space-y-5">
             <BarraProgreso paso={paso} totalPasos={4} label="Alta de cliente (por pasos)" />
             <div className="flex gap-2">
-              <Boton3D variant="blanco" size="sm" onClick={() => setPaso((p) => Math.max(0, p - 1))}>◀ Atrás</Boton3D>
-              <Boton3D variant="verde" size="sm" onClick={() => setPaso((p) => Math.min(4, p + 1))}>Siguiente ▶</Boton3D>
+              <Boton3D variant="blanco" size="sm" onClick={() => setPaso((p) => Math.max(0, p - 1))}>Atrás</Boton3D>
+              <Boton3D variant="verde" size="sm" onClick={() => setPaso((p) => Math.min(4, p + 1))}>Siguiente</Boton3D>
             </div>
             <BarraProgreso valor={80} label="Completitud (por %)" tono="azul" />
             <BarraProgreso valor={100} label="Cobro terminado" />
@@ -124,7 +124,7 @@ export default function UIShowroom() {
         </Seccion>
 
         {/* MODAL */}
-        <Seccion titulo="🪟 ModalDuo">
+        <Seccion titulo="ModalDuo">
           <Boton3D variant="azul" onClick={() => setModal(true)}>
             <HiUserAdd /> Abrir modal de ejemplo
           </Boton3D>
@@ -152,13 +152,13 @@ export default function UIShowroom() {
         </Seccion>
 
         {/* TABLA */}
-        <Seccion titulo="📋 TablaDuo (desktop tabla · mobile cards)">
+        <Seccion titulo="TablaDuo (desktop tabla · mobile cards)">
           <TablaDuo
             columns={[
               { key: "nombre", header: "Cliente", render: (c) => `${c.nombre} ${c.apellido}` },
               { key: "dni", header: "DNI / CUIT" },
               { key: "polizas", header: "Pólizas", align: "center", render: (c) => (
-                <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul font-black">{c.polizas}</span>
+                <span className="inline-flex items-center justify-center min-w-[26px] h-6 px-2 rounded bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul font-medium text-[13px]">{c.polizas}</span>
               ) },
               { key: "estado", header: "Estado", align: "center", render: (c) => <Badge tono={estadoATono(c.estado)}>{c.estado}</Badge> },
             ]}
@@ -167,8 +167,8 @@ export default function UIShowroom() {
           />
         </Seccion>
 
-        <p className="text-center text-suave dark:text-suave-dark font-extrabold text-xs mt-8">
-          Todos importables desde <code>src/components/ui/</code> · claro + oscuro incluidos 🌗
+        <p className="text-center text-suave dark:text-suave-dark text-[12px] mt-8">
+          Todos importables desde <code>src/components/ui/</code> · claro + oscuro incluidos
         </p>
       </div>
     </div>

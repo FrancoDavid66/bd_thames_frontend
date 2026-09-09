@@ -1,4 +1,4 @@
-// src/components/cotizaciones/CotizacionModal.jsx  (diseño Duo · 3 pasos · simplificado)
+// src/components/cotizaciones/CotizacionModal.jsx  (3 pasos · simplificado)
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import axios from "axios";
@@ -271,39 +271,39 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
   if (!isOpen) return null;
 
   const inputCls = (err) =>
-    `w-full h-12 rounded-2xl bg-surface dark:bg-surface-dark border-2 px-4 text-titulo dark:text-titulo-dark font-bold outline-none transition-colors ${
+    `w-full h-12 rounded-lg bg-surface dark:bg-surface-dark border px-4 text-titulo dark:text-titulo-dark outline-none transition-colors ${
       err ? "border-egreso" : "border-linea dark:border-linea-dark focus:border-oficina"
     }`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 sm:p-6">
-      <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6">
+      <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-xl overflow-hidden">
 
         {/* HEADER */}
-        <div className="flex justify-between items-center px-5 py-4 border-b-2 border-linea dark:border-linea-dark shrink-0">
-          <h2 className="text-lg font-black text-titulo dark:text-titulo-dark">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-linea dark:border-linea-dark shrink-0">
+          <h2 className="text-lg font-semibold text-titulo dark:text-titulo-dark">
             {isPdfMode ? "Vista previa de la propuesta" : (cotizacionEdit ? "Editar cotización" : "Nueva cotización")}
           </h2>
-          <button onClick={onClose} className="w-10 h-10 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso text-suave dark:text-suave-dark flex items-center justify-center transition-colors cursor-pointer">
+          <button onClick={onClose} className="w-10 h-10 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso text-suave dark:text-suave-dark flex items-center justify-center transition-colors cursor-pointer">
             <HiX size={20} />
           </button>
         </div>
 
         {/* STEPPER */}
         {!isPdfMode && (
-          <div className="px-6 py-4 bg-surface dark:bg-surface-dark border-b-2 border-linea dark:border-linea-dark shrink-0">
+          <div className="px-6 py-4 bg-surface dark:bg-surface-dark border-b border-linea dark:border-linea-dark shrink-0">
             <div className="flex items-center gap-2 max-w-lg mx-auto">
               {STEPS.map((s, i) => {
                 const done = step > s.num, active = step === s.num;
                 return (
                   <React.Fragment key={s.num}>
                     <div className="flex flex-col items-center gap-1.5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black border-2 transition-colors ${
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold border transition-colors ${
                         active ? "bg-oficina text-white border-oficina" : done ? "bg-oficina text-white border-oficina" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark"
                       }`}>
                         {done ? <HiCheckCircle size={20} /> : <s.icon size={14} />}
                       </div>
-                      <span className={`text-[10px] font-black uppercase tracking-wider ${active ? "text-oficina" : "text-suave dark:text-suave-dark"}`}>{s.label}</span>
+                      <span className={`text-[11px] font-medium ${active ? "text-oficina" : "text-suave dark:text-suave-dark"}`}>{s.label}</span>
                     </div>
                     {i < STEPS.length - 1 && (
                       <div className={`flex-1 h-1 rounded-full -mt-5 ${step > s.num ? "bg-oficina" : "bg-linea dark:bg-linea-dark"}`} />
@@ -322,33 +322,33 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
           {step === 1 && !isPdfMode && (
             <div className="max-w-2xl mx-auto">
               <div className="text-center mb-6">
-                <h3 className="text-xl font-black text-titulo dark:text-titulo-dark">Datos de la cotización</h3>
-                <p className="text-sm font-bold text-suave dark:text-suave-dark mt-1">Cliente y vehículo en una sola pantalla.</p>
+                <h3 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Datos de la cotización</h3>
+                <p className="text-sm text-suave dark:text-suave-dark mt-1">Cliente y vehículo en una sola pantalla.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">Nombre del cliente <span className="text-egreso">*</span></label>
+                  <label className="block text-[12px] text-suave dark:text-suave-dark mb-1.5">Nombre del cliente <span className="text-egreso">*</span></label>
                   <input type="text" autoFocus value={formData.cliente_nombre} onChange={e => setField("cliente_nombre", e.target.value)} className={inputCls(errores.cliente_nombre)} placeholder="Ej: Juan Pérez" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">WhatsApp / Teléfono</label>
+                  <label className="block text-[12px] text-suave dark:text-suave-dark mb-1.5">WhatsApp / Teléfono</label>
                   <input type="text" value={formData.telefono} onChange={e => setField("telefono", e.target.value)} className={inputCls(false)} placeholder="Ej: 11 2233-4455" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">Marca <span className="text-egreso">*</span></label>
+                  <label className="block text-[12px] text-suave dark:text-suave-dark mb-1.5">Marca <span className="text-egreso">*</span></label>
                   <input type="text" value={formData.marca_auto} onChange={e => setField("marca_auto", e.target.value)} className={inputCls(errores.marca_auto)} placeholder="Ej: Volkswagen" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">Modelo <span className="text-egreso">*</span></label>
+                  <label className="block text-[12px] text-suave dark:text-suave-dark mb-1.5">Modelo <span className="text-egreso">*</span></label>
                   <input type="text" value={formData.modelo_auto} onChange={e => setField("modelo_auto", e.target.value)} className={inputCls(errores.modelo_auto)} placeholder="Ej: Gol Trend 1.6" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">Año <span className="text-egreso">*</span></label>
+                  <label className="block text-[12px] text-suave dark:text-suave-dark mb-1.5">Año <span className="text-egreso">*</span></label>
                   <input type="number" value={formData.anio_auto} onChange={e => setField("anio_auto", e.target.value)} className={`${inputCls(errores.anio_auto)} font-mono`} />
                 </div>
-                <label className="flex items-center justify-center gap-3 bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl px-4 cursor-pointer hover:border-oficina transition-colors self-end h-12">
+                <label className="flex items-center justify-center gap-3 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-xl px-4 cursor-pointer hover:border-oficina transition-colors self-end h-12">
                   <input type="checkbox" checked={formData.tiene_gnc} onChange={e => setField("tiene_gnc", e.target.checked)} className="w-5 h-5 accent-[var(--color-oficina)]" />
-                  <span className="text-sm font-black text-titulo dark:text-titulo-dark">Tiene GNC instalado</span>
+                  <span className="text-sm font-medium text-titulo dark:text-titulo-dark">Tiene GNC instalado</span>
                 </label>
               </div>
             </div>
@@ -358,26 +358,26 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
           {step === 2 && !isPdfMode && (
             <div className="max-w-3xl mx-auto space-y-5">
               <div className="text-center">
-                <h3 className="text-xl font-black text-titulo dark:text-titulo-dark">Armá las opciones</h3>
-                <p className="text-sm font-bold text-suave dark:text-suave-dark mt-1">Elegí compañía, cobertura y poné el monto que paga el cliente.</p>
+                <h3 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Armá las opciones</h3>
+                <p className="text-sm text-suave dark:text-suave-dark mt-1">Elegí compañía, cobertura y poné el monto que paga el cliente.</p>
               </div>
 
               <div>
-                <p className="text-[11px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-3 text-center">Compañías para comparar</p>
+                <p className="text-[12px] text-suave dark:text-suave-dark mb-3 text-center">Compañías para comparar</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {companiasBackend.map(cia => {
                     const isSelected = opciones.some(o => String(o.compania_id) === String(cia.id));
                     const isDisabled = autoAntiguedad > (cia.antiguedad_maxima || 25);
                     return (
                       <button key={cia.id} type="button" disabled={isDisabled} onClick={() => toggleCompaniaCard(cia)}
-                        className={`relative p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                        className={`relative p-4 rounded-xl border text-center transition-colors flex flex-col items-center justify-center gap-1 ${
                           isDisabled ? "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark opacity-50 cursor-not-allowed" :
                           isSelected ? "border-oficina bg-oficina/10 text-titulo dark:text-titulo-dark cursor-pointer" :
                           "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-oficina/50 text-suave dark:text-suave-dark cursor-pointer"
                         }`}>
                         {isSelected && <div className="absolute top-2 right-2 text-oficina"><HiCheckCircle size={18} /></div>}
-                        <span className="font-black text-sm">{cia.nombre}</span>
-                        {isDisabled && <span className="text-[8px] font-bold text-suave dark:text-suave-dark">año no admitido</span>}
+                        <span className="font-medium text-sm">{cia.nombre}</span>
+                        {isDisabled && <span className="text-[9px] text-suave dark:text-suave-dark">año no admitido</span>}
                       </button>
                     );
                   })}
@@ -387,20 +387,20 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
               <div className="space-y-4">
                 {opciones.map((opcion, index) => {
                   const coberturasFiltradas = coberturasBackend.filter(cob => String(cob.compania) === String(opcion.compania_id));
-                  const selectCls = "w-full h-12 rounded-xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark px-3 text-titulo dark:text-titulo-dark font-bold outline-none focus:border-oficina cursor-pointer dark:[color-scheme:dark]";
+                  const selectCls = "w-full h-12 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark px-3 text-titulo dark:text-titulo-dark outline-none focus:border-oficina cursor-pointer dark:[color-scheme:dark]";
                   return (
                     <div key={opcion.id || opcion.tempId || index}
-                      className={`bg-surface dark:bg-surface-dark border-2 rounded-2xl p-5 ${opcion.es_recomendada ? "border-tarjeta" : "border-linea dark:border-linea-dark"}`}>
+                      className={`bg-surface dark:bg-surface-dark border rounded-xl p-5 ${opcion.es_recomendada ? "border-tarjeta" : "border-linea dark:border-linea-dark"}`}>
                       <div className="flex items-center justify-between mb-4">
-                        <span className="bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark px-2.5 py-1 rounded-lg text-xs font-black border-2 border-linea dark:border-linea-dark">Opción {index + 1}</span>
+                        <span className="bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark px-2.5 py-1 rounded-md text-xs font-medium border border-linea dark:border-linea-dark">Opción {index + 1}</span>
                         <div className="flex gap-2">
                           <button type="button" onClick={() => handleOptionChange(index, "es_recomendada", !opcion.es_recomendada)}
-                            className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider border-2 cursor-pointer transition-colors ${
+                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[11px] font-medium border cursor-pointer transition-colors ${
                               opcion.es_recomendada ? "bg-tarjeta text-white border-tarjeta" : "bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark hover:border-tarjeta"
                             }`}>
                             <HiStar size={14} /> {opcion.es_recomendada ? "Recomendada" : "Recomendar"}
                           </button>
-                          <button type="button" onClick={() => handleRemoveOption(index)} className="w-8 h-8 rounded-xl bg-card dark:bg-card-dark text-suave dark:text-suave-dark border-2 border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso transition-colors cursor-pointer flex items-center justify-center" title="Quitar">
+                          <button type="button" onClick={() => handleRemoveOption(index)} className="w-8 h-8 rounded-lg bg-card dark:bg-card-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark hover:border-egreso hover:text-egreso transition-colors cursor-pointer flex items-center justify-center" title="Quitar">
                             <HiTrash size={16} />
                           </button>
                         </div>
@@ -408,7 +408,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">1 · Compañía</label>
+                          <label className="block text-[11px] text-suave dark:text-suave-dark mb-1.5">1 · Compañía</label>
                           <select value={opcion.compania_id} onChange={e => handleCompaniaChange(index, e.target.value)} className={selectCls}>
                             <option value="">Elegir…</option>
                             {companiasBackend.map(c => {
@@ -418,24 +418,24 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">2 · Cobertura</label>
+                          <label className="block text-[11px] text-suave dark:text-suave-dark mb-1.5">2 · Cobertura</label>
                           <select value={opcion.cobertura_id} onChange={e => handleCoberturaChange(index, e.target.value)} disabled={!opcion.compania_id} className={`${selectCls} disabled:opacity-50`}>
                             <option value="">{!opcion.compania_id ? "Elegí compañía primero" : coberturasFiltradas.length === 0 ? "Sin coberturas cargadas" : "Elegir…"}</option>
                             {coberturasFiltradas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                           </select>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-ingreso mb-1.5">3 · Monto que paga el cliente</label>
-                          <div className="flex items-center gap-2 h-14 rounded-xl bg-card dark:bg-card-dark border-2 border-ingreso/40 px-4 focus-within:border-ingreso transition-colors">
-                            <span className="text-xl font-black text-ingreso">$</span>
-                            <input type="text" inputMode="decimal" value={opcion.monto || ""} onChange={e => handleOptionChange(index, "monto", formatMoneyInput(e.target.value))} placeholder="0" className="flex-1 min-w-0 bg-transparent outline-none text-2xl font-mono font-black text-ingreso" />
+                          <label className="block text-[11px] text-ingreso mb-1.5">3 · Monto que paga el cliente</label>
+                          <div className="flex items-center gap-2 h-14 rounded-lg bg-card dark:bg-card-dark border border-ingreso/35 px-4 focus-within:border-ingreso transition-colors">
+                            <span className="text-xl font-semibold text-ingreso">$</span>
+                            <input type="text" inputMode="decimal" value={opcion.monto || ""} onChange={e => handleOptionChange(index, "monto", formatMoneyInput(e.target.value))} placeholder="0" className="flex-1 min-w-0 bg-transparent outline-none text-2xl font-mono font-semibold text-ingreso" />
                           </div>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark mb-1.5">Suma asegurada <span className="normal-case font-bold">(opcional — dejala vacía si es R.C.)</span></label>
-                          <div className="flex items-center gap-2 h-12 rounded-xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark px-4 focus-within:border-oficina transition-colors">
-                            <span className="font-black text-suave dark:text-suave-dark">$</span>
-                            <input type="text" inputMode="decimal" value={opcion.suma_asegurada || ""} onChange={e => handleOptionChange(index, "suma_asegurada", formatMoneyInput(e.target.value))} placeholder="0" className="flex-1 min-w-0 bg-transparent outline-none text-base font-mono font-bold text-titulo dark:text-titulo-dark" />
+                          <label className="block text-[11px] text-suave dark:text-suave-dark mb-1.5">Suma asegurada <span className="font-normal">(opcional — dejala vacía si es R.C.)</span></label>
+                          <div className="flex items-center gap-2 h-12 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark px-4 focus-within:border-oficina transition-colors">
+                            <span className="font-medium text-suave dark:text-suave-dark">$</span>
+                            <input type="text" inputMode="decimal" value={opcion.suma_asegurada || ""} onChange={e => handleOptionChange(index, "suma_asegurada", formatMoneyInput(e.target.value))} placeholder="0" className="flex-1 min-w-0 bg-transparent outline-none text-base font-mono text-titulo dark:text-titulo-dark" />
                           </div>
                         </div>
                       </div>
@@ -445,7 +445,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
 
                 {opciones.length > 0 && (
                   <button type="button" onClick={handleAddBlankOption}
-                    className="w-full text-xs font-black uppercase tracking-widest bg-surface dark:bg-surface-dark border-2 border-dashed border-linea dark:border-linea-dark hover:border-oficina text-suave dark:text-suave-dark hover:text-oficina px-8 py-4 rounded-2xl transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                    className="w-full text-xs font-medium bg-surface dark:bg-surface-dark border border-dashed border-linea dark:border-linea-dark hover:border-oficina text-suave dark:text-suave-dark hover:text-oficina px-8 py-4 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer">
                     <HiPlus size={18} /> Agregar otra opción
                   </button>
                 )}
@@ -458,11 +458,11 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
             <div className="space-y-6 w-full mx-auto overflow-x-auto">
               {!isPdfMode && (
                 <div className="text-center">
-                  <h3 className="text-xl font-black text-ingreso flex justify-center items-center gap-2"><HiCheckCircle /> ¡Propuesta lista!</h3>
-                  <p className="text-sm font-bold text-suave dark:text-suave-dark mt-1">Así se descarga para tu cliente.</p>
+                  <h3 className="text-xl font-semibold text-ingreso flex justify-center items-center gap-2"><HiCheckCircle /> ¡Propuesta lista!</h3>
+                  <p className="text-sm text-suave dark:text-suave-dark mt-1">Así se descarga para tu cliente.</p>
                 </div>
               )}
-              <div className="flex justify-center w-full min-w-[210mm] bg-slate-950/10 dark:bg-black/20 p-4 rounded-3xl">
+              <div className="flex justify-center w-full min-w-[210mm] bg-slate-950/10 dark:bg-black/20 p-4 rounded-xl">
                 <CotizacionPDFTemplate
                   formData={formData}
                   opciones={opciones}
@@ -476,29 +476,29 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
         </div>
 
         {/* FOOTER */}
-        <div className="px-5 py-4 border-t-2 border-linea dark:border-linea-dark shrink-0 flex justify-between items-center">
+        <div className="px-5 py-4 border-t border-linea dark:border-linea-dark shrink-0 flex justify-between items-center">
           {isPdfMode ? (
             <>
-              <button type="button" onClick={onClose} className="px-5 h-11 rounded-2xl text-sm font-black text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-egreso transition-colors cursor-pointer">Cerrar</button>
+              <button type="button" onClick={onClose} className="px-5 h-11 rounded-lg text-sm font-medium text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-egreso transition-colors cursor-pointer">Cerrar</button>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={handlePrintPDF} disabled={isGeneratingPDF} className="px-4 h-11 rounded-2xl text-sm font-black bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark border-2 border-linea dark:border-linea-dark hover:border-oficina transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"><HiPrinter size={18} /> Imprimir</button>
-                <button type="button" onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="px-5 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:shadow-none disabled:translate-y-0"><HiDocumentDownload size={18} /> Descargar PDF</button>
+                <button type="button" onClick={handlePrintPDF} disabled={isGeneratingPDF} className="px-4 h-11 rounded-lg text-sm font-medium bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark border border-linea dark:border-linea-dark hover:border-oficina transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"><HiPrinter size={18} /> Imprimir</button>
+                <button type="button" onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="px-5 h-11 rounded-lg text-sm font-medium bg-oficina text-white transition-colors hover:brightness-110 flex items-center gap-2 cursor-pointer disabled:opacity-50"><HiDocumentDownload size={18} /> Descargar PDF</button>
               </div>
             </>
           ) : (
             <>
-              <button type="button" onClick={() => step > 1 ? setStep(step - 1) : onClose()} className="px-5 h-11 rounded-2xl text-sm font-black text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-egreso transition-colors flex items-center gap-2 cursor-pointer">
+              <button type="button" onClick={() => step > 1 ? setStep(step - 1) : onClose()} className="px-5 h-11 rounded-lg text-sm font-medium text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-egreso transition-colors flex items-center gap-2 cursor-pointer">
                 {step > 1 ? <><HiChevronLeft size={18} /> Atrás</> : "Cancelar"}
               </button>
               {step < 3 ? (
-                <button type="button" onClick={handleNextStep} className="px-6 h-11 rounded-2xl text-sm font-black bg-oficina text-white border-2 border-oficina shadow-[0_5px_0_var(--color-oficina-fuerte)] active:shadow-[0_0_0_var(--color-oficina-fuerte)] active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer">
+                <button type="button" onClick={handleNextStep} className="px-6 h-11 rounded-lg text-sm font-medium bg-oficina text-white transition-colors hover:brightness-110 flex items-center gap-2 cursor-pointer">
                   Siguiente <HiChevronRight size={18} />
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={handlePrintPDF} disabled={isGeneratingPDF} className="px-4 h-11 rounded-2xl text-sm font-black bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark border-2 border-linea dark:border-linea-dark hover:border-oficina transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50" title="Imprimir"><HiPrinter size={18} /></button>
-                  <button type="button" onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="px-4 h-11 rounded-2xl text-sm font-black bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark border-2 border-linea dark:border-linea-dark hover:border-oficina transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"><HiDocumentDownload size={18} /> PDF</button>
-                  <button type="button" onClick={handleSubmit} className="px-6 h-11 rounded-2xl text-sm font-black bg-ingreso text-white border-2 border-ingreso shadow-[0_5px_0_var(--color-ingreso-fuerte)] active:shadow-[0_0_0_var(--color-ingreso-fuerte)] active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer">Guardar <HiCheckCircle size={18} /></button>
+                  <button type="button" onClick={handlePrintPDF} disabled={isGeneratingPDF} className="px-4 h-11 rounded-lg text-sm font-medium bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark border border-linea dark:border-linea-dark hover:border-oficina transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50" title="Imprimir"><HiPrinter size={18} /></button>
+                  <button type="button" onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="px-4 h-11 rounded-lg text-sm font-medium bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark border border-linea dark:border-linea-dark hover:border-oficina transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"><HiDocumentDownload size={18} /> PDF</button>
+                  <button type="button" onClick={handleSubmit} className="px-6 h-11 rounded-lg text-sm font-medium bg-ingreso text-white transition-colors hover:brightness-110 flex items-center gap-2 cursor-pointer">Guardar <HiCheckCircle size={18} /></button>
                 </div>
               )}
             </>

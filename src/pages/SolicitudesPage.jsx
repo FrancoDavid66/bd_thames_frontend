@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { HiPlus } from "react-icons/hi";
+import { HiPlus, HiDocumentAdd } from "react-icons/hi";
 
 import { useAuth } from "../context/AuthContext";
 import { fetchAdminCompanias, fetchAdminCoberturas } from "../store/slices/adminSlice";
@@ -64,17 +64,17 @@ export default function SolicitudesPage() {
       <section className="min-h-full bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark flex items-center justify-center p-6">
         {/* Pantalla de bienvenida (se ve cuando el modal está cerrado) */}
         <div className="text-center max-w-md">
-          <div className="mx-auto mb-6 h-24 w-24 rounded-3xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde flex items-center justify-center text-5xl">
-            📝
+          <div className="mx-auto mb-6 h-16 w-16 rounded-xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center">
+            <HiDocumentAdd className="text-duo-verde-sombra dark:text-duo-verde text-3xl" />
           </div>
-          <h1 className="text-3xl font-black text-titulo dark:text-titulo-dark mb-2">Altas</h1>
-          <p className="text-[14px] font-bold text-suave dark:text-suave-dark mb-8">
+          <h1 className="text-2xl font-semibold text-titulo dark:text-titulo-dark mb-2">Altas</h1>
+          <p className="text-[14px] text-suave dark:text-suave-dark mb-8">
             Dá de alta una póliza nueva para {nombreOficina}. El seguimiento (enviar póliza, subir póliza…) lo
-            vas a ver en <b className="text-titulo dark:text-titulo-dark">Tareas del día</b>.
+            vas a ver en <b className="text-titulo dark:text-titulo-dark font-medium">Tareas del día</b>.
           </p>
           <div className="max-w-xs mx-auto">
             <Boton3D variant="verde" full size="lg" onClick={() => setCreating(true)}>
-              <HiPlus /> Nueva Alta
+              <HiPlus /> Nueva alta
             </Boton3D>
           </div>
         </div>

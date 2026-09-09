@@ -1,4 +1,4 @@
-// src/components/siniestros/SiniestrosAlerta.jsx  (responsive)
+// src/components/siniestros/SiniestrosAlerta.jsx
 //
 // 📱 RESPONSIVE: banner y badge ya se adaptaban. Esta pasada: el botón "Ver"
 //    del banner con tap target ≥44px, y el MODAL a hoja desde abajo en mobile
@@ -10,7 +10,7 @@
 //   - AlertaSiniestrosModal  → <SiniestrosAlerta variant="modal" ... />
 //
 // Los 3 usaban el mismo hook (useSiniestrosCliente) y mostraban lo mismo con
-// distinto formato. Ahora es un solo archivo con diseño Duo (claro/oscuro).
+// distinto formato. Ahora es un solo archivo.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,7 +24,7 @@ import useSiniestrosCliente from "../../hooks/useSiniestrosCliente";
 import Badge from "../ui/Badge";
 import Boton3D from "../ui/Boton3D";
 
-// Estado del siniestro → tono del Badge Duo.
+// Estado del siniestro → tono del Badge.
 const ESTADO_TONO = {
   PENDIENTE: "amarillo",
   DENUNCIADO: "azul",
@@ -37,14 +37,14 @@ const ESTADO_TONO = {
 function SiniestroLinea({ s }) {
   const fecha = s.fecha_siniestro ? dayjs(s.fecha_siniestro).format("DD/MM/YYYY") : "Sin fecha";
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark">
+    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-black text-titulo dark:text-titulo-dark">#{s.id}</span>
+          <span className="text-xs font-semibold text-titulo dark:text-titulo-dark">#{s.id}</span>
           <span className="text-xs text-suave dark:text-suave-dark">· {fecha}</span>
           <Badge tono={ESTADO_TONO[s.estado] || "neutro"} size="sm">{s.estado_label || s.estado}</Badge>
         </div>
-        <p className="text-[11px] text-suave dark:text-suave-dark mt-1 font-bold">
+        <p className="text-[11px] text-suave dark:text-suave-dark mt-1">
           {s.responsabilidad_label || s.responsabilidad}
           {s.nro_reclamo_cia && <> · Reclamo #{s.nro_reclamo_cia}</>}
         </p>
@@ -115,8 +115,8 @@ export default function SiniestrosAlerta({
 
     const tono = hayAbiertos ? "rojo" : "amarillo";
     const soft = hayAbiertos
-      ? "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-duo-rojo/40"
-      : "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-duo-amarillo/40";
+      ? "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-duo-rojo/30"
+      : "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-duo-amarillo/30";
     const iconColor = hayAbiertos ? "text-duo-rojo" : "text-duo-amarillo-sombra dark:text-duo-amarillo";
 
     const titulo = hayAbiertos
@@ -127,14 +127,14 @@ export default function SiniestrosAlerta({
       : "Todos los siniestros están cerrados, pero quedan en su historial.";
 
     return (
-      <div className={`rounded-2xl border-2 overflow-hidden ${soft}`}>
+      <div className={`rounded-xl border overflow-hidden ${soft}`}>
         <div className={`${compact ? "px-4 py-3" : "px-5 py-4"} flex items-start gap-3`}>
-          <div className={`${compact ? "h-10 w-10" : "h-12 w-12"} rounded-xl bg-card dark:bg-card-dark flex items-center justify-center shrink-0`}>
+          <div className={`${compact ? "h-10 w-10" : "h-12 w-12"} rounded-lg bg-card dark:bg-card-dark flex items-center justify-center shrink-0`}>
             <HiExclamation className={`${compact ? "w-5 h-5" : "w-6 h-6"} ${iconColor}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className={`${compact ? "text-sm" : "text-base"} font-black text-titulo dark:text-titulo-dark`}>{titulo}</h3>
-            <p className="text-xs text-suave dark:text-suave-dark mt-0.5 font-bold">{subtitulo}</p>
+            <h3 className={`${compact ? "text-sm" : "text-base"} font-semibold text-titulo dark:text-titulo-dark`}>{titulo}</h3>
+            <p className="text-xs text-suave dark:text-suave-dark mt-0.5">{subtitulo}</p>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               {hayAbiertos && <Badge tono="rojo" size="sm">{abiertos.length} abierto{abiertos.length !== 1 ? "s" : ""}</Badge>}
               {cerrados > 0 && <Badge tono="verde" size="sm"><HiCheckCircle className="w-3 h-3" /> {cerrados} cerrado{cerrados !== 1 ? "s" : ""}</Badge>}
@@ -144,7 +144,7 @@ export default function SiniestrosAlerta({
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="shrink-0 inline-flex items-center justify-center gap-1 min-h-[40px] px-3 py-1.5 rounded-lg bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-xs font-black transition-colors hover:brightness-95"
+              className="shrink-0 inline-flex items-center justify-center gap-1 min-h-[40px] px-3 py-1.5 rounded-lg bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-xs font-medium transition-colors hover:brightness-95"
             >
               {expanded ? "Ocultar" : "Ver"}
               {expanded ? <HiChevronUp className="w-3 h-3" /> : <HiChevronDown className="w-3 h-3" />}
@@ -159,14 +159,14 @@ export default function SiniestrosAlerta({
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="border-t-2 border-linea dark:border-linea-dark"
+              className="border-t border-linea dark:border-linea-dark"
             >
               <div className="p-4 space-y-2">
                 {siniestros.map((s) => <SiniestroLinea key={s.id} s={s} />)}
                 {clienteId && (
                   <Link
                     to={`/clientes/${clienteId}`}
-                    className="block text-xs text-center text-duo-azul hover:underline mt-2 font-black"
+                    className="block text-xs text-center text-duo-azul hover:underline mt-2 font-medium"
                   >
                     Ver perfil completo del asegurado →
                   </Link>
@@ -207,15 +207,15 @@ export default function SiniestrosAlerta({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 10 }}
           transition={{ type: "spring", stiffness: 280, damping: 24 }}
-          className="w-full sm:max-w-xl max-h-[92vh] flex flex-col bg-card dark:bg-card-dark rounded-t-3xl sm:rounded-3xl border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden"
+          className="w-full sm:max-w-xl max-h-[92vh] flex flex-col bg-card dark:bg-card-dark rounded-t-2xl sm:rounded-2xl border border-linea dark:border-linea-dark shadow-xl overflow-hidden"
         >
           {hayAbiertos && <div className="shrink-0 h-1.5 bg-duo-rojo animate-pulse" />}
           <div className="p-5 space-y-4 overflow-y-auto">
-            <div className="text-center pb-3 border-b-2 border-linea dark:border-linea-dark">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] mb-2">
+            <div className="text-center pb-3 border-b border-linea dark:border-linea-dark">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] mb-2">
                 <HiShieldExclamation className="w-7 h-7 text-duo-rojo" />
               </div>
-              <p className="text-base font-black text-titulo dark:text-titulo-dark">{clienteNombre}</p>
+              <p className="text-base font-semibold text-titulo dark:text-titulo-dark">{clienteNombre}</p>
             </div>
 
             {bannerBody}
@@ -225,7 +225,7 @@ export default function SiniestrosAlerta({
             </Boton3D>
 
             {hayAbiertos && (
-              <p className="text-[11px] text-duo-rojo text-center font-bold">
+              <p className="text-[11px] text-duo-rojo text-center">
                 Al continuar, confirmás que verificaste la situación con la compañía.
               </p>
             )}

@@ -88,14 +88,14 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
+          className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className="w-full max-w-2xl rounded-t-3xl sm:rounded-3xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]"
+            className="w-full max-w-2xl rounded-t-xl sm:rounded-xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]"
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
@@ -103,10 +103,10 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header táctil */}
-            <div className="flex items-center justify-between px-6 py-5 border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
               <div className="flex items-center gap-3">
                 <div
-                  className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                  className={`h-14 w-14 rounded-xl flex items-center justify-center shrink-0 ${
                     modoEditar
                       ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde"
                       : "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul-sombra dark:text-duo-azul"
@@ -115,10 +115,10 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
                   {modoEditar ? <HiPencilAlt className="text-2xl" /> : <HiUserAdd className="text-2xl" />}
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-titulo dark:text-titulo-dark leading-none">
+                  <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark leading-none">
                     {modoEditar ? "Editar Cliente" : "Alta de Cliente"}
                   </h2>
-                  <p className="text-[11px] text-suave dark:text-suave-dark font-extrabold uppercase tracking-widest mt-1.5">
+                  <p className="text-[11px] text-suave dark:text-suave-dark mt-1.5">
                     {modoEditar ? "Actualizá los datos de la ficha" : "Registro Centralizado"}
                   </p>
                 </div>
@@ -126,7 +126,7 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
               <button
                 type="button"
                 onClick={onClose}
-                className="h-11 w-11 flex items-center justify-center rounded-2xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:text-duo-rojo hover:border-duo-rojo transition-all active:scale-90"
+                className="h-11 w-11 flex items-center justify-center rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:text-duo-rojo hover:border-duo-rojo transition-colors"
               >
                 <HiX className="text-2xl" />
               </button>
@@ -139,8 +139,8 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
             >
               {/* SELECTOR DE SUCURSAL (solo ALTA + admin) */}
               {mostrarSelectorOficina && (
-                <div className="p-5 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-2 border-duo-azul/30">
-                  <label className="text-[11px] font-extrabold text-duo-azul-sombra dark:text-duo-azul uppercase tracking-widest flex items-center gap-2 mb-3 ml-1">
+                <div className="p-5 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border border-duo-azul/25">
+                  <label className="text-[12px] font-medium text-duo-azul-sombra dark:text-duo-azul flex items-center gap-2 mb-3 ml-1">
                     <HiOfficeBuilding className="text-base" /> Asignar a Sucursal Específica
                   </label>
                   <div className="relative">
@@ -149,7 +149,7 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
                       value={formData.oficina || ""}
                       onChange={handleChange}
                       disabled={loadingOficinas}
-                      className="h-14 w-full rounded-2xl bg-surface dark:bg-surface-dark border-[3px] border-linea dark:border-linea-dark px-4 text-sm font-extrabold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-all cursor-pointer appearance-none"
+                      className="h-14 w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-4 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-colors cursor-pointer appearance-none"
                     >
                       <option value="">— Selección Automática (Tu perfil) —</option>
                       {oficinas.map((o) => (
@@ -163,7 +163,7 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
                     </div>
                   </div>
                   {loadingOficinas && (
-                    <p className="text-[10px] text-duo-azul-sombra/70 dark:text-duo-azul/70 mt-2 ml-1 animate-pulse italic font-bold">
+                    <p className="text-[11px] text-duo-azul-sombra/70 dark:text-duo-azul/70 mt-2 ml-1 animate-pulse italic">
                       Sincronizando sucursales...
                     </p>
                   )}
@@ -174,7 +174,7 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {camposOrdenados.map((key) => (
                   <div key={key} className="flex flex-col gap-2">
-                    <label className="text-[11px] font-extrabold text-suave dark:text-suave-dark uppercase tracking-[0.12em] flex items-center justify-between ml-1">
+                    <label className="text-[12px] text-suave dark:text-suave-dark flex items-center justify-between ml-1">
                       <span>
                         {getLabel(key)}
                         {isRequired(key) && <span className="text-duo-rojo ml-1.5">*</span>}
@@ -185,7 +185,7 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
                       name={key}
                       value={formData[key] ?? ""}
                       onChange={handleChange}
-                      className="h-14 w-full rounded-2xl bg-surface dark:bg-surface-dark border-[3px] border-linea dark:border-linea-dark px-4 text-sm font-extrabold text-titulo dark:text-titulo-dark placeholder:text-suave/50 dark:placeholder:text-suave-dark/50 placeholder:font-bold focus:outline-none focus:border-duo-azul transition-all"
+                      className="h-14 w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-4 text-sm text-titulo dark:text-titulo-dark placeholder:text-suave/50 dark:placeholder:text-suave-dark/50 focus:outline-none focus:border-duo-azul transition-colors"
                       placeholder={`Escribir ${getLabel(key).toLowerCase()}...`}
                     />
                   </div>
@@ -193,7 +193,7 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
               </div>
             </form>
 
-            <div className="px-6 py-6 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex flex-col sm:flex-row items-center justify-end gap-4">
+            <div className="px-6 py-6 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex flex-col sm:flex-row items-center justify-end gap-4">
               <Boton3D
                 type="button"
                 variant="blanco"

@@ -6,6 +6,7 @@ import {
   HiSortDescending,
   HiExternalLink,
   HiDuplicate,
+  HiSearch,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
@@ -75,7 +76,7 @@ const NombreAsegurado = ({ nombre, clienteId }) => {
     return (
       <Link
         to={`/clientes/${clienteId}`}
-        className="inline-block text-[15px] font-bold text-duo-azul underline underline-offset-2 decoration-duo-azul/40 hover:decoration-duo-azul truncate max-w-full"
+        className="inline-block text-[15px] font-medium text-duo-azul underline underline-offset-2 decoration-duo-azul/40 hover:decoration-duo-azul truncate max-w-full"
         title={nombre}
       >
         {nombre}
@@ -83,7 +84,7 @@ const NombreAsegurado = ({ nombre, clienteId }) => {
     );
   }
   return (
-    <span className="block font-black text-[15px] text-titulo dark:text-titulo-dark truncate" title={nombre}>
+    <span className="block font-medium text-[15px] text-titulo dark:text-titulo-dark truncate" title={nombre}>
       {nombre}
     </span>
   );
@@ -96,7 +97,7 @@ const SortableHead = ({ label, columnKey, sortConfig, onSort, className = "" }) 
     <button
       type="button"
       onClick={() => onSort?.(columnKey)}
-      className={`flex items-center gap-1 uppercase tracking-wide hover:text-duo-azul transition-colors ${className}`}
+      className={`flex items-center gap-1 hover:text-duo-azul transition-colors ${className}`}
     >
       {label}
       {active ? (
@@ -131,9 +132,9 @@ function BajasTable({
   const someVisibleSelected = rows.length > 0 && rows.some((p) => sel.has(String(p.id)));
 
   return (
-    <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden">
       {/* Header (solo desktop) */}
-      <div className="hidden lg:grid grid-cols-12 gap-3 px-5 py-3 bg-surface dark:bg-surface-dark text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-widest border-b-2 border-linea dark:border-linea-dark">
+      <div className="hidden lg:grid grid-cols-12 gap-3 px-5 py-3 bg-surface dark:bg-surface-dark text-[11px] text-suave dark:text-suave-dark border-b border-linea dark:border-linea-dark">
         <div className="col-span-1 flex items-center justify-center">
           <input
             type="checkbox"
@@ -151,8 +152,8 @@ function BajasTable({
 
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="text-5xl mb-3">🔍</div>
-          <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">No se encontraron pólizas para procesar.</p>
+          <HiSearch className="text-4xl text-suave dark:text-suave-dark mb-3" />
+          <p className="text-[15px] font-medium text-titulo dark:text-titulo-dark">No se encontraron pólizas para procesar.</p>
         </div>
       ) : (
         <div className="divide-y divide-linea dark:divide-linea-dark">
@@ -181,16 +182,16 @@ function BajasTable({
                 {/* Asegurado (link) + Compañía */}
                 <div className="lg:col-span-4 min-w-0 order-3 lg:order-2 col-span-2">
                   <NombreAsegurado nombre={nombre} clienteId={clienteId} />
-                  <div className="text-[11px] text-suave dark:text-suave-dark font-bold truncate mt-0.5">{p?.compania || "—"}</div>
+                  <div className="text-[11px] text-suave dark:text-suave-dark truncate mt-0.5">{p?.compania || "—"}</div>
                 </div>
 
                 {/* Póliza (últimos 4) / Patente */}
                 <div className="lg:col-span-3 min-w-0 order-4 lg:order-3">
-                  <div className="font-mono text-sm font-black text-titulo dark:text-titulo-dark truncate" title={p?.numero_poliza || ""}>
+                  <div className="font-mono text-sm font-medium text-titulo dark:text-titulo-dark truncate" title={p?.numero_poliza || ""}>
                     {numeroCorto(p?.numero_poliza)}
                   </div>
                   <div className="flex items-center gap-1.5 mt-1 group/pat">
-                    <span className="text-[12px] font-black text-duo-azul uppercase bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg tracking-wider">
+                    <span className="text-[12px] font-medium text-duo-azul uppercase bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg">
                       {p?.patente || "—"}
                     </span>
                     <button
@@ -205,8 +206,8 @@ function BajasTable({
 
                 {/* Mora (grande = dato clave) */}
                 <div className="lg:col-span-2 order-2 lg:order-4 flex flex-col items-end lg:items-start">
-                  <span className="text-2xl font-black text-duo-rojo leading-none">{p?._diasMora ?? 0}</span>
-                  <span className="text-[10px] font-black text-suave dark:text-suave-dark uppercase tracking-wide mt-0.5">días de mora</span>
+                  <span className="text-2xl font-semibold text-duo-rojo leading-none">{p?._diasMora ?? 0}</span>
+                  <span className="text-[10px] text-suave dark:text-suave-dark mt-0.5">días de mora</span>
                 </div>
 
                 {/* Estado + Ver ficha */}
@@ -216,7 +217,7 @@ function BajasTable({
                     href={`/polizas/${p.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-sm font-black text-duo-azul hover:brightness-95 transition-all"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-sm font-medium text-duo-azul hover:brightness-95 transition-all"
                   >
                     Ver ficha <HiExternalLink />
                   </a>

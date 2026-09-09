@@ -38,22 +38,22 @@ const estadoTone = (estado) => {
 
   if (v.includes("incompleto") || v.includes("borrador"))
     return {
-      label: "INCOMPLETO",
+      label: "Incompleto",
       cls: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
     };
   if (v.includes("completo") || v.includes("dia"))
     return {
-      label: "COMPLETO",
+      label: "Completo",
       cls: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde",
     };
   if (v.includes("inactiv") || v.includes("baja"))
     return {
-      label: "INACTIVO",
+      label: "Inactivo",
       cls: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo",
     };
 
   return {
-    label: estado ? String(estado).toUpperCase() : "—",
+    label: estado ? String(estado) : "—",
     cls: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul",
   };
 };
@@ -67,7 +67,7 @@ const calcPolizasActivas = (cli) => {
 
 const HeaderCell = ({ children, sortable, active, dir, onClick, className = "" }) => (
   <th
-    className={`p-4 border-b-2 border-linea dark:border-linea-dark text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark ${
+    className={`p-4 border-b border-linea dark:border-linea-dark text-[11px] text-suave dark:text-suave-dark ${
       sortable ? "cursor-pointer select-none hover:text-duo-azul transition-colors" : ""
     } ${className}`}
     onClick={sortable ? onClick : undefined}
@@ -182,12 +182,12 @@ const ClientesTable = React.memo(function ClientesTable({
       {/* Tabla (Desktop) */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full text-left border-collapse">
-          <thead className="bg-surface dark:bg-surface-dark sticky top-0 z-10 backdrop-blur-md border-b-2 border-linea dark:border-linea-dark">
+          <thead className="bg-surface dark:bg-surface-dark sticky top-0 z-10 backdrop-blur-md border-b border-linea dark:border-linea-dark">
             <tr>
               <HeaderCell sortable active={sortBy === "nombre"} dir={sortDir} onClick={() => requestSort("nombre")}>Nombre</HeaderCell>
               <HeaderCell sortable active={sortBy === "dni"} dir={sortDir} onClick={() => requestSort("dni")}>DNI / CUIT</HeaderCell>
-              <th className="p-4 border-b-2 border-linea dark:border-linea-dark text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">Teléfono</th>
-              <th className="p-4 border-b-2 border-linea dark:border-linea-dark text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">Email</th>
+              <th className="p-4 border-b border-linea dark:border-linea-dark text-[11px] text-suave dark:text-suave-dark">Teléfono</th>
+              <th className="p-4 border-b border-linea dark:border-linea-dark text-[11px] text-suave dark:text-suave-dark">Email</th>
               <HeaderCell sortable active={sortBy === "polizas"} dir={sortDir} onClick={() => requestSort("polizas")} className="text-center">Pólizas activas</HeaderCell>
               <HeaderCell sortable active={sortBy === "estado"} dir={sortDir} onClick={() => requestSort("estado")} className="text-center">Estado del Perfil</HeaderCell>
             </tr>
@@ -201,43 +201,43 @@ const ClientesTable = React.memo(function ClientesTable({
 
               return (
                 <tr key={cli.id} className="hover:bg-card dark:hover:bg-card-dark transition-colors group">
-                  <td className="p-4 font-black text-sm">
+                  <td className="p-4 font-medium text-sm">
                     <div className="flex items-center gap-3 max-w-[240px]">
-                      <span className={`shrink-0 h-9 w-9 rounded-full inline-flex items-center justify-center text-[12px] font-black ${avatarColor(cli)}`}>
+                      <span className={`shrink-0 h-9 w-9 rounded-full inline-flex items-center justify-center text-[12px] font-semibold ${avatarColor(cli)}`}>
                         {getIniciales(cli)}
                       </span>
                       <div className="min-w-0">
                         <Link to={`/clientes/${cli.id}`} className="text-titulo dark:text-titulo-dark group-hover:text-duo-azul transition-colors truncate block" title="Ver ficha">
                           {(cli.nombre || "") + " " + (cli.apellido || "")}
                         </Link>
-                        {cli.alias && <div className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark truncate mt-0.5">{cli.alias}</div>}
+                        {cli.alias && <div className="text-[11px] text-suave dark:text-suave-dark truncate mt-0.5">{cli.alias}</div>}
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 text-xs text-titulo dark:text-titulo-dark font-mono font-bold">
+                  <td className="p-4 text-xs text-titulo dark:text-titulo-dark font-mono font-medium">
                     {cli.dni_cuit_cuil || <span className="text-suave/50 dark:text-suave-dark/50">—</span>}
                   </td>
                   <td className="p-4 text-xs">
                     {cli.telefono ? (
-                      <a href={`tel:${cli.telefono}`} className="text-suave dark:text-suave-dark font-bold hover:text-duo-azul transition-colors">{cli.telefono}</a>
+                      <a href={`tel:${cli.telefono}`} className="text-suave dark:text-suave-dark hover:text-duo-azul transition-colors">{cli.telefono}</a>
                     ) : <span className="text-suave/50 dark:text-suave-dark/50">—</span>}
                   </td>
                   <td className="p-4 text-xs">
                     {cli.email ? (
-                      <a href={`mailto:${cli.email}`} className="text-suave dark:text-suave-dark font-bold hover:text-duo-azul transition-colors truncate max-w-[150px] inline-block" title={cli.email}>{cli.email}</a>
+                      <a href={`mailto:${cli.email}`} className="text-suave dark:text-suave-dark hover:text-duo-azul transition-colors truncate max-w-[150px] inline-block" title={cli.email}>{cli.email}</a>
                     ) : <span className="text-suave/50 dark:text-suave-dark/50">—</span>}
                   </td>
                   <td className="p-4 text-center">
                     {polAct === null || polAct === 0 ? (
                       <span className="text-suave/50 dark:text-suave-dark/50">—</span>
                     ) : (
-                      <Link to={`/polizas?cliente=${cli.id}&modo=polizas`} className="inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-xl text-[13px] font-black bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul hover:-translate-y-0.5 transition-transform" title="Ver pólizas">
+                      <Link to={`/polizas?cliente=${cli.id}&modo=polizas`} className="inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg text-[13px] font-medium bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul hover:-translate-y-0.5 transition-transform" title="Ver pólizas">
                         {polAct}
                       </Link>
                     )}
                   </td>
                   <td className="p-4 text-center">
-                    <span className={`inline-flex items-center justify-center min-w-[90px] rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ${tone.cls}`}>
+                    <span className={`inline-flex items-center justify-center min-w-[90px] rounded-full px-3 py-1 text-[11px] font-medium ${tone.cls}`}>
                       {tone.label}
                     </span>
                   </td>
@@ -256,42 +256,42 @@ const ClientesTable = React.memo(function ClientesTable({
 
           return (
             <CardDuo as="article" key={cli.id} className="p-4">
-              <div className="flex items-start gap-3 mb-4 border-b-2 border-linea dark:border-linea-dark pb-4">
-                <span className={`shrink-0 h-12 w-12 rounded-full inline-flex items-center justify-center text-base font-black ${avatarColor(cli)}`}>
+              <div className="flex items-start gap-3 mb-4 border-b border-linea dark:border-linea-dark pb-4">
+                <span className={`shrink-0 h-12 w-12 rounded-full inline-flex items-center justify-center text-base font-semibold ${avatarColor(cli)}`}>
                   {getIniciales(cli)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-suave dark:text-suave-dark mb-0.5">Cliente #{cli.id}</p>
-                  <Link to={`/clientes/${cli.id}`} className="block text-base font-black text-titulo dark:text-titulo-dark truncate hover:text-duo-azul transition-colors">
+                  <p className="text-[10px] text-suave dark:text-suave-dark mb-0.5">Cliente #{cli.id}</p>
+                  <Link to={`/clientes/${cli.id}`} className="block text-base font-semibold text-titulo dark:text-titulo-dark truncate hover:text-duo-azul transition-colors">
                     {(cli.nombre || "") + " " + (cli.apellido || "")}
                   </Link>
-                  {cli.alias && <div className="text-[10px] font-black uppercase tracking-widest text-duo-azul truncate mt-0.5">{cli.alias}</div>}
+                  {cli.alias && <div className="text-[11px] text-duo-azul truncate mt-0.5">{cli.alias}</div>}
                 </div>
-                <span className={`shrink-0 inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ${tone.cls}`}>
+                <span className={`shrink-0 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${tone.cls}`}>
                   {tone.label}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-xs mb-4">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">DNI/CUIT</span>
-                  <span className="text-titulo dark:text-titulo-dark font-mono font-black">{cli.dni_cuit_cuil || "—"}</span>
+                  <span className="text-[10px] text-suave dark:text-suave-dark">DNI/CUIT</span>
+                  <span className="text-titulo dark:text-titulo-dark font-mono font-medium">{cli.dni_cuit_cuil || "—"}</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">Teléfono</span>
-                  {cli.telefono ? <a href={`tel:${cli.telefono}`} className="text-duo-azul font-black">{cli.telefono}</a> : <span className="text-suave dark:text-suave-dark">—</span>}
+                  <span className="text-[10px] text-suave dark:text-suave-dark">Teléfono</span>
+                  {cli.telefono ? <a href={`tel:${cli.telefono}`} className="text-duo-azul font-medium">{cli.telefono}</a> : <span className="text-suave dark:text-suave-dark">—</span>}
                 </div>
                 <div className="flex flex-col gap-1 col-span-2">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">Pólizas Activas</span>
+                  <span className="text-[10px] text-suave dark:text-suave-dark">Pólizas Activas</span>
                   {polAct === null || polAct === 0 ? <span className="text-suave dark:text-suave-dark">—</span> : (
-                     <Link to={`/polizas?cliente=${cli.id}&modo=polizas`} className="text-titulo dark:text-titulo-dark font-black inline-flex items-center gap-2">
-                       <span className="bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul px-2.5 py-1 rounded-xl">{polAct}</span> Pólizas en curso
+                     <Link to={`/polizas?cliente=${cli.id}&modo=polizas`} className="text-titulo dark:text-titulo-dark font-medium inline-flex items-center gap-2">
+                       <span className="bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul px-2.5 py-1 rounded-lg">{polAct}</span> Pólizas en curso
                      </Link>
                   )}
                 </div>
               </div>
 
-              <div className="pt-4 border-t-2 border-linea dark:border-linea-dark">
+              <div className="pt-4 border-t border-linea dark:border-linea-dark">
                 <Link to={`/clientes/${cli.id}`} className="block">
                   <Boton3D variant="blanco" size="sm" full>Abrir Ficha Completa</Boton3D>
                 </Link>
@@ -303,23 +303,23 @@ const ClientesTable = React.memo(function ClientesTable({
 
       {/* Footer Paginación */}
       {showFooter && (
-        <div className="mt-auto flex flex-col md:flex-row items-center justify-between gap-4 p-4 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark backdrop-blur-md">
-          <div className="text-[11px] font-bold text-suave dark:text-suave-dark uppercase tracking-widest">
-            Página <span className="text-titulo dark:text-titulo-dark font-black">{currPage}</span> de <span className="text-titulo dark:text-titulo-dark font-black">{totalPages}</span>
+        <div className="mt-auto flex flex-col md:flex-row items-center justify-between gap-4 p-4 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark backdrop-blur-md">
+          <div className="text-[12px] text-suave dark:text-suave-dark">
+            Página <span className="text-titulo dark:text-titulo-dark font-medium">{currPage}</span> de <span className="text-titulo dark:text-titulo-dark font-medium">{totalPages}</span>
             <span className="mx-2 opacity-50">•</span> {totalItems} Registros
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl overflow-hidden p-1 gap-1">
-              <button className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-all text-titulo dark:text-titulo-dark font-black" onClick={() => gotoPage(1)} disabled={currPage <= 1} title="Inicio">«</button>
-              <button className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-all text-titulo dark:text-titulo-dark font-black" onClick={() => gotoPage(currPage - 1)} disabled={currPage <= 1} title="Anterior">‹</button>
-              <button className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-all text-titulo dark:text-titulo-dark font-black" onClick={() => gotoPage(currPage + 1)} disabled={currPage >= totalPages} title="Siguiente">›</button>
-              <button className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-all text-titulo dark:text-titulo-dark font-black" onClick={() => gotoPage(totalPages)} disabled={currPage >= totalPages} title="Fin">»</button>
+            <div className="flex bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-lg overflow-hidden p-1 gap-1">
+              <button className="w-9 h-9 rounded-md inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-colors text-titulo dark:text-titulo-dark font-medium" onClick={() => gotoPage(1)} disabled={currPage <= 1} title="Inicio">«</button>
+              <button className="w-9 h-9 rounded-md inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-colors text-titulo dark:text-titulo-dark font-medium" onClick={() => gotoPage(currPage - 1)} disabled={currPage <= 1} title="Anterior">‹</button>
+              <button className="w-9 h-9 rounded-md inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-colors text-titulo dark:text-titulo-dark font-medium" onClick={() => gotoPage(currPage + 1)} disabled={currPage >= totalPages} title="Siguiente">›</button>
+              <button className="w-9 h-9 rounded-md inline-flex items-center justify-center hover:bg-surface dark:hover:bg-surface-dark disabled:opacity-30 transition-colors text-titulo dark:text-titulo-dark font-medium" onClick={() => gotoPage(totalPages)} disabled={currPage >= totalPages} title="Fin">»</button>
             </div>
 
             <select
               value={currSize} onChange={(e) => changeSize(Number(e.target.value))}
-              className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-titulo dark:text-titulo-dark outline-none cursor-pointer focus:border-duo-azul transition-colors"
+              className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-2.5 text-[12px] text-titulo dark:text-titulo-dark outline-none cursor-pointer focus:border-duo-azul transition-colors"
             >
               {[10, 25, 50, 100].map((n) => (
                 <option key={n} value={n} className="bg-card dark:bg-card-dark">{n} Filas</option>

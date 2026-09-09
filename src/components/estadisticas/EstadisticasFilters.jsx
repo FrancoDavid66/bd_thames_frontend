@@ -1,4 +1,4 @@
-// src/components/estadisticas/EstadisticasFilters.jsx  (diseño Duo)
+// src/components/estadisticas/EstadisticasFilters.jsx
 import { useEffect, useState } from "react";
 import AnimatedCard from "./AnimatedCard";
 import { HiOfficeBuilding, HiCalendar, HiChartBar } from "react-icons/hi";
@@ -21,9 +21,9 @@ const sortOficinas = (arr, getOficinaNombre) => {
 };
 
 const fieldCls =
-  "h-11 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-sm font-bold px-2.5 text-titulo dark:text-titulo-dark focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]";
+  "h-11 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-sm px-2.5 text-titulo dark:text-titulo-dark focus:outline-none focus:border-oficina transition-colors dark:[color-scheme:dark]";
 const labelCls =
-  "text-xs font-black text-titulo dark:text-titulo-dark flex items-center gap-1.5";
+  "text-[12px] text-suave dark:text-suave-dark flex items-center gap-1.5";
 
 export default function EstadisticasFilters({
   oficina,
@@ -129,7 +129,7 @@ export default function EstadisticasFilters({
               if (e.key === "Enter") e.currentTarget.blur();
             }}
           />
-          <div className="text-[10px] font-bold text-suave dark:text-suave-dark">Rango: {minYear}–{maxYear}</div>
+          <div className="text-[11px] text-suave dark:text-suave-dark">Rango: {minYear}–{maxYear}</div>
         </div>
 
         {/* Mes */}
@@ -174,7 +174,7 @@ export default function EstadisticasFilters({
           </select>
 
           {desde && hasta && (
-            <span className="mt-0.5 text-[10px] font-bold text-suave dark:text-suave-dark">
+            <span className="mt-0.5 text-[11px] text-suave dark:text-suave-dark">
               Período: {desde} → {hasta}
             </span>
           )}

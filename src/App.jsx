@@ -14,7 +14,6 @@ import { LoginPage } from "./pages/LoginPage";
 import Sidebar from "./components/layout/Sidebar";
 import FooterNav from "./components/layout/FooterNav";
 import Header from "./components/layout/Header";
-import MobileTopBar from "./components/layout/MobileTopBar";
 // 🧠 Preferencias del menú (sidebar/footer + abierto/cerrado) con memoria
 import useMenuPrefs from "./hooks/useMenuPrefs";
 
@@ -23,6 +22,9 @@ import ClientesPage from "./pages/ClientesPage";
 import PolizasPage from "./pages/PolizasPage";
 import PagosPage from "./pages/PagosPage";
 import SiniestrosPage from "./pages/SiniestrosPage";
+// ⚖️ NUEVA APP: LEGALES (expedientes de abogados)
+import LegalesPage from "./pages/LegalesPage";
+import LegalesDetailPage from "./pages/LegalesDetailPage";
 import ClienteProfilePage from "./pages/ClienteProfilePage";
 import PolizaDetails from "./components/polizas/PolizaDetails";
 import PropiedadesPage from "./pages/PropiedadesPage";
@@ -57,6 +59,8 @@ import CuponPublicoPage from "./pages/CuponPublicoPage";
 import PortalAseguradoPage from "./pages/PortalAseguradoPage";
 // 🛠️ Panel de administración del Portal del Asegurado (lo usa la oficina).
 import PanelPortalPage from "./pages/PanelPortalPage";
+// ⚖️ PÁGINA PÚBLICA: "Mi caso" (expediente legal, sin login)
+import MiCasoPage from "./pages/MiCasoPage";
 
 import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
@@ -426,15 +430,27 @@ function App() {
     );
   }
 
-  // 🦉 LOADER DE INGRESO (Duo) — mientras la app valida la sesión.
-  //    Tu LOGO ORIGINAL dentro de un cuadrado Duo con relieve 3D + barra.
-  //    Claro/oscuro con los tokens de la app (surface/card/marca).
+  // ⚖️ "MI CASO" (sin login): quien tiene un expediente legal ve su estado.
+  //    Es la versión standalone del caso — para quien no tiene (o no
+  //    necesita) el Portal del Asegurado completo.
+  if (location.pathname.startsWith("/mi-caso/")) {
+    return (
+      <Routes>
+        <Route path="/mi-caso/:token" element={<MiCasoPage />} />
+      </Routes>
+    );
+  }
+
+  // 🦉 LOADER DE INGRESO — mientras la app valida la sesión.
+  //    Tu LOGO ORIGINAL en un cuadrado con el mismo diseño plano del resto de
+  //    la app (sin relieve 3D). Claro/oscuro con los tokens de la app
+  //    (surface/card/linea/marca).
   if (loading) {
     return (
       <div className="flex h-[100dvh] w-screen flex-col items-center justify-center gap-6 bg-surface dark:bg-surface-dark transition-colors">
-        {/* Cuadrado Duo 3D con el logo horizontal adentro (el logo NO se toca) */}
+        {/* Cuadrado con el logo horizontal adentro (el logo NO se toca) */}
         <motion.div
-          className="flex items-center justify-center rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-7 py-6 shadow-[0_6px_0_var(--color-linea)] dark:shadow-[0_6px_0_var(--color-linea-dark)]"
+          className="flex items-center justify-center rounded-2xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-7 py-6"
           initial={{ scale: 0.9, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
@@ -448,12 +464,12 @@ function App() {
           />
         </motion.div>
 
-        <div className="text-[11px] font-black uppercase tracking-[0.2em] text-suave dark:text-suave-dark">
+        <div className="text-[12px] font-medium text-suave dark:text-suave-dark">
           Entrando…
         </div>
 
-        {/* Barra de progreso Duo */}
-        <div className="h-2.5 w-52 overflow-hidden rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+        {/* Barra de progreso */}
+        <div className="h-2 w-52 overflow-hidden rounded-full border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
           <motion.div
             className="h-full rounded-full bg-marca"
             initial={{ width: "10%" }}
@@ -492,11 +508,11 @@ function App() {
               transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
               className="flex flex-col items-center px-4 text-center"
             >
-              {/* Isotipo grande en cuadrado Duo con relieve 3D */}
+              {/* Isotipo grande en cuadrado */}
               <motion.div
                 animate={{ y: [-5, 5, -5] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="mb-8 flex h-32 w-32 items-center justify-center rounded-[2rem] border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 shadow-[0_8px_0_var(--color-linea)] dark:shadow-[0_8px_0_var(--color-linea-dark)]"
+                className="mb-8 flex h-32 w-32 items-center justify-center rounded-2xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5"
               >
                 <img
                   src={logoThames}
@@ -505,14 +521,14 @@ function App() {
                 />
               </motion.div>
 
-              <h1 className="text-4xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-5xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-titulo dark:text-titulo-dark sm:text-4xl">
                 Bienvenido, <span className="text-marca">{user?.username}</span>
               </h1>
-              <p className="mt-4 text-xs font-black uppercase tracking-widest text-suave dark:text-suave-dark sm:text-sm">
+              <p className="mt-3 text-[13px] font-medium text-suave dark:text-suave-dark sm:text-sm">
                 Preparando tu entorno de trabajo…
               </p>
 
-              <div className="relative mt-8 h-2.5 w-64 overflow-hidden rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+              <div className="relative mt-8 h-2 w-64 overflow-hidden rounded-full border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
                 <motion.div
                   className="absolute left-0 top-0 h-full bg-marca"
                   initial={{ width: "0%" }}
@@ -525,7 +541,7 @@ function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex min-h-[100dvh] overflow-x-hidden bg-brand-200 dark:bg-brand-100 text-brand-100 dark:text-brand-200 transition-colors duration-300">
+      <div className="flex min-h-[100dvh] overflow-x-hidden bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark transition-colors duration-300">
         {/* Sidebar — SIEMPRE montado; se abre/cierra con su lengüeta */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -596,6 +612,11 @@ function App() {
                 />
 
                 <Route path="/siniestros" element={<SiniestrosPage />} />
+
+                {/* ⚖️ LEGALES: listado y detalle del expediente */}
+                <Route path="/legales" element={<LegalesPage />} />
+                <Route path="/legales/:id" element={<LegalesDetailPage />} />
+
                 <Route path="/cuponeras" element={<CuponerasPage />} />
                 <Route path="/estadisticas" element={<EstadisticasPage />} />
                 <Route path="/recaudacion" element={<RecaudacionPage />} />
@@ -615,24 +636,13 @@ function App() {
             </AnimatePresence>
           </motion.main>
 
-          {/* La barra móvil original solo cuando el FooterNav está ESCONDIDO
-              (así no quedan dos barras abajo pisándose). */}
-          {!footerVisible && (
-            <MobileTopBar
-              solPendienteAlta={solPendienteAlta}
-              solPendienteEnvio={solPendienteEnvio}
-              renovacionesPendientes={renovacionesPendientes}
-              bajasPendientes={bajasPendientes}
-              serviciosAlertas={serviciosAlertas}
-            />
-          )}
-
           <CierreCajaReminder />
         </motion.div>
       </div>
 
       {/* 🚀 FOOTER (barra inferior) — SIEMPRE montado; se muestra/esconde con su
-          lengüeta, independiente del sidebar. */}
+          lengüeta, independiente del sidebar. Ya NO hay una barra de respaldo
+          cuando está oculto: apagarla con el toggle lo deja realmente vacío. */}
       <FooterNav
         isVisible={footerVisible}
         onHide={hideFooter}

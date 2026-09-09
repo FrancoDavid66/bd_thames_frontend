@@ -124,8 +124,8 @@ const ClienteProfilePage = () => {
   if (detailStatus === 'loading' || (status === 'loading' && !cliente)) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center bg-surface dark:bg-surface-dark">
-        <div className="h-12 w-12 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin mb-4" />
-        <p className="text-[11px] font-black uppercase tracking-widest text-duo-azul">Cargando Ficha...</p>
+        <div className="h-10 w-10 border-2 border-duo-violeta/25 border-t-duo-violeta rounded-full animate-spin mb-4" />
+        <p className="text-[13px] font-medium text-duo-violeta">Cargando ficha...</p>
       </div>
     );
   }
@@ -133,7 +133,7 @@ const ClienteProfilePage = () => {
   if (detailStatus === 'failed' || (status === 'failed' && !cliente)) {
     // 🚨 Distinguimos el tipo de error para mostrar un mensaje útil
     const httpStatus = detailError?.status || null;
-    let titulo, mensaje, icono;
+    let titulo, mensaje;
 
     if (httpStatus === 404) {
       titulo = "Cliente no disponible";
@@ -148,24 +148,24 @@ const ClienteProfilePage = () => {
       titulo = "Error del servidor";
       mensaje = "El servidor tuvo un problema. Probá de nuevo en unos minutos.";
     } else {
-      titulo = "Error de Conexión";
+      titulo = "Error de conexión";
       mensaje = "No se pudo cargar la ficha del cliente.";
     }
 
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-surface dark:bg-surface-dark">
         <CardDuo className="max-w-md w-full p-8 flex flex-col items-center">
-          <div className="h-16 w-16 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center mb-4">
-            <HiExclamationCircle className="text-duo-rojo text-4xl" />
+          <div className="h-14 w-14 rounded-full bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center mb-4">
+            <HiExclamationCircle className="text-duo-rojo text-3xl" />
           </div>
-          <p className="text-lg font-black text-duo-rojo uppercase tracking-wide">{titulo}</p>
-          <p className="text-sm font-bold text-suave dark:text-suave-dark mt-2">{mensaje}</p>
+          <p className="text-[16px] font-semibold text-duo-rojo">{titulo}</p>
+          <p className="text-[13px] text-suave dark:text-suave-dark mt-2">{mensaje}</p>
           {httpStatus && (
-            <p className="text-[10px] text-suave dark:text-suave-dark mt-2 font-mono">HTTP {httpStatus}</p>
+            <p className="text-[11px] text-suave dark:text-suave-dark mt-2 font-mono">HTTP {httpStatus}</p>
           )}
           <div className="mt-6 w-full">
             <Boton3D variant="blanco" size="sm" full onClick={() => navigate('/clientes')}>
-              Volver al Directorio
+              Volver al directorio
             </Boton3D>
           </div>
         </CardDuo>
@@ -182,34 +182,34 @@ const ClienteProfilePage = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      <div className="max-w-7xl mx-auto space-y-5">
 
-        {/* Header estilo Duolingo: banner con degradé azul */}
-        <div className="bg-gradient-to-br from-duo-azul to-[#0d9de0] rounded-3xl shadow-[0_4px_0_var(--color-duo-azul-sombra)] p-6 sm:p-7 flex flex-col md:flex-row md:items-center gap-5">
+        {/* Header: banner plano, acento violeta */}
+        <div className="bg-duo-violeta rounded-xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center gap-5">
           <div className="flex items-center gap-4 min-w-0 flex-1">
-            <div className="h-20 w-20 sm:h-22 sm:w-22 rounded-full bg-white text-duo-azul flex items-center justify-center text-3xl font-black shrink-0 border-4 border-white/50">
+            <div className="h-16 w-16 sm:h-[72px] sm:w-[72px] rounded-full bg-white text-duo-violeta flex items-center justify-center text-2xl font-semibold shrink-0">
               {iniciales}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight truncate">
+              <h1 className="text-xl sm:text-2xl font-semibold text-white leading-tight truncate">
                 {`${cliente?.nombre ?? ''} ${cliente?.apellido ?? ''}`.trim() || 'Cliente'}
               </h1>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[13px] font-extrabold text-white/90">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[13px] font-medium text-white/85">
                 <span>Ficha #{cliente.id}</span>
-                <span className="opacity-60">•</span>
+                <span className="opacity-60">·</span>
                 <span className="inline-flex items-center gap-1">
-                  <HiShieldCheck className="text-base shrink-0" />
+                  <HiShieldCheck className="text-sm shrink-0" />
                   {user?.perfil?.oficina_nombre || 'Local'}
                 </span>
-                <span className="opacity-60">•</span>
+                <span className="opacity-60">·</span>
                 <span>Estado: {cliente?.estado || 'Activo'}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <Boton3D
-              variant="amarillo"
+              variant="blanco"
               size="sm"
               onClick={handleVerPortal}
               disabled={cargandoPortal}

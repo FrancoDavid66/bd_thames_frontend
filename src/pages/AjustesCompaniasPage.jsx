@@ -1,3 +1,10 @@
+// src/pages/AjustesCompaniasPage.jsx
+//
+// 🆕 Este archivo usaba un estilo aparte (fondo oscuro fijo, blanco/10)
+// que no seguía el sistema de la app — no combinaba con el modo claro ni
+// con el resto de las pantallas. Se llevó a los mismos tokens que usa
+// todo Thames (surface/card/linea/titulo/suave), así se ve consistente
+// en los dos modos.
 import { useEffect, useState } from "react";
 import { HiPlus, HiTrash, HiPencil, HiCheck, HiX, HiRefresh } from "react-icons/hi";
 import toast from "react-hot-toast";
@@ -5,14 +12,14 @@ import { companiasApi } from "../services/companias";
 
 function Input({ label, value, onChange, placeholder, type = "text", className = "" }) {
   return (
-    <label className={`text-sm ${className}`}>
-      <span className="block text-white/80 mb-1">{label}</span>
+    <label className={`text-[13px] ${className}`}>
+      <span className="block text-suave dark:text-suave-dark mb-1">{label}</span>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 ring-emerald-400/30 text-white placeholder:text-white/40"
+        className="w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-3 py-2 outline-none focus:border-duo-violeta text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark transition-colors"
       />
     </label>
   );
@@ -23,13 +30,13 @@ function Switch({ checked, onChange }) {
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className={`w-12 h-7 rounded-full px-1 flex items-center transition ${
-        checked ? "bg-emerald-500/80" : "bg-white/15"
+      className={`w-11 h-6 rounded-full px-1 flex items-center transition-colors ${
+        checked ? "bg-duo-verde" : "bg-linea dark:bg-linea-dark"
       }`}
       title={checked ? "Desactivar" : "Activar"}
     >
       <span
-        className={`w-5 h-5 rounded-full bg-white transition ${checked ? "translate-x-5" : "translate-x-0"}`}
+        className={`w-4 h-4 rounded-full bg-white transition-transform ${checked ? "translate-x-5" : "translate-x-0"}`}
       />
     </button>
   );
@@ -79,21 +86,21 @@ function PlanRow({ plan, onSave, onDelete }) {
       <div className="col-span-12 flex items-center gap-2">
         {edit ? (
           <>
-            <button onClick={doSave} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-600 text-white border border-white/10 hover:brightness-110">
+            <button onClick={doSave} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-duo-verde text-white text-[13px] font-medium hover:brightness-110 transition-colors">
               <HiCheck /> Guardar
             </button>
             {!isNew && (
-              <button onClick={() => setEdit(false)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20">
+              <button onClick={() => setEdit(false)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark text-[13px] font-medium hover:bg-linea dark:hover:bg-linea-dark transition-colors">
                 <HiX /> Cancelar
               </button>
             )}
           </>
         ) : (
           <>
-            <button onClick={() => setEdit(true)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20">
+            <button onClick={() => setEdit(true)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark text-[13px] font-medium hover:bg-linea dark:hover:bg-linea-dark transition-colors">
               <HiPencil /> Editar
             </button>
-            <button onClick={onDelete} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/20 text-red-50 border border-red-500/30 hover:bg-red-500/30">
+            <button onClick={onDelete} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo border border-duo-rojo/25 text-[13px] font-medium hover:brightness-95 transition-colors">
               <HiTrash /> Eliminar
             </button>
           </>
@@ -105,8 +112,8 @@ function PlanRow({ plan, onSave, onDelete }) {
 
 function Field({ label, value }) {
   return (
-    <div className="text-white/90">
-      <div className="text-xs text-white/60">{label}</div>
+    <div className="text-titulo dark:text-titulo-dark">
+      <div className="text-[11px] text-suave dark:text-suave-dark">{label}</div>
       {value}
     </div>
   );
@@ -122,17 +129,17 @@ function EditableTitle({ value, onSave }) {
       <input
         value={v}
         onChange={(e) => setV(e.target.value)}
-        className="px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white outline-none"
+        className="px-3 py-2 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark outline-none focus:border-duo-violeta"
       />
       <button
         onClick={async () => { await onSave(v); setEditing(false); }}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 text-white border border-white/10 hover:brightness-110"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-duo-verde text-white text-[13px] font-medium hover:brightness-110 transition-colors"
       >
         <HiCheck /> Guardar
       </button>
       <button
         onClick={() => { setV(value || ""); setEditing(false); }}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark text-[13px] font-medium hover:bg-linea dark:hover:bg-linea-dark transition-colors"
       >
         <HiX /> Cancelar
       </button>
@@ -140,11 +147,11 @@ function EditableTitle({ value, onSave }) {
   ) : (
     <button
       onClick={() => setEditing(true)}
-      className="text-white font-semibold text-base sm:text-lg hover:underline text-left"
+      className="text-titulo dark:text-titulo-dark font-medium text-[15px] hover:underline text-left"
       title="Editar nombre"
     >
       <span className="align-middle">{value || "—"}</span>{" "}
-      <HiPencil className="inline-block opacity-70 ml-1 align-middle" />
+      <HiPencil className="inline-block opacity-60 ml-1 align-middle text-sm" />
     </button>
   );
 }
@@ -235,15 +242,15 @@ export default function AjustesCompaniasPage() {
   };
 
   return (
-    <section className="p-4 sm:p-6">
+    <section className="p-4 sm:p-6 bg-surface dark:bg-surface-dark min-h-[100dvh] text-titulo dark:text-titulo-dark">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="text-white/70 text-xs">Ajustes</div>
-          <h1 className="text-white text-lg sm:text-xl font-semibold">Compañías &amp; Renovaciones</h1>
+          <div className="text-suave dark:text-suave-dark text-[12px]">Ajustes</div>
+          <h1 className="text-titulo dark:text-titulo-dark text-lg sm:text-xl font-semibold">Compañías y renovaciones</h1>
         </div>
         <button
           onClick={cargar}
-          className="h-10 px-3 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 inline-flex items-center gap-2"
+          className="h-9 px-3 rounded-lg bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border border-linea dark:border-linea-dark hover:bg-surface dark:hover:bg-surface-dark inline-flex items-center gap-2 text-[13px] font-medium transition-colors"
           title="Actualizar"
         >
           <HiRefresh /> Actualizar
@@ -251,20 +258,20 @@ export default function AjustesCompaniasPage() {
       </div>
 
       {/* Crear compañía */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 mb-6">
-        <h3 className="text-white/90 font-medium mb-3">Nueva compañía</h3>
+      <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 mb-6">
+        <h3 className="text-titulo dark:text-titulo-dark font-medium mb-3 text-[14px]">Nueva compañía</h3>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <Input label="Nombre" value={nombre} onChange={setNombre} placeholder="Ej: Federación Patronal" />
           <Input label="Logo URL (opcional)" value={logoUrl} onChange={setLogoUrl} placeholder="https://…" />
           <div className="flex flex-col justify-end">
-            <div className="text-sm text-white/70 mb-1">Activa</div>
+            <div className="text-[13px] text-suave dark:text-suave-dark mb-1">Activa</div>
             <Switch checked={activa} onChange={setActiva} />
           </div>
           <div className="flex items-end">
             <button
               onClick={crear}
               disabled={saving}
-              className="w-full sm:w-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 text-white border border-white/10 hover:brightness-110 disabled:opacity-60"
+              className="w-full sm:w-auto inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-duo-verde text-white text-[13px] font-medium hover:brightness-110 disabled:opacity-60 transition-colors"
             >
               <HiPlus /> Agregar
             </button>
@@ -275,21 +282,21 @@ export default function AjustesCompaniasPage() {
       {/* Lista compañías */}
       <div className="space-y-4">
         {loading ? (
-          <div className="rounded-2xl h-28 bg-white/5 border border-white/10 animate-pulse" />
+          <div className="rounded-xl h-28 bg-card dark:bg-card-dark border border-linea dark:border-linea-dark animate-pulse" />
         ) : items.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-white/70">
+          <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 text-suave dark:text-suave-dark text-[13px]">
             No hay compañías cargadas.
           </div>
         ) : (
           items.map((c) => (
-            <div key={c.id} className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+            <div key={c.id} className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
               <div className="flex items-center gap-3">
                 {/* Logo */}
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/10 border border-white/10 grid place-items-center">
+                <div className="w-11 h-11 rounded-lg overflow-hidden bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark grid place-items-center shrink-0">
                   {c.logo_url ? (
                     <img src={c.logo_url} alt={c.nombre} className="w-full h-full object-contain" />
                   ) : (
-                    <span className="text-white/50 text-xs">Logo</span>
+                    <span className="text-suave dark:text-suave-dark text-[11px]">Logo</span>
                   )}
                 </div>
 
@@ -298,11 +305,11 @@ export default function AjustesCompaniasPage() {
 
                 {/* Activa */}
                 <div className="ml-auto flex items-center gap-2">
-                  <span className="text-xs text-white/60">Activa</span>
+                  <span className="text-[12px] text-suave dark:text-suave-dark">Activa</span>
                   <Switch checked={!!c.activa} onChange={(val) => toggleActiva(c, val)} />
                   <button
                     onClick={() => borrar(c)}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 text-red-50 border border-red-500/30 hover:bg-red-500/30"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo border border-duo-rojo/25 text-[13px] font-medium hover:brightness-95 transition-colors"
                   >
                     <HiTrash /> Eliminar
                   </button>
@@ -310,11 +317,11 @@ export default function AjustesCompaniasPage() {
               </div>
 
               {/* Planes */}
-              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                <div className="text-white/80 font-medium mb-2">Planes de cuotas / Renovación</div>
+              <div className="mt-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3">
+                <div className="text-titulo dark:text-titulo-dark font-medium mb-2 text-[13px]">Planes de cuotas / renovación</div>
 
                 {(c.planes && c.planes.length > 0) ? (
-                  <div className="divide-y divide-white/10">
+                  <div className="divide-y divide-linea dark:divide-linea-dark">
                     {c.planes.map((p) => (
                       <PlanRow
                         key={p.id || `${c.id}-plan-${p.cuotas}-${p.dia_vto}`}
@@ -325,12 +332,12 @@ export default function AjustesCompaniasPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-white/60 text-sm mb-2">No hay planes aún.</div>
+                  <div className="text-suave dark:text-suave-dark text-[13px] mb-2">No hay planes aún.</div>
                 )}
 
                 {/* Nuevo plan */}
-                <div className="mt-3 rounded-xl border border-dashed border-white/15 p-3">
-                  <div className="text-xs text-white/60 mb-2">Agregar plan</div>
+                <div className="mt-3 rounded-lg border border-dashed border-linea dark:border-linea-dark p-3">
+                  <div className="text-[12px] text-suave dark:text-suave-dark mb-2">Agregar plan</div>
                   <PlanRow
                     plan={{}}
                     onSave={(pl) => guardarPlan(c.id, pl)}

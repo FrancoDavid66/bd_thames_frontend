@@ -1,7 +1,7 @@
 // src/components/polizas/PolizaTable.jsx
 import React, { useMemo, memo } from "react";
 import { FaBuilding } from "react-icons/fa";
-import { HiChevronRight } from "react-icons/hi";
+import { HiChevronRight, HiSearch } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Badge from "../ui/Badge";
@@ -45,7 +45,7 @@ function numeroCorto(numero) {
   return s;
 }
 
-// Estado de cuotas (pago) → { label, tono (duo) }
+// Estado de cuotas (pago) → { label, tono }
 const CUOTAS_META = {
   al_dia:     { label: "AL DÍA",            tono: "verde" },
   por_vencer: { label: "POR VENCER",        tono: "amarillo" },
@@ -149,7 +149,7 @@ const SortHeader = memo(function SortHeader({ label, field, ordering, onOrdering
   };
   return (
     <th
-      className={`border-b-2 border-linea dark:border-linea-dark p-4 text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark ${onOrderingChange ? "cursor-pointer select-none hover:text-titulo dark:hover:text-titulo-dark" : ""} ${className}`}
+      className={`border-b border-linea dark:border-linea-dark p-4 text-[11px] text-suave dark:text-suave-dark ${onOrderingChange ? "cursor-pointer select-none hover:text-titulo dark:hover:text-titulo-dark" : ""} ${className}`}
       onClick={toggle}
     >
       <div className="flex items-center gap-1">
@@ -166,7 +166,7 @@ function EstadoCell({ poliza, center = false }) {
     <div className={`inline-flex flex-col gap-0.5 ${center ? "items-center" : "items-start"}`}>
       <Badge tono={est.tono} size="sm">{est.label}</Badge>
       {est.sub && (
-        <span className="text-[9px] font-extrabold uppercase text-suave dark:text-suave-dark">{est.sub}</span>
+        <span className="text-[10px] text-suave dark:text-suave-dark">{est.sub}</span>
       )}
     </div>
   );
@@ -179,33 +179,33 @@ const DesktopRow = memo(function DesktopRow({ poliza, isWebAdmin }) {
   return (
     <tr className="border-b border-linea dark:border-linea-dark transition-colors hover:bg-surface dark:hover:bg-surface-dark">
       <td className="p-4">
-        <Link to={`/polizas/${poliza.id}`} target="_blank" rel="noopener noreferrer" className="block text-sm font-black text-duo-azul hover:underline" title={poliza.numero_poliza || ""}>
+        <Link to={`/polizas/${poliza.id}`} target="_blank" rel="noopener noreferrer" className="block text-sm font-semibold text-duo-azul hover:underline" title={poliza.numero_poliza || ""}>
           {numeroCorto(poliza.numero_poliza)}
         </Link>
-        <div className="text-[10px] font-extrabold uppercase text-suave dark:text-suave-dark" title={poliza.compania || "S/C"}>
+        <div className="text-[10px] text-suave dark:text-suave-dark" title={poliza.compania || "S/C"}>
           {recortar(poliza.compania, 5) || "S/C"}
         </div>
       </td>
 
       <td className="p-4">
-        <Link to={`/clientes/${poliza.cliente?.id}`} className="inline-block text-sm font-bold text-duo-azul underline underline-offset-2 decoration-duo-azul/40 hover:decoration-duo-azul">
+        <Link to={`/clientes/${poliza.cliente?.id}`} className="inline-block text-sm font-medium text-duo-azul underline underline-offset-2 decoration-duo-azul/40 hover:decoration-duo-azul">
           {clienteNombre || "-"}
         </Link>
       </td>
 
       {isWebAdmin && (
         <td className="p-4">
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tight text-duo-azul">
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-duo-azul">
             <FaBuilding className="text-[10px]" />
             {poliza?.oficina_nombre || "LOCAL"}
           </span>
         </td>
       )}
 
-      <td className="p-4 font-mono text-sm font-bold text-titulo dark:text-titulo-dark">{poliza.patente || "-"}</td>
+      <td className="p-4 font-mono text-sm text-titulo dark:text-titulo-dark">{poliza.patente || "-"}</td>
 
       <td className="p-4">
-        <div className="text-xs font-bold text-titulo dark:text-titulo-dark">{poliza.marca}</div>
+        <div className="text-xs text-titulo dark:text-titulo-dark">{poliza.marca}</div>
         <div className="max-w-[120px] truncate text-[10px] text-suave dark:text-suave-dark">{poliza.modelo}</div>
       </td>
 
@@ -223,12 +223,12 @@ const MobileCard = memo(function MobileCard({ poliza, isWebAdmin }) {
   return (
     <Link
       to={`/polizas/${poliza.id}`}
-      className="block rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 transition-transform active:scale-[0.99]"
+      className="block rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 transition-transform active:scale-[0.99]"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm font-black text-duo-azul" title={poliza.numero_poliza || ""}>{poliza.numero_poliza ? numeroCorto(poliza.numero_poliza) : "Sin número"}</div>
-          <div className="text-[10px] font-extrabold uppercase text-suave dark:text-suave-dark" title={poliza.compania || "S/C"}>
+          <div className="text-sm font-semibold text-duo-azul" title={poliza.numero_poliza || ""}>{poliza.numero_poliza ? numeroCorto(poliza.numero_poliza) : "Sin número"}</div>
+          <div className="text-[10px] text-suave dark:text-suave-dark" title={poliza.compania || "S/C"}>
             {recortar(poliza.compania, 5) || "S/C"}
           </div>
         </div>
@@ -236,7 +236,7 @@ const MobileCard = memo(function MobileCard({ poliza, isWebAdmin }) {
       </div>
 
       <div className="mt-3 space-y-0.5">
-        <div className="truncate text-sm font-bold text-titulo dark:text-titulo-dark">{clienteNombre || "Sin titular"}</div>
+        <div className="truncate text-sm font-medium text-titulo dark:text-titulo-dark">{clienteNombre || "Sin titular"}</div>
         <div className="text-xs text-suave dark:text-suave-dark">
           {poliza.marca} {poliza.modelo}
           {poliza.patente ? <> · <span className="font-mono uppercase text-titulo dark:text-titulo-dark">{poliza.patente}</span></> : null}
@@ -245,7 +245,7 @@ const MobileCard = memo(function MobileCard({ poliza, isWebAdmin }) {
 
       <div className="mt-3 flex items-center justify-end gap-2">
         {isWebAdmin && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-tight text-duo-azul">
+          <span className="inline-flex items-center gap-1 text-[11px] text-duo-azul">
             <FaBuilding className="text-[10px]" /> {poliza?.oficina_nombre || "LOCAL"}
           </span>
         )}
@@ -267,7 +267,7 @@ const PolizaTable = ({
   const isLoading = status === "loading";
 
   return (
-    <div className="overflow-hidden rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-[0_2px_0_var(--color-duo-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)]">
+    <div className="overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
       {/* 🚫 Loader quitado a pedido: la barrita azul de "cargando" ya NO se muestra
           en la tabla. El loader queda SOLO para el inicio/cierre de sesión (App.jsx). */}
 
@@ -292,8 +292,8 @@ const PolizaTable = ({
         </table>
         {polizas.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="text-5xl mb-3">🔍</div>
-            <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">Sin pólizas para los filtros aplicados.</p>
+            <HiSearch className="mb-3 h-10 w-10 text-suave dark:text-suave-dark" />
+            <p className="text-[15px] font-medium text-titulo dark:text-titulo-dark">Sin pólizas para los filtros aplicados.</p>
           </div>
         )}
       </div>
@@ -305,15 +305,15 @@ const PolizaTable = ({
         ))}
         {polizas.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="text-4xl mb-2">🔍</div>
-            <p className="text-sm font-black text-titulo dark:text-titulo-dark">Sin pólizas para los filtros aplicados.</p>
+            <HiSearch className="mb-2 h-8 w-8 text-suave dark:text-suave-dark" />
+            <p className="text-sm font-medium text-titulo dark:text-titulo-dark">Sin pólizas para los filtros aplicados.</p>
           </div>
         )}
       </div>
 
       {/* ===== Paginación ===== */}
-      <div className="flex items-center justify-between border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-4 sm:px-6">
-        <div className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">
+      <div className="flex items-center justify-between border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-4 sm:px-6">
+        <div className="text-[11px] text-suave dark:text-suave-dark">
           {cursorEnabled ? `Registros: ${polizas.length}` : `Página ${page} de ${totalPages} · Total: ${total}`}
         </div>
         <div className="flex gap-2">
@@ -339,4 +339,4 @@ const PolizaTable = ({
   );
 };
 
-export default PolizaTable;
+export default PolizaTable;

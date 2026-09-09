@@ -8,6 +8,10 @@
  * correspondan. Comparte header, barra de progreso, navegación y footer.
  * Usa la paleta semántica real (surface/card/titulo/marca) — modo claro+oscuro.
  *
+ * 🆕 Rediseño "profesional": bordes de 1px (antes 2px), esquinas menos
+ * redondeadas, sin MAYÚSCULA+tracking ancho en labels/chips, pesos de
+ * fuente más moderados. La lógica no cambió, solo el estilo.
+ *
  * 📱 RESPONSIVE:
  *   - La hoja se limita a max-h-[92vh] y es columna flex: header fijo arriba,
  *     contenido con scroll propio en el medio, footer fijo abajo. Así el footer
@@ -66,19 +70,19 @@ function FotoSlot({ titulo, url, subiendo, onPick, accept = "image/*" }) {
   return (
     <div className={`${UI.card} p-4 flex flex-col gap-3`}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-widest text-suave dark:text-suave-dark">{titulo}</span>
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${url ? UI.chipOk : UI.chipPend}`}>
+        <span className="text-[12px] font-medium text-suave dark:text-suave-dark">{titulo}</span>
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${url ? UI.chipOk : UI.chipPend}`}>
           {url ? <><HiCheckCircle /> Cargado</> : "Pendiente"}
         </span>
       </div>
       {/* El recuadro de imagen queda oscuro a propósito (resalta la foto) */}
-      <div className="relative overflow-hidden rounded-xl border-2 border-linea dark:border-linea-dark bg-slate-900 aspect-[3/2] flex items-center justify-center">
+      <div className="relative overflow-hidden rounded-lg border border-linea dark:border-linea-dark bg-slate-900 aspect-[3/2] flex items-center justify-center">
         {url
           ? <img src={url} alt={titulo} className="w-full h-full object-cover" />
-          : <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Sin imagen</span>}
+          : <span className="text-[11px] text-white/40">Sin imagen</span>}
       </div>
       <button type="button" onClick={() => ref.current?.click()} disabled={subiendo}
-        className={`h-11 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest ${url ? UI.btnGhost : UI.btnPrimary}`}>
+        className={`h-10 rounded-lg flex items-center justify-center gap-2 text-[12px] font-medium ${url ? UI.btnGhost : UI.btnPrimary}`}>
         {subiendo
           ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
           : <><HiUpload className="text-sm" /> {url ? "Cambiar" : "Subir"}</>}
@@ -167,7 +171,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
     try {
       await dispatch(updateCliente({ id: item.cliente_id, fecha_nacimiento: fNac })).unwrap();
       dispatch(registrarTareaCompletada({ tipo: "datos_cliente", cliente_id: item.cliente_id }));
-      setHecho({ titulo: "¡Dato completado!", lineas: ["Fecha de nacimiento guardada."] });
+      setHecho({ titulo: "Dato completado", lineas: ["Fecha de nacimiento guardada."] });
     } catch { toast.error("No se pudo guardar"); }
     finally { setSaving(false); }
   };
@@ -182,7 +186,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
         numero_poliza: num || null, sin_numero: !num,
       })).unwrap();
       dispatch(registrarTareaCompletada({ tipo: "datos_poliza", poliza_id: item.poliza_id }));
-      setHecho({ titulo: "¡Datos completados!", lineas: [`Compañía: ${compania.trim()}`, num ? `N° ${num}` : "Sin número"] });
+      setHecho({ titulo: "Datos completados", lineas: [`Compañía: ${compania.trim()}`, num ? `N° ${num}` : "Sin número"] });
     } catch { toast.error("No se pudo guardar"); }
     finally { setSaving(false); }
   };
@@ -196,14 +200,14 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
       if (!secure_url) throw new Error("Sin URL");
       await dispatch(updateCliente({ id: item.cliente_id, [field]: secure_url })).unwrap();
       setUrl(secure_url);
-      toast.success("Foto subida ✅");
+      toast.success("Foto subida");
     } catch (e) { toast.error(e?.message || "No se pudo subir"); }
     finally { setUp(false); }
   };
 
   const finDni = () => {
     dispatch(registrarTareaCompletada({ tipo: "fotos_dni", cliente_id: item.cliente_id }));
-    setHecho({ titulo: "¡DNI cargado!", lineas: ["Frente y dorso subidos."] });
+    setHecho({ titulo: "DNI cargado", lineas: ["Frente y dorso subidos."] });
   };
 
   const subirFotoVeh = async (file) => {
@@ -216,14 +220,14 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
         poliza: Number(item.poliza_id), tipo: tipoVeh, url: secure_url, public_id, origen: "OFICINA",
       });
       setFotosVeh((p) => [...p, { url: secure_url, tipo: tipoVeh }]);
-      toast.success("Foto subida ✅");
+      toast.success("Foto subida");
     } catch (e) { toast.error(e?.message || "No se pudo subir"); }
     finally { setSubVeh(false); if (fileVehRef.current) fileVehRef.current.value = ""; }
   };
 
   const finVeh = () => {
     dispatch(registrarTareaCompletada({ tipo: "fotos_poliza", poliza_id: item.poliza_id }));
-    setHecho({ titulo: "¡Fotos cargadas!", lineas: [`${fotosVeh.length} foto(s) del vehículo.`] });
+    setHecho({ titulo: "Fotos cargadas", lineas: [`${fotosVeh.length} foto(s) del vehículo.`] });
   };
 
   /* ── Flujo subir-poliza (lee PDF, detecta inconsistencias, guarda) ── */
@@ -251,7 +255,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
           _apellido: datos?.cliente?.apellido || "", _vig_hasta: datos?.poliza?.vigencia_hasta || "",
         };
       } catch {
-        toast("No se pudieron leer los datos, pero se guardan los papeles.", { icon: "⚠️" });
+        toast("No se pudieron leer los datos, pero se guardan los papeles.");
         await guardarFinalPdf(d, {}); return;
       }
       const patPol = item.patente_real || (item.patente !== "—" ? item.patente : "");
@@ -305,7 +309,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
       if (r.autocompletado?.length) lineas.push(`Autocompletado: ${r.autocompletado.join(", ")}.`);
       if (r.cupones_actualizados) lineas.push(`${r.cupones_actualizados} cupón(es) de robo.`);
       if (r.cuotas_actualizadas) lineas.push(`${r.cuotas_actualizadas} cuota(s) reprogramada(s).`);
-      setHecho({ titulo: "¡Papeles cargados!", lineas });
+      setHecho({ titulo: "Papeles cargados", lineas });
     } catch (e) { toast.error(e?.message || "No se pudo cargar"); }
     finally { setSaving(false); }
   };
@@ -357,7 +361,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
           </div>
           <div className="flex items-end">
             <button onClick={() => fileVehRef.current?.click()} disabled={subVeh}
-              className={`h-12 px-5 rounded-xl inline-flex items-center gap-2 text-sm ${UI.btnPrimary}`}>
+              className={`h-12 px-5 rounded-lg inline-flex items-center gap-2 text-[14px] ${UI.btnPrimary}`}>
               {subVeh ? <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <><HiUpload /> Subir</>}
             </button>
           </div>
@@ -365,7 +369,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
         {fotosVeh.length > 0 && (
           <div className="grid grid-cols-3 gap-2">
             {fotosVeh.map((f, i) => (
-              <div key={i} className="rounded-lg overflow-hidden border-2 border-linea dark:border-linea-dark bg-slate-900 aspect-[3/2]">
+              <div key={i} className="rounded-lg overflow-hidden border border-linea dark:border-linea-dark bg-slate-900 aspect-[3/2]">
                 <img src={f.url} alt={f.tipo} className="w-full h-full object-cover" />
               </div>
             ))}
@@ -382,43 +386,43 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
         if (incActual.campo === "vigencia") return (
           <div className="p-6">
             <div className="flex flex-col items-center text-center gap-2 mb-4">
-              <div className="h-14 w-14 rounded-full bg-tarjeta/15 border-2 border-tarjeta/30 flex items-center justify-center text-[#d97706] dark:text-tarjeta-claro"><HiExclamation className="text-3xl" /></div>
-              <div className="text-lg font-bold text-titulo dark:text-titulo-dark">¿Es el papel correcto?</div>
-              <div className="text-[11px] text-suave dark:text-suave-dark">{idxInc + 1} de {incs.length}</div>
+              <div className="h-14 w-14 rounded-full bg-tarjeta/15 border border-tarjeta/30 flex items-center justify-center text-[#d97706] dark:text-tarjeta-claro"><HiExclamation className="text-2xl" /></div>
+              <div className="text-[16px] font-semibold text-titulo dark:text-titulo-dark">¿Es el papel correcto?</div>
+              <div className="text-[12px] text-suave dark:text-suave-dark">{idxInc + 1} de {incs.length}</div>
             </div>
-            <div className="rounded-2xl border-2 border-tarjeta/25 bg-tarjeta/10 p-4 mb-4">
+            <div className="rounded-lg border border-tarjeta/25 bg-tarjeta/10 p-4 mb-4">
               <p className="text-[13px] leading-snug text-[#d97706] dark:text-tarjeta-claro">
                 La vigencia termina el <b>{fmtFecha(incActual.valorPdf)}</b>, una fecha que ya pasó.
                 Puede ser el papel de la <b>póliza anterior</b>, no de la renovación.
               </p>
             </div>
             <div className="space-y-2">
-              <button onClick={() => resolverInc(false)} className={`w-full h-11 rounded-xl text-sm ${UI.btnPrimary}`}>Está bien, continuar</button>
-              <button onClick={onClose} className={`w-full h-11 rounded-xl text-sm ${UI.btnGhost}`}>Cancelar, es el viejo</button>
+              <button onClick={() => resolverInc(false)} className={`w-full h-11 rounded-lg text-[14px] ${UI.btnPrimary}`}>Está bien, continuar</button>
+              <button onClick={onClose} className={`w-full h-11 rounded-lg text-[14px] ${UI.btnGhost}`}>Cancelar, es el viejo</button>
             </div>
           </div>
         );
         return (
           <div className="p-6">
             <div className="flex flex-col items-center text-center gap-2 mb-4">
-              <div className="h-14 w-14 rounded-full bg-marca/10 border-2 border-marca/30 flex items-center justify-center text-marca"><HiExclamation className="text-3xl" /></div>
-              <div className="text-lg font-bold text-titulo dark:text-titulo-dark">El dato no coincide</div>
-              <div className="text-[11px] text-suave dark:text-suave-dark">{idxInc + 1} de {incs.length}</div>
+              <div className="h-14 w-14 rounded-full bg-marca/10 border border-marca/30 flex items-center justify-center text-marca"><HiExclamation className="text-2xl" /></div>
+              <div className="text-[16px] font-semibold text-titulo dark:text-titulo-dark">El dato no coincide</div>
+              <div className="text-[12px] text-suave dark:text-suave-dark">{idxInc + 1} de {incs.length}</div>
             </div>
-            <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark divide-y-2 divide-linea dark:divide-linea-dark mb-4">
+            <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark divide-y divide-linea dark:divide-linea-dark mb-4">
               <div className="px-4 py-3">
-                <div className="text-[10px] uppercase tracking-widest text-suave dark:text-suave-dark mb-1">{incActual.label} en el PDF</div>
-                <div className="text-sm font-bold text-marca">{incActual.valorPdf}</div>
+                <div className="text-[12px] text-suave dark:text-suave-dark mb-1">{incActual.label} en el PDF</div>
+                <div className="text-[14px] font-medium text-marca">{incActual.valorPdf}</div>
               </div>
               <div className="px-4 py-3">
-                <div className="text-[10px] uppercase tracking-widest text-suave dark:text-suave-dark mb-1">{incActual.label} en la póliza</div>
-                <div className="text-sm font-bold text-titulo dark:text-titulo-dark">{incActual.valorPol}</div>
+                <div className="text-[12px] text-suave dark:text-suave-dark mb-1">{incActual.label} en la póliza</div>
+                <div className="text-[14px] font-medium text-titulo dark:text-titulo-dark">{incActual.valorPol}</div>
               </div>
             </div>
             <div className="space-y-2">
-              <button onClick={() => resolverInc(false)} className={`w-full h-11 rounded-xl text-sm ${UI.btnGhost}`}>Dejar la de la póliza</button>
-              <button onClick={() => resolverInc(true)} className={`w-full h-11 rounded-xl text-sm ${UI.btnPrimary}`}>Usar la del PDF</button>
-              <button onClick={onClose} className={`w-full h-11 rounded-xl text-sm ${UI.btnGhost}`}>Cancelar</button>
+              <button onClick={() => resolverInc(false)} className={`w-full h-11 rounded-lg text-[14px] ${UI.btnGhost}`}>Dejar la de la póliza</button>
+              <button onClick={() => resolverInc(true)} className={`w-full h-11 rounded-lg text-[14px] ${UI.btnPrimary}`}>Usar la del PDF</button>
+              <button onClick={onClose} className={`w-full h-11 rounded-lg text-[14px] ${UI.btnGhost}`}>Cancelar</button>
             </div>
           </div>
         );
@@ -429,10 +433,10 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
           {SLOTS_PDF.map((s) => (
             <div key={s.key} className={`${UI.card} p-4 flex items-center gap-3`}>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-bold text-titulo dark:text-titulo-dark">{s.label}</div>
-                <div className="text-[11px] text-suave dark:text-suave-dark truncate">{filesPdf[s.key] ? filesPdf[s.key].name : "Sin archivo"}</div>
+                <div className="text-[14px] font-medium text-titulo dark:text-titulo-dark">{s.label}</div>
+                <div className="text-[12px] text-suave dark:text-suave-dark truncate">{filesPdf[s.key] ? filesPdf[s.key].name : "Sin archivo"}</div>
               </div>
-              <label className={`h-10 px-4 rounded-xl inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest cursor-pointer ${filesPdf[s.key] ? UI.btnGhost : UI.btnPrimary}`}>
+              <label className={`h-9 px-3.5 rounded-lg inline-flex items-center gap-2 text-[12px] font-medium cursor-pointer ${filesPdf[s.key] ? UI.btnGhost : UI.btnPrimary}`}>
                 <HiUpload className="text-sm" /> {filesPdf[s.key] ? "Cambiar" : "Elegir"}
                 <input type="file" accept="application/pdf" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) pickPdf(s.key, f); e.target.value = ""; }} />
@@ -443,10 +447,10 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
             <div className={`${UI.card} p-4`}>
               <label className={UI.label}>Fecha de la 1ª cuota (sin cuponera)</label>
               <input type="date" value={fechaIni} onChange={(e) => setFechaIni(e.target.value)} className={`mt-2 ${UI.input}`} />
-              <p className="mt-1.5 text-[11px] text-suave dark:text-suave-dark">Las demás cuotas se calculan +1 mes cada una.</p>
+              <p className="mt-1.5 text-[12px] text-suave dark:text-suave-dark">Las demás cuotas se calculan +1 mes cada una.</p>
             </div>
           )}
-          <p className="text-[11px] text-suave dark:text-suave-dark leading-snug pt-1">
+          <p className="text-[12px] text-suave dark:text-suave-dark leading-snug pt-1">
             La app lee los PDFs y completa número y compañía. Si algo no coincide, te avisa antes de guardar.
           </p>
         </div>
@@ -473,19 +477,19 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
   return (
     <AnimatePresence>
       {isOpen && item && (
-        <motion.div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+        <motion.div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-          <motion.div className={`w-full max-w-lg max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl ${UI.sheet} shadow-2xl overflow-hidden`}
+          <motion.div className={`w-full max-w-lg max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl ${UI.sheet} shadow-xl overflow-hidden`}
             initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 26, stiffness: 220 }} onClick={(e) => e.stopPropagation()}>
 
             {/* Header (fijo) */}
-            <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-4 border-b-2 border-linea dark:border-linea-dark">
+            <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-4 border-b border-linea dark:border-linea-dark">
               <div className="min-w-0">
-                <h2 className="text-base font-bold text-titulo dark:text-titulo-dark truncate">{cfg.titulo}</h2>
-                {cfg.sub ? <p className="text-[11px] text-suave dark:text-suave-dark truncate">{cfg.sub}</p> : null}
+                <h2 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark truncate">{cfg.titulo}</h2>
+                {cfg.sub ? <p className="text-[12px] text-suave dark:text-suave-dark truncate">{cfg.sub}</p> : null}
               </div>
-              <button onClick={onClose} aria-label="Cerrar" className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg bg-titulo/5 dark:bg-white/5 text-suave dark:text-suave-dark hover:opacity-70"><HiX className="text-xl" /></button>
+              <button onClick={onClose} aria-label="Cerrar" className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors"><HiX className="text-lg" /></button>
             </div>
 
             {/* Cuerpo: éxito o contenido del paso (scrollea) */}
@@ -494,9 +498,9 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
               {hecho ? (
                 <motion.div key="exito" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-6">
                   <div className="flex flex-col items-center text-center gap-3 py-4">
-                    <div className="h-16 w-16 rounded-full bg-ingreso/10 border-2 border-ingreso/20 flex items-center justify-center text-ingreso"><HiCheckCircle className="text-4xl" /></div>
-                    <div className="text-xl font-bold text-titulo dark:text-titulo-dark">{hecho.titulo}</div>
-                    <div className="text-sm text-suave dark:text-suave-dark space-y-1">
+                    <div className="h-16 w-16 rounded-full bg-ingreso/10 border border-ingreso/20 flex items-center justify-center text-ingreso"><HiCheckCircle className="text-3xl" /></div>
+                    <div className="text-[18px] font-semibold text-titulo dark:text-titulo-dark">{hecho.titulo}</div>
+                    <div className="text-[13px] text-suave dark:text-suave-dark space-y-1">
                       {hecho.lineas.map((l, i) => (
                         <div key={i} className={l.startsWith("Autocompletado") ? "inline-flex items-center gap-1 text-marca" : ""}>
                           {l.startsWith("Autocompletado") && <HiSparkles />} {l}
@@ -504,7 +508,7 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
                       ))}
                     </div>
                   </div>
-                  <button onClick={() => onSaved?.()} className={`mt-4 w-full h-12 rounded-xl text-sm ${UI.btnPrimary}`}>Listo</button>
+                  <button onClick={() => onSaved?.()} className={`mt-4 w-full h-11 rounded-lg text-[14px] ${UI.btnPrimary}`}>Listo</button>
                 </motion.div>
               ) : (
                 <motion.div key={`paso-${flujo}-${paso}`} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
@@ -517,9 +521,9 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
             {/* Footer (fijo abajo · no se muestra en éxito ni en revisión, que traen sus botones) */}
             {/* 📱 En mobile se apila (principal arriba, Cancelar abajo); fila a la derecha en sm+ */}
             {!hecho && !enRevision && (
-              <div className="shrink-0 px-5 sm:px-6 py-4 sm:py-5 border-t-2 border-linea dark:border-linea-dark flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-                <button onClick={onClose} disabled={saving} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm ${UI.btnGhost}`}>Cancelar</button>
-                <button onClick={acc.fn} disabled={acc.disabled} className={`w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl text-sm inline-flex items-center justify-center gap-2 ${UI.btnPrimary}`}>
+              <div className="shrink-0 px-5 sm:px-6 py-4 border-t border-linea dark:border-linea-dark flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
+                <button onClick={onClose} disabled={saving} className={`w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-lg text-[14px] ${UI.btnGhost}`}>Cancelar</button>
+                <button onClick={acc.fn} disabled={acc.disabled} className={`w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-lg text-[14px] inline-flex items-center justify-center gap-2 ${UI.btnPrimary}`}>
                   {saving
                     ? <><div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Procesando…</>
                     : <>{acc.icon || <HiCheck />} {acc.label}</>}

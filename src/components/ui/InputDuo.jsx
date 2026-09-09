@@ -2,11 +2,15 @@
 import { forwardRef } from "react";
 
 /**
- * ⌨️ Input redondo gordo estilo Duolingo, con label opcional, icono e error.
+ * ⌨️ Input de THAMES, con label opcional, icono e error.
+ *
+ * 🆕 Rediseño "profesional": borde de 1px (antes 3px), esquinas rounded-lg
+ * (antes rounded-2xl) y una altura más estándar (antes h-13 = 52px, muy
+ * alto). El label pasa de MAYÚSCULA+negrita a texto normal en gris medio.
  *
  * Props:
  *   label: texto arriba del input (opcional)
- *   required: muestra * rojo junto al label
+ *   required: muestra * roja junto al label
  *   icon: elemento/ícono a la izquierda (opcional)
  *   error: string de error a mostrar abajo en rojo (opcional)
  *   ...resto: type, value, onChange, placeholder, name, etc.
@@ -19,31 +23,31 @@ const InputDuo = forwardRef(function InputDuo(
   ref
 ) {
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div className={`flex flex-col gap-1.5 ${className}`}>
       {label && (
-        <label className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark ml-1">
+        <label className="text-[13px] font-medium text-suave dark:text-suave-dark ml-0.5">
           {label}
           {required && <span className="text-duo-rojo ml-1">*</span>}
         </label>
       )}
       <div className="relative">
         {icon && (
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-lg pointer-events-none">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark text-base pointer-events-none">
             {icon}
           </span>
         )}
         <input
           ref={ref}
-          className={`w-full h-13 rounded-2xl border-[3px] bg-surface dark:bg-surface-dark
-            text-[15px] font-bold text-titulo dark:text-titulo-dark
-            placeholder:text-suave dark:placeholder:text-suave-dark placeholder:font-normal
+          className={`w-full h-10 rounded-lg border bg-card dark:bg-card-dark
+            text-[14px] font-normal text-titulo dark:text-titulo-dark
+            placeholder:text-suave dark:placeholder:text-suave-dark
             outline-none transition-colors [color-scheme:light] dark:[color-scheme:dark]
-            ${icon ? "pl-12 pr-4" : "px-4"}
-            ${error ? "border-duo-rojo" : "border-linea dark:border-linea-dark focus:border-duo-azul"}`}
+            ${icon ? "pl-10 pr-3.5" : "px-3.5"}
+            ${error ? "border-duo-rojo" : "border-linea dark:border-linea-dark focus:border-duo-violeta"}`}
           {...rest}
         />
       </div>
-      {error && <span className="text-[11px] font-extrabold text-duo-rojo ml-1">{error}</span>}
+      {error && <span className="text-[12px] font-medium text-duo-rojo ml-0.5">{error}</span>}
     </div>
   );
 });

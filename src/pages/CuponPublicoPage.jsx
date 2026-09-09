@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { HiCheck } from "react-icons/hi";
 
 // Base de la API (misma var que el resto del front). Le sacamos un /api final
 // si viniera incluido, y armamos la ruta pública del portal.
@@ -85,35 +86,35 @@ export default function CuponPublicoPage() {
 
         {/* Header */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black">T</div>
-          <span className="font-bold text-slate-800 text-lg">Estudio Thames</span>
+          <div className="h-9 w-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-semibold">T</div>
+          <span className="font-semibold text-slate-800 text-lg">Estudio Thames</span>
         </div>
 
         {loading && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500">
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
             Cargando tus cupones…
           </div>
         )}
 
         {!loading && error && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-            <p className="text-rose-600 font-semibold mb-1">No pudimos abrir tus cupones</p>
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+            <p className="text-rose-600 font-medium mb-1">No pudimos abrir tus cupones</p>
             <p className="text-slate-500 text-sm">{error}</p>
           </div>
         )}
 
         {!loading && !error && data && (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {/* Datos */}
             <div className="p-5 border-b border-slate-100">
-              <p className="text-sm text-slate-500">Hola{data.nombre ? `, ${data.nombre}` : ""} 👋</p>
-              <p className="font-bold text-slate-800 text-lg leading-tight mt-0.5">{data.vehiculo}</p>
+              <p className="text-sm text-slate-500">Hola{data.nombre ? `, ${data.nombre}` : ""}</p>
+              <p className="font-semibold text-slate-800 text-lg leading-tight mt-0.5">{data.vehiculo}</p>
               <p className="text-sm text-slate-500">Patente {data.patente}</p>
             </div>
 
             {/* Cupones */}
             <div className="p-4 space-y-3">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Tus cupones</p>
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wide px-1">Tus cupones</p>
 
               {data.cupones.length === 0 && (
                 <p className="text-sm text-slate-500 px-1 py-4 text-center">No hay cupones cargados todavía.</p>
@@ -123,34 +124,34 @@ export default function CuponPublicoPage() {
                 const badge = BADGE[c.estado] || BADGE.PENDIENTE;
                 const puedeReportar = c.estado === "PENDIENTE" || c.estado === "VENCIDA";
                 return (
-                  <div key={c.id} className="rounded-xl border border-slate-200 p-4">
+                  <div key={c.id} className="rounded-lg border border-slate-200 p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-slate-700">
+                      <span className="text-sm font-medium text-slate-700">
                         Vence {fmtFecha(c.fecha_vencimiento)}
                       </span>
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${badge.cls}`}>
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
                         {badge.txt}
                       </span>
                     </div>
-                    <p className="text-2xl font-black text-slate-800 mb-3">{fmtMonto(c.monto)}</p>
+                    <p className="text-2xl font-semibold text-slate-800 mb-3">{fmtMonto(c.monto)}</p>
 
                     {puedeReportar && (
                       <button
                         onClick={() => reportar(c.id)}
                         disabled={enviando === c.id}
-                        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition"
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-medium rounded-lg py-2.5 flex items-center justify-center gap-2 transition-colors"
                       >
-                        {enviando === c.id ? "Registrando…" : "✓ Ya pagué"}
+                        {enviando === c.id ? "Registrando…" : <><HiCheck /> Ya pagué</>}
                       </button>
                     )}
                     {c.estado === "REPORTADO" && (
                       <p className="text-center text-sky-600 text-sm font-medium py-2">
-                        ¡Gracias! Ya recibimos tu aviso 🙌
+                        Gracias, ya recibimos tu aviso
                       </p>
                     )}
                     {c.estado === "PAGADA" && (
                       <p className="text-center text-emerald-600 text-sm font-medium py-2">
-                        Pago confirmado ✓
+                        Pago confirmado
                       </p>
                     )}
                   </div>
@@ -161,7 +162,7 @@ export default function CuponPublicoPage() {
             <div className="px-5 py-4 bg-slate-50 border-t border-slate-100">
               <p className="text-xs text-slate-400 text-center leading-relaxed">
                 Pagá el cupón en Rapipago, Pago Fácil o Mercado Pago, y después tocá "Ya pagué".
-                Nosotros lo verificamos. 🙌
+                Nosotros lo verificamos.
               </p>
             </div>
           </div>

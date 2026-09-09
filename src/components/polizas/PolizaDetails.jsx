@@ -43,24 +43,24 @@ function bannerEstado(estadoRaw) {
   const map = {
     activa: {
       label: "Activa",
-      clases: "bg-duo-verde text-white shadow-[0_5px_0_var(--color-duo-verde-sombra)]",
+      clases: "bg-duo-verde text-white",
     },
     vencida: {
       label: "Vencida",
-      clases: "bg-duo-rojo text-white shadow-[0_5px_0_var(--color-duo-rojo-sombra)]",
+      clases: "bg-duo-rojo text-white",
     },
     cancelada: {
       label: "Cancelada",
-      clases: "bg-duo-rojo text-white shadow-[0_5px_0_var(--color-duo-rojo-sombra)]",
+      clases: "bg-duo-rojo text-white",
     },
     finalizada: {
       label: "Finalizada",
-      clases: "bg-suave text-white shadow-[0_5px_0_rgba(0,0,0,0.15)] dark:bg-suave-dark",
+      clases: "bg-suave text-white dark:bg-suave-dark",
     },
   };
   return map[v] || {
     label: estadoRaw ? String(estadoRaw).toUpperCase() : "Sin estado",
-    clases: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-2 border-linea dark:border-linea-dark",
+    clases: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark",
   };
 }
 
@@ -73,7 +73,7 @@ function SectionTitle({ Icon, title, right }) {
   return (
     <div className="mb-3 flex items-center gap-2">
       <Icon className="h-[18px] w-[18px] text-duo-azul" />
-      <span className="text-[15px] font-black text-titulo dark:text-titulo-dark">{title}</span>
+      <span className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">{title}</span>
       {right ? <span className="ml-auto text-xs text-suave dark:text-suave-dark">{right}</span> : null}
     </div>
   );
@@ -83,8 +83,8 @@ function FilaDato({ label, value, mono = false }) {
   if (!value && value !== 0) return null;
   return (
     <div className="flex items-center justify-between gap-3 border-b border-linea dark:border-linea-dark py-2.5 last:border-0">
-      <span className="text-xs font-bold text-suave dark:text-suave-dark">{label}</span>
-      <span className={`text-right text-[13px] font-bold text-titulo dark:text-titulo-dark ${mono ? "font-mono uppercase tracking-wide" : ""}`}>{value}</span>
+      <span className="text-xs text-suave dark:text-suave-dark">{label}</span>
+      <span className={`text-right text-[13px] font-medium text-titulo dark:text-titulo-dark ${mono ? "font-mono uppercase" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -242,8 +242,8 @@ export default function PolizaDetails() {
       <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">
         <div className="animate-pulse space-y-4">
           <div className="h-9 w-1/2 rounded bg-linea dark:bg-linea-dark" />
-          <div className="h-20 w-full rounded-2xl bg-linea dark:bg-linea-dark" />
-          <div className="h-40 w-full rounded-2xl bg-linea dark:bg-linea-dark" />
+          <div className="h-20 w-full rounded-xl bg-linea dark:bg-linea-dark" />
+          <div className="h-40 w-full rounded-xl bg-linea dark:bg-linea-dark" />
         </div>
       </div>
     );
@@ -257,7 +257,7 @@ export default function PolizaDetails() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">Acceso denegado / Error</h2>
+        <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Acceso denegado / Error</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-suave dark:text-suave-dark">
           {String(loadError || "No tenés permisos para ver esta póliza o no pertenece a tu sucursal.")}
         </p>
@@ -285,20 +285,20 @@ export default function PolizaDetails() {
             type="button"
             onClick={isWebAdmin ? abrirCambioEstado : undefined}
             disabled={!isWebAdmin}
-            className={`mb-5 flex w-full items-center justify-between gap-4 rounded-3xl px-6 py-5 text-left transition
+            className={`mb-5 flex w-full items-center justify-between gap-4 rounded-2xl px-6 py-5 text-left transition-colors
               ${b.clases}
-              ${isWebAdmin ? "cursor-pointer active:translate-y-[3px] active:shadow-none" : "cursor-default"}`}
+              ${isWebAdmin ? "cursor-pointer hover:brightness-110" : "cursor-default"}`}
           >
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.15em] opacity-80">
+              <div className="text-[11px] opacity-80">
                 Estado de la póliza
               </div>
-              <div className="mt-1 text-3xl font-black uppercase leading-none tracking-wide sm:text-4xl">
+              <div className="mt-1 text-3xl font-semibold leading-none sm:text-4xl">
                 {b.label}
               </div>
             </div>
             {isWebAdmin ? (
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white/20 px-3.5 py-2 text-xs font-black">
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/20 px-3.5 py-2 text-xs font-medium">
                 <FaExchangeAlt className="h-3.5 w-3.5" /> Cambiar
               </span>
             ) : null}
@@ -307,7 +307,7 @@ export default function PolizaDetails() {
       })()}
 
       <div className="mb-4 flex items-center gap-4">
-        <div className="relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+        <div className="relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
           <div className="grid h-full w-full place-items-center text-duo-azul">
             <FaCar className="text-2xl" />
           </div>
@@ -315,13 +315,13 @@ export default function PolizaDetails() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[13px] text-suave dark:text-suave-dark">Póliza</span>
-            <span className="text-base font-black text-duo-azul">{numero}</span>
+            <span className="text-base font-semibold text-duo-azul">{numero}</span>
           </div>
-          <div className="mt-1 truncate text-[17px] font-black text-titulo dark:text-titulo-dark">
+          <div className="mt-1 truncate text-[17px] font-semibold text-titulo dark:text-titulo-dark">
             {poliza?.marca} {poliza?.modelo}
           </div>
           <div className="mt-0.5 truncate text-[13px] text-suave dark:text-suave-dark">
-            {poliza?.patente ? <span className="font-mono uppercase tracking-wide text-titulo dark:text-titulo-dark">{poliza.patente}</span> : null}
+            {poliza?.patente ? <span className="font-mono uppercase text-titulo dark:text-titulo-dark">{poliza.patente}</span> : null}
             {poliza?.patente ? " · " : ""}{compania} · Cobertura {cobertura}
           </div>
         </div>
@@ -330,16 +330,16 @@ export default function PolizaDetails() {
       {clienteId ? (
         <Link
           to={`/clientes/${clienteId}`}
-          className="mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-duo-azul/40 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-4 py-3.5 transition hover:border-duo-azul"
+          className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-4 py-3.5 transition-colors hover:border-duo-azul"
         >
           <span className="flex min-w-0 items-center gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-duo-azul text-sm font-black text-white">{iniciales}</span>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-duo-azul text-sm font-semibold text-white">{iniciales}</span>
             <span className="min-w-0">
-              <span className="block truncate text-[15px] font-black text-titulo dark:text-titulo-dark">{clienteNombre || "Sin titular"}</span>
-              {clienteDni ? <span className="block text-xs font-bold text-duo-azul">DNI {clienteDni}</span> : null}
+              <span className="block truncate text-[15px] font-semibold text-titulo dark:text-titulo-dark">{clienteNombre || "Sin titular"}</span>
+              {clienteDni ? <span className="block text-xs text-duo-azul">DNI {clienteDni}</span> : null}
             </span>
           </span>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-duo-azul px-3.5 py-2 text-xs font-black text-white">Ver cliente <HiChevronRight className="h-4 w-4" /></span>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-duo-azul px-3.5 py-2 text-xs font-medium text-white">Ver cliente <HiChevronRight className="h-4 w-4" /></span>
         </Link>
       ) : null}
 
@@ -357,27 +357,27 @@ export default function PolizaDetails() {
 
       <div className="mb-6 grid grid-cols-2 gap-2.5">
         <CardDuo className="p-3.5">
-          <div className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">Compañía</div>
-          <div className="text-[15px] font-black text-duo-azul">{compania}</div>
+          <div className="mb-1.5 text-[11px] text-suave dark:text-suave-dark">Compañía</div>
+          <div className="text-[15px] font-semibold text-duo-azul">{compania}</div>
           <div className="mt-0.5 text-xs text-suave dark:text-suave-dark">Cobertura {cobertura}</div>
           <div className="mt-3 border-t border-linea dark:border-linea-dark pt-2.5">
-            <div className="text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">Oficina</div>
-            <div className="mt-1 flex items-center gap-1.5 text-lg font-black text-duo-azul">
+            <div className="text-[11px] text-suave dark:text-suave-dark">Oficina</div>
+            <div className="mt-1 flex items-center gap-1.5 text-lg font-semibold text-duo-azul">
               <HiOfficeBuilding className="h-4 w-4 shrink-0" /> <span className="truncate">{oficina}</span>
             </div>
           </div>
         </CardDuo>
         <CardDuo className="flex flex-col p-3.5">
-          <div className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark">Próximo pago</div>
+          <div className="mb-1.5 text-[11px] text-suave dark:text-suave-dark">Próximo pago</div>
           <div className="flex flex-1 flex-col justify-center">
             {proxima?.fecha_vencimiento ? (
               <>
-                <div className="text-2xl font-black leading-tight text-duo-amarillo-sombra dark:text-duo-amarillo sm:text-3xl">{dayjs(proxima.fecha_vencimiento).format("DD/MM/YYYY")}</div>
+                <div className="text-2xl font-semibold leading-tight text-duo-amarillo-sombra dark:text-duo-amarillo sm:text-3xl">{dayjs(proxima.fecha_vencimiento).format("DD/MM/YYYY")}</div>
                 <div className="mt-1.5 text-sm text-suave dark:text-suave-dark">Cuota {proxima.cuota_nro} de {cuotas.length}</div>
               </>
             ) : (
               <>
-                <div className="text-2xl font-black leading-tight text-duo-verde-sombra dark:text-duo-verde sm:text-3xl">Al día</div>
+                <div className="text-2xl font-semibold leading-tight text-duo-verde-sombra dark:text-duo-verde sm:text-3xl">Al día</div>
                 <div className="mt-1.5 text-sm text-suave dark:text-suave-dark">Sin cuotas pendientes</div>
               </>
             )}
@@ -459,7 +459,7 @@ export default function PolizaDetails() {
           </>
         }
       >
-        <p className="mb-4 text-[13px] font-bold text-suave dark:text-suave-dark">
+        <p className="mb-4 text-[13px] text-suave dark:text-suave-dark">
           Estado actual:{" "}
           <Badge tono={estadoATono(poliza?.estado)} size="sm">{poliza?.estado || "—"}</Badge>
         </p>
@@ -474,12 +474,12 @@ export default function PolizaDetails() {
                   setNuevoEstado(op.value);
                   setAceptaSinRecordatorio(false); // reset del check al cambiar de opción
                 }}
-                className={`flex items-center justify-between rounded-2xl border-[3px] px-4 py-3 text-left transition
+                className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors
                   ${activo
                     ? "border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]"
                     : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-azul/50"}`}
               >
-                <span className="text-[15px] font-black text-titulo dark:text-titulo-dark">{op.label}</span>
+                <span className="text-[15px] font-medium text-titulo dark:text-titulo-dark">{op.label}</span>
                 <Badge tono={op.tono} size="sm">{op.value.toUpperCase()}</Badge>
               </button>
             );
@@ -488,22 +488,22 @@ export default function PolizaDetails() {
 
         {/* 🔕 Aviso: al pasar a cancelada/finalizada, no recibe más recordatorios */}
         {requiereConfirmacion ? (
-          <div className="mt-4 rounded-2xl border-2 border-duo-amarillo/60 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-4">
-            <p className="text-[13px] font-black text-duo-amarillo-sombra dark:text-duo-amarillo">
+          <div className="mt-4 rounded-xl border border-duo-amarillo/50 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] p-4">
+            <p className="text-[13px] font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo">
               ⚠️ Este cliente NO recibirá más el recordatorio de cuota por WhatsApp
             </p>
-            <p className="mt-1 text-[12px] font-bold text-titulo dark:text-titulo-dark leading-relaxed">
+            <p className="mt-1 text-[12px] text-titulo dark:text-titulo-dark leading-relaxed">
               Al dejar la póliza en <span className="uppercase">{nuevoEstado}</span>, el envío
               automático de recordatorios de cuota deja de incluir a esta póliza.
             </p>
-            <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface dark:bg-surface-dark p-3">
+            <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg bg-surface dark:bg-surface-dark p-3">
               <input
                 type="checkbox"
                 checked={aceptaSinRecordatorio}
                 onChange={(e) => setAceptaSinRecordatorio(e.target.checked)}
                 className="mt-0.5 h-5 w-5 shrink-0 accent-duo-verde"
               />
-              <span className="text-[13px] font-bold text-titulo dark:text-titulo-dark">
+              <span className="text-[13px] text-titulo dark:text-titulo-dark">
                 Entiendo y acepto que no se le enviarán más recordatorios de cuota a este cliente.
               </span>
             </label>
@@ -530,7 +530,7 @@ export default function PolizaDetails() {
           </>
         }
       >
-        <p className="text-[15px] font-bold text-titulo dark:text-titulo-dark leading-relaxed">
+        <p className="text-[15px] text-titulo dark:text-titulo-dark leading-relaxed">
           ¿Confirmás la eliminación total de la póliza{" "}
           <span className="text-duo-rojo">{poliza?.numero_poliza || "S/N"}</span>?
         </p>

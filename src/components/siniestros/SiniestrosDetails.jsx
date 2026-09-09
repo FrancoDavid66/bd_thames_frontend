@@ -1,15 +1,15 @@
-// src/components/siniestros/SiniestrosDetails.jsx  (responsive)
+// src/components/siniestros/SiniestrosDetails.jsx
 //
-// 📱 RESPONSIVE: ya venía muy bien — la bitácora se apila abajo en mobile
-//    (flex-col lg:flex-row) y vuelve al costado en desktop. Esta pasada: los
-//    grids de datos usan 1 columna en pantallas muy chicas (<380px) y 2 desde
-//    ahí, para que los valores largos no se corten; botón "Nota" con buen tap.
+// 📱 RESPONSIVE: la bitácora se apila abajo en mobile (flex-col lg:flex-row) y
+//    vuelve al costado en desktop. Los grids de datos usan 1 columna en
+//    pantallas muy chicas (<380px) y 2 desde ahí, para que los valores largos
+//    no se corten; botón "Nota" con buen tap.
 //    NOTA: el scroll interno del modal lo maneja <ModalDuo> (no se toca acá).
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
 import { toast } from "react-hot-toast";
-import { HiPlus } from "react-icons/hi";
+import { HiPlus, HiExclamationCircle, HiClock } from "react-icons/hi";
 
 import { getEventosBySiniestro, addEvento } from "../../store/slices/siniestrosSlice";
 import SiniestroFotosPanel from "./SiniestroFotosPanel";
@@ -29,8 +29,8 @@ const ESTADO_TONO = {
 function Dato({ label, value, mono = false }) {
   return (
     <div>
-      <span className="block text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-0.5">{label}</span>
-      <span className={`text-sm font-bold text-titulo dark:text-titulo-dark ${mono ? "font-mono uppercase" : ""}`}>{value || "—"}</span>
+      <span className="block text-[11px] text-suave dark:text-suave-dark mb-0.5">{label}</span>
+      <span className={`text-sm text-titulo dark:text-titulo-dark ${mono ? "font-mono uppercase" : ""}`}>{value || "—"}</span>
     </div>
   );
 }
@@ -90,7 +90,7 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
       onClose={onClose}
       title={`Siniestro #${siniestro.id}`}
       subtitle={siniestro.estado_label || siniestro.estado}
-      icon={<span className="text-xl">🚨</span>}
+      icon={<HiExclamationCircle />}
       iconTono="rojo"
       size="lg"
     >
@@ -100,7 +100,7 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
           <div className="flex items-center gap-2 flex-wrap">
             <Badge tono={ESTADO_TONO[siniestro.estado] || "neutro"}>{siniestro.estado_label || siniestro.estado}</Badge>
             {siniestro.fecha_siniestro && (
-              <span className="text-xs font-bold text-suave dark:text-suave-dark">{dayjs(siniestro.fecha_siniestro).format("DD/MM/YYYY")}</span>
+              <span className="text-xs text-suave dark:text-suave-dark">{dayjs(siniestro.fecha_siniestro).format("DD/MM/YYYY")}</span>
             )}
           </div>
 
@@ -114,8 +114,8 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
           </div>
 
           <div>
-            <span className="block text-[10px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-2">Descripción de los hechos</span>
-            <div className="p-3 bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl text-sm font-bold text-titulo dark:text-titulo-dark whitespace-pre-wrap">
+            <span className="block text-[11px] text-suave dark:text-suave-dark mb-2">Descripción de los hechos</span>
+            <div className="p-3 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-xl text-sm text-titulo dark:text-titulo-dark whitespace-pre-wrap">
               {siniestro.descripcion || "—"}
             </div>
           </div>
@@ -127,8 +127,8 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
 
           {/* Tercero (solo si hay) */}
           {(siniestro.tercero_nombre || siniestro.tercero_patente) && (
-            <div className="p-4 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] rounded-2xl">
-              <span className="block text-[10px] font-black uppercase tracking-wide text-duo-rojo mb-3">Datos del tercero</span>
+            <div className="p-4 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] rounded-xl">
+              <span className="block text-[11px] text-duo-rojo mb-3">Datos del tercero</span>
               <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
                 <Dato label="Nombre" value={siniestro.tercero_nombre} />
                 <Dato label="Teléfono" value={siniestro.tercero_telefono} />
@@ -140,9 +140,11 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
         </div>
 
         {/* DERECHA: bitácora */}
-        <div className="w-full lg:w-80 flex flex-col border-t-2 lg:border-t-0 lg:border-l-2 border-linea dark:border-linea-dark pt-5 lg:pt-0 lg:pl-6">
+        <div className="w-full lg:w-80 flex flex-col border-t lg:border-t-0 lg:border-l border-linea dark:border-linea-dark pt-5 lg:pt-0 lg:pl-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-base font-black text-titulo dark:text-titulo-dark">⏱️ Bitácora</h3>
+            <h3 className="text-base font-semibold text-titulo dark:text-titulo-dark flex items-center gap-1.5">
+              <HiClock className="w-4 h-4 text-suave dark:text-suave-dark" /> Bitácora
+            </h3>
             <Boton3D variant="azul" size="sm" onClick={() => setNotaAbierta((v) => !v)}>
               <HiPlus className="w-3.5 h-3.5" /> Nota
             </Boton3D>
@@ -153,13 +155,13 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
             <CardDuo className="p-3 mb-4 space-y-3">
               <InputDuo type="date" label="Fecha" value={notaFecha} onChange={(e) => setNotaFecha(e.target.value)} />
               <div>
-                <label className="text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark ml-1">Nota</label>
+                <label className="text-[11px] text-suave dark:text-suave-dark ml-1">Nota</label>
                 <textarea
                   value={notaTexto}
                   onChange={(e) => setNotaTexto(e.target.value)}
                   rows={3}
                   placeholder="Qué pasó / qué se hizo..."
-                  className="mt-2 w-full rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-[15px] font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul resize-none"
+                  className="mt-2 w-full rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-sm text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul resize-none"
                 />
               </div>
               <div className="flex gap-2">
@@ -177,19 +179,19 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
                 <div className="w-6 h-6 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
               </div>
             ) : eventosError ? (
-              <div className="p-3 border-2 border-duo-rojo/40 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-center">
-                <p className="text-xs font-bold text-duo-rojo">Error al cargar la bitácora</p>
+              <div className="p-3 border border-duo-rojo/30 rounded-xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-center">
+                <p className="text-xs text-duo-rojo">Error al cargar la bitácora</p>
               </div>
             ) : eventos.length > 0 ? (
               eventos.map((evento) => (
-                <div key={evento.id} className="p-3 bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl">
-                  <p className="text-[10px] font-black text-duo-azul mb-1 uppercase">{dayjs(evento.fecha_evento).format("DD MMM YYYY")}</p>
-                  <p className="text-sm font-bold text-titulo dark:text-titulo-dark leading-relaxed">{evento.descripcion_evento}</p>
+                <div key={evento.id} className="p-3 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-xl">
+                  <p className="text-[11px] text-duo-azul mb-1">{dayjs(evento.fecha_evento).format("DD MMM YYYY")}</p>
+                  <p className="text-sm text-titulo dark:text-titulo-dark leading-relaxed">{evento.descripcion_evento}</p>
                 </div>
               ))
             ) : (
-              <div className="p-4 border-2 border-dashed border-linea dark:border-linea-dark rounded-2xl text-center">
-                <p className="text-sm font-bold text-suave dark:text-suave-dark">No hay movimientos registrados.</p>
+              <div className="p-4 border-2 border-dashed border-linea dark:border-linea-dark rounded-xl text-center">
+                <p className="text-sm text-suave dark:text-suave-dark">No hay movimientos registrados.</p>
               </div>
             )}
           </div>

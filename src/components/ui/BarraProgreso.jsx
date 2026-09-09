@@ -1,12 +1,16 @@
 // src/components/ui/BarraProgreso.jsx
 /**
- * 📊 Barra de progreso estilo Duolingo (para procesos de varios pasos o completitud).
+ * 📊 Barra de progreso de THAMES (para procesos de varios pasos o completitud).
  *
  * Sirve para: asegurar un cliente nuevo, cobrar, tareas, controles diarios, etc.
  * Podés usarla de 2 formas:
  *
  *  A) Por PASOS:   <BarraProgreso paso={2} totalPasos={4} label="Alta de cliente" />
  *  B) Por PORCENTAJE: <BarraProgreso valor={80} label="Ficha completa" />
+ *
+ * 🆕 Rediseño "profesional": se sacó el brillo de vidrio de arriba de la
+ * barra (el detalle 3D estilo Duolingo) y el "¡Completo! 🎉" — ahora dice
+ * simplemente "Completo". Labels en texto normal, no mayúscula.
  *
  * Props:
  *   valor: 0-100 (si no pasás paso/totalPasos)
@@ -21,7 +25,7 @@ const TONOS_FILL = {
   azul: "bg-duo-azul",
   amarillo: "bg-duo-amarillo",
 };
-const ALTURAS = { sm: "h-2.5", md: "h-4", lg: "h-5" };
+const ALTURAS = { sm: "h-1.5", md: "h-2", lg: "h-2.5" };
 
 export default function BarraProgreso({
   valor = 0,
@@ -43,20 +47,20 @@ export default function BarraProgreso({
   const alt = ALTURAS[size] || ALTURAS.md;
 
   const textoDerecha = modoPasos
-    ? completo ? "¡Completo! 🎉" : `Paso ${Math.min(paso, totalPasos)} de ${totalPasos}`
-    : completo ? "¡Completo! 🎉" : `${pct}%`;
+    ? completo ? "Completo" : `Paso ${Math.min(paso, totalPasos)} de ${totalPasos}`
+    : completo ? "Completo" : `${pct}%`;
 
   return (
     <div className={className}>
       {(label || mostrarTexto) && (
         <div className="flex items-center justify-between mb-1.5">
           {label && (
-            <span className="text-[11px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">
+            <span className="text-[13px] font-medium text-suave dark:text-suave-dark">
               {label}
             </span>
           )}
           {mostrarTexto && (
-            <span className={`text-[11px] font-extrabold uppercase tracking-wide ${completo ? "text-duo-verde-sombra dark:text-duo-verde" : "text-suave dark:text-suave-dark"}`}>
+            <span className={`text-[13px] font-medium ${completo ? "text-duo-verde-sombra dark:text-duo-verde" : "text-suave dark:text-suave-dark"}`}>
               {textoDerecha}
             </span>
           )}
@@ -64,12 +68,9 @@ export default function BarraProgreso({
       )}
       <div className={`w-full ${alt} bg-linea dark:bg-linea-dark rounded-full overflow-hidden`}>
         <div
-          className={`h-full rounded-full ${fill} transition-all duration-500 relative`}
+          className={`h-full rounded-full ${fill} transition-all duration-500`}
           style={{ width: `${pct}%` }}
-        >
-          {/* brillo superior estilo Duo */}
-          <span className="absolute top-[2px] left-1.5 right-1.5 h-[3px] bg-white/40 rounded-full" />
-        </div>
+        />
       </div>
     </div>
   );

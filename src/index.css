@@ -63,6 +63,9 @@
        border-linea      → bordes suaves
        text-titulo       → texto principal
        text-suave        → texto secundario / labels
+     Sin cambios en esta vuelta: ya eran grises neutros (slate), no
+     "estilo Duolingo" — el cambio de tono profesional vive en la
+     paleta de abajo, no acá.
      ------------------------------------------------------------------ */
   --color-surface: #f8fafc;      /* slate-50  — fondo página (claro) */
   --color-card: #ffffff;         /* blanco    — tarjetas (claro) */
@@ -78,45 +81,54 @@
   --color-suave-dark: #94a3b8;   /* slate-400 — texto secundario (oscuro) */
 
   /* ==================================================================
-     🦉 ESTILO DUOLINGO — colores planos y vivos + sombras 3D
+     💼 PALETA "DUO" — RECOLOREADA A TONO PROFESIONAL (ex-Duolingo)
      ------------------------------------------------------------------
-     Cada color "vivo" trae su versión -sombra (más oscura) para el
-     efecto de botón 3D (borde inferior que se hunde al apretar).
-     Uso: bg-duo-verde, text-duo-azul, shadow-[0_5px_0] con duo-*-sombra.
-     Los -soft son los fondos tenues de badges/chips (modo claro).
+     🆕 Mismos NOMBRES de siempre (duo-verde, duo-azul, etc.) — así todo
+     lo que ya usa <Boton3D variant="azul">, <Badge tono="verde">, o
+     directamente clases bg-duo-* en cualquier página, hereda el tono
+     nuevo SIN que haga falta tocar esas páginas una por una. Lo que
+     cambia son los VALORES: colores más apagados (tipo Stripe), no
+     los saturados/brillantes de antes. El violeta pasa a ser el
+     acento principal de la app (ya era "lo más importante" — Emisión
+     de póliza ya lo usaba).
+
+     Cada color sigue trayendo su -sombra (ahora un tono más oscuro
+     para hover/foco, YA NO para el efecto de botón 3D que se hundía)
+     y su -soft (fondo pálido de badges — se mantiene, es un patrón
+     sano y lo sigue usando Stripe también).
      ================================================================== */
-  --color-duo-verde: #58cc02;        /* verde icónico — éxito / completo / activa */
-  --color-duo-verde-sombra: #4daa02; /* sombra 3D */
-  --color-duo-verde-soft: #d7ffb8;   /* fondo tenue badge */
+  --color-duo-violeta: #5b52e6;        /* 🆕 ACENTO PRINCIPAL de la app */
+  --color-duo-violeta-sombra: #453ecc;
+  --color-duo-violeta-soft: #eeecfd;
 
-  --color-duo-azul: #1cb0f6;         /* celeste — acción / links / oficina */
-  --color-duo-azul-sombra: #1899d6;
-  --color-duo-azul-soft: #ddf4ff;
+  --color-duo-azul: #2563eb;           /* info / secundario */
+  --color-duo-azul-sombra: #1d4ed8;
+  --color-duo-azul-soft: #dbeafe;
 
-  --color-duo-amarillo: #ffc800;     /* amarillo — pendiente / por vencer / atención */
-  --color-duo-amarillo-sombra: #e6a800;
-  --color-duo-amarillo-soft: #fff3c4;
+  --color-duo-verde: #16a34a;          /* éxito / completo / cobrado */
+  --color-duo-verde-sombra: #15803d;
+  --color-duo-verde-soft: #dcfce7;
 
-  --color-duo-rojo: #ff4b4b;         /* rojo — eliminar / vencida / error */
-  --color-duo-rojo-sombra: #ea2b2b;
-  --color-duo-rojo-soft: #ffe0e0;
+  --color-duo-rojo: #dc2626;           /* peligro / vencida / eliminar */
+  --color-duo-rojo-sombra: #b91c1c;
+  --color-duo-rojo-soft: #fee2e2;
 
-  --color-duo-violeta: #ce82ff;      /* violeta — extra / documentación */
-  --color-duo-violeta-sombra: #b968e6;
-  --color-duo-violeta-soft: #f3e8ff;
+  --color-duo-amarillo: #d97706;       /* alerta / pendiente / por vencer */
+  --color-duo-amarillo-sombra: #b45309;
+  --color-duo-amarillo-soft: #fef3c7;
 
-  /* Texto/superficie estilo Duo (claro): gris oscuro, NO negro puro */
+  /* Texto/superficie estilo Duo (claro): sin cambios, ya eran neutros */
   --color-duo-texto: #3c3c3c;
   --color-duo-suave: #afafaf;
   --color-duo-linea: #e5e5e5;
   --color-duo-fondo: #f7f7f7;
 
-  /* Variantes DARK del estilo Duo (fondos tenues legibles sobre oscuro) */
-  --color-duo-verde-soft-dark: #1f3d0a;
-  --color-duo-azul-soft-dark: #0b3a52;
-  --color-duo-amarillo-soft-dark: #3d3208;
-  --color-duo-rojo-soft-dark: #4a1414;
-  --color-duo-violeta-soft-dark: #331a4a;
+  /* Variantes DARK (fondos tenues legibles sobre oscuro) */
+  --color-duo-violeta-soft-dark: #241f4d;
+  --color-duo-azul-soft-dark: #17284a;
+  --color-duo-verde-soft-dark: #10301d;
+  --color-duo-rojo-soft-dark: #3a1414;
+  --color-duo-amarillo-soft-dark: #3d2f08;
 }
 
 @font-face {

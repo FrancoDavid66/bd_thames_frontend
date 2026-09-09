@@ -10,7 +10,7 @@
 //    ("Ya renovada", "Finalizada", "No renueva"…) para que se vea qué se está
 //    por tocar, y el botón "Renovar" queda SIEMPRE disponible.
 
-import { HiRefresh, HiX, HiEye, HiArrowLeft, HiTicket, HiUpload } from "react-icons/hi";
+import { HiRefresh, HiX, HiEye, HiArrowLeft, HiTicket, HiUpload, HiSearch, HiCheckCircle } from "react-icons/hi";
 
 import Boton3D from "../ui/Boton3D";
 import Badge from "../ui/Badge";
@@ -92,7 +92,7 @@ function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, o
         disabled={submitting}
         title="Marcar que no va a renovar"
         aria-label="No renueva"
-        className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo transition-transform active:scale-90 disabled:opacity-40"
+        className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo transition-transform active:scale-90 disabled:opacity-40"
       >
         <HiX className="text-lg" />
       </button>
@@ -105,7 +105,7 @@ function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, o
         title="Ver detalle (nueva pestaña)"
         aria-label="Ver detalle"
         className={cx(
-          "inline-flex items-center justify-center h-10 w-10 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul transition-transform active:scale-90",
+          "inline-flex items-center justify-center h-10 w-10 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul transition-transform active:scale-90",
           submitting && "pointer-events-none opacity-40"
         )}
       >
@@ -135,7 +135,7 @@ function FilaDesktop({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, on
       <td className="p-4">
         <Badge tono="azul" size="sm">{getOficina(p)}</Badge>
       </td>
-      <td className={cx("p-4 text-sm font-black tracking-wider", textClass)}>
+      <td className={cx("p-4 text-sm font-semibold", textClass)}>
         <div className="flex items-center gap-2">
           <span>{p?.patente || "—"}</span>
           {/* 🎟️ El chip avisa de un vistazo cuáles necesitan el PDF. */}
@@ -145,13 +145,13 @@ function FilaDesktop({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, on
           {situacion && <Badge tono={situacion.tono} size="sm">{situacion.label}</Badge>}
         </div>
       </td>
-      <td className={cx("p-4 text-sm font-bold", textClass)}>{getCompania(p)}</td>
-      <td className={cx("p-4 text-sm font-bold", textClass)}>
+      <td className={cx("p-4 text-sm", textClass)}>{getCompania(p)}</td>
+      <td className={cx("p-4 text-sm", textClass)}>
         <div className="truncate max-w-[240px]" title={getNombreCompleto(p?.cliente)}>
           {getNombreCompleto(p?.cliente)}
         </div>
       </td>
-      <td className={cx("p-4 text-sm font-bold tabular-nums whitespace-nowrap", textClass)}>
+      <td className={cx("p-4 text-sm tabular-nums whitespace-nowrap", textClass)}>
         {formatVto(getVencimiento(p))}
       </td>
       <td className="p-4">
@@ -180,7 +180,7 @@ function CardMobile({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onD
     // 🎟️ Borde violeta para las de cuponera: se distinguen de lejos, sin leer.
     <div
       className={cx(
-        "rounded-2xl border-2 p-4",
+        "rounded-xl border p-4",
         descartada
           ? "border-duo-rojo/40 bg-duo-rojo-soft/40 dark:bg-[var(--color-duo-rojo-soft-dark)]/40"
           : llevaCuponera(p)
@@ -189,14 +189,14 @@ function CardMobile({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onD
       )}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className={cx("text-base font-black tracking-wider", textClass)}>{p?.patente || "—"}</span>
+        <span className={cx("text-base font-semibold", textClass)}>{p?.patente || "—"}</span>
         <div className="flex items-center gap-1.5">
           {llevaCuponera(p) && <Badge tono="violeta" size="sm"><HiTicket /> Cuponera</Badge>}
           {situacion && <Badge tono={situacion.tono} size="sm">{situacion.label}</Badge>}
           <Badge tono="azul" size="sm">{getOficina(p)}</Badge>
         </div>
       </div>
-      <div className={cx("text-sm font-bold", textClass)}>{getNombreCompleto(p?.cliente)}</div>
+      <div className={cx("text-sm", textClass)}>{getNombreCompleto(p?.cliente)}</div>
       <div className="mt-0.5 text-[13px] text-suave dark:text-suave-dark">
         {getCompania(p)} · Vto {formatVto(getVencimiento(p))}
       </div>
@@ -228,9 +228,9 @@ export default function Renovacionestable({
 }) {
   if (loading && (!items || items.length === 0)) {
     return (
-      <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-12 text-center">
+      <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-12 text-center">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-[3px] border-duo-azul/30 border-t-duo-azul" />
-        <p className="mt-3 text-sm font-bold text-suave dark:text-suave-dark">Cargando renovaciones…</p>
+        <p className="mt-3 text-sm text-suave dark:text-suave-dark">Cargando renovaciones…</p>
       </div>
     );
   }
@@ -239,17 +239,19 @@ export default function Renovacionestable({
     // En modo búsqueda el mensaje NO puede hablar de vencimientos (no filtramos
     // por eso). Si no hay nada, es que no existe una póliza con ese texto.
     const empty = buscando
-      ? { icon: "🔍", text: "Ninguna póliza coincide con esa búsqueda." }
+      ? { Icon: HiSearch, text: "Ninguna póliza coincide con esa búsqueda." }
       : {
-          renovar_hoy: { icon: "🎉", text: "No hay pólizas que venzan hoy." },
-          en_3_dias: { icon: "🎉", text: "Nada vence en los próximos 3 días." },
-          vencidas: { icon: "✅", text: "No tenés pólizas sin renovar." },
-        }[tab] || { icon: "🔍", text: "Sin resultados." };
+          renovar_hoy: { Icon: HiCheckCircle, text: "No hay pólizas que venzan hoy." },
+          en_3_dias: { Icon: HiCheckCircle, text: "Nada vence en los próximos 3 días." },
+          vencidas: { Icon: HiCheckCircle, text: "No tenés pólizas sin renovar." },
+        }[tab] || { Icon: HiSearch, text: "Sin resultados." };
+
+    const EmptyIcon = empty.Icon;
 
     return (
-      <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-12 text-center">
-        <div className="text-5xl mb-3">{empty.icon}</div>
-        <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">{empty.text}</p>
+      <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-12 text-center">
+        <EmptyIcon className="mx-auto mb-3 h-10 w-10 text-suave dark:text-suave-dark" />
+        <p className="text-[15px] font-medium text-titulo dark:text-titulo-dark">{empty.text}</p>
       </div>
     );
   }
@@ -257,7 +259,7 @@ export default function Renovacionestable({
   const COLS = ["Oficina", "Patente", "Compañía", "Asegurado", "Vto"];
 
   return (
-    <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-[0_2px_0_var(--color-duo-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)] overflow-hidden">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark overflow-hidden">
       {/* ===== DESKTOP: tabla ===== */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full border-collapse">
@@ -266,12 +268,12 @@ export default function Renovacionestable({
               {COLS.map((h) => (
                 <th
                   key={h}
-                  className="p-4 text-left text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark border-b-2 border-linea dark:border-linea-dark"
+                  className="p-4 text-left text-[11px] text-suave dark:text-suave-dark border-b border-linea dark:border-linea-dark"
                 >
                   {h}
                 </th>
               ))}
-              <th className="p-4 text-right text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark border-b-2 border-linea dark:border-linea-dark">
+              <th className="p-4 text-right text-[11px] text-suave dark:text-suave-dark border-b border-linea dark:border-linea-dark">
                 Acciones
               </th>
             </tr>
@@ -308,10 +310,10 @@ export default function Renovacionestable({
       </div>
 
       {/* Footer con conteo */}
-      <div className="border-t-2 border-linea dark:border-linea-dark px-4 py-3 text-[11px] font-bold text-suave dark:text-suave-dark">
+      <div className="border-t border-linea dark:border-linea-dark px-4 py-3 text-[11px] text-suave dark:text-suave-dark">
         Mostrando <span className="text-titulo dark:text-titulo-dark">{items.length}</span>{" "}
         {items.length === 1 ? "póliza" : "pólizas"}
       </div>
     </div>
   );
-}
+}

@@ -1,4 +1,4 @@
-// src/components/balanzes/BalanzesSettingsModal.jsx  (diseño Duo · responsive)
+// src/components/balanzes/BalanzesSettingsModal.jsx  (responsive)
 //
 // 📱 RESPONSIVE: en mobile la hoja sube desde abajo (items-end) y ocupa el ancho
 //    completo; en desktop se centra. Botones de acción (✎ / 🗑 / ✓ / ✕) con
@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
-  HiSearch, HiPlus, HiPencil, HiTrash, HiCheck, HiX, HiFolderOpen, HiCog,
+  HiSearch, HiPlus, HiPencil, HiTrash, HiCheck, HiX, HiFolderOpen, HiCog, HiInformationCircle,
 } from "react-icons/hi";
 import {
   fetchCategorias,
@@ -120,41 +120,41 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
 
   // 📱 h-12 (48px) + text-base en mobile (sin zoom de iOS).
   const inputCls =
-    "flex-1 h-12 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors";
+    "flex-1 h-12 px-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors";
 
   return (
     <div className="fixed inset-0 z-[1000]">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div className="absolute inset-0 flex items-end md:items-center justify-center p-0 sm:p-2 md:p-4">
-        <div className="w-full md:w-[min(96vw,720px)] max-h-[92vh] rounded-t-3xl md:rounded-3xl shadow-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark flex flex-col overflow-hidden">
+        <div className="w-full md:w-[min(96vw,720px)] max-h-[92vh] rounded-t-xl md:rounded-xl shadow-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark shrink-0">
+          <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b border-linea dark:border-linea-dark bg-card dark:bg-card-dark shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 shrink-0 rounded-2xl bg-duo-azul/15 flex items-center justify-center">
+              <div className="w-10 h-10 shrink-0 rounded-lg bg-duo-azul/15 flex items-center justify-center">
                 <HiCog className="text-xl text-duo-azul" />
               </div>
               <div className="flex flex-col min-w-0">
-                <h2 className="text-base md:text-lg font-black tracking-tight truncate">Categorías</h2>
-                <p className="text-[11px] sm:text-xs font-bold text-suave dark:text-suave-dark truncate">Las que aparecen al cargar ingresos y egresos</p>
+                <h2 className="text-base md:text-lg font-semibold tracking-tight truncate">Categorías</h2>
+                <p className="text-[11px] sm:text-xs text-suave dark:text-suave-dark truncate">Las que aparecen al cargar ingresos y egresos</p>
               </div>
             </div>
-            <button onClick={onClose} className="shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-xs font-black bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:brightness-95 transition-colors">Cerrar</button>
+            <button onClick={onClose} className="shrink-0 min-h-[44px] px-4 py-2 rounded-lg text-xs font-medium bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:brightness-95 transition-colors">Cerrar</button>
           </div>
 
           {/* Body */}
           <div className="p-4 sm:p-6 overflow-auto min-h-0 space-y-4 text-xs sm:text-sm">
             {/* Tabs Ingreso / Egreso */}
-            <div className="flex bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-xl p-1 gap-1">
+            <div className="flex bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg p-1 gap-1">
               <button
                 onClick={() => { setTab("INGRESO"); setEditId(null); setConfirmDelId(null); }}
-                className={`flex-1 min-h-[44px] py-2 px-1 rounded-lg text-xs sm:text-sm font-black transition-colors ${tab === "INGRESO" ? "bg-duo-verde/20 text-duo-verde dark:text-duo-verde" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                className={`flex-1 min-h-[44px] py-2 px-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${tab === "INGRESO" ? "bg-duo-verde/20 text-duo-verde dark:text-duo-verde" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
               >
                 <span className="sm:hidden">Ingreso</span>
                 <span className="hidden sm:inline">Categorías de Ingreso</span>
               </button>
               <button
                 onClick={() => { setTab("EGRESO"); setEditId(null); setConfirmDelId(null); }}
-                className={`flex-1 min-h-[44px] py-2 px-1 rounded-lg text-xs sm:text-sm font-black transition-colors ${tab === "EGRESO" ? "bg-duo-rojo/20 text-duo-rojo dark:text-duo-rojo" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                className={`flex-1 min-h-[44px] py-2 px-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${tab === "EGRESO" ? "bg-duo-rojo/20 text-duo-rojo dark:text-duo-rojo" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
               >
                 <span className="sm:hidden">Egreso</span>
                 <span className="hidden sm:inline">Categorías de Egreso</span>
@@ -173,12 +173,12 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
               <button
                 onClick={addCat}
                 disabled={!newCat.trim() || adding}
-                className={`h-12 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 transition-all text-white ${
+                className={`h-12 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-white ${
                   !newCat.trim() || adding
-                    ? "bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark cursor-not-allowed"
+                    ? "bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark cursor-not-allowed"
                     : tab === "INGRESO"
-                      ? "bg-duo-verde shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5"
-                      : "bg-duo-rojo shadow-[0_4px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5"
+                      ? "bg-duo-verde hover:brightness-110"
+                      : "bg-duo-rojo hover:brightness-110"
                 }`}
               >
                 <HiPlus className="text-lg" /> Agregar
@@ -191,16 +191,16 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar categoría…"
-                className="w-full h-12 pl-9 pr-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors"
+                className="w-full h-12 pl-9 pr-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark text-base sm:text-sm placeholder:text-suave dark:placeholder:text-suave-dark focus:outline-none focus:border-duo-azul transition-colors"
               />
             </div>
 
             {/* Lista */}
-            <div className="rounded-2xl border-2 border-linea dark:border-linea-dark max-h-[50vh] overflow-y-auto divide-y-2 divide-linea dark:divide-linea-dark bg-surface dark:bg-surface-dark">
+            <div className="rounded-xl border border-linea dark:border-linea-dark max-h-[50vh] overflow-y-auto divide-y divide-linea dark:divide-linea-dark bg-surface dark:bg-surface-dark">
               {lista.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 py-10 text-suave dark:text-suave-dark">
                   <HiFolderOpen className="text-4xl opacity-50" />
-                  <p className="text-xs sm:text-sm font-bold">Sin categorías todavía</p>
+                  <p className="text-xs sm:text-sm">Sin categorías todavía</p>
                 </div>
               ) : (
                 lista.map((cat) => {
@@ -215,15 +215,15 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") saveEdit(cat); if (e.key === "Escape") setEditId(null); }}
-                          className="flex-1 min-w-0 h-11 px-3 rounded-lg border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-base sm:text-sm font-bold focus:outline-none focus:border-duo-azul"
+                          className="flex-1 min-w-0 h-11 px-3 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark text-base sm:text-sm focus:outline-none focus:border-duo-azul"
                         />
                       ) : (
                         <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <span className="font-black text-titulo dark:text-titulo-dark truncate">{cat.nombre}</span>
+                          <span className="font-medium text-titulo dark:text-titulo-dark truncate">{cat.nombre}</span>
                           {esOtroTipo && (
-                            <span className="shrink-0 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark">{cat.tipo}</span>
+                            <span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded bg-card dark:bg-card-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark">{cat.tipo}</span>
                           )}
-                          <span className="shrink-0 text-[10px] font-bold text-suave dark:text-suave-dark whitespace-nowrap">{usoDe(cat.nombre)} usos</span>
+                          <span className="shrink-0 text-[10px] text-suave dark:text-suave-dark whitespace-nowrap">{usoDe(cat.nombre)} usos</span>
                         </div>
                       )}
 
@@ -231,18 +231,18 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
                       {editando ? (
                         <div className="flex items-center gap-1 shrink-0">
                           <button onClick={() => saveEdit(cat)} disabled={busy} className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-duo-verde hover:bg-duo-verde-sombra text-white"><HiCheck /></button>
-                          <button onClick={() => setEditId(null)} className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark hover:brightness-95 text-suave dark:text-suave-dark"><HiX /></button>
+                          <button onClick={() => setEditId(null)} className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark hover:brightness-95 text-suave dark:text-suave-dark"><HiX /></button>
                         </div>
                       ) : confirmando ? (
                         <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[11px] font-black text-duo-rojo dark:text-duo-rojo mr-1 hidden sm:inline">¿Borrar?</span>
+                          <span className="text-[11px] font-medium text-duo-rojo dark:text-duo-rojo mr-1 hidden sm:inline">¿Borrar?</span>
                           <button onClick={() => removeCat(cat)} disabled={busy} className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-duo-rojo hover:bg-duo-rojo-sombra text-white"><HiCheck /></button>
-                          <button onClick={() => setConfirmDelId(null)} className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark hover:brightness-95 text-suave dark:text-suave-dark"><HiX /></button>
+                          <button onClick={() => setConfirmDelId(null)} className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark hover:brightness-95 text-suave dark:text-suave-dark"><HiX /></button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={() => startEdit(cat)} title="Renombrar" aria-label="Renombrar" className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark hover:brightness-95 text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark border-2 border-linea dark:border-linea-dark"><HiPencil /></button>
-                          <button onClick={() => setConfirmDelId(cat.id)} title="Eliminar" aria-label="Eliminar" className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark hover:bg-duo-rojo hover:text-white text-duo-rojo border-2 border-duo-rojo/30"><HiTrash /></button>
+                          <button onClick={() => startEdit(cat)} title="Renombrar" aria-label="Renombrar" className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark hover:brightness-95 text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark border border-linea dark:border-linea-dark"><HiPencil /></button>
+                          <button onClick={() => setConfirmDelId(cat.id)} title="Eliminar" aria-label="Eliminar" className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card dark:bg-card-dark hover:bg-duo-rojo hover:text-white text-duo-rojo border border-duo-rojo/30"><HiTrash /></button>
                         </div>
                       )}
                     </div>
@@ -251,8 +251,9 @@ export default function BalanzesSettingsModal({ isOpen, onClose }) {
               )}
             </div>
 
-            <p className="text-[11px] font-bold text-suave dark:text-suave-dark">
-              💡 Las <strong>billeteras / cuentas</strong> se administran desde <strong>Gerencia</strong>. Acá solo gestionás categorías.
+            <p className="flex items-start gap-1.5 text-[11px] text-suave dark:text-suave-dark">
+              <HiInformationCircle className="shrink-0 mt-0.5 text-sm" />
+              Las <strong className="font-medium text-titulo dark:text-titulo-dark">billeteras / cuentas</strong> se administran desde <strong className="font-medium text-titulo dark:text-titulo-dark">Gerencia</strong>. Acá solo gestionás categorías.
             </p>
           </div>
         </div>

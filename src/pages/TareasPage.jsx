@@ -20,7 +20,13 @@
  * Lógica:
  *  - "enviar" usa el thunk Redux marcarPolizaEnviada (ya existente).
  *  - "verificar alta" pega directo a /tareas/marcar-alta/ con api.
- *  - Paleta Duo (duo-azul / duo-verde) + tokens UI de tareasUI.js.
+ *  - Paleta de la app (duo-azul / duo-verde) + tokens UI de tareasUI.js.
+ *
+ * 🆕 Rediseño "profesional": esta era la pantalla con MÁS relieve 3D de
+ * toda la app (tarjetas que se hundían al tocar). Se sacó por completo:
+ * ahora son tarjetas planas con borde fino y un hover sutil. Ninguna
+ * función de lógica (marcar enviada, verificar alta, confirmar
+ * comprobante) se tocó.
  */
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -56,14 +62,14 @@ const SECCIONES = [
     titulo: "Verificar alta en la compañía",
     sub: "Confirmá que quedó activa",
     icon: HiShieldCheck,
-    color: "azul", // duo-azul
+    color: "azul",
   },
   {
     key: "enviar_poliza",
     titulo: "Enviar póliza al cliente",
     sub: "Mandásela por WhatsApp",
     icon: HiPaperAirplane,
-    color: "verde", // duo-verde
+    color: "verde",
   },
   {
     // 📎 Comprobantes que subieron los clientes desde el Portal.
@@ -101,27 +107,19 @@ const SECCIONES = [
 ];
 
 /* Clases completas por color (Tailwind no soporta clases dinámicas).
-   🦉 Look Duolingo: tarjeta con relieve 3D (borde de color + sombra inferior
-   gruesa que se "hunde" al presionar), ícono con fondo de color PLENO y chip
-   de contador jugoso. */
+   🆕 Tarjeta plana: borde fino de color + fondo normal, sin relieve 3D.
+   Ícono con fondo de color pleno, sin sombra propia. */
 const COLOR = {
   azul: {
-    // Tarjeta 3D: borde grueso de color + sombra inferior 6px que se hunde.
-    card3d:
-      "border-duo-azul bg-card dark:bg-card-dark " +
-      "shadow-[0_6px_0_var(--color-duo-azul-sombra)] " +
-      "active:translate-y-[5px] active:shadow-[0_1px_0_var(--color-duo-azul-sombra)]",
-    icoBg: "bg-duo-azul text-white shadow-[0_3px_0_var(--color-duo-azul-sombra)]",
+    card: "border-duo-azul/40 bg-card dark:bg-card-dark hover:border-duo-azul",
+    icoBg: "bg-duo-azul text-white",
     icoChip: "bg-duo-azul/15 text-duo-azul",
     chip: "bg-duo-azul text-white",
     num: "text-duo-azul",
   },
   verde: {
-    card3d:
-      "border-duo-verde bg-card dark:bg-card-dark " +
-      "shadow-[0_6px_0_var(--color-duo-verde-sombra)] " +
-      "active:translate-y-[5px] active:shadow-[0_1px_0_var(--color-duo-verde-sombra)]",
-    icoBg: "bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)]",
+    card: "border-duo-verde/40 bg-card dark:bg-card-dark hover:border-duo-verde",
+    icoBg: "bg-duo-verde text-white",
     icoChip: "bg-duo-verde/15 text-duo-verde",
     chip: "bg-duo-verde text-white",
     num: "text-duo-verde",
@@ -129,11 +127,8 @@ const COLOR = {
   // Violeta = documentación de por medio. Es el mismo color que usa
   // Renovaciones para las de cuponera: se reconocen entre pantallas.
   violeta: {
-    card3d:
-      "border-duo-violeta bg-card dark:bg-card-dark " +
-      "shadow-[0_6px_0_var(--color-duo-violeta-sombra)] " +
-      "active:translate-y-[5px] active:shadow-[0_1px_0_var(--color-duo-violeta-sombra)]",
-    icoBg: "bg-duo-violeta text-white shadow-[0_3px_0_var(--color-duo-violeta-sombra)]",
+    card: "border-duo-violeta/40 bg-card dark:bg-card-dark hover:border-duo-violeta",
+    icoBg: "bg-duo-violeta text-white",
     icoChip: "bg-duo-violeta/15 text-duo-violeta",
     chip: "bg-duo-violeta text-white",
     num: "text-duo-violeta",
@@ -142,12 +137,8 @@ const COLOR = {
   // resolvió solo y conviene confirmar.
   // 🎨 Sobre amarillo el blanco no se lee: va el tono oscuro del mismo color.
   amarillo: {
-    card3d:
-      "border-duo-amarillo bg-card dark:bg-card-dark " +
-      "shadow-[0_6px_0_var(--color-duo-amarillo-sombra)] " +
-      "active:translate-y-[5px] active:shadow-[0_1px_0_var(--color-duo-amarillo-sombra)]",
-    icoBg:
-      "bg-duo-amarillo text-duo-amarillo-sombra shadow-[0_3px_0_var(--color-duo-amarillo-sombra)]",
+    card: "border-duo-amarillo/40 bg-card dark:bg-card-dark hover:border-duo-amarillo",
+    icoBg: "bg-duo-amarillo text-duo-amarillo-sombra",
     icoChip: "bg-duo-amarillo/20 text-duo-amarillo-sombra dark:text-duo-amarillo",
     chip: "bg-duo-amarillo text-duo-amarillo-sombra",
     num: "text-duo-amarillo",
@@ -155,11 +146,8 @@ const COLOR = {
   // Rojo de marca para los comprobantes: es plata que entró, merece el color
   // de la casa y no uno más del set.
   marca: {
-    card3d:
-      "border-marca bg-card dark:bg-card-dark " +
-      "shadow-[0_6px_0_#8E0000] " +
-      "active:translate-y-[5px] active:shadow-[0_1px_0_#8E0000]",
-    icoBg: "bg-marca text-white shadow-[0_3px_0_#8E0000]",
+    card: "border-marca/40 bg-card dark:bg-card-dark hover:border-marca",
+    icoBg: "bg-marca text-white",
     icoChip: "bg-marca/15 text-marca",
     chip: "bg-marca text-white",
     num: "text-marca",
@@ -212,7 +200,7 @@ export default function TareasPage() {
   const onEnviar = async (polizaId) => {
     const res = await dispatch(marcarPolizaEnviada(polizaId));
     if (marcarPolizaEnviada.fulfilled.match(res)) {
-      toast.success("Marcada como enviada ✅");
+      toast.success("Marcada como enviada");
       setHechasHoy((n) => n + 1);
     } else toast.error(res.payload || "No se pudo marcar.");
   };
@@ -222,7 +210,7 @@ export default function TareasPage() {
     setMarcandoAlta(polizaId);
     try {
       await api.post("/tareas/marcar-alta/", { poliza_id: polizaId });
-      toast.success("Alta verificada ✅");
+      toast.success("Alta verificada");
       setHechasHoy((n) => n + 1);
       recargar();
     } catch (e) {
@@ -240,7 +228,7 @@ export default function TareasPage() {
     setMarcandoCupon(cuponId);
     try {
       await api.post("/tareas/confirmar-comprobante/", { cupon_id: cuponId, aprobado });
-      toast.success(aprobado ? "Pago confirmado ✅" : "Comprobante rechazado");
+      toast.success(aprobado ? "Pago confirmado" : "Comprobante rechazado");
       if (aprobado) setHechasHoy((n) => n + 1);
       recargar();
     } catch (e) {
@@ -264,19 +252,19 @@ export default function TareasPage() {
       <motion.div layout exit={{ opacity: 0, x: 40 }}
         className={`${UI.card} px-4 py-3`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-black truncate ${UI.txtTitulo}`}>{item.cliente}</span>
+          <span className={`text-[14px] font-medium truncate ${UI.txtTitulo}`}>{item.cliente}</span>
           {item.patente && item.patente !== "—" && (
-            <span className={`shrink-0 rounded-md ${c.icoChip} px-1.5 py-0.5 text-[11px] font-mono font-bold tracking-wide`}>
+            <span className={`shrink-0 rounded ${c.icoChip} px-1.5 py-0.5 text-[11px] font-mono font-medium`}>
               {item.patente}
             </span>
           )}
         </div>
 
-        <div className={`text-xs mt-0.5 ${UI.txtSuave}`}>
+        <div className={`text-[12px] mt-0.5 ${UI.txtSuave}`}>
           {[item.vehiculo, item.compania].filter(Boolean).join(" · ")}
         </div>
 
-        <div className={`text-xs mt-1 ${UI.txtSuave}`}>
+        <div className={`text-[12px] mt-1 ${UI.txtSuave}`}>
           Vence {item.vence}
           {item.monto ? ` · $${Math.round(item.monto).toLocaleString("es-AR")}` : ""}
           {item.reportado_en ? ` · subido ${item.reportado_en}` : ""}
@@ -289,7 +277,7 @@ export default function TareasPage() {
             href={item.comprobante_url}
             target="_blank"
             rel="noreferrer"
-            className="flex-1 h-11 rounded-2xl border-2 border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1.5 text-sm font-black text-titulo dark:text-titulo-dark"
+            className="flex-1 h-10 rounded-lg border border-linea dark:border-linea-dark inline-flex items-center justify-center gap-1.5 text-[13px] font-medium text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors"
           >
             <HiExternalLink className="w-4 h-4" /> Ver comprobante
           </a>
@@ -299,18 +287,18 @@ export default function TareasPage() {
             disabled={enCurso}
             aria-label="Rechazar"
             title="El comprobante no sirve"
-            className="w-11 h-11 shrink-0 rounded-2xl border-2 border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50"
+            className="w-10 h-10 shrink-0 rounded-lg border border-linea dark:border-linea-dark text-suave dark:text-suave-dark inline-flex items-center justify-center disabled:opacity-50 hover:bg-surface dark:hover:bg-surface-dark transition-colors"
           >
-            <HiX className="w-5 h-5" />
+            <HiX className="w-4 h-4" />
           </button>
 
           <button
             onClick={() => onComprobante(item.cupon_id, true)}
             disabled={enCurso}
             aria-label="Confirmar pago"
-            className="w-11 h-11 shrink-0 rounded-2xl border-none bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--color-duo-verde-sombra)] inline-flex items-center justify-center transition-all disabled:opacity-50"
+            className="w-10 h-10 shrink-0 rounded-lg bg-duo-verde text-white hover:brightness-110 inline-flex items-center justify-center transition-colors disabled:opacity-50"
           >
-            <HiCheck className="w-6 h-6" />
+            <HiCheck className="w-5 h-5" />
           </button>
         </div>
       </motion.div>
@@ -329,20 +317,20 @@ export default function TareasPage() {
       <motion.div layout exit={{ opacity: 0, x: 40 }}
         className={`${UI.card} px-4 py-3`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-black truncate ${UI.txtTitulo}`}>{item.cliente}</span>
+          <span className={`text-[14px] font-medium truncate ${UI.txtTitulo}`}>{item.cliente}</span>
           {item.patente && item.patente !== "—" && (
-            <span className={`shrink-0 rounded-md ${c.icoChip} px-1.5 py-0.5 text-[11px] font-mono font-bold tracking-wide`}>
+            <span className={`shrink-0 rounded ${c.icoChip} px-1.5 py-0.5 text-[11px] font-mono font-medium`}>
               {item.patente}
             </span>
           )}
         </div>
 
-        <div className={`text-xs mt-0.5 ${UI.txtSuave}`}>
+        <div className={`text-[12px] mt-0.5 ${UI.txtSuave}`}>
           {[item.vehiculo, item.compania].filter(Boolean).join(" · ")}
         </div>
 
         {/* El plazo es lo que decide la urgencia: rojo si ya se venció. */}
-        <div className={`text-xs mt-1 font-bold ${vencida ? "text-duo-rojo" : UI.txtSuave}`}>
+        <div className={`text-[12px] mt-1 font-medium ${vencida ? "text-duo-rojo" : UI.txtSuave}`}>
           {vencida
             ? `Venció el ${item.vence} — hace ${Math.abs(item.dias)} ${Math.abs(item.dias) === 1 ? "día" : "días"}`
             : item.dias === 0
@@ -352,7 +340,7 @@ export default function TareasPage() {
 
         <Link
           to="/polizas/renovaciones"
-          className="mt-3 w-full h-11 rounded-2xl border-none bg-duo-violeta text-white shadow-[0_3px_0_var(--color-duo-violeta-sombra)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--color-duo-violeta-sombra)] inline-flex items-center justify-center gap-1.5 text-sm font-black transition-all"
+          className="mt-3 w-full h-10 rounded-lg bg-duo-violeta text-white hover:brightness-110 inline-flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
         >
           <HiUpload className="w-4 h-4" /> Subir la póliza nueva
         </Link>
@@ -373,14 +361,14 @@ export default function TareasPage() {
       <motion.div layout exit={{ opacity: 0, x: 40 }}
         className={`${UI.card} px-4 py-3`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-black truncate ${UI.txtTitulo}`}>{item.nombre}</span>
-          <span className={`shrink-0 rounded-md ${c.icoChip} px-1.5 py-0.5 text-[11px] font-bold tracking-wide`}>
+          <span className={`text-[14px] font-medium truncate ${UI.txtTitulo}`}>{item.nombre}</span>
+          <span className={`shrink-0 rounded ${c.icoChip} px-1.5 py-0.5 text-[11px] font-medium`}>
             {item.compania}
           </span>
         </div>
 
         {/* Lo que el sistema dedujo del PDF: es lo que hay que confirmar. */}
-        <div className={`text-xs mt-1 flex items-center gap-1.5 ${UI.txtSuave}`}>
+        <div className={`text-[12px] mt-1 flex items-center gap-1.5 ${UI.txtSuave}`}>
           <HiTicket className="w-3.5 h-3.5 shrink-0" />
           <span>
             {item.cuotas} {item.cuotas === 1 ? "cuota" : "cuotas"}
@@ -389,7 +377,7 @@ export default function TareasPage() {
           </span>
         </div>
 
-        <div className={`text-xs mt-0.5 ${UI.txtSuave}`}>
+        <div className={`text-[12px] mt-0.5 ${UI.txtSuave}`}>
           {item.polizas} {item.polizas === 1 ? "póliza usa" : "pólizas usan"} esta cobertura
         </div>
 
@@ -397,7 +385,7 @@ export default function TareasPage() {
           href={`${ADMIN_BASE}/admin/cotizaciones/tipocobertura/${item.cobertura_id}/change/`}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 w-full h-11 rounded-2xl border-none bg-duo-amarillo text-duo-amarillo-sombra shadow-[0_3px_0_var(--color-duo-amarillo-sombra)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--color-duo-amarillo-sombra)] inline-flex items-center justify-center gap-1.5 text-sm font-black transition-all"
+          className="mt-3 w-full h-10 rounded-lg bg-duo-amarillo text-duo-amarillo-sombra hover:brightness-105 inline-flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
         >
           <HiExternalLink className="w-4 h-4" /> Revisar en el Admin
         </a>
@@ -421,16 +409,16 @@ export default function TareasPage() {
         className={`${UI.card} flex items-center gap-3 px-4 py-3`}>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-black truncate ${UI.txtTitulo}`}>{item.cliente}</span>
+            <span className={`text-[14px] font-medium truncate ${UI.txtTitulo}`}>{item.cliente}</span>
             {patente && (
-              <span className={`shrink-0 rounded-md ${c.icoBg} px-1.5 py-0.5 text-[11px] font-mono font-bold tracking-wide`}>{patente}</span>
+              <span className={`shrink-0 rounded ${c.icoBg} px-1.5 py-0.5 text-[11px] font-mono font-medium`}>{patente}</span>
             )}
           </div>
-          {sub && <div className={`text-xs truncate mt-0.5 ${UI.txtSuave}`}>{sub}</div>}
+          {sub && <div className={`text-[12px] truncate mt-0.5 ${UI.txtSuave}`}>{sub}</div>}
         </div>
         <button onClick={onClick} disabled={enCurso} aria-label="Marcar como hecha"
-          className="w-11 h-11 shrink-0 rounded-2xl border-none bg-duo-verde text-white shadow-[0_3px_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--color-duo-verde-sombra)] inline-flex items-center justify-center transition-all disabled:opacity-50">
-          <HiCheck className="w-6 h-6" />
+          className="w-10 h-10 shrink-0 rounded-lg bg-duo-verde text-white hover:brightness-110 inline-flex items-center justify-center transition-colors disabled:opacity-50">
+          <HiCheck className="w-5 h-5" />
         </button>
       </motion.div>
     );
@@ -449,13 +437,13 @@ export default function TareasPage() {
               {/* Header */}
               <div className="flex items-center justify-between gap-3 mb-5">
                 <div className="min-w-0">
-                  <div className={`text-sm ${UI.txtSuave}`}>
+                  <div className={`text-[13px] ${UI.txtSuave}`}>
                     Tareas de hoy{data?.oficina && data.oficina !== "Todas" ? ` · Oficina ${data.oficina}` : ""}
                   </div>
-                  <div className={`text-lg font-black mt-0.5 ${UI.txtTitulo}`}>¿Qué querés hacer?</div>
+                  <div className={`text-[17px] font-semibold mt-0.5 ${UI.txtTitulo}`}>¿Qué querés hacer?</div>
                 </div>
                 <button onClick={recargar} aria-label="Actualizar"
-                  className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-titulo/5 dark:hover:bg-white/5 text-suave dark:text-suave-dark transition-colors">
+                  className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors">
                   <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 </button>
               </div>
@@ -472,8 +460,8 @@ export default function TareasPage() {
                 </div>
               )}
 
-              {/* 🦉 2 tarjetas grandes estilo Duolingo (relieve 3D) */}
-              <div className="flex flex-col gap-4">
+              {/* 🆕 Tarjetas grandes, planas (antes con relieve 3D) */}
+              <div className="flex flex-col gap-3">
                 {SECCIONES.map((sec) => {
                   const c = COLOR[sec.color];
                   const n = conteos[sec.key] || 0;
@@ -485,19 +473,18 @@ export default function TareasPage() {
                   }
                   return (
                     <button key={sec.key} onClick={() => setAbierta(sec.key)}
-                      className={`${c.card3d} border-[3px] rounded-3xl flex items-center gap-4 p-5 text-left transition-all`}>
-                      {/* Ícono con fondo de color PLENO + su propio relieve */}
-                      <span className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${c.icoBg}`}>
-                        <sec.icon className="w-9 h-9" />
+                      className={`${c.card} border rounded-xl flex items-center gap-4 p-4 text-left transition-colors`}>
+                      <span className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${c.icoBg}`}>
+                        <sec.icon className="w-6 h-6" />
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className={`block text-base sm:text-lg font-black leading-tight ${UI.txtTitulo}`}>{sec.titulo}</span>
-                        <span className={`block text-[13px] font-bold mt-1 ${UI.txtSuave}`}>{sec.sub}</span>
+                        <span className={`block text-[15px] font-semibold leading-tight ${UI.txtTitulo}`}>{sec.titulo}</span>
+                        <span className={`block text-[12px] mt-1 ${UI.txtSuave}`}>{sec.sub}</span>
                       </span>
-                      {/* Contador en chip jugoso de color */}
-                      <span className={`shrink-0 min-w-[54px] px-2 py-2 rounded-2xl flex flex-col items-center justify-center ${c.chip}`}>
-                        <span className="text-2xl font-black leading-none">{n}</span>
-                        <span className="text-[10px] font-black uppercase tracking-wide opacity-90">pend.</span>
+                      {/* Contador */}
+                      <span className={`shrink-0 min-w-[48px] px-2 py-1.5 rounded-lg flex flex-col items-center justify-center ${c.chip}`}>
+                        <span className="text-[18px] font-semibold leading-none">{n}</span>
+                        <span className="text-[9px] font-medium opacity-90">pend.</span>
                       </span>
                     </button>
                   );
@@ -505,9 +492,9 @@ export default function TareasPage() {
               </div>
 
               {/* Pie: completadas */}
-              <div className="mt-5 pt-4 border-t-2 border-linea dark:border-linea-dark flex items-center justify-center gap-2">
+              <div className="mt-5 pt-4 border-t border-linea dark:border-linea-dark flex items-center justify-center gap-2">
                 <HiCheckCircle className="w-4 h-4 text-duo-verde" />
-                <span className={`text-xs font-bold ${UI.txtSuave}`}>
+                <span className={`text-[12px] ${UI.txtSuave}`}>
                   {hechasHoy > 0 ? `${hechasHoy} completadas en esta sesión` : "Elegí una tarea para empezar"}
                 </span>
               </div>
@@ -520,18 +507,18 @@ export default function TareasPage() {
               {/* Header de la lista */}
               <div className="flex items-center gap-3 mb-5">
                 <button onClick={() => setAbierta(null)} aria-label="Volver"
-                  className="w-10 h-10 shrink-0 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-titulo/5 dark:hover:bg-white/5 inline-flex items-center justify-center transition-colors">
-                  <HiArrowLeft className={`w-5 h-5 ${UI.txtTitulo}`} />
+                  className="w-9 h-9 shrink-0 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark inline-flex items-center justify-center transition-colors">
+                  <HiArrowLeft className={`w-4 h-4 ${UI.txtTitulo}`} />
                 </button>
-                <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${COLOR[secAbierta.color].icoBg}`}>
-                  <secAbierta.icon className="w-6 h-6" />
+                <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${COLOR[secAbierta.color].icoBg}`}>
+                  <secAbierta.icon className="w-5 h-5" />
                 </span>
                 <div className="min-w-0">
-                  <div className={`text-[15px] font-black truncate ${UI.txtTitulo}`}>{secAbierta.titulo}</div>
-                  <div className={`text-xs ${UI.txtSuave}`}>{items.length} pendientes</div>
+                  <div className={`text-[15px] font-semibold truncate ${UI.txtTitulo}`}>{secAbierta.titulo}</div>
+                  <div className={`text-[12px] ${UI.txtSuave}`}>{items.length} pendientes</div>
                 </div>
                 <button onClick={recargar} aria-label="Actualizar"
-                  className="ml-auto shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-titulo/5 dark:hover:bg-white/5 text-suave dark:text-suave-dark transition-colors">
+                  className="ml-auto shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark text-suave dark:text-suave-dark transition-colors">
                   <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 </button>
               </div>
@@ -539,14 +526,14 @@ export default function TareasPage() {
               {/* 💡 Estas dos tareas no se tildan: se resuelven en otro lado.
                      Sin este renglón el operador busca el ✓ y no lo encuentra. */}
               {secAbierta.key === "renovar_cuponera" && items.length > 0 && (
-                <div className={`${UI.card} px-4 py-3 mb-2 text-xs ${UI.txtSuave}`}>
+                <div className={`${UI.card} px-4 py-3 mb-2 text-[12px] ${UI.txtSuave}`}>
                   Estas compañías no se renuevan solas: las cuotas y los cupones
                   solo están en el papel. Subí la póliza nueva desde Renovaciones
                   y la tarea se va sola.
                 </div>
               )}
               {secAbierta.key === "configurar_cobertura" && items.length > 0 && (
-                <div className={`${UI.card} px-4 py-3 mb-2 text-xs ${UI.txtSuave}`}>
+                <div className={`${UI.card} px-4 py-3 mb-2 text-[12px] ${UI.txtSuave}`}>
                   El sistema armó estas coberturas mirando el PDF. Revisá que las
                   cuotas y la cuponera estén bien. Al guardar en el Admin
                   desaparecen solas de esta lista.
@@ -555,12 +542,12 @@ export default function TareasPage() {
 
               {/* Lista o vacío */}
               {loading && items.length === 0 ? (
-                <div className={`${UI.card} px-4 py-10 text-center text-sm ${UI.txtSuave}`}>Cargando…</div>
+                <div className={`${UI.card} px-4 py-10 text-center text-[13px] ${UI.txtSuave}`}>Cargando…</div>
               ) : items.length === 0 ? (
                 <div className={`${UI.card} px-6 py-12 text-center`}>
-                  <HiCheckCircle className="w-14 h-14 mx-auto text-duo-verde" />
-                  <div className={`mt-3 text-lg font-black ${UI.txtTitulo}`}>¡Todo hecho!</div>
-                  <div className={`mt-1 text-sm ${UI.txtSuave}`}>No quedan pendientes en esta tarea 🎉</div>
+                  <HiCheckCircle className="w-12 h-12 mx-auto text-duo-verde" />
+                  <div className={`mt-3 text-[16px] font-semibold ${UI.txtTitulo}`}>Todo hecho</div>
+                  <div className={`mt-1 text-[13px] ${UI.txtSuave}`}>No quedan pendientes en esta tarea</div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">

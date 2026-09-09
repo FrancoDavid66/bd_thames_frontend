@@ -66,7 +66,7 @@ const FRASES_MOTIVADORAS = [
   "Pequeños pasos todos los días construyen grandes carteras.",
 ];
 
-// 🦉 Tarjeta KPI Duo (borde grueso, sombra 3D, sin animación)
+// 🆕 Tarjeta KPI — borde fino, sin sombra 3D.
 function KpiCard({ titulo, children, icon, color = "oficina", nota, onClick }) {
   // color → clases del recuadro del ícono (fondo tenue + texto vivo)
   const iconTone = {
@@ -80,20 +80,20 @@ function KpiCard({ titulo, children, icon, color = "oficina", nota, onClick }) {
   return (
     <div
       onClick={onClick}
-      className={`rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 transition-all ${
-        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_6px_0_var(--color-linea)] dark:hover:shadow-[0_6px_0_var(--color-linea-dark)]" : ""
+      className={`rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 transition-colors ${
+        onClick ? "cursor-pointer hover:border-duo-violeta/40" : ""
       }`}
     >
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-black uppercase tracking-wider text-suave dark:text-suave-dark">
+          <span className="text-[12px] font-medium text-suave dark:text-suave-dark">
             {titulo}
           </span>
-          <div className={`rounded-xl p-2 ${iconTone}`}>{icon}</div>
+          <div className={`rounded-lg p-2 ${iconTone}`}>{icon}</div>
         </div>
         {children}
         {nota && (
-          <p className="text-xs font-semibold text-suave dark:text-suave-dark">{nota}</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark">{nota}</p>
         )}
       </div>
     </div>
@@ -277,26 +277,26 @@ const HomePage = () => {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-surface dark:bg-surface-dark px-4 py-6 sm:px-6 lg:px-10 transition-colors">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5">
 
         {/* HEADER / BIENVENIDA */}
-        <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 shadow-[0_4px_0_var(--color-linea)] dark:shadow-[0_4px_0_var(--color-linea-dark)]">
+        <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div>
-              <p className="text-xs font-black uppercase tracking-wider text-oficina">
+              <p className="text-[12px] font-medium text-oficina">
                 {todayLabel}
               </p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight text-titulo dark:text-titulo-dark sm:text-3xl">
-                Hola, {user?.username || 'Equipo'} 👋
+              <h1 className="mt-1 text-xl font-semibold text-titulo dark:text-titulo-dark sm:text-2xl">
+                Hola, {user?.username || 'Equipo'}
               </h1>
-              <p className="mt-2 max-w-xl text-sm font-semibold italic text-suave dark:text-suave-dark">
+              <p className="mt-2 max-w-xl text-[13px] italic text-suave dark:text-suave-dark">
                 "{fraseDelDia}"
               </p>
             </div>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-oficina/30 bg-oficina/10 px-3 py-1.5 text-xs font-black text-oficina-fuerte dark:text-oficina-claro">
-              <HiSparkles className="h-4 w-4" />
-              Dashboard Activo
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-oficina/30 bg-oficina/10 px-3 py-1.5 text-[12px] font-medium text-oficina-fuerte dark:text-oficina-claro">
+              <HiSparkles className="h-3.5 w-3.5" />
+              Dashboard activo
             </span>
           </div>
         </div>
@@ -306,35 +306,35 @@ const HomePage = () => {
 
           {/* Ingresos del mes */}
           <KpiCard titulo="Ingresos del mes" color="ingreso" icon={<HiCash className="h-5 w-5" />} nota="Total cobrado este mes">
-            <p className="text-2xl font-black text-ingreso-fuerte dark:text-ingreso-claro">
+            <p className="text-xl font-semibold text-ingreso-fuerte dark:text-ingreso-claro">
               $ {formatMoney(totalIngresosMes)}
             </p>
           </KpiCard>
 
           {/* Egresos del mes */}
           <KpiCard titulo="Egresos del mes" color="egreso" icon={<HiTrendingDown className="h-5 w-5" />} nota="Total gastado este mes">
-            <p className="text-2xl font-black text-egreso-fuerte dark:text-egreso-claro">
+            <p className="text-xl font-semibold text-egreso-fuerte dark:text-egreso-claro">
               $ {formatMoney(totalEgresosMes)}
             </p>
           </KpiCard>
 
           {/* Balance del mes */}
-          <KpiCard titulo="Balance Neto" color="ingreso" icon={<HiTrendingUp className="h-5 w-5" />} nota="Ingresos − Egresos del mes">
-            <p className={`text-2xl font-black ${balanceMes >= 0 ? 'text-ingreso-fuerte dark:text-ingreso-claro' : 'text-egreso-fuerte dark:text-egreso-claro'}`}>
+          <KpiCard titulo="Balance neto" color="ingreso" icon={<HiTrendingUp className="h-5 w-5" />} nota="Ingresos − egresos del mes">
+            <p className={`text-xl font-semibold ${balanceMes >= 0 ? 'text-ingreso-fuerte dark:text-ingreso-claro' : 'text-egreso-fuerte dark:text-egreso-claro'}`}>
               $ {formatMoney(balanceMes)}
             </p>
           </KpiCard>
 
           {/* Pólizas activas (FIX) */}
           <KpiCard titulo="Pólizas activas" color="oficina" icon={<HiShieldCheck className="h-5 w-5" />} nota='Solo en estado "activa"'>
-            <p className="text-2xl font-black text-titulo dark:text-titulo-dark">
+            <p className="text-xl font-semibold text-titulo dark:text-titulo-dark">
               {polizasActivas}
             </p>
           </KpiCard>
 
           {/* Clientes */}
-          <KpiCard titulo="Total Clientes" color="transferencia" icon={<HiUsers className="h-5 w-5" />} nota="Personas en tu base de datos">
-            <p className="text-2xl font-black text-titulo dark:text-titulo-dark">
+          <KpiCard titulo="Total clientes" color="transferencia" icon={<HiUsers className="h-5 w-5" />} nota="Personas en tu base de datos">
+            <p className="text-xl font-semibold text-titulo dark:text-titulo-dark">
               {totalClientes}
             </p>
           </KpiCard>
@@ -343,22 +343,22 @@ const HomePage = () => {
           <KpiCard titulo="Renovaciones" color="tarjeta" icon={<HiRefresh className="h-5 w-5" />} onClick={() => navigate("/polizas/renovaciones")}>
             <div className="flex items-end gap-4">
               <div>
-                <p className="text-2xl font-black leading-none text-[#d97706] dark:text-tarjeta-claro">
+                <p className="text-xl font-semibold leading-none text-[#d97706] dark:text-tarjeta-claro">
                   {renovHoy}
                 </p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Vencen hoy</p>
+                <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">Vencen hoy</p>
               </div>
               <div>
-                <p className="text-lg font-black leading-none text-titulo dark:text-titulo-dark">
+                <p className="text-[16px] font-semibold leading-none text-titulo dark:text-titulo-dark">
                   {renovProximas}
                 </p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Próximas</p>
+                <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">Próximas</p>
               </div>
               <div>
-                <p className="text-lg font-black leading-none text-egreso-fuerte dark:text-egreso-claro">
+                <p className="text-[16px] font-semibold leading-none text-egreso-fuerte dark:text-egreso-claro">
                   {renovVencidas}
                 </p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark">Vencidas</p>
+                <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">Vencidas</p>
               </div>
             </div>
           </KpiCard>
@@ -376,31 +376,31 @@ const HomePage = () => {
           <div className="flex flex-col gap-4">
 
             {/* Tareas Pendientes */}
-            <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
-              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark pb-3">
-                <h2 className="text-sm font-black text-titulo dark:text-titulo-dark">
-                  Tareas Pendientes
+            <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+              <div className="flex items-center justify-between border-b border-linea dark:border-linea-dark pb-3">
+                <h2 className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
+                  Tareas pendientes
                 </h2>
-                <span className="rounded-full bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-duo-amarillo-sombra dark:text-duo-amarillo">
+                <span className="rounded-full bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2.5 py-1 text-[11px] font-medium text-duo-amarillo-sombra dark:text-duo-amarillo">
                   {totalTareasSolicitudes} avisos
                 </span>
               </div>
-              <ul className="mt-4 space-y-3 text-sm">
+              <ul className="mt-4 space-y-2.5 text-sm">
                 <li
                   onClick={() => navigate("/solicitudes")}
-                  className="group flex cursor-pointer items-center justify-between rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
+                  className="group flex cursor-pointer items-center justify-between rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
                 >
-                  <span className="font-bold text-titulo dark:text-titulo-dark">Alta en compañía</span>
-                  <span className="rounded-md bg-egreso/10 px-2 py-1 text-xs font-black text-egreso-fuerte dark:text-egreso-claro">
+                  <span className="font-medium text-titulo dark:text-titulo-dark">Alta en compañía</span>
+                  <span className="rounded-md bg-egreso/10 px-2 py-1 text-[12px] font-medium text-egreso-fuerte dark:text-egreso-claro">
                     {solCounters.pendiente_alta}
                   </span>
                 </li>
                 <li
                   onClick={() => navigate("/solicitudes")}
-                  className="group flex cursor-pointer items-center justify-between rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
+                  className="group flex cursor-pointer items-center justify-between rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
                 >
-                  <span className="font-bold text-titulo dark:text-titulo-dark">Envío de póliza</span>
-                  <span className="rounded-md bg-oficina/10 px-2 py-1 text-xs font-black text-oficina-fuerte dark:text-oficina-claro">
+                  <span className="font-medium text-titulo dark:text-titulo-dark">Envío de póliza</span>
+                  <span className="rounded-md bg-oficina/10 px-2 py-1 text-[12px] font-medium text-oficina-fuerte dark:text-oficina-claro">
                     {solCounters.pendiente_envio}
                   </span>
                 </li>
@@ -408,72 +408,72 @@ const HomePage = () => {
             </div>
 
             {/* Accesos Rápidos */}
-            <div className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
-              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark pb-3">
-                <h2 className="text-sm font-black text-titulo dark:text-titulo-dark">
-                  Accesos Rápidos
+            <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+              <div className="flex items-center justify-between border-b border-linea dark:border-linea-dark pb-3">
+                <h2 className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
+                  Accesos rápidos
                 </h2>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
 
                 {/* Cargar Ingreso */}
                 <button
                   type="button"
                   onClick={() => setModalTipo("INGRESO")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-verde p-3 text-white shadow-[0_4px_0_var(--color-duo-verde-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-verde-sombra)]"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-verde p-3 text-white transition-colors hover:brightness-110"
                 >
-                  <HiArrowCircleDown className="h-6 w-6" />
-                  <span className="text-xs font-black">Cargar Ingreso</span>
+                  <HiArrowCircleDown className="h-5 w-5" />
+                  <span className="text-[12px] font-medium">Cargar ingreso</span>
                 </button>
 
                 {/* Cargar Egreso */}
                 <button
                   type="button"
                   onClick={() => setModalTipo("EGRESO")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-rojo p-3 text-white shadow-[0_4px_0_var(--color-duo-rojo-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-rojo-sombra)]"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-rojo p-3 text-white transition-colors hover:brightness-110"
                 >
-                  <HiArrowCircleUp className="h-6 w-6" />
-                  <span className="text-xs font-black">Cargar Egreso</span>
+                  <HiArrowCircleUp className="h-5 w-5" />
+                  <span className="text-[12px] font-medium">Cargar egreso</span>
                 </button>
 
                 {/* Nueva Póliza → flujo de alta (Solicitudes) */}
                 <button
                   type="button"
                   onClick={() => navigate("/solicitudes")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-azul p-3 text-white shadow-[0_4px_0_var(--color-duo-azul-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-azul-sombra)]"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-violeta p-3 text-white transition-colors hover:brightness-110"
                 >
-                  <HiPlusSm className="h-6 w-6" />
-                  <span className="text-xs font-black">Nueva Póliza</span>
+                  <HiPlusSm className="h-5 w-5" />
+                  <span className="text-[12px] font-medium">Nueva póliza</span>
                 </button>
 
                 {/* Nuevo Cliente */}
                 <button
                   type="button"
                   onClick={() => navigate("/clientes")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-all active:translate-y-0.5"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-colors hover:border-duo-violeta"
                 >
-                  <HiUsers className="h-5 w-5" />
-                  <span className="text-xs font-black">Nuevo Cliente</span>
+                  <HiUsers className="h-4 w-4" />
+                  <span className="text-[12px] font-medium">Nuevo cliente</span>
                 </button>
 
                 {/* Ir a Pagos */}
                 <button
                   type="button"
                   onClick={() => navigate("/pagos")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-duo-verde p-3 text-white shadow-[0_4px_0_var(--color-duo-verde-sombra)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-duo-verde-sombra)]"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-verde p-3 text-white transition-colors hover:brightness-110"
                 >
-                  <HiCash className="h-5 w-5" />
-                  <span className="text-xs font-black">Ir a Pagos</span>
+                  <HiCash className="h-4 w-4" />
+                  <span className="text-[12px] font-medium">Ir a pagos</span>
                 </button>
 
                 {/* Ver Pólizas */}
                 <button
                   type="button"
                   onClick={() => navigate("/polizas")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-all active:translate-y-0.5"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-colors hover:border-duo-violeta"
                 >
-                  <HiShieldCheck className="h-5 w-5" />
-                  <span className="text-xs font-black">Ver Pólizas</span>
+                  <HiShieldCheck className="h-4 w-4" />
+                  <span className="text-[12px] font-medium">Ver pólizas</span>
                 </button>
               </div>
             </div>

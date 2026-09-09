@@ -1,4 +1,4 @@
-// src/components/balanzes/MovimientosPanel.jsx  (diseño Duo · responsive)
+// src/components/balanzes/MovimientosPanel.jsx  (responsive)
 //
 // 🚀 SOLO LA TABLA de movimientos (Ingresos + Egresos en una sola vista).
 //    Los FILTROS ya NO viven acá: los maneja el toolbar único (BalancesFilters)
@@ -77,7 +77,7 @@ const FormaBadge = ({ forma }) => {
   if (!f) return <span className="text-suave dark:text-suave-dark">—</span>;
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black whitespace-nowrap border-2 ${
+      className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap border ${
         FORMA_ESTILOS[f] || FORMA_ESTILOS.OTRO
       }`}
     >
@@ -93,7 +93,7 @@ const TipoBadge = ({ item }) => {
   return (
     <span
       title={ing ? "Ingreso" : "Egreso"}
-      className={`inline-flex items-center justify-center w-8 h-8 rounded-xl border-2 ${
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border ${
         ing
           ? "bg-duo-verde/10 text-duo-verde dark:text-duo-verde border-duo-verde/30"
           : "bg-duo-rojo/10 text-duo-rojo dark:text-duo-rojo border-duo-rojo/30"
@@ -107,7 +107,7 @@ const TipoBadge = ({ item }) => {
 // 📱 Chip de oficina (reutilizado en tabla y tarjeta).
 const OficinaBadge = ({ nombre }) =>
   nombre ? (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-lg border-2 border-duo-azul/30 bg-duo-azul/10 text-duo-azul dark:text-duo-azul text-[11px] font-black whitespace-nowrap">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-md border border-duo-azul/30 bg-duo-azul/10 text-duo-azul dark:text-duo-azul text-[11px] font-medium whitespace-nowrap">
       {nombre}
     </span>
   ) : (
@@ -120,23 +120,23 @@ const MovimientoCard = ({ item }) => {
   const ing = esIngreso(item);
   const hora = fmtHora(item);
   return (
-    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl shadow-[0_2px_0_var(--color-linea)] dark:shadow-[0_2px_0_var(--color-linea-dark)] p-3">
+    <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl p-3">
       {/* Fila superior: tipo + descripción + monto */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <TipoBadge item={item} />
           <div className="min-w-0">
-            <p className="font-black text-sm text-titulo dark:text-titulo-dark truncate">
+            <p className="font-medium text-sm text-titulo dark:text-titulo-dark truncate">
               {descripcionConPatente(item)}
             </p>
-            <p className="text-[11px] font-bold text-suave dark:text-suave-dark leading-tight mt-0.5">
+            <p className="text-[11px] text-suave dark:text-suave-dark leading-tight mt-0.5">
               {fmtFecha(item.fecha)}
               {hora && <span className="tabular-nums"> · {hora} hs</span>}
             </p>
           </div>
         </div>
         <p
-          className={`font-mono font-black text-lg tracking-tight whitespace-nowrap shrink-0 ${
+          className={`font-mono font-semibold text-lg tracking-tight whitespace-nowrap shrink-0 ${
             ing ? "text-duo-verde dark:text-duo-verde" : "text-duo-rojo dark:text-duo-rojo"
           }`}
         >
@@ -170,7 +170,7 @@ export default function MovimientosPanel({
     <div className="space-y-4">
       {/* Contador de resultados — SIEMPRE visible */}
       <div className="flex items-center justify-between px-1">
-        <span className="text-xs font-bold text-suave dark:text-suave-dark">
+        <span className="text-xs text-suave dark:text-suave-dark">
           {loading ? "Cargando…" : `${count} ${count === 1 ? "movimiento" : "movimientos"}`}
         </span>
       </div>
@@ -178,22 +178,22 @@ export default function MovimientosPanel({
       {/* ═══════════════ MOBILE: tarjetas (oculto en sm+) ═══════════════ */}
       <div className="sm:hidden space-y-2.5">
         {loading ? (
-          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl py-8 text-center font-bold text-suave dark:text-suave-dark">
+          <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-8 text-center text-suave dark:text-suave-dark">
             Cargando…
           </div>
         ) : error ? (
-          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl py-8 flex flex-col items-center gap-3">
-            <span className="text-duo-rojo font-bold px-4 text-center">{error}</span>
+          <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-8 flex flex-col items-center gap-3">
+            <span className="text-duo-rojo px-4 text-center">{error}</span>
             <button
               type="button"
               onClick={onReintentar}
-              className="min-h-[44px] border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul text-suave dark:text-suave-dark hover:text-duo-azul rounded-xl px-4 py-2 font-black transition-colors"
+              className="min-h-[44px] border border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul text-suave dark:text-suave-dark hover:text-duo-azul rounded-lg px-4 py-2 font-medium transition-colors"
             >
               Reintentar
             </button>
           </div>
         ) : estadoVacio ? (
-          <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl py-8 text-center font-bold text-suave dark:text-suave-dark px-4">
+          <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-8 text-center text-suave dark:text-suave-dark px-4">
             No hay movimientos con estos filtros.
           </div>
         ) : (
@@ -202,23 +202,23 @@ export default function MovimientosPanel({
       </div>
 
       {/* ═══════════════ DESKTOP: tabla (oculto en mobile) ═══════════════ */}
-      <div className="hidden sm:block bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl overflow-hidden">
+      <div className="hidden sm:block bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-suave dark:text-suave-dark border-b-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
-                <th className="text-center px-2 py-2.5 font-black uppercase tracking-wide w-10">Tipo</th>
-                <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Fecha</th>
-                <th className="text-left px-3 py-2.5 font-black uppercase tracking-wide">Descripción</th>
-                <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Forma</th>
-                <th className="text-center px-3 py-2.5 font-black uppercase tracking-wide text-titulo dark:text-titulo-dark">Oficina</th>
-                <th className="text-right px-3 py-2.5 font-black uppercase tracking-wide">Monto</th>
+              <tr className="text-suave dark:text-suave-dark border-b border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark">
+                <th className="text-center px-2 py-2.5 font-medium w-10">Tipo</th>
+                <th className="text-left px-3 py-2.5 font-medium">Fecha</th>
+                <th className="text-left px-3 py-2.5 font-medium">Descripción</th>
+                <th className="text-center px-3 py-2.5 font-medium text-titulo dark:text-titulo-dark">Forma</th>
+                <th className="text-center px-3 py-2.5 font-medium text-titulo dark:text-titulo-dark">Oficina</th>
+                <th className="text-right px-3 py-2.5 font-medium">Monto</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
+                  <td colSpan={6} className="text-center py-8 text-suave dark:text-suave-dark">
                     Cargando…
                   </td>
                 </tr>
@@ -226,11 +226,11 @@ export default function MovimientosPanel({
                 <tr>
                   <td colSpan={6} className="text-center py-8">
                     <div className="flex flex-col items-center gap-3">
-                      <span className="text-duo-rojo font-bold">{error}</span>
+                      <span className="text-duo-rojo">{error}</span>
                       <button
                         type="button"
                         onClick={onReintentar}
-                        className="border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul text-suave dark:text-suave-dark hover:text-duo-azul rounded-xl px-3 py-1.5 font-black transition-colors"
+                        className="border border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul text-suave dark:text-suave-dark hover:text-duo-azul rounded-lg px-3 py-1.5 font-medium transition-colors"
                       >
                         Reintentar
                       </button>
@@ -239,7 +239,7 @@ export default function MovimientosPanel({
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 font-bold text-suave dark:text-suave-dark">
+                  <td colSpan={6} className="text-center py-8 text-suave dark:text-suave-dark">
                     No hay movimientos con estos filtros.
                   </td>
                 </tr>
@@ -250,22 +250,22 @@ export default function MovimientosPanel({
                   return (
                     <tr
                       key={`${item._tipo}-${item.id}`}
-                      className="border-b-2 border-linea/50 dark:border-linea-dark/50 hover:bg-duo-azul/5 dark:hover:bg-white/5 transition-colors"
+                      className="border-b border-linea/50 dark:border-linea-dark/50 hover:bg-duo-azul/5 dark:hover:bg-white/5 transition-colors"
                     >
                       <td className="px-2 py-2 text-center">
                         <TipoBadge item={item} />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="font-bold text-suave dark:text-suave-dark leading-tight">
+                        <div className="text-suave dark:text-suave-dark leading-tight">
                           {fmtFecha(item.fecha)}
                         </div>
                         {hora && (
-                          <div className="text-[10px] font-black text-suave/70 dark:text-suave-dark/70 tabular-nums leading-tight">
+                          <div className="text-[10px] font-medium text-suave/70 dark:text-suave-dark/70 tabular-nums leading-tight">
                             {hora} hs
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2 font-bold text-titulo dark:text-titulo-dark">{descripcionConPatente(item)}</td>
+                      <td className="px-3 py-2 font-medium text-titulo dark:text-titulo-dark">{descripcionConPatente(item)}</td>
                       <td className="px-3 py-2 text-center">
                         <FormaBadge forma={item.forma_pago} />
                       </td>
@@ -273,7 +273,7 @@ export default function MovimientosPanel({
                         <OficinaBadge nombre={item.oficina_nombre} />
                       </td>
                       <td
-                        className={`px-3 py-2 text-right font-mono font-black whitespace-nowrap text-base sm:text-lg tracking-tight ${
+                        className={`px-3 py-2 text-right font-mono font-semibold whitespace-nowrap text-base sm:text-lg tracking-tight ${
                           ing ? "text-duo-verde dark:text-duo-verde" : "text-duo-rojo dark:text-duo-rojo"
                         }`}
                       >
@@ -290,8 +290,8 @@ export default function MovimientosPanel({
 
       {/* ═══════════════ Paginación (compartida) ═══════════════ */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 px-3 py-3 bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl">
-          <span className="text-[11px] sm:text-xs font-bold text-suave dark:text-suave-dark min-w-0 truncate">
+        <div className="flex items-center justify-between gap-2 px-3 py-3 bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl">
+          <span className="text-[11px] sm:text-xs text-suave dark:text-suave-dark min-w-0 truncate">
             Página {page} de {totalPages}
             <span className="hidden sm:inline"> · {count} resultados</span>
           </span>
@@ -299,18 +299,18 @@ export default function MovimientosPanel({
             <button
               disabled={page <= 1 || loading}
               onClick={() => onPage(page - 1)}
-              className="inline-flex items-center justify-center w-11 h-11 rounded-xl border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-lg border border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
               aria-label="Página anterior"
             >
               <HiChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-xs font-mono font-black text-titulo dark:text-titulo-dark min-w-[52px] text-center">
+            <span className="text-xs font-mono font-medium text-titulo dark:text-titulo-dark min-w-[52px] text-center">
               {page} / {totalPages}
             </span>
             <button
               disabled={page >= totalPages || loading}
               onClick={() => onPage(page + 1)}
-              className="inline-flex items-center justify-center w-11 h-11 rounded-xl border-2 border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-lg border border-linea dark:border-linea-dark hover:bg-duo-azul/10 hover:border-duo-azul disabled:opacity-30 text-suave dark:text-suave-dark transition-colors"
               aria-label="Página siguiente"
             >
               <HiChevronRight className="w-5 h-5" />

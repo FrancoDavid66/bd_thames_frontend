@@ -20,6 +20,9 @@
 // Es el mismo truco del lavarropas que muestra "Enjuague / Centrifugado":
 // no acelera nada, pero uno sabe que avanza.
 //
+// 🆕 Rediseño "profesional": mismo comportamiento, tipografía más
+// contenida (sin mayúscula/tracking ancho en el pie).
+//
 // Props:
 //   visible: boolean
 //   titulo:  el texto grande
@@ -70,9 +73,9 @@ export default function LoaderPantalla({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className={`h-16 w-16 rounded-full border-[5px] animate-spin ${t.anillo}`} />
+          <div className={`h-14 w-14 rounded-full border-4 animate-spin ${t.anillo}`} />
 
-          <p className="mt-6 text-lg font-black text-white text-center tracking-tight">
+          <p className="mt-6 text-lg font-semibold text-white text-center">
             {titulo}
           </p>
 
@@ -84,7 +87,7 @@ export default function LoaderPantalla({
                 return (
                   <div
                     key={p}
-                    className={`flex items-center gap-2.5 text-[13px] font-bold transition-opacity duration-300 ${
+                    className={`flex items-center gap-2.5 text-[13px] font-medium transition-opacity duration-300 ${
                       activo ? "opacity-100" : hecho ? "opacity-60" : "opacity-25"
                     }`}
                   >
@@ -106,7 +109,7 @@ export default function LoaderPantalla({
             </div>
           ) : null}
 
-          <p className="mt-6 text-[11px] font-bold uppercase tracking-widest text-white/40">
+          <p className="mt-6 text-[12px] font-medium text-white/40">
             No cierres esta ventana
           </p>
         </motion.div>

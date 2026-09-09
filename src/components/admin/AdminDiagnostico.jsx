@@ -12,6 +12,7 @@ import {
   HiOutlineInformationCircle,
   HiOutlineChevronDown,
   HiOutlineChevronUp,
+  HiOutlineChartBar,
 } from "react-icons/hi";
 
 import api from "../../services/api";
@@ -48,7 +49,7 @@ const CATEGORIAS_META = {
 };
 
 // ════════════════════════════════════════════════════
-// Helpers de color según cantidad (tokens Duo)
+// Helpers de color según cantidad
 //   0 casos  -> verde (ingreso)
 //   1-5      -> ámbar (tarjeta)
 //   6+       -> rojo  (egreso)
@@ -56,7 +57,7 @@ const CATEGORIAS_META = {
 function getColorByCount(count) {
   if (count === 0) {
     return {
-      border: "border-[var(--color-ingreso)]/40",
+      border: "border-[var(--color-ingreso)]/30",
       bg: "bg-[var(--color-ingreso)]/10",
       text: "text-[var(--color-ingreso-fuerte)]",
       number: "text-[var(--color-ingreso-fuerte)]",
@@ -67,7 +68,7 @@ function getColorByCount(count) {
   }
   if (count <= 5) {
     return {
-      border: "border-[var(--color-tarjeta)]/40",
+      border: "border-[var(--color-tarjeta)]/30",
       bg: "bg-[var(--color-tarjeta)]/10",
       text: "text-[#d97706]",
       number: "text-[#d97706]",
@@ -77,7 +78,7 @@ function getColorByCount(count) {
     };
   }
   return {
-    border: "border-[var(--color-egreso)]/40",
+    border: "border-[var(--color-egreso)]/30",
     bg: "bg-[var(--color-egreso)]/10",
     text: "text-[var(--color-egreso-fuerte)]",
     number: "text-[var(--color-egreso-fuerte)]",
@@ -111,10 +112,10 @@ function CategoriaCard({
       : meta.label;
 
   return (
-    <div className={`rounded-2xl border-2 ${colors.border} ${colors.bg} p-4`}>
+    <div className={`rounded-xl border ${colors.border} ${colors.bg} p-4`}>
       <div className="flex items-start gap-3">
         <div
-          className={`${colors.iconBg} flex-shrink-0 rounded-xl p-2`}
+          className={`${colors.iconBg} flex-shrink-0 rounded-lg p-2`}
           aria-hidden="true"
         >
           <Icon className={`h-5 w-5 ${colors.text}`} />
@@ -123,23 +124,23 @@ function CategoriaCard({
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className={`truncate text-xs font-bold ${colors.text}`}>
+              <div className={`truncate text-[12px] font-medium ${colors.text}`}>
                 {labelMostrado}
               </div>
-              <div className={`mt-0.5 text-3xl font-black ${colors.number}`}>
+              <div className={`mt-0.5 text-2xl font-semibold ${colors.number}`}>
                 {data.count}
               </div>
             </div>
           </div>
 
-          <p className={`mt-1 text-xs font-bold ${colors.hint}`}>{colors.label}</p>
-          <p className="mt-2 text-xs text-[var(--color-suave)]">{meta.descripcion}</p>
+          <p className={`mt-1 text-[12px] font-medium ${colors.hint}`}>{colors.label}</p>
+          <p className="mt-2 text-[12px] text-[var(--color-suave)]">{meta.descripcion}</p>
 
           {data.count > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => onToggleDetalle(categoria)}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-xs font-bold text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
                 title={expandido ? "Ocultar detalle" : "Ver ejemplos"}
               >
                 {expandido ? (
@@ -155,7 +156,7 @@ function CategoriaCard({
 
               <button
                 onClick={() => onExportar(categoria, "csv")}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-xs font-bold text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
                 title="Descargar como CSV"
               >
                 <HiOutlineDownload className="h-3.5 w-3.5" /> CSV
@@ -163,7 +164,7 @@ function CategoriaCard({
 
               <button
                 onClick={() => onExportar(categoria, "xlsx")}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border-2 border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-xs font-bold text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
                 title="Descargar como Excel"
               >
                 <HiOutlineDownload className="h-3.5 w-3.5" /> Excel
@@ -173,7 +174,7 @@ function CategoriaCard({
 
           {/* Detalle expandido */}
           {expandido && data.count > 0 && (
-            <div className="mt-3 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-3">
+            <div className="mt-3 rounded-lg border border-[var(--color-linea)] bg-[var(--color-card)] p-3">
               <div className="mb-2 text-[11px] text-[var(--color-suave)]">
                 Primeros {data.ejemplos?.length || 0} casos (de {data.count}{" "}
                 totales):
@@ -182,7 +183,7 @@ function CategoriaCard({
                 {(data.ejemplos || []).map((item) => (
                   <li
                     key={item.id}
-                    className="border-b border-[var(--color-linea)] pb-1 font-mono text-xs leading-relaxed text-[var(--color-titulo)] last:border-0"
+                    className="border-b border-[var(--color-linea)] pb-1 font-mono text-[12px] leading-relaxed text-[var(--color-titulo)] last:border-0"
                   >
                     {categoria === "clientes_sin_oficina" ? (
                       <>
@@ -216,28 +217,28 @@ function CategoriaCard({
 // ════════════════════════════════════════════════════
 function EstadoInicial({ onEjecutar, cargando, diasMora, setDiasMora }) {
   return (
-    <div className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-8 text-center">
-      <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--color-oficina)] text-white shadow-[0_4px_0_var(--color-oficina-fuerte)]">
-        <HiOutlineDocumentSearch className="h-8 w-8" />
+    <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-8 text-center">
+      <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-lg bg-[var(--color-oficina)] text-white">
+        <HiOutlineDocumentSearch className="h-7 w-7" />
       </div>
-      <h2 className="mb-2 text-xl font-black text-[var(--color-titulo)]">
-        🩺 Salud de los datos
+      <h2 className="mb-2 text-[18px] font-semibold text-[var(--color-titulo)]">
+        Salud de los datos
       </h2>
-      <p className="mx-auto mb-6 max-w-md text-sm font-semibold text-[var(--color-suave)]">
+      <p className="mx-auto mb-6 max-w-md text-[13px] text-[var(--color-suave)]">
         Esta herramienta analiza la base de datos en busca de inconsistencias.
-        <span className="mt-2 block text-xs">
+        <span className="mt-2 block text-[12px]">
           Solo lee información — no modifica nada.
         </span>
       </p>
 
       <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
-        <label className="text-xs font-bold text-[var(--color-suave)]">
+        <label className="text-[12px] text-[var(--color-suave)]">
           Umbral de mora considerado problemático:
         </label>
         <select
           value={diasMora}
           onChange={(e) => setDiasMora(Number(e.target.value))}
-          className="cursor-pointer rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-2 py-1.5 text-sm font-semibold text-[var(--color-titulo)] outline-none focus:border-[var(--color-oficina)] dark:[color-scheme:dark]"
+          className="cursor-pointer rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-2 py-1.5 text-[13px] text-[var(--color-titulo)] outline-none focus:border-[var(--color-oficina)] dark:[color-scheme:dark]"
         >
           <option value={15}>15 días</option>
           <option value={30}>30 días (recomendado)</option>
@@ -249,7 +250,7 @@ function EstadoInicial({ onEjecutar, cargando, diasMora, setDiasMora }) {
       <button
         onClick={onEjecutar}
         disabled={cargando}
-        className={`inline-flex items-center gap-2 rounded-xl bg-[var(--color-oficina)] px-5 py-3 text-sm font-black text-white shadow-[0_4px_0_var(--color-oficina-fuerte)] transition-all active:translate-y-0.5 active:shadow-[0_0_0_var(--color-oficina-fuerte)] ${
+        className={`inline-flex items-center gap-2 rounded-lg bg-[var(--color-oficina)] px-5 py-2.5 text-[13px] font-medium text-white hover:brightness-110 transition-colors ${
           cargando ? "cursor-not-allowed opacity-60" : "cursor-pointer"
         }`}
       >
@@ -372,12 +373,12 @@ export default function AdminDiagnostico() {
   return (
     <div className="space-y-6">
       {/* Header con botón refrescar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--color-titulo)]">
-            🩺 Salud de los datos
+          <h2 className="text-[16px] font-semibold text-[var(--color-titulo)]">
+            Salud de los datos
           </h2>
-          <p className="mt-0.5 text-xs font-semibold text-[var(--color-suave)]">
+          <p className="mt-0.5 text-[12px] text-[var(--color-suave)]">
             Diagnóstico de inconsistencias · Umbral mora: {diasMora} días
           </p>
         </div>
@@ -386,7 +387,7 @@ export default function AdminDiagnostico() {
           <select
             value={diasMora}
             onChange={(e) => setDiasMora(Number(e.target.value))}
-            className="cursor-pointer rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-2 py-1.5 text-sm font-semibold text-[var(--color-titulo)] outline-none focus:border-[var(--color-oficina)] dark:[color-scheme:dark]"
+            className="cursor-pointer rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-2 py-1.5 text-[13px] text-[var(--color-titulo)] outline-none focus:border-[var(--color-oficina)] dark:[color-scheme:dark]"
             title="Cambiar umbral de mora"
           >
             <option value={15}>15 días</option>
@@ -398,7 +399,7 @@ export default function AdminDiagnostico() {
           <button
             onClick={ejecutarDiagnostico}
             disabled={cargando}
-            className={`inline-flex items-center gap-2 rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2 text-sm font-bold text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-card)] ${
+            className={`inline-flex items-center gap-2 rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2 text-[13px] font-medium text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-card)] ${
               cargando ? "cursor-not-allowed opacity-60" : "cursor-pointer"
             }`}
             title="Volver a analizar"
@@ -413,12 +414,12 @@ export default function AdminDiagnostico() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-2xl border-2 border-[var(--color-egreso)]/40 bg-[var(--color-egreso)]/10 p-4 text-[var(--color-egreso-fuerte)]">
+        <div className="rounded-xl border border-[var(--color-egreso)]/30 bg-[var(--color-egreso)]/10 p-4 text-[var(--color-egreso-fuerte)]">
           <div className="flex items-start gap-3">
             <HiOutlineExclamation className="mt-0.5 h-5 w-5 flex-shrink-0" />
             <div>
-              <p className="mb-1 font-black">Error al ejecutar diagnóstico</p>
-              <p className="text-sm">{error}</p>
+              <p className="mb-1 font-medium text-[14px]">Error al ejecutar diagnóstico</p>
+              <p className="text-[13px]">{error}</p>
             </div>
           </div>
         </div>
@@ -428,21 +429,21 @@ export default function AdminDiagnostico() {
       {resultado && (
         <div className="space-y-6">
           {/* Resumen general */}
-          <div className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4">
+          <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   {resultado.totales.problemas_detectados === 0 ? (
                     <>
                       <HiOutlineCheckCircle className="h-5 w-5 text-[var(--color-ingreso)]" />
-                      <span className="font-black text-[var(--color-ingreso-fuerte)]">
+                      <span className="font-medium text-[14px] text-[var(--color-ingreso-fuerte)]">
                         Base de datos limpia
                       </span>
                     </>
                   ) : (
                     <>
                       <HiOutlineClipboardCheck className="h-5 w-5 text-[#d97706]" />
-                      <span className="font-black text-[var(--color-titulo)]">
+                      <span className="font-medium text-[14px] text-[var(--color-titulo)]">
                         {resultado.totales.problemas_detectados} caso
                         {resultado.totales.problemas_detectados !== 1 ? "s" : ""}{" "}
                         detectado
@@ -451,12 +452,12 @@ export default function AdminDiagnostico() {
                     </>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-[var(--color-suave)]">
+                <p className="mt-1 text-[12px] text-[var(--color-suave)]">
                   Pólizas en base: {resultado.totales.polizas_en_base} ·
                   Clientes: {resultado.totales.clientes_en_base}
                 </p>
               </div>
-              <div className="text-xs text-[var(--color-suave)]">
+              <div className="text-[12px] text-[var(--color-suave)]">
                 Ejecutado:{" "}
                 {new Date(resultado.ejecutado_en).toLocaleString("es-AR")}
               </div>
@@ -465,8 +466,8 @@ export default function AdminDiagnostico() {
 
           {/* Grupo: Oficinas huérfanas */}
           <div>
-            <h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-[var(--color-suave)]">
-              🏢 Oficinas huérfanas
+            <h3 className="mb-3 px-1 flex items-center gap-1.5 text-[12px] text-[var(--color-suave)]">
+              <HiOutlineOfficeBuilding className="text-[13px]" /> Oficinas huérfanas
             </h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <CategoriaCard
@@ -490,8 +491,8 @@ export default function AdminDiagnostico() {
 
           {/* Grupo: Estados inconsistentes */}
           <div>
-            <h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-[var(--color-suave)]">
-              📋 Estados inconsistentes
+            <h3 className="mb-3 px-1 flex items-center gap-1.5 text-[12px] text-[var(--color-suave)]">
+              <HiOutlineClipboardCheck className="text-[13px]" /> Estados inconsistentes
             </h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <CategoriaCard
@@ -522,20 +523,20 @@ export default function AdminDiagnostico() {
           </div>
 
           {/* Distribución de estados */}
-          <div className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-4">
-            <h3 className="mb-3 text-xs font-black uppercase tracking-wider text-[var(--color-suave)]">
-              📈 Distribución actual de pólizas
+          <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-4">
+            <h3 className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--color-suave)]">
+              <HiOutlineChartBar className="text-[13px]" /> Distribución actual de pólizas
             </h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {resultado.distribucion_estados.map((row) => (
                 <div
                   key={row.estado}
-                  className="rounded-xl border-2 border-[var(--color-linea)] bg-[var(--color-surface)] p-2.5"
+                  className="rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] p-2.5"
                 >
-                  <div className="truncate text-[10px] uppercase tracking-wider text-[var(--color-suave)]">
+                  <div className="truncate text-[10px] text-[var(--color-suave)]">
                     {row.estado}
                   </div>
-                  <div className="mt-1 text-lg font-black text-[var(--color-titulo)]">
+                  <div className="mt-1 text-[16px] font-semibold text-[var(--color-titulo)]">
                     {row.total}
                   </div>
                 </div>
@@ -544,12 +545,12 @@ export default function AdminDiagnostico() {
           </div>
 
           {/* Aviso */}
-          <div className="rounded-2xl border-2 border-[var(--color-linea)] bg-[var(--color-card)] p-3">
-            <div className="flex items-start gap-2 text-xs text-[var(--color-suave)]">
+          <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-3">
+            <div className="flex items-start gap-2 text-[12px] text-[var(--color-suave)]">
               <HiOutlineInformationCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <span>
                 Este reporte es{" "}
-                <strong className="text-[var(--color-titulo)]">solo lectura</strong>. No
+                <strong className="text-[var(--color-titulo)] font-medium">solo lectura</strong>. No
                 modifica la base. Para corregir los casos detectados, hay que
                 hacerlo manualmente desde cada pantalla.
               </span>

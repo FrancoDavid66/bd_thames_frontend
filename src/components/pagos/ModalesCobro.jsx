@@ -1,4 +1,4 @@
-// src/components/pagos/ModalesCobro.jsx — diseño Duo (claro/oscuro)
+// src/components/pagos/ModalesCobro.jsx
 // ─────────────────────────────────────────────────────────────
 // ARCHIVO UNIFICADO — reemplaza a estos 3 archivos:
 //   · ModalFormaPago.jsx        → export { ModalFormaPago }  (y default)
@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   HiX, HiCalendar, HiPencil, HiChevronLeft, HiCheck, HiUser, HiArrowRight,
   HiCash, HiSparkles, HiCamera, HiOutlineSwitchHorizontal,
-  HiClock, HiCurrencyDollar,
+  HiClock, HiCurrencyDollar, HiOfficeBuilding, HiCreditCard, HiIdentification,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 import { sendAdminPagoRegistrado } from "../../services/notifications/pagos";
@@ -267,20 +267,20 @@ export function ModalFormaPago({
               leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0 scale-100"
               leaveTo="opacity-0 translate-y-3 scale-95">
 
-              <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-3xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark shadow-2xl text-titulo dark:text-titulo-dark">
+              <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl text-titulo dark:text-titulo-dark">
 
                 {/* Header */}
-                <div className="px-5 py-4 border-b-2 border-linea dark:border-linea-dark flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-linea dark:border-linea-dark flex items-center justify-between">
                   <div>
-                    <Dialog.Title className="text-base font-black text-titulo dark:text-titulo-dark">
-                      🤑 {title}
+                    <Dialog.Title className="text-base font-semibold text-titulo dark:text-titulo-dark">
+                      {title}
                     </Dialog.Title>
-                    <p className="text-xs text-suave dark:text-suave-dark mt-0.5 font-bold">
+                    <p className="text-xs text-suave dark:text-suave-dark mt-0.5">
                       {clienteNombreApellido && <span>{clienteNombreApellido}</span>}
                       {pagoCuota && <span> · Cuota #{pagoCuota}</span>}
                     </p>
                   </div>
-                  <button onClick={onClose} className="h-8 w-8 rounded-xl flex items-center justify-center text-suave dark:text-suave-dark hover:brightness-95 bg-surface dark:bg-surface-dark transition-colors">
+                  <button onClick={onClose} className="h-8 w-8 rounded-lg flex items-center justify-center text-suave dark:text-suave-dark hover:brightness-95 bg-surface dark:bg-surface-dark transition-colors">
                     <HiX className="w-5 h-5" />
                   </button>
                 </div>
@@ -296,7 +296,7 @@ export function ModalFormaPago({
                           <div className={`h-2.5 w-full rounded-full transition-all duration-300 ${
                             done || active ? "bg-duo-azul" : "bg-linea dark:bg-linea-dark"
                           }`} />
-                          <span className={`text-[10px] font-black transition-colors ${
+                          <span className={`text-[10px] font-medium transition-colors ${
                             done || active ? "text-duo-azul" : "text-suave dark:text-suave-dark"
                           }`}>{label}</span>
                         </div>
@@ -315,23 +315,23 @@ export function ModalFormaPago({
                         initial="enter" animate="center" exit="exit"
                         transition={{ duration: 0.18 }}
                         className="flex-1 flex flex-col justify-center gap-4 py-4">
-                        <p className="text-sm font-black text-titulo dark:text-titulo-dark text-center mb-2">¿Cómo paga el cliente?</p>
+                        <p className="text-sm font-semibold text-titulo dark:text-titulo-dark text-center mb-2">¿Cómo paga el cliente?</p>
                         <div className="grid grid-cols-2 gap-3">
                           {/* Efectivo */}
                           <button type="button" onClick={() => setMetodo("efectivo")}
-                            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-150 ${
+                            className={`flex flex-col items-center gap-3 p-5 rounded-xl border transition-colors duration-150 ${
                               metodo === "efectivo"
                                 ? "border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]"
                                 : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-verde"
                             }`}>
-                            <div className="h-14 w-14 rounded-2xl bg-card dark:bg-card-dark flex items-center justify-center text-3xl">
-                              💵
+                            <div className="h-14 w-14 rounded-lg bg-card dark:bg-card-dark flex items-center justify-center">
+                              <HiCash className="w-7 h-7 text-duo-verde" />
                             </div>
                             <div className="text-center">
-                              <div className={`text-sm font-black ${metodo === "efectivo" ? "text-duo-verde-sombra dark:text-duo-verde" : "text-titulo dark:text-titulo-dark"}`}>
+                              <div className={`text-sm font-semibold ${metodo === "efectivo" ? "text-duo-verde-sombra dark:text-duo-verde" : "text-titulo dark:text-titulo-dark"}`}>
                                 Efectivo
                               </div>
-                              <div className="text-[11px] text-suave dark:text-suave-dark font-bold mt-0.5">Pago en mano</div>
+                              <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5">Pago en mano</div>
                             </div>
                             {metodo === "efectivo" && (
                               <div className="h-5 w-5 rounded-full bg-duo-verde flex items-center justify-center">
@@ -342,19 +342,19 @@ export function ModalFormaPago({
 
                           {/* Transferencia */}
                           <button type="button" onClick={() => setMetodo("transferencia")}
-                            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-150 ${
+                            className={`flex flex-col items-center gap-3 p-5 rounded-xl border transition-colors duration-150 ${
                               metodo === "transferencia"
                                 ? "border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]"
                                 : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-azul"
                             }`}>
-                            <div className="h-14 w-14 rounded-2xl bg-card dark:bg-card-dark flex items-center justify-center text-3xl">
-                              🏦
+                            <div className="h-14 w-14 rounded-lg bg-card dark:bg-card-dark flex items-center justify-center">
+                              <HiOfficeBuilding className="w-7 h-7 text-duo-azul" />
                             </div>
                             <div className="text-center">
-                              <div className={`text-sm font-black ${metodo === "transferencia" ? "text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
+                              <div className={`text-sm font-semibold ${metodo === "transferencia" ? "text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
                                 Transferencia
                               </div>
-                              <div className="text-[11px] text-suave dark:text-suave-dark font-bold mt-0.5">MP / Bancaria</div>
+                              <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5">MP / Bancaria</div>
                             </div>
                             {metodo === "transferencia" && (
                               <div className="h-5 w-5 rounded-full bg-duo-azul flex items-center justify-center">
@@ -372,23 +372,23 @@ export function ModalFormaPago({
                         initial="enter" animate="center" exit="exit"
                         transition={{ duration: 0.18 }}
                         className="flex-1 flex flex-col gap-3 py-4">
-                        <p className="text-sm font-black text-titulo dark:text-titulo-dark text-center mb-2">¿A qué cuenta llegó la plata?</p>
+                        <p className="text-sm font-semibold text-titulo dark:text-titulo-dark text-center mb-2">¿A qué cuenta llegó la plata?</p>
 
                         <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                           {/* Mercado Pago */}
                           {(mediosMP.length > 0 || mpStrings.length > 0) && (
                             <div>
-                              <p className="text-[10px] uppercase tracking-wide text-duo-azul font-black mb-1.5 px-1">Mercado Pago</p>
+                              <p className="text-[11px] text-duo-azul mb-1.5 px-1">Mercado Pago</p>
                               <div className="space-y-1.5">
                                 {(mediosMP.length > 0 ? mediosMP : mpStrings.map((s, i) => ({ id: `mp-${i}`, display: s, proveedor: "mercado_pago" }))).map(m => (
                                   <button key={m.id} type="button" onClick={() => setDestinoId(String(m.id))}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
                                       destinoId === String(m.id)
                                         ? "border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]"
                                         : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-azul"
                                     }`}>
-                                    <span className="text-xl shrink-0">💳</span>
-                                    <span className={`text-sm font-bold flex-1 ${destinoId === String(m.id) ? "text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
+                                    <HiCreditCard className="w-5 h-5 shrink-0 text-duo-azul" />
+                                    <span className={`text-sm font-medium flex-1 ${destinoId === String(m.id) ? "text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
                                       {m.display}
                                     </span>
                                     {destinoId === String(m.id) && <HiCheck className="w-4 h-4 text-duo-azul shrink-0" />}
@@ -401,17 +401,16 @@ export function ModalFormaPago({
                           {/* Billeteras virtuales */}
                           {(mediosBil.length > 0 || bilStrings.length > 0) && (
                             <div>
-                              <p className="text-[10px] uppercase tracking-wide text-duo-violeta font-black mb-1.5 px-1">Billeteras virtuales</p>
+                              <p className="text-[11px] text-duo-violeta mb-1.5 px-1">Billeteras virtuales</p>
                               <div className="space-y-1.5">
                                 {(mediosBil.length > 0 ? mediosBil : bilStrings.map((s, i) => ({ id: `bil-${i}`, display: s }))).map(m => (
                                   <button key={m.id} type="button" onClick={() => setDestinoId(String(m.id))}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
                                       destinoId === String(m.id)
                                         ? "border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)]"
                                         : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-violeta"
                                     }`}>
-                                    <span className="text-xl shrink-0">👛</span>
-                                    <span className={`text-sm font-bold flex-1 ${destinoId === String(m.id) ? "text-duo-violeta" : "text-titulo dark:text-titulo-dark"}`}>
+                                    <span className={`text-sm font-medium flex-1 ${destinoId === String(m.id) ? "text-duo-violeta" : "text-titulo dark:text-titulo-dark"}`}>
                                       {m.display}
                                     </span>
                                     {destinoId === String(m.id) && <HiCheck className="w-4 h-4 text-duo-violeta shrink-0" />}
@@ -423,17 +422,17 @@ export function ModalFormaPago({
 
                           {/* Otra */}
                           <button type="button" onClick={() => setDestinoId("_otra_")}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
                               destinoEsOtra ? "border-duo-amarillo bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)]" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-amarillo"
                             }`}>
-                            <span className="text-xl shrink-0">✏️</span>
-                            <span className={`text-sm font-bold flex-1 ${destinoEsOtra ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-suave dark:text-suave-dark"}`}>Otra…</span>
+                            <HiPencil className="w-4 h-4 shrink-0 text-duo-amarillo-sombra dark:text-duo-amarillo" />
+                            <span className={`text-sm font-medium flex-1 ${destinoEsOtra ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-suave dark:text-suave-dark"}`}>Otra…</span>
                           </button>
 
                           {destinoEsOtra && (
                             <input type="text" value={destinoOtra} onChange={e => setDestinoOtra(e.target.value)}
                               placeholder="Nombre de la cuenta o billetera"
-                              className="w-full px-4 py-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-duo-amarillo/60 focus:border-duo-amarillo text-sm font-bold text-titulo dark:text-titulo-dark outline-none transition-colors" />
+                              className="w-full px-4 py-3 rounded-lg bg-surface dark:bg-surface-dark border border-duo-amarillo/50 focus:border-duo-amarillo text-sm text-titulo dark:text-titulo-dark outline-none transition-colors" />
                           )}
                         </div>
                       </motion.div>
@@ -445,22 +444,22 @@ export function ModalFormaPago({
                         initial="enter" animate="center" exit="exit"
                         transition={{ duration: 0.18 }}
                         className="flex-1 flex flex-col gap-3 py-4">
-                        <p className="text-sm font-black text-titulo dark:text-titulo-dark text-center mb-1">Datos del remitente</p>
-                        <p className="text-[11px] text-suave dark:text-suave-dark text-center -mt-1 mb-2 font-bold">Copiá del comprobante de transferencia</p>
+                        <p className="text-sm font-semibold text-titulo dark:text-titulo-dark text-center mb-1">Datos del remitente</p>
+                        <p className="text-[11px] text-suave dark:text-suave-dark text-center -mt-1 mb-2">Copiá del comprobante de transferencia</p>
 
-                        <div className="bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-2 border-duo-amarillo/50 rounded-2xl p-4 space-y-4">
+                        <div className="bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border border-duo-amarillo/40 rounded-xl p-4 space-y-4">
 
                           {/* Nombre */}
                           <div>
-                            <label className="flex items-center gap-1.5 text-xs text-duo-amarillo-sombra dark:text-duo-amarillo font-black uppercase tracking-wide mb-1.5">
-                              👤 Nombre del remitente <span className="text-duo-rojo">*</span>
+                            <label className="flex items-center gap-1.5 text-xs text-duo-amarillo-sombra dark:text-duo-amarillo mb-1.5">
+                              <HiUser className="w-3.5 h-3.5" /> Nombre del remitente <span className="text-duo-rojo">*</span>
                             </label>
                             <input type="text" value={enviadoPor} onChange={e => setEnviadoPor(e.target.value)}
                               placeholder="Ej: Williams Javier Coronel"
-                              className="w-full px-3 py-2.5 rounded-xl bg-card dark:bg-card-dark border-2 border-duo-amarillo/40 focus:border-duo-amarillo text-sm font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none transition-colors" />
+                              className="w-full px-3 py-2.5 rounded-lg bg-card dark:bg-card-dark border border-duo-amarillo/35 focus:border-duo-amarillo text-sm text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none transition-colors" />
                             {clienteNombreApellido && enviadoPor !== clienteNombreApellido && (
                               <button type="button" onClick={() => setEnviadoPor(clienteNombreApellido)}
-                                className="mt-1 text-[11px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-110 transition-colors">
+                                className="mt-1 text-[11px] font-medium text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-110 transition-colors">
                                 ↩ Usar nombre del asegurado ({clienteNombreApellido})
                               </button>
                             )}
@@ -468,19 +467,19 @@ export function ModalFormaPago({
 
                           {/* CUIT/CUIL */}
                           <div>
-                            <label className="flex items-center gap-1.5 text-xs text-duo-amarillo-sombra dark:text-duo-amarillo font-black uppercase tracking-wide mb-1.5">
-                              🪪 CUIT / CUIL <span className="text-duo-rojo">*</span>
+                            <label className="flex items-center gap-1.5 text-xs text-duo-amarillo-sombra dark:text-duo-amarillo mb-1.5">
+                              <HiIdentification className="w-3.5 h-3.5" /> CUIT / CUIL <span className="text-duo-rojo">*</span>
                             </label>
                             <input type="text" inputMode="numeric" value={cuitRemitente}
                               onChange={e => setCuitRemitente(e.target.value)}
                               placeholder="Ej: 20-38721209-5"
-                              className="w-full px-3 py-2.5 rounded-xl bg-card dark:bg-card-dark border-2 border-duo-amarillo/40 focus:border-duo-amarillo text-sm font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none transition-colors font-mono" />
+                              className="w-full px-3 py-2.5 rounded-lg bg-card dark:bg-card-dark border border-duo-amarillo/35 focus:border-duo-amarillo text-sm text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none transition-colors font-mono" />
                           </div>
 
                         </div>
 
                         {(!enviadoPor.trim() || !cuitRemitente.trim()) && (
-                          <p className="text-[11px] text-suave dark:text-suave-dark text-center font-bold">
+                          <p className="text-[11px] text-suave dark:text-suave-dark text-center">
                             Todos los campos son obligatorios para transferencias
                           </p>
                         )}
@@ -496,16 +495,16 @@ export function ModalFormaPago({
 
                         {/* Resumen de lo elegido */}
                         {needsDestino && (
-                          <div className="bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-xl px-4 py-3 space-y-1.5">
+                          <div className="bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg px-4 py-3 space-y-1.5">
                             <div className="flex items-center gap-2 text-sm">
-                              <span className="text-lg shrink-0">🏦</span>
-                              <span className="text-titulo dark:text-titulo-dark font-bold truncate">
+                              <HiOfficeBuilding className="w-4 h-4 shrink-0 text-suave dark:text-suave-dark" />
+                              <span className="text-titulo dark:text-titulo-dark truncate">
                                 {medios.find(m => m.id === destinoId)?.display || destinoOtra || destinoId || "—"}
                               </span>
                             </div>
                             {enviadoPor && (
-                              <div className="flex items-center gap-2 text-xs text-suave dark:text-suave-dark font-bold">
-                                <span>👤</span>
+                              <div className="flex items-center gap-2 text-xs text-suave dark:text-suave-dark">
+                                <HiUser className="w-3.5 h-3.5" />
                                 <span>{enviadoPor}</span>
                                 {cuitRemitente && <span className="font-mono">· {cuitRemitente}</span>}
                               </div>
@@ -514,14 +513,14 @@ export function ModalFormaPago({
                         )}
 
                         {/* Monto */}
-                        <div className="bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-2 border-duo-verde/50 rounded-2xl p-4">
-                          <p className="text-xs text-duo-verde-sombra dark:text-duo-verde font-black uppercase tracking-wide mb-3">
-                            💸 Monto a pagar
+                        <div className="bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border border-duo-verde/40 rounded-xl p-4">
+                          <p className="text-xs text-duo-verde-sombra dark:text-duo-verde mb-3">
+                            Monto a pagar
                           </p>
                           {/* Campo redondo contenido: la caja blanca envuelve AR$ + el número,
                               así el borde ya NO se desborda de la tarjeta verde. */}
-                          <div className="flex items-center gap-2 w-full bg-card dark:bg-card-dark border-2 border-duo-verde/40 focus-within:border-duo-verde rounded-xl px-3 py-2 transition-colors">
-                            <span className="text-duo-verde-sombra dark:text-duo-verde font-black text-lg shrink-0">AR$</span>
+                          <div className="flex items-center gap-2 w-full bg-card dark:bg-card-dark border border-duo-verde/35 focus-within:border-duo-verde rounded-lg px-3 py-2 transition-colors">
+                            <span className="text-duo-verde-sombra dark:text-duo-verde font-semibold text-lg shrink-0">AR$</span>
                             <input ref={inputMontoRef} type="text" inputMode="decimal"
                               value={monto}
                               onChange={(e => {
@@ -539,21 +538,21 @@ export function ModalFormaPago({
                                 if (Number.isFinite(n)) setMonto(String(n));
                               })}
                               placeholder={defaultMonto ? Number(defaultMonto).toLocaleString("es-AR") : "0"}
-                              className="flex-1 min-w-0 bg-transparent text-3xl font-black text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none" />
+                              className="flex-1 min-w-0 bg-transparent text-3xl font-semibold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none" />
                           </div>
                         </div>
 
                         {/* 🆕 Quién cobra */}
                         <div>
-                          <label className="block text-xs text-suave dark:text-suave-dark font-black mb-1.5 uppercase tracking-wide">
-                            <HiUser className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                          <label className="flex items-center gap-1.5 text-xs text-suave dark:text-suave-dark mb-1.5">
+                            <HiUser className="w-3.5 h-3.5" />
                             Responsable (quién cobra) *
                           </label>
                           <select
                             value={responsableId}
                             onChange={(e) => setResponsableId(e.target.value)}
                             disabled={empleadosLoading}
-                            className="w-full h-11 px-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-verde transition-colors disabled:opacity-50 dark:[color-scheme:dark] cursor-pointer"
+                            className="w-full h-11 px-3 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-sm text-titulo dark:text-titulo-dark outline-none focus:border-duo-verde transition-colors disabled:opacity-50 dark:[color-scheme:dark] cursor-pointer"
                           >
                             <option value="">
                               {empleadosLoading ? "Cargando…" : "— Elegir —"}
@@ -567,21 +566,21 @@ export function ModalFormaPago({
                         {/* Fecha y observaciones */}
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs text-suave dark:text-suave-dark font-black mb-1.5 uppercase tracking-wide">
-                              <HiCalendar className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                            <label className="flex items-center gap-1.5 text-xs text-suave dark:text-suave-dark mb-1.5">
+                              <HiCalendar className="w-3.5 h-3.5" />
                               Fecha de pago
                             </label>
                             <input type="date" value={fechaPago} onChange={e => setFechaPago(e.target.value)}
-                              className="w-full h-11 px-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-sm font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-verde transition-colors dark:[color-scheme:dark]" />
+                              className="w-full h-11 px-3 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-sm text-titulo dark:text-titulo-dark outline-none focus:border-duo-verde transition-colors dark:[color-scheme:dark]" />
                           </div>
                           <div>
-                            <label className="block text-xs text-suave dark:text-suave-dark font-black mb-1.5 uppercase tracking-wide">
-                              <HiPencil className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                            <label className="flex items-center gap-1.5 text-xs text-suave dark:text-suave-dark mb-1.5">
+                              <HiPencil className="w-3.5 h-3.5" />
                               Observaciones
                             </label>
                             <input type="text" value={observaciones} onChange={e => setObservaciones(e.target.value)}
                               placeholder="Referencia, nº comprobante…"
-                              className="w-full h-11 px-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-sm font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-verde transition-colors" />
+                              className="w-full h-11 px-3 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-sm text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-verde transition-colors" />
                           </div>
                         </div>
                       </motion.div>
@@ -590,24 +589,24 @@ export function ModalFormaPago({
                   </AnimatePresence>
 
                   {/* ── Botones de navegación ── */}
-                  <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t-2 border-linea dark:border-linea-dark">
+                  <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-linea dark:border-linea-dark">
                     {step > 1 ? (
                       <button type="button" onClick={back}
-                        className="flex items-center gap-1.5 h-11 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-sm font-black transition-colors">
+                        className="flex items-center gap-1.5 h-11 px-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-sm font-medium transition-colors">
                         <HiChevronLeft className="w-4 h-4" /> Atrás
                       </button>
                     ) : (
                       <button type="button" onClick={onClose}
-                        className="h-11 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark text-sm font-black transition-colors">
+                        className="h-11 px-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark text-sm font-medium transition-colors">
                         Cancelar
                       </button>
                     )}
 
                     {step < 4 ? (
                       <button type="button" onClick={next} disabled={!canNext}
-                        className={`flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-black transition-all ${
+                        className={`flex items-center gap-2 h-11 px-5 rounded-lg text-sm font-medium transition-colors ${
                           canNext
-                            ? "bg-duo-azul text-white shadow-[0_4px_0_var(--color-duo-azul-sombra)] active:shadow-[0_0_0_var(--color-duo-azul-sombra)] active:translate-y-0.5"
+                            ? "bg-duo-azul text-white hover:brightness-110"
                             : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark cursor-not-allowed"
                         }`}>
                         Siguiente <HiArrowRight className="w-4 h-4" />
@@ -615,14 +614,14 @@ export function ModalFormaPago({
                     ) : (
                       <button type="button" onClick={confirm}
                         disabled={!canNext || submitting}
-                        className={`flex items-center gap-2 h-11 px-6 rounded-xl text-sm font-black transition-all ${
+                        className={`flex items-center gap-2 h-11 px-6 rounded-lg text-sm font-semibold transition-colors ${
                           canNext && !submitting
-                            ? "bg-duo-verde text-white shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5"
+                            ? "bg-duo-verde text-white hover:brightness-110"
                             : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark cursor-not-allowed"
                         }`}>
                         {submitting
                           ? <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Confirmando…</>
-                          : <><span>🤑</span> Confirmar pago</>
+                          : <><HiCheck className="w-4 h-4" /> Confirmar pago</>
                         }
                       </button>
                     )}
@@ -642,6 +641,8 @@ export function ModalFormaPago({
 
 /* ═══════════════════════════════════════════════════════════════════
    2) ConfirmarPagoModal — resumen final + advertencias de riesgo
+   ⚠️ Los textos de las advertencias (incluidas las mayúsculas) son
+      contenido de seguridad deliberado — no se tocan, solo el estilo.
 ═══════════════════════════════════════════════════════════════════ */
 const MONEY_FMT_CONF = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
@@ -689,7 +690,7 @@ export function ConfirmarPagoModal({
     cobNormalizada === "D"
   );
 
-  // Borde del modal según nivel de riesgo (tokens Duo)
+  // Borde del modal según nivel de riesgo
   let modalBorde = "border-linea dark:border-linea-dark";
   if (isCancelada || da >= 15) modalBorde = "border-duo-rojo";
   else if (da >= 4) modalBorde = "border-duo-amarillo";
@@ -716,31 +717,31 @@ export function ConfirmarPagoModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 12 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className={`relative z-[66] w-full max-w-2xl rounded-3xl border-2 px-6 py-6 shadow-2xl bg-card dark:bg-card-dark ${modalBorde} max-h-[95vh] overflow-y-auto custom-scrollbar`}
+            className={`relative z-[66] w-full max-w-2xl rounded-xl border px-6 py-6 shadow-xl bg-card dark:bg-card-dark ${modalBorde} max-h-[95vh] overflow-y-auto custom-scrollbar`}
           >
             <div className="flex items-start justify-between gap-3 mb-3">
-              <h3 className="text-xl font-black text-titulo dark:text-titulo-dark">Confirmar pago</h3>
+              <h3 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Confirmar pago</h3>
               <button
                 onClick={onClose}
                 disabled={confirmandoPago}
-                className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl border-2 border-linea dark:border-linea-dark flex items-center justify-center cursor-pointer transition-colors bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark disabled:opacity-50"
+                className="h-9 w-9 sm:w-auto sm:px-3 rounded-lg border border-linea dark:border-linea-dark flex items-center justify-center cursor-pointer transition-colors bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark disabled:opacity-50"
               >
                 <HiX className="w-5 h-5" />
-                <span className="hidden sm:inline ml-1 text-sm font-black">Cancelar</span>
+                <span className="hidden sm:inline ml-1 text-sm font-medium">Cancelar</span>
               </button>
             </div>
 
-            {/* 🚨 ADVERTENCIAS DE RIESGO */}
+            {/* ADVERTENCIAS DE RIESGO */}
             {isCancelada && (
-              <div className="mb-4 p-3 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-2 border-duo-rojo rounded-2xl text-titulo dark:text-titulo-dark text-sm font-bold">
-                ⚠️ <strong>PÓLIZA DADA DE BAJA:</strong> Estás a punto de cobrar una cuota de una póliza cancelada. Esto se registrará como <b>recupero de deuda</b>.
+              <div className="mb-4 p-3 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border border-duo-rojo rounded-xl text-titulo dark:text-titulo-dark text-sm">
+                <strong className="font-semibold">PÓLIZA DADA DE BAJA:</strong> Estás a punto de cobrar una cuota de una póliza cancelada. Esto se registrará como <b>recupero de deuda</b>.
               </div>
             )}
 
             {!isCancelada && da >= 15 && (
-              <div className="mb-4 p-4 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-2 border-duo-rojo rounded-2xl text-titulo dark:text-titulo-dark text-sm">
-                <div className="font-black text-xl mb-3 text-duo-rojo">🚨 PELIGRO: ATRASO DE {da} DÍAS</div>
-                <ul className="list-disc pl-5 font-black space-y-2 text-base">
+              <div className="mb-4 p-4 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border border-duo-rojo rounded-xl text-titulo dark:text-titulo-dark text-sm">
+                <div className="font-semibold text-xl mb-3 text-duo-rojo">PELIGRO: ATRASO DE {da} DÍAS</div>
+                <ul className="list-disc pl-5 space-y-2 text-base">
                   <li>VERIFICAR QUE LA PÓLIZA NO ESTÉ DADA DE BAJA EN LA COMPAÑÍA.</li>
                   <li>PREGUNTAR Y REVISAR SI TIENE O TUVO ALGÚN SINIESTRO.</li>
                 </ul>
@@ -748,9 +749,9 @@ export function ConfirmarPagoModal({
             )}
 
             {!isCancelada && da >= 4 && da <= 14 && (
-              <div className="mb-4 p-4 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-2 border-duo-amarillo rounded-2xl text-titulo dark:text-titulo-dark text-sm">
-                <div className="font-black text-xl mb-3 text-duo-amarillo-sombra dark:text-duo-amarillo">⚠️ ATENCIÓN: ATRASO DE {da} DÍAS</div>
-                <ul className="list-disc pl-5 font-black space-y-2 text-base">
+              <div className="mb-4 p-4 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border border-duo-amarillo rounded-xl text-titulo dark:text-titulo-dark text-sm">
+                <div className="font-semibold text-xl mb-3 text-duo-amarillo-sombra dark:text-duo-amarillo">ATENCIÓN: ATRASO DE {da} DÍAS</div>
+                <ul className="list-disc pl-5 space-y-2 text-base">
                   <li>VERIFICAR QUE LA PÓLIZA NO ESTÉ DADA DE BAJA EN LA COMPAÑÍA.</li>
                   <li>PREGUNTAR Y REVISAR SI TIENE O TUVO ALGÚN SINIESTRO.</li>
                 </ul>
@@ -758,51 +759,51 @@ export function ConfirmarPagoModal({
             )}
 
             {!isCancelada && da >= 1 && da <= 3 && (
-              <div className="mb-4 p-3 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-2 border-duo-amarillo/60 rounded-2xl text-titulo dark:text-titulo-dark text-sm">
-                <div className="font-black text-lg mb-2 text-duo-amarillo-sombra dark:text-duo-amarillo">👀 PRECAUCIÓN: {da} {da === 1 ? 'DÍA' : 'DÍAS'} DE ATRASO</div>
-                <ul className="list-disc pl-5 font-bold text-sm space-y-1.5">
+              <div className="mb-4 p-3 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border border-duo-amarillo/60 rounded-xl text-titulo dark:text-titulo-dark text-sm">
+                <div className="font-semibold text-lg mb-2 text-duo-amarillo-sombra dark:text-duo-amarillo">PRECAUCIÓN: {da} {da === 1 ? 'DÍA' : 'DÍAS'} DE ATRASO</div>
+                <ul className="list-disc pl-5 text-sm space-y-1.5">
                   <li>Preguntar y revisar si tiene o tuvo algún siniestro.</li>
                 </ul>
               </div>
             )}
 
-            {/* 📸 VALIDACIÓN DE CUPONERA */}
+            {/* VALIDACIÓN DE CUPONERA */}
             {tieneRobo && (
-              <div className="mb-4 p-4 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-2 border-duo-azul rounded-2xl text-titulo dark:text-titulo-dark text-sm">
-                <div className="flex items-center gap-2 font-black text-base mb-2">
+              <div className="mb-4 p-4 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border border-duo-azul rounded-xl text-titulo dark:text-titulo-dark text-sm">
+                <div className="flex items-center gap-2 font-semibold text-base mb-2">
                   <HiCamera className="w-5 h-5 text-duo-azul" />
                   SEGURO CON ROBO
                 </div>
-                <p className="mb-3 text-[13px] leading-relaxed font-bold">
+                <p className="mb-3 text-[13px] leading-relaxed">
                   Estás por cobrar un seguro que incluye Robo. <strong>Tenés que pagar la cuponera y subir el comprobante</strong> para poder continuar.
                 </p>
-                <label className="flex items-center gap-3 cursor-pointer bg-card dark:bg-card-dark hover:brightness-95 transition-colors p-3 rounded-xl border-2 border-duo-azul/40">
+                <label className="flex items-center gap-3 cursor-pointer bg-card dark:bg-card-dark hover:brightness-95 transition-colors p-3 rounded-lg border border-duo-azul/35">
                   <input
                     type="checkbox"
                     checked={cuponeraSubida}
                     onChange={(e) => setCuponeraSubida(e.target.checked)}
                     className="w-5 h-5 accent-duo-azul cursor-pointer rounded"
                   />
-                  <span className="font-black text-[13px]">Ya pagué y subí la cuponera.</span>
+                  <span className="font-medium text-[13px]">Ya pagué y subí la cuponera.</span>
                 </label>
               </div>
             )}
 
             {/* CONTENIDO DEL PAGO */}
-            <div className="space-y-3 p-4 rounded-2xl border-2 bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark">
-              <p className="text-sm font-bold text-titulo dark:text-titulo-dark">
-                Vas a pagar la cuota <span className="font-black text-duo-verde">#{confirmData.cuotaNro ?? "?"}</span> de la póliza <span className="font-black text-titulo dark:text-titulo-dark">{confirmData.numeroPoliza}</span>.
+            <div className="space-y-3 p-4 rounded-xl border bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark">
+              <p className="text-sm text-titulo dark:text-titulo-dark">
+                Vas a pagar la cuota <span className="font-semibold text-duo-verde">#{confirmData.cuotaNro ?? "?"}</span> de la póliza <span className="font-semibold text-titulo dark:text-titulo-dark">{confirmData.numeroPoliza}</span>.
               </p>
 
               {isWebAdmin && confirmData.oficinaLabel && (
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wide bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
-                   🏢 Oficina: {confirmData.oficinaLabel}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
+                   <HiOfficeBuilding className="w-3.5 h-3.5" /> Oficina: {confirmData.oficinaLabel}
                 </div>
               )}
 
               <div className="mt-2 text-center">
-                <p className="text-xs uppercase tracking-wide mb-2 font-black text-suave dark:text-suave-dark">Importe a pagar</p>
-                <p className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-duo-verde">
+                <p className="text-xs mb-2 text-suave dark:text-suave-dark">Importe a pagar</p>
+                <p className="text-4xl sm:text-5xl font-semibold font-mono tracking-tight text-duo-verde">
                   $ {fmtMoneyConf(confirmData.monto)}
                 </p>
               </div>
@@ -812,17 +813,17 @@ export function ConfirmarPagoModal({
               <button
                 onClick={onClose}
                 disabled={confirmandoPago}
-                className="h-12 px-6 rounded-xl border-2 text-base font-black cursor-pointer transition-colors bg-surface dark:bg-surface-dark hover:brightness-95 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark disabled:opacity-50"
+                className="h-12 px-6 rounded-lg border text-base font-medium cursor-pointer transition-colors bg-surface dark:bg-surface-dark hover:brightness-95 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark disabled:opacity-50"
               >
                 Corregir
               </button>
               <button
                 onClick={onConfirm}
                 disabled={botonBloqueado}
-                className={`h-12 px-6 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all ${
+                className={`h-12 px-6 rounded-lg font-semibold text-base flex items-center justify-center gap-2 transition-colors ${
                   botonBloqueado
                     ? "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark cursor-not-allowed"
-                    : "bg-duo-verde text-white shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 cursor-pointer"
+                    : "bg-duo-verde text-white hover:brightness-110 cursor-pointer"
                 }`}
               >
                 {confirmandoPago ? (
@@ -911,7 +912,7 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
   const handleRegistrar = () => {
     if (!validarFormulario()) return;
     toast.success("¡Traspaso cerrado! Tu comisión quedó Pendiente.", {
-      style: { background: '#58cc02', color: '#fff', fontWeight: 'bold' }
+      style: { background: '#16a34a', color: '#fff', fontWeight: '500' }
     });
     onClose();
   };
@@ -920,12 +921,12 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
     if (!validarFormulario()) return;
     toast("Oportunidad Reservada por 15 días ⏳", {
       icon: '🤔',
-      style: { background: '#ffc800', color: '#3c3c3c', fontWeight: 'bold' }
+      style: { background: '#d97706', color: '#fff', fontWeight: '500' }
     });
     onClose();
   };
 
-  const selCls = "w-full rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-sm font-bold text-titulo dark:text-titulo-dark focus:border-duo-violeta focus:outline-none dark:[color-scheme:dark] cursor-pointer";
+  const selCls = "w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-sm text-titulo dark:text-titulo-dark focus:border-duo-violeta focus:outline-none dark:[color-scheme:dark] cursor-pointer";
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -934,20 +935,20 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
 
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
-            <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-3xl border-2 border-duo-violeta/50 bg-card dark:bg-card-dark shadow-2xl transition-all">
+            <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-xl border border-duo-violeta/35 bg-card dark:bg-card-dark shadow-xl transition-all">
 
               {/* Header */}
-              <div className="flex items-center justify-between border-b-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-6 py-4">
+              <div className="flex items-center justify-between border-b border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta">
                     <HiOutlineSwitchHorizontal className="text-xl" />
                   </div>
                   <div>
-                    <Dialog.Title className="text-lg font-black text-titulo dark:text-titulo-dark">
+                    <Dialog.Title className="text-lg font-semibold text-titulo dark:text-titulo-dark">
                       Traspaso de Cartera
                     </Dialog.Title>
-                    <p className="text-xs text-suave dark:text-suave-dark font-bold">
-                      Ofreciendo a: <span className="font-black text-titulo dark:text-titulo-dark">{clienteData?.nombre || "Asegurado"}</span>
+                    <p className="text-xs text-suave dark:text-suave-dark">
+                      Ofreciendo a: <span className="font-medium text-titulo dark:text-titulo-dark">{clienteData?.nombre || "Asegurado"}</span>
                     </p>
                   </div>
                 </div>
@@ -961,7 +962,7 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
 
                 {/* 0. Vendedor */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-black uppercase tracking-wide text-suave dark:text-suave-dark flex items-center gap-1.5">
+                  <label className="text-xs text-suave dark:text-suave-dark flex items-center gap-1.5">
                     <HiUser /> ¿Quién está atendiendo?
                   </label>
                   <select value={vendedor} onChange={(e) => setVendedor(e.target.value)} className={selCls}>
@@ -975,7 +976,7 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
                 <div className="grid grid-cols-2 gap-3">
                   {/* 1. Compañía Destino */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] uppercase tracking-wide font-black text-suave dark:text-suave-dark">Pasar a Compañía</label>
+                    <label className="text-[11px] text-suave dark:text-suave-dark">Pasar a Compañía</label>
                     <select
                       value={companiaDestino}
                       onChange={(e) => { setCompaniaDestino(e.target.value); setCoberturaDestino(""); }}
@@ -989,7 +990,7 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
 
                   {/* 2. Cobertura Destino */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] uppercase tracking-wide font-black text-suave dark:text-suave-dark">Cobertura</label>
+                    <label className="text-[11px] text-suave dark:text-suave-dark">Cobertura</label>
                     <select
                       value={coberturaDestino}
                       onChange={(e) => setCoberturaDestino(e.target.value)}
@@ -1017,12 +1018,12 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="rounded-2xl border-2 border-duo-azul/50 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3 text-titulo dark:text-titulo-dark text-xs"
+                      className="rounded-xl border border-duo-azul/40 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3 text-titulo dark:text-titulo-dark text-xs"
                     >
-                      <div className="flex items-center gap-1.5 font-black mb-1">
+                      <div className="flex items-center gap-1.5 font-medium mb-1">
                         <HiCamera className="text-duo-azul text-base" /> ¡OBLIGATORIO!
                       </div>
-                      <p className="font-bold">Para emitir el ROBO es obligatorio pedirle las <b>fotos del vehículo</b>. Anotalas en la bandeja de Emisiones.</p>
+                      <p>Para emitir el ROBO es obligatorio pedirle las <b>fotos del vehículo</b>. Anotalas en la bandeja de Emisiones.</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1037,19 +1038,19 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
                       className="grid grid-cols-2 gap-3"
                     >
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] uppercase tracking-wide font-black text-suave dark:text-suave-dark">Costo Compañía</label>
+                        <label className="text-[11px] text-suave dark:text-suave-dark">Costo Compañía</label>
                         <input
                           type="number" placeholder="$" value={costoTecnico}
                           onChange={(e) => setCostoTecnico(e.target.value)}
-                          className="w-full rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 text-sm font-bold text-titulo dark:text-titulo-dark focus:border-duo-violeta focus:outline-none"
+                          className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 text-sm text-titulo dark:text-titulo-dark focus:border-duo-violeta focus:outline-none"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] uppercase tracking-wide font-black text-duo-verde-sombra dark:text-duo-verde">Cobrado al Cliente</label>
+                        <label className="text-[11px] text-duo-verde-sombra dark:text-duo-verde">Cobrado al Cliente</label>
                         <input
                           type="number" placeholder="$" value={precioCobrado}
                           onChange={(e) => setPrecioCobrado(e.target.value)}
-                          className="w-full rounded-xl border-2 border-duo-verde/50 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2.5 text-sm font-black text-duo-verde-sombra dark:text-duo-verde focus:border-duo-verde focus:outline-none"
+                          className="w-full rounded-lg border border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2.5 text-sm font-semibold text-duo-verde-sombra dark:text-duo-verde focus:border-duo-verde focus:outline-none"
                         />
                       </div>
                     </motion.div>
@@ -1062,17 +1063,17 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
                     <motion.div
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="mt-2 rounded-2xl border-2 border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-5 text-center"
+                      className="mt-2 rounded-xl border border-duo-verde/35 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] p-5 text-center"
                     >
                       <div className="flex items-center justify-center gap-2 text-duo-verde-sombra dark:text-duo-verde mb-1">
                         <HiSparkles className="text-xl" />
-                        <span className="text-xs font-black uppercase tracking-wide">Tu comisión a ganar</span>
+                        <span className="text-xs font-medium">Tu comisión a ganar</span>
                       </div>
-                      <div className="text-4xl font-black text-duo-verde-sombra dark:text-duo-verde">
+                      <div className="text-4xl font-semibold text-duo-verde-sombra dark:text-duo-verde">
                         {MONEY_FMT_TRAS.format(comisionCalculada)}
                       </div>
                       {companiaDestino === "AMCA" && (
-                        <p className="mt-1 text-[10px] text-duo-verde-sombra/80 dark:text-duo-verde/80 font-bold">
+                        <p className="mt-1 text-[11px] text-duo-verde-sombra/80 dark:text-duo-verde/80">
                           ($10.000 Base + {MONEY_FMT_TRAS.format(Math.max(0, precioCobrado - costoTecnico))} Sobreprecio)
                         </p>
                       )}
@@ -1083,10 +1084,10 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
               </div>
 
               {/* Footer con Múltiples Acciones */}
-              <div className="border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 flex flex-col gap-3">
+              <div className="border-t border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 flex flex-col gap-3">
                 <button
                   onClick={handleRegistrar}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-duo-verde px-5 py-3.5 text-sm font-black text-white shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all"
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-duo-verde px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:brightness-110"
                 >
                   <HiCurrencyDollar className="text-xl" /> ¡Lo Vendí! Registrar Traspaso
                 </button>
@@ -1094,13 +1095,13 @@ export function RegistrarTraspasoModal({ isOpen, onClose, clienteData }) {
                 <div className="flex gap-3">
                   <button
                     onClick={onClose}
-                    className="flex-1 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5 text-xs font-black text-titulo dark:text-titulo-dark hover:brightness-95 transition-colors"
+                    className="flex-1 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5 text-xs font-medium text-titulo dark:text-titulo-dark hover:brightness-95 transition-colors"
                   >
                     Cerrar
                   </button>
                   <button
                     onClick={handleOportunidad}
-                    className="flex-[2] flex items-center justify-center gap-1.5 rounded-xl border-2 border-duo-amarillo/50 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-4 py-2.5 text-xs font-black text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-95 transition-colors"
+                    className="flex-[2] flex items-center justify-center gap-1.5 rounded-lg border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-4 py-2.5 text-xs font-medium text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-95 transition-colors"
                   >
                     <HiClock className="text-lg" /> Lo va a pensar (Reserva 15d)
                   </button>

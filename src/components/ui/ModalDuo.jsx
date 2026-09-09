@@ -3,9 +3,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { HiX } from "react-icons/hi";
 
 /**
- * 🪟 Modal / Shell reutilizable estilo Duolingo.
- * Overlay oscuro + caja redonda que sube desde abajo en mobile y aparece centrada en desktop.
+ * 🪟 Modal / Shell reutilizable de THAMES.
+ * Overlay oscuro + caja que sube desde abajo en mobile y aparece centrada en desktop.
  * Maneja: cerrar al clickear afuera, cerrar con la X, header con ícono/título, y footer opcional.
+ *
+ * 🆕 Rediseño "profesional": esquinas rounded-2xl (antes rounded-3xl),
+ * borde de 1px (antes 2px), título en peso semibold (antes black), y la
+ * cajita de ícono del header ya no es un cuadrado de color grande — es
+ * un ícono más chico y contenido.
  *
  * Props:
  *   isOpen: boolean
@@ -52,14 +57,14 @@ export default function ModalDuo({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className={`w-full ${ancho} rounded-t-3xl sm:rounded-3xl bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]`}
+            className={`w-full ${ancho} rounded-t-2xl sm:rounded-2xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]`}
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
@@ -67,19 +72,19 @@ export default function ModalDuo({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b-2 border-linea dark:border-linea-dark">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-linea dark:border-linea-dark">
               <div className="flex items-center gap-3 min-w-0">
                 {icon && (
-                  <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 ${it}`}>
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg shrink-0 ${it}`}>
                     {icon}
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h2 className="text-lg font-black text-titulo dark:text-titulo-dark tracking-tight leading-none truncate">
+                  <h2 className="text-base font-semibold text-titulo dark:text-titulo-dark leading-none truncate">
                     {title}
                   </h2>
                   {subtitle && (
-                    <p className="text-[11px] text-suave dark:text-suave-dark uppercase tracking-wide font-extrabold mt-1 truncate">
+                    <p className="text-[12px] text-suave dark:text-suave-dark mt-1 truncate">
                       {subtitle}
                     </p>
                   )}
@@ -88,19 +93,19 @@ export default function ModalDuo({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-10 w-10 flex items-center justify-center rounded-xl bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-all active:scale-90 shrink-0"
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors shrink-0"
                 aria-label="Cerrar"
               >
-                <HiX className="text-2xl" />
+                <HiX className="text-lg" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">{children}</div>
+            <div className="flex-1 overflow-y-auto p-5 scrollbar-hide">{children}</div>
 
             {/* Footer (opcional) */}
             {footer && (
-              <div className="px-6 py-5 border-t-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex flex-col sm:flex-row items-center justify-end gap-3">
+              <div className="px-5 py-4 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex flex-col sm:flex-row items-center justify-end gap-2.5">
                 {footer}
               </div>
             )}

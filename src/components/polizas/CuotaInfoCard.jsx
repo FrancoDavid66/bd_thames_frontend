@@ -262,11 +262,11 @@ function InfoBlock({ tono, Icon, label, titulo, subtitulo, hint }) {
     <div className={`rounded-lg border ${styles.bg} ${styles.border} p-2.5`}>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className={`${styles.iconColor} text-sm`} />
-        <div className={`text-[10px] uppercase tracking-wide font-bold ${styles.subtitle}`}>
+        <div className={`text-[11px] ${styles.subtitle}`}>
           {label}
         </div>
       </div>
-      <div className={`text-base font-bold ${styles.title}`}>{titulo}</div>
+      <div className={`text-base font-semibold ${styles.title}`}>{titulo}</div>
       {subtitulo && (
         <div className={`text-[11px] ${styles.subtitle} mt-0.5`}>{subtitulo}</div>
       )}
@@ -363,10 +363,10 @@ export default function CuotaInfoCard({
 
         {/* ── Bloque 1: Número de cuota + monto ── */}
         <div className="flex flex-col gap-1 md:w-28 shrink-0">
-          <div className="text-xl font-black text-titulo dark:text-titulo-dark">#{cuota?.cuota_nro}</div>
+          <div className="text-xl font-semibold text-titulo dark:text-titulo-dark">#{cuota?.cuota_nro}</div>
           {showMonto && (
             <div className="text-xs text-suave dark:text-suave-dark">
-              <span className="text-titulo dark:text-titulo-dark font-bold">{fmtMoney(cuota?.monto ?? cuota?.importe)}</span>
+              <span className="text-titulo dark:text-titulo-dark font-medium">{fmtMoney(cuota?.monto ?? cuota?.importe)}</span>
             </div>
           )}
         </div>
@@ -410,18 +410,18 @@ export default function CuotaInfoCard({
               <div className={`flex-1 rounded-lg border ${pagoStyles.bg} ${pagoStyles.border} p-2.5`}>
                 <div className="flex items-center gap-1.5 mb-1">
                   <HiCheck className={`${pagoStyles.iconColor} text-sm`} />
-                  <div className={`text-[10px] uppercase tracking-wide font-bold ${pagoStyles.subtitle}`}>
+                  <div className={`text-[11px] ${pagoStyles.subtitle}`}>
                     Fecha de pago
                   </div>
                 </div>
-                <div className={`text-base font-bold ${pagoStyles.title}`}>
+                <div className={`text-base font-semibold ${pagoStyles.title}`}>
                   {pagada && fechaPago ? fmtFecha(fechaPago) : "Sin pagar"}
                 </div>
               </div>
 
               {/* Flecha central: período de cobertura */}
               <div className="flex flex-col items-center justify-center shrink-0 px-1">
-                <div className="text-[9px] uppercase tracking-wide font-bold text-suave dark:text-suave-dark text-center leading-tight mb-0.5">
+                <div className="text-[10px] text-suave dark:text-suave-dark text-center leading-tight mb-0.5">
                   Período de<br />cobertura
                 </div>
                 <div className="text-2xl text-suave dark:text-suave-dark leading-none">→</div>
@@ -432,7 +432,7 @@ export default function CuotaInfoCard({
                 <div className="flex items-center justify-between gap-1.5 mb-1">
                   <div className="flex items-center gap-1.5">
                     <HiCalendar className={`${vtoStyles.iconColor} text-sm`} />
-                    <div className={`text-[10px] uppercase tracking-wide font-bold ${vtoStyles.subtitle}`}>
+                    <div className={`text-[11px] ${vtoStyles.subtitle}`}>
                       Fin de cobertura / Vence
                     </div>
                   </div>
@@ -447,7 +447,7 @@ export default function CuotaInfoCard({
                     </button>
                   )}
                 </div>
-                <div className={`text-base font-bold ${vtoStyles.title}`}>
+                <div className={`text-base font-semibold ${vtoStyles.title}`}>
                   {fmtFecha(cuota?.fecha_vencimiento)}
                 </div>
                 {vtoSubtitulo && (
@@ -465,7 +465,7 @@ export default function CuotaInfoCard({
         {showAction && (
           <div className="flex md:justify-end md:w-44 shrink-0">
             {cuota?.pagado ? (
-              <div className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2 text-xs sm:text-sm text-duo-verde-sombra dark:text-duo-verde font-black uppercase tracking-wide">
+              <div className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-duo-verde/30 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2 text-xs sm:text-sm text-duo-verde-sombra dark:text-duo-verde font-medium">
                 <HiCheck className="h-4 w-4" /> Pagada
               </div>
             ) : onMarcarPagada ? (
@@ -473,7 +473,7 @@ export default function CuotaInfoCard({
                 type="button"
                 disabled={busy}
                 onClick={() => onMarcarPagada(cuota)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-duo-verde hover:brightness-105 text-white px-3 py-2.5 text-xs sm:text-sm shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:top-[4px] relative top-0 disabled:opacity-60 font-black uppercase tracking-wide transition-all"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-duo-verde hover:brightness-110 text-white px-3 py-2.5 text-xs sm:text-sm disabled:opacity-60 font-medium transition-colors"
               >
                 {busy ? (
                   <HiRefresh className="h-4 w-4 animate-spin" />

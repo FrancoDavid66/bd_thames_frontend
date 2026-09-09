@@ -1,4 +1,4 @@
-/* src/components/pagos/PagosList.jsx — diseño Duo (claro/oscuro) */
+/* src/components/pagos/PagosList.jsx */
 import { useDispatch } from "react-redux";
 import { useMemo, useState, useCallback, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,8 +33,8 @@ import ModalFormaPago, { ConfirmarPagoModal, RegistrarTraspasoModal } from "./Mo
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
-/* ====== PALETA DUO — por estado de cuota ======
-   Cada estado mapea a clases con tokens Duo (claro/oscuro). */
+/* ====== PALETA — por estado de cuota ======
+   Cada estado mapea a clases con tokens (claro/oscuro). */
 const PALETTE = {
   paid: {
     stripe: "bg-duo-verde",
@@ -217,7 +217,7 @@ function buildFraseCobertura(cobertura, cuota, esCuotaFutura) {
   };
 }
 
-/* Estilos por tono semántico → tokens Duo. */
+/* Estilos por tono semántico. */
 const TONO_STYLES = {
   success: {
     bg: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]",
@@ -639,26 +639,26 @@ export default function PagosList({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 sm:p-10 text-center text-sm sm:text-base font-bold text-suave dark:text-suave-dark">
+      <div className="rounded-xl border border-dashed border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 sm:p-10 text-center text-sm sm:text-base text-suave dark:text-suave-dark">
         No hay cuotas para mostrar en este filtro.
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-surface dark:bg-surface-dark rounded-none sm:rounded-3xl border-t-2 border-b-2 sm:border-2 border-linea dark:border-linea-dark overflow-hidden flex flex-col">
-      <div className="px-3 sm:px-6 py-3 sm:py-4 text-[11px] sm:text-sm uppercase tracking-wide bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-b-2 border-linea dark:border-linea-dark">
+    <div className="w-full bg-surface dark:bg-surface-dark rounded-none sm:rounded-xl border-t border-b sm:border border-linea dark:border-linea-dark overflow-hidden flex flex-col">
+      <div className="px-3 sm:px-6 py-3 sm:py-4 text-[12px] sm:text-sm bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-b border-linea dark:border-linea-dark">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-black">Resultados ({items.length})</span>
+          <span className="font-semibold">Resultados ({items.length})</span>
           {showFastControls && (
             <div className="flex items-center gap-2">
-              <span className="text-[10px] sm:text-[11px] normal-case text-suave dark:text-suave-dark font-bold">{items.length} cuotas</span>
+              <span className="text-[11px] text-suave dark:text-suave-dark">{items.length} cuotas</span>
               <button
                 type="button"
                 onClick={() => setModoRapidoManual((v) => !(v ?? modoRapido))}
-                className={`h-7 sm:h-8 px-2 sm:px-3 rounded-xl border-2 text-[10px] sm:text-[11px] transition font-black ${modoRapido ? "border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-azul"}`}
+                className={`h-7 sm:h-8 px-2 sm:px-3 rounded-lg border text-[11px] transition-colors font-medium ${modoRapido ? "border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde" : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-azul"}`}
               >
-                {modoRapido ? "Rápido: ON ⚡" : "Rápido: OFF"}
+                {modoRapido ? "Rápido: ON" : "Rápido: OFF"}
               </button>
             </div>
           )}
@@ -678,8 +678,8 @@ export default function PagosList({
           })}
         </ul>
         {modoRapido && renderLimit < items.length && (
-          <div className="p-3 sm:p-4 border-t-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
-            <button type="button" onClick={() => setRenderLimit((n) => Math.min(items.length, n + FAST_STEP))} className="w-full h-11 rounded-2xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark hover:border-duo-azul text-titulo dark:text-titulo-dark text-xs sm:text-sm font-black cursor-pointer">
+          <div className="p-3 sm:p-4 border-t border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+            <button type="button" onClick={() => setRenderLimit((n) => Math.min(items.length, n + FAST_STEP))} className="w-full h-11 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark hover:border-duo-azul text-titulo dark:text-titulo-dark text-xs sm:text-sm font-medium cursor-pointer">
               Mostrar más ({Math.min(FAST_STEP, items.length - renderLimit)})
             </button>
           </div>
@@ -725,25 +725,25 @@ export default function PagosList({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 12 }}
               transition={{ type: "spring", stiffness: 300, damping: 26 }}
-              className="relative z-[71] w-full max-w-sm rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-5 sm:px-6 sm:py-6 shadow-2xl"
+              className="relative z-[71] w-full max-w-sm rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-5 sm:px-6 sm:py-6 shadow-xl"
             >
               <div className="flex items-start justify-between gap-3 mb-4">
-                <h3 className="text-base sm:text-lg font-black text-titulo dark:text-titulo-dark">Cambiar Vencimiento</h3>
-                <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-8 w-8 rounded-xl border-2 flex items-center justify-center text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark hover:brightness-95 border-linea dark:border-linea-dark cursor-pointer"><HiX className="w-4 h-4" /></button>
+                <h3 className="text-base sm:text-lg font-semibold text-titulo dark:text-titulo-dark">Cambiar Vencimiento</h3>
+                <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-8 w-8 rounded-lg border flex items-center justify-center text-titulo dark:text-titulo-dark bg-surface dark:bg-surface-dark hover:brightness-95 border-linea dark:border-linea-dark cursor-pointer"><HiX className="w-4 h-4" /></button>
               </div>
               <div className="space-y-4">
-                <p className="text-sm font-bold text-titulo dark:text-titulo-dark">Cuota <span className="font-black text-duo-verde">#{cuotaFechaSeleccionada.cuota_nro}</span></p>
+                <p className="text-sm text-titulo dark:text-titulo-dark">Cuota <span className="font-semibold text-duo-verde">#{cuotaFechaSeleccionada.cuota_nro}</span></p>
                 <div>
-                  <label className="block text-sm font-black text-suave dark:text-suave-dark mb-1">Nueva fecha</label>
-                  <input type="date" value={nuevaFecha} onChange={(e) => setNuevaFecha(e.target.value)} className="w-full h-11 px-3 rounded-xl bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark font-bold outline-none focus:border-duo-azul dark:[color-scheme:dark]" />
+                  <label className="block text-sm text-suave dark:text-suave-dark mb-1">Nueva fecha</label>
+                  <input type="date" value={nuevaFecha} onChange={(e) => setNuevaFecha(e.target.value)} className="w-full h-11 px-3 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul dark:[color-scheme:dark]" />
                 </div>
-                <label className="flex items-start gap-3 cursor-pointer mt-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3 rounded-xl border-2 border-duo-azul/30">
+                <label className="flex items-start gap-3 cursor-pointer mt-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3 rounded-lg border border-duo-azul/25">
                   <input type="checkbox" checked={ajustarSiguientes} onChange={(e) => setAjustarSiguientes(e.target.checked)} className="mt-1 accent-duo-azul w-4 h-4" />
-                  <span className="text-sm font-bold text-titulo dark:text-titulo-dark">Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).</span>
+                  <span className="text-sm text-titulo dark:text-titulo-dark">Ajustar automáticamente los vencimientos de las <strong>cuotas siguientes</strong> (+1 mes a cada una).</span>
                 </label>
                 <div className="mt-5 flex justify-end gap-2">
-                  <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-11 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-sm text-titulo dark:text-titulo-dark hover:brightness-95 cursor-pointer font-black">Cancelar</button>
-                  <button onClick={handleCambiarFecha} disabled={isSubmittingFecha || !nuevaFecha} className="h-11 px-4 rounded-xl bg-duo-azul text-sm font-black text-white hover:brightness-105 flex items-center gap-2 cursor-pointer shadow-[0_4px_0_var(--color-duo-azul-sombra)] active:shadow-[0_0_0_var(--color-duo-azul-sombra)] active:translate-y-0.5">{isSubmittingFecha ? "Guardando..." : "Guardar cambios"}</button>
+                  <button onClick={cerrarModalFecha} disabled={isSubmittingFecha} className="h-11 px-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-sm text-titulo dark:text-titulo-dark hover:brightness-95 cursor-pointer font-medium">Cancelar</button>
+                  <button onClick={handleCambiarFecha} disabled={isSubmittingFecha || !nuevaFecha} className="h-11 px-4 rounded-lg bg-duo-azul text-sm font-medium text-white hover:brightness-110 flex items-center gap-2 cursor-pointer transition-colors">{isSubmittingFecha ? "Guardando..." : "Guardar cambios"}</button>
                 </div>
               </div>
             </motion.div>
@@ -775,12 +775,12 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 20, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className="relative z-[61] w-full max-w-[680px] max-h-[85vh] overflow-y-auto rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 sm:p-5 shadow-2xl custom-scrollbar"
+            className="relative z-[61] w-full max-w-[680px] max-h-[85vh] overflow-y-auto rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 sm:p-5 shadow-xl custom-scrollbar"
           >
-            <div className="flex items-start justify-between gap-3 sticky top-0 bg-card dark:bg-card-dark pb-3 z-10 border-b-2 border-linea dark:border-linea-dark mb-3">
-              <h3 className="text-base sm:text-lg font-black text-titulo dark:text-titulo-dark">Detalle de cuota</h3>
-              <button onClick={cerrarDetalle} className="h-8 w-8 sm:w-auto sm:px-3 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark flex items-center justify-center cursor-pointer">
-                <HiX className="w-4 h-4 sm:w-5 sm:h-5" /><span className="hidden sm:inline ml-1 text-sm font-black">Cerrar</span>
+            <div className="flex items-start justify-between gap-3 sticky top-0 bg-card dark:bg-card-dark pb-3 z-10 border-b border-linea dark:border-linea-dark mb-3">
+              <h3 className="text-base sm:text-lg font-semibold text-titulo dark:text-titulo-dark">Detalle de cuota</h3>
+              <button onClick={cerrarDetalle} className="h-8 w-8 sm:w-auto sm:px-3 rounded-lg bg-surface dark:bg-surface-dark hover:brightness-95 border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark flex items-center justify-center cursor-pointer">
+                <HiX className="w-4 h-4 sm:w-5 sm:h-5" /><span className="hidden sm:inline ml-1 text-sm font-medium">Cerrar</span>
               </button>
             </div>
             {(() => {
@@ -828,19 +828,19 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
                     {/* Resumen */}
                     {resumen.total > 0 && (
                       <div className="flex flex-wrap gap-2 text-[11px] mb-3">
-                        <span className="px-2 py-1 rounded-full font-black bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
+                        <span className="px-2 py-1 rounded-full font-medium bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
                           {resumen.pagadas} pagadas
                         </span>
-                        <span className="px-2 py-1 rounded-full font-black bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo">
+                        <span className="px-2 py-1 rounded-full font-medium bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo">
                           {resumen.pendientes} pendientes
                         </span>
                         {resumen.vencidas > 0 && (
-                          <span className="px-2 py-1 rounded-full font-black bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo">
+                          <span className="px-2 py-1 rounded-full font-medium bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo">
                             {resumen.vencidas} vencidas
                           </span>
                         )}
                         {resumen.venceHoy > 0 && (
-                          <span className="px-2 py-1 rounded-full font-black bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo">
+                          <span className="px-2 py-1 rounded-full font-medium bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo">
                             {resumen.venceHoy} vence hoy
                           </span>
                         )}
@@ -852,11 +852,11 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
 
                       {/* HITO: Inicio de póliza */}
                       <div className="flex items-center gap-2.5 p-2.5 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-l-[3px] border-duo-verde rounded-r-md">
-                        <div className="shrink-0 w-9 h-9 rounded-full bg-duo-verde text-white flex items-center justify-center text-sm font-black">🚀</div>
+                        <div className="shrink-0 w-9 h-9 rounded-full bg-duo-verde text-white flex items-center justify-center text-sm font-semibold">🚀</div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[10px] uppercase tracking-wide text-duo-verde-sombra dark:text-duo-verde font-black">Inicio de póliza</div>
-                          <div className="text-sm font-black text-titulo dark:text-titulo-dark">{fmtFecha(pol?.fecha_emision)}</div>
-                          <div className="text-[10px] text-suave dark:text-suave-dark font-bold">
+                          <div className="text-[11px] text-duo-verde-sombra dark:text-duo-verde">Inicio de póliza</div>
+                          <div className="text-sm font-semibold text-titulo dark:text-titulo-dark">{fmtFecha(pol?.fecha_emision)}</div>
+                          <div className="text-[11px] text-suave dark:text-suave-dark">
                             Asegurado · {todasCuotas.length || total || "—"} cuota{todasCuotas.length === 1 ? "" : "s"} mensual{todasCuotas.length === 1 ? "" : "es"}
                           </div>
                         </div>
@@ -875,7 +875,7 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
                         const diasFaltan = !cuotaPagada && fv ? fv.diff(hoy, "day") : null;
                         const esUltima = i === todasCuotas.length - 1;
 
-                        // Estilo visual según estado (tokens Duo)
+                        // Estilo visual según estado
                         let dotBg = "bg-suave";
                         let cardBg = "bg-surface dark:bg-surface-dark";
                         let cardBorder = "border-linea dark:border-linea-dark";
@@ -884,7 +884,7 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
                         if (esActual) {
                           dotBg = "bg-duo-azul";
                           cardBg = "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]";
-                          cardBorder = "border-duo-azul border-2";
+                          cardBorder = "border-duo-azul";
                         } else if (cuotaPagada) {
                           dotBg = pagoAtrasadoCu ? "bg-duo-amarillo" : "bg-duo-verde";
                           cardBg = pagoAtrasadoCu ? "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)]" : "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]";
@@ -914,38 +914,38 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
 
                             <div className={`flex items-stretch gap-2.5 ${opacity}`}>
                               <div className="flex flex-col items-center shrink-0">
-                                <div className={`${esActual ? "w-10 h-10" : "w-9 h-9"} rounded-full ${dotBg} text-white flex items-center justify-center text-sm font-black ${esActual ? "ring-2 ring-duo-azul/40 ring-offset-2 ring-offset-card dark:ring-offset-card-dark" : ""}`}>
+                                <div className={`${esActual ? "w-10 h-10" : "w-9 h-9"} rounded-full ${dotBg} text-white flex items-center justify-center text-sm font-semibold ${esActual ? "ring-2 ring-duo-azul/40 ring-offset-2 ring-offset-card dark:ring-offset-card-dark" : ""}`}>
                                   {cuotaPagada && !esActual ? "✓" : (cu?.cuota_nro || (i + 1))}
                                 </div>
                               </div>
 
-                              <div className={`flex-1 p-2.5 ${cardBg} border-2 ${cardBorder} rounded-lg min-w-0`}>
+                              <div className={`flex-1 p-2.5 ${cardBg} border ${cardBorder} rounded-lg min-w-0`}>
                                 <div className="flex items-start justify-between gap-2 mb-1.5">
                                   <div className="min-w-0">
                                     {esActual && (
-                                      <div className="text-[9px] uppercase tracking-wide text-duo-azul font-black mb-0.5">📍 Aquí estás</div>
+                                      <div className="text-[10px] text-duo-azul mb-0.5">Aquí estás</div>
                                     )}
-                                    <div className="text-xs font-black text-titulo dark:text-titulo-dark">
+                                    <div className="text-xs font-semibold text-titulo dark:text-titulo-dark">
                                       Cuota {cu?.cuota_nro || (i + 1)}
-                                      {esUltima && <span className="ml-1 text-[10px] text-duo-rojo font-bold">· Última</span>}
+                                      {esUltima && <span className="ml-1 text-[11px] text-duo-rojo">· Última</span>}
                                     </div>
                                   </div>
                                   <span className={getBadgeClasses(estado)}>{getBadgeLabel(estado)}</span>
                                 </div>
 
                                 {/* Datos clave: vence + monto */}
-                                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-titulo dark:text-titulo-dark mb-1 font-bold">
-                                  <div>📅 <span className="text-suave dark:text-suave-dark">Vence:</span> <span>{fmtFecha(cu?.fecha_vencimiento)}</span></div>
-                                  <div>💵 <span className="text-suave dark:text-suave-dark">Monto:</span> <span>${fmtMoney(cu?.monto)}</span></div>
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-titulo dark:text-titulo-dark mb-1">
+                                  <div className="flex items-center gap-1"><HiCalendar className="w-3 h-3 text-suave dark:text-suave-dark" /> <span className="text-suave dark:text-suave-dark">Vence:</span> <span>{fmtFecha(cu?.fecha_vencimiento)}</span></div>
+                                  <div className="flex items-center gap-1"><HiCash className="w-3 h-3 text-suave dark:text-suave-dark" /> <span className="text-suave dark:text-suave-dark">Monto:</span> <span>${fmtMoney(cu?.monto)}</span></div>
 
                                   {cuotaPagada ? (
-                                    <div className="col-span-2 text-duo-verde-sombra dark:text-duo-verde">
-                                      ✅ <span className="text-suave dark:text-suave-dark">Pagada el:</span> <span className="font-black">{fmtFecha(fechaPago)}</span>
+                                    <div className="col-span-2 flex items-center gap-1 text-duo-verde-sombra dark:text-duo-verde">
+                                      <HiCheck className="w-3 h-3" /> <span className="text-suave dark:text-suave-dark">Pagada el:</span> <span className="font-medium">{fmtFecha(fechaPago)}</span>
                                     </div>
                                   ) : (
                                     diasFaltan !== null && (
-                                      <div className={`col-span-2 ${diasFaltan < 0 ? "text-duo-rojo" : diasFaltan === 0 ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-duo-amarillo-sombra dark:text-duo-amarillo"}`}>
-                                        ⏳ {diasFaltan > 0 ? `Faltan ${diasFaltan} día${diasFaltan === 1 ? "" : "s"}` : diasFaltan === 0 ? "Vence hoy" : `Venció hace ${Math.abs(diasFaltan)} día${Math.abs(diasFaltan) === 1 ? "" : "s"}`}
+                                      <div className={`col-span-2 flex items-center gap-1 ${diasFaltan < 0 ? "text-duo-rojo" : diasFaltan === 0 ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-duo-amarillo-sombra dark:text-duo-amarillo"}`}>
+                                        <HiClock className="w-3 h-3" /> {diasFaltan > 0 ? `Faltan ${diasFaltan} día${diasFaltan === 1 ? "" : "s"}` : diasFaltan === 0 ? "Vence hoy" : `Venció hace ${Math.abs(diasFaltan)} día${Math.abs(diasFaltan) === 1 ? "" : "s"}`}
                                       </div>
                                     )
                                   )}
@@ -953,34 +953,34 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
 
                                 {/* AVISO: recibo emitido al día hábil siguiente */}
                                 {reciboEmitido && (
-                                  <div className="mt-1.5 text-[10px] px-2 py-1 rounded bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border border-duo-azul/20 text-duo-azul font-bold">
-                                    📝 <span className="font-black">Recibo emitido:</span> {fmtFecha(reciboEmitido)}
+                                  <div className="mt-1.5 text-[11px] px-2 py-1 rounded bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border border-duo-azul/20 text-duo-azul">
+                                    <span className="font-medium">Recibo emitido:</span> {fmtFecha(reciboEmitido)}
                                     <span className="opacity-70 ml-1">(al día hábil siguiente del aseguramiento)</span>
                                   </div>
                                 )}
 
                                 {/* AVISO: pago tardío recupera cobertura a las 48hs hábiles */}
                                 {pagoAtrasadoCu && inicioCoberturaTardia && (
-                                  <div className="mt-1.5 text-[10px] px-2 py-1 rounded bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border border-duo-amarillo/30 text-duo-amarillo-sombra dark:text-duo-amarillo font-bold">
-                                    ⚠️ <span className="font-black">Pago atrasado:</span> recupera cobertura el {fmtFecha(inicioCoberturaTardia)}
+                                  <div className="mt-1.5 text-[11px] px-2 py-1 rounded bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border border-duo-amarillo/25 text-duo-amarillo-sombra dark:text-duo-amarillo">
+                                    <span className="font-medium">Pago atrasado:</span> recupera cobertura el {fmtFecha(inicioCoberturaTardia)}
                                     <span className="opacity-70 ml-1">(48hs hábiles después del pago)</span>
                                   </div>
                                 )}
 
                                 {/* Cobertura */}
                                 {cob && cob.tipo === "sin_cobertura" && (
-                                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-duo-rojo/20 text-[10px] text-duo-rojo font-bold">
-                                    🛡 Sin cobertura desde {fmtFecha(cob.desde)}
+                                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-duo-rojo/20 text-[11px] text-duo-rojo">
+                                    Sin cobertura desde {fmtFecha(cob.desde)}
                                   </div>
                                 )}
                                 {cob && cob.tipo === "ok" && cob.desde && cob.hasta && (
-                                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-duo-verde/20 text-[10px] text-duo-verde-sombra dark:text-duo-verde font-bold">
-                                    🛡 Cubre: {fmtFecha(cob.desde)} → {fmtFecha(cob.hasta)}
+                                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-duo-verde/20 text-[11px] text-duo-verde-sombra dark:text-duo-verde">
+                                    Cubre: {fmtFecha(cob.desde)} → {fmtFecha(cob.hasta)}
                                   </div>
                                 )}
                                 {cob && cob.tipo === "atrasado" && cob.desde && cob.hasta && (
-                                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-duo-amarillo/20 text-[10px] text-duo-amarillo-sombra dark:text-duo-amarillo font-bold">
-                                    🛡 Cubre: {fmtFecha(cob.desde)} → {fmtFecha(cob.hasta)}
+                                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-duo-amarillo/20 text-[11px] text-duo-amarillo-sombra dark:text-duo-amarillo">
+                                    Cubre: {fmtFecha(cob.desde)} → {fmtFecha(cob.hasta)}
                                   </div>
                                 )}
                               </div>
@@ -992,11 +992,11 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
                       {/* HITO: Vto final */}
                       <div className="ml-[18px] w-[2px] h-3 bg-duo-rojo/60"></div>
                       <div className="flex items-center gap-2.5 p-2.5 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] border-l-[3px] border-duo-rojo rounded-r-md">
-                        <div className="shrink-0 w-9 h-9 rounded-full bg-duo-rojo text-white flex items-center justify-center text-sm font-black">🏁</div>
+                        <div className="shrink-0 w-9 h-9 rounded-full bg-duo-rojo text-white flex items-center justify-center text-sm font-semibold">🏁</div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[10px] uppercase tracking-wide text-duo-rojo font-black">Vto final de la póliza</div>
-                          <div className="text-sm font-black text-titulo dark:text-titulo-dark">{fmtFecha(finPoliza)}</div>
-                          <div className="text-[10px] text-suave dark:text-suave-dark font-bold">Renovar antes de esta fecha</div>
+                          <div className="text-[11px] text-duo-rojo">Vto final de la póliza</div>
+                          <div className="text-sm font-semibold text-titulo dark:text-titulo-dark">{fmtFecha(finPoliza)}</div>
+                          <div className="text-[11px] text-suave dark:text-suave-dark">Renovar antes de esta fecha</div>
                         </div>
                       </div>
 
@@ -1005,11 +1005,11 @@ function DetalleCuotaModal({ detalleAbierto, cerrarDetalle, hoy }) {
 
                   {/* Observación si existe */}
                   {(c?.observaciones_pago || c?.ultima_observacion_pago) && (
-                    <div className="rounded-2xl border-2 border-duo-rojo/50 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 sm:p-4 text-titulo dark:text-titulo-dark">
+                    <div className="rounded-xl border border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3 sm:p-4 text-titulo dark:text-titulo-dark">
                       <div className="flex items-start gap-2">
                         <HiExclamationCircle className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 shrink-0 text-duo-rojo" />
-                        <div className="whitespace-pre-wrap break-words text-xs sm:text-sm font-bold">
-                          <span className="font-black text-duo-rojo">Observación: </span>
+                        <div className="whitespace-pre-wrap break-words text-xs sm:text-sm">
+                          <span className="font-medium text-duo-rojo">Observación: </span>
                           {(c?.observaciones_pago || c?.ultima_observacion_pago || "").toString().trim()}
                         </div>
                       </div>
@@ -1052,38 +1052,38 @@ const CuotaRow = memo(
     return (
       <>
         <span className={`absolute left-0 top-0 h-full w-1.5 ${S.stripe}`} aria-hidden />
-        <div className={`mx-0 sm:mx-2 my-0 sm:my-1 sm:rounded-2xl border-2 p-3 sm:p-4 ${S.cardBg} ${S.border} ${extraClasses} relative`}>
+        <div className={`mx-0 sm:mx-2 my-0 sm:my-1 sm:rounded-xl border p-3 sm:p-4 ${S.cardBg} ${S.border} ${extraClasses} relative`}>
           <div className="pl-2 sm:pl-2.5 flex flex-col gap-3">
 
             {/* ═══ HEADER: cliente + monto + estado ═══ */}
             <div className="flex justify-between items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`truncate max-w-[200px] sm:max-w-md font-black text-sm ${state === "overdue" ? "text-duo-rojo" : "text-titulo dark:text-titulo-dark"}`}>
+                  <span className={`truncate max-w-[200px] sm:max-w-md font-semibold text-sm ${state === "overdue" ? "text-duo-rojo" : "text-titulo dark:text-titulo-dark"}`}>
                     {nombreCompleto}
                   </span>
                   {isWebAdmin && oficinaLabel && (
-                    <span className="text-[10px] font-mono font-bold text-suave dark:text-suave-dark border border-linea dark:border-linea-dark rounded px-1.5 py-0.5">
+                    <span className="text-[11px] font-mono text-suave dark:text-suave-dark border border-linea dark:border-linea-dark rounded px-1.5 py-0.5">
                       {oficinaLabel}
                     </span>
                   )}
                   {isPolicyCancelada && !cuota.pagado && (
-                    <span className="text-[10px] font-mono font-bold text-duo-rojo border border-duo-rojo/60 rounded px-1.5 py-0.5">BAJA</span>
+                    <span className="text-[11px] font-mono text-duo-rojo border border-duo-rojo/50 rounded px-1.5 py-0.5">BAJA</span>
                   )}
                   {isPolicyVencida && !cuota.pagado && (
-                    <span className="text-[10px] font-mono font-bold text-duo-amarillo-sombra dark:text-duo-amarillo border border-duo-amarillo/60 rounded px-1.5 py-0.5">REACTIVAR</span>
+                    <span className="text-[11px] font-mono text-duo-amarillo-sombra dark:text-duo-amarillo border border-duo-amarillo/50 rounded px-1.5 py-0.5">REACTIVAR</span>
                   )}
                 </div>
-                <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5 flex items-center gap-1.5 font-mono font-bold">
+                <div className="text-[11px] text-suave dark:text-suave-dark mt-0.5 flex items-center gap-1.5 font-mono">
                   <span>{cuotaTextoFull}</span>
                   {patente && <><span>·</span><span>{patente}</span></>}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className={`text-lg sm:text-xl font-mono font-black ${isPolicyVencida && !cuota.pagado ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : S.amountText}`}>
+                <div className={`text-lg sm:text-xl font-mono font-semibold ${isPolicyVencida && !cuota.pagado ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : S.amountText}`}>
                   $ {montoTxt}
                 </div>
-                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${S.chip}`}>
+                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${S.chip}`}>
                   {label}
                 </span>
               </div>
@@ -1092,10 +1092,10 @@ const CuotaRow = memo(
             {/* ═══ Fecha de alta de la póliza — centrada y destacada ═══ */}
             {altaTxt && (
               <div className="flex justify-center">
-                <div className="inline-flex items-center gap-2 rounded-xl border-2 border-duo-azul/30 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-4 py-2">
+                <div className="inline-flex items-center gap-2 rounded-lg border border-duo-azul/25 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-4 py-2">
                   <HiCalendar className="text-duo-azul text-base shrink-0" />
-                  <span className="text-[11px] uppercase tracking-wide text-duo-azul font-black">Póliza dada de alta el</span>
-                  <span className="text-base font-black text-titulo dark:text-titulo-dark">{altaTxt}</span>
+                  <span className="text-[11px] text-duo-azul">Póliza dada de alta el</span>
+                  <span className="text-base font-semibold text-titulo dark:text-titulo-dark">{altaTxt}</span>
                 </div>
               </div>
             )}
@@ -1132,32 +1132,32 @@ const CuotaRow = memo(
               return (
                 <div className="flex items-stretch gap-2">
                   {/* Box: Fecha de pago */}
-                  <div className={`flex-1 rounded-lg border-2 ${pagoStyles.bg} ${pagoStyles.border} p-2.5`}>
+                  <div className={`flex-1 rounded-lg border ${pagoStyles.bg} ${pagoStyles.border} p-2.5`}>
                     <div className="flex items-center gap-1.5 mb-1">
                       <HiCheck className={`${pagoStyles.iconColor} text-sm`} />
-                      <div className={`text-[10px] uppercase tracking-wide font-black ${pagoStyles.subtitle}`}>
+                      <div className={`text-[11px] ${pagoStyles.subtitle}`}>
                         Fecha de pago
                       </div>
                     </div>
-                    <div className={`text-base font-black ${pagoStyles.title}`}>
+                    <div className={`text-base font-semibold ${pagoStyles.title}`}>
                       {pagada && fechaPago ? fmtFecha(fechaPago) : "Sin pagar"}
                     </div>
                   </div>
 
                   {/* Flecha central */}
                   <div className="flex flex-col items-center justify-center shrink-0 px-1">
-                    <div className="text-[9px] uppercase tracking-wide font-black text-suave dark:text-suave-dark text-center leading-tight mb-0.5">
+                    <div className="text-[10px] text-suave dark:text-suave-dark text-center leading-tight mb-0.5">
                       Período de<br />cobertura
                     </div>
                     <div className="text-2xl text-suave dark:text-suave-dark leading-none">→</div>
                   </div>
 
                   {/* Box: Fin de cobertura / Vence */}
-                  <div className={`flex-1 rounded-lg border-2 ${vtoStyles.bg} ${vtoStyles.border} p-2.5`}>
+                  <div className={`flex-1 rounded-lg border ${vtoStyles.bg} ${vtoStyles.border} p-2.5`}>
                     <div className="flex items-center justify-between gap-1.5 mb-1">
                       <div className="flex items-center gap-1.5">
                         <HiCalendar className={`${vtoStyles.iconColor} text-sm`} />
-                        <div className={`text-[10px] uppercase tracking-wide font-black ${vtoStyles.subtitle}`}>
+                        <div className={`text-[11px] ${vtoStyles.subtitle}`}>
                           Fin de cobertura / Vence
                         </div>
                       </div>
@@ -1170,11 +1170,11 @@ const CuotaRow = memo(
                         <HiPencil className="w-3 h-3" />
                       </button>
                     </div>
-                    <div className={`text-base font-black ${vtoStyles.title}`}>
+                    <div className={`text-base font-semibold ${vtoStyles.title}`}>
                       {fmtFecha(cuota?.fecha_vencimiento)}
                     </div>
                     {vtoSubtitulo && (
-                      <div className={`text-[11px] ${vtoStyles.subtitle} mt-0.5 flex items-center gap-1 font-bold`}>
+                      <div className={`text-[11px] ${vtoStyles.subtitle} mt-0.5 flex items-center gap-1`}>
                         {vtoSubAlerta && <HiExclamation className="text-xs shrink-0" />}
                         {vtoSubtitulo}
                       </div>
@@ -1189,10 +1189,10 @@ const CuotaRow = memo(
               {!cuota?.pagado ? (
                 <button
                   onClick={() => abrirPagar(cuota)}
-                  className={`w-full h-11 px-4 rounded-xl transition-all inline-flex items-center justify-center gap-2 font-black text-sm ${
+                  className={`w-full h-11 px-4 rounded-lg transition-colors inline-flex items-center justify-center gap-2 font-medium text-sm ${
                     isPolicyVencida
-                      ? "bg-duo-amarillo text-duo-texto shadow-[0_4px_0_var(--color-duo-amarillo-sombra)] active:shadow-[0_0_0_var(--color-duo-amarillo-sombra)] active:translate-y-0.5"
-                      : "bg-duo-verde text-white shadow-[0_4px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5"
+                      ? "bg-duo-amarillo text-duo-texto hover:brightness-110"
+                      : "bg-duo-verde text-white hover:brightness-110"
                   }`}
                 >
                   <HiCash className="w-4 h-4" />
@@ -1202,11 +1202,11 @@ const CuotaRow = memo(
                 <div className="flex gap-1.5 w-full">
                   <div className="flex-1">
                     <BotonDescargarPDF cliente={model?.pol?.cliente} poliza={model?.pol} cuota={cuotaPdf || cuota} label="PDF"
-                      className="w-full h-10 px-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-black transition-colors inline-flex items-center justify-center gap-1.5" />
+                      className="w-full h-10 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
                   </div>
                   <div className="flex-1">
                     <BotonImprimirTicket cliente={model?.pol?.cliente} poliza={model?.pol} cuota={cuotaPdf || cuota} label="Ticket"
-                      className="w-full h-10 px-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-black transition-colors inline-flex items-center justify-center gap-1.5" />
+                      className="w-full h-10 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5" />
                   </div>
                 </div>
               )}
@@ -1215,7 +1215,7 @@ const CuotaRow = memo(
             {/* Expandible */}
             <button
               onClick={() => setExpanded(!expanded)}
-              className="w-full py-1.5 flex items-center justify-center gap-1 text-[11px] font-bold text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
+              className="w-full py-1.5 flex items-center justify-center gap-1 text-[11px] text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors"
             >
               {expanded ? <><HiChevronUp className="w-3.5 h-3.5" /> Ocultar</> : <><HiChevronDown className="w-3.5 h-3.5" /> Ver detalles</>}
             </button>
@@ -1223,25 +1223,25 @@ const CuotaRow = memo(
             <AnimatePresence>
               {expanded && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <div className="pt-3 border-t-2 border-linea dark:border-linea-dark grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                    {modelo && <div className="flex justify-between px-2 py-1.5 rounded bg-surface dark:bg-surface-dark"><span className="text-suave dark:text-suave-dark font-bold">Vehículo</span><span className="text-titulo dark:text-titulo-dark font-mono font-bold">{modelo}</span></div>}
-                    {altaTxt && <div className="flex justify-between px-2 py-1.5 rounded bg-surface dark:bg-surface-dark"><span className="text-suave dark:text-suave-dark font-bold">Alta póliza</span><span className="text-titulo dark:text-titulo-dark font-mono font-bold">{altaTxt}</span></div>}
+                  <div className="pt-3 border-t border-linea dark:border-linea-dark grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                    {modelo && <div className="flex justify-between px-2 py-1.5 rounded bg-surface dark:bg-surface-dark"><span className="text-suave dark:text-suave-dark">Vehículo</span><span className="text-titulo dark:text-titulo-dark font-mono">{modelo}</span></div>}
+                    {altaTxt && <div className="flex justify-between px-2 py-1.5 rounded bg-surface dark:bg-surface-dark"><span className="text-suave dark:text-suave-dark">Alta póliza</span><span className="text-titulo dark:text-titulo-dark font-mono">{altaTxt}</span></div>}
                   </div>
                   <div className="mt-2 flex gap-1.5">
-                    <button onClick={() => abrirDetalle(cuota)} className="h-9 px-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-black transition-colors inline-flex items-center gap-1.5">
+                    <button onClick={() => abrirDetalle(cuota)} className="h-9 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-medium transition-colors inline-flex items-center gap-1.5">
                       <HiQuestionMarkCircle className="w-3.5 h-3.5" /> Info completa
                     </button>
                     {hasObs && (
-                      <button onClick={() => onToggleObs(cuota?.id)} className="h-9 px-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-black transition-colors inline-flex items-center gap-1.5">
+                      <button onClick={() => onToggleObs(cuota?.id)} className="h-9 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark text-xs font-medium transition-colors inline-flex items-center gap-1.5">
                         <HiExclamationCircle className="w-3.5 h-3.5" /> Nota
                       </button>
                     )}
                   </div>
                   {hasObs && isObsOpen && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 text-xs text-titulo dark:text-titulo-dark">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 text-xs text-titulo dark:text-titulo-dark">
                       <div className="flex items-start gap-2">
                         <HiExclamationCircle className="w-4 h-4 mt-0.5 shrink-0 text-duo-amarillo-sombra dark:text-duo-amarillo" />
-                        <span className="whitespace-pre-wrap font-bold">{observacion}</span>
+                        <span className="whitespace-pre-wrap">{observacion}</span>
                       </div>
                     </motion.div>
                   )}
@@ -1265,19 +1265,19 @@ const CuotaRow = memo(
 
 function InfoRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1.5">
-      <span className="text-suave dark:text-suave-dark text-xs font-bold">{label}</span>
-      <span className="text-titulo dark:text-titulo-dark truncate max-w-[60%] text-right text-xs font-mono font-bold">{value}</span>
+    <div className="flex items-center justify-between gap-2 rounded-md border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1.5">
+      <span className="text-suave dark:text-suave-dark text-xs">{label}</span>
+      <span className="text-titulo dark:text-titulo-dark truncate max-w-[60%] text-right text-xs font-mono">{value}</span>
     </div>
   );
 }
 
 function SectionCard({ title, icon, children }) {
   return (
-    <div className="rounded-2xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-card dark:bg-card-dark border-b-2 border-linea dark:border-linea-dark">
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-card dark:bg-card-dark border-b border-linea dark:border-linea-dark">
         {icon && <span className="text-duo-azul">{icon}</span>}
-        <span className="text-[11px] uppercase tracking-wide font-black text-titulo dark:text-titulo-dark">{title}</span>
+        <span className="text-[11px] font-medium text-titulo dark:text-titulo-dark">{title}</span>
       </div>
       <div className="p-3">
         {children}

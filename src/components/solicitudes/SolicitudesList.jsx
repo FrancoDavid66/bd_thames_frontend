@@ -106,8 +106,8 @@ export default function SolicitudesList({
     return (
       <div className="grid place-items-center text-center py-16">
         <HiShieldCheck className="w-14 h-14 text-suave dark:text-suave-dark mb-3" />
-        <p className="text-titulo dark:text-titulo-dark font-black">No hay solicitudes acá</p>
-        <p className="text-suave dark:text-suave-dark text-[13px] font-bold mt-1">
+        <p className="text-titulo dark:text-titulo-dark font-medium">No hay solicitudes acá</p>
+        <p className="text-suave dark:text-suave-dark text-[13px] mt-1">
           Probá con otro filtro o creá una nueva.
         </p>
       </div>
@@ -171,7 +171,7 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onTerminar 
       {/* Fila principal */}
       <div className="flex items-center gap-3">
         <div
-          className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 ${
+          className={`w-11 h-11 rounded-xl flex items-center justify-center font-medium text-sm shrink-0 ${
             terminada
               ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde"
               : "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
@@ -183,21 +183,21 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onTerminar 
           {idDelCliente ? (
             <Link
               to={rutaCliente}
-              className="font-black text-[15px] text-titulo dark:text-titulo-dark hover:text-duo-azul transition-colors truncate block"
+              className="font-semibold text-[15px] text-titulo dark:text-titulo-dark hover:text-duo-azul transition-colors truncate block"
             >
               {s?.cliente_nombre || "Cliente sin nombre"}
             </Link>
           ) : (
-            <span className="font-black text-[15px] text-titulo dark:text-titulo-dark truncate block">
+            <span className="font-semibold text-[15px] text-titulo dark:text-titulo-dark truncate block">
               {s?.cliente_nombre || "Cliente sin nombre"}
             </span>
           )}
-          <p className="text-[12px] font-bold text-suave dark:text-suave-dark truncate">
+          <p className="text-[12px] text-suave dark:text-suave-dark truncate">
             {[s?.vehiculo_marca, s?.vehiculo_modelo].filter(Boolean).join(" ") || "Vehículo"}
             {s?.vehiculo_patente && (
               <>
                 {" · "}
-                <span className="uppercase font-mono font-black text-titulo dark:text-titulo-dark">
+                <span className="uppercase font-mono text-titulo dark:text-titulo-dark">
                   {s.vehiculo_patente}
                 </span>
               </>
@@ -210,8 +210,8 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onTerminar 
       </div>
 
       {/* Footer */}
-      <div className="mt-3 pt-3 border-t-2 border-linea dark:border-linea-dark flex items-center justify-between gap-2">
-        <span className="text-[11px] font-extrabold text-suave dark:text-suave-dark truncate flex items-center gap-1.5">
+      <div className="mt-3 pt-3 border-t border-linea dark:border-linea-dark flex items-center justify-between gap-2">
+        <span className="text-[11px] text-suave dark:text-suave-dark truncate flex items-center gap-1.5">
           {isWebAdmin && oficinaLabel && (
             <>
               <HiOfficeBuilding className="shrink-0" /> {oficinaLabel} ·
@@ -223,14 +223,14 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onTerminar 
           {idDePoliza ? (
             <Link
               to={`/polizas/${idDePoliza}`}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo text-[11px] font-black uppercase tracking-wide hover:brightness-105 transition"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo text-[11px] font-medium hover:brightness-105 transition-colors"
             >
               Póliza <HiExternalLink />
             </Link>
           ) : idDelCliente ? (
             <Link
               to={rutaCliente}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark text-[11px] font-black uppercase tracking-wide hover:text-titulo dark:hover:text-titulo-dark transition"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark text-suave dark:text-suave-dark text-[11px] font-medium hover:text-titulo dark:hover:text-titulo-dark transition-colors"
             >
               Ver <HiExternalLink />
             </Link>
@@ -238,7 +238,7 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onTerminar 
           {puedeTerminar && (
             <button
               onClick={() => onTerminar?.(s)}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde hover:brightness-105 active:scale-90 transition"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde hover:brightness-105 active:scale-90 transition-all"
               title="Finalizar"
             >
               <HiCheck />
@@ -248,7 +248,7 @@ const SolicitudCard = memo(function SolicitudCard({ row, onEliminar, onTerminar 
             <button
               onClick={() => onEliminar?.(s)}
               disabled={!puedeEliminar}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo hover:brightness-105 active:scale-90 transition disabled:opacity-25"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo hover:brightness-105 active:scale-90 transition-all disabled:opacity-25"
               title="Eliminar"
             >
               <HiTrash />
@@ -266,9 +266,9 @@ function SkeletonList() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="rounded-3xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 animate-pulse h-24"
+          className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 animate-pulse h-24"
         />
       ))}
     </div>
   );
-}
+}

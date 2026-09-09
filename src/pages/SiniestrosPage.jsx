@@ -1,8 +1,11 @@
 // src/pages/SiniestrosPage.jsx  (responsive)
 //
-// 🚨 Página de Siniestros (diseño Duo claro/oscuro).
+// 🚨 Página de Siniestros.
 // Orquesta todo: lista + búsqueda + filtro por estado + wizard (alta/edición)
 // + detalle + borrar. Es autónoma (no recibe props; la ruta la monta sola).
+//
+// 🆕 Rediseño "profesional": bordes de 1px, esquinas menos redondeadas,
+// sin mayúsculas en los chips de filtro, sin emoji en el header.
 //
 // 📱 RESPONSIVE: encabezado apila el botón "Nuevo siniestro" full-width en
 //    mobile; los chips de estado hacen scroll horizontal (no se amontonan);
@@ -139,18 +142,18 @@ export default function SiniestrosPage() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto px-4 sm:px-0 py-4 sm:py-6 space-y-5"
+      className="max-w-5xl mx-auto px-4 sm:px-0 py-4 sm:py-6 space-y-4"
     >
       {/* ── Encabezado ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center shrink-0">
-            <span className="text-2xl">🚨</span>
+          <div className="h-11 w-11 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center shrink-0">
+            <HiExclamationCircle className="text-duo-rojo text-xl" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-black text-titulo dark:text-titulo-dark">Siniestros</h1>
+            <h1 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Siniestros</h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-sm font-bold text-suave dark:text-suave-dark">{siniestros?.length || 0} en total</span>
+              <span className="text-[13px] text-suave dark:text-suave-dark">{siniestros?.length || 0} en total</span>
               {abiertos > 0 && <Badge tono="rojo" size="sm">{abiertos} abierto{abiertos !== 1 ? "s" : ""}</Badge>}
             </div>
           </div>
@@ -159,19 +162,19 @@ export default function SiniestrosPage() {
         {/* 📱 Full-width en mobile; ancho natural en desktop (el wrapper w-auto lo encoge). */}
         <div className="w-full sm:w-auto shrink-0">
           <Boton3D variant="verde" full onClick={abrirAlta}>
-            <HiPlus className="w-5 h-5" /> Nuevo siniestro
+            <HiPlus className="w-4 h-4" /> Nuevo siniestro
           </Boton3D>
         </div>
       </div>
 
       {/* ── Búsqueda ── */}
       <div className="relative">
-        <HiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-suave dark:text-suave-dark" />
+        <HiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-suave dark:text-suave-dark" />
         <input
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por cliente, patente, póliza o N° de reclamo..."
-          className="w-full h-13 pl-12 pr-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-base font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+          className="w-full h-10 pl-10 pr-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[14px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
         />
       </div>
 
@@ -184,7 +187,7 @@ export default function SiniestrosPage() {
               key={f.value || "todos"}
               type="button"
               onClick={() => setFiltroEstado(f.value)}
-              className={`shrink-0 min-h-[40px] px-4 rounded-xl border-2 text-xs font-black transition-colors ${
+              className={`shrink-0 min-h-[36px] px-3.5 rounded-lg border text-[12px] font-medium transition-colors ${
                 active
                   ? "bg-duo-azul border-duo-azul text-white"
                   : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
@@ -199,7 +202,7 @@ export default function SiniestrosPage() {
       {/* ── Lista ── */}
       {loading && (!siniestros || siniestros.length === 0) ? (
         <div className="flex justify-center py-20">
-          <div className="w-10 h-10 border-4 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
         </div>
       ) : (
         <SiniestrosList
@@ -233,14 +236,14 @@ export default function SiniestrosPage() {
         onClose={() => setBorrarSiniestro(null)}
         title="Eliminar siniestro"
         subtitle="Esta acción no se puede deshacer"
-        icon={<HiExclamationCircle className="w-6 h-6" />}
+        icon={<HiExclamationCircle className="w-5 h-5" />}
         iconTono="rojo"
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-sm font-bold text-titulo dark:text-titulo-dark">
+          <p className="text-[14px] text-titulo dark:text-titulo-dark">
             ¿Seguro que querés eliminar el siniestro
-            {borrarSiniestro?.cliente_label ? <> de <b>{borrarSiniestro.cliente_label}</b></> : ""}
+            {borrarSiniestro?.cliente_label ? <> de <b className="font-medium">{borrarSiniestro.cliente_label}</b></> : ""}
             {borrarSiniestro?.id ? <> (#{borrarSiniestro.id})</> : ""}? Se borrarán también sus fotos y su bitácora.
           </p>
           <div className="flex gap-2">

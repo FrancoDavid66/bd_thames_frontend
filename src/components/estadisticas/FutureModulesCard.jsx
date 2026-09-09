@@ -1,10 +1,10 @@
-// src/components/estadisticas/FutureModulesCard.jsx  (diseño Duo)
+// src/components/estadisticas/FutureModulesCard.jsx
 import AnimatedCard from "./AnimatedCard";
 
 export default function FutureModulesCard() {
   return (
     <AnimatedCard index={8} interactive={false}>
-      <div className="text-xs font-bold text-suave dark:text-suave-dark">
+      <div className="text-xs text-suave dark:text-suave-dark">
         Próximos módulos a sumar en este tablero:
         <ul className="mt-2 list-disc list-inside space-y-1">
           <li>Cobranzas y morosidad por oficina (desde Pagos).</li>

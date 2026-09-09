@@ -8,26 +8,26 @@ export default function Button({
 }) {
   const tones = {
     neutral: {
-      solid: "bg-gray-800 hover:bg-gray-700 text-white border border-gray-700",
-      outline: "border border-gray-700 hover:bg-gray-800 text-gray-100",
-      ghost: "hover:bg-gray-800 text-gray-100",
+      solid: "bg-titulo dark:bg-titulo-dark text-surface dark:text-surface-dark border border-titulo dark:border-titulo-dark hover:brightness-110",
+      outline: "border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark",
+      ghost: "text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark",
     },
     primary: {
-      solid: "bg-primary-400 hover:opacity-90 text-neutral-900",
-      outline: "border border-primary-400 text-primary-300 hover:bg-primary-400/10",
-      ghost: "text-primary-300 hover:bg-primary-400/10",
+      solid: "bg-duo-azul hover:brightness-110 text-white",
+      outline: "border border-duo-azul text-duo-azul hover:bg-duo-azul-soft dark:hover:bg-[var(--color-duo-azul-soft-dark)]",
+      ghost: "text-duo-azul hover:bg-duo-azul-soft dark:hover:bg-[var(--color-duo-azul-soft-dark)]",
     },
     danger: {
-      solid: "bg-red-600 hover:bg-red-700 text-white",
-      outline: "border border-red-600 text-red-300 hover:bg-red-600/10",
-      ghost: "text-red-300 hover:bg-red-600/10",
+      solid: "bg-duo-rojo hover:brightness-110 text-white",
+      outline: "border border-duo-rojo text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]",
+      ghost: "text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]",
     },
     success: {
-      solid: "bg-emerald-600 hover:bg-emerald-700 text-white",
-      outline: "border border-emerald-600 text-emerald-300 hover:bg-emerald-600/10",
-      ghost: "text-emerald-300 hover:bg-emerald-600/10",
+      solid: "bg-duo-verde hover:brightness-110 text-white",
+      outline: "border border-duo-verde text-duo-verde-sombra dark:text-duo-verde hover:bg-duo-verde-soft dark:hover:bg-[var(--color-duo-verde-soft-dark)]",
+      ghost: "text-duo-verde-sombra dark:text-duo-verde hover:bg-duo-verde-soft dark:hover:bg-[var(--color-duo-verde-soft-dark)]",
     },
   };
-  const base = "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm";
+  const base = "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors";
   return <Comp className={`${base} ${tones[tone][variant]} ${className}`} {...props} />;
 }

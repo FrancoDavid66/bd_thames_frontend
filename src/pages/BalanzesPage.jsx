@@ -1,8 +1,8 @@
-// src/pages/BalancesPage.jsx  (diseño Duo · responsive)
+// src/pages/BalancesPage.jsx  (responsive)
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlus } from "react-icons/fa";
-import { HiOfficeBuilding } from "react-icons/hi";
+import { HiOfficeBuilding, HiGlobeAlt } from "react-icons/hi";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import axios from "axios";
@@ -25,7 +25,7 @@ import BalancesFilters from "../components/balanzes/BalancesFilters";
 // 🚀 Tabla de movimientos (SOLO tabla; los datos y filtros los pasa esta página).
 import MovimientosPanel from "../components/balanzes/MovimientosPanel";
 
-// 🚀 Gráfico Ingresos vs Egresos (diseño Duo, se adapta a claro/oscuro).
+// 🚀 Gráfico Ingresos vs Egresos (se adapta a claro/oscuro).
 import BalanceChart from "../components/balanzes/BalanceChart";
 
 // ── Base de API (igual que el resto de la app) ──
@@ -78,20 +78,20 @@ const rangoDeAtajo = (key, fechaDia) => {
   }
 };
 
-/* 🚀 KPI card — etiqueta tenue, número grande (estilo Duo). */
+/* 🆕 KPI card — borde fino, sin relieve. */
 const KPI_VARIANTS = {
-  green: "border-duo-verde/30 bg-duo-verde/[0.06]",
-  red: "border-duo-rojo/30 bg-duo-rojo/[0.06]",
-  blue: "border-duo-azul/30 bg-duo-azul/[0.06]",
+  green: "border-duo-verde/25 bg-duo-verde/[0.05]",
+  red: "border-duo-rojo/25 bg-duo-rojo/[0.05]",
+  blue: "border-duo-azul/25 bg-duo-azul/[0.05]",
 };
 const KpiCard = React.memo(function KpiCard({ title, value, variant = "blue" }) {
   return (
-    <div className={`border-2 ${KPI_VARIANTS[variant]} px-4 py-5 rounded-2xl min-w-0 flex flex-col gap-1.5 justify-center`}>
-      <h3 className="text-[11px] font-black uppercase tracking-[0.08em] text-suave dark:text-suave-dark truncate" title={title}>
+    <div className={`border ${KPI_VARIANTS[variant]} px-4 py-4 rounded-lg min-w-0 flex flex-col gap-1.5 justify-center`}>
+      <h3 className="text-[12px] font-medium text-suave dark:text-suave-dark truncate" title={title}>
         {title}
       </h3>
-      <p className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-titulo dark:text-titulo-dark truncate">
-        <span className="text-lg sm:text-xl opacity-60 mr-0.5">$</span>{fmtMoney(value)}
+      <p className="text-xl sm:text-2xl font-semibold leading-none text-titulo dark:text-titulo-dark truncate">
+        <span className="text-[15px] opacity-60 mr-0.5">$</span>{fmtMoney(value)}
       </p>
     </div>
   );
@@ -99,13 +99,13 @@ const KpiCard = React.memo(function KpiCard({ title, value, variant = "blue" }) 
 
 /* 🚀 Bloque de 3 KPIs (Ingreso / Egreso / Neto) por oficina. */
 const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
-  <div className={`rounded-3xl border-2 overflow-hidden ${highlight ? "border-duo-azul/40 bg-duo-azul/[0.05]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"}`}>
-    <div className={`flex items-center gap-2 px-4 py-3 border-b-2 ${highlight ? "border-duo-azul/30" : "border-linea dark:border-linea-dark"}`}>
-      <span className="text-base shrink-0">{highlight ? "🌍" : "🏢"}</span>
-      <h2 className={`text-sm font-black tracking-wide truncate ${highlight ? "text-duo-azul dark:text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
+  <div className={`rounded-xl border overflow-hidden ${highlight ? "border-duo-azul/35 bg-duo-azul/[0.04]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"}`}>
+    <div className={`flex items-center gap-2 px-4 py-3 border-b ${highlight ? "border-duo-azul/25" : "border-linea dark:border-linea-dark"}`}>
+      {highlight ? <HiGlobeAlt className="text-base shrink-0 text-duo-azul" /> : <HiOfficeBuilding className="text-base shrink-0 text-suave dark:text-suave-dark" />}
+      <h2 className={`text-[14px] font-semibold truncate ${highlight ? "text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
         {title}
       </h2>
-      <span className="ml-auto text-[10px] font-black uppercase tracking-wider text-suave dark:text-suave-dark shrink-0">
+      <span className="ml-auto text-[11px] text-suave dark:text-suave-dark shrink-0">
         {suffix}
       </span>
     </div>
@@ -359,35 +359,35 @@ const BalancesPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <p className="text-[11px] sm:text-xs font-black tracking-[0.18em] uppercase text-suave dark:text-suave-dark mb-1 flex items-center gap-2 truncate">
+          <p className="text-[12px] font-medium text-suave dark:text-suave-dark mb-1 flex items-center gap-2 truncate">
             Balance
             {!isWebAdmin && (
-              <span className="inline-flex items-center gap-1 bg-duo-verde/10 text-duo-verde dark:text-duo-verde border-2 border-duo-verde/30 px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest truncate">
+              <span className="inline-flex items-center gap-1 bg-duo-verde/10 text-duo-verde-sombra dark:text-duo-verde border border-duo-verde/25 px-2 py-0.5 rounded-full text-[11px] font-medium truncate">
                 <HiOfficeBuilding className="shrink-0" /> <span className="truncate">{user?.perfil?.oficina_nombre || `Sucursal ${userOficina}`}</span>
               </span>
             )}
           </p>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight truncate text-titulo dark:text-titulo-dark">
+          <h1 className="text-xl sm:text-2xl font-semibold truncate text-titulo dark:text-titulo-dark">
             Balances
           </h1>
-          <p className="text-xs sm:text-sm font-bold text-suave dark:text-suave-dark mt-1 truncate">
+          <p className="text-[13px] text-suave dark:text-suave-dark mt-1 truncate">
             Ingresos y egresos de la caja
           </p>
         </div>
 
-        {/* Botones de carga rápida — 3D Duo. 📱 Full-width apilados en mobile. */}
+        {/* Botones de carga rápida — planos. 📱 Full-width apilados en mobile. */}
         <div className="flex flex-col sm:flex-row gap-2 md:shrink-0">
           <button
             type="button"
             onClick={() => setModalTipo("INGRESO")}
-            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-duo-verde border-2 border-duo-verde shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)] active:translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 rounded-lg text-[13px] font-medium text-white bg-duo-verde hover:brightness-110 transition-colors"
           >
             <FaPlus /> Nuevo ingreso
           </button>
           <button
             type="button"
             onClick={() => setModalTipo("EGRESO")}
-            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 rounded-2xl font-black text-sm text-white bg-duo-rojo border-2 border-duo-rojo shadow-[0_5px_0_var(--color-duo-rojo-sombra)] active:shadow-[0_0_0_var(--color-duo-rojo-sombra)] active:translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 rounded-lg text-[13px] font-medium text-white bg-duo-rojo hover:brightness-110 transition-colors"
           >
             <FaPlus /> Nuevo egreso
           </button>
@@ -424,10 +424,10 @@ const BalancesPage = () => {
 
       {/* ===================== SELECTOR DE VISTA ===================== */}
       {/* 📱 scroll-x por si no entran los tabs; sin barra visible. */}
-      <div className="mb-5 border-b-2 border-linea dark:border-linea-dark flex gap-2 pb-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-5 border-b border-linea dark:border-linea-dark flex gap-2 pb-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {[
-          { id: "movimientos", label: "💰 Movimientos" },
-          { id: "resumen", label: "📊 Resumen" },
+          { id: "movimientos", label: "Movimientos" },
+          { id: "resumen", label: "Resumen" },
         ].map((tab) => {
           const active = vista === tab.id;
           return (
@@ -435,7 +435,7 @@ const BalancesPage = () => {
               key={tab.id}
               type="button"
               onClick={() => setVista(tab.id)}
-              className={`whitespace-nowrap shrink-0 min-h-[44px] px-4 py-2 rounded-t-2xl text-xs sm:text-sm font-black transition border-2 border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+              className={`whitespace-nowrap shrink-0 min-h-[40px] px-4 py-2 rounded-t-lg text-[13px] font-medium transition-colors border border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
             >
               {tab.label}
             </button>
@@ -445,26 +445,26 @@ const BalancesPage = () => {
 
       {/* ===================== RESUMEN (solo 3 KPIs) ===================== */}
       {vista === "resumen" && (
-      <section className="space-y-6">
+      <section className="space-y-5">
         {isWebAdmin ? (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {oficinaSeleccionada === "ALL" ? (
               <>
-                <KpiRowGroup title="Caja General (Todas las Sucursales)" metrics={metricsPorOficina.ALL} suffix={suffix} highlight />
+                <KpiRowGroup title="Caja general (todas las sucursales)" metrics={metricsPorOficina.ALL} suffix={suffix} highlight />
                 {modo === "dia" && balanceData?.por_oficina?.map(ofi => (
                   <KpiRowGroup key={ofi.scope.oficina} title={`Sucursal: ${ofi.scope.oficina_nombre}`} metrics={metricsPorOficina[ofi.scope.oficina]} suffix={suffix} />
                 ))}
                 {modo === "dia" && balanceData?.sin_oficina && (
-                  <KpiRowGroup title="Sin Sucursal Asignada" metrics={metricsPorOficina._sin} suffix={suffix} />
+                  <KpiRowGroup title="Sin sucursal asignada" metrics={metricsPorOficina._sin} suffix={suffix} />
                 )}
               </>
             ) : (
-              <KpiRowGroup title="Sucursal Seleccionada" metrics={metricsPorOficina.ALL} suffix={suffix} highlight />
+              <KpiRowGroup title="Sucursal seleccionada" metrics={metricsPorOficina.ALL} suffix={suffix} highlight />
             )}
           </div>
         ) : (
           // Vista empleado común — 3 KPIs
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <KpiCard title={`Ingresos ${suffix}`} value={empMetrics.tIn} variant="green" />
             <KpiCard title={`Egresos ${suffix}`} value={empMetrics.tEg} variant="red" />
             <KpiCard title={`Neto ${suffix}`} value={empMetrics.tBal} variant="blue" />

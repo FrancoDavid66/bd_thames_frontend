@@ -61,6 +61,17 @@ export const QUICK_ACTIONS = [
     icon: "calc", bg: "var(--color-duo-amarillo)", shadow: "var(--color-duo-amarillo-sombra)",
     darkText: true, adminOnly: true, // amarillo → texto oscuro; solo admin
   },
+  {
+    // ⚖️ NUEVO: acceso directo a Siniestros — antes solo se llegaba
+    //    abriendo el acordeón "Cartera" (empieza plegado).
+    to: "/siniestros", label: "Siniestros", sub: "Cargar un siniestro",
+    icon: "doc", bg: "var(--color-duo-rojo)", shadow: "var(--color-duo-rojo-sombra)",
+  },
+  {
+    // ⚖️ NUEVO: acceso directo a Legales (consultas/casos) — mismo motivo.
+    to: "/legales", label: "Legales", sub: "Nueva consulta o caso",
+    icon: "doc", bg: "var(--color-duo-violeta)", shadow: "var(--color-duo-violeta-sombra)",
+  },
 ];
 
 // 🏗️ Construye los grupos del menú según el rol y los contadores (badges).
@@ -83,8 +94,8 @@ export function buildMenuGroups({
     }];
   }
 
+  // 🆕 Gestión de Pagos salió de Finanzas: ahora vive en Principal (ver abajo).
   const finanzasItems = [
-    { to: "/pagos", label: "Gestión de Pagos", icon: "cash" },
     { to: "/recaudacion", label: "Recaudación", icon: "cash" },
     { to: "/balanzes", label: "Balances", icon: "db" },
   ];
@@ -97,26 +108,33 @@ export function buildMenuGroups({
 
   return [
     {
-      // 🆕 PRINCIPAL ahora solo: Clientes, Pólizas, Tareas del día y Control diario.
-      title: "Principal", flat: true, id: "principal",
+      // 🆕 INICIO solo, arriba de todo — es la puerta de entrada.
+      title: "", flat: true, id: "inicio",
       items: [
-        { to: "/clientes", label: "Clientes", icon: "users" },
-        { to: "/polizas", label: "Pólizas", icon: "doc" },
-        { to: "/tareas", label: "Tareas del día", icon: "tasks", highlight: true },
-        { to: "/control-diario", label: "Control diario", icon: "clipboard", badge: controlDiarioPendientes, tone: "rojo" },
+        { to: "/", label: "Inicio", icon: "home" },
       ],
     },
     {
-      // 🆕 CARTERA absorbe Inicio, Ranking y Altas (antes estaban en Principal).
+      // 🆕 PRINCIPAL: Pólizas, Altas, Gestión de Pagos, Siniestros y Legales.
+      //    Tareas del día y Control diario salieron de acá.
+      title: "Principal", flat: true, id: "principal",
+      items: [
+        { to: "/polizas", label: "Pólizas", icon: "doc" },
+        { to: "/solicitudes", label: "Altas", icon: "clipboard" },
+        { to: "/pagos", label: "Gestión de Pagos", icon: "cash", highlight: "verde" },
+        { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
+        { to: "/legales", label: "Legales", icon: "doc" },
+      ],
+    },
+    {
+      // 🆕 CARTERA: Altas se movió a Principal; Clientes bajó para acá; Inicio subió a su propio grupo.
       title: "Cartera", id: "cartera", icon: "doc",
       items: [
-        { to: "/", label: "Inicio", icon: "home" },
+        { to: "/clientes", label: "Clientes", icon: "users" },
         { to: "/ranking", label: "Ranking", icon: "star" },
-        { to: "/solicitudes", label: "Altas", icon: "clipboard", badge: solTotal, tone: "amarillo" },
         { to: "/polizas/renovaciones", label: "Renovaciones", icon: "refresh", badge: renovacionesPendientes, tone: "amarillo" },
         { to: "/cuponeras", label: "Cuponeras", icon: "receipt", badge: cuponVencidas, tone: "rojo" },
         { to: "/polizas/bajas", label: "Bajas", icon: "ban", badge: bajasPendientes, tone: "rojo" },
-        { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
       ],
     },
     {

@@ -34,20 +34,20 @@ function severityFor(code) {
 
 const STYLES = {
   error: {
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/40",
-    icon: "text-rose-400",
-    title: "text-rose-200",
-    text: "text-rose-100/85",
-    action: "text-rose-300",
+    bg: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]",
+    border: "border-duo-rojo/40",
+    icon: "text-duo-rojo",
+    title: "text-duo-rojo",
+    text: "text-titulo dark:text-titulo-dark",
+    action: "text-duo-rojo",
   },
   warning: {
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/40",
-    icon: "text-amber-400",
-    title: "text-amber-200",
-    text: "text-amber-100/85",
-    action: "text-amber-300",
+    bg: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)]",
+    border: "border-duo-amarillo/40",
+    icon: "text-duo-amarillo-sombra dark:text-duo-amarillo",
+    title: "text-duo-amarillo-sombra dark:text-duo-amarillo",
+    text: "text-titulo dark:text-titulo-dark",
+    action: "text-duo-amarillo-sombra dark:text-duo-amarillo",
   },
 };
 
@@ -73,7 +73,7 @@ export default function ErrorBanner({ error, onClose, children }) {
       <Icon className={cx("text-2xl shrink-0 mt-0.5", s.icon)} />
 
       <div className="flex-1 min-w-0">
-        <div className={cx("text-sm font-extrabold mb-0.5", s.title)}>
+        <div className={cx("text-sm font-semibold mb-0.5", s.title)}>
           {error.message || "Ocurrió un error"}
         </div>
 
@@ -85,7 +85,7 @@ export default function ErrorBanner({ error, onClose, children }) {
 
         {error.action && (
           <div className={cx("text-xs font-medium mt-1.5 leading-relaxed", s.action)}>
-            💡 {error.action}
+            {error.action}
           </div>
         )}
 
@@ -97,10 +97,10 @@ export default function ErrorBanner({ error, onClose, children }) {
               .map(([k, v]) => (
                 <span
                   key={k}
-                  className="inline-flex items-center gap-1 rounded-md bg-black/20 px-2 py-0.5 text-[10px] font-mono text-white/70"
+                  className="inline-flex items-center gap-1 rounded-md bg-surface dark:bg-surface-dark px-2 py-0.5 text-[10px] font-mono text-suave dark:text-suave-dark"
                 >
                   <span className="opacity-60">{k}:</span>
-                  <span className="font-bold">{String(v)}</span>
+                  <span className="font-medium text-titulo dark:text-titulo-dark">{String(v)}</span>
                 </span>
               ))}
           </div>
@@ -114,7 +114,7 @@ export default function ErrorBanner({ error, onClose, children }) {
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
+          className="shrink-0 p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
           title="Cerrar"
         >
           <HiX className={s.icon} />
@@ -122,4 +122,4 @@ export default function ErrorBanner({ error, onClose, children }) {
       )}
     </motion.div>
   );
-}
+}

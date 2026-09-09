@@ -2,9 +2,13 @@
 import React from "react";
 
 /**
- * 📋 Tabla base reutilizable estilo Duolingo.
+ * 📋 Tabla base reutilizable de THAMES.
  * Vista TABLA en desktop y CARDS en mobile automáticamente.
  * Vos definís las columnas; ella arma todo.
+ *
+ * 🆕 Rediseño "profesional": encabezados en texto normal (antes MAYÚSCULA
+ * + tracking ancho), bordes de 1px (antes 2px), cards de mobile menos
+ * redondeadas y sin el emoji en el estado vacío.
  *
  * Props:
  *   columns: array de columnas. Cada una:
@@ -37,8 +41,7 @@ function TablaDuo({ columns = [], rows = [], rowKey, onRowClick, emptyText = "No
   if (!rows.length) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="text-5xl mb-3">🔍</div>
-        <p className="text-[15px] font-black text-titulo dark:text-titulo-dark">{emptyText}</p>
+        <p className="text-[14px] font-medium text-suave dark:text-suave-dark">{emptyText}</p>
       </div>
     );
   }
@@ -53,7 +56,7 @@ function TablaDuo({ columns = [], rows = [], rowKey, onRowClick, emptyText = "No
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`p-4 border-b-2 border-linea dark:border-linea-dark text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark ${alignCls(col.align)}`}
+                  className={`p-3 border-b border-linea dark:border-linea-dark text-[12px] font-medium text-suave dark:text-suave-dark ${alignCls(col.align)}`}
                 >
                   {col.header}
                 </th>
@@ -70,7 +73,7 @@ function TablaDuo({ columns = [], rows = [], rowKey, onRowClick, emptyText = "No
                 }`}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={`p-4 text-sm font-bold text-titulo dark:text-titulo-dark ${alignCls(col.align)} ${col.className || ""}`}>
+                  <td key={col.key} className={`p-3 text-sm text-titulo dark:text-titulo-dark ${alignCls(col.align)} ${col.className || ""}`}>
                     {cellValue(col, fila)}
                   </td>
                 ))}
@@ -81,21 +84,21 @@ function TablaDuo({ columns = [], rows = [], rowKey, onRowClick, emptyText = "No
       </div>
 
       {/* ===== MOBILE: cards ===== */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-2.5">
         {rows.map((fila, i) => (
           <div
             key={keyOf(fila, i)}
             onClick={onRowClick ? () => onRowClick(fila) : undefined}
-            className={`bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-4 ${
+            className={`bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-lg p-3.5 ${
               onRowClick ? "cursor-pointer active:scale-[0.99] transition-transform" : ""
             }`}
           >
             {columns.map((col) => (
-              <div key={col.key} className="flex items-center justify-between gap-3 py-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark shrink-0">
+              <div key={col.key} className="flex items-center justify-between gap-3 py-1">
+                <span className="text-[12px] font-medium text-suave dark:text-suave-dark shrink-0">
                   {col.header}
                 </span>
-                <span className="text-sm font-bold text-titulo dark:text-titulo-dark text-right min-w-0 truncate">
+                <span className="text-sm text-titulo dark:text-titulo-dark text-right min-w-0 truncate">
                   {cellValue(col, fila)}
                 </span>
               </div>

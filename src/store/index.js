@@ -38,6 +38,9 @@ import serviciosReducer from "./slices/serviciosSlice";
 // 🆕 NUEVO: Tareas del día
 import tareasReducer from "./slices/tareasSlice";
 
+// ⚖️ NUEVO: Legales (expedientes, abogados, consultas)
+import legalesReducer from "./slices/legalesSlice";
+
 export const store = configureStore({
   reducer: {
     clientes: clientesReducer,
@@ -75,6 +78,9 @@ export const store = configureStore({
 
     // 🆕 NUEVO: Tareas del día
     tareas: tareasReducer,
+
+    // ⚖️ NUEVO: Legales
+    legales: legalesReducer,
   },
 });
 

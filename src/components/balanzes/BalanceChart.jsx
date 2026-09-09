@@ -1,4 +1,4 @@
-// src/components/balanzes/BalanceChart.jsx  (diseño Duo · responsive)
+// src/components/balanzes/BalanceChart.jsx  (responsive)
 import { useMemo, useState, useEffect } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -140,25 +140,25 @@ function useIsMobile(breakpoint = 640) {
   return isMobile;
 }
 
-// Tooltip Duo — se adapta a claro/oscuro con tokens.
+// Tooltip — se adapta a claro/oscuro con tokens.
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const p = Object.fromEntries(payload.map((x) => [x.dataKey, x.value]));
   return (
-    <div className="bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark rounded-2xl shadow-2xl px-4 py-3 text-[11px]">
-      <div className="font-black mb-2 text-suave dark:text-suave-dark uppercase tracking-wide border-b-2 border-linea dark:border-linea-dark pb-1">{label}</div>
+    <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark rounded-xl shadow-lg px-4 py-3 text-[11px]">
+      <div className="font-medium mb-2 text-suave dark:text-suave-dark border-b border-linea dark:border-linea-dark pb-1">{label}</div>
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-between items-center gap-4">
-          <span className="text-duo-verde font-black">Ingresos</span>
-          <span className="text-duo-verde dark:text-duo-verde font-mono font-black">${currencyAR(p.ingresos)}</span>
+          <span className="text-duo-verde font-medium">Ingresos</span>
+          <span className="text-duo-verde dark:text-duo-verde font-mono font-semibold">${currencyAR(p.ingresos)}</span>
         </div>
         <div className="flex justify-between items-center gap-4">
-          <span className="text-duo-rojo font-black">Egresos</span>
-          <span className="text-duo-rojo dark:text-duo-rojo font-mono font-black">${currencyAR(p.egresos)}</span>
+          <span className="text-duo-rojo font-medium">Egresos</span>
+          <span className="text-duo-rojo dark:text-duo-rojo font-mono font-semibold">${currencyAR(p.egresos)}</span>
         </div>
-        <div className="flex justify-between items-center gap-4 pt-1 mt-1 border-t-2 border-linea dark:border-linea-dark">
-          <span className="text-duo-azul font-black">Balance</span>
-          <span className="text-duo-azul dark:text-duo-azul font-mono font-black">${currencyAR(p.balance)}</span>
+        <div className="flex justify-between items-center gap-4 pt-1 mt-1 border-t border-linea dark:border-linea-dark">
+          <span className="text-duo-azul font-medium">Balance</span>
+          <span className="text-duo-azul dark:text-duo-azul font-mono font-semibold">${currencyAR(p.balance)}</span>
         </div>
       </div>
     </div>
@@ -196,9 +196,9 @@ const BalanceChart = ({
       type="button"
       onClick={() => setRange(id)}
       // 📱 min-h-[40px] → botón cómodo de tocar en mobile.
-      className={`flex-1 min-h-[40px] px-3 py-1.5 rounded-xl transition-all font-black ${
+      className={`flex-1 min-h-[40px] px-3 py-1.5 rounded-lg transition-colors font-medium ${
         range === id
-          ? "bg-duo-azul text-white shadow-[0_3px_0_var(--color-duo-azul-sombra)]"
+          ? "bg-duo-azul text-white"
           : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
       }`}
     >
@@ -208,21 +208,21 @@ const BalanceChart = ({
 
   return (
     <div
-      className={`bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-3xl px-3 py-3 sm:px-5 sm:py-4 mb-6 ${className}`}
+      className={`bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl px-3 py-3 sm:px-5 sm:py-4 mb-6 ${className}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-duo-azul via-duo-azul/60 to-duo-verde flex items-center justify-center text-white">
+          <div className="w-10 h-10 shrink-0 rounded-lg bg-gradient-to-br from-duo-azul via-duo-azul/60 to-duo-verde flex items-center justify-center text-white">
             <HiOutlinePresentationChartBar className="w-5 h-5" />
           </div>
           <div className="flex flex-col min-w-0">
-            <h3 className="text-sm sm:text-base font-black text-titulo dark:text-titulo-dark tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="text-sm sm:text-base font-semibold text-titulo dark:text-titulo-dark tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>Ingresos vs Egresos</span>
-              <span className="text-[11px] text-suave dark:text-suave-dark font-bold bg-surface dark:bg-surface-dark px-2 py-0.5 rounded-lg border-2 border-linea dark:border-linea-dark">
+              <span className="text-[11px] text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark px-2 py-0.5 rounded-md border border-linea dark:border-linea-dark">
                 {range === "12m" ? "Histórico anual" : "Evolución diaria"}
               </span>
             </h3>
-            <p className="text-[11px] sm:text-xs font-bold text-suave dark:text-suave-dark mt-0.5">
+            <p className="text-[11px] sm:text-xs text-suave dark:text-suave-dark mt-0.5">
               Análisis de flujo de caja y rentabilidad
             </p>
           </div>
@@ -230,7 +230,7 @@ const BalanceChart = ({
 
         {/* Selector de rango tipo pill */}
         <div className="flex w-full sm:w-auto">
-          <div className="flex flex-1 bg-surface dark:bg-surface-dark border-2 border-linea dark:border-linea-dark rounded-2xl p-1 text-[11px] sm:text-xs">
+          <div className="flex flex-1 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg p-1 text-[11px] sm:text-xs">
             {pillBtn("7d", "7 días")}
             {pillBtn("30d", "30 días")}
             {pillBtn("12m", "12 meses")}
@@ -247,7 +247,7 @@ const BalanceChart = ({
             <XAxis
               dataKey="label"
               stroke={axisColor}
-              tick={{ fontSize: 10, fill: axisColor, fontWeight: 700 }}
+              tick={{ fontSize: 10, fill: axisColor, fontWeight: 500 }}
               tickMargin={10}
               interval="preserveStartEnd"
               axisLine={false}
@@ -258,7 +258,7 @@ const BalanceChart = ({
               tickFormatter={(v) => (isMobile ? currencyShort(v) : `$${currencyAR(v)}`)}
               domain={[yMin, "auto"]}
               width={isMobile ? 44 : 80}
-              tick={{ fontSize: 10, fill: axisColor, fontWeight: 700 }}
+              tick={{ fontSize: 10, fill: axisColor, fontWeight: 500 }}
               stroke={axisColor}
               axisLine={false}
               tickLine={false}
@@ -270,21 +270,21 @@ const BalanceChart = ({
               iconType="circle"
               wrapperStyle={{
                 fontSize: 11,
-                fontWeight: 700,
+                fontWeight: 500,
                 color: axisColor,
               }}
             />
-            {/* Barras con bordes redondeados arriba (tus tokens: ingreso / egreso) */}
-            <Bar dataKey="ingresos" name="Ingresos" fill="#58cc02" radius={[6, 6, 0, 0]} maxBarSize={40} />
-            <Bar dataKey="egresos" name="Egresos" fill="#ff4b4b" radius={[6, 6, 0, 0]} maxBarSize={40} />
-            {/* Línea de balance (oficina / celeste) */}
+            {/* Barras con bordes redondeados arriba (paleta actual: duo-verde / duo-rojo) */}
+            <Bar dataKey="ingresos" name="Ingresos" fill="#16a34a" radius={[6, 6, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="egresos" name="Egresos" fill="#dc2626" radius={[6, 6, 0, 0]} maxBarSize={40} />
+            {/* Línea de balance (duo-azul) */}
             <Line
               type="monotone"
               dataKey="balance"
               name="Balance Neto"
-              stroke="#1cb0f6"
+              stroke="#2563eb"
               strokeWidth={3}
-              dot={{ r: 3, fill: "#1cb0f6", strokeWidth: 0 }}
+              dot={{ r: 3, fill: "#2563eb", strokeWidth: 0 }}
               activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
             />
             <ReferenceLine y={0} stroke={axisColor} strokeWidth={1} />
@@ -293,7 +293,7 @@ const BalanceChart = ({
       </div>
 
       {!data?.length && (
-        <div className="text-center text-xs sm:text-sm font-bold text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark py-4 rounded-2xl border-2 border-dashed border-linea dark:border-linea-dark mt-4">
+        <div className="text-center text-xs sm:text-sm text-suave dark:text-suave-dark bg-surface dark:bg-surface-dark py-4 rounded-xl border border-dashed border-linea dark:border-linea-dark mt-4">
           No hay datos suficientes para generar el gráfico en este período.
         </div>
       )}

@@ -1,6 +1,6 @@
-// src/components/siniestros/SiniestrosWizard.jsx  (responsive)
+// src/components/siniestros/SiniestrosWizard.jsx
 //
-// 🧙 Wizard paso a paso para cargar un siniestro (diseño Duo claro/oscuro).
+// 🧙 Wizard paso a paso para cargar un siniestro.
 // Guía al usuario: Póliza → Tipo → Fecha → Relato → Fotos → Tercero.
 // Las fotos se cargan en modo BORRADOR (memoria) y se suben al crear
 // el siniestro: onSubmit(payload, draftFotos).
@@ -17,7 +17,7 @@ import {
   HiX, HiArrowRight, HiArrowLeft, HiSearch, HiCheck,
   HiTruck, HiShieldExclamation, HiLockClosed, HiFire,
   HiDotsHorizontal, HiCalendar, HiDocumentText, HiUser,
-  HiCheckCircle, HiPhotograph,
+  HiCheckCircle, HiPhotograph, HiOfficeBuilding,
 } from "react-icons/hi";
 import api from "../../services/api";
 import dayjs from "dayjs";
@@ -26,7 +26,7 @@ import { useAuth } from "../../context/AuthContext";
 
 import SiniestroFotosPanel from "./SiniestroFotosPanel";
 
-/* ── Tipos de siniestro (tono Duo por tipo) ── */
+/* ── Tipos de siniestro (tono por tipo) ── */
 const TIPOS = [
   { key: "CHOCO",    Icon: HiTruck,             label: "Chocó",        desc: "El asegurado causó el choque", tono: "amarillo" },
   { key: "CHOCARON", Icon: HiShieldExclamation, label: "Fue chocado",  desc: "Un tercero lo impactó",        tono: "azul"     },
@@ -35,7 +35,7 @@ const TIPOS = [
   { key: "OTRO",     Icon: HiDotsHorizontal,    label: "Otro",         desc: "Granizo, vandalismo, etc.",    tono: "violeta"  },
 ];
 
-// tono → clases Duo (activo / inactivo)
+// tono → clases (activo / inactivo)
 const TIPO_CLASES = {
   amarillo: { on: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-duo-amarillo", icon: "text-duo-amarillo-sombra dark:text-duo-amarillo" },
   azul:     { on: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-duo-azul",             icon: "text-duo-azul" },
@@ -151,7 +151,7 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
           autoFocus
           placeholder="Buscá por patente, nombre o N° de póliza..."
           autoComplete="off"
-          className="w-full h-14 pl-12 pr-12 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+          className="w-full h-14 pl-12 pr-12 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
         />
         {loading && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 border-2 border-duo-azul border-t-transparent rounded-full animate-spin" />
@@ -167,7 +167,7 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="absolute z-50 top-full mt-2 w-full bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto"
+            className="absolute z-50 top-full mt-2 w-full bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto"
           >
             {results.map((p) => {
               const cli = p.cliente && typeof p.cliente === "object" ? p.cliente : null;
@@ -181,12 +181,12 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
                   onClick={() => handleSelect(p)}
                   className="w-full text-left px-5 py-4 hover:bg-surface dark:hover:bg-surface-dark transition-colors border-b border-linea dark:border-linea-dark last:border-0"
                 >
-                  <p className="font-black text-titulo dark:text-titulo-dark text-sm">
+                  <p className="font-semibold text-titulo dark:text-titulo-dark text-sm">
                     {[p.patente, p.numero_poliza ? `N°${p.numero_poliza}` : null, p.compania_nombre].filter(Boolean).join(" · ")}
                   </p>
-                  <p className="text-xs text-duo-azul font-bold mt-1 flex items-center gap-2 flex-wrap">
+                  <p className="text-xs text-duo-azul mt-1 flex items-center gap-2 flex-wrap">
                     <span>{nombreCliente}</span>
-                    {dni && <span className="text-suave dark:text-suave-dark font-medium">· DNI {dni}</span>}
+                    {dni && <span className="text-suave dark:text-suave-dark">· DNI {dni}</span>}
                   </p>
                   {vehiculo && <p className="text-xs text-suave dark:text-suave-dark mt-0.5">{vehiculo}</p>}
                 </button>
@@ -202,7 +202,7 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
 /* Etiqueta chiquita reutilizable */
 function MiniLabel({ children }) {
   return (
-    <label className="block text-[11px] font-black uppercase tracking-wide text-suave dark:text-suave-dark mb-1.5">
+    <label className="block text-[11px] text-suave dark:text-suave-dark mb-1.5">
       {children}
     </label>
   );
@@ -404,18 +404,18 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
         initial={{ scale: 0.96, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 20 }}
-        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-card dark:bg-card-dark border-2 border-linea dark:border-linea-dark rounded-t-3xl sm:rounded-3xl shadow-2xl"
+        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-t-2xl sm:rounded-2xl shadow-xl"
       >
         {/* ── Header: progreso (fijo) ── */}
-        <div className="shrink-0 px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b-2 border-linea dark:border-linea-dark">
+        <div className="shrink-0 px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-linea dark:border-linea-dark">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-black text-suave dark:text-suave-dark">
+            <p className="text-sm text-suave dark:text-suave-dark">
               {initialData ? "Editar siniestro" : "Nuevo siniestro"} — paso {step} de {STEPS.length}
             </p>
             <button
               onClick={onClose}
               aria-label="Cerrar"
-              className="shrink-0 inline-flex items-center justify-center h-11 w-11 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark transition-colors"
+              className="shrink-0 inline-flex items-center justify-center h-11 w-11 rounded-lg bg-surface dark:bg-surface-dark hover:brightness-95 text-suave dark:text-suave-dark transition-colors"
             >
               <HiX className="w-4 h-4" />
             </button>
@@ -438,13 +438,13 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                   id === step ? "bg-duo-azul ring-2 ring-duo-azul/40" :
                   "bg-linea dark:bg-linea-dark"
                 }`} />
-                <span className={`hidden sm:block text-[10px] font-black ${id === step ? "text-duo-azul" : "text-suave dark:text-suave-dark"}`}>
+                <span className={`hidden sm:block text-[10px] ${id === step ? "text-duo-azul font-medium" : "text-suave dark:text-suave-dark"}`}>
                   {label}
                 </span>
               </div>
             ))}
             {/* Etiqueta del paso activo (solo mobile) */}
-            <span className="sm:hidden ml-2 text-xs font-black text-duo-azul">
+            <span className="sm:hidden ml-2 text-xs font-medium text-duo-azul">
               {STEPS[step - 1]?.label}
             </span>
           </div>
@@ -468,11 +468,11 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               {step === 1 && (
                 <>
                   <div className="text-center mb-2">
-                    <div className="h-14 w-14 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] flex items-center justify-center mx-auto mb-3">
+                    <div className="h-14 w-14 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] flex items-center justify-center mx-auto mb-3">
                       <HiUser className="w-7 h-7 text-duo-azul" />
                     </div>
-                    <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">¿De qué póliza es el siniestro?</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1 font-bold">Buscá por patente, cliente o número de póliza</p>
+                    <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">¿De qué póliza es el siniestro?</h2>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Buscá por patente, cliente o número de póliza</p>
                   </div>
 
                   {/* 🚀 Multi-tenant: admin ve chips de oficina; empleado ve badge fijo */}
@@ -483,7 +483,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                         <button
                           type="button"
                           onClick={() => { setOficinaSel(""); setPolizaDisplay(""); set("poliza", ""); }}
-                          className={`h-9 px-4 rounded-xl border-2 text-xs font-black transition-colors ${
+                          className={`h-9 px-4 rounded-lg border text-xs font-medium transition-colors ${
                             !oficinaSel
                               ? "bg-duo-azul border-duo-azul text-white"
                               : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
@@ -496,7 +496,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                             key={o.id}
                             type="button"
                             onClick={() => { setOficinaSel(String(o.id)); setPolizaDisplay(""); set("poliza", ""); }}
-                            className={`h-9 px-4 rounded-xl border-2 text-xs font-black transition-colors ${
+                            className={`h-9 px-4 rounded-lg border text-xs font-medium transition-colors ${
                               oficinaSel === String(o.id)
                                 ? "bg-duo-azul border-duo-azul text-white"
                                 : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
@@ -509,9 +509,11 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     </div>
                   ) : (
                     oficinaPropiaNombre && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]">
-                        <span className="text-[10px] uppercase tracking-wide font-black text-duo-azul">Tu oficina</span>
-                        <span className="text-sm font-black text-duo-azul">🏢 {oficinaPropiaNombre}</span>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]">
+                        <span className="text-[11px] text-duo-azul">Tu oficina</span>
+                        <span className="text-sm font-medium text-duo-azul flex items-center gap-1">
+                          <HiOfficeBuilding className="w-3.5 h-3.5" /> {oficinaPropiaNombre}
+                        </span>
                       </div>
                     )
                   )}
@@ -523,40 +525,40 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     <motion.div
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="rounded-2xl border-2 border-duo-verde/50 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] overflow-hidden"
+                      className="rounded-xl border border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] overflow-hidden"
                     >
-                      <div className="flex items-center gap-3 px-4 py-3 border-b-2 border-duo-verde/30">
+                      <div className="flex items-center gap-3 px-4 py-3 border-b border-duo-verde/25">
                         <HiCheckCircle className="w-5 h-5 text-duo-verde shrink-0" />
-                        <p className="text-sm font-black text-duo-verde-sombra dark:text-duo-verde">Póliza seleccionada</p>
+                        <p className="text-sm font-medium text-duo-verde-sombra dark:text-duo-verde">Póliza seleccionada</p>
                       </div>
                       <div className="px-4 py-4 space-y-3">
                         <div>
                           <MiniLabel>Asegurado</MiniLabel>
-                          <p className="text-base font-black text-titulo dark:text-titulo-dark">{form._clienteNombre || "Sin nombre"}</p>
-                          {form._clienteDni && <p className="text-xs text-suave dark:text-suave-dark mt-0.5 font-bold">DNI / CUIT: {form._clienteDni}</p>}
+                          <p className="text-base font-semibold text-titulo dark:text-titulo-dark">{form._clienteNombre || "Sin nombre"}</p>
+                          {form._clienteDni && <p className="text-xs text-suave dark:text-suave-dark mt-0.5">DNI / CUIT: {form._clienteDni}</p>}
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <MiniLabel>Póliza</MiniLabel>
-                            <p className="text-sm font-black text-duo-azul font-mono">{polizaDisplay}</p>
+                            <p className="text-sm font-medium text-duo-azul font-mono">{polizaDisplay}</p>
                           </div>
                           {form._companiaNombre && (
                             <div>
                               <MiniLabel>Compañía</MiniLabel>
-                              <p className="text-sm font-black text-titulo dark:text-titulo-dark">{form._companiaNombre}</p>
+                              <p className="text-sm text-titulo dark:text-titulo-dark">{form._companiaNombre}</p>
                             </div>
                           )}
                         </div>
                         {isAdmin && form._oficinaNombre && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] rounded-xl">
-                            <span className="text-[10px] uppercase tracking-wide font-black text-duo-azul">Oficina</span>
-                            <span className="text-sm font-black text-duo-azul">{form._oficinaNombre}</span>
+                          <div className="flex items-center gap-2 px-3 py-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] rounded-lg">
+                            <span className="text-[11px] text-duo-azul">Oficina</span>
+                            <span className="text-sm font-medium text-duo-azul">{form._oficinaNombre}</span>
                           </div>
                         )}
                         {(form.marca_auto || form.modelo_auto || form.patente) && (
                           <div>
                             <MiniLabel>Vehículo</MiniLabel>
-                            <p className="text-sm font-black text-titulo dark:text-titulo-dark">
+                            <p className="text-sm text-titulo dark:text-titulo-dark">
                               {[form.marca_auto, form.modelo_auto].filter(Boolean).join(" ")}
                               {form.patente && (
                                 <span className="ml-2 font-mono text-xs bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-2 py-0.5 rounded-md uppercase">
@@ -576,11 +578,11 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               {step === 2 && (
                 <>
                   <div className="text-center mb-2">
-                    <div className="h-14 w-14 rounded-2xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center mx-auto mb-3">
+                    <div className="h-14 w-14 rounded-xl bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] flex items-center justify-center mx-auto mb-3">
                       <HiTruck className="w-7 h-7 text-duo-rojo" />
                     </div>
-                    <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">¿Qué tipo de siniestro es?</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1 font-bold">Elegí la opción que mejor describe lo que pasó</p>
+                    <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">¿Qué tipo de siniestro es?</h2>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Elegí la opción que mejor describe lo que pasó</p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2.5">
@@ -593,16 +595,16 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                           type="button"
                           onClick={() => set("responsabilidad", key)}
                           whileTap={{ scale: 0.98 }}
-                          className={`flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                          className={`flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-colors cursor-pointer ${
                             active ? cl.on : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark hover:border-duo-azul"
                           }`}
                         >
-                          <div className="h-11 w-11 rounded-xl bg-card dark:bg-card-dark flex items-center justify-center shrink-0">
+                          <div className="h-11 w-11 rounded-lg bg-card dark:bg-card-dark flex items-center justify-center shrink-0">
                             <Icon className={`w-5 h-5 ${cl.icon}`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-black text-sm text-titulo dark:text-titulo-dark">{label}</p>
-                            <p className="text-xs mt-0.5 text-suave dark:text-suave-dark font-bold">{desc}</p>
+                            <p className="font-medium text-sm text-titulo dark:text-titulo-dark">{label}</p>
+                            <p className="text-xs mt-0.5 text-suave dark:text-suave-dark">{desc}</p>
                           </div>
                           {active && (
                             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="h-6 w-6 rounded-full bg-duo-verde flex items-center justify-center shrink-0">
@@ -620,11 +622,11 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               {step === 3 && (
                 <>
                   <div className="text-center mb-2">
-                    <div className="h-14 w-14 rounded-2xl bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] flex items-center justify-center mx-auto mb-3">
+                    <div className="h-14 w-14 rounded-xl bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] flex items-center justify-center mx-auto mb-3">
                       <HiCalendar className="w-7 h-7 text-duo-amarillo-sombra dark:text-duo-amarillo" />
                     </div>
-                    <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">¿Cuándo ocurrió?</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1 font-bold">Fecha del accidente o del hecho</p>
+                    <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">¿Cuándo ocurrió?</h2>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Fecha del accidente o del hecho</p>
                   </div>
 
                   <input
@@ -633,7 +635,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     value={form.fecha_siniestro}
                     max={dayjs().format("YYYY-MM-DD")}
                     onChange={(e) => set("fecha_siniestro", e.target.value)}
-                    className="w-full h-14 px-5 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] font-bold text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-colors dark:[color-scheme:dark]"
+                    className="w-full h-14 px-5 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul transition-colors dark:[color-scheme:dark]"
                   />
 
                   <div className="grid grid-cols-3 gap-2">
@@ -646,7 +648,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                           key={d}
                           type="button"
                           onClick={() => set("fecha_siniestro", fechaStr)}
-                          className={`h-11 rounded-xl border-2 text-sm font-black transition-colors ${
+                          className={`h-11 rounded-lg border text-sm font-medium transition-colors ${
                             active
                               ? "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-duo-amarillo text-duo-amarillo-sombra dark:text-duo-amarillo"
                               : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
@@ -665,7 +667,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                       value={form.nro_reclamo_cia}
                       placeholder="Ej: 456789"
                       onChange={(e) => set("nro_reclamo_cia", e.target.value)}
-                      className="w-full h-12 px-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+                      className="w-full h-12 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
                     />
                   </div>
                 </>
@@ -675,11 +677,11 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               {step === 4 && (
                 <>
                   <div className="text-center mb-2">
-                    <div className="h-14 w-14 rounded-2xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] flex items-center justify-center mx-auto mb-3">
+                    <div className="h-14 w-14 rounded-xl bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] flex items-center justify-center mx-auto mb-3">
                       <HiDocumentText className="w-7 h-7 text-duo-azul" />
                     </div>
-                    <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">¿Cómo ocurrió?</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1 font-bold">Describí brevemente los hechos</p>
+                    <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">¿Cómo ocurrió?</h2>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Describí brevemente los hechos</p>
                   </div>
 
                   <textarea
@@ -688,9 +690,9 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     value={form.descripcion}
                     onChange={(e) => set("descripcion", e.target.value)}
                     placeholder="Ej: El asegurado circulaba por Av. San Martín cuando impactó contra un vehículo que no respetó el semáforo en rojo..."
-                    className="w-full px-5 py-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark resize-none outline-none focus:border-duo-azul transition-colors"
+                    className="w-full px-5 py-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark resize-none outline-none focus:border-duo-azul transition-colors"
                   />
-                  <p className={`text-xs text-right font-bold ${form.descripcion.length < 10 ? "text-suave dark:text-suave-dark" : "text-duo-verde"}`}>
+                  <p className={`text-xs text-right ${form.descripcion.length < 10 ? "text-suave dark:text-suave-dark" : "text-duo-verde"}`}>
                     {form.descripcion.length} caracteres {form.descripcion.length < 10 ? "(mínimo 10)" : "✓"}
                   </p>
                 </>
@@ -700,11 +702,11 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               {step === 5 && (
                 <>
                   <div className="text-center mb-2">
-                    <div className="h-14 w-14 rounded-2xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center mx-auto mb-3">
+                    <div className="h-14 w-14 rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center mx-auto mb-3">
                       <HiPhotograph className="w-7 h-7 text-duo-violeta" />
                     </div>
-                    <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">Agregá fotos (opcional)</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1 font-bold">Sacá una foto del daño o elegí de la galería</p>
+                    <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Agregá fotos (opcional)</h2>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Sacá una foto del daño o elegí de la galería</p>
                   </div>
 
                   {/* Panel en modo BORRADOR: las fotos quedan en memoria hasta guardar */}
@@ -720,18 +722,18 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               {step === 6 && (
                 <>
                   <div className="text-center mb-2">
-                    <div className="h-14 w-14 rounded-2xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center mx-auto mb-3">
+                    <div className="h-14 w-14 rounded-xl bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] flex items-center justify-center mx-auto mb-3">
                       <HiUser className="w-7 h-7 text-duo-violeta" />
                     </div>
-                    <h2 className="text-xl font-black text-titulo dark:text-titulo-dark">¿Hay un tercero involucrado?</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1 font-bold">Esta sección es opcional — podés saltearla</p>
+                    <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">¿Hay un tercero involucrado?</h2>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Esta sección es opcional — podés saltearla</p>
                   </div>
 
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setSkipTercero(false)}
-                      className={`flex-1 h-11 rounded-xl border-2 text-sm font-black transition-colors ${
+                      className={`flex-1 h-11 rounded-lg border text-sm font-medium transition-colors ${
                         !skipTercero
                           ? "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] border-duo-violeta text-duo-violeta"
                           : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-violeta"
@@ -742,7 +744,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     <button
                       type="button"
                       onClick={() => setSkipTercero(true)}
-                      className={`flex-1 h-11 rounded-xl border-2 text-sm font-black transition-colors ${
+                      className={`flex-1 h-11 rounded-lg border text-sm font-medium transition-colors ${
                         skipTercero
                           ? "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border-duo-verde text-duo-verde-sombra dark:text-duo-verde"
                           : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-verde"
@@ -767,7 +769,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                             value={form[k]}
                             placeholder={ph}
                             onChange={(e) => set(k, upper ? e.target.value.toUpperCase() : e.target.value)}
-                            className="w-full h-12 px-4 rounded-2xl border-[3px] border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] font-bold text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta transition-colors"
+                            className="w-full h-12 px-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[15px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta transition-colors"
                           />
                         </div>
                       ))}
@@ -781,12 +783,12 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
         </div>
 
         {/* ── Footer: botones (fijo) ── */}
-        <div className="shrink-0 px-5 sm:px-6 pb-6 pt-4 flex gap-3 border-t-2 border-linea dark:border-linea-dark">
+        <div className="shrink-0 px-5 sm:px-6 pb-6 pt-4 flex gap-3 border-t border-linea dark:border-linea-dark">
           {step > 1 && (
             <button
               type="button"
               onClick={goBack}
-              className="h-12 px-4 sm:px-5 rounded-2xl bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark font-black flex items-center justify-center gap-2 transition-colors"
+              className="h-12 px-4 sm:px-5 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark font-medium flex items-center justify-center gap-2 transition-colors"
             >
               <HiArrowLeft className="w-4 h-4" /> Volver
             </button>
@@ -797,9 +799,9 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               type="button"
               onClick={goNext}
               disabled={!canNext()}
-              className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all ${
+              className={`flex-1 h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
                 canNext()
-                  ? "bg-duo-azul text-white shadow-[0_5px_0_var(--color-duo-azul-sombra)] active:shadow-[0_0_0_var(--color-duo-azul-sombra)]"
+                  ? "bg-duo-azul text-white hover:brightness-110"
                   : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark cursor-not-allowed"
               }`}
             >
@@ -810,10 +812,10 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all ${
+              className={`flex-1 h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
                 submitting
                   ? "bg-duo-verde/70 text-white cursor-wait"
-                  : "bg-duo-verde text-white shadow-[0_5px_0_var(--color-duo-verde-sombra)] active:shadow-[0_0_0_var(--color-duo-verde-sombra)]"
+                  : "bg-duo-verde text-white hover:brightness-110"
               }`}
             >
               {submitting ? (

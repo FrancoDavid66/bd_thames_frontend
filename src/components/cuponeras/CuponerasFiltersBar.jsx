@@ -67,17 +67,16 @@ export default function CuponerasFiltersBar({
     <div className="flex flex-col lg:flex-row gap-3 lg:items-end">
       {/* Search */}
       <div className="w-full lg:max-w-lg">
-        <label className="text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+        <label className="text-[12px] text-suave dark:text-suave-dark">
           Buscar
         </label>
 
         <div className="relative mt-2">
-          <HiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <HiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-suave dark:text-suave-dark" />
           <input
             type="text"
-            className="w-full rounded-full border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition
-                       focus:ring-2 focus:ring-sky-400/60
-                       dark:bg-slate-900/80 dark:text-slate-100 dark:border-slate-700/60"
+            className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-10 py-2.5 text-sm text-titulo dark:text-titulo-dark outline-none transition-colors
+                       focus:border-duo-azul"
             placeholder="Buscar por póliza, patente, asegurado o DNI..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -86,7 +85,7 @@ export default function CuponerasFiltersBar({
           />
         </div>
 
-        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">
           Podés escribir parte del número de póliza, la patente, el nombre o el
           DNI.
         </p>
@@ -94,15 +93,15 @@ export default function CuponerasFiltersBar({
 
       {/* Oficina */}
       <div className="w-full lg:w-80">
-        <label className="text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+        <label className="text-[12px] text-suave dark:text-suave-dark">
           Oficina
         </label>
 
         <select
-          className="mt-2 w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition
-                     focus:ring-2 focus:ring-sky-400/60
+          className="mt-2 w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5 text-sm text-titulo dark:text-titulo-dark outline-none transition-colors
+                     focus:border-duo-azul
                      disabled:opacity-60 disabled:cursor-not-allowed
-                     dark:bg-slate-900/80 dark:text-slate-100 dark:border-slate-700/60"
+                     dark:[color-scheme:dark]"
           value={oficina}
           onChange={(e) => setOficina(e.target.value)}
           disabled={oficinaDisabled}
@@ -117,7 +116,7 @@ export default function CuponerasFiltersBar({
         </select>
 
         {options.length === 0 && !loading && (
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">
             No se detectaron oficinas (o el endpoint aún no está).
           </p>
         )}

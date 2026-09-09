@@ -1,17 +1,18 @@
 /* src/pages/ControlDiarioPage.jsx  (responsive)
  *
- * Control diario (tareas recurrentes con foto) — REDISEÑO simple y claro.
+ * Control diario (tareas recurrentes con foto).
  *
- * Ideas del rediseño:
  *   1) Tarjetas mínimas: ícono de estado + nombre + 1 línea chica. Sin saturar.
  *   2) Se ve qué falta: círculo + barra de progreso arriba, y las tareas
- *      separadas en "⏳ Falta hacer" (arriba) y "✅ Ya hechas" (abajo).
+ *      separadas en "Falta hacer" (arriba) y "Ya hechas" (abajo).
  *   3) Foto simple: un solo botón por tarea. El paso de responsable solo
  *      aparece en la 1ª foto. Botón bloqueado mientras sube (anti doble-envío).
  *   4) Una oficina a la vez: si hay varias (admin), selector de chips arriba.
  *
- * 📱 RESPONSIVE: esta pantalla ya venía bien (max-w-lg, tarjetas apiladas).
- *    Ajustes de esta pasada: chips de oficina con scroll cómodo, botones de
+ * 🆕 Rediseño "profesional": bordes de 1px (antes 2px), esquinas menos
+ * redondeadas, sin MAYÚSCULA+tracking ancho, sin emojis decorativos.
+ *
+ * 📱 RESPONSIVE: chips de oficina con scroll cómodo, botones de
  *    refresh/cerrar a 44px, y el visor de foto (FotoModal) full-width en mobile.
  *
  * Paleta semántica real (surface/card/titulo/marca) con modo claro + oscuro.
@@ -27,18 +28,18 @@ import { uploadToCloudinary } from "../utils/cloudinary";
 import { UI } from "../components/tareas/tareasUI";
 import WizardShell from "../components/tareas/WizardShell";
 
-/* ── Visor de foto a pantalla grande (Duo claro/oscuro) ── */
+/* ── Visor de foto a pantalla grande ── */
 function FotoModal({ foto, onClose }) {
   return (
     <AnimatePresence>
       {foto && (
         <motion.div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-3 sm:p-4"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-          <motion.div className="relative max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
+          <motion.div className="relative max-h-[85vh] w-full max-w-lg overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}>
             <button onClick={onClose} aria-label="Cerrar"
-              className="absolute right-2 top-2 inline-flex items-center justify-center w-11 h-11 rounded-lg bg-card/90 dark:bg-card-dark/90 border-2 border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark"><HiX className="text-xl" /></button>
+              className="absolute right-2 top-2 inline-flex items-center justify-center w-10 h-10 rounded-lg bg-card/90 dark:bg-card-dark/90 border border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark"><HiX className="text-lg" /></button>
             <img src={foto} alt="Foto de la tarea" className="max-h-[85vh] w-full object-contain" />
           </motion.div>
         </motion.div>
@@ -56,7 +57,7 @@ function WizardResponsable({ open, tarea, oficina, empleados, onClose, onElegido
       pasoActual={0} totalPasos={2} onClose={onClose} maxW="max-w-md">
       <div className="p-5 sm:p-6">
         {emps.length === 0 ? (
-          <div className={`rounded-xl border-2 border-linea dark:border-linea-dark p-4 text-center text-[13px] ${UI.txtSuave}`}>
+          <div className={`rounded-lg border border-linea dark:border-linea-dark p-4 text-center text-[13px] ${UI.txtSuave}`}>
             No hay empleados cargados en esta oficina.
             <button onClick={() => onElegido(null)} className={`mt-3 w-full rounded-lg py-3 text-[13px] ${UI.btnPrimary}`}>Subir igual sin responsable</button>
           </div>
@@ -64,17 +65,17 @@ function WizardResponsable({ open, tarea, oficina, empleados, onClose, onElegido
           <div className="flex flex-col gap-2">
             {emps.map((e) => (
               <button key={e.id} onClick={() => onElegido(e.id)}
-                className="flex items-center gap-3 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 min-h-[56px] text-left transition hover:border-marca hover:bg-marca/10">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-marca/15 text-[12px] font-bold text-marca">
+                className="flex items-center gap-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 min-h-[56px] text-left transition-colors hover:border-marca hover:bg-marca/10">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-marca/15 text-[12px] font-medium text-marca">
                   {String(e.nombre || "").slice(0, 2).toUpperCase()}
                 </span>
-                <span className={`flex-1 text-[14px] font-semibold ${UI.txtTitulo}`}>{e.nombre}</span>
+                <span className={`flex-1 text-[14px] font-medium ${UI.txtTitulo}`}>{e.nombre}</span>
                 <HiArrowRight className={UI.txtSuave} />
               </button>
             ))}
           </div>
         )}
-        <div className={`mt-3 text-center text-[11px] ${UI.txtSuave}`}>Después de elegir se abre la cámara 📸</div>
+        <div className={`mt-3 text-center text-[12px] ${UI.txtSuave}`}>Después de elegir se abre la cámara</div>
       </div>
     </WizardShell>
   );
@@ -122,7 +123,7 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
         responsable_empleado_id: respRef.current || "",
       });
       const d = res?.data || {};
-      if (d.cumplida) toast.success(d.puntos ? `¡Completa! +${d.puntos} pts` : "¡Tarea completa! ✅");
+      if (d.cumplida) toast.success(d.puntos ? `Completa, +${d.puntos} pts` : "Tarea completa");
       else toast.success(`Foto subida (${d.fotos_subidas}/${d.fotos_min})`);
       onCumplida();
     } catch (e) {
@@ -140,12 +141,12 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
   return (
     <>
       <motion.div layout
-        className={`rounded-2xl border-2 p-3.5 transition ${
+        className={`rounded-lg border p-3.5 transition-colors ${
           done ? "border-ingreso/35 bg-ingreso/[0.06]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
         }`}>
         <div className="flex items-center gap-3 sm:gap-3.5">
           {/* Ícono de estado */}
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg ${
             done ? "bg-ingreso text-white" : "bg-marca/15 text-marca"
           }`}>
             {done ? <HiCheckCircle /> : <HiCamera />}
@@ -153,17 +154,17 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
 
           {/* Nombre + meta */}
           <div className="min-w-0 flex-1" onClick={() => fotos[0] && setFoto(fotos[0].url)}>
-            <div className={`text-[15px] font-bold leading-tight ${done ? "text-ingreso" : UI.txtTitulo}`}>{tarea.nombre}</div>
+            <div className={`text-[14px] font-medium leading-tight ${done ? "text-ingreso" : UI.txtTitulo}`}>{tarea.nombre}</div>
             <div className={`text-[12px] mt-0.5 ${UI.txtSuave}`}>{meta}</div>
           </div>
 
           {/* Acción a la derecha */}
           <div className="shrink-0">
             {done ? (
-              <HiCheckCircle className="text-ingreso text-2xl" />
+              <HiCheckCircle className="text-ingreso text-xl" />
             ) : puedeSumar ? (
               <button onClick={onSubirClick} disabled={cargando}
-                className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl px-4 py-2.5 text-[13px] ${UI.btnPrimary}`}>
+                className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-lg px-3.5 py-2 text-[13px] ${UI.btnPrimary}`}>
                 {cargando
                   ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                   : subidas === 0
@@ -174,26 +175,26 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
           </div>
         </div>
 
-        {/* 🆕 Instrucción de foto DESTACADA (qué tiene que mostrar la foto) */}
+        {/* Instrucción de foto (qué tiene que mostrar la foto) */}
         {tarea.instruccion_foto && !done ? (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border-2 border-oficina/25 bg-oficina/[0.08] px-3 py-2">
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-oficina/25 bg-oficina/[0.08] px-3 py-2">
             <HiCamera className="mt-0.5 shrink-0 text-oficina text-base" />
-            <span className="text-[13px] font-semibold leading-snug text-oficina-fuerte dark:text-oficina-claro">{tarea.instruccion_foto}</span>
+            <span className="text-[13px] font-medium leading-snug text-oficina-fuerte dark:text-oficina-claro">{tarea.instruccion_foto}</span>
           </div>
         ) : null}
 
-        {/* 🆕 Progreso de fotos VISTOSO: casilleros que se van llenando */}
+        {/* Progreso de fotos: casilleros que se van llenando */}
         {variasFotos && !done ? (
           <div className="mt-3 flex items-center gap-2.5">
             <div className="flex gap-1.5">
               {Array.from({ length: fmin }).map((_, i) => (
                 <span key={i}
-                  className={`h-3 w-3 rounded-[5px] transition-colors ${
-                    i < subidas ? "bg-marca" : "border-2 border-marca/30 bg-transparent"
+                  className={`h-3 w-3 rounded-[4px] transition-colors ${
+                    i < subidas ? "bg-marca" : "border border-marca/30 bg-transparent"
                   }`} />
               ))}
             </div>
-            <span className="text-[12px] font-bold text-marca">
+            <span className="text-[12px] font-medium text-marca">
               {subidas} de {fmin} fotos{fmax > fmin ? " (o más)" : ""}
             </span>
           </div>
@@ -212,22 +213,22 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
 function Anillo({ pct }) {
   const dash = `${Math.round(pct)} 100`;
   return (
-    <svg viewBox="0 0 36 36" className="h-16 w-16 shrink-0">
+    <svg viewBox="0 0 36 36" className="h-14 w-14 shrink-0">
       <path d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31" fill="none"
         className="stroke-titulo/10 dark:stroke-white/10" strokeWidth="4" />
       <path d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31" fill="none"
         stroke="var(--color-marca)" strokeWidth="4" strokeDasharray={dash} strokeLinecap="round" />
-      <text x="18" y="21" textAnchor="middle" fontSize="9" fontWeight="800"
+      <text x="18" y="21" textAnchor="middle" fontSize="9" fontWeight="600"
         className="fill-titulo dark:fill-titulo-dark">{Math.round(pct)}%</text>
     </svg>
   );
 }
 
 function mensaje(pct, faltan) {
-  if (faltan === 0) return "¡Todo hecho por hoy! 🎉";
-  if (pct >= 60) return `¡Ya casi! Faltan ${faltan} 💪`;
-  if (pct >= 30) return `¡Buen ritmo! Faltan ${faltan}`;
-  return `¡A darle! Faltan ${faltan} tareas`;
+  if (faltan === 0) return "Todo hecho por hoy";
+  if (pct >= 60) return `Ya casi, faltan ${faltan}`;
+  if (pct >= 30) return `Buen ritmo, faltan ${faltan}`;
+  return `Faltan ${faltan} tareas`;
 }
 
 export default function ControlDiarioPage() {
@@ -271,10 +272,10 @@ export default function ControlDiarioPage() {
       <div className="mx-auto max-w-lg lg:max-w-3xl">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className={`text-2xl font-extrabold ${UI.txtTitulo}`}>Control diario</h1>
+          <h1 className={`text-xl font-semibold ${UI.txtTitulo}`}>Control diario</h1>
           <button onClick={() => { setLoading(true); cargar(); }} aria-label="Actualizar"
-            className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-suave dark:text-suave-dark hover:opacity-70">
-            <HiRefresh className={`text-lg ${loading ? "animate-spin" : ""}`} />
+            className="inline-flex items-center justify-center w-10 h-10 rounded-full border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors">
+            <HiRefresh className={`text-base ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
         {data?.fecha && <div className={`text-[13px] mt-0.5 flex items-center gap-1.5 ${UI.txtSuave}`}><HiCalendar className="text-sm" /> {data.fecha}</div>}
@@ -284,12 +285,12 @@ export default function ControlDiarioPage() {
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-linea dark:border-linea-dark border-t-marca" />
           </div>
         ) : data?.feriado ? (
-          <div className="mt-5 rounded-2xl border-2 border-tarjeta/25 bg-tarjeta/[0.07] p-5 text-center">
-            <div className="text-base font-bold text-[#d97706] dark:text-tarjeta-claro">🎌 Feriado — {data.feriado_nombre}</div>
+          <div className="mt-5 rounded-xl border border-tarjeta/25 bg-tarjeta/[0.07] p-5 text-center">
+            <div className="text-[15px] font-medium text-[#d97706] dark:text-tarjeta-claro">Feriado — {data.feriado_nombre}</div>
             <p className={`mt-1 text-[13px] ${UI.txtSuave}`}>Hoy no se esperan tareas fijas.</p>
           </div>
         ) : oficinas.length === 0 ? (
-          <div className={`mt-5 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 text-center ${UI.txtSuave}`}>
+          <div className={`mt-5 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 text-center ${UI.txtSuave}`}>
             No hay tareas fijas cargadas todavía.
           </div>
         ) : (
@@ -302,7 +303,7 @@ export default function ControlDiarioPage() {
                   const okOfi = o.total > 0 && o.cumplidas === o.total;
                   return (
                     <button key={o.oficina_id} onClick={() => setOfiSel(o.oficina_id)}
-                      className={`shrink-0 rounded-full px-4 min-h-[44px] text-[13px] font-semibold border-2 transition-colors ${
+                      className={`shrink-0 rounded-full px-4 min-h-[40px] text-[13px] font-medium border transition-colors ${
                         on ? "bg-marca border-marca text-white" : `border-linea dark:border-linea-dark bg-card dark:bg-card-dark ${UI.txtSuave}`
                       }`}>
                       {okOfi ? "✓ " : ""}{o.oficina_nombre}
@@ -313,17 +314,17 @@ export default function ControlDiarioPage() {
             )}
 
             {/* HERO: progreso grande */}
-            <div className={`mt-3 mb-5 rounded-2xl border-2 border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5`}>
+            <div className={`mt-3 mb-5 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5`}>
               <div className="flex items-center justify-between mb-3 gap-3">
                 <div className="min-w-0">
-                  <div className={`text-[34px] font-extrabold leading-none ${UI.txtTitulo}`}>
-                    {nHechas}<span className={`text-base font-semibold ${UI.txtSuave}`}> / {total} hechas</span>
+                  <div className={`text-[28px] font-semibold leading-none ${UI.txtTitulo}`}>
+                    {nHechas}<span className={`text-[15px] font-medium ${UI.txtSuave}`}> / {total} hechas</span>
                   </div>
                   <div className={`text-[13px] mt-1 ${UI.txtSuave}`}>{mensaje(pct, pendientes.length)}</div>
                 </div>
                 <Anillo pct={pct} />
               </div>
-              <div className="h-3 rounded-full bg-titulo/10 dark:bg-white/10 overflow-hidden">
+              <div className="h-2 rounded-full bg-titulo/10 dark:bg-white/10 overflow-hidden">
                 <div className="h-full rounded-full bg-marca transition-all duration-500" style={{ width: `${pct}%` }} />
               </div>
             </div>
@@ -331,8 +332,8 @@ export default function ControlDiarioPage() {
             {/* PENDIENTES */}
             {pendientes.length > 0 && (
               <>
-                <div className={`flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-widest ${UI.txtSuave} mb-2.5 mx-1`}>
-                  ⏳ Falta hacer <span className="rounded-full bg-marca/15 text-marca px-2 py-0.5 text-[11px]">{pendientes.length}</span>
+                <div className={`flex items-center gap-2 text-[12px] font-medium ${UI.txtSuave} mb-2.5 mx-1`}>
+                  Falta hacer <span className="rounded-full bg-marca/15 text-marca px-2 py-0.5 text-[11px]">{pendientes.length}</span>
                 </div>
                 <div className="flex flex-col gap-2.5 mb-6">
                   <AnimatePresence initial={false}>
@@ -349,8 +350,8 @@ export default function ControlDiarioPage() {
             {/* YA HECHAS */}
             {hechas.length > 0 && (
               <>
-                <div className={`flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-widest ${UI.txtSuave} mb-2.5 mx-1`}>
-                  ✅ Ya hechas <span className="rounded-full bg-ingreso/15 text-ingreso px-2 py-0.5 text-[11px]">{hechas.length}</span>
+                <div className={`flex items-center gap-2 text-[12px] font-medium ${UI.txtSuave} mb-2.5 mx-1`}>
+                  Ya hechas <span className="rounded-full bg-ingreso/15 text-ingreso px-2 py-0.5 text-[11px]">{hechas.length}</span>
                 </div>
                 <div className="flex flex-col gap-2.5">
                   <AnimatePresence initial={false}>
@@ -367,8 +368,8 @@ export default function ControlDiarioPage() {
             {/* Todo hecho */}
             {total > 0 && pendientes.length === 0 && (
               <div className="mt-6 text-center py-6">
-                <HiCheckCircle className="w-14 h-14 mx-auto text-ingreso mb-2" />
-                <div className={`text-lg font-bold ${UI.txtTitulo}`}>¡{ofiActiva.oficina_nombre} completó todo! 🎉</div>
+                <HiCheckCircle className="w-12 h-12 mx-auto text-ingreso mb-2" />
+                <div className={`text-[16px] font-semibold ${UI.txtTitulo}`}>{ofiActiva.oficina_nombre} completó todo</div>
               </div>
             )}
           </>
