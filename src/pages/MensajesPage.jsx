@@ -4,15 +4,16 @@
 //
 //   · "Descargar reporte": el PDF/Excel de contactos de siempre (antes estaba
 //     en Pagos). La oficina baja SOLO lo suyo; el admin elige la oficina.
-//   · OFICINA: lista del día → en cada cliente toca
+//   · OFICINA: ve la lista de clientes para contactar hoy SIN botones (es una
+//     ayuda) y baja el PDF. No marca nada.
+//   · ADMIN: es el único que marca, en cada cliente:
 //       "✓ Enviado", o "No se mandó" y elige el MOTIVO:
 //         - Hoy no se pudo   (número mal, no tiene WhatsApp, otro) → solo hoy
 //         - No enviarle más  (mal llevado, pidió que no le escriban, otro)
 //           → no aparece más en Mensajes ni en el reporte
-//     Lo que no marcó sigue en su lista ("Pendiente desde 15/09").
-//   · ADMIN: controla el avance de cada oficina, ve a quién no se le mandó y
-//     por qué, y en "Clientes sin mensajes" puede volver a activar a un cliente.
-//     El sistema NO le avisa nada a las oficinas.
+//     Lo que no se marcó sigue en la lista al otro día ("Pendiente desde 15/09").
+//     Controla el avance de cada oficina y en "Clientes sin mensajes" puede
+//     volver a activar a un cliente. El sistema NO le avisa nada a las oficinas.
 //
 // Backend: notificaciones/views_control_mensajes.py
 //   GET  /api/notificaciones/mensajes/?fecha=AAAA-MM-DD&actualizar=1
@@ -308,7 +309,8 @@ function EstadoMensaje({ item, esAdmin, marcando, onAccion, onNoMandar }) {
   const motivoTxt = [item.motivo_label, item.motivo_detalle].filter(Boolean).join(": ");
 
   if (item.estado === "PENDIENTE") {
-    if (esAdmin) return <Pill tono="rojo">Sin mandar</Pill>;
+    // 👀 La oficina solo mira (la lista es una ayuda): sin botones.
+    if (!esAdmin) return null;
     return (
       <div className="flex items-center gap-1.5">
         <button
@@ -332,7 +334,7 @@ function EstadoMensaje({ item, esAdmin, marcando, onAccion, onNoMandar }) {
     );
   }
 
-  const deshacer = !esAdmin && (
+  const deshacer = esAdmin && (
     <button
       type="button"
       onClick={() => onAccion(item, { accion: "deshacer" })}
@@ -414,7 +416,32 @@ function FilaMensaje({ item, esAdmin, verOficina, marcando, onAccion, onNoMandar
       </div>
 
       <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-        {!apagado &&
+        {!apagado && !esAdmin &&
+          (item.telefono ? (
+            item.whatsapp_link ? (
+              <a
+                href={item.whatsapp_link}
+                target="_blank"
+                rel="noreferrer"
+                title="Abrir en WhatsApp"
+                className="inline-flex items-center gap-1 text-[13px] text-titulo dark:text-titulo-dark hover:text-duo-verde-sombra dark:hover:text-duo-verde"
+              >
+                <HiPhone className="text-suave dark:text-suave-dark" /> {item.telefono}
+              </a>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1 text-[13px] text-duo-amarillo-sombra dark:text-duo-amarillo"
+                title="Revisá el número en la ficha"
+              >
+                <HiPhone /> {item.telefono}
+              </span>
+            )
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[12px] text-duo-rojo">
+              <HiExclamation /> Sin teléfono
+            </span>
+          ))}
+        {!apagado && esAdmin &&
           (item.whatsapp_link ? (
             <a
               href={item.whatsapp_link}
@@ -679,7 +706,6 @@ export default function MensajesPage() {
     });
   }, [base, filtro, busqueda]);
 
-  const miOficina = oficinas[0];
   const verSinMensajes = esAdmin && vista === "sin_mensajes";
 
   return (
@@ -695,8 +721,8 @@ export default function MensajesPage() {
               <h1 className="text-xl sm:text-2xl font-semibold">Mensajes</h1>
               <p className="text-suave dark:text-suave-dark text-[13px] mt-0.5">
                 {esAdmin
-                  ? "Controlá qué mensajes mandó cada oficina"
-                  : `Marcá los mensajes que ya mandaste · ${user?.perfil?.oficina_nombre || "tu oficina"}`}
+                  ? "Marcá y controlá los mensajes de cada oficina"
+                  : `Clientes para contactar hoy · ${user?.perfil?.oficina_nombre || "tu oficina"}`}
               </p>
             </div>
           </div>
@@ -765,15 +791,16 @@ export default function MensajesPage() {
                 ))}
               </div>
             ) : (
-              miOficina && (
-                <div className="mb-4 max-w-sm">
-                  <TarjetaOficina o={miOficina} clickeable={false} />
-                </div>
-              )
+              <div className="mb-4 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3.5 py-2.5 text-[13px] text-suave dark:text-suave-dark">
+                Esta lista es una <span className="font-medium text-titulo dark:text-titulo-dark">ayuda</span>: son los
+                clientes para contactar hoy. Antes de escribirles,{" "}
+                <span className="font-medium text-duo-rojo">verificá el estado de la cuota en la app</span>.
+              </div>
             )}
 
             {/* Filtros */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 mb-3">
+              {esAdmin && (
               <div className="flex items-center gap-1.5 flex-wrap">
                 {FILTROS.map((f) => (
                   <button
@@ -791,6 +818,7 @@ export default function MensajesPage() {
                   </button>
                 ))}
               </div>
+              )}
 
               <div className="flex items-center gap-2 lg:ml-auto flex-wrap">
                 {esAdmin && (
@@ -855,7 +883,9 @@ export default function MensajesPage() {
                 <div className="px-4 py-10 text-center text-[13px] text-suave dark:text-suave-dark">
                   {base.length === 0
                     ? esHoy
-                      ? "Hoy no hay mensajes para mandar"
+                      ? esAdmin
+                        ? "Hoy no hay mensajes para mandar"
+                        : "Hoy no hay clientes para contactar"
                       : "Ese día no hubo mensajes"
                     : "No hay mensajes con este filtro"}
                 </div>
