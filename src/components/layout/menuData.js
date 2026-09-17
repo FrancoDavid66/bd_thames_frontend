@@ -10,7 +10,7 @@ import {
   HiChartBar, HiClipboardList, HiClipboardCheck, HiRefresh,
   HiBan, HiCash, HiReceiptTax,
   HiShieldCheck, HiCog, HiViewGrid, HiStar,
-  HiPencilAlt, HiCalculator, HiCamera,
+  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2,
 } from "react-icons/hi";
 
 export const ICON_MAP = {
@@ -19,7 +19,7 @@ export const ICON_MAP = {
   star: HiStar, tasks: HiClipboardCheck, refresh: HiRefresh,
   ban: HiBan, cash: HiCash, receipt: HiReceiptTax,
   shield: HiShieldCheck, cog: HiCog, grid: HiViewGrid,
-  pencil: HiPencilAlt, calc: HiCalculator, camera: HiCamera,
+  pencil: HiPencilAlt, calc: HiCalculator, camera: HiCamera, chat: HiChatAlt2,
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -115,13 +115,15 @@ export function buildMenuGroups({
       ],
     },
     {
-      // 🆕 PRINCIPAL: Pólizas, Altas, Gestión de Pagos, Siniestros y Legales.
+      // 🆕 PRINCIPAL: Pólizas, Altas, Gestión de Pagos, Mensajes, Siniestros y Legales.
       //    Tareas del día y Control diario salieron de acá.
       title: "Principal", flat: true, id: "principal",
       items: [
         { to: "/polizas", label: "Pólizas", icon: "doc" },
         { to: "/solicitudes", label: "Altas", icon: "clipboard" },
         { to: "/pagos", label: "Gestión de Pagos", icon: "cash", highlight: "verde" },
+        // 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp.
+        { to: "/mensajes", label: "Mensajes", icon: "chat" },
         { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
         { to: "/legales", label: "Legales", icon: "doc" },
       ],

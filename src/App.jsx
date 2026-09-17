@@ -21,6 +21,8 @@ import HomePage from "./pages/HomePage";
 import ClientesPage from "./pages/ClientesPage";
 import PolizasPage from "./pages/PolizasPage";
 import PagosPage from "./pages/PagosPage";
+// 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp
+import MensajesPage from "./pages/MensajesPage";
 import SiniestrosPage from "./pages/SiniestrosPage";
 // ⚖️ NUEVA APP: LEGALES (expedientes de abogados)
 import LegalesPage from "./pages/LegalesPage";
@@ -603,6 +605,8 @@ function App() {
                 <Route path="/polizas/bajas" element={<BajasPage />} />
                 <Route path="/polizas/:id" element={<PolizaDetails />} />
                 <Route path="/pagos" element={<PagosPage />} />
+                {/* 💬 MENSAJES: la oficina marca lo que mandó; el admin controla */}
+                <Route path="/mensajes" element={<MensajesPage />} />
                 <Route path="/balanzes" element={<BalanzesPage />} />
 
                 {/* 🚀 RUTA PROTEGIDA: SERVICIOS Y GASTOS FIJOS (Solo Admin) */}

@@ -13,7 +13,6 @@ import {
   HiIdentification,
   HiChevronRight as HiChevronRightMini,
   HiCurrencyDollar,
-  HiDocumentReport,
   HiPaperAirplane,
 } from "react-icons/hi";
 
@@ -24,8 +23,7 @@ import PagosSearch from "../components/pagos/PagosSearch";
 import PagosList from "../components/pagos/PagosList";
 // 🧾 Medios de cobro unificado (Recordatorios + Panel de envío + Cuentas de cobro)
 import RecordatoriosCuotasModal, { CuentasCobroModal } from "../components/pagos/MediosCobro";
-// 📋 Reporte de contactos pendientes (PDF/Excel) — para gestión manual si falla el envío automático
-import ReporteContactosModal from "../components/notificaciones/ReporteContactosModal";
+// 📋 El "Reporte de contactos" (PDF/Excel) se mudó a la sección Mensajes (/mensajes).
 // 🚨 Sistema unificado de alertas del cliente (siniestros + póliza + cuotas)
 import {
   AlertasClienteBadges,
@@ -272,7 +270,6 @@ const PagosPage = () => {
 
   const [showCuentasModal, setShowCuentasModal] = useState(false);
   const [showRecordatoriosModal, setShowRecordatoriosModal] = useState(false);
-  const [showReporteContactosModal, setShowReporteContactosModal] = useState(false);
 
   // 🚨 Aviso de alertas: el usuario debe confirmar "Entendido" para poder cobrar.
   const [avisoAlertasConfirmado, setAvisoAlertasConfirmado] = useState(false);
@@ -391,19 +388,9 @@ const PagosPage = () => {
             </div>
           </div>
 
-          {/* 📋 Reporte de contactos: para TODOS — lo usan los empleados para
-              contactar a mano según su oficina. Recordatorios/Medios de cobro
-              siguen siendo solo del admin. */}
+          {/* 📋 El "Reporte de contactos" se mudó a la sección Mensajes.
+              Recordatorios/Medios de cobro siguen siendo solo del admin. */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <button
-              type="button"
-              onClick={() => setShowReporteContactosModal(true)}
-              className="inline-flex flex-1 justify-center sm:flex-none items-center gap-2 rounded-lg bg-duo-azul text-white px-4 h-10 text-[13px] font-medium hover:brightness-110 transition-colors cursor-pointer"
-            >
-              <HiDocumentReport className="text-base" />
-              <span>Reporte de contactos</span>
-            </button>
-
             {isWebAdmin && (
               <>
                 <button
@@ -634,7 +621,6 @@ const PagosPage = () => {
 
       <CuentasCobroModal open={showCuentasModal} onClose={() => setShowCuentasModal(false)} mpCuentas={mpCuentas} billeteras={billeteras} mediosCobro={mediosCobro} />
       <RecordatoriosCuotasModal isOpen={showRecordatoriosModal} onClose={() => setShowRecordatoriosModal(false)} mediosCobro={mediosCobro} sending={sendingRecordatorios} onEnviar={handleEnviarRecordatorios} isWebAdmin={isWebAdmin} userOficina={userOficina} />
-      <ReporteContactosModal open={showReporteContactosModal} onClose={() => setShowReporteContactosModal(false)} />
     </div>
   );
 };
