@@ -13,9 +13,29 @@ import {
   HiOutlineChevronDown,
   HiOutlineChevronUp,
   HiOutlineChartBar,
+  HiOutlineCalendar,
+  HiOutlineDocumentText,
+  HiOutlineDuplicate,
+  HiOutlineClock,
+  HiOutlineSwitchVertical,
 } from "react-icons/hi";
 
 import api from "../../services/api";
+
+// ════════════════════════════════════════════════════
+// Categorías de FECHAS de cuotas
+// Estas admiten descarga en PDF y muestran el "por qué" de cada caso.
+// Tienen que coincidir con CATEGORIAS_FECHAS del backend.
+// ════════════════════════════════════════════════════
+const CATEGORIAS_FECHAS = [
+  "cuota_paga_salteada",
+  "cuotas_sin_fecha",
+  "poliza_sin_cuotas",
+  "cuotas_fuera_de_orden",
+  "cuotas_duplicadas",
+  "salto_raro_entre_cuotas",
+  "cobertura_muy_futura",
+];
 
 // ════════════════════════════════════════════════════
 // Configuración de categorías
@@ -45,6 +65,50 @@ const CATEGORIAS_META = {
     label: "Canceladas con pagos",
     descripcion: "Marcadas como 'canceladas' pero recibieron pagos hace poco",
     icon: HiOutlineExclamation,
+  },
+
+  // ── 🗓️ Fechas de cuotas ──
+  cuota_paga_salteada: {
+    label: "Pagó salteando una cuota",
+    descripcion:
+      "Pagó una cuota posterior a otra que sigue impaga. La app lo muestra AL DÍA aunque esté debiendo.",
+    icon: HiOutlineExclamation,
+  },
+  cuotas_sin_fecha: {
+    label: "Cuotas sin fecha",
+    descripcion:
+      "Cuotas cargadas sin fecha de vencimiento. Son invisibles para todos los cálculos.",
+    icon: HiOutlineDocumentText,
+  },
+  poliza_sin_cuotas: {
+    label: "Sin cuotas cargadas",
+    descripcion:
+      "La póliza existe pero no tiene ninguna cuota. No aparece en ningún reporte de cobranza.",
+    icon: HiOutlineDocumentText,
+  },
+  cuotas_fuera_de_orden: {
+    label: "Cuotas fuera de orden",
+    descripcion:
+      "El número de cuota sube pero la fecha baja. Una de las dos está mal cargada.",
+    icon: HiOutlineSwitchVertical,
+  },
+  cuotas_duplicadas: {
+    label: "Cuotas duplicadas",
+    descripcion:
+      "Mismo número de cuota repetido, o dos cuotas que vencen el mismo día.",
+    icon: HiOutlineDuplicate,
+  },
+  salto_raro_entre_cuotas: {
+    label: "Salto raro entre cuotas",
+    descripcion:
+      "Una cuota salta mucho más (o mucho menos) que el resto de esa misma póliza. Suele faltar una.",
+    icon: HiOutlineClock,
+  },
+  cobertura_muy_futura: {
+    label: "Cobertura muy adelantada",
+    descripcion:
+      "Pagó más de 4 meses por adelantado. Puede ser real, o una fecha cargada de más.",
+    icon: HiOutlineCalendar,
   },
 };
 
@@ -100,10 +164,11 @@ function CategoriaCard({
   diasMora,
 }) {
   const meta = CATEGORIAS_META[categoria];
-  if (!meta) return null;
+  if (!meta || !data) return null;
 
   const colors = getColorByCount(data.count);
   const Icon = meta.icon;
+  const esDeFechas = CATEGORIAS_FECHAS.includes(categoria);
 
   // Adaptar label según categoría dinámica
   const labelMostrado =
@@ -169,6 +234,16 @@ function CategoriaCard({
               >
                 <HiOutlineDownload className="h-3.5 w-3.5" /> Excel
               </button>
+
+              {esDeFechas && (
+                <button
+                  onClick={() => onExportar(categoria, "pdf")}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--color-linea)] bg-[var(--color-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-titulo)] transition-colors hover:bg-[var(--color-surface)]"
+                  title="Descargar como PDF"
+                >
+                  <HiOutlineDownload className="h-3.5 w-3.5" /> PDF
+                </button>
+              )}
             </div>
           )}
 
@@ -194,6 +269,11 @@ function CategoriaCard({
                       <>
                         ID {item.id} · {item.numero_poliza || "SIN N°"} ·{" "}
                         {item.cliente_label} · Patente: {item.patente || "—"}
+                        {item.detalle && (
+                          <span className="mt-0.5 block font-sans text-[11px] text-[var(--color-suave)]">
+                            → {item.detalle}
+                          </span>
+                        )}
                       </>
                     )}
                   </li>
@@ -201,7 +281,7 @@ function CategoriaCard({
               </ul>
               {data.count > (data.ejemplos?.length || 0) && (
                 <p className="mt-2 text-[11px] italic text-[var(--color-suave)]">
-                  Para ver TODOS los casos, exportá a CSV o Excel.
+                  Para ver TODOS los casos, exportá a CSV, Excel o PDF.
                 </p>
               )}
             </div>
@@ -225,7 +305,9 @@ function EstadoInicial({ onEjecutar, cargando, diasMora, setDiasMora }) {
         Salud de los datos
       </h2>
       <p className="mx-auto mb-6 max-w-md text-[13px] text-[var(--color-suave)]">
-        Esta herramienta analiza la base de datos en busca de inconsistencias.
+        Esta herramienta analiza la base de datos en busca de inconsistencias:
+        oficinas sin asignar, estados que no coinciden con los pagos, y fechas de
+        cuotas mal cargadas.
         <span className="mt-2 block text-[12px]">
           Solo lee información — no modifica nada.
         </span>
@@ -314,7 +396,19 @@ export default function AdminDiagnostico() {
     }));
   };
 
-  // ── Exportar ──
+  // ── Bajar un blob como archivo ──
+  const bajarBlob = (data, nombre) => {
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", nombre);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // ── Exportar una categoría ──
   const exportar = useCallback(
     async (categoria, formato) => {
       try {
@@ -331,19 +425,8 @@ export default function AdminDiagnostico() {
           responseType: "blob",
         });
 
-        // Descarga del archivo
-        const url = window.URL.createObjectURL(new Blob([res.data]));
-        const link = document.createElement("a");
-        link.href = url;
         const fecha = new Date().toISOString().slice(0, 10);
-        link.setAttribute(
-          "download",
-          `diagnostico_${categoria}_${fecha}.${formato}`
-        );
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        bajarBlob(res.data, `diagnostico_${categoria}_${fecha}.${formato}`);
 
         toast.success(`Descargado ${formato.toUpperCase()}`, { id: "exportar" });
       } catch (err) {
@@ -357,6 +440,29 @@ export default function AdminDiagnostico() {
     [diasMora]
   );
 
+  // ── 📄 PDF completo de la auditoría de fechas ──
+  const descargarAuditoriaPDF = useCallback(async () => {
+    try {
+      toast.loading("Generando PDF...", { id: "auditoria-pdf" });
+
+      const res = await api.get("/polizas/diagnostico-datos/exportar/", {
+        params: { categoria: "auditoria_fechas", formato: "pdf" },
+        responseType: "blob",
+      });
+
+      const fecha = new Date().toISOString().slice(0, 10);
+      bajarBlob(res.data, `auditoria_fechas_${fecha}.pdf`);
+
+      toast.success("PDF descargado", { id: "auditoria-pdf" });
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al generar el PDF";
+      toast.error(msg, { id: "auditoria-pdf" });
+    }
+  }, []);
+
   // ── Estado inicial ──
   if (!resultado && !error) {
     return (
@@ -368,6 +474,8 @@ export default function AdminDiagnostico() {
       />
     );
   }
+
+  const totalFechas = resultado?.totales?.problemas_fechas ?? 0;
 
   // ── Render ──
   return (
@@ -522,6 +630,60 @@ export default function AdminDiagnostico() {
             </div>
           </div>
 
+          {/* ══════════════════════════════════════════════
+              Grupo: 🗓️ Fechas de cuotas
+             ══════════════════════════════════════════════ */}
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+              <h3 className="flex items-center gap-1.5 text-[12px] text-[var(--color-suave)]">
+                <HiOutlineCalendar className="text-[13px]" /> Fechas de cuotas
+                {totalFechas > 0 && (
+                  <span className="ml-1 rounded-full bg-[var(--color-egreso)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--color-egreso-fuerte)]">
+                    {totalFechas}
+                  </span>
+                )}
+              </h3>
+
+              <button
+                onClick={descargarAuditoriaPDF}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--color-oficina)] px-3 py-1.5 text-[12px] font-medium text-white transition-all hover:brightness-110"
+                title="Descargar el informe completo de fechas en PDF"
+              >
+                <HiOutlineDownload className="h-3.5 w-3.5" />
+                Descargar informe completo (PDF)
+              </button>
+            </div>
+
+            <div className="mb-3 rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-3">
+              <div className="flex items-start gap-2 text-[12px] text-[var(--color-suave)]">
+                <HiOutlineInformationCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>
+                  Las cuotas se pagan por adelantado: la cobertura llega hasta el
+                  vencimiento de la{" "}
+                  <strong className="font-medium text-[var(--color-titulo)]">
+                    última cuota pagada
+                  </strong>
+                  . Si una fecha está mal cargada, ese cálculo miente y no se nota
+                  mirando la pantalla.
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {CATEGORIAS_FECHAS.map((cat) => (
+                <CategoriaCard
+                  key={cat}
+                  categoria={cat}
+                  data={resultado.categorias[cat]}
+                  onExportar={exportar}
+                  onToggleDetalle={toggleDetalle}
+                  expandido={!!detalleAbierto[cat]}
+                  diasMora={resultado.dias_mora}
+                />
+              ))}
+            </div>
+          </div>
+
           {/* Distribución de estados */}
           <div className="rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-4">
             <h3 className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--color-suave)]">
@@ -560,4 +722,4 @@ export default function AdminDiagnostico() {
       )}
     </div>
   );
-}
+}git
