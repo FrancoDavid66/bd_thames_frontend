@@ -722,4 +722,4 @@ export default function AdminDiagnostico() {
       )}
     </div>
   );
-}git
+}
