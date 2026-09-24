@@ -3,12 +3,15 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { batch, useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { FaFileExcel, FaFilePdf } from "react-icons/fa";
 
+import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import PolizaTable from "../components/polizas/PolizaTable";
 import PolizaFilter from "../components/polizas/PolizaFilter";
 import PageContainer from "../components/ui/PageContainer";
 import CardDuo from "../components/ui/CardDuo";
+import Boton3D from "../components/ui/Boton3D";
 
 import {
   fetchPolizas, fetchPolizasKpis,
@@ -32,6 +35,26 @@ const norm = (s) =>
 
 const getCompaniaPoliza = (p) =>
   p?.compania_nombre ?? p?.compania?.nombre ?? (typeof p?.compania === "string" ? p.compania : "");
+
+// 📅 Fecha LOCAL "YYYY-MM-DD" (toISOString usa UTC y de noche daría mañana)
+const hoyISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// Si el backend responde un error JSON y pedimos "blob", el mensaje viene adentro del blob.
+async function leerErrorBlob(err) {
+  try {
+    const data = err?.response?.data;
+    if (data && typeof data.text === "function") {
+      const j = JSON.parse(await data.text());
+      return j?.error || j?.detail || null;
+    }
+    return data?.error || data?.detail || null;
+  } catch {
+    return null;
+  }
+}
 
 const estadoPorCuotas = (poliza) => {
   const key = (poliza?.estado_cuotas || "").toString().trim().toLowerCase();
@@ -220,9 +243,88 @@ export default function PolizasPage() {
     setSearchDraft(""); dispatch(setSearch("")); dispatch(fetchPolizas({ force: true })); dispatch(fetchPolizasKpis({ force: true }));
   }, [dispatch]);
 
+  // ===== 📥 Descargar lo filtrado (Excel / PDF) =====
+  // Van los MISMOS filtros que la tabla (ver buildPolizasParams en polizasSlice), pero sin
+  // paginado: el archivo trae TODAS las pólizas del filtro, no solo la página que se ve.
+  // El backend (polizas/views/mixins/exportar.py) arma el archivo. Las oficinas descargan
+  // solo lo de su sucursal; el admin, lo que tenga filtrado.
+  const [exportando, setExportando] = useState(""); // "" | "xlsx" | "pdf"
+
+  const exportParams = useMemo(() => {
+    const p = {};
+    const isPolizas = (modo || "polizas") === "polizas";
+    if (search) p.search = search;
+    if (cliente) p.cliente = cliente;
+    if (patente) p.patente = patente;
+    if (solo_activas) p.solo_activas = 1;
+    if (oficina) p.oficina = oficina;
+    if (companiaLocal) p.compania = companiaLocal; // en la tabla es local; acá lo filtra el backend
+    if (isPolizas) {
+      if (estado && estado !== "todos") p.estado = estado;
+      if (estado_financiero && estado_financiero !== "todos") p.estado_financiero = estado_financiero;
+      if (fecha_vencimiento_desde) p.fecha_vencimiento_desde = fecha_vencimiento_desde;
+      if (fecha_vencimiento_hasta) p.fecha_vencimiento_hasta = fecha_vencimiento_hasta;
+      if (vencidas_ultimos_dias) p.vencidas_ultimos_dias = vencidas_ultimos_dias;
+      if (vencidas_mas_de_dias) p.vencidas_mas_de_dias = vencidas_mas_de_dias;
+    }
+    // Filtrando por vencimiento y con el orden por defecto, el archivo sale ordenado por fecha de vencimiento.
+    const hayFecha = !!(p.fecha_vencimiento_desde || p.fecha_vencimiento_hasta);
+    p.ordering = hayFecha && (!ordering || ordering === "-id") ? "fecha_vencimiento,-id" : (ordering || "-id");
+    return p;
+  }, [search, cliente, patente, solo_activas, oficina, companiaLocal, modo, estado, estado_financiero,
+    fecha_vencimiento_desde, fecha_vencimiento_hasta, vencidas_ultimos_dias, vencidas_mas_de_dias, ordering]);
+
+  // Mismo nombre que arma el backend (por si el navegador no deja leer el que manda)
+  const nombreExport = useCallback((formato) => {
+    const d = exportParams.fecha_vencimiento_desde;
+    const h = exportParams.fecha_vencimiento_hasta;
+    let base = "polizas";
+    if (d && h) base += d === h ? `_vencen_${d}` : `_vencen_${d}_al_${h}`;
+    else if (d) base += `_vencen_desde_${d}`;
+    else if (h) base += `_vencen_hasta_${h}`;
+    else base += `_${hoyISO()}`;
+    if (exportParams.estado) base += `_${exportParams.estado}`;
+    return `${base}.${formato}`;
+  }, [exportParams]);
+
+  const exportar = useCallback(async (formato) => {
+    if (exportando) return;
+    const etiqueta = formato === "pdf" ? "PDF" : "Excel";
+    setExportando(formato);
+    toast.loading(`Generando ${etiqueta}…`, { id: "exportar-polizas" });
+    try {
+      const res = await api.get("polizas/exportar/", {
+        params: { ...exportParams, formato },
+        responseType: "blob",
+      });
+
+      let nombre = nombreExport(formato);
+      const disp = res.headers?.["content-disposition"];
+      const m = disp ? /filename="?([^";]+)"?/i.exec(disp) : null;
+      if (m?.[1]) nombre = m[1];
+
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+      toast.success(`${etiqueta} descargado`, { id: "exportar-polizas" });
+    } catch (err) {
+      const msg = (await leerErrorBlob(err)) || `No se pudo generar el ${etiqueta}`;
+      toast.error(msg, { id: "exportar-polizas" });
+    } finally {
+      setExportando("");
+    }
+  }, [exportando, exportParams, nombreExport]);
+
   const pagingLabel = cursorEnabled ? "cursor" : `página ${page}`;
   const totalLabel = companiaLocal ? `${listFiltrada.length}` : cursorEnabled ? `${listFiltrada.length}` : `${total}`;
   const isWebAdmin = user?.perfil?.rol === "ADMIN";
+  const sinResultados = status !== "loading" && listFiltrada.length === 0;
 
   return (
     <PageContainer>
@@ -276,9 +378,33 @@ export default function PolizasPage() {
         </div>
       )}
 
-      <div className="mt-2 text-[12px] text-suave dark:text-suave-dark sm:text-[13px]">
-        Mostrando {listFiltrada.length} de {totalLabel} pólizas ({pagingLabel})
-        {companiaLocal ? <span className="ml-1 text-duo-azul">· filtrado por "{companiaLocal}"</span> : null}
+      {/* Resultados + 📥 descargar lo filtrado */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[12px] text-suave dark:text-suave-dark sm:text-[13px]">
+          Mostrando {listFiltrada.length} de {totalLabel} pólizas ({pagingLabel})
+          {companiaLocal ? <span className="ml-1 text-duo-azul">· filtrado por "{companiaLocal}"</span> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-suave dark:text-suave-dark">Descargar:</span>
+          <Boton3D
+            variant="blanco"
+            size="sm"
+            onClick={() => exportar("xlsx")}
+            disabled={!!exportando || sinResultados}
+            title="Descarga en Excel todas las pólizas del filtro"
+          >
+            <FaFileExcel className="text-duo-verde" /> {exportando === "xlsx" ? "Generando…" : "Excel"}
+          </Boton3D>
+          <Boton3D
+            variant="blanco"
+            size="sm"
+            onClick={() => exportar("pdf")}
+            disabled={!!exportando || sinResultados}
+            title="Descarga en PDF todas las pólizas del filtro"
+          >
+            <FaFilePdf className="text-duo-rojo" /> {exportando === "pdf" ? "Generando…" : "PDF"}
+          </Boton3D>
+        </div>
       </div>
 
       <div className="mt-2 sm:mt-3">
