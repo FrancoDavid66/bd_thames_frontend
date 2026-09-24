@@ -108,6 +108,12 @@ function buildPolizasParams(
     if (fecha_vencimiento_hasta)
       params.fecha_vencimiento_hasta = fecha_vencimiento_hasta;
 
+    // 📅 "Vence el …" = TODO lo que vence esas fechas: pólizas que terminan +
+    //    pólizas con alguna cuota que vence (pagada o no). Cada fila vuelve con
+    //    "vence_en" (qué vence). Ver backend polizas/utils/vence_en.py
+    if (fecha_vencimiento_desde || fecha_vencimiento_hasta)
+      params.incluir_cuotas = 1;
+
     if (vencidas_ultimos_dias)
       params.vencidas_ultimos_dias = Number(vencidas_ultimos_dias);
     if (vencidas_mas_de_dias)
@@ -621,7 +627,18 @@ const polizasSlice = createSlice({
         state.cursorEnabled = isCursorResponse(data);
         for (const p of results) {
           if (p?.id == null) continue;
-          state.byId[p.id] = { ...(state.byId[p.id] || {}), ...p };
+          const prev = state.byId[p.id] || {};
+          const merged = { ...prev, ...p };
+          // 📅 "Qué vence" depende de la fecha elegida: se guarda POR RANGO
+          //    ("2026-09-26|2026-09-26"), así una búsqueda vieja del cache no
+          //    muestra lo que vence en otra fecha.
+          if (p.vence_en && typeof p.vence_en === "object" && p.vence_en.clave) {
+            merged.vence_en_por_rango = {
+              ...(prev.vence_en_por_rango || {}),
+              [p.vence_en.clave]: Array.isArray(p.vence_en.items) ? p.vence_en.items : [],
+            };
+          }
+          state.byId[p.id] = merged;
           state.byIdFetchedAt[p.id] = nowMs();
         }
         const ids = results.map((p) => p?.id).filter((id) => id != null);

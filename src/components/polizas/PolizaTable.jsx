@@ -1,7 +1,7 @@
 // src/components/polizas/PolizaTable.jsx
 import React, { useMemo, memo } from "react";
 import { FaBuilding } from "react-icons/fa";
-import { HiChevronRight, HiSearch } from "react-icons/hi";
+import { HiCalendar, HiChevronRight, HiSearch } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Badge from "../ui/Badge";
@@ -172,8 +172,47 @@ function EstadoCell({ poliza, center = false }) {
   );
 }
 
+/* ---------------- 📅 Qué vence (filtro "Vence el …") ----------------
+   El backend manda, por fila, lo que vence en las fechas elegidas:
+     { tipo: "cuota", fecha, cuota_nro, pagada, otras }  → "26/09 · Cuota 3" + Pagada / Sin pagar
+     { tipo: "poliza", fecha }                          → "26/09 · Fin de póliza"
+   Se lee de vence_en_por_rango[venceClave] (lo arma polizasSlice), así nunca se
+   mezcla lo que vence en una fecha con lo de otra. */
+function ddmm(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  return m ? `${m[3]}/${m[2]}` : "";
+}
+
+function VenceCell({ poliza, venceClave }) {
+  const items = poliza?.vence_en_por_rango?.[venceClave];
+  if (!Array.isArray(items) || items.length === 0) {
+    return <span className="text-[11px] text-suave dark:text-suave-dark">—</span>;
+  }
+  return (
+    <div className="inline-flex flex-col items-start gap-1">
+      {items.map((it, i) =>
+        it?.tipo === "cuota" ? (
+          <div key={`c${i}`} className="leading-tight">
+            <div className="whitespace-nowrap text-xs font-medium text-titulo dark:text-titulo-dark">
+              {ddmm(it.fecha)} · Cuota {it.cuota_nro ?? ""}
+              {it.otras ? <span className="text-suave dark:text-suave-dark"> (+{it.otras})</span> : null}
+            </div>
+            <div className={`text-[10px] ${it.pagada ? "text-duo-verde-sombra dark:text-duo-verde" : "text-duo-amarillo-sombra dark:text-duo-amarillo"}`}>
+              {it.pagada ? "Pagada" : "Sin pagar"}
+            </div>
+          </div>
+        ) : (
+          <div key={`p${i}`} className="whitespace-nowrap text-xs font-medium leading-tight text-duo-azul">
+            {ddmm(it?.fecha)} · Fin de póliza
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 /* ---------------- Desktop row ---------------- */
-const DesktopRow = memo(function DesktopRow({ poliza, isWebAdmin }) {
+const DesktopRow = memo(function DesktopRow({ poliza, isWebAdmin, venceClave }) {
   const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
 
   return (
@@ -209,6 +248,12 @@ const DesktopRow = memo(function DesktopRow({ poliza, isWebAdmin }) {
         <div className="max-w-[120px] truncate text-[10px] text-suave dark:text-suave-dark">{poliza.modelo}</div>
       </td>
 
+      {venceClave && (
+        <td className="p-4">
+          <VenceCell poliza={poliza} venceClave={venceClave} />
+        </td>
+      )}
+
       <td className="p-4 text-center">
         <EstadoCell poliza={poliza} center />
       </td>
@@ -217,7 +262,7 @@ const DesktopRow = memo(function DesktopRow({ poliza, isWebAdmin }) {
 });
 
 /* ---------------- Mobile card ---------------- */
-const MobileCard = memo(function MobileCard({ poliza, isWebAdmin }) {
+const MobileCard = memo(function MobileCard({ poliza, isWebAdmin, venceClave }) {
   const clienteNombre = `${poliza?.cliente?.nombre || ""} ${poliza?.cliente?.apellido || ""}`.trim();
 
   return (
@@ -243,6 +288,14 @@ const MobileCard = memo(function MobileCard({ poliza, isWebAdmin }) {
         </div>
       </div>
 
+      {/* 📅 Filtrando "Vence el …": qué vence de esta póliza */}
+      {venceClave && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-2">
+          <HiCalendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-suave dark:text-suave-dark" />
+          <VenceCell poliza={poliza} venceClave={venceClave} />
+        </div>
+      )}
+
       <div className="mt-3 flex items-center justify-end gap-2">
         {isWebAdmin && (
           <span className="inline-flex items-center gap-1 text-[11px] text-duo-azul">
@@ -260,6 +313,8 @@ const PolizaTable = ({
   polizas = [], status = "idle", page = 1, pageSize = 10, total = 0,
   ordering, onOrderingChange, onPageChange, onNext, onPrev,
   cursorEnabled = false, hasNext = false, hasPrev = false,
+  // 📅 "desde|hasta" del filtro "Vence el …" ("" = sin filtro → no hay columna Vence)
+  venceClave = "",
 }) => {
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
@@ -281,12 +336,13 @@ const PolizaTable = ({
               {isWebAdmin && <SortHeader label="Sucursal" field="oficina__nombre" ordering={ordering} onOrderingChange={onOrderingChange} />}
               <SortHeader label="Patente" field="patente" ordering={ordering} onOrderingChange={onOrderingChange} />
               <SortHeader label="Vehículo" field="marca" ordering={ordering} onOrderingChange={onOrderingChange} />
+              {venceClave && <SortHeader label="Vence" field="vence" ordering={ordering} />}
               <SortHeader label="Estado" field="estado" ordering={ordering} onOrderingChange={onOrderingChange} className="text-center" />
             </tr>
           </thead>
           <tbody>
             {polizas.map((p) => (
-              <DesktopRow key={p.id} poliza={p} isWebAdmin={isWebAdmin} />
+              <DesktopRow key={p.id} poliza={p} isWebAdmin={isWebAdmin} venceClave={venceClave} />
             ))}
           </tbody>
         </table>
@@ -301,7 +357,7 @@ const PolizaTable = ({
       {/* ===== Mobile: tarjetas (< md) ===== */}
       <div className="space-y-3 p-3 md:hidden">
         {polizas.map((p) => (
-          <MobileCard key={p.id} poliza={p} isWebAdmin={isWebAdmin} />
+          <MobileCard key={p.id} poliza={p} isWebAdmin={isWebAdmin} venceClave={venceClave} />
         ))}
         {polizas.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -339,4 +395,4 @@ const PolizaTable = ({
   );
 };
 
-export default PolizaTable;
+export default PolizaTable;

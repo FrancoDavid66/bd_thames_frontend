@@ -264,12 +264,14 @@ export default function PolizasPage() {
       if (estado_financiero && estado_financiero !== "todos") p.estado_financiero = estado_financiero;
       if (fecha_vencimiento_desde) p.fecha_vencimiento_desde = fecha_vencimiento_desde;
       if (fecha_vencimiento_hasta) p.fecha_vencimiento_hasta = fecha_vencimiento_hasta;
+      // 📅 Igual que la tabla: TODO lo que vence esas fechas (cuotas + fin de póliza)
+      if (fecha_vencimiento_desde || fecha_vencimiento_hasta) p.incluir_cuotas = 1;
       if (vencidas_ultimos_dias) p.vencidas_ultimos_dias = vencidas_ultimos_dias;
       if (vencidas_mas_de_dias) p.vencidas_mas_de_dias = vencidas_mas_de_dias;
     }
-    // Filtrando por vencimiento y con el orden por defecto, el archivo sale ordenado por fecha de vencimiento.
-    const hayFecha = !!(p.fecha_vencimiento_desde || p.fecha_vencimiento_hasta);
-    p.ordering = hayFecha && (!ordering || ordering === "-id") ? "fecha_vencimiento,-id" : (ordering || "-id");
+    // Con el orden por defecto, filtrando "Vence el …" el backend ordena el archivo
+    // por fecha de vencimiento y cliente. Si ordenaste la tabla por otra columna, se respeta.
+    p.ordering = ordering || "-id";
     return p;
   }, [search, cliente, patente, solo_activas, oficina, companiaLocal, modo, estado, estado_financiero,
     fecha_vencimiento_desde, fecha_vencimiento_hasta, vencidas_ultimos_dias, vencidas_mas_de_dias, ordering]);
@@ -320,6 +322,12 @@ export default function PolizasPage() {
       setExportando("");
     }
   }, [exportando, exportParams, nombreExport]);
+
+  // 📅 Filtrando "Vence el …": la tabla suma la columna "Vence" (qué vence en cada fila).
+  //    La clave es el rango pedido, igual que la arma el backend ("desde|hasta").
+  const venceClave = (modo || "polizas") === "polizas" && (fecha_vencimiento_desde || fecha_vencimiento_hasta)
+    ? `${fecha_vencimiento_desde || ""}|${fecha_vencimiento_hasta || ""}`
+    : "";
 
   const pagingLabel = cursorEnabled ? "cursor" : `página ${page}`;
   const totalLabel = companiaLocal ? `${listFiltrada.length}` : cursorEnabled ? `${listFiltrada.length}` : `${total}`;
@@ -414,6 +422,7 @@ export default function PolizasPage() {
           onPageSizeChange={onPageSizeChange} ordering={ordering} onOrderingChange={onOrderingChange}
           modo={modo} cursorEnabled={cursorEnabled} hasNext={!!next} hasPrev={!!previous}
           onNext={() => onPageChange("next")} onPrev={() => onPageChange("prev")}
+          venceClave={venceClave}
         />
       </div>
 

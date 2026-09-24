@@ -110,10 +110,11 @@ const NUMERO_CLS =
  * - TODOS los usuarios: buscador + estado de la póliza + "Vence el" (con días antes/después).
  * - Solo ADMIN: además sucursal y aseguradora.
  *
- * 📅 "Vence el" = fecha de vencimiento de la PÓLIZA (fin de vigencia), NO de las cuotas.
- *    Fecha + días antes/después se mandan como rango al backend:
- *    fecha_vencimiento_desde / fecha_vencimiento_hasta (inclusivo, ver
- *    polizas/utils/viewtools.py → apply_vencimiento_filters). El backend no se toca.
+ * 📅 "Vence el" = TODO lo que vence ese día: pólizas que TERMINAN + pólizas con alguna
+ *    CUOTA que vence (pagada o no). Fecha + días antes/después se mandan como rango:
+ *    fecha_vencimiento_desde / fecha_vencimiento_hasta (inclusivo) + incluir_cuotas=1
+ *    (lo agrega polizasSlice; backend: polizas/utils/vence_en.py). La tabla suma la
+ *    columna "Vence" que dice qué vence en cada fila (ej. "26/09 · Cuota 3").
  *      Ej: 26/09 con 3 días antes  → del 23/09 al 26/09.
  *          hoy con 7 días después  → lo que vence en la próxima semana.
  *
@@ -343,10 +344,10 @@ export default function PolizaFilter({
             </SelectDuo>
           )}
 
-          {/* 📅 Vence el — vencimiento de la PÓLIZA (todos los usuarios) */}
+          {/* 📅 Vence el — TODO lo que vence ese día: cuotas + fin de póliza (todos los usuarios) */}
           {fechaDisponible && (
             <label
-              title="Muestra las pólizas cuya vigencia vence ese día"
+              title="Muestra todo lo que vence ese día: cuotas (pagadas o no) y pólizas que terminan"
               className={`${CAJA_CLS} cursor-pointer pl-3 pr-2`}
             >
               <HiCalendar className="h-4 w-4 shrink-0 text-suave dark:text-suave-dark" />
