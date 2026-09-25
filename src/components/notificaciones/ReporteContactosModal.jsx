@@ -1,15 +1,14 @@
 // src/components/notificaciones/ReporteContactosModal.jsx
 //
-// 📋 Descarga el reporte de contactos pendientes (PDF o Excel) para gestión
-// manual — por si el envío automático de WhatsApp falla algún día.
+// 📋 Descarga el reporte de contactos (PDF o Excel) para mandar los WhatsApp a mano.
 //
 // El backend YA arma todo (notificaciones/services_reporte_contactos.py):
 //   GET /api/notificaciones/cuotas/reporte-contactos/?formato=pdf|excel&oficina=1
 // Este modal solo junta los filtros y dispara la descarga.
 //
-// El reporte trae MÁS casos que el WhatsApp automático (que solo manda en
-// -30, -3, 0 y +3 días): agrega -7, -2 y +1, y suma filas "VENTA" para los
-// clientes que pagaron hace 14 días (buen momento para ofrecerles otro seguro).
+// 📅 Cada día del reporte trae LO MISMO que el filtro "Vence el" de Pólizas con
+// esa fecha: cuotas que vencen ese día (pagadas o no) y pólizas que terminan ese
+// día. Cada fila dice si el cliente PAGÓ o NO PAGÓ la cuota que tocaba.
 
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -25,18 +24,59 @@ import Boton3D from "../ui/Boton3D";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
-// 🏷️ Leyenda de qué trae el reporte. Los tonos son solo visuales (no vienen
-// del backend); replican los mismos colores que usa services_reporte_contactos.py.
-const DELTAS_REPORTE = [
-  { estado: "-30", texto: "Último aviso (cobertura perdida hace tiempo)", tono: "rojo" },
-  { estado: "-7", texto: "Vencida hace una semana", tono: "rojo" },
-  { estado: "-3", texto: "Pago pendiente", tono: "rojo" },
-  { estado: "-2", texto: "Aviso de baja (mañana se da de baja)", tono: "rojo" },
-  { estado: "0", texto: "Vence hoy", tono: "amarillo" },
-  { estado: "+1", texto: "Vence mañana", tono: "amarillo" },
-  { estado: "+3", texto: "Faltan unos días", tono: "verde" },
-  { estado: "+7", texto: "Falta una semana", tono: "verde" },
+// 🏷️ Los días que trae el reporte (mismos que el backend: REPORT_DELTAS + MESES_ATRASO).
+//    "dias" = el número de la primera columna del PDF (0 = hoy · 3 = hace 3 días · -3 = en 3 días).
+const DIAS_REPORTE = [
+  { dias: "0", texto: "Vence hoy", sumar: { dias: 0 }, tono: "amarillo" },
+  { dias: "3", texto: "Venció hace 3 días", sumar: { dias: -3 }, tono: "rojo" },
+  { dias: "7", texto: "Venció hace 7 días", sumar: { dias: -7 }, tono: "rojo" },
+  { dias: "15", texto: "Venció hace 15 días", sumar: { dias: -15 }, tono: "rojo" },
+  { dias: "1 mes", texto: "Venció hace un mes", sumar: { meses: -1 }, tono: "rojo" },
+  { dias: "-3", texto: "Vence en 3 días", sumar: { dias: 3 }, tono: "verde" },
 ];
+
+// Qué dice la columna "Pago" de cada fila.
+const PAGO_REPORTE = [
+  { txt: "NO PAGÓ", texto: "Hay que escribirle", tono: "rojo" },
+  { txt: "PAGÓ", texto: "Ya está, no hace falta", tono: "verde" },
+  { txt: "RENOVAR", texto: "No tiene cuota siguiente", tono: "violeta" },
+  { txt: "YA RENOVÓ", texto: "El auto ya tiene póliza nueva", tono: "gris" },
+];
+
+const TONOS = {
+  rojo: "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo",
+  amarillo: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo",
+  verde: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde",
+  violeta: "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta",
+  azul: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul",
+  gris: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark",
+};
+
+// Fecha de cada día (dd/mm), para compararla con el filtro "Vence el" de Pólizas.
+// "Hace un mes" es el mismo día del mes anterior (si no existe, el último: 31/03 → 28/02).
+function fechaDelDia({ dias = 0, meses = 0 }) {
+  const hoy = new Date();
+  let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  if (meses) {
+    const primero = new Date(d.getFullYear(), d.getMonth() + meses, 1);
+    const ultimoDia = new Date(primero.getFullYear(), primero.getMonth() + 1, 0).getDate();
+    d = new Date(primero.getFullYear(), primero.getMonth(), Math.min(d.getDate(), ultimoDia));
+  }
+  if (dias) d.setDate(d.getDate() + dias);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function Chip({ tono, children }) {
+  return (
+    <span
+      className={`shrink-0 min-w-[2.75rem] text-center rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ${
+        TONOS[tono] || TONOS.gris
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
 
 export default function ReporteContactosModal({ open, onClose }) {
   const { user } = useAuth();
@@ -106,8 +146,8 @@ export default function ReporteContactosModal({ open, onClose }) {
     <ModalDuo
       isOpen={open}
       onClose={descargando ? () => {} : onClose}
-      title="Reporte de contactos pendientes"
-      subtitle="Para gestión manual, por si el envío automático falla"
+      title="Reporte de contactos"
+      subtitle="Para mandar los WhatsApp a mano"
       icon={<HiDocumentReport />}
       iconTono="azul"
       size="md"
@@ -164,39 +204,46 @@ export default function ReporteContactosModal({ open, onClose }) {
           />
         )}
 
-        {/* Leyenda: qué incluye el reporte */}
+        {/* Leyenda: qué días trae y qué dice cada fila */}
         <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3.5">
           <div className="text-[11px] text-suave dark:text-suave-dark mb-2.5">
-            El reporte incluye
+            Días que trae el reporte
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {DELTAS_REPORTE.map((d) => (
-              <div key={d.estado} className="flex items-center gap-2 text-[12px]">
-                <span
-                  className={`shrink-0 w-9 text-center rounded px-1 py-0.5 text-[10px] font-semibold ${
-                    d.tono === "rojo"
-                      ? "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo"
-                      : d.tono === "amarillo"
-                      ? "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo"
-                      : "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde"
-                  }`}
-                >
-                  {d.estado}
+            {DIAS_REPORTE.map((d) => (
+              <div key={d.dias} className="flex items-center gap-2 text-[12px] min-w-0">
+                <Chip tono={d.tono}>{d.dias}</Chip>
+                <span className="text-titulo dark:text-titulo-dark truncate">
+                  {d.texto} <span className="text-suave dark:text-suave-dark">· {fechaDelDia(d.sumar)}</span>
                 </span>
-                <span className="text-titulo dark:text-titulo-dark">{d.texto}</span>
               </div>
             ))}
           </div>
-          <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark flex items-center gap-2 text-[12px]">
-            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul">
-              VENTA
-            </span>
+          <p className="mt-2.5 text-[11px] text-suave dark:text-suave-dark">
+            Cada día trae lo mismo que el filtro <b>«Vence el»</b> de Pólizas con esa fecha: cuotas que vencen ese día
+            (pagadas o no) y pólizas que terminan ese día.
+          </p>
+
+          <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark">
+            <div className="text-[11px] text-suave dark:text-suave-dark mb-2">Columna «Pago»</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {PAGO_REPORTE.map((p) => (
+                <div key={p.txt} className="flex items-center gap-2 text-[12px] min-w-0">
+                  <Chip tono={p.tono}>{p.txt}</Chip>
+                  <span className="text-titulo dark:text-titulo-dark truncate">{p.texto}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark flex items-center gap-2 text-[12px] min-w-0">
+            <Chip tono="azul">OFERTAS</Chip>
             <span className="text-titulo dark:text-titulo-dark">Pagaron hace 14 días — para ofrecerles otros seguros</span>
           </div>
         </div>
 
         <p className="text-[11px] text-suave dark:text-suave-dark">
-          Los recordatorios automáticos por WhatsApp solo cubren -30, -3, 0 y +3 días. Este reporte trae más casos, para poder contactarlos a mano.
+          Cada oficina baja solo lo suyo. Los clientes marcados con «No enviarle más» no salen.
         </p>
       </div>
     </ModalDuo>
