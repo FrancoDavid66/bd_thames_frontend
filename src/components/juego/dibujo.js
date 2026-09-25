@@ -282,27 +282,42 @@ function dibujarParticulas(ctx, p) {
   ctx.globalAlpha = 1;
 }
 
+// Letra de fichín (la carga la página; mientras no llega, usa la común).
+const LETRA_PIXEL = '"Press Start 2P", ui-monospace, Menlo, Consolas, monospace';
+const CONTORNO = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+
+// Tamaño para que el cartel entre siempre en la ruta (180 px de ancho).
+function tamCartel(t) {
+  const letras = Array.from(t.txt).length || 1;
+  if (t.gigante) return Math.max(10, Math.min(18, Math.floor(168 / letras)));
+  if (t.grande) return Math.max(8, Math.min(14, Math.floor(168 / letras)));
+  return Math.max(6, Math.min(8, Math.floor(160 / letras)));
+}
+
+// Texto pixel con borde oscuro "de a un píxel" (nítido, como en los fichines).
+function textoPixel(ctx, txt, x, y, color, borde, sombra) {
+  ctx.fillStyle = "#0b0618";
+  for (const [dx, dy] of CONTORNO) ctx.fillText(txt, x + dx * borde, y + dy * borde);
+  if (sombra) {
+    ctx.fillStyle = sombra;
+    ctx.fillText(txt, x + borde * 1.5, y + borde * 1.5);
+  }
+  ctx.fillStyle = color;
+  ctx.fillText(txt, x, y);
+}
+
 function dibujarTextos(ctx, p) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
   for (const t of p.textos) {
     ctx.globalAlpha = Math.max(0, Math.min(1, t.vida / 0.35));
-    ctx.font = t.gigante
-      ? "900 25px ui-monospace, Menlo, Consolas, monospace"
-      : t.grande
-        ? "900 15px ui-monospace, Menlo, Consolas, monospace"
-        : "bold 8px ui-monospace, Menlo, Consolas, monospace";
-    ctx.lineWidth = t.gigante ? 6 : t.grande ? 4 : 2.5;
-    ctx.strokeStyle = "rgba(15,23,42,0.85)";
-    ctx.strokeText(t.txt, t.x, t.y);
+    ctx.font = `${tamCartel(t)}px ${LETRA_PIXEL}`;
     if (t.gigante) {
       // sombra amarilla corrida, como los carteles de los fichines
-      ctx.fillStyle = "#facc15";
-      ctx.fillText(t.txt, t.x + 1.5, t.y + 1.5);
+      textoPixel(ctx, t.txt, t.x, t.y, t.color, 1.5, "#facc15");
+    } else {
+      textoPixel(ctx, t.txt, t.x, t.y, t.color, 1, t.grande ? "#5b1680" : null);
     }
-    ctx.fillStyle = t.color;
-    ctx.fillText(t.txt, t.x, t.y);
   }
   ctx.globalAlpha = 1;
 }
@@ -312,16 +327,15 @@ function dibujarCuenta(ctx, p) {
   if (n <= 0) return;
   const frac = p.cuenta - Math.floor(p.cuenta); // 1 → 0 dentro de cada segundo
   const escala = 0.8 + frac * 0.5;
-  ctx.fillStyle = "rgba(15,23,42,0.55)";
+  ctx.fillStyle = "rgba(11,6,24,0.6)";
   ctx.beginPath(); ctx.arc(ANCHO / 2, ALTO / 2 - 10, 26, 0, Math.PI * 2); ctx.fill();
   ctx.save();
   ctx.translate(ANCHO / 2, ALTO / 2 - 9);
   ctx.scale(escala, escala);
-  ctx.font = "900 30px ui-monospace, Menlo, Consolas, monospace";
+  ctx.font = `24px ${LETRA_PIXEL}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#facc15";
-  ctx.fillText(String(n), 0, 0);
+  textoPixel(ctx, String(n), 1, 1, "#facc15", 1.5, "#ff3cac");
   ctx.restore();
 }
 

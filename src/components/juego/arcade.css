@@ -1,0 +1,800 @@
+/* src/components/juego/arcade.css
+ *
+ * 🕹️ THAMES ARCADE — el estilo "fichín" de la sección de minijuegos.
+ *
+ * A propósito NO sigue el diseño de la app: es el recreo, un mundo aparte
+ * (noche de fichín, neón, letras pixel y pantallas de tubo). Todo cuelga de
+ * la clase .arcade, así no se mezcla con el resto de THAMES.
+ *
+ * Letras (Google Fonts, se cargan desde arcade.js):
+ *   · Press Start 2P → títulos, puntajes y botones (la letra de los fichines)
+ *   · VT323          → textos (pantalla de compu vieja)
+ *   · Monoton        → el cartel de neón "THAMES ARCADE"
+ *
+ * Va dentro de @layer components: las clases de Tailwind (utilidades) pueden
+ * pisar estas si hace falta.
+ */
+
+@keyframes arcade-titilar {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+@keyframes arcade-grilla {
+  from { transform: translateY(0); }
+  to { transform: translateY(60px); }
+}
+@keyframes arcade-estrellas {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.3; }
+}
+@keyframes arcade-neon {
+  0%, 17%, 21%, 24%, 61%, 65%, 100% { opacity: 1; }
+  19%, 22%, 63% { opacity: 0.45; }
+}
+@keyframes arcade-glitch-a {
+  0%, 84%, 100% { clip-path: inset(0 0 100% 0); transform: translate(0, 0); }
+  86% { clip-path: inset(8% 0 58% 0); transform: translate(-5px, 0); }
+  90% { clip-path: inset(62% 0 10% 0); transform: translate(4px, 0); }
+  94% { clip-path: inset(34% 0 38% 0); transform: translate(-3px, 0); }
+}
+@keyframes arcade-glitch-b {
+  0%, 86%, 100% { clip-path: inset(100% 0 0 0); transform: translate(0, 0); }
+  88% { clip-path: inset(50% 0 20% 0); transform: translate(5px, 0); }
+  92% { clip-path: inset(12% 0 64% 0); transform: translate(-4px, 0); }
+  96% { clip-path: inset(70% 0 6% 0); transform: translate(3px, 0); }
+}
+@keyframes arcade-arcoiris {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+@keyframes arcade-sacudir {
+  0%, 100% { transform: translateX(0); }
+  15%, 55% { transform: translateX(-7px); }
+  35%, 75% { transform: translateX(7px); }
+}
+@keyframes arcade-saltito {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes arcade-timbre {
+  0%, 40%, 100% { transform: rotate(0); }
+  5%, 15%, 25% { transform: rotate(-16deg); }
+  10%, 20%, 30% { transform: rotate(16deg); }
+}
+
+@layer components {
+  /* ── Raíz y colores ─────────────────────────────────────────────────── */
+  .arcade {
+    --a-fondo: #0b0618;
+    --a-panel: rgba(17, 8, 40, 0.9);
+    --a-hundido: rgba(8, 3, 22, 0.72);
+    --a-linea: #3a2a73;
+    --a-linea-2: #4b3a8a;
+    --a-texto: #f1ecff;
+    --a-suave: #a99bd8;
+    --a-tenue: #7b6fb0;
+    --a-cian: #2de2ff;
+    --a-magenta: #ff3cac;
+    --a-amarillo: #ffd23f;
+    --a-rojo: #ff3b5c;
+    --a-verde: #5dff8f;
+    --a-oro: #ffd23f;
+    --a-plata: #d9e0ff;
+    --a-bronce: #ff9f5a;
+    --a-lcd: #9bbc0f;
+    --a-lcd-osc: #306230;
+    --a-lcd-tinta: #0f380f;
+    --f-pixel: "Press Start 2P", ui-monospace, "Courier New", monospace;
+    --f-crt: "VT323", ui-monospace, "Courier New", monospace;
+    --f-neon: "Monoton", "Press Start 2P", ui-monospace, monospace;
+
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    color: var(--a-texto);
+    background-color: var(--a-fondo);
+    font-family: var(--f-crt);
+    font-size: 20px;
+    line-height: 1.2;
+    color-scheme: dark;
+  }
+
+  /* Mientras se juega, toda la zona de contenido de la app va de noche. */
+  html.thames-arcade main {
+    background-color: #0b0618;
+  }
+
+  .arcade ::selection { background: var(--a-magenta); color: #fff; }
+  .arcade :focus-visible { outline: 2px solid var(--a-amarillo); outline-offset: 3px; }
+
+  .arcade .f-pixel { font-family: var(--f-pixel); font-weight: 400; line-height: 1.55; letter-spacing: 0.02em; }
+  .arcade .f-crt { font-family: var(--f-crt); line-height: 1.05; }
+
+  .arcade .t-texto { color: var(--a-texto); }
+  .arcade .t-suave { color: var(--a-suave); }
+  .arcade .t-tenue { color: var(--a-tenue); }
+  .arcade .t-cian { color: var(--a-cian); }
+  .arcade .t-magenta { color: var(--a-magenta); }
+  .arcade .t-amarillo { color: var(--a-amarillo); }
+  .arcade .t-rojo { color: var(--a-rojo); }
+  .arcade .t-verde { color: var(--a-verde); }
+
+  .arcade-titilar { animation: arcade-titilar 1.1s steps(1, end) infinite; }
+  .arcade-sacudir { animation: arcade-sacudir 0.45s linear 1; }
+  .arcade-arcoiris { color: var(--a-amarillo); animation: arcade-arcoiris 1.6s linear infinite; }
+
+  /* ── Fondo: noche de fichín ─────────────────────────────────────────── */
+  .arcade-fondo { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .arcade-fondo__cielo {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(60% 420px at 50% 0%, rgba(255, 60, 172, 0.2), transparent 70%),
+      radial-gradient(45% 380px at 0% 260px, rgba(45, 226, 255, 0.1), transparent 70%),
+      radial-gradient(45% 380px at 100% 340px, rgba(177, 140, 255, 0.12), transparent 70%),
+      linear-gradient(180deg, #140932 0%, var(--a-fondo) 520px, #07030f 100%);
+  }
+  .arcade-fondo__estrellas {
+    position: absolute;
+    inset: 0 0 35% 0;
+    opacity: 0.55;
+    background-image:
+      radial-gradient(1.5px 1.5px at 7% 9%, #fff 50%, transparent 52%),
+      radial-gradient(1px 1px at 18% 22%, #fff 50%, transparent 52%),
+      radial-gradient(1.5px 1.5px at 29% 6%, #ffd1f0 50%, transparent 52%),
+      radial-gradient(1px 1px at 41% 17%, #fff 50%, transparent 52%),
+      radial-gradient(2px 2px at 53% 4%, #c9f7ff 50%, transparent 52%),
+      radial-gradient(1px 1px at 64% 26%, #fff 50%, transparent 52%),
+      radial-gradient(1.5px 1.5px at 76% 11%, #fff 50%, transparent 52%),
+      radial-gradient(1px 1px at 88% 20%, #ffd1f0 50%, transparent 52%),
+      radial-gradient(1.5px 1.5px at 95% 7%, #fff 50%, transparent 52%),
+      radial-gradient(1px 1px at 12% 41%, #fff 50%, transparent 52%),
+      radial-gradient(1.5px 1.5px at 34% 52%, #c9f7ff 50%, transparent 52%),
+      radial-gradient(1px 1px at 58% 44%, #fff 50%, transparent 52%),
+      radial-gradient(1.5px 1.5px at 81% 49%, #fff 50%, transparent 52%),
+      radial-gradient(1px 1px at 93% 63%, #ffd1f0 50%, transparent 52%),
+      radial-gradient(1px 1px at 4% 71%, #fff 50%, transparent 52%),
+      radial-gradient(1.5px 1.5px at 47% 76%, #fff 50%, transparent 52%);
+    animation: arcade-estrellas 5s steps(2, end) infinite;
+  }
+  /* El piso de neón: un plano acostado que se pierde en el horizonte. */
+  .arcade-fondo__piso {
+    position: absolute;
+    left: -60%;
+    width: 220%;
+    bottom: 0;
+    height: 1400px;
+    overflow: hidden;
+    transform-origin: 50% 100%;
+    transform: perspective(900px) rotateX(70deg);
+    -webkit-mask-image: linear-gradient(to top, #000 0%, #000 18%, transparent 62%);
+    mask-image: linear-gradient(to top, #000 0%, #000 18%, transparent 62%);
+  }
+  .arcade-fondo__grilla {
+    position: absolute;
+    inset: -60px 0 0 0;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 60, 172, 0.6) 2px, transparent 2px),
+      linear-gradient(to right, rgba(255, 60, 172, 0.38) 2px, transparent 2px);
+    background-size: 100% 60px, 60px 100%;
+    background-position: 0 0, center 0;
+    animation: arcade-grilla 1.2s linear infinite;
+    will-change: transform;
+  }
+  .arcade-fondo__horizonte {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 260px;
+    background: radial-gradient(55% 100% at 50% 100%, rgba(255, 60, 172, 0.2), transparent 72%);
+  }
+  .arcade-fondo__lineas {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.22) 2px 3px);
+  }
+  .arcade--jugando .arcade-fondo__grilla,
+  .arcade--jugando .arcade-fondo__estrellas,
+  .arcade--jugando .arcade-neon { animation-play-state: paused; }
+
+  /* ── Cartel de neón ─────────────────────────────────────────────────── */
+  .arcade-marquesina {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-block: 4px 12px;
+    border-bottom: 2px solid rgba(255, 60, 172, 0.35);
+    box-shadow: 0 12px 24px -20px var(--a-magenta);
+  }
+  .arcade-neon {
+    font-family: var(--f-neon);
+    font-weight: 400;
+    color: #ffe3f4;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    text-shadow:
+      0 0 3px #fff,
+      0 0 10px var(--a-magenta),
+      0 0 22px var(--a-magenta),
+      0 0 42px rgba(255, 60, 172, 0.55);
+    animation: arcade-neon 7s linear infinite;
+  }
+  .arcade-sfx {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px 8px;
+    font-family: var(--f-pixel);
+    font-size: 9px;
+    line-height: 1;
+    color: var(--a-suave);
+    background: var(--a-hundido);
+    border: 2px solid var(--a-linea);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .arcade-sfx:hover { color: var(--a-texto); border-color: var(--a-linea-2); }
+  .arcade-sfx[aria-pressed="true"] {
+    color: var(--a-verde);
+    border-color: var(--a-verde);
+    box-shadow: 0 0 12px rgba(93, 255, 143, 0.35);
+  }
+  .arcade-led { width: 8px; height: 8px; background: #3a2a73; }
+  .arcade-sfx[aria-pressed="true"] .arcade-led { background: var(--a-verde); box-shadow: 0 0 8px var(--a-verde); }
+
+  /* ── Marcos (las "pantallas" del fichín) ───────────────────────────── */
+  .arcade-marco {
+    position: relative;
+    background: var(--a-panel);
+    border: 2px solid var(--a-cian);
+    box-shadow:
+      0 0 0 3px var(--a-fondo),
+      0 0 0 5px var(--a-magenta),
+      0 0 30px rgba(255, 60, 172, 0.28),
+      inset 0 0 40px rgba(45, 226, 255, 0.07);
+  }
+  .arcade-marco--magenta {
+    border-color: var(--a-magenta);
+    box-shadow:
+      0 0 0 3px var(--a-fondo),
+      0 0 0 5px var(--a-cian),
+      0 0 30px rgba(45, 226, 255, 0.22),
+      inset 0 0 40px rgba(255, 60, 172, 0.08);
+  }
+
+  /* Marcador de arriba: 1UP · HI-SCORE · PUESTO */
+  .arcade-marcador {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    font-family: var(--f-pixel);
+    font-size: 8px;
+    line-height: 1.8;
+    text-transform: uppercase;
+  }
+  .arcade-marcador b {
+    display: block;
+    font-weight: 400;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--a-texto);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Título del juego */
+  .arcade-logo {
+    font-family: var(--f-pixel);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+    color: var(--a-amarillo);
+    text-shadow:
+      2px 2px 0 var(--a-magenta),
+      4px 4px 0 #5b1680,
+      0 0 18px rgba(255, 210, 63, 0.35);
+  }
+  .arcade-logo--cero {
+    color: #ffffff;
+    text-shadow:
+      3px 3px 0 var(--a-cian),
+      6px 6px 0 #1b4a8a,
+      0 0 24px rgba(45, 226, 255, 0.5);
+  }
+
+  /* Pantallita de la DEMO */
+  .arcade-mini-pantalla {
+    position: relative;
+    aspect-ratio: 180 / 300;
+    max-width: 100%;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #3f9b3a;
+    border: 3px solid #05020c;
+    box-shadow: 0 0 0 2px var(--a-magenta), 0 0 18px rgba(255, 60, 172, 0.45);
+  }
+  .arcade-mini-pantalla__demo {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    padding: 3px 4px 2px;
+    font-family: var(--f-pixel);
+    font-size: 8px;
+    line-height: 1;
+    color: #fff;
+    background: rgba(255, 59, 92, 0.92);
+    animation: arcade-titilar 1.2s steps(1, end) infinite;
+  }
+
+  /* Líneas de tubo + viñeta, encima de las pantallas (no tapa los toques) */
+  .arcade-crt {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.14) 2px 3px),
+      radial-gradient(120% 90% at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.42) 100%);
+  }
+
+  /* ── Botones ────────────────────────────────────────────────────────── */
+  .arcade-btn {
+    --notch: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 13px 18px 12px;
+    font-family: var(--f-pixel);
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #1f1200;
+    background: var(--a-amarillo);
+    border: 0;
+    cursor: pointer;
+    clip-path: polygon(
+      0 var(--notch), var(--notch) var(--notch), var(--notch) 0,
+      calc(100% - var(--notch)) 0, calc(100% - var(--notch)) var(--notch), 100% var(--notch),
+      100% calc(100% - var(--notch)), calc(100% - var(--notch)) calc(100% - var(--notch)), calc(100% - var(--notch)) 100%,
+      var(--notch) 100%, var(--notch) calc(100% - var(--notch)), 0 calc(100% - var(--notch))
+    );
+    box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3), inset 0 3px 0 rgba(255, 255, 255, 0.4);
+    transition: transform 0.08s, filter 0.15s;
+  }
+  .arcade-btn:hover:not(:disabled) { filter: brightness(1.12); }
+  .arcade-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.3); }
+  .arcade-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+  .arcade-btn--cian { color: #03161c; background: var(--a-cian); }
+  .arcade-btn--fantasma {
+    clip-path: none;
+    color: var(--a-cian);
+    background: var(--a-hundido);
+    box-shadow: inset 0 0 0 2px var(--a-cian);
+  }
+  .arcade-btn--fantasma:active:not(:disabled) { box-shadow: inset 0 0 0 2px var(--a-cian); }
+  .arcade-brillo { filter: drop-shadow(0 0 12px rgba(255, 210, 63, 0.4)); }
+
+  .arcade-link {
+    font-family: var(--f-pixel);
+    font-size: 8px;
+    text-transform: uppercase;
+    color: var(--a-suave);
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .arcade-link:hover { color: var(--a-cian); }
+
+  /* Oficinas (chips) */
+  .arcade-chip {
+    padding: 8px 10px 7px;
+    font-family: var(--f-pixel);
+    font-size: 9px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--a-suave);
+    background: var(--a-hundido);
+    border: 2px solid var(--a-linea);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  }
+  .arcade-chip:hover { color: var(--a-texto); border-color: var(--a-linea-2); }
+  .arcade-chip[aria-pressed="true"] {
+    color: #fff;
+    background: var(--a-magenta);
+    border-color: var(--a-magenta);
+    box-shadow: 0 0 14px rgba(255, 60, 172, 0.55);
+  }
+
+  /* Jugadores (cartas de "elegí tu jugador") */
+  .arcade-carta {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 6px 9px;
+    color: var(--a-texto);
+    background: var(--a-hundido);
+    border: 2px solid var(--a-linea);
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.12s, box-shadow 0.15s, background-color 0.15s;
+  }
+  .arcade-carta:hover { border-color: var(--a-linea-2); transform: translateY(-2px); }
+  .arcade-carta[aria-pressed="true"] {
+    border-color: var(--a-cian);
+    background: rgba(45, 226, 255, 0.1);
+    box-shadow: 0 0 16px rgba(45, 226, 255, 0.45), inset 0 0 12px rgba(45, 226, 255, 0.15);
+  }
+  .arcade-carta[aria-pressed="true"] .arcade-carta__bicho { animation: arcade-saltito 0.8s steps(2, end) infinite; }
+  .arcade-carta__nombre {
+    max-width: 100%;
+    overflow: hidden;
+    font-family: var(--f-crt);
+    font-size: 20px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .arcade-carta__p1 {
+    position: absolute;
+    top: -9px;
+    right: -6px;
+    padding: 3px 4px 2px;
+    font-family: var(--f-pixel);
+    font-size: 8px;
+    line-height: 1;
+    color: #03161c;
+    background: var(--a-cian);
+  }
+  .arcade-tag {
+    display: inline-block;
+    padding: 3px 4px 2px;
+    font-family: var(--f-pixel);
+    font-size: 8px;
+    line-height: 1;
+    vertical-align: 3px;
+    color: #03161c;
+    background: var(--a-cian);
+  }
+
+  /* Teclas */
+  .arcade-tecla {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 6px;
+    font-family: var(--f-pixel);
+    font-size: 9px;
+    color: var(--a-texto);
+    background: #1d1242;
+    border: 2px solid var(--a-linea-2);
+    border-bottom-width: 4px;
+    border-radius: 3px;
+  }
+
+  /* Reglas / power-ups */
+  .arcade-separador { border-top: 2px dashed var(--a-linea); }
+
+  /* ── La pantalla donde se juega ─────────────────────────────────────── */
+  .arcade-pantalla {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #3f9b3a;
+    border: 4px solid #05020c;
+    box-shadow:
+      0 0 0 3px var(--a-cian),
+      0 0 0 6px var(--a-fondo),
+      0 0 0 8px var(--a-magenta),
+      0 0 36px rgba(255, 60, 172, 0.35);
+  }
+  .arcade-hud {
+    position: absolute;
+    inset: 0 0 auto 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 9px 22px;
+    font-family: var(--f-pixel);
+    line-height: 1.45;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(5, 2, 12, 0.8), rgba(5, 2, 12, 0));
+  }
+  .arcade-hud__label { font-size: 8px; color: var(--a-rojo); }
+  .arcade-hud__num { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .arcade-hud__mini { font-size: 7px; color: rgba(255, 255, 255, 0.75); }
+  .arcade-hud__combo { font-size: 8px; color: var(--a-amarillo); }
+  .arcade-hud__escudo {
+    padding: 3px 4px 2px;
+    font-size: 7px;
+    line-height: 1;
+    color: #03161c;
+    text-shadow: none;
+    background: var(--a-cian);
+  }
+  .arcade-boton-pausa {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    color: #fff;
+    background: rgba(5, 2, 12, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+  }
+  .arcade-boton-pausa:hover { border-color: var(--a-cian); color: var(--a-cian); }
+  .arcade-pausa {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+    background: rgba(5, 2, 12, 0.8);
+    backdrop-filter: blur(2px);
+  }
+
+  /* Botonera del celu: botones redondos de fichín */
+  .arcade-panel-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    background: linear-gradient(#1b1042, #0e0726);
+    border: 2px solid var(--a-linea);
+    border-radius: 16px;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.06), 0 10px 26px rgba(0, 0, 0, 0.45);
+  }
+  .arcade-boton-redondo {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 78px;
+    height: 78px;
+    color: #fff;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 35% 30%, #ff9aae 0 12%, #ff3b5c 40%, #b3122f 100%);
+    border: 3px solid #3a0613;
+    box-shadow: 0 6px 0 #5c0a1c, 0 12px 18px rgba(0, 0, 0, 0.45), inset 0 -4px 8px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.05s, box-shadow 0.05s;
+  }
+  .arcade-boton-redondo--azul {
+    background: radial-gradient(circle at 35% 30%, #b5f6ff 0 12%, #2de2ff 40%, #0b7fa3 100%);
+    border-color: #042733;
+    box-shadow: 0 6px 0 #064456, 0 12px 18px rgba(0, 0, 0, 0.45), inset 0 -4px 8px rgba(0, 0, 0, 0.25);
+  }
+  .arcade-boton-redondo[data-apretado="true"] {
+    transform: translateY(5px);
+    box-shadow: 0 1px 0 #5c0a1c, 0 3px 8px rgba(0, 0, 0, 0.45), inset 0 -2px 6px rgba(0, 0, 0, 0.25);
+  }
+  .arcade-boton-redondo--azul[data-apretado="true"] {
+    box-shadow: 0 1px 0 #064456, 0 3px 8px rgba(0, 0, 0, 0.45), inset 0 -2px 6px rgba(0, 0, 0, 0.25);
+  }
+
+  /* ── HIGH SCORES ────────────────────────────────────────────────────── */
+  .arcade-titulo-scores {
+    font-family: var(--f-pixel);
+    font-weight: 400;
+    color: var(--a-amarillo);
+    text-shadow: 2px 2px 0 #7a2a00, 0 0 16px rgba(255, 210, 63, 0.45);
+  }
+  .arcade-tab {
+    flex: 1;
+    padding: 9px 6px 8px;
+    font-family: var(--f-pixel);
+    font-size: 9px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--a-suave);
+    background: var(--a-hundido);
+    border: 2px solid var(--a-linea);
+    cursor: pointer;
+  }
+  .arcade-tab:hover { color: var(--a-texto); }
+  .arcade-tab[aria-pressed="true"] {
+    color: #03161c;
+    background: var(--a-cian);
+    border-color: var(--a-cian);
+    box-shadow: 0 0 14px rgba(45, 226, 255, 0.5);
+  }
+  .arcade-rango {
+    padding: 7px 8px 6px;
+    font-family: var(--f-pixel);
+    font-size: 8px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--a-tenue);
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .arcade-rango:hover { color: var(--a-suave); }
+  .arcade-rango[aria-pressed="true"] { color: var(--a-amarillo); text-shadow: 0 0 8px rgba(255, 210, 63, 0.6); }
+  .arcade-rango[aria-pressed="true"]::before { content: ">"; margin-right: 4px; }
+  .arcade-cabecera {
+    display: flex;
+    gap: 10px;
+    padding: 0 10px 6px;
+    font-family: var(--f-pixel);
+    font-size: 7px;
+    color: var(--a-tenue);
+  }
+  .arcade-fila {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px;
+    border: 2px solid transparent;
+  }
+  .arcade-fila--yo {
+    border-color: var(--a-cian);
+    background: rgba(45, 226, 255, 0.08);
+    box-shadow: 0 0 12px rgba(45, 226, 255, 0.25);
+  }
+  .arcade-puesto {
+    width: 30px;
+    flex-shrink: 0;
+    font-family: var(--f-pixel);
+    font-size: 10px;
+    color: var(--a-cian);
+  }
+  .arcade-nombre {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--f-crt);
+    font-size: 21px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .arcade-sub {
+    overflow: hidden;
+    font-family: var(--f-crt);
+    font-size: 16px;
+    line-height: 1.1;
+    color: var(--a-suave);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .arcade-score {
+    flex-shrink: 0;
+    font-family: var(--f-pixel);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--a-texto);
+  }
+  .arcade-podio-1 { --podio: var(--a-oro); }
+  .arcade-podio-2 { --podio: var(--a-plata); }
+  .arcade-podio-3 { --podio: var(--a-bronce); }
+  :is(.arcade-podio-1, .arcade-podio-2, .arcade-podio-3) :is(.arcade-puesto, .arcade-score, .arcade-nombre) {
+    color: var(--podio);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--podio) 45%, transparent);
+  }
+  .arcade-vos {
+    flex-shrink: 0;
+    padding: 3px 4px 2px;
+    font-family: var(--f-pixel);
+    font-size: 7px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: #03161c;
+    background: var(--a-cian);
+    animation: arcade-titilar 1.4s steps(1, end) infinite;
+  }
+  .arcade-barra {
+    height: 6px;
+    margin-block: 5px 4px;
+    background: #1d1242;
+    box-shadow: inset 0 0 0 1px var(--a-linea);
+  }
+  .arcade-barra > span {
+    display: block;
+    height: 100%;
+    background: repeating-linear-gradient(90deg, var(--a-verde) 0 6px, transparent 6px 8px);
+  }
+
+  /* ── GAME OVER ──────────────────────────────────────────────────────── */
+  .arcade-gameover {
+    position: relative;
+    display: inline-block;
+    font-family: var(--f-pixel);
+    font-weight: 400;
+    line-height: 1.1;
+    color: var(--a-rojo);
+    text-shadow: 3px 3px 0 #4a0a1e, 0 0 22px rgba(255, 59, 92, 0.6);
+  }
+  .arcade-gameover::before,
+  .arcade-gameover::after {
+    content: attr(data-texto);
+    position: absolute;
+    inset: 0;
+    text-shadow: none;
+    pointer-events: none;
+  }
+  .arcade-gameover::before { color: var(--a-cian); clip-path: inset(0 0 100% 0); animation: arcade-glitch-a 2.6s steps(1, end) infinite; }
+  .arcade-gameover::after { color: var(--a-magenta); clip-path: inset(100% 0 0 0); animation: arcade-glitch-b 2.6s steps(1, end) infinite; }
+
+  .arcade-puntaje {
+    font-family: var(--f-pixel);
+    font-weight: 400;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    text-shadow: 3px 3px 0 #1b4a8a, 0 0 20px rgba(45, 226, 255, 0.5);
+  }
+
+  /* ☎️ La llamada de Mariano: pantallita verde de celular viejo */
+  .arcade-lcd-marco {
+    padding: 10px;
+    background: linear-gradient(#2c2a3b, #17151f);
+    border-radius: 12px 12px 26px 12px;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08), 0 12px 26px rgba(0, 0, 0, 0.5);
+  }
+  .arcade-lcd {
+    padding: 10px 12px 12px;
+    text-align: left;
+    color: var(--a-lcd-tinta);
+    background-color: var(--a-lcd);
+    background-image:
+      linear-gradient(rgba(15, 56, 15, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 56, 15, 0.08) 1px, transparent 1px);
+    background-size: 3px 3px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2px var(--a-lcd-osc), inset 0 0 24px rgba(15, 56, 15, 0.35);
+  }
+  .arcade-lcd__titulo { font-family: var(--f-pixel); font-size: 8px; line-height: 1.5; letter-spacing: 0.05em; text-transform: uppercase; }
+  .arcade-lcd__nombre { font-family: var(--f-pixel); font-size: 15px; line-height: 1.3; }
+  .arcade-lcd__msg { font-family: var(--f-crt); font-size: 23px; line-height: 1; }
+  .arcade-lcd__chiste { font-family: var(--f-crt); font-size: 19px; line-height: 1.05; color: var(--a-lcd-osc); }
+  .arcade-timbre { transform-origin: 50% 60%; animation: arcade-timbre 1.4s ease-in-out infinite; }
+
+  /* Resumen de la partida (como el "bonus" de fin de nivel) */
+  .arcade-tally { display: grid; gap: 8px; }
+  .arcade-tally__fila {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--f-pixel);
+    font-size: 9px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--a-suave);
+  }
+  .arcade-tally__puntos { flex: 1; min-width: 12px; border-bottom: 2px dotted var(--a-tenue); transform: translateY(-3px); }
+  .arcade-tally__valor { font-size: 11px; color: var(--a-texto); font-variant-numeric: tabular-nums; }
+}
+
+/* Sin animaciones para quien las tiene apagadas en su compu/celu. */
+@media (prefers-reduced-motion: reduce) {
+  .arcade *,
+  .arcade *::before,
+  .arcade *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

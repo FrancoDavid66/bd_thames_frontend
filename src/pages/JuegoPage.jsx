@@ -1,19 +1,24 @@
 /* src/pages/JuegoPage.jsx
  *
- * 🎮 MINIJUEGO "SINIESTRO CERO" (se entra desde el menú: Recreo → Minijuego).
+ * 🕹️ THAMES ARCADE — MINIJUEGO "SINIESTRO CERO" (menú: Recreo → Minijuego).
+ *
+ * A propósito tiene su propio estilo de FICHÍN (neón, letras pixel, pantallas
+ * de tubo) y NO el de la app: es el recreo. Los estilos están en
+ * components/juego/arcade.css.
  *
  * Un auto que esquiva el tráfico, estilo Road Fighter de la Family.
  * Si chocás es un siniestro; con 3 siniestros "te dan de baja".
  *
  * Pantallas:
- *   1) Portada → eligís quién juega: el RESPONSABLE de la oficina (los mismos
- *      de Configuración → Responsables). El admin primero elige la oficina.
- *      Así el tablero muestra quién jugó y quién tiene más puntos.
+ *   1) Portada → la DEMO se juega sola (como los fichines esperando ficha),
+ *      ELEGÍ TU JUGADOR: el RESPONSABLE de la oficina (los mismos de
+ *      Configuración → Responsables; el admin primero elige la oficina)
+ *      y START. En la compu: ENTER = start · ← → cambian de jugador.
  *   2) Jugando → el juego (components/juego/SiniestroCero.jsx).
- *   3) GAME OVER → "Mariano te va a llamar para pedir documentación" (el
- *      chiste de la llamada entrante), tus puntos, si rompiste un récord y
- *      tu puesto de la semana.
- *   Al costado (o abajo en el celu): el TABLERO GLOBAL de jugadores y oficinas.
+ *   3) GAME OVER → "Mariano te va a llamar para pedir documentación" (la
+ *      llamada entrante), tu puntaje (sube contando), si rompiste un récord y
+ *      tu puesto de la semana. ENTER = jugar de nuevo · ESC = cambiar jugador.
+ *   Al costado (o abajo en el celu): HIGH SCORES de jugadores y oficinas.
  *
  * Backend:
  *   GET  ranking/juego/?rango=hoy|semana|siempre&jugador=<id>
@@ -22,16 +27,15 @@
  * El jugador elegido y el sonido se recuerdan en ese dispositivo.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import toast from "react-hot-toast";
 import { motion, useReducedMotion } from "framer-motion";
-import {
-  HiVolumeUp, HiVolumeOff, HiPlay, HiRefresh, HiUserGroup, HiSparkles, HiPhone, HiOfficeBuilding,
-} from "react-icons/hi";
-import { FaGamepad, FaCar } from "react-icons/fa";
 import api from "../services/api";
-import { UI } from "../components/tareas/tareasUI";
 import SiniestroCero from "../components/juego/SiniestroCero";
 import TableroJuego from "../components/juego/TableroJuego";
+import DemoArcade from "../components/juego/DemoArcade";
+import { AvatarPixel, FondoArcade, Pixel } from "../components/juego/ArcadeUI";
+import { puntaje6, useCuentaArriba, useModoArcade } from "../components/juego/arcade";
+import { crearSonido } from "../components/juego/sonido";
+import "../components/juego/arcade.css";
 
 // (alias en mayúscula para que el linter lo reconozca como componente)
 const MotionDiv = motion.div;
@@ -56,14 +60,19 @@ const tiempo = (s) => {
   const r = (s || 0) % 60;
   return m ? `${m}:${String(r).padStart(2, "0")}` : `${r} s`;
 };
+// Botones, links y campos ya reaccionan solos al ENTER: no hay que duplicarlo.
+// (Los títulos en letra de fichín van SIN tilde: esa letra no tiene mayúsculas acentuadas.)
+const esControl = (el) =>
+  !!el && (/^(BUTTON|A|INPUT|TEXTAREA|SELECT)$/.test(el.tagName || "") || !!el.isContentEditable);
+const esCampo = (el) => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || "") || !!el.isContentEditable);
 
 const REGLAS = [
-  ["1 punto por metro", "cuanto más rápido vas, más suma"],
-  ["¡CASI! +100", "pasá rozando un auto sin tocarlo (seguidos se multiplican)"],
-  ["$ +250", "cada moneda de la ruta"],
-  ["Cobertura total", "el escudo celeste: 5 segundos sin siniestros"],
-  ["Autos amarillos", "ponen el guiño y se cruzan a tu carril"],
-  ["3 siniestros", "te dan de baja: GAME OVER (y te llama Mariano)"],
+  { sprite: "autoRojo", titulo: "1 punto x metro", texto: "Cuanto más rápido vas, más suma." },
+  { sprite: "rayo", titulo: "¡CASI! +100", texto: "Pasá rozando un auto sin tocarlo. Seguidos se multiplican." },
+  { sprite: "moneda", titulo: "Moneda +250", texto: "Cada moneda que agarrás en la ruta." },
+  { sprite: "escudo", titulo: "Cobertura total", texto: "El escudo celeste: 5 segundos sin siniestros." },
+  { sprite: "autoAmarillo", titulo: "Autos amarillos", texto: "Ponen el guiño y se cruzan a tu carril." },
+  { sprite: "explosion", titulo: "3 siniestros", texto: "Te dan de baja: GAME OVER (y te llama Mariano)." },
 ];
 
 // ☎️ Lo que agrega Mariano cuando llama (sale uno distinto cada partida)
@@ -77,17 +86,21 @@ const CHISTES_MARIANO = [
 ];
 
 export default function JuegoPage() {
+  useModoArcade();
   const [estado, setEstado] = useState("inicio"); // inicio | jugando | fin
   const [rango, setRango] = useState("semana");
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
   const [jugador, setJugador] = useState(() => Number(leer(CLAVE_JUGADOR)) || null);
   const [sonido, setSonido] = useState(() => leer(CLAVE_SONIDO) === "1");
   const [partidaN, setPartidaN] = useState(0);
   const [final, setFinal] = useState(null); // { resultado, guardando, error, respuesta }
+  const [aviso, setAviso] = useState(0); // sube cada vez que tocan START sin elegir jugador (sacude la lista)
   const uidRef = useRef(null);
   const zonaRef = useRef(null);
   const pedidoRef = useRef(0); // para no pisar datos nuevos con una respuesta vieja
+  const sfxRef = useRef(null); // ruiditos del menú
 
   // Responsables por oficina (usuario de oficina: la suya · admin: todas)
   const grupos = useMemo(() => datos?.responsables || [], [datos]);
@@ -100,7 +113,7 @@ export default function JuegoPage() {
   const jugadorValido = elegido ? elegido.id : null;
   const nombreJugador = elegido?.nombre || "";
   const faltaElegir = chips.length > 0 && !jugadorValido;
-  // Qué oficina se ve en los chips: la que tocaste, la de quien juega, la tuya o la primera con gente.
+  // Qué oficina se ve en la lista: la que tocaste, la de quien juega, la tuya o la primera con gente.
   const oficinaVista =
     (grupos.some((g) => g.oficina_id === oficinaElegida) ? oficinaElegida : null) ||
     elegido?.oficina_id ||
@@ -109,6 +122,24 @@ export default function JuegoPage() {
     grupos[0]?.oficina_id ||
     null;
 
+  // 🔊 Ruiditos del menú (solo si el parlante está prendido)
+  const sonar = useCallback(
+    (evento, aunqueApagado = false) => {
+      if (!sonido && !aunqueApagado) return;
+      if (!sfxRef.current) sfxRef.current = crearSonido();
+      sfxRef.current.activar(true);
+      sfxRef.current.evento(evento);
+    },
+    [sonido]
+  );
+  useEffect(() => {
+    if (!sonido && sfxRef.current) sfxRef.current.activar(false);
+  }, [sonido]);
+  useEffect(() => {
+    const sfx = sfxRef;
+    return () => sfx.current?.cerrar();
+  }, []);
+
   const cargar = useCallback(async (r, quien) => {
     const n = ++pedidoRef.current;
     setCargando(true);
@@ -116,9 +147,12 @@ export default function JuegoPage() {
       const params = { rango: r };
       if (quien) params.jugador = quien;
       const res = await api.get("ranking/juego/", { params });
-      if (n === pedidoRef.current) setDatos(res.data);
+      if (n === pedidoRef.current) {
+        setDatos(res.data);
+        setErrorCarga(false);
+      }
     } catch {
-      if (n === pedidoRef.current) toast.error("No se pudo cargar el tablero");
+      if (n === pedidoRef.current) setErrorCarga(true);
     } finally {
       if (n === pedidoRef.current) setCargando(false);
     }
@@ -127,12 +161,14 @@ export default function JuegoPage() {
   useEffect(() => { cargar(rango, jugador); }, [cargar, rango, jugador]);
 
   const elegirJugador = (id) => {
+    if (id !== jugador) sonar("menu");
     setJugador(id);
     guardar(CLAVE_JUGADOR, String(id));
   };
 
   // Admin: al cambiar de oficina, si el que estaba elegido es de otra, se des-elige.
   const elegirOficina = (id) => {
+    sonar("menu");
     setOficinaElegida(id);
     if (elegido && elegido.oficina_id !== id) {
       setJugador(null);
@@ -140,18 +176,34 @@ export default function JuegoPage() {
     }
   };
 
+  // ← → en la portada: cambia de jugador dentro de la oficina que se ve.
+  const moverJugador = (paso) => {
+    const lista = grupos.find((g) => g.oficina_id === oficinaVista)?.responsables || [];
+    if (!lista.length) return;
+    const actual = lista.findIndex((r) => r.id === jugadorValido);
+    const siguiente = actual < 0 ? (paso > 0 ? 0 : lista.length - 1) : (actual + paso + lista.length) % lista.length;
+    elegirJugador(lista[siguiente].id);
+  };
+
+  const cambiarRango = (r) => {
+    if (r !== rango) sonar("menu");
+    setRango(r);
+  };
+
   const alternarSonido = () => {
-    setSonido((s) => {
-      guardar(CLAVE_SONIDO, s ? "0" : "1");
-      return !s;
-    });
+    const prender = !sonido;
+    setSonido(prender);
+    guardar(CLAVE_SONIDO, prender ? "1" : "0");
+    if (prender) sonar("menu", true);
   };
 
   const jugar = () => {
     if (faltaElegir) {
-      toast.error("Elegí quién juega");
+      setAviso((n) => n + 1);
+      sonar("error");
       return;
     }
+    sonar("start");
     uidRef.current = nuevoUid();
     setFinal(null);
     setPartidaN((n) => n + 1);
@@ -169,9 +221,12 @@ export default function JuegoPage() {
         uid: uidRef.current,
       });
       setFinal({ resultado, guardando: false, error: "", respuesta: res.data });
+      const rec = res.data?.records || {};
+      if (rec.personal || rec.oficina || rec.global) sonar("record");
       if (rango === "semana" && res.data?.tablero) {
         pedidoRef.current += 1; // lo que viene del guardado es lo más nuevo
         setDatos(res.data.tablero);
+        setErrorCarga(false);
         setCargando(false);
       } else {
         cargar(rango, jugadorValido);
@@ -193,37 +248,60 @@ export default function JuegoPage() {
     requestAnimationFrame(() => zonaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
+  // ⌨️ Portada: ENTER = start · ← → = cambiar de jugador
+  const accionesRef = useRef({});
+  useEffect(() => {
+    accionesRef.current = { jugar, moverJugador, cargando };
+  });
+  useEffect(() => {
+    if (estado !== "inicio") return undefined;
+    const alTeclear = (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || esCampo(e.target)) return;
+      const a = accionesRef.current;
+      if (e.key === "Enter") {
+        if (e.repeat || esControl(e.target)) return;
+        e.preventDefault();
+        if (!a.cargando) a.jugar();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        a.moverJugador(e.key === "ArrowRight" ? 1 : -1);
+      }
+    };
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, [estado]);
+
   const yo = datos?.yo;
   // Tu récord (solo si los datos cargados son de quien va a jugar)
   const miRecord = yo && (yo.empleado_id || null) === (jugadorValido || null) ? yo.mejor_historico || 0 : 0;
 
   return (
-    <div className={`${UI.screen} px-4 py-5`}>
-      <div className="mx-auto max-w-5xl">
-        {/* Encabezado */}
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className={`flex items-center gap-2 text-xl font-semibold ${UI.txtTitulo}`}>
-              <FaGamepad className="text-marca" /> Siniestro Cero
-            </h1>
-            <p className={`text-[13px] ${UI.txtSuave}`}>Esquivá el tráfico. 3 siniestros y te dan de baja.</p>
+    <div className={`arcade min-h-[calc(100dvh-4rem)]${estado === "jugando" ? " arcade--jugando" : ""}`}>
+      <FondoArcade />
+      <div className="relative mx-auto max-w-5xl px-4 pb-10 pt-4">
+        {/* Cartel de neón */}
+        <header className="arcade-marquesina">
+          <div className="flex min-w-0 items-center gap-3">
+            <Pixel sprite="joystick" tam={3} />
+            <div className="min-w-0">
+              <div className="arcade-neon text-[clamp(17px,5vw,34px)] leading-none">THAMES ARCADE</div>
+              <div className="f-pixel t-suave mt-1.5 text-[7px] sm:text-[8px]">RECREO · MINIJUEGOS</div>
+            </div>
           </div>
           <button
             type="button"
             onClick={alternarSonido}
             aria-pressed={sonido}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors ${
-              sonido
-                ? "border-marca bg-marca/10 text-marca"
-                : "border-linea bg-card text-suave dark:border-linea-dark dark:bg-card-dark dark:text-suave-dark"
-            }`}
+            aria-label={sonido ? "Sonido prendido" : "Sonido apagado"}
+            className="arcade-sfx"
           >
-            {sonido ? <HiVolumeUp className="text-base" /> : <HiVolumeOff className="text-base" />}
-            {sonido ? "Sonido" : "Sin sonido"}
+            <Pixel sprite={sonido ? "parlante" : "parlanteMudo"} tam={2} />
+            SFX
+            <span className="arcade-led" />
           </button>
-        </div>
+        </header>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-start">
+        <div className="mt-6 grid gap-7 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-start">
           <section ref={zonaRef} className="scroll-mt-20">
             {estado === "jugando" ? (
               <SiniestroCero
@@ -253,21 +331,29 @@ export default function JuegoPage() {
                 onElegir={elegirJugador}
                 faltaElegir={faltaElegir}
                 yo={yo}
-                rango={rango}
+                record={datos?.record}
                 cargando={cargando}
                 onJugar={jugar}
+                aviso={aviso}
               />
             )}
           </section>
 
           <aside className={estado === "jugando" ? "hidden lg:block" : ""}>
-            <TableroJuego datos={datos} rango={rango} onRango={setRango} cargando={cargando} />
+            <TableroJuego
+              datos={datos}
+              rango={rango}
+              onRango={cambiarRango}
+              cargando={cargando}
+              error={errorCarga}
+              onReintentar={() => cargar(rango, jugadorValido)}
+            />
             <button
               type="button"
               onClick={() => cargar(rango, jugadorValido)}
-              className={`mx-auto mt-2 flex items-center gap-1.5 text-[12px] ${UI.txtSuave} hover:text-titulo dark:hover:text-titulo-dark`}
+              className="arcade-link mx-auto mt-4 flex items-center gap-2"
             >
-              <HiRefresh className={cargando ? "animate-spin" : ""} /> Actualizar tablero
+              {cargando ? <span className="arcade-titilar">CARGANDO...</span> : "ACTUALIZAR TABLERO"}
             </button>
           </aside>
         </div>
@@ -277,255 +363,324 @@ export default function JuegoPage() {
 }
 
 // ── 1) Portada ──────────────────────────────────────────────────────────
-function Portada({ grupos, oficinaVista, onOficina, elegido, jugador, onElegir, faltaElegir, yo, rango, cargando, onJugar }) {
+function Portada({ grupos, oficinaVista, onOficina, elegido, jugador, onElegir, faltaElegir, yo, record, cargando, onJugar, aviso }) {
   const variasOficinas = grupos.length > 1;
   const grupo = grupos.find((g) => g.oficina_id === oficinaVista) || null;
   const responsables = grupo?.responsables || [];
   const hayAlguien = grupos.some((g) => g.responsables.length);
-  const chip = (activo) =>
-    `rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors ${
-      activo
-        ? "border-marca bg-marca text-white"
-        : `border-linea bg-surface dark:border-linea-dark dark:bg-surface-dark ${UI.txtTitulo}`
-    }`;
 
   return (
-    <div className={`${UI.card} overflow-hidden`} data-testid="juego-portada">
-      {/* Cartel "arcade" */}
-      <div className="relative overflow-hidden bg-[#1e2430] px-5 py-6 text-center text-white">
-        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-24 -translate-x-1/2 bg-[#535963]" />
-        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-[repeating-linear-gradient(to_bottom,#e5e7eb_0_10px,transparent_10px_20px)]" />
-        <div className="relative">
-          <div className="font-mono text-[26px] font-black leading-none tracking-wider text-[#facc15] drop-shadow-[0_2px_0_rgba(0,0,0,0.6)]">
-            SINIESTRO
-          </div>
-          <div className="font-mono text-[26px] font-black leading-none tracking-wider text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.6)]">
-            CERO
-          </div>
-          <FaCar className="mx-auto mt-3 text-[34px] text-[#dc1f26] drop-shadow-[0_2px_0_rgba(0,0,0,0.6)]" />
-          <div className="mt-2 font-mono text-[11px] tracking-widest text-white/80">ESQUIVÁ · SUMÁ · NO CHOQUES</div>
+    <div className="arcade-marco p-4" data-testid="juego-portada">
+      {/* Marcador de fichín */}
+      <div className="arcade-marcador">
+        <div>
+          <span className="t-rojo arcade-titilar">1UP</span>
+          <b>{puntaje6(yo?.mejor_historico)}</b>
+        </div>
+        <div className="text-center">
+          <span className="t-rojo">HI-SCORE</span>
+          <b>{puntaje6(record?.puntos)}</b>
+        </div>
+        <div className="text-right">
+          <span className="t-cian">PUESTO</span>
+          <b>{yo?.puesto ? `#${yo.puesto}` : "---"}</b>
         </div>
       </div>
 
-      <div className="space-y-4 p-4">
-        {/* ¿Quién juega? → el responsable, según la oficina */}
-        {grupos.length > 0 && (
-          <div data-testid="juego-quien">
-            <div className={`mb-2 flex items-center gap-1.5 ${UI.label}`}>
-              <HiUserGroup /> ¿Quién juega?
-            </div>
+      {/* DEMO + título */}
+      <div className="mt-4 flex items-center gap-3 sm:gap-4">
+        <DemoArcade className="w-[40%] max-w-[168px] shrink-0 self-start" />
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
+          <div className="arcade-logo text-[clamp(14px,4.6vw,24px)]">SINIESTRO</div>
+          <div className="arcade-logo arcade-logo--cero text-[clamp(28px,9vw,44px)]">CERO</div>
+          <div className="f-crt t-suave mt-1 text-[18px]">Esquivá · sumá · no choques</div>
+          <div className="f-pixel t-amarillo arcade-titilar mt-2 text-[10px]">PRESS START</div>
+          <div className="f-pixel t-tenue text-[7px]">FREE PLAY · 1 JUGADOR</div>
+        </div>
+      </div>
 
-            {variasOficinas && (
-              <>
-                <div className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wider ${UI.txtSuave}`}>1. Oficina</div>
-                <div className="mb-3 flex flex-wrap gap-1.5">
-                  {grupos.map((g) => (
-                    <button
-                      key={g.oficina_id}
-                      type="button"
-                      onClick={() => onOficina(g.oficina_id)}
-                      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                        oficinaVista === g.oficina_id
-                          ? "border-duo-azul bg-duo-azul-soft text-duo-azul dark:bg-[var(--color-duo-azul-soft-dark)]"
-                          : `border-linea bg-surface dark:border-linea-dark dark:bg-surface-dark ${UI.txtTitulo}`
-                      }`}
-                    >
-                      <HiOfficeBuilding className="text-[14px]" /> {g.oficina}
-                    </button>
-                  ))}
-                </div>
-                <div className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wider ${UI.txtSuave}`}>2. Responsable</div>
-              </>
-            )}
-            {!variasOficinas && grupo && (
-              <div className={`mb-1.5 text-[12px] ${UI.txtSuave}`}>Responsables de {grupo.oficina}</div>
-            )}
+      {/* ¿Quién juega? → el responsable, según la oficina */}
+      {grupos.length > 0 && (
+        <div key={aviso} className={`mt-6${aviso ? " arcade-sacudir" : ""}`} data-testid="juego-quien">
+          <div className="f-pixel t-cian mb-3 flex items-center gap-2 text-[11px]">
+            <Pixel sprite="flechaDer" tam={2} /> ELEGI TU JUGADOR
+          </div>
 
-            {responsables.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {responsables.map((r) => (
-                  <button key={r.id} type="button" onClick={() => onElegir(r.id)} className={chip(jugador === r.id)}>
-                    {r.nombre}
+          {variasOficinas && (
+            <>
+              <div className="f-pixel t-tenue mb-2 text-[8px]">1. OFICINA</div>
+              <div className="mb-4 flex flex-wrap gap-2">
+                {grupos.map((g) => (
+                  <button
+                    key={g.oficina_id}
+                    type="button"
+                    onClick={() => onOficina(g.oficina_id)}
+                    aria-pressed={oficinaVista === g.oficina_id}
+                    className="arcade-chip"
+                  >
+                    {g.oficina}
                   </button>
                 ))}
               </div>
-            ) : (
-              <p className={`text-[12px] ${UI.txtSuave}`}>
-                {variasOficinas ? "Esta oficina" : "Tu oficina"} no tiene responsables cargados
-                {hayAlguien ? "." : " (se cargan en Configuración → Responsables). El puntaje queda a nombre de la cuenta."}
-              </p>
-            )}
+              <div className="f-pixel t-tenue mb-2 text-[8px]">2. JUGADOR</div>
+            </>
+          )}
+          {!variasOficinas && grupo && (
+            <div className="f-crt t-suave mb-2 text-[18px]">Responsables de {grupo.oficina}</div>
+          )}
 
-            {elegido ? (
-              <p className={`mt-2 text-[12px] ${UI.txtSuave}`} data-testid="juego-elegido">
-                Juega <strong className={`font-semibold ${UI.txtTitulo}`}>{elegido.nombre}</strong> · {elegido.oficina}
-              </p>
-            ) : faltaElegir ? (
-              <p className={`mt-2 text-[12px] ${UI.txtSuave}`}>Tocá quién juega: así el puntaje queda a su nombre.</p>
-            ) : null}
-          </div>
-        )}
-
-        {/* Cómo se juega */}
-        <ul className="space-y-1.5">
-          {REGLAS.map(([t, d]) => (
-            <li key={t} className="flex gap-2 text-[13px] leading-snug">
-              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-marca" />
-              <span className={UI.txtSuave}>
-                <strong className={`font-semibold ${UI.txtTitulo}`}>{t}</strong> — {d}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {yo && (yo.mejor_historico > 0 || yo.puesto) ? (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-surface p-2.5 dark:bg-surface-dark">
-              <div className={`text-[11px] ${UI.txtSuave}`}>Tu mejor puntaje</div>
-              <div className={`font-mono text-[17px] font-semibold ${UI.txtTitulo}`}>{fmt(yo.mejor_historico)}</div>
+          {responsables.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {responsables.map((r) => {
+                const activo = jugador === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onElegir(r.id)}
+                    aria-pressed={activo}
+                    className="arcade-carta"
+                  >
+                    {activo && (
+                      <span className="arcade-carta__p1" aria-hidden="true">
+                        P1
+                      </span>
+                    )}
+                    <span className="arcade-carta__bicho flex">
+                      <AvatarPixel semilla={`e${r.id}`} tam={4} />
+                    </span>
+                    <span className="arcade-carta__nombre">{r.nombre}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="rounded-lg bg-surface p-2.5 dark:bg-surface-dark">
-              <div className={`text-[11px] ${UI.txtSuave}`}>
-                Tu puesto ({rango === "hoy" ? "hoy" : rango === "siempre" ? "siempre" : "semana"})
-              </div>
-              <div className={`font-mono text-[17px] font-semibold ${UI.txtTitulo}`}>{yo.puesto ? `#${yo.puesto}` : "—"}</div>
-            </div>
-          </div>
-        ) : null}
+          ) : (
+            <p className="f-crt t-suave text-[18px]">
+              {variasOficinas ? "Esta oficina" : "Tu oficina"} no tiene responsables cargados
+              {hayAlguien ? "." : " (se cargan en Configuración → Responsables). El puntaje queda a nombre de la cuenta."}
+            </p>
+          )}
 
+          {elegido ? (
+            <p className="f-crt t-suave mt-3 text-[19px]" data-testid="juego-elegido">
+              <span className="arcade-tag">P1</span> Juega <strong className="t-cian font-normal">{elegido.nombre}</strong> · {elegido.oficina}
+            </p>
+          ) : faltaElegir ? (
+            <p className={`f-crt mt-3 text-[19px] ${aviso ? "t-rojo" : "t-suave"}`}>
+              {aviso ? "¡Elegí tu jugador para arrancar!" : "Tocá quién juega: así el puntaje queda a su nombre."}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {/* START */}
+      <div className="arcade-brillo mt-6">
         <button
           type="button"
           onClick={onJugar}
           disabled={cargando}
-          className={`flex h-12 w-full items-center justify-center gap-2 rounded-lg text-[15px] ${UI.btnPrimary}`}
+          className="arcade-btn h-14 w-full text-[13px]"
           data-testid="juego-jugar"
         >
-          <HiPlay className="text-lg" /> Jugar
+          <Pixel sprite="play" tam={2} /> Start
         </button>
+      </div>
+      <div className="f-crt t-tenue mt-2 hidden text-center text-[17px] lg:block">
+        o apretá ENTER · ← → cambian de jugador
+      </div>
+
+      {/* Cómo se juega */}
+      <div className="arcade-separador mt-6 pt-4">
+        <div className="f-pixel t-magenta mb-3 text-[9px]">COMO SE JUEGA</div>
+        <div className="f-crt t-suave mb-4 hidden flex-wrap items-center gap-2 text-[18px] lg:flex">
+          <span className="arcade-tecla"><Pixel sprite="flechaIzq" tam={2} /></span>
+          <span className="arcade-tecla"><Pixel sprite="flechaDer" tam={2} /></span>
+          <span>mover</span>
+          <span className="arcade-tecla ml-3">P</span>
+          <span>pausa</span>
+        </div>
+        <p className="f-crt t-suave mb-4 text-[18px] lg:hidden">
+          Mantené apretados los botones redondos de abajo (o tocá los costados de la ruta).
+        </p>
+        <ul className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+          {REGLAS.map((r) => (
+            <li key={r.titulo} className="flex items-start gap-2.5">
+              <span className="mt-0.5 flex w-[18px] shrink-0 justify-center">
+                <Pixel sprite={r.sprite} tam={2} />
+              </span>
+              <div className="min-w-0">
+                <div className="f-pixel t-amarillo text-[8px] uppercase">{r.titulo}</div>
+                <div className="f-crt t-suave text-[17px]">{r.texto}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
 }
 
-// ── 3) Resultado ────────────────────────────────────────────────────────
+// ── 3) GAME OVER ───────────────────────────────────────────────────────
 function Resultado({ final, onOtra, onReintentar, onCambiar, hayChips, nombre, ocupado }) {
   const { resultado: r, guardando, error, respuesta } = final;
   const reducir = useReducedMotion();
   const [chiste] = useState(() => CHISTES_MARIANO[Math.floor(Math.random() * CHISTES_MARIANO.length)]);
+  const cuenta = useCuentaArriba(r.puntos, 1100);
   const rec = respuesta?.records || {};
   const km = (r.metros / 1000).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const miRecord = respuesta?.tablero?.yo?.mejor_historico || 0;
   const faltaron = respuesta && !rec.personal && miRecord > r.puntos ? miRecord - r.puntos : 0;
   const festejo = rec.global
-    ? "¡Récord de toda la empresa!"
+    ? "¡Record de toda la empresa!"
     : rec.oficina
-      ? "¡Récord de tu oficina!"
+      ? "¡Record de tu oficina!"
       : rec.personal
-        ? "¡Tu mejor puntaje!"
+        ? "¡Nuevo record personal!"
         : "";
 
+  // ⌨️ ENTER = jugar de nuevo · ESC = cambiar jugador / volver
+  const accionesRef = useRef({});
+  useEffect(() => {
+    accionesRef.current = { onOtra, onCambiar, ocupado };
+  });
+  useEffect(() => {
+    const alTeclear = (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.repeat || esCampo(e.target)) return;
+      const a = accionesRef.current;
+      if (e.key === "Enter") {
+        if (esControl(e.target)) return;
+        e.preventDefault();
+        if (!a.ocupado) a.onOtra();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        a.onCambiar();
+      }
+    };
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, []);
+
   return (
-    <div className={`${UI.card} overflow-hidden`} data-testid="juego-resultado">
-      <div className="bg-[#111827] px-5 pb-6 pt-5 text-center text-white">
-        {/* 🕹️ GAME OVER de fichín */}
-        <MotionDiv
-          initial={reducir ? false : { scale: 1.6, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 260, damping: 14 }}
-          className="font-mono text-[38px] font-black leading-none tracking-[0.12em] text-[#ef4444] [text-shadow:3px_3px_0_#facc15]"
-          data-testid="juego-game-over"
-        >
-          GAME OVER
-        </MotionDiv>
-        <div className="mt-2 text-[12px] text-white/70">
-          {r.siniestros || 3} siniestros · te dieron de baja
-        </div>
-
-        {/* ☎️ El chiste: te llama Mariano */}
-        <MotionDiv
-          initial={reducir ? false : { y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.35, duration: 0.35 }}
-          className="mx-auto mt-4 flex max-w-[340px] items-center gap-3 rounded-2xl bg-white/10 p-3 text-left ring-1 ring-white/15"
-          data-testid="juego-mariano"
-        >
-          <div className="relative flex h-12 w-12 shrink-0 items-center justify-center">
-            {!reducir && <span className="absolute inset-0 animate-ping rounded-full bg-[#22c55e]/40" />}
-            <MotionDiv
-              animate={reducir ? undefined : { rotate: [0, -18, 18, -18, 18, -10, 10, 0] }}
-              transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 0.7 }}
-              className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#16a34a]"
-            >
-              <HiPhone className="text-[22px] text-white" />
-            </MotionDiv>
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-[#86efac]">Llamada entrante · Mariano</div>
-            <div className="text-[14px] font-bold leading-snug text-[#facc15]">Mariano te va a llamar para pedir documentación</div>
-            <div className="mt-0.5 text-[12px] leading-snug text-white/70">{chiste}</div>
-          </div>
-        </MotionDiv>
-
-        {nombre && <div className="mt-4 text-[12px] text-white/70">{nombre}</div>}
-        <div className="mt-1 font-mono text-[40px] font-black leading-none tabular-nums" data-testid="juego-puntaje-final">
-          {fmt(r.puntos)}
-        </div>
-        <div className="text-[12px] text-white/70">puntos</div>
-        {festejo && (
-          <div className="mx-auto mt-3 inline-flex items-center gap-1 rounded-full bg-[#facc15] px-3 py-1 text-[12px] font-bold text-[#422006]" data-testid="juego-record">
-            <HiSparkles className="text-[14px]" /> {festejo}
-          </div>
-        )}
+    <div className="arcade-marco arcade-marco--magenta px-4 pb-5 pt-7 text-center" data-testid="juego-resultado">
+      {/* 🕹️ GAME OVER de fichín */}
+      <MotionDiv
+        initial={reducir ? false : { scale: 1.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 14 }}
+        className="arcade-gameover text-[clamp(26px,8.4vw,36px)]"
+        data-texto="GAME OVER"
+        data-testid="juego-game-over"
+      >
+        GAME OVER
+      </MotionDiv>
+      <div className="f-pixel t-suave mt-3 text-[9px] uppercase">
+        {r.siniestros || 3} siniestros · te dieron de baja
       </div>
 
-      <div className="grid grid-cols-4 gap-2 p-4 text-center">
+      {/* ☎️ El chiste: te llama Mariano (en la pantallita de un celular viejo) */}
+      <MotionDiv
+        initial={reducir ? false : { y: 18, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.4, duration: 0.35 }}
+        className="arcade-lcd-marco mx-auto mt-6 max-w-[360px]"
+        data-testid="juego-mariano"
+      >
+        <div className="arcade-lcd">
+          <div className="flex items-center gap-3">
+            <span className="arcade-timbre flex shrink-0">
+              <Pixel sprite="telefono" tam={3} />
+            </span>
+            <div className="min-w-0">
+              <div className="arcade-lcd__titulo">
+                Llamada entrante<span className="arcade-titilar">...</span>
+              </div>
+              <div className="arcade-lcd__nombre">MARIANO</div>
+            </div>
+          </div>
+          <div className="arcade-lcd__msg mt-2">Mariano te va a llamar para pedir documentación</div>
+          <div className="arcade-lcd__chiste mt-1">&gt; {chiste}</div>
+        </div>
+      </MotionDiv>
+
+      {/* Puntaje */}
+      {nombre && <div className="f-crt t-cian mt-6 text-[22px] uppercase">{nombre}</div>}
+      <div className="f-pixel t-suave mt-2 text-[8px]">PUNTAJE</div>
+      <div
+        className="arcade-puntaje mt-1 text-[clamp(26px,8vw,34px)]"
+        data-testid="juego-puntaje-final"
+        data-listo={cuenta.listo ? "1" : "0"}
+      >
+        {puntaje6(cuenta.n)}
+      </div>
+      {festejo && (
+        <div className="f-pixel arcade-arcoiris mt-3 flex items-center justify-center gap-2 text-[10px] uppercase" data-testid="juego-record">
+          <Pixel sprite="trofeo" tam={2} /> {festejo}
+        </div>
+      )}
+
+      {/* Resumen, como el "bonus" de fin de nivel */}
+      <div className="arcade-tally mx-auto mt-6 max-w-[340px] text-left">
         {[
-          [km, "km"],
-          [r.esquives, "¡casi!"],
-          [r.monedas, "monedas"],
-          [tiempo(r.segundos), "tiempo"],
-        ].map(([v, lbl]) => (
-          <div key={lbl} className="rounded-lg bg-surface py-2 dark:bg-surface-dark">
-            <div className={`font-mono text-[15px] font-semibold ${UI.txtTitulo}`}>{v}</div>
-            <div className={`text-[11px] ${UI.txtSuave}`}>{lbl}</div>
+          ["autoRojo", "Distancia", `${km} km`],
+          ["rayo", "¡Casi!", r.esquives],
+          ["moneda", "Monedas", r.monedas],
+          ["reloj", "Tiempo", tiempo(r.segundos)],
+        ].map(([sprite, etiqueta, valor]) => (
+          <div key={etiqueta} className="arcade-tally__fila">
+            <span className="flex w-[16px] shrink-0 justify-center">
+              <Pixel sprite={sprite} tam={2} />
+            </span>
+            <span>{etiqueta}</span>
+            <span className="arcade-tally__puntos" />
+            <span className="arcade-tally__valor">{valor}</span>
           </div>
         ))}
       </div>
 
-      <div className="px-4 text-center text-[13px]">
+      {/* Guardado y puesto */}
+      <div className="f-crt mt-5 min-h-[24px] text-[20px]">
         {guardando ? (
-          <span className={UI.txtSuave}>Guardando tu puntaje…</span>
+          <span className="t-suave arcade-titilar">Guardando tu puntaje...</span>
         ) : error ? (
-          <span className="text-marca">
+          <span className="t-rojo">
             {error}{" "}
-            <button type="button" onClick={onReintentar} className="font-semibold underline">
+            <button type="button" onClick={onReintentar} className="t-amarillo underline">
               Reintentar
             </button>
           </span>
         ) : respuesta?.puesto_semana ? (
-          <span className={UI.txtSuave} data-testid="juego-puesto">
-            Quedaste <strong className={`font-semibold ${UI.txtTitulo}`}>#{respuesta.puesto_semana}</strong> de{" "}
+          <span className="t-suave" data-testid="juego-puesto">
+            Quedaste <strong className="t-amarillo font-normal">#{respuesta.puesto_semana}</strong> de{" "}
             {respuesta.total_semana} esta semana
             {faltaron > 0 && (
-              <span className="block text-[12px]">Te faltaron {fmt(faltaron)} puntos para tu récord ({fmt(miRecord)}).</span>
+              <span className="block text-[17px]">
+                Te faltaron {fmt(faltaron)} puntos para tu récord ({fmt(miRecord)}).
+              </span>
             )}
           </span>
         ) : null}
       </div>
 
-      <div className="flex gap-2 p-4">
-        <button
-          type="button"
-          onClick={onOtra}
-          disabled={ocupado}
-          className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-lg text-[15px] ${UI.btnPrimary}`}
-          data-testid="juego-otra"
-        >
-          <HiPlay className="text-lg" /> Jugar de nuevo
-        </button>
-        <button type="button" onClick={onCambiar} className={`h-12 rounded-lg px-4 text-[13px] ${UI.btnGhost}`}>
+      {/* ¿Otra ficha? */}
+      <div className="f-pixel t-amarillo arcade-titilar mt-6 text-[10px]">¿OTRA FICHA?</div>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+        <div className="arcade-brillo flex-1">
+          <button
+            type="button"
+            onClick={onOtra}
+            disabled={ocupado}
+            className="arcade-btn h-12 w-full"
+            data-testid="juego-otra"
+          >
+            <Pixel sprite="play" tam={2} /> Jugar de nuevo
+          </button>
+        </div>
+        <button type="button" onClick={onCambiar} className="arcade-btn arcade-btn--fantasma h-12 px-4 text-[9px]">
           {hayChips ? "Cambiar jugador" : "Volver"}
         </button>
+      </div>
+      <div className="f-crt t-tenue mt-2 hidden text-[17px] lg:block">
+        ENTER = jugar de nuevo · ESC = {hayChips ? "cambiar jugador" : "volver"}
       </div>
     </div>
   );

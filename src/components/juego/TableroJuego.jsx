@@ -1,24 +1,23 @@
 /* src/components/juego/TableroJuego.jsx
  *
- * 🏆 Tablero global del minijuego (Siniestro Cero).
+ * 🏆 HIGH SCORES del minijuego (Siniestro Cero), estilo fichín.
  *
- *   · Jugadores → el mejor puntaje de cada persona, con su oficina.
- *   · Oficinas  → el récord de cada oficina, quién lo hizo, cuántas
- *                 partidas jugaron y cuántas personas (así se ve qué
- *                 oficina es más competitiva).
+ *   · Jugadores → el mejor puntaje de cada persona (con su bichito pixel y
+ *                 su oficina). El 1° lleva corona.
+ *   · Oficinas  → el récord de cada oficina con su barra de "energía", quién
+ *                 lo hizo (MVP), cuántas partidas y cuántas personas jugaron
+ *                 (así se ve qué oficina es más competitiva).
  *
  * Períodos: Hoy / Semana (arranca el lunes) / Siempre.
  * Recibe los datos armados (GET /api/ranking/juego/); no pide nada solo.
  */
 import { useState } from "react";
-import { HiUser, HiOfficeBuilding, HiStar } from "react-icons/hi";
-import { UI } from "../tareas/tareasUI";
-
-const fmt = (n) => Number(n || 0).toLocaleString("es-AR");
+import { AvatarPixel, Pixel } from "./ArcadeUI";
+import { puntaje6 } from "./arcade";
 
 const VISTAS = [
-  { clave: "jugadores", texto: "Jugadores", icono: HiUser },
-  { clave: "oficinas", texto: "Oficinas", icono: HiOfficeBuilding },
+  { clave: "jugadores", texto: "Jugadores" },
+  { clave: "oficinas", texto: "Oficinas" },
 ];
 
 const RANGOS = [
@@ -27,135 +26,123 @@ const RANGOS = [
   ["siempre", "Siempre"],
 ];
 
-// Oro / plata / bronce (mismos tonos que la pantalla de Ranking)
-const PODIO = [
-  "bg-[#fde68a]/60 text-[#92400e] dark:bg-[#78350f]/50 dark:text-[#fbbf24]",
-  "bg-titulo/10 text-titulo dark:bg-white/10 dark:text-titulo-dark",
-  "bg-[#fdba74]/40 text-[#9a3412] dark:bg-[#7c2d12]/45 dark:text-[#fb923c]",
-];
+const podio = (n) => (n >= 1 && n <= 3 ? ` arcade-podio-${n}` : "");
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 
-function Puesto({ n }) {
-  const cls = n <= 3 ? PODIO[n - 1] : `bg-transparent ${UI.txtSuave}`;
-  return (
-    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold ${cls}`}>
-      {n}
-    </span>
-  );
-}
-
-export default function TableroJuego({ datos, rango = "semana", onRango, cargando = false }) {
+export default function TableroJuego({ datos, rango = "semana", onRango, cargando = false, error = false, onReintentar }) {
   const [vista, setVista] = useState("jugadores");
   const jugadores = datos?.jugadores || [];
   const oficinas = datos?.oficinas || [];
   const record = datos?.record;
   const verMinutos = oficinas.some((o) => o.minutos !== undefined);
+  const maxOficina = oficinas.reduce((m, o) => Math.max(m, o.mejor || 0), 0);
 
   return (
-    <div className={`${UI.card} overflow-hidden`} data-testid="juego-tablero">
-      {/* Encabezado + pestañas */}
-      <div className="flex items-center justify-between gap-2 border-b border-linea px-4 py-3 dark:border-linea-dark">
-        <h2 className={`flex items-center gap-2 text-[15px] font-semibold ${UI.txtTitulo}`}>
-          <HiStar className="text-tarjeta" /> Tablero
-        </h2>
-        <div className="flex gap-1 rounded-lg border border-linea bg-surface p-1 dark:border-linea-dark dark:bg-surface-dark">
-          {VISTAS.map((v) => {
-            const Icono = v.icono;
-            return (
-              <button
-                key={v.clave}
-                type="button"
-                onClick={() => setVista(v.clave)}
-                className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                  vista === v.clave ? "bg-marca text-white" : UI.txtSuave
-                }`}
-              >
-                <Icono className="text-[13px]" /> {v.texto}
-              </button>
-            );
-          })}
-        </div>
+    <div className="arcade-marco p-4" data-testid="juego-tablero">
+      <h2 className="arcade-titulo-scores flex items-center justify-center gap-3 text-[15px] leading-none">
+        <Pixel sprite="trofeo" tam={3} /> HIGH SCORES <Pixel sprite="trofeo" tam={3} />
+      </h2>
+
+      {/* Jugadores / Oficinas */}
+      <div className="mt-4 flex gap-2">
+        {VISTAS.map((v) => (
+          <button
+            key={v.clave}
+            type="button"
+            onClick={() => setVista(v.clave)}
+            aria-pressed={vista === v.clave}
+            className="arcade-tab"
+          >
+            {v.texto}
+          </button>
+        ))}
       </div>
 
       {/* Período */}
-      <div className="flex gap-1.5 px-4 pt-3">
+      <div className="mt-2 flex flex-wrap justify-center gap-1">
         {RANGOS.map(([k, lbl]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => onRango?.(k)}
-            className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${
-              rango === k ? "border-marca bg-marca/10 text-marca" : `border-linea dark:border-linea-dark ${UI.txtSuave}`
-            }`}
-          >
+          <button key={k} type="button" onClick={() => onRango?.(k)} aria-pressed={rango === k} className="arcade-rango">
             {lbl}
           </button>
         ))}
       </div>
 
-      <div className="px-2 pb-2 pt-2">
+      <div className="mt-3 min-h-[180px]">
         {cargando && !datos ? (
-          <div className="flex justify-center py-10">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-linea border-t-marca dark:border-linea-dark" />
+          <div className="f-pixel t-cian arcade-titilar py-14 text-center text-[11px]">CARGANDO...</div>
+        ) : error && !datos ? (
+          <div className="py-10 text-center">
+            <div className="f-pixel t-rojo text-[11px]">SIN CONEXION</div>
+            <p className="f-crt t-suave mt-2 text-[19px]">No se pudo cargar el tablero. Revisá la conexión.</p>
+            {onReintentar && (
+              <button type="button" onClick={onReintentar} className="arcade-btn arcade-btn--cian mt-4 px-4 text-[9px]">
+                Reintentar
+              </button>
+            )}
           </div>
         ) : vista === "jugadores" ? (
           jugadores.length === 0 ? (
-            <p className={`px-3 py-8 text-center text-[13px] ${UI.txtSuave}`}>
-              Nadie jugó todavía en este período. ¡Estrenalo vos!
-            </p>
+            <div className="py-10 text-center">
+              <p className="f-crt t-suave text-[20px]">Nadie jugó todavía en este período.</p>
+              <p className="f-pixel t-amarillo arcade-titilar mt-3 text-[10px]">¡ESTRENALO VOS!</p>
+            </div>
           ) : (
-            <ul>
-              {jugadores.map((r, i) => {
-                const separado = i > 0 && r.puesto - jugadores[i - 1].puesto > 1;
-                return (
-                  <li key={r.clave}>
-                    {separado && <div className={`py-1 text-center text-[11px] ${UI.txtSuave}`}>···</div>}
-                    <div
-                      className={`flex items-center gap-3 rounded-lg px-2 py-2 ${
-                        r.soy_yo ? "bg-duo-azul-soft ring-1 ring-duo-azul/30 dark:bg-[var(--color-duo-azul-soft-dark)]" : ""
-                      }`}
-                    >
-                      <Puesto n={r.puesto} />
-                      <div className="min-w-0 flex-1">
-                        <div className={`truncate text-[14px] font-medium ${UI.txtTitulo}`}>
-                          {r.nombre}
-                          {r.soy_yo && <span className="ml-1.5 text-[11px] font-semibold text-duo-azul">vos</span>}
+            <>
+              <div className="arcade-cabecera">
+                <span className="w-[30px]">POS</span>
+                <span className="flex-1 pl-[31px]">JUGADOR</span>
+                <span>PUNTOS</span>
+              </div>
+              <ul className="grid gap-1">
+                {jugadores.map((r, i) => {
+                  const separado = i > 0 && r.puesto - jugadores[i - 1].puesto > 1;
+                  return (
+                    <li key={r.clave}>
+                      {separado && <div className="f-pixel t-tenue py-1 text-center text-[8px]">. . .</div>}
+                      <div className={`arcade-fila${podio(r.puesto)}${r.soy_yo ? " arcade-fila--yo" : ""}`}>
+                        <span className="arcade-puesto">{r.puesto}°</span>
+                        <span className="relative flex shrink-0">
+                          {r.puesto === 1 && (
+                            <Pixel sprite="corona" tam={2} className="absolute -top-[11px] left-1/2 -translate-x-1/2" />
+                          )}
+                          <AvatarPixel semilla={r.clave} tam={3} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="arcade-nombre">{r.nombre}</div>
+                          <div className="arcade-sub">
+                            {r.oficina || "Sin oficina"} · {plural(r.partidas, "partida", "partidas")}
+                          </div>
                         </div>
-                        <div className={`truncate text-[11px] ${UI.txtSuave}`}>
-                          {r.oficina || "Sin oficina"} · {r.partidas} {r.partidas === 1 ? "partida" : "partidas"}
-                        </div>
+                        {r.soy_yo && <span className="arcade-vos">vos</span>}
+                        <span className="arcade-score">{puntaje6(r.mejor)}</span>
                       </div>
-                      <span className={`font-mono text-[15px] font-semibold tabular-nums ${UI.txtTitulo}`}>{fmt(r.mejor)}</span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )
         ) : (
-          <ul>
+          <ul className="grid gap-1">
             {oficinas.map((o) => (
-              <li
-                key={o.oficina_id}
-                className={`flex items-center gap-3 rounded-lg px-2 py-2 ${
-                  o.es_mia ? "bg-duo-azul-soft ring-1 ring-duo-azul/30 dark:bg-[var(--color-duo-azul-soft-dark)]" : ""
-                }`}
-              >
-                <Puesto n={o.puesto} />
+              <li key={o.oficina_id} className={`arcade-fila${podio(o.mejor ? o.puesto : 0)}${o.es_mia ? " arcade-fila--yo" : ""}`}>
+                <span className="arcade-puesto">{o.puesto}°</span>
                 <div className="min-w-0 flex-1">
-                  <div className={`truncate text-[14px] font-medium ${UI.txtTitulo}`}>
-                    {o.nombre}
-                    {o.es_mia && <span className="ml-1.5 text-[11px] font-semibold text-duo-azul">tu oficina</span>}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="arcade-nombre">{o.nombre}</span>
+                    {o.es_mia && <span className="arcade-vos">tu oficina</span>}
                   </div>
-                  <div className={`truncate text-[11px] ${UI.txtSuave}`}>
+                  <div className="arcade-barra" aria-hidden="true">
+                    <span style={{ width: `${o.mejor && maxOficina ? Math.max(4, Math.round((o.mejor / maxOficina) * 100)) : 0}%` }} />
+                  </div>
+                  <div className="arcade-sub">
                     {o.partidas
-                      ? `${o.partidas} ${o.partidas === 1 ? "partida" : "partidas"} · ${o.jugadores} ${o.jugadores === 1 ? "jugador" : "jugadores"}${o.record_de ? ` · récord de ${o.record_de}` : ""}`
+                      ? `${plural(o.partidas, "partida", "partidas")} · ${plural(o.jugadores, "jugador", "jugadores")}${o.record_de ? ` · MVP: ${o.record_de}` : ""}`
                       : "Todavía no jugó nadie"}
                     {verMinutos && o.partidas ? ` · ${o.minutos ? `${o.minutos} min` : "menos de 1 min"}` : ""}
                   </div>
                 </div>
-                <span className={`font-mono text-[15px] font-semibold tabular-nums ${o.mejor ? UI.txtTitulo : UI.txtSuave}`}>
-                  {fmt(o.mejor)}
-                </span>
+                <span className={`arcade-score${o.mejor ? "" : " t-tenue"}`}>{puntaje6(o.mejor)}</span>
               </li>
             ))}
           </ul>
@@ -163,10 +150,13 @@ export default function TableroJuego({ datos, rango = "semana", onRango, cargand
       </div>
 
       {record && (
-        <div className={`border-t border-linea px-4 py-2.5 text-[12px] dark:border-linea-dark ${UI.txtSuave}`}>
-          Récord histórico:{" "}
-          <strong className={`font-semibold ${UI.txtTitulo}`}>{fmt(record.puntos)}</strong> · {record.nombre}
-          {record.oficina ? ` (${record.oficina})` : ""}
+        <div className="arcade-separador mt-3 pt-3 text-center">
+          <div className="f-pixel t-magenta text-[8px]">RECORD HISTORICO</div>
+          <div className="f-pixel t-amarillo mt-1 text-[13px]">{puntaje6(record.puntos)}</div>
+          <div className="f-crt t-suave text-[19px]">
+            {record.nombre}
+            {record.oficina ? ` (${record.oficina})` : ""}
+          </div>
         </div>
       )}
     </div>

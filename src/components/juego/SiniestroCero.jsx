@@ -1,12 +1,13 @@
 /* src/components/juego/SiniestroCero.jsx
  *
- * 🚗 SINIESTRO CERO — la pantalla donde se juega (canvas + controles).
+ * 🚗 SINIESTRO CERO — la pantalla donde se juega (canvas + controles),
+ * con look de fichín: marco de neón, líneas de tubo y marcador pixel.
  *
  * Arma la partida (motor.js), la dibuja (dibujo.js) 60 veces por segundo y
  * lee los controles:
  *   · Compu: flechas ← → (o A / D). P, Espacio o Esc = pausa.
  *   · Celu:  tocá y mantené la mitad IZQUIERDA o DERECHA de la ruta,
- *            o los botones grandes de abajo.
+ *            o los botones redondos de abajo.
  *
  * Cuando termina la partida llama a onTerminar(resultado) UNA sola vez.
  * Se pausa sola si cambiás de pestaña o de ventana, o si algo tapa la ruta
@@ -16,21 +17,16 @@
  *   sonido          → true/false (parlante prendido)
  *   recordPersonal  → tu mejor puntaje (si lo pasás, sale "¡NUEVO RÉCORD!")
  *   onTerminar      → (resultado) => void   { puntos, metros, segundos, esquives, monedas, siniestros }
- *   onAbandonar → () => void            (desde la pausa; no se guarda nada)
+ *   onAbandonar     → () => void            (desde la pausa; no se guarda nada)
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HiPause, HiPlay, HiChevronLeft, HiChevronRight } from "react-icons/hi";
-import { FaCar } from "react-icons/fa";
 import { ANCHO, ALTO, VIDAS, actualizar, anunciar, crearPartida, kmh, resultado } from "./motor";
 import { dibujarPartida } from "./dibujo";
 import { crearSonido } from "./sonido";
+import { Pixel } from "./ArcadeUI";
+import { puntaje6 } from "./arcade";
 
-const fmt = (n) => Number(n || 0).toLocaleString("es-AR");
-
-const BOTONES = [
-  { lado: "izq", icono: HiChevronLeft, texto: "Izquierda" },
-  { lado: "der", icono: HiChevronRight, texto: "Derecha" },
-];
+const SUELTO = { izq: false, der: false };
 
 // ¿Es un celu/tablet? (dedo como puntero principal, o pantalla táctil chica)
 function esTactil() {
@@ -57,6 +53,7 @@ export default function SiniestroCero({ sonido = false, recordPersonal = 0, onTe
   const pausaRef = useRef(false);
   const [pausa, setPausa] = useState(false);
   const [hud, setHud] = useState({ puntos: 0, vidas: VIDAS, kmh: 0, km: "0,0", escudo: 0, combo: 0 });
+  const [apretado, setApretado] = useState(SUELTO); // para que el botón redondo "se hunda"
   const [tactil] = useState(esTactil);
 
   const sonidoRef = useRef(null);
@@ -84,6 +81,7 @@ export default function SiniestroCero({ sonido = false, recordPersonal = 0, onTe
     botonesRef.current = { izq: false, der: false };
     dedosRef.current.clear();
     entradaRef.current = { izq: false, der: false };
+    setApretado(SUELTO);
   }, []);
 
   // 🔊 Sonido
@@ -199,7 +197,7 @@ export default function SiniestroCero({ sonido = false, recordPersonal = 0, onTe
       }
       if (!recordAvisado && p.finEn === null && p.puntos > recordRef.current) {
         recordAvisado = true;
-        anunciar(p, "¡NUEVO RÉCORD!");
+        anunciar(p, "¡NUEVO RECORD!"); // sin tilde: la letra de fichín no tiene mayúsculas acentuadas
         p.eventos.push("escudo"); // el mismo "tururú" de festejo
       }
 
@@ -263,19 +261,36 @@ export default function SiniestroCero({ sonido = false, recordPersonal = 0, onTe
     recalcularEntrada();
   };
 
-  // Botones grandes de abajo (celu)
-  const boton = (lado, apretado) => (e) => {
+  // Botones redondos de abajo (celu)
+  const boton = (lado, si) => (e) => {
     e.preventDefault();
     if (pausaRef.current) return;
-    botonesRef.current[lado] = apretado;
+    botonesRef.current[lado] = si;
     recalcularEntrada();
+    setApretado((a) => (a[lado] === si ? a : { ...a, [lado]: si }));
   };
+  const botonRedondo = (lado, sprite, texto, extra = "") => (
+    <button
+      type="button"
+      aria-label={texto}
+      onPointerDown={boton(lado, true)}
+      onPointerUp={boton(lado, false)}
+      onPointerCancel={boton(lado, false)}
+      onPointerLeave={boton(lado, false)}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`arcade-boton-redondo${extra}`}
+      data-apretado={apretado[lado] ? "true" : "false"}
+      data-testid={`juego-boton-${lado}`}
+    >
+      <Pixel sprite={sprite} tam={4} />
+    </button>
+  );
 
   return (
-    <div className="flex w-full flex-col items-center select-none">
+    <div className="flex w-full select-none flex-col items-center">
       <div
         ref={cajaRef}
-        className="relative w-full overflow-hidden rounded-xl border border-black/40 bg-[#3f9b3a] shadow-lg"
+        className="arcade-pantalla"
         style={{
           aspectRatio: `${ANCHO} / ${ALTO}`,
           // Que entre en la pantalla, pero nunca tan chica que no se pueda jugar
@@ -293,32 +308,30 @@ export default function SiniestroCero({ sonido = false, recordPersonal = 0, onTe
         data-testid="juego-ruta"
       >
         <canvas ref={lienzoRef} className="block h-full w-full" style={{ imageRendering: "pixelated" }} />
+        <div className="arcade-crt" aria-hidden="true" />
 
-        {/* HUD: puntos · vidas · velocidad */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between bg-linear-to-b from-black/70 to-transparent px-2.5 pb-4 pt-2 font-mono text-white">
-          <div>
-            <div className="text-[9px] font-semibold uppercase tracking-widest text-white/70">Puntos</div>
-            <div className="text-[17px] font-black leading-none tabular-nums" data-testid="juego-puntos">{fmt(hud.puntos)}</div>
-            {recordRef.current > 0 && (
-              <div className="mt-0.5 text-[9px] font-semibold text-white/60">Récord {fmt(recordRef.current)}</div>
-            )}
-            {hud.combo > 1 && (
-              <div className="mt-0.5 text-[10px] font-bold text-yellow-300">¡CASI! x{hud.combo}</div>
-            )}
+        {/* HUD de fichín: 1UP · récord · vidas · velocidad */}
+        <div className="arcade-hud">
+          <div className="min-w-0">
+            <div className="arcade-hud__label arcade-titilar">1UP</div>
+            <div className="arcade-hud__num" data-testid="juego-puntos">{puntaje6(hud.puntos)}</div>
+            {recordRef.current > 0 && <div className="arcade-hud__mini">HI {puntaje6(recordRef.current)}</div>}
+            {hud.combo > 1 && <div className="arcade-hud__combo">¡CASI! x{hud.combo}</div>}
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex gap-1" aria-label={`${hud.vidas} vidas`} data-testid="juego-vidas">
+          <div className="flex flex-col items-end gap-1 text-right">
+            <div className="flex gap-1" role="img" aria-label={`${hud.vidas} vidas`} data-testid="juego-vidas">
               {Array.from({ length: VIDAS }).map((_, i) => (
-                <FaCar key={i} className={`text-[13px] ${i < hud.vidas ? "text-red-500" : "text-white/25"}`} />
+                <span key={i} className="flex" data-viva={i < hud.vidas ? "1" : "0"}>
+                  <Pixel sprite="corazon" tam={2} apagado={i >= hud.vidas} />
+                </span>
               ))}
             </div>
-            {hud.escudo > 0 && (
-              <div className="rounded bg-sky-500/90 px-1.5 text-[9px] font-bold uppercase">Cobertura {hud.escudo}s</div>
-            )}
-          </div>
-          <div className="text-right">
-            <div className="text-[15px] font-black leading-none tabular-nums">{hud.kmh}<span className="ml-0.5 text-[9px] font-semibold text-white/70">km/h</span></div>
-            <div className="mt-0.5 text-[10px] font-semibold tabular-nums text-white/80">{hud.km} km</div>
+            <div className="arcade-hud__num">
+              {hud.kmh}
+              <span className="arcade-hud__mini ml-1">KM/H</span>
+            </div>
+            <div className="arcade-hud__mini">{hud.km} KM</div>
+            {hud.escudo > 0 && <div className="arcade-hud__escudo">COBERTURA {hud.escudo}</div>}
           </div>
         </div>
 
@@ -327,69 +340,48 @@ export default function SiniestroCero({ sonido = false, recordPersonal = 0, onTe
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => ponerPausa(!pausaRef.current)}
-          className="absolute bottom-2 right-2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+          className="arcade-boton-pausa"
           aria-label={pausa ? "Seguir" : "Pausa"}
           data-testid="juego-pausa"
         >
-          {pausa ? <HiPlay className="text-lg" /> : <HiPause className="text-lg" />}
+          <Pixel sprite={pausa ? "play" : "pausa"} tam={2} />
         </button>
 
         {pausa && (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/65 px-6 text-center text-white backdrop-blur-[2px]"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <div className="font-mono text-2xl font-black tracking-widest">PAUSA</div>
-            <button
-              type="button"
-              onClick={() => ponerPausa(false)}
-              className="w-44 rounded-lg bg-marca py-3 text-[15px] font-semibold text-white hover:brightness-110"
-            >
+          <div className="arcade-pausa" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="f-pixel t-amarillo arcade-titilar text-[22px]">PAUSA</div>
+            <button type="button" onClick={() => ponerPausa(false)} className="arcade-btn w-48">
               Seguir
             </button>
             {onAbandonar && (
-              <button
-                type="button"
-                onClick={onAbandonar}
-                className="w-44 rounded-lg border border-white/30 py-2.5 text-[13px] font-medium text-white/85 hover:bg-white/10"
-              >
+              <button type="button" onClick={onAbandonar} className="arcade-btn arcade-btn--fantasma w-48 text-[8px]">
                 Abandonar (no se guarda)
               </button>
             )}
+            <div className="f-crt t-suave text-[18px]">P o ESPACIO para seguir</div>
           </div>
         )}
       </div>
 
-      {/* Botones grandes para el celu */}
+      {/* Controles */}
       {tactil ? (
-        <div className="mt-3 grid w-full max-w-[420px] grid-cols-2 gap-3">
-          {BOTONES.map((b) => {
-            const Icono = b.icono;
-            return (
-              <button
-                key={b.lado}
-                type="button"
-                aria-label={b.texto}
-                onPointerDown={boton(b.lado, true)}
-                onPointerUp={boton(b.lado, false)}
-                onPointerCancel={boton(b.lado, false)}
-                onPointerLeave={boton(b.lado, false)}
-                onContextMenu={(e) => e.preventDefault()}
-                className="flex h-14 items-center justify-center rounded-xl border border-linea bg-card text-3xl text-titulo active:bg-surface dark:border-linea-dark dark:bg-card-dark dark:text-titulo-dark dark:active:bg-surface-dark"
-                style={{ touchAction: "none" }}
-                data-testid={`juego-boton-${b.lado}`}
-              >
-                <Icono />
-              </button>
-            );
-          })}
+        <div className="arcade-panel-control mt-5 w-full max-w-[420px]">
+          {botonRedondo("izq", "flechaIzq", "Izquierda")}
+          <div className="f-pixel t-tenue text-center text-[7px] leading-relaxed">
+            MANTENER
+            <br />
+            APRETADO
+          </div>
+          {botonRedondo("der", "flechaDer", "Derecha", " arcade-boton-redondo--azul")}
         </div>
       ) : (
-        <p className="mt-2 text-center text-[12px] text-suave dark:text-suave-dark">
-          Flechas <kbd className="rounded border border-linea px-1 dark:border-linea-dark">←</kbd>{" "}
-          <kbd className="rounded border border-linea px-1 dark:border-linea-dark">→</kbd> para doblar ·{" "}
-          <kbd className="rounded border border-linea px-1 dark:border-linea-dark">P</kbd> pausa
-        </p>
+        <div className="f-crt t-suave mt-5 flex flex-wrap items-center justify-center gap-2 text-[18px]">
+          <span className="arcade-tecla"><Pixel sprite="flechaIzq" tam={2} /></span>
+          <span className="arcade-tecla"><Pixel sprite="flechaDer" tam={2} /></span>
+          <span>mover</span>
+          <span className="arcade-tecla ml-3">P</span>
+          <span>pausa</span>
+        </div>
       )}
     </div>
   );

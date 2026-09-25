@@ -9,6 +9,7 @@
 //   const s = crearSonido();
 //   s.activar(true);        // después de un toque del usuario (regla del navegador)
 //   s.evento("moneda");     // moneda, casi, choque, escudo, cuenta, ya, fin, banquina
+//                           // y los del menú: menu (elegir), start (ficha), error, record
 //   s.motor(vel);           // zumbido del motor según la velocidad (0 = apagado)
 //   s.cerrar();
 
@@ -101,6 +102,14 @@ export function crearSonido() {
           [1.05, 1.75].forEach((desde) => {
             for (let k = 0; k < 8; k++) beep(k % 2 ? 1047 : 1319, 0.05, { despues: desde + k * 0.05, vol: 0.03 });
           });
+          break;
+        // ── Menú del fichín ──
+        case "menu": beep(880, 0.04, { vol: 0.03 }); beep(1320, 0.05, { despues: 0.04, vol: 0.03 }); break;
+        case "start": [523, 784, 1047, 1568].forEach((f, i) => beep(f, 0.08, { despues: i * 0.06, vol: 0.04 })); break;
+        case "error": beep(150, 0.2, { tipo: "sawtooth", vol: 0.05 }); break;
+        case "record":
+          // fanfarria (arranca un toque después, cuando ya terminó el teléfono)
+          [659, 784, 988, 1319, 988, 1319].forEach((f, i) => beep(f, 0.1, { despues: 0.9 + i * 0.1, vol: 0.04 }));
           break;
         default: break;
       }
