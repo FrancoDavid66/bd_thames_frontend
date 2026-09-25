@@ -275,6 +275,16 @@ export default function PagosSearch({ onBuscar }) {
     });
   }, [buscarClienteData]);
   const cliente   = buscarClienteData?.cliente || null;
+  // 🚫 Pólizas dadas de baja: no se cobran (no van en las tarjetas), pero se
+  //    muestra POR QUÉ, así el que atiende sabe el contexto del cliente.
+  //    Ej: "Baja automática por cuota impaga · Cuota 3 sin pagar · vencía el 24/09".
+  const bajas     = useMemo(() => {
+    const arr = Array.isArray(buscarClienteData?.polizas) ? buscarClienteData.polizas : [];
+    return arr
+      .filter((p) => String(p?.estado || "").toLowerCase() === "cancelada")
+      .sort((a, b) => String(b?.fecha_baja || "").localeCompare(String(a?.fecha_baja || "")))
+      .slice(0, 3);
+  }, [buscarClienteData]);
 
   const limpiar = useCallback(() => {
     setQuery(""); setAlertaPoliza(null);
@@ -515,7 +525,37 @@ export default function PagosSearch({ onBuscar }) {
             </div>
 
             {polizas.length === 0 && (
-              <p className="text-sm text-suave dark:text-suave-dark px-1">No hay pólizas para este cliente.</p>
+              <p className="text-sm text-suave dark:text-suave-dark px-1">
+                {bajas.length ? "No tiene pólizas para cobrar." : "No hay pólizas para este cliente."}
+              </p>
+            )}
+
+            {/* 🚫 Dadas de baja: por qué (no se cobran, pero se ve el contexto) */}
+            {bajas.length > 0 && (
+              <div className="mt-3 rounded-xl border border-duo-rojo/30 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-3.5 space-y-2.5">
+                <p className="text-[11px] font-medium text-duo-rojo">
+                  {bajas.length > 1 ? "Pólizas dadas de baja" : "Póliza dada de baja"}
+                </p>
+                {bajas.map((b) => (
+                  <div key={b.poliza_id} className="text-[13px] leading-snug">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono font-medium text-titulo dark:text-titulo-dark">{b.patente || "—"}</span>
+                      <span className="text-xs text-suave dark:text-suave-dark">{b.compania || ""}</span>
+                    </div>
+                    <div className="font-semibold text-titulo dark:text-titulo-dark">
+                      {b.baja_motivo || "Sin motivo cargado"}
+                    </div>
+                    {b.baja_detalle && (
+                      <div className="text-xs text-titulo dark:text-titulo-dark">{b.baja_detalle}</div>
+                    )}
+                    {b.fecha_baja && (
+                      <div className="text-[11px] text-suave dark:text-suave-dark">
+                        Dada de baja el {dayjs(b.fecha_baja).format("DD/MM/YYYY")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </motion.div>
         )}

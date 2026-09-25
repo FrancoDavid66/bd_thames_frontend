@@ -450,12 +450,14 @@ export const renovarPoliza = createAsyncThunk(
   }
 );
 
+// `extra`: campos que viajan junto con el estado. Ej. al cancelar:
+//   { motivo_baja: "INCUMPLIMIENTO_PAGO", observaciones_baja: "debe 3 cuotas" }
 export const togglePolizaEstado = createAsyncThunk(
   "polizas/togglePolizaEstado",
-  async ({ id, estado }, { rejectWithValue, signal }) => {
+  async ({ id, estado, extra }, { rejectWithValue, signal }) => {
     try {
-      await api.patch(`polizas/${id}/`, { estado }, { signal });
-      return { id, estado };
+      await api.patch(`polizas/${id}/`, { estado, ...(extra || {}) }, { signal });
+      return { id, estado, extra: extra || {} };
     } catch (err) {
       return rejectWithValue(err.response?.data || "Error al cambiar estado");
     }
@@ -719,11 +721,12 @@ const polizasSlice = createSlice({
         if (state.poliza?.id === id) state.poliza = merged;
       })
       .addCase(togglePolizaEstado.fulfilled, (state, action) => {
-        const { id, estado } = action.payload || {}; if (!id) return;
-        if (state.byId[id]) state.byId[id] = { ...state.byId[id], estado };
+        const { id, estado, extra = {} } = action.payload || {}; if (!id) return;
+        if (state.byId[id]) state.byId[id] = { ...state.byId[id], ...extra, estado };
         const i = (state.list || []).findIndex((p) => p?.id === id);
-        if (i !== -1) state.list[i] = { ...(state.list[i] || {}), estado };
-        if (state.poliza?.id === id) state.poliza = { ...(state.poliza || {}), estado };
+        // En la lista se descarta el baja_info viejo: la tabla usa el motivo nuevo hasta que se recargue.
+        if (i !== -1) state.list[i] = { ...(state.list[i] || {}), ...extra, estado, baja_info: null };
+        if (state.poliza?.id === id) state.poliza = { ...(state.poliza || {}), ...extra, estado };
       })
       .addCase(fetchResumenPolizas.fulfilled, (state, action) => { state.resumenPorEstado = action.payload || {}; })
       .addCase(pagarCuota.fulfilled, (state, action) => {

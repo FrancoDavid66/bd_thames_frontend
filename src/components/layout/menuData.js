@@ -12,6 +12,8 @@ import {
   HiShieldCheck, HiCog, HiViewGrid, HiStar,
   HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2,
 } from "react-icons/hi";
+// 🎮 Ícono del minijuego (Heroicons v1 no trae un joystick)
+import { FaGamepad } from "react-icons/fa";
 
 export const ICON_MAP = {
   home: HiHome, users: HiUsers, doc: HiDocumentText, money: HiCurrencyDollar,
@@ -20,6 +22,7 @@ export const ICON_MAP = {
   ban: HiBan, cash: HiCash, receipt: HiReceiptTax,
   shield: HiShieldCheck, cog: HiCog, grid: HiViewGrid,
   pencil: HiPencilAlt, calc: HiCalculator, camera: HiCamera, chat: HiChatAlt2,
+  game: FaGamepad,
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -151,6 +154,15 @@ export function buildMenuGroups({
         { to: "/admin", label: "Configuración", icon: "cog" },
       ],
     }] : []),
+    {
+      // 🎮 RECREO: el minijuego "Siniestro Cero" (auto que esquiva el
+      //    tráfico, estilo Road Fighter). Suelto (sin acordeón) para que se
+      //    vea a la primera. Los puntos del juego NO suman al ranking de trabajo.
+      title: "Recreo", flat: true, id: "recreo",
+      items: [
+        { to: "/juego", label: "Minijuego", icon: "game" },
+      ],
+    },
   ];
 }
 

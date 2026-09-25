@@ -66,6 +66,22 @@ const ESTADO_TONO = {
 // Estados de póliza que MANDAN por sobre el pago (no importa si debe cuotas).
 const ESTADOS_QUE_MANDAN = new Set(["finalizada", "cancelada"]);
 
+// 🚫 Por qué se dio de baja (texto corto). Lo manda el backend en baja_info;
+//    el mapa es por si la fila todavía no se recargó después de cancelarla.
+const MOTIVO_BAJA_CORTO = {
+  INCUMPLIMIENTO_PAGO: "Cuota impaga",
+  MIGRACION_COMPANIA: "Se pasó a otra compañía",
+  VENTA_VEHICULO: "Vendió el auto",
+  SIN_USO: "No lo usa",
+  OTRO: "Otro motivo",
+};
+
+function motivoBajaCorto(poliza) {
+  const bi = poliza?.baja_info;
+  if (bi?.motivo === "OTRO" && bi?.titulo) return bi.titulo;
+  return bi?.motivo_texto || MOTIVO_BAJA_CORTO[poliza?.motivo_baja] || "";
+}
+
 function computeCuotasBadgeFast(poliza) {
   const keyFromBackend = normalizeEstadoCuotasKey(poliza?.estado_cuotas);
   const impagasCount = toIntOrNaN(poliza?.impagas_count ?? poliza?.impagasCount);
@@ -122,6 +138,8 @@ function computeEstadoUnificado(poliza) {
     return {
       label: estadoPol.replace(/_/g, " ").toUpperCase(),
       tono: ESTADO_TONO[estadoPol] || "neutro",
+      // 🚫 Cancelada → por qué (ej: "Cuota impaga")
+      motivo: estadoPol === "cancelada" ? motivoBajaCorto(poliza) : "",
       // Nota chica: si igual debe cuotas, lo avisamos
       sub: pago.impagas > 0 ? `${pago.impagas} impagas` : null,
     };
@@ -165,8 +183,12 @@ function EstadoCell({ poliza, center = false }) {
   return (
     <div className={`inline-flex flex-col gap-0.5 ${center ? "items-center" : "items-start"}`}>
       <Badge tono={est.tono} size="sm">{est.label}</Badge>
-      {est.sub && (
-        <span className="text-[10px] text-suave dark:text-suave-dark">{est.sub}</span>
+      {(est.motivo || est.sub) && (
+        <span className="max-w-[160px] truncate text-[10px] text-suave dark:text-suave-dark" title={est.motivo || undefined}>
+          {est.motivo ? <span className="font-medium text-duo-rojo">{est.motivo}</span> : null}
+          {est.motivo && est.sub ? " · " : ""}
+          {est.sub}
+        </span>
       )}
     </div>
   );

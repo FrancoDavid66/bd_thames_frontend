@@ -64,6 +64,30 @@ function bannerEstado(estadoRaw) {
   };
 }
 
+// 🚫 Motivos de baja. Valores EXACTOS del backend (polizas/models.py → Poliza.MotivoBaja).
+//    La baja automática (cron de las 9 hs) guarda siempre "INCUMPLIMIENTO_PAGO".
+const MOTIVOS_BAJA = [
+  { value: "INCUMPLIMIENTO_PAGO", label: "Cuota impaga" },
+  { value: "MIGRACION_COMPANIA",  label: "Se pasó a otra compañía" },
+  { value: "VENTA_VEHICULO",      label: "Vendió el auto" },
+  { value: "SIN_USO",             label: "No lo usa" },
+  { value: "OTRO",                label: "Otro" },
+];
+
+const fmtFecha = (iso) => (iso ? dayjs(iso).format("DD/MM/YYYY") : "");
+
+// Primer mensaje de error que manda el backend (DRF: { campo: ["mensaje"] }).
+function mensajeError(e, fallback) {
+  if (typeof e === "string") return e;
+  if (!e || typeof e !== "object") return fallback;
+  if (e.detail) return String(e.detail);
+  if (e.message) return String(e.message);
+  const primero = Object.values(e)[0];
+  if (Array.isArray(primero) && primero.length) return String(primero[0]);
+  if (typeof primero === "string") return primero;
+  return fallback;
+}
+
 // 🔕 Estados que DEJAN de recibir el recordatorio de cuotas por WhatsApp.
 //    (Coincide con el backend: solo 'activa' y 'vencida' reciben mensajes.)
 const ESTADOS_SIN_RECORDATORIO = ["cancelada", "finalizada"];
@@ -113,6 +137,9 @@ export default function PolizaDetails() {
   const [savingEstado, setSavingEstado] = useState(false);
   // 🆕 Confirmación explícita cuando el nuevo estado deja de recibir recordatorios.
   const [aceptaSinRecordatorio, setAceptaSinRecordatorio] = useState(false);
+  // 🚫 Motivo de la baja (cuando se pasa a Cancelada, o para corregirlo).
+  const [motivoBaja, setMotivoBaja] = useState("");
+  const [notaBaja, setNotaBaja] = useState("");
 
   const scrollToSection = (key) => {
     if (key === "documentos" || key === "vehiculo_docs") key = "vehiculo";
@@ -202,20 +229,33 @@ export default function PolizaDetails() {
     }
   };
 
+  // 🚫 Motivo y nota de la baja que tiene hoy la póliza (la nota automática no se edita).
+  const bajaInfo = poliza?.baja_info || null;
+  const estadoActual = (poliza?.estado || "").toLowerCase();
+  const motivoActual = poliza?.motivo_baja || "";
+  const notaActual = bajaInfo?.automatica ? "" : (poliza?.observaciones_baja || "");
+
   // 🆕 Abrir modal de estado con el estado actual preseleccionado
   const abrirCambioEstado = () => {
-    setNuevoEstado((poliza?.estado || "").toLowerCase());
+    setNuevoEstado(estadoActual);
     setAceptaSinRecordatorio(false); // reset del check al abrir
+    setMotivoBaja(motivoActual || "INCUMPLIMIENTO_PAGO");
+    setNotaBaja(notaActual);
     setOpenEstado(true);
   };
 
   // 🆕 ¿El estado elegido deja SIN recordatorio de cuotas? (cancelada / finalizada)
-  const requiereConfirmacion = ESTADOS_SIN_RECORDATORIO.includes(nuevoEstado);
+  //    Si ya estaba en ese estado (solo corrige el motivo), no hace falta aceptar de nuevo.
+  const requiereConfirmacion = ESTADOS_SIN_RECORDATORIO.includes(nuevoEstado) && nuevoEstado !== estadoActual;
+  const esBaja = nuevoEstado === "cancelada";
+  const cambioMotivo = esBaja && estadoActual === "cancelada"
+    && (motivoBaja !== motivoActual || notaBaja.trim() !== notaActual.trim());
+  const faltaNotaOtro = esBaja && motivoBaja === "OTRO" && !notaBaja.trim();
 
   // 🆕 Guardar el nuevo estado (usa el thunk que ya existe: PATCH /polizas/:id/ { estado })
   const handleGuardarEstado = async () => {
     if (!polizaId || !nuevoEstado) return;
-    if (nuevoEstado === (poliza?.estado || "").toLowerCase()) {
+    if (nuevoEstado === estadoActual && !cambioMotivo) {
       setOpenEstado(false);
       return;
     }
@@ -224,14 +264,25 @@ export default function PolizaDetails() {
       toast.error("Tenés que aceptar el aviso para continuar.");
       return;
     }
+    // 🚫 Cancelada → hace falta el motivo ("Otro" → escribir cuál).
+    if (esBaja && !motivoBaja) {
+      toast.error("Elegí por qué se da de baja.");
+      return;
+    }
+    if (faltaNotaOtro) {
+      toast.error("Escribí cuál es el motivo de la baja.");
+      return;
+    }
     setSavingEstado(true);
     try {
-      await dispatch(togglePolizaEstado({ id: polizaId, estado: nuevoEstado })).unwrap();
-      toast.success("Estado actualizado");
+      // El backend pone la fecha de baja (hoy) y, si se reactiva, borra la baja.
+      const extra = esBaja ? { motivo_baja: motivoBaja, observaciones_baja: notaBaja.trim() } : undefined;
+      await dispatch(togglePolizaEstado({ id: polizaId, estado: nuevoEstado, extra })).unwrap();
+      toast.success(nuevoEstado === estadoActual ? "Motivo de la baja actualizado" : "Estado actualizado");
       setOpenEstado(false);
       dispatch(fetchPolizaPorId({ id: polizaId, force: true }));
     } catch (e) {
-      toast.error(typeof e === "string" ? e : (e?.message || "Error al cambiar estado"));
+      toast.error(mensajeError(e, "Error al cambiar estado"));
     } finally {
       setSavingEstado(false);
     }
@@ -296,6 +347,23 @@ export default function PolizaDetails() {
               <div className="mt-1 text-3xl font-semibold leading-none sm:text-4xl">
                 {b.label}
               </div>
+              {/* 🚫 Por qué se dio de baja (automática: "Baja automática por cuota impaga") */}
+              {estadoActual === "cancelada" ? (
+                <div className="mt-2.5 space-y-0.5 text-[13px] leading-snug">
+                  {bajaInfo?.titulo ? (
+                    <div className="font-semibold">{bajaInfo.titulo}</div>
+                  ) : (
+                    <div className="opacity-80">
+                      Sin motivo cargado{isWebAdmin ? " · tocá para cargarlo" : ""}
+                    </div>
+                  )}
+                  {bajaInfo?.detalle ? <div className="opacity-90">{bajaInfo.detalle}</div> : null}
+                  {bajaInfo?.nota ? <div className="italic opacity-90">“{bajaInfo.nota}”</div> : null}
+                  {bajaInfo?.fecha ? (
+                    <div className="text-[11px] opacity-80">Dada de baja el {fmtFecha(bajaInfo.fecha)}</div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             {isWebAdmin ? (
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/20 px-3.5 py-2 text-xs font-medium">
@@ -451,7 +519,7 @@ export default function PolizaDetails() {
             <Boton3D
               variant="verde"
               onClick={handleGuardarEstado}
-              disabled={savingEstado || !nuevoEstado || (requiereConfirmacion && !aceptaSinRecordatorio)}
+              disabled={savingEstado || !nuevoEstado || (requiereConfirmacion && !aceptaSinRecordatorio) || faltaNotaOtro}
               full
             >
               {savingEstado ? "Guardando..." : "Guardar"}
@@ -485,6 +553,50 @@ export default function PolizaDetails() {
             );
           })}
         </div>
+
+        {/* 🚫 Motivo de la baja (solo al pasar a Cancelada, o para corregirlo) */}
+        {esBaja ? (
+          <div className="mt-4 rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4">
+            <p className="mb-2.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
+              ¿Por qué se da de baja?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {MOTIVOS_BAJA.map((m) => {
+                const activo = motivoBaja === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMotivoBaja(m.value)}
+                    className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors
+                      ${activo
+                        ? "border-duo-rojo bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo"
+                        : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark hover:border-duo-rojo/50"}`}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="mt-3 block text-[11px] text-suave dark:text-suave-dark">
+              {motivoBaja === "OTRO" ? "¿Cuál es el motivo? (obligatorio)" : "Detalle (opcional)"}
+            </label>
+            <textarea
+              value={notaBaja}
+              onChange={(e) => setNotaBaja(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder={motivoBaja === "OTRO" ? "Ej: se mudó a otra provincia" : "Ej: debe 3 cuotas y no contesta"}
+              className={`mt-1 w-full resize-none rounded-lg border bg-card dark:bg-card-dark px-3 py-2 text-[13px] text-titulo dark:text-titulo-dark outline-none focus:border-duo-azul
+                ${faltaNotaOtro ? "border-duo-rojo" : "border-linea dark:border-linea-dark"}`}
+            />
+            {motivoBaja === "INCUMPLIMIENTO_PAGO" ? (
+              <p className="mt-1.5 text-[11px] text-suave dark:text-suave-dark">
+                La app muestra sola qué cuota quedó sin pagar.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* 🔕 Aviso: al pasar a cancelada/finalizada, no recibe más recordatorios */}
         {requiereConfirmacion ? (

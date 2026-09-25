@@ -54,6 +54,8 @@ import TareasPage from "./pages/TareasPage";
 // 🆕 NUEVA APP: CONTROL DIARIO (tareas fijas con foto)
 import ControlDiarioPage from "./pages/ControlDiarioPage";
 import RankingPage from "./pages/RankingPage";
+// 🎮 MINIJUEGO "SINIESTRO CERO" (auto que esquiva el tráfico)
+import JuegoPage from "./pages/JuegoPage";
 import CierreCajaReminder from "./components/recaudacion/CierreCajaReminder";
 
 // 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
@@ -594,6 +596,8 @@ function App() {
                 {/* 🆕 CONTROL DIARIO (tareas fijas con foto) */}
                 <Route path="/control-diario" element={<ControlDiarioPage />} />
                 <Route path="/ranking" element={<RankingPage />} />
+                {/* 🎮 MINIJUEGO (Recreo) */}
+                <Route path="/juego" element={<JuegoPage />} />
 
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/clientes/:id" element={<ClienteProfilePage />} />

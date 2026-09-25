@@ -14,6 +14,11 @@ import CardDuo from "../ui/CardDuo";
 // Helpers puros: viven en module scope para no recrearse en cada render.
 const fmt = (v) => (v === 0 || v ? String(v) : "—");
 const upper = (v) => (v ? String(v).toUpperCase() : "—");
+// "2026-09-25" → "25/09/2026"
+const fmtFecha = (iso) => {
+  const [y, m, d] = String(iso || "").slice(0, 10).split("-");
+  return y && m && d ? `${d}/${m}/${y}` : "";
+};
 
 const ClientePolizasCard = ({ cliente }) => {
   // 🚀 Ordenamos: la póliza MÁS NUEVA primero. Criterio: fecha de emisión más reciente;
@@ -112,6 +117,26 @@ const ClientePolizasCard = ({ cliente }) => {
                         </span>
                       </div>
                     </div>
+
+                    {/* 🚫 Dada de baja: por qué (ej: "Baja automática por cuota impaga") */}
+                    {estado === "cancelada" && (
+                      <div className="rounded-lg border border-duo-rojo/30 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] px-3 py-2 text-[12px] leading-snug">
+                        <p className="font-semibold text-duo-rojo">
+                          {p.baja_info?.titulo || "Dada de baja · sin motivo cargado"}
+                        </p>
+                        {p.baja_info?.detalle && (
+                          <p className="text-titulo dark:text-titulo-dark">{p.baja_info.detalle}</p>
+                        )}
+                        {p.baja_info?.nota && (
+                          <p className="italic text-suave dark:text-suave-dark">“{p.baja_info.nota}”</p>
+                        )}
+                        {p.baja_info?.fecha && (
+                          <p className="text-[11px] text-suave dark:text-suave-dark">
+                            Dada de baja el {fmtFecha(p.baja_info.fecha)}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Datos del vehículo (Grid responsiva) */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
