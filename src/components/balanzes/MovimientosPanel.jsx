@@ -114,13 +114,27 @@ const OficinaBadge = ({ nombre }) =>
     <span className="text-suave dark:text-suave-dark">—</span>
   );
 
+// 📡 Etiqueta "NUEVO": movimientos que llegaron EN VIVO (cargados en otra
+//    oficina o por otra persona). Se ve unos segundos y se va sola.
+const NuevoBadge = () => (
+  <span className="inline-flex items-center rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-duo-verde-sombra dark:text-duo-verde">
+    Nuevo
+  </span>
+);
+
 // 📱 TARJETA de movimiento (solo mobile). Muestra lo mismo que una fila de la
 //    tabla pero apilado y sin scroll horizontal.
-const MovimientoCard = ({ item }) => {
+const MovimientoCard = ({ item, nuevo = false }) => {
   const ing = esIngreso(item);
   const hora = fmtHora(item);
   return (
-    <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl p-3">
+    <div
+      className={`border rounded-xl p-3 transition-colors duration-700 ${
+        nuevo
+          ? "bg-duo-verde/10 border-duo-verde/40"
+          : "bg-card dark:bg-card-dark border-linea dark:border-linea-dark"
+      }`}
+    >
       {/* Fila superior: tipo + descripción + monto */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -132,6 +146,7 @@ const MovimientoCard = ({ item }) => {
             <p className="text-[11px] text-suave dark:text-suave-dark leading-tight mt-0.5">
               {fmtFecha(item.fecha)}
               {hora && <span className="tabular-nums"> · {hora} hs</span>}
+              {nuevo && <span className="ml-1.5 align-middle"><NuevoBadge /></span>}
             </p>
           </div>
         </div>
@@ -158,6 +173,7 @@ export default function MovimientosPanel({
   count = 0,
   loading = false,
   error = null,
+  nuevos = null, // 📡 Set de claves "_tipo-id" que llegaron en vivo
   page = 1,
   totalPages = 1,
   onPage = () => {},
@@ -197,7 +213,13 @@ export default function MovimientosPanel({
             No hay movimientos con estos filtros.
           </div>
         ) : (
-          items.map((item) => <MovimientoCard key={`${item._tipo}-${item.id}`} item={item} />)
+          items.map((item) => (
+            <MovimientoCard
+              key={`${item._tipo}-${item.id}`}
+              item={item}
+              nuevo={!!nuevos?.has(`${item._tipo}-${item.id}`)}
+            />
+          ))
         )}
       </div>
 
@@ -247,17 +269,21 @@ export default function MovimientosPanel({
                 items.map((item) => {
                   const ing = esIngreso(item);
                   const hora = fmtHora(item);
+                  const nuevo = !!nuevos?.has(`${item._tipo}-${item.id}`);
                   return (
                     <tr
                       key={`${item._tipo}-${item.id}`}
-                      className="border-b border-linea/50 dark:border-linea-dark/50 hover:bg-duo-azul/5 dark:hover:bg-white/5 transition-colors"
+                      className={`border-b border-linea/50 dark:border-linea-dark/50 transition-colors duration-700 ${
+                        nuevo ? "bg-duo-verde/10" : "hover:bg-duo-azul/5 dark:hover:bg-white/5"
+                      }`}
                     >
                       <td className="px-2 py-2 text-center">
                         <TipoBadge item={item} />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="text-suave dark:text-suave-dark leading-tight">
+                        <div className="text-suave dark:text-suave-dark leading-tight flex items-center gap-1.5">
                           {fmtFecha(item.fecha)}
+                          {nuevo && <NuevoBadge />}
                         </div>
                         {hora && (
                           <div className="text-[10px] font-medium text-suave/70 dark:text-suave-dark/70 tabular-nums leading-tight">

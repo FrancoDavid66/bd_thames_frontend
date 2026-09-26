@@ -14,6 +14,7 @@ import Boton3D from "../components/ui/Boton3D";
 import CardDuo from "../components/ui/CardDuo";
 import PageContainer from "../components/ui/PageContainer";
 import { lanzarConfetti } from "../utils/confetti"; // celebración al crear
+import useDatosVivos from "../hooks/useDatosVivos";
 
 import {
   fetchClientes,
@@ -87,9 +88,18 @@ const ClientesPage = () => {
   const handleEstado = useCallback((nuevo) => { dispatch(setEstado(nuevo || "todos")); }, [dispatch]);
   const handlePageChange = useCallback((p) => { dispatch(setPage(p)); }, [dispatch]);
   const handlePageSizeChange = useCallback((ps) => { dispatch(setPageSize(ps)); }, [dispatch]);
+  // force: true → vuelve a pedir aunque sea la misma página (antes el botón
+  // "Actualizar" no hacía nada: el pedido se salteaba por ser igual al anterior).
   const handleRefresh = useCallback(() => {
-    dispatch(fetchClientes({ page, page_size: pageSize, search, estado, ordering }));
+    return dispatch(fetchClientes({ page, page_size: pageSize, search, estado, ordering, force: true }));
   }, [dispatch, page, pageSize, search, estado, ordering]);
+
+  // 📡 EN VIVO: un cliente nuevo (o una póliza nueva) de otra oficina aparece solo.
+  //    silencioso: si esa recarga falla, queda la lista que se veía (sin cartel).
+  const recargandoVivo = useDatosVivos(["clientes", "polizas"], () =>
+    dispatch(fetchClientes({ page, page_size: pageSize, search, estado, ordering, force: true, silencioso: true }))
+  );
+  const cargandoVisible = status === "loading" && !recargandoVivo;
 
   // KPIs rápidos (de la página actual — sin queries extra)
   const stats = useMemo(() => {
@@ -145,7 +155,7 @@ const ClientesPage = () => {
                   <HiShieldCheck className="text-sm" /> {user?.perfil?.oficina_nombre || "Soporte"}
                 </span>
                 <span className="text-[12px] text-suave dark:text-suave-dark">
-                  {status === "loading" ? "Sincronizando…" : `${total} registrados`}
+                  {cargandoVisible ? "Sincronizando…" : `${total} registrados`}
                 </span>
               </div>
             </div>
@@ -219,7 +229,7 @@ const ClientesPage = () => {
             className="h-8 px-3 rounded-md bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta border border-duo-violeta/30 hover:border-duo-violeta transition-colors flex items-center gap-1.5 ml-auto"
             title="Refrescar"
           >
-            <HiRefresh className={status === "loading" ? "animate-spin text-sm" : "text-sm"} />
+            <HiRefresh className={cargandoVisible ? "animate-spin text-sm" : "text-sm"} />
             <span className="text-[12px] font-medium">Actualizar</span>
           </button>
         </div>

@@ -1,5 +1,5 @@
 /* src/pages/PagosPage.jsx — Panel de Cobranza (buscar + cobrar) */
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
@@ -14,6 +14,7 @@ import {
   HiChevronRight as HiChevronRightMini,
   HiCurrencyDollar,
   HiPaperAirplane,
+  HiExclamation,
 } from "react-icons/hi";
 
 // 🚀 IMPORTAMOS CONTEXTO PARA SEGURIDAD
@@ -57,6 +58,29 @@ const safe = (v, fallback = "—") => {
   const s = String(v ?? "").trim();
   return s ? s : fallback;
 };
+
+// 📡 Aviso EN VIVO: otra oficina (u otra persona) acaba de cobrar una cuota
+//    de lo que estás mirando. Evita cobrarla dos veces.
+function AvisoCobradaRecien({ cuotas = [] }) {
+  if (!cuotas.length) return null;
+  const nros = cuotas.map((c) => c?.cuota_nro).filter((n) => n != null);
+  const hora = cuotas.length === 1 && cuotas[0]?.pago_hm ? ` (${cuotas[0].pago_hm})` : "";
+  const texto =
+    nros.length > 1
+      ? `Las cuotas ${nros.join(", ")} se acaban de cobrar.`
+      : `La cuota ${nros[0] ?? ""} se acaba de cobrar${hora}.`;
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2.5 rounded-xl border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-4 py-3 text-[13px] text-duo-amarillo-sombra dark:text-duo-amarillo"
+    >
+      <HiExclamation className="w-5 h-5 shrink-0" />
+      <span>
+        <strong>{texto}</strong> Ya no hace falta cobrarla acá.
+      </span>
+    </div>
+  );
+}
 
 function normalizeCuotaFlat(item) {
   const it = item && typeof item === "object" ? item : {};
@@ -297,8 +321,45 @@ const PagosPage = () => {
     setClienteSeleccionado(null);
   }, []);
 
+  // 📡 EN VIVO: PagosSearch repite la búsqueda en silencio y nos pasa las
+  //    cuotas frescas. Se actualizan en el lugar (sin cerrar nada). Si alguna
+  //    pasó a PAGADA mientras la mirábamos, avisamos arriba unos segundos.
+  const cuotasRef = useRef(cuotas);
+  cuotasRef.current = cuotas;
+  const [recienPagadas, setRecienPagadas] = useState(() => new Set());
+  const recienTimerRef = useRef(null);
+  // Lo que cobraste VOS en esta pantalla: no es "cobrada en otra oficina".
+  const ultimoCambioLocalRef = useRef(0);
+  const pagadasAcaRef = useRef(new Set());
+  const handleActualizarVivo = useCallback((items = [], inicio = 0) => {
+    // Respuesta de un pedido que salió ANTES de tu último cobro: viene vieja
+    // (diría "impaga"). Se descarta; enseguida llega otra con lo último.
+    if (inicio && inicio < ultimoCambioLocalRef.current) return;
+    const lista = (Array.isArray(items) ? items : []).map(normalizeCuotaFlat).filter((c) => c.id != null);
+    if (!lista.length) return;
+    const porId = new Map(lista.map((c) => [c.id, c]));
+    const prev = Array.isArray(cuotasRef.current) ? cuotasRef.current : [];
+    const pagadasAhora = prev
+      .filter((c) => !c.pagado && porId.get(c.id)?.pagado && !pagadasAcaRef.current.has(c.id))
+      .map((c) => c.id);
+    setCuotas(prev.map((c) => (porId.has(c.id) ? { ...c, ...porId.get(c.id) } : c)));
+    if (pagadasAhora.length) {
+      setRecienPagadas(new Set(pagadasAhora));
+      clearTimeout(recienTimerRef.current);
+      recienTimerRef.current = setTimeout(() => setRecienPagadas(new Set()), 30000);
+    }
+  }, []);
+  useEffect(() => () => clearTimeout(recienTimerRef.current), []);
+
   const handleActualizarCuotas = useCallback((actualizadas = []) => {
     if (!Array.isArray(actualizadas) || actualizadas.length === 0) return;
+    // 📡 Cobro hecho ACÁ: lo anotamos para que el aviso en vivo no lo confunda
+    //    con un cobro de otra oficina.
+    ultimoCambioLocalRef.current = Date.now();
+    actualizadas.forEach((item) => {
+      const obj = item?.cuotaActualizada && typeof item.cuotaActualizada === "object" ? item.cuotaActualizada : item;
+      if (obj?.id != null && obj?.pagado) pagadasAcaRef.current.add(obj.id);
+    });
     setCuotas((prev) => {
       const prevList = Array.isArray(prev) ? prev : [];
       const map = new Map();
@@ -355,6 +416,15 @@ const PagosPage = () => {
     const key = clienteSeleccionado?.key;
     return (Array.isArray(cuotas) ? cuotas : []).filter((c) => clienteKeyFromCuota(c) === key);
   }, [cuotas, clienteSeleccionado]);
+
+  const recienPagadasTodas = useMemo(
+    () => (Array.isArray(cuotas) ? cuotas : []).filter((c) => recienPagadas.has(c.id)),
+    [cuotas, recienPagadas]
+  );
+  const recienPagadasEnModal = useMemo(
+    () => visibleCuotasEnModal.filter((c) => recienPagadas.has(c.id)),
+    [visibleCuotasEnModal, recienPagadas]
+  );
 
   const abrirCliente = useCallback((g) => {
     setAvisoAlertasConfirmado(false);
@@ -420,7 +490,7 @@ const PagosPage = () => {
           className="space-y-3 sm:space-y-4"
         >
           <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 sm:p-6 space-y-3">
-            <PagosSearch onBuscar={handleBuscarPolizas} />
+            <PagosSearch onBuscar={handleBuscarPolizas} onActualizarVivo={handleActualizarVivo} />
             <button
               type="button"
               onClick={() => setOcultarPagadas((v) => !v)}
@@ -439,6 +509,11 @@ const PagosPage = () => {
           </div>
 
           <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl p-3 sm:p-4">
+            {!clienteSeleccionado && recienPagadasTodas.length > 0 && (
+              <div className="mb-3">
+                <AvisoCobradaRecien cuotas={recienPagadasTodas} />
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul">
@@ -583,6 +658,12 @@ const PagosPage = () => {
                   </div>
 
                   <div className="p-0 flex-1 overflow-y-auto custom-scrollbar">
+                    {/* 📡 EN VIVO: cuota cobrada recién en otra oficina */}
+                    {recienPagadasEnModal.length > 0 && (
+                      <div className="px-4 sm:px-6 pt-4">
+                        <AvisoCobradaRecien cuotas={recienPagadasEnModal} />
+                      </div>
+                    )}
                     {/* 🚨 BANNER INLINE UNIFICADO — recordatorio mientras cobra */}
                     {clienteSeleccionado?.cliente_id && avisoAlertasConfirmado && (
                       <div className="px-4 sm:px-6 pt-4">

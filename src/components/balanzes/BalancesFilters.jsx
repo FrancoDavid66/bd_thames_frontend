@@ -9,13 +9,17 @@
 //
 // 📱 RESPONSIVE:
 //    - En MOBILE los grupos se APILAN (uno debajo del otro) y los botones se
-//      estiran a lo ancho: atajos de período en grilla 2×2, Tipo en 3 columnas,
-//      Forma de pago / Buscar / Descargar cada uno en su fila full-width.
+//      estiran a lo ancho: atajos de período en 4 columnas (Hoy · Ayer ·
+//      Semana · Mes) y, con "Mes" elegido, abajo una fila ‹ Agosto 2026 ›;
+//      Tipo en 3 columnas, Forma de pago / Buscar / Descargar cada uno en su
+//      fila full-width.
 //    - En DESKTOP se muestran en línea como antes.
 //    - Tap targets ≥ 44px. Inputs con text-base (evita el zoom de iOS al enfocar).
 //
 // Filtros que maneja:
-//   - Atajos de período: Hoy (default) · Ayer · Esta semana · Este mes
+//   - Atajos de período: Hoy (default) · Ayer · Esta semana · Mes
+//     🆕 Con "Mes" elegido aparecen las flechas ‹ Agosto 2026 › para pasar de
+//        mes en mes (la › se apaga en el mes actual: no hay meses futuros).
 //   - Rango personalizado colapsable: un día puntual / desde-hasta
 //   - Oficina (solo admin)
 //   - Tipo: Ambos · Ingresos · Egresos
@@ -27,23 +31,79 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 import {
   HiCalendar, HiOfficeBuilding, HiChevronDown, HiSearch, HiX, HiDownload,
+  HiChevronLeft, HiChevronRight,
 } from "react-icons/hi";
 dayjs.locale("es");
 
-/* Botón de atajo (segmented). En mobile ocupa toda su celda del grid. */
-const AtajoBtn = ({ id, label, activo, onClick }) => (
+/* Botón de atajo (segmented). En mobile ocupa toda su celda del grid.
+   `labelCorto`: texto para el celu (ej: "Semana" en vez de "Esta semana"). */
+const AtajoBtn = ({ id, label, labelCorto, activo, onClick, className = "" }) => (
   <button
     type="button"
     onClick={() => onClick(id)}
-    className={`min-h-[44px] px-3 sm:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+    aria-pressed={activo}
+    className={`min-h-[44px] px-2 sm:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
       activo
         ? "bg-duo-azul text-white"
         : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"
-    }`}
+    } ${className}`}
   >
-    {label}
+    {labelCorto ? (
+      <>
+        <span className="sm:hidden">{labelCorto}</span>
+        <span className="hidden sm:inline">{label}</span>
+      </>
+    ) : (
+      label
+    )}
   </button>
 );
+
+/* 🗓️ ‹ Agosto 2026 › — pasa de mes en mes.
+   - Compu: va DENTRO de la barra de atajos, en el lugar de "Este mes".
+   - Celu (`grande`): fila propia a lo ancho, con botones de 44px. */
+const MesStepper = ({ etiqueta, onAnterior, onSiguiente, puedeSiguiente, grande = false, className = "" }) => {
+  const btn = grande
+    ? "w-11 h-11 rounded-lg bg-duo-azul text-white hover:brightness-110"
+    : "w-11 h-11 rounded-md bg-white/15 text-white hover:bg-white/25";
+  return (
+    <div
+      className={`items-center justify-between gap-1 ${
+        grande
+          ? "h-[54px] px-1 rounded-lg bg-duo-azul/10 border border-duo-azul/40"
+          : "min-h-[44px] rounded-lg bg-duo-azul"
+      } ${className}`}
+    >
+      <button
+        type="button"
+        onClick={onAnterior}
+        aria-label="Mes anterior"
+        title="Mes anterior"
+        className={`inline-flex shrink-0 items-center justify-center transition-colors ${btn}`}
+      >
+        <HiChevronLeft className="w-5 h-5" />
+      </button>
+      <span
+        aria-live="polite"
+        className={`text-center font-semibold capitalize whitespace-nowrap ${
+          grande ? "flex-1 text-base text-titulo dark:text-titulo-dark" : "min-w-[128px] px-1 text-sm text-white"
+        }`}
+      >
+        {etiqueta}
+      </span>
+      <button
+        type="button"
+        onClick={onSiguiente}
+        disabled={!puedeSiguiente}
+        aria-label="Mes siguiente"
+        title={puedeSiguiente ? "Mes siguiente" : "Ya estás en el mes actual"}
+        className={`inline-flex shrink-0 items-center justify-center transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${btn}`}
+      >
+        <HiChevronRight className="w-5 h-5" />
+      </button>
+    </div>
+  );
+};
 
 /* Botón de tipo (Ambos / Ingresos / Egresos). En mobile ocupa su celda del grid. */
 const TipoBtn = ({ id, label, activo, onClick }) => (
@@ -72,6 +132,11 @@ export default function BalancesFilters({
   oficinasAdmin = [],
   // Período (atajo + rango)
   atajo, setAtajo,
+  // 🆕 Mes elegido (con el atajo "Mes"): etiqueta "agosto 2026" y flechas ‹ ›
+  etiquetaMes = "",
+  onMesAnterior,
+  onMesSiguiente,
+  puedeMesSiguiente = false,
   advOpen, setAdvOpen,
   customDia, setCustomDia,
   customDesde, setCustomDesde,
@@ -107,13 +172,38 @@ export default function BalancesFilters({
           <span className={`${labelCls} flex items-center gap-1.5`}>
             <HiCalendar className="text-duo-azul" /> Período
           </span>
-          {/* 📱 Grid 2×2 en mobile → 4 en fila desde sm. */}
-          <div className="grid grid-cols-2 sm:inline-flex sm:flex-wrap bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg p-1 gap-1">
+          {/* 📱 4 columnas en mobile → en fila desde sm. */}
+          <div className="grid grid-cols-4 sm:inline-flex sm:flex-wrap sm:items-center sm:self-start bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg p-1 gap-1">
             <AtajoBtn id="hoy" label="Hoy" activo={atajo === "hoy"} onClick={setAtajo} />
             <AtajoBtn id="ayer" label="Ayer" activo={atajo === "ayer"} onClick={setAtajo} />
-            <AtajoBtn id="semana" label="Esta semana" activo={atajo === "semana"} onClick={setAtajo} />
-            <AtajoBtn id="mes" label="Este mes" activo={atajo === "mes"} onClick={setAtajo} />
+            <AtajoBtn id="semana" label="Esta semana" labelCorto="Semana" activo={atajo === "semana"} onClick={setAtajo} />
+            {atajo === "mes" ? (
+              <>
+                {/* Celu: el botón queda marcado y las flechas van en la fila de abajo */}
+                <AtajoBtn id="mes" label="Mes" activo onClick={setAtajo} className="sm:hidden" />
+                {/* Compu: las flechas van acá mismo */}
+                <MesStepper
+                  className="hidden sm:inline-flex"
+                  etiqueta={etiquetaMes}
+                  onAnterior={onMesAnterior}
+                  onSiguiente={onMesSiguiente}
+                  puedeSiguiente={puedeMesSiguiente}
+                />
+              </>
+            ) : (
+              <AtajoBtn id="mes" label="Este mes" labelCorto="Mes" activo={false} onClick={setAtajo} />
+            )}
           </div>
+          {atajo === "mes" && (
+            <MesStepper
+              grande
+              className="flex sm:hidden"
+              etiqueta={etiquetaMes}
+              onAnterior={onMesAnterior}
+              onSiguiente={onMesSiguiente}
+              puedeSiguiente={puedeMesSiguiente}
+            />
+          )}
         </div>
 
         {isWebAdmin && (

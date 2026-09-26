@@ -97,6 +97,7 @@ export const deleteEgreso = createAsyncThunk(
 const initialState = {
   list: [],
   status: 'idle',
+  reqId: null, // último pedido de la lista (para ignorar respuestas viejas)
   error: null,
   next: null,
   previous: null,
@@ -111,10 +112,12 @@ const egresosSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // --- Obtener egresos ---
-      .addCase(fetchEgresos.pending, (state) => {
+      .addCase(fetchEgresos.pending, (state, action) => {
         state.status = 'loading';
+        state.reqId = action.meta.requestId;
       })
       .addCase(fetchEgresos.fulfilled, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.status = 'succeeded';
         const payload = action.payload || {};
         state.list = payload.results ?? [];
@@ -128,6 +131,7 @@ const egresosSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchEgresos.rejected, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.status = 'failed';
         state.error = action.payload || 'Error al obtener los egresos';
       })

@@ -221,10 +221,12 @@ const serviciosSlice = createSlice({
     pagos: [],
     pagosStatus: "idle",
     pagosError: null,
+    pagosRequestId: null, // último pedido (para ignorar respuestas viejas)
 
     // Resumen
     resumen: null,
     resumenStatus: "idle",
+    resumenRequestId: null,
 
     // Contadores (badge)
     contadores: { vencidos: 0, por_vencer: 0, total_alertas: 0, proximos: [] },
@@ -272,18 +274,23 @@ const serviciosSlice = createSlice({
       })
 
       // ── PAGOS ─────────────────────────────────────────────────
-      .addCase(fetchPagosMes.pending, (s) => { s.pagosStatus = "loading"; })
+      // 📡 Si llega tarde la respuesta de un pedido viejo (ej: cambiaste de mes
+      //    mientras se recargaba en vivo), se ignora: vale la del último pedido.
+      .addCase(fetchPagosMes.pending, (s, a) => { s.pagosStatus = "loading"; s.pagosRequestId = a.meta.requestId; })
       .addCase(fetchPagosMes.fulfilled, (s, a) => {
+        if (s.pagosRequestId && a.meta.requestId !== s.pagosRequestId) return;
         s.pagosStatus = "succeeded";
         s.pagos = a.payload;
       })
       .addCase(fetchPagosMes.rejected, (s, a) => {
+        if (s.pagosRequestId && a.meta.requestId !== s.pagosRequestId) return;
         s.pagosStatus = "failed";
         s.pagosError = a.payload;
       })
 
-      .addCase(fetchResumenMes.pending, (s) => { s.resumenStatus = "loading"; })
+      .addCase(fetchResumenMes.pending, (s, a) => { s.resumenStatus = "loading"; s.resumenRequestId = a.meta.requestId; })
       .addCase(fetchResumenMes.fulfilled, (s, a) => {
+        if (s.resumenRequestId && a.meta.requestId !== s.resumenRequestId) return;
         s.resumenStatus = "succeeded";
         s.resumen = a.payload;
       })

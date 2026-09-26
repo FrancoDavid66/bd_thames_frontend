@@ -18,6 +18,7 @@ import { toast } from "react-hot-toast";
 import { HiArrowLeft, HiPlus, HiCheck, HiClipboardCopy } from "react-icons/hi";
 
 import { useAuth } from "../context/AuthContext";
+import useDatosVivos from "../hooks/useDatosVivos";
 import {
   fetchExpediente,
   updateExpediente,
@@ -107,6 +108,14 @@ export default function LegalesDetailPage() {
     dispatch(fetchVencimientos(id));
     dispatch(fetchAbogados());
   }, [dispatch, id]);
+
+  // 📡 EN VIVO: si otra persona agrega un movimiento o un vencimiento, o cambia
+  //    el estado, se ve acá solo. Lo que estás escribiendo no se toca.
+  useDatosVivos(["legales"], () => {
+    dispatch(fetchExpediente(id));
+    dispatch(fetchMovimientos(id));
+    dispatch(fetchVencimientos(id));
+  }, { activo: !!id });
 
   const handleEstadoChange = async (nuevoEstado) => {
     setGuardandoEstado(true);

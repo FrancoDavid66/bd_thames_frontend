@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCotizaciones, deleteCotizacion, updateCotizacion } from "../store/slices/cotizacionesSlice";
 import { useAuth } from "../context/AuthContext";
+import useDatosVivos from "../hooks/useDatosVivos";
 import dayjs from "dayjs";
 import { HiPlus, HiPencil, HiTrash, HiDocumentText, HiShieldCheck, HiCog } from "react-icons/hi";
 import CotizacionModal from "../components/cotizaciones/CotizacionModal";
@@ -24,6 +25,9 @@ const CotizacionesPage = () => {
       dispatch(fetchCotizaciones());
     }
   }, [dispatch, isWebAdmin]);
+
+  // 📡 EN VIVO: una cotización nueva (o editada) de otra persona aparece sola.
+  const recargandoVivo = useDatosVivos(["cotizaciones"], () => dispatch(fetchCotizaciones()), { activo: isWebAdmin });
 
   const handleEdit = (cot) => {
     setCotizacionEdit(cot);
@@ -121,7 +125,7 @@ const CotizacionesPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-linea/50 dark:divide-linea-dark/50">
-              {status === 'loading' ? (
+              {status === 'loading' && !recargandoVivo ? (
                 <tr><td colSpan="6" className="text-center py-10 text-suave dark:text-suave-dark">Cargando cotizaciones...</td></tr>
               ) : cotizaciones.length === 0 ? (
                 <tr><td colSpan="6" className="text-center py-10 text-suave dark:text-suave-dark">No hay cotizaciones armadas aún.</td></tr>

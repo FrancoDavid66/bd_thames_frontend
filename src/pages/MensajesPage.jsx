@@ -41,6 +41,7 @@ import {
 } from "react-icons/hi";
 
 import { useAuth } from "../context/AuthContext";
+import useDatosVivos from "../hooks/useDatosVivos";
 import ReporteContactosModal from "../components/notificaciones/ReporteContactosModal";
 import ModalDuo from "../components/ui/ModalDuo";
 import Boton3D from "../components/ui/Boton3D";
@@ -479,23 +480,28 @@ function PanelSinMensajes({ onCambio }) {
   const [confirmandoId, setConfirmandoId] = useState(null);
   const [guardandoId, setGuardandoId] = useState(null);
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
+  // silencioso = recarga EN VIVO: sin "cargando" y sin cartel de error.
+  const cargar = useCallback(async (opciones) => {
+    const silencioso = !!opciones?.silencioso;
+    if (!silencioso) setCargando(true);
     try {
       const params = historial ? "?historial=1" : "";
       const res = await axios.get(`${BASE_URL}/notificaciones/mensajes/sin-mensajes/${params}`, { headers: authHeaders() });
       setItems(res.data?.items || []);
       setError("");
     } catch (err) {
-      setError(errorDe(err, "No se pudo cargar la lista"));
+      if (!silencioso) setError(errorDe(err, "No se pudo cargar la lista"));
     } finally {
-      setCargando(false);
+      if (!silencioso) setCargando(false);
     }
   }, [historial]);
 
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // 📡 EN VIVO: si otra persona saca o reactiva a un cliente, se ve acá solo.
+  useDatosVivos(["mensajes"], () => cargar({ silencioso: true }));
 
   const reactivar = async (it) => {
     setGuardandoId(it.id);
@@ -618,8 +624,10 @@ export default function MensajesPage() {
   const [noMandarItem, setNoMandarItem] = useState(null);
   const [showReporte, setShowReporte] = useState(false);
 
+  // vivo = recarga EN VIVO: como silencioso, y si falla no muestra el error
+  // (queda lo que ya se veía; se reintenta con el próximo aviso).
   const cargar = useCallback(
-    async ({ silencioso = false, actualizar = false } = {}) => {
+    async ({ silencioso = false, actualizar = false, vivo = false } = {}) => {
       if (!silencioso) setCargando(true);
       if (actualizar) setActualizando(true);
       try {
@@ -634,7 +642,7 @@ export default function MensajesPage() {
         if (actualizar) toast.success("Lista actualizada");
       } catch (err) {
         console.error("[Mensajes] Error:", err);
-        setError(errorDe(err, "No se pudieron cargar los mensajes"));
+        if (!vivo) setError(errorDe(err, "No se pudieron cargar los mensajes"));
       } finally {
         if (!silencioso) setCargando(false);
         if (actualizar) setActualizando(false);
@@ -646,6 +654,10 @@ export default function MensajesPage() {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // 📡 EN VIVO: si otra persona marca un mensaje, o el cliente paga (y su
+  //    aviso de cobranza se cierra solo), la lista se pone al día sola.
+  useDatosVivos(["mensajes", "cuotas"], () => cargar({ silencioso: true, vivo: true }), { cadaMs: 30_000 });
 
   // payload: { accion: "enviado" | "deshacer" | "no_se_pudo" | "no_enviar_mas", motivo?, detalle? }
   const accionar = async (item, payload) => {

@@ -8,11 +8,12 @@
  * de color oro/plata/bronce), sin botones con relieve 3D, bordes finos.
  * Desempate: mismos puntos → gana el de menos acciones (más eficiente).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { HiStar, HiRefresh, HiTrendingUp } from "react-icons/hi";
 import api from "../services/api";
+import useDatosVivos from "../hooks/useDatosVivos";
 import { UI } from "../components/tareas/tareasUI";
 import HistorialRanking from "../components/ranking/HistorialRanking";
 
@@ -40,21 +41,30 @@ export default function RankingPage() {
   const [ranking, setRanking] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const cargar = async () => {
-    setLoading(true);
+  // silencioso = recarga EN VIVO: sin "cargando" y sin cartel si falla.
+  // pedidoRef: si cambiaste de rango mientras se recargaba, vale el último pedido.
+  const pedidoRef = useRef(0);
+  const cargar = async (opciones) => {
+    const silencioso = !!opciones?.silencioso;
+    const mio = ++pedidoRef.current;
+    if (!silencioso) setLoading(true);
     try {
       // 🆕 por=responsable → el ranking cuenta por el EMPLEADO que hizo la tarea
       //    (no la cuenta que la cargó). Muestra a cada uno con su oficina.
       const q = `rango=${rango}&por=responsable${categoria ? `&categoria=${categoria}` : ""}`;
       const res = await api.get(`ranking/?${q}`);
+      if (mio !== pedidoRef.current) return;
       setRanking(res?.data?.ranking || []);
     } catch {
-      toast.error("No se pudo cargar el ranking");
+      if (!silencioso && mio === pedidoRef.current) toast.error("No se pudo cargar el ranking");
     } finally {
-      setLoading(false);
+      if (mio === pedidoRef.current) setLoading(false);
     }
   };
   useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [rango, categoria]);
+
+  // 📡 EN VIVO: cuando alguien suma puntos (tareas, juego), la tabla se mueve sola.
+  useDatosVivos(["ranking", "tareas"], () => cargar({ silencioso: true }), { cadaMs: 30_000 });
 
   const top3 = ranking.slice(0, 3);
   const resto = ranking.slice(3);

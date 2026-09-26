@@ -131,14 +131,9 @@
   --color-duo-amarillo-soft-dark: #3d2f08;
 }
 
-@font-face {
-  font-family: "MiFuentePersonalizada";
-  /* RUTAS ABSOLUTAS DESDE LA RAÍZ DEL SITIO */
-  src: url("/assets/fonts/MiFuente.woff2") format("woff2"),
-    url("/assets/fonts/MiFuente.woff") format("woff");
-  font-weight: normal;
-  font-style: normal;
-}
+/* ⚡ Se sacó el @font-face de "MiFuentePersonalizada": el archivo
+   /assets/fonts/MiFuente.woff2 no existe, así que en cada carga había 2 pedidos
+   fallidos y el texto igual usaba la letra del sistema (sans-serif). */
 
 /* ✅ FIX MOBILE HEIGHT/SCROLL:
    - evita que “se agrande” la app por 100vh en mobile

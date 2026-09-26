@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { HiX, HiBell, HiArrowCircleDown, HiArrowCircleUp, HiCurrencyDollar } from "react-icons/hi";
 import { FaPowerOff } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
@@ -19,12 +19,15 @@ import { fetchRenovacionesGlobalResumen, selectRenovacionesGlobalResumen } from 
 import { fetchBajasGlobalCounters, selectBajasGlobalCounters }      from "../../store/slices/bajasSlice";
 
 // 🚀 Caja rápida: refresco de datos + modal combinado (ingreso/egreso en uno)
-import { fetchIngresos } from "../../store/slices/ingresosSlice";
-import { fetchEgresos } from "../../store/slices/egresosSlice";
 import MovimientoCreateModal from "../balanzes/MovimientoCreateModal";
 
 // 🚀 Banner de atención (pagos pendientes de Micaela)
 import AtencionBanner from "./AtencionBanner";
+
+// 📡 Datos en vivo: indicador "● EN VIVO" + avisos del cartero
+import IndicadorVivo from "./IndicadorVivo";
+import useDatosVivos from "../../hooks/useDatosVivos";
+import { disponible as vivoDisponible } from "../../services/vivo";
 
 const POLL_MS = 2 * 60 * 1000; // 2 minutos
 
@@ -257,7 +260,9 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
   useEffect(() => {
     if (isVendedor) return;
 
+    let ultimo = 0;
     const fetchAll = () => {
+      ultimo = Date.now();
       dispatch(fetchSolicitudes());          // 🧹 antes: fetchResumen()
       dispatch(fetchCuponerasCounters({}));
       dispatch(fetchRenovacionesGlobalResumen({}));
@@ -265,9 +270,48 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
     };
 
     fetchAll();
-    const id = setInterval(fetchAll, POLL_MS);
-    return () => clearInterval(id);
+    // ⚡ Con la pestaña minimizada no pedimos nada; al volver a la pestaña nos
+    //    ponemos al día (si pasaron más de 30 s desde el último pedido).
+    // 📡 Con el cartero andando, los cambios llegan solos (abajo): esto queda
+    //    como respaldo cada 5 min.
+    const id = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      if (vivoDisponible() && Date.now() - ultimo < 300_000) return;
+      fetchAll();
+    }, POLL_MS);
+    const onVisible = () => {
+      const espera = vivoDisponible() ? 300_000 : 30_000;
+      if (document.visibilityState === "visible" && Date.now() - ultimo >= espera) fetchAll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [dispatch, isVendedor]);
+
+  // 📡 EN VIVO: cambió un tema → se pide solo el contador de ese tema.
+  //    En la pantalla de Bajas (admin), los contadores globales los recarga la
+  //    propia pantalla (con sus filtros): si los pidiéramos también acá, los
+  //    números de "Global" saltarían entre dos valores según qué respuesta
+  //    llegue última.
+  const location = useLocation();
+  const rutaRef = useRef(location.pathname);
+  rutaRef.current = location.pathname;
+  useDatosVivos(
+    ["solicitudes", "cupones", "polizas", "cuotas", "bajas"],
+    (temas) => {
+      const t = new Set(temas);
+      const toca = (...lista) => lista.some((x) => t.has(x));
+      if (toca("solicitudes")) dispatch(fetchSolicitudes());
+      if (toca("cupones", "polizas")) dispatch(fetchCuponerasCounters({}));
+      // force: este pedido tiene una memoria de 20 s; en vivo queremos lo último.
+      if (toca("polizas", "cuotas", "bajas")) dispatch(fetchRenovacionesGlobalResumen({ force: true }));
+      const enBajasAdmin = isAdmin && String(rutaRef.current || "").startsWith("/polizas/bajas");
+      if (toca("bajas", "polizas", "cuotas") && !enBajasAdmin) dispatch(fetchBajasGlobalCounters({}));
+    },
+    { activo: !isVendedor, siempre: true }
+  );
 
   // ── Items del dropdown (badges con tokens Duo) ───────────────
   const notifItems = [
@@ -338,12 +382,11 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
 
   const closeNotif = useCallback(() => setShowNotifications(false), []);
 
-  // 🚀 Al cerrar el modal, refrescamos ingresos Y egresos (el modal combinado
-  //    maneja los dos), para mantener el tablero al día.
+  // Al cerrar el modal no hace falta pedir nada: al guardar, el cartero (datos
+  // en vivo) avisa y cada pantalla abierta (Balances, Inicio) se pone al día sola.
+  // Antes se bajaban acá 500 ingresos + 500 egresos que ya nadie usaba.
   const cerrarMovimiento = () => {
     setModalTipo(null);
-    dispatch(fetchIngresos());
-    dispatch(fetchEgresos());
   };
 
   // ── Render ───────────────────────────────────────────────────
@@ -425,6 +468,8 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
               <span className="text-[16px] font-semibold text-titulo dark:text-titulo-dark">
                 THAMES <span className="text-marca">APP</span>
               </span>
+              {/* 📡 ● EN VIVO */}
+              <IndicadorVivo />
             </div>
           </div>
 
@@ -434,6 +479,8 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
             <span className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">
               THAMES
             </span>
+            {/* 📡 puntito EN VIVO (celu) */}
+            <IndicadorVivo compacto />
           </div>
 
           {/* Derecha: caja rápida + campana + usuario + logout */}

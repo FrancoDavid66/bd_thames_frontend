@@ -7,6 +7,9 @@ import api from "../../services/api";
 /** Helpers */
 const normalizeStr = (v) => String(v ?? "").trim();
 
+// fetchClienteById acepta el id solo (como siempre) o { id, force }.
+const idDeArg = (arg) => (arg && typeof arg === "object" ? arg.id : arg);
+
 const buildListQueryKey = ({ page, page_size, search, estado, ordering }) => {
   const p = Number(page || 1);
   const ps = page_size ? Number(page_size) : "";
@@ -46,6 +49,8 @@ export const fetchClientes = createAsyncThunk(
   },
   {
     condition: (arg, { getState }) => {
+      // force: true → pedimos igual (botón "Actualizar" y datos EN VIVO).
+      if (arg?.force) return true;
       const st = getState().clientes;
       const page = arg?.page ?? st.page ?? 1;
       const ps = arg?.page_size ?? arg?.pageSize ?? st.pageSize;
@@ -68,7 +73,8 @@ export const fetchClientes = createAsyncThunk(
  */
 export const fetchClienteById = createAsyncThunk(
   "clientes/fetchClienteById",
-  async (id, { rejectWithValue, signal }) => {
+  async (arg, { rejectWithValue, signal }) => {
+    const id = idDeArg(arg);
     try {
       if (!id) throw new Error("Falta id");
       const { data } = await api.get(`clientes/${id}/`, { signal });
@@ -87,9 +93,11 @@ export const fetchClienteById = createAsyncThunk(
     }
   },
   {
-    condition: (id, { getState }) => {
+    condition: (arg, { getState }) => {
+      // force: true → pedimos igual (datos EN VIVO / después de editar).
+      if (arg && typeof arg === "object" && arg.force) return true;
       const st = getState().clientes;
-      const key = String(id);
+      const key = String(idDeArg(arg));
       const cached = st.byId?.[key];
       if (cached && cached.__hasDetail) return false;
       return true;
@@ -167,6 +175,7 @@ const clientesSlice = createSlice({
     page: 1,
     pageSize: 25,
     lastListQueryKey: null,
+    listRequestId: null, // id del último pedido de la lista (para ignorar respuestas viejas)
     listFetchedAt: null,
     byId: {},
     byIdStatus: {},
@@ -211,6 +220,7 @@ const clientesSlice = createSlice({
     builder
       // -------- LIST --------
       .addCase(fetchClientes.pending, (state, action) => {
+        state.listRequestId = action.meta.requestId; // el último pedido es el que vale
         state.status = "loading";
         state.error = null;
         const arg = action.meta.arg || {};
@@ -222,6 +232,8 @@ const clientesSlice = createSlice({
         state.lastListQueryKey = buildListQueryKey({ page, page_size: ps, search, estado, ordering });
       })
       .addCase(fetchClientes.fulfilled, (state, action) => {
+        // Llegó tarde una respuesta vieja (ya se pidió otra página/filtro): la ignoramos.
+        if (state.listRequestId && action.meta.requestId !== state.listRequestId) return;
         state.status = "succeeded";
         const payload = action.payload?.data || {};
         state.clientes = payload.results || [];
@@ -241,6 +253,13 @@ const clientesSlice = createSlice({
         state.listFetchedAt = Date.now();
       })
       .addCase(fetchClientes.rejected, (state, action) => {
+        if (state.listRequestId && action.meta.requestId !== state.listRequestId) return; // pedido viejo
+        // 📡 Recarga EN VIVO que falló: si había lista a la vista, queda esa (sin
+        //    cartel). Si no había nada (ej: ya venía fallando), se muestra el error.
+        if (action.meta.arg?.silencioso && state.clientes.length > 0) {
+          state.status = "succeeded";
+          return;
+        }
         if (action.payload?.aborted) {
           state.status = "idle";
           return;
@@ -251,19 +270,25 @@ const clientesSlice = createSlice({
 
       // -------- DETAIL --------
       .addCase(fetchClienteById.pending, (state, action) => {
-        const id = String(action.meta.arg);
+        const arg = action.meta.arg;
+        const id = String(idDeArg(arg));
+        // 📡 Recarga EN VIVO con la ficha ya en pantalla: sin "Cargando ficha…".
+        if (arg?.silencioso && state.byId[id]?.__hasDetail) return;
         state.byIdStatus[id] = "loading";
         state.byIdError[id] = null;
       })
       .addCase(fetchClienteById.fulfilled, (state, action) => {
         const c = action.payload;
-        const id = c?.id != null ? String(c.id) : String(action.meta.arg);
+        const id = c?.id != null ? String(c.id) : String(idDeArg(action.meta.arg));
         const prev = state.byId[id] || {};
         state.byId[id] = { ...prev, ...c, __hasDetail: true };
         state.byIdStatus[id] = "succeeded";
       })
       .addCase(fetchClienteById.rejected, (state, action) => {
-        const id = String(action.meta.arg);
+        const arg = action.meta.arg;
+        const id = String(idDeArg(arg));
+        // 📡 Si falla una recarga EN VIVO, se queda la ficha que ya se veía.
+        if (arg?.silencioso && state.byId[id]?.__hasDetail) return;
         if (action.payload?.aborted) {
           state.byIdStatus[id] = "idle";
           return;

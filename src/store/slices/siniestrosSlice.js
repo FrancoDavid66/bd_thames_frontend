@@ -195,6 +195,7 @@ const siniestrosSlice = createSlice({
   name: 'siniestros',
   initialState: {
     siniestros: [],
+    reqId: null, // último pedido de la lista (para ignorar respuestas viejas)
     eventos: {},          // { [siniestroId: string]: Evento[] }
     eventosLoading: {},   // { [siniestroId: string]: boolean }
     eventosError: {},     // { [siniestroId: string]: string|null }
@@ -209,16 +210,19 @@ const siniestrosSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // ── LIST ───────────────────────────────────────
-      .addCase(getSiniestros.pending, (state) => {
+      .addCase(getSiniestros.pending, (state, action) => {
         state.loading = true;
         state.error = null;
+        state.reqId = action.meta.requestId;
       })
       .addCase(getSiniestros.fulfilled, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.loading = false;
         // 🐛 FIX: garantizamos que siempre sea array, jamás un objeto paginado.
         state.siniestros = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(getSiniestros.rejected, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.loading = false;
         state.error = action.payload || 'Error';
       })

@@ -20,7 +20,9 @@ import {
   HiOutlineFire,
   HiOutlineCloud,
 } from "react-icons/hi";
-import { toast } from "react-toastify";
+// 🐛 FIX: antes era "react-toastify", que en la app no tiene contenedor → los
+//    avisos (errores y "pagado") nunca se veían. La app usa react-hot-toast.
+import toast from "react-hot-toast";
 
 import {
   fetchServicios,

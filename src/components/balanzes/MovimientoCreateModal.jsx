@@ -35,7 +35,6 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { createIngreso } from "../../store/slices/ingresosSlice";
 import { createEgreso } from "../../store/slices/egresosSlice";
-import { fetchBalanceDiario } from "../../store/slices/balanceSlice";
 import ModalWrapper from "../comunes/ModalWrapper";
 
 const normalizarStr = (raw) => (raw ?? "").toString().trim();
@@ -108,7 +107,6 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
 
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
-  const userOficina = user?.perfil?.oficina?.id || user?.perfil?.oficina?.codigo || user?.perfil?.oficina || "";
 
   const { oficinas: oficinasStore } = useSelector((s) => s.balance || {});
 
@@ -277,9 +275,8 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
         await dispatch(createEgreso(payload)).unwrap();
       }
 
-      // Refrescar el balance del día en la oficina correspondiente
-      const ofiParaBalance = isWebAdmin ? form.oficina : userOficina;
-      dispatch(fetchBalanceDiario({ fecha: today(), oficina: ofiParaBalance }));
+      // (Ya no se pide el balance del día acá: Balances e Inicio se actualizan
+      //  solos con el cartero de datos en vivo.)
 
       toast.success(`${esIngreso ? "Ingreso" : "Egreso"} de $${montoNum.toLocaleString("es-AR")} guardado`);
       onClose?.();

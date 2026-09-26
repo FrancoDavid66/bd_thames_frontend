@@ -31,6 +31,7 @@ import {
 
 import BajasTable from "../components/bajas/BajasTable";
 import { useAuth } from "../context/AuthContext";
+import useDatosVivos from "../hooks/useDatosVivos";
 
 // 🦉 Componentes del design system de Thames
 import PageContainer from "../components/ui/PageContainer";
@@ -197,6 +198,11 @@ export default function BajasPage() {
   // 1. Carga inicial
   useEffect(() => { loadTableData(); }, [loadTableData]);
   useEffect(() => { dispatch(fetchBajasOficinas()); }, [dispatch]);
+
+  // 📡 EN VIVO: si otra oficina marca una baja (o el cliente paga y sale de la
+  //    lista), la tabla y los contadores se ponen al día solos. Lo que tenías
+  //    tildado queda tildado.
+  useDatosVivos(["bajas", "polizas", "cuotas"], () => loadTableData({ force: true }));
 
   useEffect(() => {
     if (isWebAdmin) localStorage.setItem(LS.oficina, oficina);

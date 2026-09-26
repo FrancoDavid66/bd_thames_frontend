@@ -1,8 +1,15 @@
 // src/pages/BalancesPage.jsx  (responsive)
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+//
+// 🆕 Meses anteriores: con el atajo "Mes" aparecen las flechas ‹ Agosto 2026 ›.
+//    Los totales, la comparación y el gráfico los SUMA EL SERVIDOR (siempre
+//    completos). Antes se sumaban en el navegador los primeros 500 ingresos y
+//    500 egresos → un mes con más movimientos daba mal.
+//
+//    Ej: agosto con 1.842 ingresos → antes el Resumen sumaba solo 500;
+//        ahora muestra los 1.842 y cuánto subió o bajó contra julio.
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
-import { HiOfficeBuilding, HiGlobeAlt } from "react-icons/hi";
+import { HiOfficeBuilding } from "react-icons/hi";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import axios from "axios";
@@ -12,9 +19,11 @@ dayjs.locale("es");
 // 🚀 CONTEXTO PARA SEGURIDAD (escudo de sucursal)
 import { useAuth } from "../context/AuthContext";
 
-import { fetchIngresos } from "../store/slices/ingresosSlice";
-import { fetchEgresos } from "../store/slices/egresosSlice";
-import { fetchBalanceDiario } from "../store/slices/balanceSlice";
+// 📡 Datos en vivo: si otra oficina carga un ingreso/egreso, aparece solo.
+import useDatosVivos, { useResaltarNuevos } from "../hooks/useDatosVivos";
+// 📈 Serie del gráfico (sumada en el servidor)
+import useSerieBalance from "../hooks/useSerieBalance";
+import { pedirResumenDia, pedirResumenRango, descargarReporteMes } from "../services/balances";
 
 // 🚀 UN solo modal combinado para cargar ingreso O egreso.
 import MovimientoCreateModal from "../components/balanzes/MovimientoCreateModal";
@@ -27,6 +36,9 @@ import MovimientosPanel from "../components/balanzes/MovimientosPanel";
 
 // 🚀 Gráfico Ingresos vs Egresos (se adapta a claro/oscuro).
 import BalanceChart from "../components/balanzes/BalanceChart";
+
+// 📊 Pestaña Resumen (totales, comparación, sucursales, categorías).
+import ResumenBalance from "../components/balanzes/ResumenBalance";
 
 // ── Base de API (igual que el resto de la app) ──
 const RAW_BASE = (import.meta.env?.VITE_API_URL || "/api/").toString().trim();
@@ -43,16 +55,12 @@ const _authHeaders = () => {
 const PAGE_SIZE = 50;
 
 /* -------------------- Helpers -------------------- */
-const toNumber = (v) => {
-  if (v == null) return 0;
-  const n = Number(String(v).replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-};
-const fmtMoney = (n) =>
-  (Number(n) || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const mayuscula = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const mesActual = () => dayjs().format("YYYY-MM");
+const nombreMes = (yyyyMM) => mayuscula(dayjs(`${yyyyMM}-01`).format("MMMM YYYY")); // "Agosto 2026"
 
 /* 🚀 Atajos de tiempo. Cada uno devuelve { desde, hasta, modo }. */
-const rangoDeAtajo = (key, fechaDia) => {
+const rangoDeAtajo = (key, fechaDia, mesSel) => {
   const hoy = dayjs();
   switch (key) {
     case "hoy":
@@ -61,79 +69,69 @@ const rangoDeAtajo = (key, fechaDia) => {
       const a = hoy.subtract(1, "day");
       return { desde: a.format("YYYY-MM-DD"), hasta: a.format("YYYY-MM-DD"), modo: "dia" };
     }
-    case "semana":
+    case "semana": {
+      // 🐛 Antes: martes a lunes (sumaba 1 día a una semana que ya empezaba el
+      //    lunes). Ahora: de LUNES a DOMINGO. Ej: sábado 26/09 → 21/09 al 27/09.
+      const lunes = hoy.subtract((hoy.day() + 6) % 7, "day");
       return {
-        desde: hoy.startOf("week").add(1, "day").format("YYYY-MM-DD"),
-        hasta: hoy.endOf("week").add(1, "day").format("YYYY-MM-DD"),
+        desde: lunes.format("YYYY-MM-DD"),
+        hasta: lunes.add(6, "day").format("YYYY-MM-DD"),
         modo: "rango",
       };
-    case "mes":
+    }
+    case "mes": {
+      // 🗓️ El mes elegido con ‹ ›, entero (del 1 al último día). Si es el mes en
+      //    curso también va entero: un pago cargado con fecha 30/09 tiene que
+      //    aparecer en septiembre (igual que en el Inicio y en el reporte Excel).
+      const m = dayjs(`${mesSel}-01`);
       return {
-        desde: hoy.startOf("month").format("YYYY-MM-DD"),
-        hasta: hoy.endOf("month").format("YYYY-MM-DD"),
+        desde: m.startOf("month").format("YYYY-MM-DD"),
+        hasta: m.endOf("month").format("YYYY-MM-DD"),
         modo: "rango",
       };
+    }
     default:
       return { desde: fechaDia, hasta: fechaDia, modo: "dia" };
   }
 };
 
-/* 🆕 KPI card — borde fino, sin relieve. */
-const KPI_VARIANTS = {
-  green: "border-duo-verde/25 bg-duo-verde/[0.05]",
-  red: "border-duo-rojo/25 bg-duo-rojo/[0.05]",
-  blue: "border-duo-azul/25 bg-duo-azul/[0.05]",
+/* 🆚 ¿Con qué se compara? Solo con el atajo "Mes":
+   - mes cerrado (ej: agosto)            → contra julio entero;
+   - mes en curso (ej: septiembre al 26) → contra el 1 al 26 de agosto (mismos días),
+     así no parece que se vendió menos solo porque el mes no terminó. */
+const comparacionDeMes = (mesSel) => {
+  const hoy = dayjs();
+  const m = dayjs(`${mesSel}-01`);
+  const ant = m.subtract(1, "month");
+  const nombreAnt = ant.format("MMMM"); // "agosto"
+  if (m.isSame(hoy, "month")) {
+    const finAnt = Math.min(hoy.date(), ant.daysInMonth()); // ej: 30 de marzo → hasta el 28 de febrero
+    const mesCorto = ant.format("MMM").replace(".", "");
+    return {
+      desde: ant.startOf("month").format("YYYY-MM-DD"),
+      hasta: ant.date(finAnt).format("YYYY-MM-DD"),
+      etiqueta: finAnt === 1 ? `1 ${mesCorto}` : `1–${finAnt} ${mesCorto}`, // "1–26 ago"
+      texto:
+        finAnt === 1
+          ? `Mes en curso: se compara con el 1 de ${nombreAnt} (el mismo día)`
+          : `Mes en curso: se compara con el 1 al ${finAnt} de ${nombreAnt} (los mismos días)`,
+    };
+  }
+  return {
+    desde: ant.startOf("month").format("YYYY-MM-DD"),
+    hasta: ant.endOf("month").format("YYYY-MM-DD"),
+    etiqueta: nombreAnt, // "julio"
+    texto: `Comparado con ${nombreAnt} ${ant.format("YYYY")} (mes completo)`,
+  };
 };
-const KpiCard = React.memo(function KpiCard({ title, value, variant = "blue" }) {
-  return (
-    <div className={`border ${KPI_VARIANTS[variant]} px-4 py-4 rounded-lg min-w-0 flex flex-col gap-1.5 justify-center`}>
-      <h3 className="text-[12px] font-medium text-suave dark:text-suave-dark truncate" title={title}>
-        {title}
-      </h3>
-      <p className="text-xl sm:text-2xl font-semibold leading-none text-titulo dark:text-titulo-dark truncate">
-        <span className="text-[15px] opacity-60 mr-0.5">$</span>{fmtMoney(value)}
-      </p>
-    </div>
-  );
-});
-
-/* 🚀 Bloque de 3 KPIs (Ingreso / Egreso / Neto) por oficina. */
-const KpiRowGroup = ({ title, metrics, suffix, highlight }) => (
-  <div className={`rounded-xl border overflow-hidden ${highlight ? "border-duo-azul/35 bg-duo-azul/[0.04]" : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"}`}>
-    <div className={`flex items-center gap-2 px-4 py-3 border-b ${highlight ? "border-duo-azul/25" : "border-linea dark:border-linea-dark"}`}>
-      {highlight ? <HiGlobeAlt className="text-base shrink-0 text-duo-azul" /> : <HiOfficeBuilding className="text-base shrink-0 text-suave dark:text-suave-dark" />}
-      <h2 className={`text-[14px] font-semibold truncate ${highlight ? "text-duo-azul" : "text-titulo dark:text-titulo-dark"}`}>
-        {title}
-      </h2>
-      <span className="ml-auto text-[11px] text-suave dark:text-suave-dark shrink-0">
-        {suffix}
-      </span>
-    </div>
-    {/* 🚀 SOLO 3 cajas: Ingresos · Egresos · Neto */}
-    <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <KpiCard title="Ingresos" value={metrics.tIn} variant="green" />
-      <KpiCard title="Egresos" value={metrics.tEg} variant="red" />
-      <KpiCard title="Neto" value={metrics.tBal} variant="blue" />
-    </div>
-  </div>
-);
 
 const BalancesPage = () => {
-  const dispatch = useDispatch();
-
   // 🚀 ESCUDO DE SUCURSAL
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === 'ADMIN' || user?.rol === 'ADMIN';
   const userOficina = user?.perfil?.oficina?.codigo || user?.perfil?.oficina?.id || user?.perfil?.oficina || "";
 
   const [oficinaSeleccionada, setOficinaSeleccionada] = useState("ALL");
-
-  const { list: ingresos = [], status: ingresosStatus } = useSelector((s) => s.ingresos || {});
-  const { list: egresos = [], status: egresosStatus } = useSelector((s) => s.egresos || {});
-
-  const balanceState = useSelector((s) => s.balance || {});
-  const balanceData = balanceState?.data;
-  const balanceStatus = balanceState?.status;
 
   // 🚀 Lista de oficinas (solo admin) para el filtro
   const [oficinasAdmin, setOficinasAdmin] = useState([]);
@@ -150,21 +148,42 @@ const BalancesPage = () => {
 
   // ═══════════════ TOOLBAR: atajo + rango ═══════════════
   const [atajo, setAtajo] = useState("hoy"); // "hoy" por default
+  const [mesSel, setMesSel] = useState(mesActual); // 🗓️ mes elegido con ‹ › ("YYYY-MM")
   const [customDesde, setCustomDesde] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [customHasta, setCustomHasta] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [customDia, setCustomDia] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [advOpen, setAdvOpen] = useState(false);
 
+  // Tocar "Mes" (o "Este mes") arranca siempre en el mes actual; después ‹ › para moverse.
+  const elegirAtajo = useCallback((key) => {
+    if (key === "mes") setMesSel(mesActual());
+    setAtajo(key);
+  }, []);
+
+  const puedeMesSiguiente = mesSel < mesActual(); // no hay meses futuros
+  const onMesAnterior = () => setMesSel((m) => dayjs(`${m}-01`).subtract(1, "month").format("YYYY-MM"));
+  const onMesSiguiente = () =>
+    setMesSel((m) => {
+      const sig = dayjs(`${m}-01`).add(1, "month").format("YYYY-MM");
+      return sig > mesActual() ? m : sig;
+    });
+
   // 🚀 Rango efectivo (desde/hasta/modo) según el atajo.
   const { desde, hasta, modo } = useMemo(() => {
     if (atajo === "custom") {
-      const esUnDia = customDesde && customDesde === customHasta;
-      return { desde: customDesde, hasta: customHasta, modo: esUnDia ? "dia" : "rango" };
+      // Si quedaron al revés (desde después de hasta) se dan vuelta; si falta
+      // una, se usa la otra. Ej: 20/08 → 05/08 = del 05/08 al 20/08.
+      const hoyTxt = dayjs().format("YYYY-MM-DD");
+      let d1 = customDesde || customHasta || hoyTxt;
+      let d2 = customHasta || customDesde || hoyTxt;
+      if (d1 > d2) [d1, d2] = [d2, d1];
+      return { desde: d1, hasta: d2, modo: d1 === d2 ? "dia" : "rango" };
     }
-    return rangoDeAtajo(atajo, dayjs().format("YYYY-MM-DD"));
-  }, [atajo, customDesde, customHasta]);
+    return rangoDeAtajo(atajo, dayjs().format("YYYY-MM-DD"), mesSel);
+  }, [atajo, customDesde, customHasta, mesSel]);
 
-  const fecha = modo === "dia" ? desde : hasta;
+  // 🆚 Comparación contra el mes anterior (solo con "Mes")
+  const comparacion = useMemo(() => (atajo === "mes" ? comparacionDeMes(mesSel) : null), [atajo, mesSel]);
 
   // Filtros de la TABLA (viven en la página ahora)
   const [tipo, setTipo] = useState("ambos");         // ambos | ingresos | egresos
@@ -188,23 +207,154 @@ const BalancesPage = () => {
 
   const ofiParam = isWebAdmin ? oficinaSeleccionada : userOficina;
 
-  // ── REFRESCO A (modo "dia"): KPIs del día con desglose por oficina ──
-  useEffect(() => {
-    if (modo !== "dia") return;
-    dispatch(fetchBalanceDiario({ fecha, oficina: ofiParam }));
-  }, [dispatch, fecha, modo, ofiParam]);
+  // ═══════════════ RESUMEN (totales del servidor) ═══════════════
+  //   1 día  → balance-diario   ·   rango / mes → balance-mensual
+  //   Con "Mes" se pide también el período anterior para comparar.
+  //   Solo se pide con la pestaña Resumen abierta.
+  const [resumen, setResumen] = useState({ actual: null, anterior: null, clave: null });
+  const [resumenCargando, setResumenCargando] = useState(false);
+  const [resumenError, setResumenError] = useState(null);
+  const resumenPedidoRef = useRef(0);
+  const resumenNormalesRef = useRef(0); // cargas "normales" (cambio de filtro) en vuelo
+  const claveResumen = `${modo}|${desde}|${hasta}|${ofiParam}|${comparacion?.desde || ""}|${comparacion?.hasta || ""}`;
 
-  // ── REFRESCO B (modo "rango"): totales del período (para KPIs del resumen) ──
+  // silencioso = recarga EN VIVO: sin "Cargando…" ni carteles de error.
+  // Si llega tarde la respuesta de un pedido viejo (ej: tocaste ‹ ‹ ‹ rápido), se ignora.
+  const cargarResumen = useCallback(async ({ silencioso = false } = {}) => {
+    // En vivo: si justo se está cargando por un cambio de filtro, esa carga ya
+    // trae lo último → no la pisamos.
+    if (silencioso && resumenNormalesRef.current > 0) return false;
+    const mio = ++resumenPedidoRef.current;
+    if (!silencioso) {
+      resumenNormalesRef.current += 1;
+      setResumenCargando(true);
+      setResumenError(null);
+    }
+    try {
+      const [actual, anterior] = await Promise.all([
+        modo === "dia" ? pedirResumenDia(desde, ofiParam) : pedirResumenRango(desde, hasta, ofiParam),
+        comparacion ? pedirResumenRango(comparacion.desde, comparacion.hasta, ofiParam) : Promise.resolve(null),
+      ]);
+      if (mio !== resumenPedidoRef.current) return false;
+      setResumen({ actual, anterior, clave: claveResumen });
+      setResumenError(null);
+      return true;
+    } catch (err) {
+      if (mio !== resumenPedidoRef.current) return false;
+      console.error("[Balances] Error al cargar el resumen:", err);
+      if (!silencioso) {
+        // No dejamos a la vista los números del período anterior con el título del nuevo.
+        setResumen({ actual: null, anterior: null, clave: null });
+        setResumenError("No se pudo cargar el resumen.");
+      }
+      return false;
+    } finally {
+      if (!silencioso) resumenNormalesRef.current -= 1;
+      if (mio === resumenPedidoRef.current) setResumenCargando(false);
+    }
+  }, [modo, desde, hasta, ofiParam, comparacion, claveResumen]);
+
   useEffect(() => {
-    if (modo !== "rango") return;
-    dispatch(fetchIngresos({ oficina: ofiParam, desde, hasta, page_size: 500 }));
-    dispatch(fetchEgresos({  oficina: ofiParam, desde, hasta, page_size: 500 }));
-  }, [dispatch, modo, desde, hasta, ofiParam]);
+    if (vista !== "resumen") {
+      resumenPedidoRef.current += 1; // lo que esté en vuelo ya no cuenta
+      setResumenCargando(false);
+      return;
+    }
+    cargarResumen();
+  }, [vista, cargarResumen]);
+
+  // ═══════════════ GRÁFICO (serie del servidor) ═══════════════
+  const [vistaGrafico, setVistaGrafico] = useState("meses"); // "dias" | "meses"
+  const grafico = useMemo(() => {
+    const hoy = dayjs();
+    const fmt = (d) => d.format("YYYY-MM-DD");
+    if (vistaGrafico === "meses") {
+      // 12 meses. Si el mes elegido está entre los últimos 12, la ventana queda
+      // fija hasta el mes actual (así al tocar barras el gráfico no "salta").
+      const hoyMes = hoy.startOf("month");
+      const sel = atajo === "mes" ? dayjs(`${mesSel}-01`) : dayjs(hasta).startOf("month");
+      const fin = hoyMes.diff(sel, "month") <= 11 ? hoyMes : sel;
+      return {
+        agrupar: "mes",
+        desde: fmt(fin.subtract(11, "month").startOf("month")),
+        hasta: fmt(fin.endOf("month")),
+        destacado: atajo === "mes" ? mesSel : null,
+        subtitulo: fin.isSame(hoyMes, "month")
+          ? "Últimos 12 meses · tocá un mes para verlo"
+          : `12 meses hasta ${fin.format("MMMM YYYY")} · tocá un mes para verlo`,
+      };
+    }
+    if (atajo === "mes") {
+      const m = dayjs(`${mesSel}-01`);
+      const enCurso = m.isSame(hoy, "month");
+      return {
+        agrupar: "dia",
+        desde: fmt(m.startOf("month")),
+        hasta: fmt(m.endOf("month")),
+        destacado: enCurso ? fmt(hoy) : null,
+        subtitulo: `${nombreMes(mesSel)}, día por día`,
+      };
+    }
+    if (modo === "dia") {
+      const d = dayjs(desde);
+      return {
+        agrupar: "dia",
+        desde: fmt(d.subtract(29, "day")),
+        hasta: fmt(d),
+        destacado: desde,
+        subtitulo: `Últimos 30 días hasta el ${d.format("DD/MM/YYYY")}`,
+      };
+    }
+    // Semana o rango elegido: sus días (como mucho los últimos 62).
+    const fin = dayjs(hasta);
+    let ini = dayjs(desde);
+    if (fin.diff(ini, "day") > 61) ini = fin.subtract(61, "day");
+    return {
+      agrupar: "dia",
+      desde: fmt(ini),
+      hasta: fmt(fin),
+      destacado: null,
+      subtitulo: `Día por día, del ${ini.format("DD/MM")} al ${fin.format("DD/MM/YYYY")}`,
+    };
+  }, [vistaGrafico, atajo, mesSel, modo, desde, hasta]);
+
+  const serie = useSerieBalance({
+    agrupar: grafico.agrupar,
+    desde: grafico.desde,
+    hasta: grafico.hasta,
+    oficina: ofiParam,
+    activo: vista === "resumen",
+  });
+
+  // Tocar una barra del gráfico de 12 meses → ir a ese mes.
+  const irAlMes = useCallback((periodo) => {
+    if (!/^\d{4}-\d{2}$/.test(String(periodo || ""))) return;
+    if (periodo > mesActual()) return;
+    setMesSel(periodo);
+    setAtajo("mes");
+  }, []);
+
+  // 📡 Filas NUEVAS (en vivo): se marcan unos segundos. Ver más abajo.
+  const { nuevos: movNuevos, marcar: marcarMovNuevos, olvidar: olvidarMovNuevos } = useResaltarNuevos(
+    movItems,
+    (it) => `${it?._tipo}-${it?.id}`
+  );
 
   // ── Cargar la TABLA de movimientos (endpoint unificado) ──
-  const cargarMovimientos = useCallback(async (p = 1) => {
-    setMovLoading(true);
-    setMovError(null);
+  // silencioso = recarga EN VIVO: sin "Cargando…" ni carteles de error.
+  // movPedidoRef: si llega tarde la respuesta de un pedido viejo (ej: cambiaste
+  // de filtro mientras se recargaba en vivo), se ignora: vale el último.
+  // Devuelve true si cargó bien (lo usa el marcado de NUEVO).
+  const movPedidoRef = useRef(0);
+  const movNormalesRef = useRef(0); // cargas "normales" (filtro/página) en vuelo
+  const cargarMovimientos = useCallback(async (p = 1, { silencioso = false } = {}) => {
+    const mio = ++movPedidoRef.current;
+    if (!silencioso) {
+      movNormalesRef.current += 1;
+      olvidarMovNuevos(); // carga "normal" (filtro/página): nada se marca NUEVO
+      setMovLoading(true);
+      setMovError(null);
+    }
     try {
       const params = { tipo, page: p, page_size: PAGE_SIZE };
       if (ofiParam && ofiParam !== "ALL") params.oficina = ofiParam;
@@ -214,20 +364,25 @@ const BalancesPage = () => {
       if (q) params.search = q;
 
       const res = await axios.get(`${API_BASE}ingresos/movimientos/`, { params, headers: _authHeaders() });
+      if (mio !== movPedidoRef.current) return false;
       const data = res?.data;
       const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
       setMovItems(results);
       setMovCount(Number(data?.count ?? results.length));
+      return true;
     } catch (err) {
       console.error("[Balances] Error al cargar movimientos:", err);
+      if (silencioso || mio !== movPedidoRef.current) return false; // en vivo: si falla, dejamos lo que se ve
       toast.error("No se pudieron cargar los movimientos.");
       setMovError("No se pudieron cargar los movimientos.");
       setMovItems([]);
       setMovCount(0);
+      return false;
     } finally {
-      setMovLoading(false);
+      if (!silencioso) movNormalesRef.current -= 1;
+      if (mio === movPedidoRef.current) setMovLoading(false);
     }
-  }, [tipo, ofiParam, desde, hasta, formaPago, q]);
+  }, [tipo, ofiParam, desde, hasta, formaPago, q, olvidarMovNuevos]);
 
   // Recargar la tabla cuando cambian los filtros (solo si estamos en Movimientos)
   useEffect(() => {
@@ -239,6 +394,29 @@ const BalancesPage = () => {
   const onBuscar = (e) => { e?.preventDefault?.(); setQ(qInput.trim()); };
   const onLimpiarBusqueda = () => { setQInput(""); setQ(""); };
   const onPage = (p) => { setMovPage(p); cargarMovimientos(p); };
+
+  // 📡 EN VIVO: cambió la caja (un cobro, un ingreso o egreso cargado en
+  //    cualquier oficina) → se recarga lo que se está viendo, en silencio.
+  //    Las filas nuevas quedan marcadas "NUEVO" unos segundos (solo en la
+  //    página 1: en las otras, una fila "nueva" es solo una que se corrió).
+  const recargandoVivo = useDatosVivos(["caja"], () => {
+    const tareas = [];
+    if (vista === "resumen") {
+      tareas.push(cargarResumen({ silencioso: true }));
+      tareas.push(serie.recargar({ silencioso: true }));
+    }
+    // Si justo se está cargando por un cambio de filtro/página, esa carga ya
+    // trae lo último: no la pisamos con una recarga en vivo.
+    if (vista === "movimientos" && movNormalesRef.current === 0) {
+      const foto = movPage === 1 ? marcarMovNuevos() : null;
+      tareas.push(
+        cargarMovimientos(movPage, { silencioso: true }).then((ok) => {
+          if (!ok && foto) olvidarMovNuevos(foto);
+        })
+      );
+    }
+    return Promise.allSettled(tareas);
+  });
 
   // ── Descargar (Excel / PDF) ──
   const onExport = async () => {
@@ -268,7 +446,9 @@ const BalancesPage = () => {
 
       const ext = exportFormat === "pdf" ? "pdf" : "xlsx";
       const etiqueta = tipo === "ingresos" ? "Ingresos" : tipo === "egresos" ? "Egresos" : "Movimientos";
-      const filename = `${etiqueta}_${dayjs().format("YYYY-MM-DD")}.${ext}`;
+      // El nombre dice qué período trae (antes decía siempre la fecha de hoy).
+      const periodoArchivo = modo === "dia" ? desde : `${desde}_a_${hasta}`;
+      const filename = `${etiqueta}_${periodoArchivo}.${ext}`;
 
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
@@ -290,62 +470,53 @@ const BalancesPage = () => {
     }
   };
 
-  // El backend ya filtra por rango; acá solo aplicamos el filtro de oficina (para KPIs de resumen).
-  const ingresosMensuales = useMemo(() =>
-    ingresos.filter((i) => {
-      if (!isWebAdmin) return true;
-      return oficinaSeleccionada === "ALL" || String(i.oficina) === String(oficinaSeleccionada);
-    }), [ingresos, isWebAdmin, oficinaSeleccionada]);
-
-  const egresosMensuales = useMemo(() =>
-    egresos.filter((e) => {
-      if (!isWebAdmin) return true;
-      return oficinaSeleccionada === "ALL" || String(e.oficina) === String(oficinaSeleccionada);
-    }), [egresos, isWebAdmin, oficinaSeleccionada]);
-
-  // ── Métricas Día/Rango por Oficina (para los KPIs) ──
-  const getMetrics = useCallback((ofiCode, timeMode) => {
-    if (timeMode === "dia") {
-      let source = balanceData;
-      if (ofiCode !== "ALL" && ofiCode !== null) {
-        source = balanceData?.por_oficina?.find(o => String(o.scope.oficina) === String(ofiCode)) || null;
-      } else if (ofiCode === null) {
-        source = balanceData?.sin_oficina || null;
-      }
-      const tIn = toNumber(source?.totales?.ingresos);
-      const tEg = toNumber(source?.totales?.egresos);
-      const tBal = toNumber(source?.totales?.balance);
-      return { tIn, tEg, tBal };
-    } else {
-      const ingFiltrados = ofiCode === "ALL" ? ingresosMensuales : ofiCode === null ? ingresosMensuales.filter(i => !i.oficina) : ingresosMensuales.filter(i => String(i.oficina) === String(ofiCode));
-      const egFiltrados = ofiCode === "ALL" ? egresosMensuales : ofiCode === null ? egresosMensuales.filter(e => !e.oficina) : egresosMensuales.filter(e => String(e.oficina) === String(ofiCode));
-      const tIn = ingFiltrados.reduce((acc, i) => acc + toNumber(i.monto), 0);
-      const tEg = egFiltrados.reduce((acc, e) => acc + toNumber(e.monto), 0);
-      return { tIn, tEg, tBal: tIn - tEg };
+  // ── Reporte del mes (Excel con tablas y gráficos, lo arma el servidor) ──
+  const [descargandoReporte, setDescargandoReporte] = useState(false);
+  const onReporteMes = async () => {
+    if (descargandoReporte) return;
+    setDescargandoReporte(true);
+    const toastId = toast.loading(`Generando el reporte de ${dayjs(`${mesSel}-01`).format("MMMM")}…`);
+    try {
+      await descargarReporteMes(mesSel, ofiParam);
+      toast.success("Reporte generado", { id: toastId, duration: 3500 });
+    } catch (err) {
+      console.error("[Balances] Error al generar el reporte del mes:", err);
+      const st = err?.response?.status;
+      toast.error(
+        st === 401 || st === 403 ? "Tu sesión expiró. Volvé a iniciar sesión." : "No se pudo generar el reporte del mes.",
+        { id: toastId }
+      );
+    } finally {
+      setDescargandoReporte(false);
     }
-  }, [balanceData, ingresosMensuales, egresosMensuales]);
+  };
 
-  const metricsPorOficina = useMemo(() => {
-    const map = { ALL: getMetrics("ALL", modo), _sin: getMetrics(null, modo) };
-    (balanceData?.por_oficina || []).forEach((ofi) => {
-      map[ofi.scope.oficina] = getMetrics(ofi.scope.oficina, modo);
-    });
-    return map;
-  }, [getMetrics, modo, balanceData]);
-
-  const cargando = ingresosStatus === "loading" || egresosStatus === "loading" || balanceStatus === "loading" || movLoading;
+  const cargando =
+    !recargandoVivo &&
+    (vista === "movimientos" ? movLoading : resumenCargando || serie.cargando);
 
   const etiquetaAtajo = {
-    hoy: "Hoy", ayer: "Ayer", semana: "Esta semana", mes: "Este mes", custom: "Rango elegido",
+    hoy: "Hoy", ayer: "Ayer", semana: "Esta semana", mes: "Mes", custom: "Rango elegido",
   }[atajo] || "Hoy";
 
   const periodoTexto = useMemo(() => {
-    if (modo === "dia") return dayjs(fecha).format("DD/MM/YYYY");
+    if (modo === "dia") return dayjs(desde).format("DD/MM/YYYY");
     return `${dayjs(desde).format("DD/MM/YYYY")} → ${dayjs(hasta).format("DD/MM/YYYY")}`;
-  }, [modo, fecha, desde, hasta]);
+  }, [modo, desde, hasta]);
 
-  const suffix = modo === "dia" ? "(Día)" : "(Período)";
-  const empMetrics = getMetrics("ALL", modo);
+  // Título y bajada del Resumen según el período.
+  const { tituloResumen, subtituloResumen } = useMemo(() => {
+    const largo = (f) => mayuscula(dayjs(f).format("dddd D [de] MMMM [de] YYYY"));
+    const corto = (f) => dayjs(f).format("DD/MM/YYYY");
+    if (atajo === "mes") return { tituloResumen: nombreMes(mesSel), subtituloResumen: comparacion?.texto || "" };
+    if (atajo === "hoy") return { tituloResumen: "Hoy", subtituloResumen: largo(desde) };
+    if (atajo === "ayer") return { tituloResumen: "Ayer", subtituloResumen: largo(desde) };
+    if (atajo === "semana") {
+      return { tituloResumen: "Esta semana", subtituloResumen: `Del ${dayjs(desde).format("DD/MM")} al ${corto(hasta)}` };
+    }
+    if (modo === "dia") return { tituloResumen: corto(desde), subtituloResumen: largo(desde) };
+    return { tituloResumen: "Rango elegido", subtituloResumen: `Del ${corto(desde)} al ${corto(hasta)}` };
+  }, [atajo, mesSel, comparacion, modo, desde, hasta]);
 
   const aplicarCustomDia = () => { setCustomDesde(customDia); setCustomHasta(customDia); setAtajo("custom"); };
   const aplicarCustomRango = () => setAtajo("custom");
@@ -398,7 +569,11 @@ const BalancesPage = () => {
       <BalancesFilters
         isWebAdmin={isWebAdmin}
         oficinasAdmin={oficinasAdmin}
-        atajo={atajo} setAtajo={setAtajo}
+        atajo={atajo} setAtajo={elegirAtajo}
+        etiquetaMes={nombreMes(mesSel)}
+        onMesAnterior={onMesAnterior}
+        onMesSiguiente={onMesSiguiente}
+        puedeMesSiguiente={puedeMesSiguiente}
         advOpen={advOpen} setAdvOpen={setAdvOpen}
         customDia={customDia} setCustomDia={setCustomDia}
         customDesde={customDesde} setCustomDesde={setCustomDesde}
@@ -423,7 +598,7 @@ const BalancesPage = () => {
       />
 
       {/* ===================== SELECTOR DE VISTA ===================== */}
-      {/* 📱 scroll-x por si no entran los tabs; sin barra visible. */}
+      {/* 📱 En el celu los 2 tabs ocupan el ancho (mitad y mitad). */}
       <div className="mb-5 border-b border-linea dark:border-linea-dark flex gap-2 pb-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {[
           { id: "movimientos", label: "Movimientos" },
@@ -435,7 +610,8 @@ const BalancesPage = () => {
               key={tab.id}
               type="button"
               onClick={() => setVista(tab.id)}
-              className={`whitespace-nowrap shrink-0 min-h-[40px] px-4 py-2 rounded-t-lg text-[13px] font-medium transition-colors border border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+              aria-current={active ? "page" : undefined}
+              className={`flex-1 sm:flex-none whitespace-nowrap shrink-0 min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-t-lg text-[13px] font-medium transition-colors border border-b-0 ${active ? "bg-card dark:bg-card-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark" : "bg-transparent border-transparent text-suave dark:text-suave-dark hover:bg-card dark:hover:bg-card-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
             >
               {tab.label}
             </button>
@@ -443,36 +619,43 @@ const BalancesPage = () => {
         })}
       </div>
 
-      {/* ===================== RESUMEN (solo 3 KPIs) ===================== */}
+      {/* ===================== RESUMEN ===================== */}
       {vista === "resumen" && (
       <section className="space-y-5">
-        {isWebAdmin ? (
-          <div className="space-y-4">
-            {oficinaSeleccionada === "ALL" ? (
-              <>
-                <KpiRowGroup title="Caja general (todas las sucursales)" metrics={metricsPorOficina.ALL} suffix={suffix} highlight />
-                {modo === "dia" && balanceData?.por_oficina?.map(ofi => (
-                  <KpiRowGroup key={ofi.scope.oficina} title={`Sucursal: ${ofi.scope.oficina_nombre}`} metrics={metricsPorOficina[ofi.scope.oficina]} suffix={suffix} />
-                ))}
-                {modo === "dia" && balanceData?.sin_oficina && (
-                  <KpiRowGroup title="Sin sucursal asignada" metrics={metricsPorOficina._sin} suffix={suffix} />
-                )}
-              </>
-            ) : (
-              <KpiRowGroup title="Sucursal seleccionada" metrics={metricsPorOficina.ALL} suffix={suffix} highlight />
-            )}
-          </div>
-        ) : (
-          // Vista empleado común — 3 KPIs
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <KpiCard title={`Ingresos ${suffix}`} value={empMetrics.tIn} variant="green" />
-            <KpiCard title={`Egresos ${suffix}`} value={empMetrics.tEg} variant="red" />
-            <KpiCard title={`Neto ${suffix}`} value={empMetrics.tBal} variant="blue" />
-          </div>
-        )}
+        <ResumenBalance
+          actual={resumen.actual}
+          anterior={resumen.anterior}
+          comparacion={comparacion}
+          titulo={tituloResumen}
+          subtitulo={subtituloResumen}
+          mostrarSucursales={isWebAdmin && oficinaSeleccionada === "ALL"}
+          cargando={resumenCargando}
+          desactualizado={resumen.clave !== claveResumen}
+          error={resumenError}
+          onReintentar={() => cargarResumen()}
+          mostrarReporte={atajo === "mes"}
+          onReporte={onReporteMes}
+          descargandoReporte={descargandoReporte}
+        />
 
-        {/* 🚀 Gráfico Ingresos vs Egresos */}
-        <BalanceChart ingresos={ingresosMensuales} egresos={egresosMensuales} />
+        {/* 🚀 Gráfico Ingresos vs Egresos (serie del servidor) */}
+        <BalanceChart
+          puntos={serie.puntos}
+          agrupar={serie.agruparDatos || grafico.agrupar}
+          opciones={[
+            { id: "dias", label: "Día por día" },
+            { id: "meses", label: "12 meses" },
+          ]}
+          valor={vistaGrafico}
+          onCambiar={setVistaGrafico}
+          destacado={grafico.destacado}
+          onElegir={(serie.agruparDatos || grafico.agrupar) === "mes" ? irAlMes : null}
+          subtitulo={grafico.subtitulo}
+          cargando={serie.cargando}
+          desactualizado={serie.desactualizado}
+          error={serie.error}
+          onReintentar={() => serie.recargar()}
+        />
       </section>
       )}
 
@@ -488,6 +671,7 @@ const BalancesPage = () => {
           totalPages={movTotalPages}
           onPage={onPage}
           onReintentar={() => cargarMovimientos(movPage)}
+          nuevos={movNuevos}
         />
       </section>
       )}

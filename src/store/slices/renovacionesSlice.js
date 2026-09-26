@@ -660,6 +660,9 @@ const renovacionesSlice = createSlice({
         }
       })
       .addCase(fetchRenovaciones.rejected, (state, action) => {
+        // 📡 Recarga EN VIVO que falló: si había lista a la vista, queda esa (sin
+        //    cartel). Si no había nada (ej: ya venía fallando), se muestra el error.
+        if (action.meta.arg?.silencioso && (state.items || []).length > 0) { state.status = "succeeded"; return; }
         state.status = "failed";
         state.error = action.payload?.message || "Error al cargar renovaciones";
       })

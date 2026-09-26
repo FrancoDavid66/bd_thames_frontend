@@ -2,26 +2,38 @@
 // Muestra, para un día, qué sucursales cerraron caja y cuáles NO.
 // 📱 RESPONSIVE: el selector de fecha y el botón "Hoy" con tap target ≥44px, y la
 //    lista de sucursales usa 1 columna en celu (2 desde sm).
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { HiCheckCircle, HiXCircle, HiCalendar } from "react-icons/hi";
 import api from "../../services/api";
+import useDatosVivos from "../../hooks/useDatosVivos";
 
 export default function EstadoCierresDia() {
   const [fecha, setFecha] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [data, setData] = useState({ oficinas: [], pendientes: [], cerraron: 0, total: 0 });
   const [loading, setLoading] = useState(false);
 
+  // 📡 EN VIVO: cuando una sucursal cierra caja, se tilda sola acá (sin "Cargando...").
+  const [vivo, setVivo] = useState(0);
+  const silenciosoRef = useRef(false);
+  useDatosVivos(["recaudacion"], () => {
+    silenciosoRef.current = true;
+    setVivo((n) => n + 1);
+  });
+
   useEffect(() => {
     let activo = true;
-    setLoading(true);
+    const silencioso = silenciosoRef.current;
+    silenciosoRef.current = false;
+    if (!silencioso) setLoading(true);
     api
       .get("recaudacion/estado-dia/", { params: { fecha } })
       .then((res) => {
         if (activo) setData(res.data || { oficinas: [], pendientes: [], cerraron: 0, total: 0 });
       })
       .catch(() => {
-        if (activo) setData({ oficinas: [], pendientes: [], cerraron: 0, total: 0 });
+        // En una recarga EN VIVO que falla, se queda lo que ya se veía.
+        if (activo && !silencioso) setData({ oficinas: [], pendientes: [], cerraron: 0, total: 0 });
       })
       .finally(() => {
         if (activo) setLoading(false);
@@ -29,7 +41,7 @@ export default function EstadoCierresDia() {
     return () => {
       activo = false;
     };
-  }, [fecha]);
+  }, [fecha, vivo]);
 
   const todasCerraron = data.total > 0 && data.pendientes.length === 0;
 

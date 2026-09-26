@@ -24,6 +24,7 @@ import {
   HiCheckCircle, HiCamera, HiX, HiCalendar, HiRefresh, HiArrowRight, HiPlus,
 } from "react-icons/hi";
 import api from "../services/api";
+import useDatosVivos from "../hooks/useDatosVivos";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import { UI } from "../components/tareas/tareasUI";
 import WizardShell from "../components/tareas/WizardShell";
@@ -238,17 +239,23 @@ export default function ControlDiarioPage() {
   const [foto, setFoto] = useState(null);
   const [ofiSel, setOfiSel] = useState(null); // oficina_id elegida (o null = primera)
 
-  const cargar = async () => {
+  // silencioso = recarga EN VIVO: si falla no molestamos con un cartel
+  // (se reintenta sola con el próximo aviso).
+  const cargar = async (opciones) => {
+    const silencioso = !!opciones?.silencioso;
     try {
       const res = await api.get("tareas-fijas/dia/");
       setData(res.data);
     } catch {
-      toast.error("No se pudieron cargar las tareas");
+      if (!silencioso) toast.error("No se pudieron cargar las tareas");
     } finally {
       setLoading(false);
     }
   };
   useEffect(() => { cargar(); }, []);
+
+  // 📡 EN VIVO: si otro empleado sube la foto de una tarea, se tilda sola acá.
+  useDatosVivos(["tareas"], () => cargar({ silencioso: true }));
 
   const oficinas = data?.oficinas || [];
   const variasOfis = oficinas.length > 1;

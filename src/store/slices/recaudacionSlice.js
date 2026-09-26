@@ -63,6 +63,7 @@ const recaudacionSlice = createSlice({
     pageSize: 12,
     loading: false,
     error: null,
+    reqId: null, // último pedido de la lista (para ignorar respuestas viejas)
     uploading: false,
     // 🚀 ESTADOS PARA EMPLEADOS
     empleados: [],
@@ -72,11 +73,13 @@ const recaudacionSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // Fetch Recaudaciones
-      .addCase(fetchRecaudaciones.pending, (state) => {
+      .addCase(fetchRecaudaciones.pending, (state, action) => {
         state.loading = true;
         state.error = null;
+        state.reqId = action.meta.requestId;
       })
       .addCase(fetchRecaudaciones.fulfilled, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.loading = false;
         // El payload ahora es { count, next, previous, results }
         const payload = action.payload || {};
@@ -84,6 +87,7 @@ const recaudacionSlice = createSlice({
         state.count = payload.count ?? state.items.length;
       })
       .addCase(fetchRecaudaciones.rejected, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.loading = false;
         state.error = action.payload;
       })

@@ -203,6 +203,7 @@ const initialState = {
   data: null,
   status: "idle",
   error: null,
+  reqId: null, // último pedido del balance diario (para ignorar respuestas viejas)
   
   envioStatus: "idle",
   envioError: null,
@@ -235,15 +236,18 @@ const balanceSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // --- Balance Diario ---
-      .addCase(fetchBalanceDiario.pending, (state) => {
+      .addCase(fetchBalanceDiario.pending, (state, action) => {
         state.status = "loading";
         state.error = null;
+        state.reqId = action.meta.requestId;
       })
       .addCase(fetchBalanceDiario.fulfilled, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.status = "succeeded";
         state.data = action.payload; 
       })
       .addCase(fetchBalanceDiario.rejected, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.status = "failed";
         state.error = action.payload || action.error?.message || "Error desconocido";
       })

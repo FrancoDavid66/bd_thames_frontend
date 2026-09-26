@@ -1,5 +1,5 @@
 // src/pages/CuponerasPage.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
   HiRefresh, HiSearch, HiChevronRight, HiChatAlt2,
@@ -11,6 +11,7 @@ import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 
 import { actualizarEstadoCuponRobo } from "../store/slices/cuponesRoboSlice";
+import useDatosVivos from "../hooks/useDatosVivos";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
 // 🦉 Design system de Thames
@@ -307,17 +308,28 @@ export default function CuponerasPage() {
      ~2866 cupones de golpe). Le pedimos al backend scope="MES": solo lo
      accionable = vencidos impagos + lo que vence este mes (incluye hoy y 3 días).
      El backend además ya excluye las pólizas dadas de baja / canceladas. */
-  const loadDashboard = async (term = "") => {
-    setLoading(true);
-    setError("");
+  // silencioso = recarga EN VIVO: sin "..." en el botón, y si falla se queda
+  // lo que ya se veía (se reintenta sola con el próximo aviso).
+  // pedidoRef: si llega tarde la respuesta de un pedido viejo (ej: escribiste
+  // en el buscador mientras se recargaba), se ignora: vale la del último.
+  const pedidoRef = useRef(0);
+  const loadDashboard = async (term = "", { silencioso = false } = {}) => {
+    const mio = ++pedidoRef.current;
+    if (!silencioso) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const params = { solo_ultimo: 0, scope: "MES", page: 1, page_size: 100 };
       if (term.trim()) params.search = term.trim();
       const res = await http.get("polizas/cupones-robo/dashboard/", { params });
+      if (mio !== pedidoRef.current) return;
       const data = res.data || {};
       setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0, reportados: 0 });
       setCupones(Array.isArray(data.results) ? data.results : []);
+      if (silencioso) setError("");
     } catch (e) {
+      if (silencioso || mio !== pedidoRef.current) return;
       const msg =
         e?.response?.data?.detail ||
         e?.response?.data?.error ||
@@ -326,7 +338,7 @@ export default function CuponerasPage() {
       toast.error(msg);
       setCupones([]);
     } finally {
-      setLoading(false);
+      if (mio === pedidoRef.current) setLoading(false);
     }
   };
 
@@ -338,6 +350,10 @@ export default function CuponerasPage() {
   }, [search]);
 
   const refreshAll = () => loadDashboard(search);
+
+  // 📡 EN VIVO: si un cliente sube el comprobante desde el Portal, u otra
+  //    oficina confirma un pago, la lista se pone al día sola.
+  useDatosVivos(["cupones", "polizas"], () => loadDashboard(search, { silencioso: true }));
 
   /* Agrupar cupones por póliza (cada cliente = 1 fila) */
   const clientes = useMemo(() => {

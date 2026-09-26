@@ -1,5 +1,8 @@
 // src/App.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+// 📡 Datos en vivo: el cartero (pregunta cada 20 s si cambió algo) y el hook para anotarse.
+import { iniciar as iniciarVivo, detener as detenerVivo, disponible as vivoDisponible } from "./services/vivo";
+import useDatosVivos from "./hooks/useDatosVivos";
 import { useSelector, useDispatch } from "react-redux";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,6 +45,9 @@ import RecaudacionPage from "./pages/RecaudacionPage";
 import ServiciosPage from "./pages/ServiciosPage";
 // 🚀 Thunk de contadores
 import { fetchContadoresServicios } from "./store/slices/serviciosSlice";
+import { invalidarCachesVivo } from "./store/slices/pagosSlice";
+import { invalidarCacheSiniestrosCliente } from "./hooks/useSiniestrosCliente";
+import { invalidarCacheAlertasCliente } from "./hooks/useAlertasCliente";
 
 // 🚀 NUEVA APP: COTIZACIONES
 import CotizacionesPage from "./pages/CotizacionesPage";
@@ -65,8 +71,6 @@ import PortalAseguradoPage from "./pages/PortalAseguradoPage";
 import PanelPortalPage from "./pages/PanelPortalPage";
 // ⚖️ PÁGINA PÚBLICA: "Mi caso" (expediente legal, sin login)
 import MiCasoPage from "./pages/MiCasoPage";
-
-import { solicitudesRealtime } from "./services/notifications/solicitudes.js";
 
 // 🚀 Marca de "ya mostré la bienvenida en esta sesión". Se guarda en
 //    sessionStorage: vive mientras la pestaña esté abierta y se borra al
@@ -343,17 +347,21 @@ function App() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const unsub = solicitudesRealtime.subscribe((evt) => {
-      if (evt && evt.data) {
-        const root = evt.data?.solicitudes ?? evt.data ?? {};
-        setSolPendienteAlta(Number(root.pendiente_alta || 0));
-        setSolPendienteEnvio(Number(root.pendiente_envio || 0));
-      }
-    });
-
+  // 🚀 CONTADORES DEL MENÚ — una sola función los pide todos.
+  //    ⚡ Antes se pedían los 7 en CADA cambio de pantalla, cada 60 s aunque la
+  //    pestaña estuviera minimizada, y además la lista COMPLETA de solicitudes
+  //    cada 5 s (~22 pedidos por minuto por pestaña). Ahora:
+  //      · al iniciar sesión;
+  //      · 📡 EN VIVO: cuando el cartero avisa que cambió un tema, se pide
+  //        SOLO el contador de ese tema (ej: cambió "siniestros" → 1 pedido);
+  //      · respaldo cada 5 min con la pestaña a la vista (cosas que cambian
+  //        con el paso del tiempo, ej: una póliza que entra en renovación).
+  //      · Si el servidor todavía no tiene el cartero: como antes (60 s, y al
+  //        navegar o volver a la pestaña si pasaron 30 s).
+  const ultimoRefrescoRef = useRef(0);
+  const refrescarRef = useRef(() => {});
+  refrescarRef.current = () => {
+    ultimoRefrescoRef.current = Date.now();
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
@@ -361,15 +369,83 @@ function App() {
     fetchSiniestrosCount();
     fetchServiciosCounters();
     fetchControlDiarioCount();
+  };
+  const refrescarSiViejoRef = useRef(() => {});
+  refrescarSiViejoRef.current = (ms = 30_000) => {
+    if (Date.now() - ultimoRefrescoRef.current >= ms) refrescarRef.current();
+  };
+
+  // 📡 Cambió algo → pedimos solo los contadores de esos temas.
+  const refrescarPorTemaRef = useRef(() => {});
+  refrescarPorTemaRef.current = (temas = []) => {
+    const t = new Set(temas);
+    const toca = (...lista) => lista.some((x) => t.has(x));
+    if (toca("solicitudes")) tryFetchCounters();
+    if (toca("cupones", "polizas")) fetchCuponerasCounters();
+    if (toca("polizas", "cuotas", "bajas")) fetchRenovacionesCounters();
+    if (toca("bajas", "polizas", "cuotas")) fetchBajasCountersApp();
+    if (toca("siniestros")) fetchSiniestrosCount();
+    if (toca("tareas")) fetchControlDiarioCount();
+    if (toca("servicios")) fetchServiciosCounters();
+  };
+  useDatosVivos(
+    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios"],
+    (temas) => refrescarPorTemaRef.current(temas),
+    { activo: !!user, siempre: true }
+  );
+
+  // 📡 Cambió algo → se vacían las memorias rápidas que quedaron viejas:
+  //    · cuota/pago/póliza/cliente → las de Pagos (búsquedas, cuotas, historial);
+  //    · siniestros → la de "¿este cliente tiene siniestros abiertos?".
+  useDatosVivos(
+    ["cuotas", "pagos", "polizas", "clientes", "siniestros"],
+    (temas) => {
+      const t = new Set(temas || []);
+      if (["cuotas", "pagos", "polizas", "clientes"].some((x) => t.has(x))) {
+        dispatch(invalidarCachesVivo([...t]));
+      }
+      if (t.has("siniestros")) {
+        invalidarCacheSiniestrosCliente();
+        invalidarCacheAlertasCliente();
+      }
+    },
+    { activo: !!user, siempre: true }
+  );
+
+  // 📡 El cartero anda mientras haya sesión (1 solo para toda la app).
+  useEffect(() => {
+    if (user) iniciarVivo();
+    else detenerVivo();
+  }, [user]);
+
+  // Cada cuánto se refresca TODO por las dudas: 5 min con el cartero andando;
+  // si el servidor no lo tiene todavía, como antes.
+  const respaldoMs = (sinCartero) => (vivoDisponible() ? 300_000 : sinCartero);
+
+  useEffect(() => {
+    if (!user) {
+      ultimoRefrescoRef.current = 0; // sin sesión: el próximo login pide todo de cero
+      return;
+    }
+
+    // Al iniciar sesión pedimos todo. Mientras carga, "user" cambia 2-3 veces en
+    // pocos segundos (mismo usuario): con el margen de 5 s no se repite el pedido.
+    refrescarSiViejoRef.current(5_000);
 
     // 🆕 Cuando Control Diario avisa que se completó/cambió una tarea,
     //    refrescamos el globo del menú al toque (sin esperar los 60s).
-    const onControlDiarioCambio = () => fetchControlDiarioCount();
+    const onControlDiarioCambio = () => refrescarPorTemaRef.current(["tareas"]);
     window.addEventListener("control-diario-cambio", onControlDiarioCambio);
 
+    // Al volver a la pestaña: nos ponemos al día (si hace rato que no se pedía).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refrescarSiViejoRef.current(respaldoMs(30_000));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
-      try { unsub && unsub(); } catch {}
       window.removeEventListener("control-diario-cambio", onControlDiarioCambio);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user]);
 
@@ -382,25 +458,14 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    tryFetchCounters();
-    fetchCuponerasCounters();
-    fetchRenovacionesCounters();
-    fetchBajasCountersApp();
-    fetchSiniestrosCount();
-    fetchServiciosCounters();
-    fetchControlDiarioCount();
+    refrescarSiViejoRef.current(respaldoMs(30_000));
   }, [location.pathname, location.search, user]);
 
   useEffect(() => {
     if (DISABLE_POLL || !user) return;
     const id = setInterval(() => {
-      tryFetchCounters();
-      fetchCuponerasCounters();
-      fetchRenovacionesCounters();
-      fetchBajasCountersApp();
-        fetchSiniestrosCount();
-      fetchServiciosCounters();
-      fetchControlDiarioCount();
+      if (document.visibilityState === "hidden") return; // pestaña minimizada: no molestamos al servidor
+      refrescarSiViejoRef.current(respaldoMs(60_000));
     }, 60_000);
     return () => clearInterval(id);
   }, [DISABLE_POLL, user]);

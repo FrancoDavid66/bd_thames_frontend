@@ -16,6 +16,7 @@ import {
   addDocumento,
 } from "../store/slices/legalesSlice";
 
+import useDatosVivos from "../hooks/useDatosVivos";
 import LegalesWizard from "../components/legales/LegalesWizard";
 import Boton3D from "../components/ui/Boton3D";
 import CardDuo from "../components/ui/CardDuo";
@@ -153,6 +154,14 @@ export default function LegalesPage() {
     return () => clearTimeout(t);
   }, [dispatch, search, filtro]);
 
+  // 📡 EN VIVO: un expediente nuevo o que cambió de estado aparece solo.
+  const recargandoVivo = useDatosVivos(["legales"], () =>
+    Promise.all([
+      dispatch(fetchResumen()),
+      dispatch(fetchExpedientes({ search: search || undefined, estado: filtro || undefined })),
+    ])
+  );
+
   const handleCrear = async (payload, draftDocumentos) => {
     const nuevo = await dispatch(createExpediente(payload)).unwrap();
     await subirDocumentosBorrador(dispatch, nuevo.id, draftDocumentos);
@@ -211,7 +220,7 @@ export default function LegalesPage() {
       </div>
 
       {/* Lista */}
-      {loading ? (
+      {loading && !recargandoVivo ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 animate-pulse h-20" />

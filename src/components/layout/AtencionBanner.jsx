@@ -14,6 +14,9 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiExclamation, HiArrowRight } from "react-icons/hi";
 import { useAuth } from "../../context/AuthContext";
+// 📡 Datos en vivo
+import useDatosVivos from "../../hooks/useDatosVivos";
+import { disponible as vivoDisponible } from "../../services/vivo";
 
 const POLL_MS = 60 * 1000; // 1 minuto
 const API_ROOT = (import.meta.env.VITE_API_URL || "/api/").replace(/\/?$/, "/");
@@ -28,6 +31,10 @@ export default function AtencionBanner() {
   const isVendedor = user?.perfil?.rol === "VENDEDOR";
 
   const [data, setData] = useState({ total: 0, por_estado: {}, por_oficina: {} });
+  const [recargar, setRecargar] = useState(0);
+
+  // 📡 EN VIVO: cuando cambian los pagos, se vuelve a pedir el contador.
+  useDatosVivos(["pagos"], () => setRecargar((n) => n + 1), { siempre: true });
 
   // Poll del contador
   useEffect(() => {
@@ -47,12 +54,26 @@ export default function AtencionBanner() {
     };
 
     fetchCount();
-    const id = setInterval(fetchCount, POLL_MS);
+    // ⚡ Con la pestaña minimizada no pedimos nada; al volver, se pone al día.
+    // 📡 Con el cartero andando, los cambios llegan solos: el poll queda como
+    //    respaldo cada 5 min.
+    let ticks = 0;
+    const id = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      ticks += 1;
+      if (vivoDisponible() && ticks % 5 !== 0) return;
+      fetchCount();
+    }, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && !vivoDisponible()) fetchCount();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [recargar]);
 
   // No mostrar para vendedores que no tienen casos
   if (isVendedor && data.total === 0) return null;

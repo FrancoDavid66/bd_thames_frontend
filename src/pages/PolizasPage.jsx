@@ -7,6 +7,7 @@ import { FaFileExcel, FaFilePdf } from "react-icons/fa";
 
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import useDatosVivos from "../hooks/useDatosVivos";
 import PolizaTable from "../components/polizas/PolizaTable";
 import PolizaFilter from "../components/polizas/PolizaFilter";
 import PageContainer from "../components/ui/PageContainer";
@@ -181,6 +182,21 @@ export default function PolizasPage() {
     lastKpisKeyRef.current = kpisQueryKey;
     dispatch(fetchPolizasKpis({ force: true }));
   }, [dispatch, kpisQueryKey, ready]);
+
+  // 📡 EN VIVO: si otra oficina carga o cobra algo, se recarga la página que
+  //    estás viendo (con tus mismos filtros) y los números de arriba, sin parpadeo.
+  //    Con paginado por cursor, si ya avanzaste de página no te volvemos a la 1ra.
+  const recargandoVivo = useDatosVivos(
+    ["polizas", "cuotas", "clientes"],
+    () => {
+      const pedidos = [dispatch(fetchPolizasKpis({ force: true }))];
+      if (!(cursorEnabled && previous)) pedidos.push(dispatch(fetchPolizas({ force: true, silencioso: true })));
+      return Promise.all(pedidos);
+    },
+    { activo: ready }
+  );
+  // Mientras dura una recarga EN VIVO no mostramos "Buscando…" ni bloqueamos botones.
+  const statusVisible = recargandoVivo && status === "loading" ? "succeeded" : status;
 
   const resumenCuotas = useMemo(() => {
     if (resumenCuotasDesdeSlice && typeof resumenCuotasDesdeSlice === "object") return resumenCuotasDesdeSlice;
@@ -373,7 +389,7 @@ export default function PolizasPage() {
         onVencidasMasDeDiasChange={onVencidasMasDeDiasChange}
         onClearVencimientoFilters={onClearVencimiento}
         onVerUltimas={handleVerUltimas}
-        status={status}
+        status={statusVisible}
         oficinaActual={oficina}
         onOficinaChange={(val) => dispatch(setOficina(val === "ALL" ? "" : val))}
         companiaActual={companiaLocal}
@@ -417,7 +433,7 @@ export default function PolizasPage() {
 
       <div className="mt-2 sm:mt-3">
         <PolizaTable
-          polizas={listFiltrada} status={status} page={page} pageSize={pageSize}
+          polizas={listFiltrada} status={statusVisible} page={page} pageSize={pageSize}
           total={companiaLocal ? listFiltrada.length : cursorEnabled ? listFiltrada.length : total} onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange} ordering={ordering} onOrderingChange={onOrderingChange}
           modo={modo} cursorEnabled={cursorEnabled} hasNext={!!next} hasPrev={!!previous}

@@ -60,6 +60,7 @@ import DescartarRenovacionModal from "../components/renovaciones/DescartarRenova
 import PolizaYaRenovadaModal from "../components/renovaciones/PolizaYaRenovadaModal";
 import { useRenovacionesProgreso } from "../hooks/useRenovacionesProgreso";
 import { useAuth } from "../context/AuthContext";
+import useDatosVivos from "../hooks/useDatosVivos";
 
 // 🎨 UI THAMES
 import PageContainer from "../components/ui/PageContainer";
@@ -327,8 +328,6 @@ export default function RenovacionesPage() {
     registrar: registrarProgreso,
   } = useRenovacionesProgreso();
 
-  const loading = status === "loading";
-
   // 🆕 ¿Estamos buscando? Si sí, las pestañas quedan en pausa.
   const searchTrim = (search || "").trim();
   const modoBusqueda = searchTrim.length >= MIN_CHARS_BUSQUEDA;
@@ -448,6 +447,7 @@ export default function RenovacionesPage() {
               dias: 30,
               solo_pendientes: false,
               search: (search || "").trim(),
+              force: !!opts.force,
             })
           );
         }
@@ -462,6 +462,14 @@ export default function RenovacionesPage() {
   useEffect(() => {
     loadResumen();
   }, [loadResumen]);
+
+  // 📡 EN VIVO: si otra oficina renueva, cobra o descarta una póliza, la lista
+  //    y las pestañas se ponen al día solas (sin perder la pestaña ni la búsqueda).
+  const recargandoVivo = useDatosVivos(["polizas", "cuotas", "bajas"], () =>
+    Promise.all([load({ force: true, silencioso: true }), loadResumen({ force: true, silencioso: true })])
+  );
+  // Durante una recarga EN VIVO no mostramos "Buscando…" ni bloqueamos botones.
+  const loading = status === "loading" && !recargandoVivo;
 
   // Guardamos preferencia si es Admin
   useEffect(() => {

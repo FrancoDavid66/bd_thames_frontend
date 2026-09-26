@@ -665,6 +665,13 @@ const polizasSlice = createSlice({
           state.inFlightListKey = null;
           return;
         }
+        // 📡 Recarga EN VIVO que falló: si había lista a la vista, queda esa (sin
+        //    cartel). Si no había nada (ej: ya venía fallando), se muestra el error.
+        if (action.meta.arg?.silencioso && (state.list || []).length > 0) {
+          state.listStatus = "succeeded";
+          state.inFlightListKey = null;
+          return;
+        }
         state.listStatus = "failed";
         state.listError = action.payload;
         state.inFlightListKey = null;

@@ -25,6 +25,7 @@ import {
   addFoto,
 } from "../store/slices/siniestrosSlice";
 import { invalidarCacheSiniestrosCliente } from "../hooks/useSiniestrosCliente";
+import useDatosVivos from "../hooks/useDatosVivos";
 
 import SiniestrosList from "../components/siniestros/SiniestrosList";
 import SiniestrosDetails from "../components/siniestros/SiniestrosDetails";
@@ -82,6 +83,9 @@ export default function SiniestrosPage() {
   useEffect(() => {
     dispatch(getSiniestros());
   }, [dispatch]);
+
+  // 📡 EN VIVO: un siniestro cargado o actualizado en otra oficina aparece solo.
+  useDatosVivos(["siniestros"], () => dispatch(getSiniestros()));
 
   // Filtrado en memoria (búsqueda + estado)
   const listaFiltrada = useMemo(() => {

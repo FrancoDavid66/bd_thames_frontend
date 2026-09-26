@@ -41,6 +41,7 @@ import {
   generarPagosMes,
 } from "../store/slices/serviciosSlice";
 
+import useDatosVivos from "../hooks/useDatosVivos";
 import ServiciosCrudModal from "../components/servicios/ServiciosCrudModal";
 import RegistrarPagoModal from "../components/servicios/RegistrarPagoModal";
 
@@ -80,6 +81,16 @@ export default function ServiciosPage() {
     dispatch(fetchPagosMes({ periodo }));
     dispatch(fetchResumenMes({ periodo }));
   }, [dispatch, periodo]);
+
+  // 📡 EN VIVO: si otra persona registra un pago o cambia un servicio, el mes
+  //    que estás viendo se pone al día solo (sin el "Cargando...").
+  const recargandoVivo = useDatosVivos(["servicios"], () =>
+    Promise.all([
+      dispatch(fetchServicios({ activo: true })),
+      dispatch(fetchPagosMes({ periodo })),
+      dispatch(fetchResumenMes({ periodo })),
+    ])
+  );
 
   // 🚀 AUTO-GENERAR para CUALQUIER mes navegado (no solo el actual)
   useEffect(() => {
@@ -285,7 +296,7 @@ export default function ServiciosPage() {
         </div>
 
         {/* ═══════════ CARGANDO / GENERANDO / SIN SERVICIOS ═══════════ */}
-        {pagosStatus === "loading" || autoGenerating ? (
+        {(pagosStatus === "loading" && !recargandoVivo) || autoGenerating ? (
           <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl py-16 text-center">
             <div className="w-7 h-7 mx-auto mb-3 border-2 border-oficina/30 border-t-oficina rounded-full animate-spin" />
             <p className="text-[13px] text-suave dark:text-suave-dark">

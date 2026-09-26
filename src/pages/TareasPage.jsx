@@ -41,6 +41,7 @@ import { Link } from "react-router-dom";
 import { fetchTareasDia, marcarPolizaEnviada } from "../store/slices/tareasSlice";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import useDatosVivos from "../hooks/useDatosVivos";
 import { UI } from "../components/tareas/tareasUI";
 
 /* 🔗 Base del Admin de Django.
@@ -187,6 +188,10 @@ export default function TareasPage() {
   }, [isAdmin]);
 
   const recargar = () => dispatch(fetchTareasDia(oficinaSel ? { oficina: oficinaSel } : {}));
+
+  // 📡 EN VIVO: si otra persona tilda algo (o entra un comprobante), la lista
+  //    se pone al día sola. Esta pantalla es pesada: como mucho 1 vez por minuto.
+  useDatosVivos(["tareas", "polizas", "cupones", "clientes", "cotizaciones"], recargar, { cadaMs: 60_000 });
 
   // Conteos por sección
   const conteos = useMemo(() => {

@@ -27,6 +27,7 @@ import {
 } from "../store/slices/recaudacionSlice";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import api from "../services/api";
+import useDatosVivos from "../hooks/useDatosVivos";
 
 // 🚀 Ranking de cumplimiento de cierres por oficina
 // 🚀 NUEVO: panel de quién cerró / no cerró en un día
@@ -186,6 +187,20 @@ function UserView({ user }) {
     };
     fetchBalance();
   }, [dispatch]);
+
+  // 📡 EN VIVO: el efectivo del día se actualiza solo cuando entra o sale plata
+  //    (un cobro, un ingreso, un egreso), y tu historial de cierres también.
+  //    Lo que estás cargando (responsable, monto, foto) no se toca.
+  useDatosVivos(["caja", "recaudacion"], async (temas) => {
+    const t = new Set(temas || []);
+    if (t.has("recaudacion")) dispatch(fetchRecaudaciones());
+    if (t.has("caja")) {
+      try {
+        const res = await api.get("balance-diario/");
+        setBalanceDia(res.data);
+      } catch { /* se reintenta con el próximo aviso */ }
+    }
+  });
 
   // Limpia el object URL del preview al desmontar (evita fuga de memoria).
   useEffect(() => {
@@ -773,8 +788,22 @@ function AdminView() {
     const params = { page, page_size: PAGE_SIZE };
     if (filtroFecha)   params.fecha   = filtroFecha;
     if (filtroOficina) params.oficina = filtroOficina;
-    dispatch(fetchRecaudaciones(params));
+    return dispatch(fetchRecaudaciones(params));
   };
+
+  // 📡 EN VIVO: un cierre nuevo de una sucursal aparece solo (sin el "cargando"
+  //    de las tarjetas), y el efectivo esperado se actualiza con cada movimiento.
+  const recargandoVivo = useDatosVivos(["recaudacion"], () => refresh());
+  const cargandoVisible = loading && !recargandoVivo;
+  const fechaRef = useRef(filtroFecha);
+  fechaRef.current = filtroFecha;
+  useDatosVivos(["caja"], async () => {
+    const f = filtroFecha;
+    try {
+      const res = await api.get("balance-diario/", { params: { fecha: f } });
+      if (fechaRef.current === f) setEsperado(res.data); // si cambiaste de fecha, no pisamos
+    } catch { /* se reintenta con el próximo aviso */ }
+  });
 
   // 🆕 Paginación REAL: totalPages sale del count del backend.
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
@@ -851,11 +880,11 @@ function AdminView() {
         </div>
         <button
           onClick={refresh}
-          disabled={loading}
+          disabled={cargandoVisible}
           className="h-10 w-full sm:w-auto px-4 rounded-lg bg-oficina text-white text-[13px] font-medium hover:brightness-110 transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
         >
-          <HiRefresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Cargando..." : "Actualizar"}
+          <HiRefresh className={`w-4 h-4 ${cargandoVisible ? "animate-spin" : ""}`} />
+          {cargandoVisible ? "Cargando..." : "Actualizar"}
         </button>
       </div>
 
@@ -920,7 +949,7 @@ function AdminView() {
       </div>
 
       {/* Grid */}
-      {loading ? (
+      {cargandoVisible ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark h-64 animate-pulse" />

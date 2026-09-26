@@ -263,6 +263,14 @@ const pagosSlice = createSlice({
     setCuotas(state, action) {
       state.cuotas = Array.isArray(action.payload) ? action.payload : [];
     },
+    // 📡 EN VIVO: tarjetas del cliente refrescadas en silencio (sin pasar por
+    //    "cargando" ni vaciar lo que se ve). Si mientras tanto se limpió la
+    //    búsqueda, no se pisa nada.
+    setBuscarClienteVivo(state, action) {
+      if (!state.buscarClienteData) return;
+      const p = action.payload || {};
+      state.buscarClienteData = { cliente: p.cliente || null, polizas: Array.isArray(p.polizas) ? p.polizas : [] };
+    },
     clearBuscarCliente(state) {
       state.buscarClienteData = null;
       state.buscarClienteStatus = "idle";
@@ -307,6 +315,25 @@ const pagosSlice = createSlice({
     invalidateBuscarCache(state) {
       state.buscarCache = {};
       state.buscarCacheOrder = [];
+    },
+    // 📡 Datos en vivo: cambió una cuota/pago/póliza en cualquier oficina →
+    //    se vacían las memorias rápidas de búsqueda, así el próximo clic trae
+    //    lo último (ej: no mostrar como impaga una cuota que ya cobró Axion).
+    invalidarCachesVivo(state, action) {
+      state.buscarCache = {};
+      state.buscarCacheOrder = [];
+      state.buscarClienteCache = {};
+      state.buscarClienteCacheOrder = [];
+      state.cuotasPolizaCache = {};
+      state.cuotasPolizaCacheOrder = [];
+      state.historialPagosCache = {};
+      state.historialPagosCacheOrder = [];
+      // Si cambió una póliza (estado, baja…), también la memoria de pólizas por id.
+      const temas = Array.isArray(action?.payload) ? action.payload : null;
+      if (!temas || temas.includes("polizas")) {
+        state.polizaByIdCache = {};
+        state.polizaByIdOrder = [];
+      }
     },
   },
   extraReducers: (builder) => {
@@ -562,6 +589,8 @@ export const {
   clearSearch,
   invalidateHistorialPagosCache,
   invalidateBuscarCache,
+  invalidarCachesVivo,
+  setBuscarClienteVivo,
   pushRecienteDni,
   clearBuscarCliente,
 } = pagosSlice.actions;

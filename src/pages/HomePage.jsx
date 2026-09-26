@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -28,14 +28,15 @@ import {
   HiArrowCircleUp,
 } from "react-icons/hi";
 
-import { fetchIngresos } from "../store/slices/ingresosSlice";
-import { fetchEgresos } from "../store/slices/egresosSlice";
 import {
   fetchPolizasKpis,
   selectPolizasKpis,
   selectKpisPorEstado,
 } from "../store/slices/polizasSlice";
 import { fetchClientes } from "../store/slices/clientesSlice";
+import useDatosVivos from "../hooks/useDatosVivos";
+// 📈 Gráfico con la serie sumada en el servidor (antes: últimos 500 movimientos)
+import useSerieBalance from "../hooks/useSerieBalance";
 // 🚀 Resumen de renovaciones (mismo que usa la campana del header)
 import {
   fetchRenovacionesGlobalResumen,
@@ -121,9 +122,6 @@ const HomePage = () => {
   const [modalTipo, setModalTipo] = useState(null);
 
   // ---- STORE ----
-  const ingresos = useSelector((state) => state.ingresos?.list || []);
-  const egresos = useSelector((state) => state.egresos?.list || []);
-
   // 🚀 KPIs de pólizas: por_estado.activa es el conteo REAL de activas
   const polizasKpis = useSelector(selectPolizasKpis);
   const kpisPorEstado = useSelector(selectKpisPorEstado);
@@ -153,14 +151,16 @@ const HomePage = () => {
   //    cae a paginar en el front como respaldo.
   const [totalesMes, setTotalesMes] = useState({ ingresos: 0, egresos: 0, cargando: true });
 
-  const cargarTotalesMes = useCallback(async () => {
+  // silencioso = recarga EN VIVO: no pone los totales en "cargando".
+  const cargarTotalesMes = useCallback(async (opciones) => {
+    const silencioso = !!opciones?.silencioso;
     const token = localStorage.getItem("access_token");
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const mes   = dayjs().format("YYYY-MM");
     const desde = dayjs().startOf("month").format("YYYY-MM-DD");
     const hasta = dayjs().endOf("month").format("YYYY-MM-DD");
 
-    setTotalesMes((p) => ({ ...p, cargando: true }));
+    if (!silencioso) setTotalesMes((p) => ({ ...p, cargando: true }));
 
     // 1) Camino ideal: el backend suma todo el mes (no se trunca jamás)
     try {
@@ -206,10 +206,33 @@ const HomePage = () => {
     }
   }, []);
 
+  // 📈 Gráfico: 7 días / 30 días / 12 meses. Lo suma el SERVIDOR (completo):
+  //    antes se dibujaba con los últimos 500 movimientos → a los meses viejos
+  //    les faltaba plata.
+  const [rangoGrafico, setRangoGrafico] = useState("30d");
+  const grafico = useMemo(() => {
+    const hoy = dayjs();
+    if (rangoGrafico === "12m") {
+      return {
+        agrupar: "mes",
+        desde: hoy.subtract(11, "month").startOf("month").format("YYYY-MM-DD"),
+        hasta: hoy.format("YYYY-MM-DD"),
+        subtitulo: "Últimos 12 meses",
+      };
+    }
+    const dias = rangoGrafico === "7d" ? 7 : 30;
+    return {
+      agrupar: "dia",
+      desde: hoy.subtract(dias - 1, "day").format("YYYY-MM-DD"),
+      hasta: hoy.format("YYYY-MM-DD"),
+      subtitulo: `Últimos ${dias} días`,
+    };
+  }, [rangoGrafico]);
+  // Sin oficina: el admin ve todas; el empleado, la suya (lo decide el servidor).
+  const serie = useSerieBalance({ agrupar: grafico.agrupar, desde: grafico.desde, hasta: grafico.hasta });
+
   // Cargar datos
   useEffect(() => {
-    dispatch(fetchIngresos());
-    dispatch(fetchEgresos());
     dispatch(fetchRenovacionesGlobalResumen({}));
     dispatch(
       fetchClientes({
@@ -229,40 +252,62 @@ const HomePage = () => {
     dispatch(fetchPolizasKpis(esAdmin ? {} : { oficina: miOficina }));
   }, [dispatch, user]);
 
-  // 🚀 Al cerrar el modal, refrescamos para que el tablero quede al día.
-  //    (Refresca ingresos Y egresos porque el modal combinado maneja ambos.)
+  // 🚀 Al cerrar el modal, refrescamos para que el tablero quede al día
+  //    (totales del mes + gráfico).
   const cerrarMovimiento = () => {
     setModalTipo(null);
-    dispatch(fetchIngresos());
-    dispatch(fetchEgresos());
     cargarTotalesMes();
+    serie.recargar();
   };
 
   // Cargar contadores
+  const montadoRef = useRef(true);
   useEffect(() => {
-    let isMounted = true;
-
-    const loadCounters = async () => {
-      try {
-        const res = await axios.get(`${API_BASE}solicitudes/counters/`);
-        if (!isMounted) return;
-        const data = res.data || {};
-        setSolCounters({
-          pendiente_alta: data.pendiente_alta ?? 0,
-          pendiente_envio: data.pendiente_envio ?? 0,
-        });
-      } catch (err) {
-        if (!isMounted) return;
-        console.error("Error al cargar counters de solicitudes", err);
-        setSolCounters({ pendiente_alta: 0, pendiente_envio: 0 });
-      }
-    };
-
-    loadCounters();
+    montadoRef.current = true;
     return () => {
-      isMounted = false;
+      montadoRef.current = false;
     };
   }, []);
+
+  const loadCounters = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}solicitudes/counters/`);
+      if (!montadoRef.current) return;
+      const data = res.data || {};
+      setSolCounters({
+        pendiente_alta: data.pendiente_alta ?? 0,
+        pendiente_envio: data.pendiente_envio ?? 0,
+      });
+    } catch (err) {
+      if (!montadoRef.current) return;
+      console.error("Error al cargar counters de solicitudes", err);
+      setSolCounters({ pendiente_alta: 0, pendiente_envio: 0 });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCounters();
+  }, [loadCounters]);
+
+  // 📡 EN VIVO: el tablero se pone al día solo cuando otra oficina carga algo.
+  //   Totales del mes y gráfico: 2 pedidos chiquitos (los suma el servidor).
+  useDatosVivos(["caja"], () =>
+    Promise.allSettled([cargarTotalesMes({ silencioso: true }), serie.recargar({ silencioso: true })])
+  );
+  useDatosVivos(
+    ["polizas", "cuotas", "clientes", "solicitudes"],
+    (temas) => {
+      const t = new Set(temas || []);
+      if (t.has("polizas") || t.has("cuotas")) {
+        const esAdmin = (user?.perfil?.rol === "ADMIN") || (user?.rol === "ADMIN");
+        const miOficina = user?.perfil?.oficina?.id ?? user?.perfil?.oficina ?? null;
+        dispatch(fetchPolizasKpis(esAdmin ? { force: true } : { oficina: miOficina, force: true }));
+      }
+      if (t.has("clientes")) dispatch(fetchClientes({ page: 1, page_size: 1, force: true }));
+      if (t.has("solicitudes")) loadCounters();
+    },
+    { activo: !!user }
+  );
 
   // ---- CÁLCULOS DEL MES (totales reales del backend, sin el tope de 500) ----
   const totalIngresosMes = totalesMes.ingresos;
@@ -369,7 +414,22 @@ const HomePage = () => {
 
           {/* Gráfico de balances */}
           <div className="col-span-3 lg:col-span-2">
-            <BalanceChart ingresos={ingresos} egresos={egresos} />
+            <BalanceChart
+              puntos={serie.puntos}
+              agrupar={serie.agruparDatos || grafico.agrupar}
+              opciones={[
+                { id: "7d", label: "7 días" },
+                { id: "30d", label: "30 días" },
+                { id: "12m", label: "12 meses" },
+              ]}
+              valor={rangoGrafico}
+              onCambiar={setRangoGrafico}
+              subtitulo={grafico.subtitulo}
+              cargando={serie.cargando}
+              desactualizado={serie.desactualizado}
+              error={serie.error}
+              onReintentar={() => serie.recargar()}
+            />
           </div>
 
           {/* Lateral derecho: Tareas y Accesos */}

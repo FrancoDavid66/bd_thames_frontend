@@ -118,6 +118,7 @@ const ingresosSlice = createSlice({
   initialState: {
     list: [],
     status: 'idle',
+    reqId: null, // último pedido de la lista (para ignorar respuestas viejas)
     error: null,
     next: null,
     previous: null,
@@ -127,10 +128,12 @@ const ingresosSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchIngresos.pending, (state) => {
+      .addCase(fetchIngresos.pending, (state, action) => {
         state.status = 'loading';
+        state.reqId = action.meta.requestId;
       })
       .addCase(fetchIngresos.fulfilled, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.status = 'succeeded';
         state.list = action.payload.results || action.payload;
         state.next = action.payload.next;
@@ -140,6 +143,7 @@ const ingresosSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchIngresos.rejected, (state, action) => {
+        if (state.reqId && action.meta.requestId !== state.reqId) return; // 📡 respuesta vieja: ya se pidió otra
         state.status = 'failed';
         state.error = action.payload || 'Error al obtener los ingresos';
       })

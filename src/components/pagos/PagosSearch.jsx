@@ -12,10 +12,13 @@ import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
 import {
   fetchBuscarClientePorDni, fetchCuotasPorPoliza,
-  fetchCuotasBuscar, pushRecienteDni, clearBuscarCliente,
+  fetchCuotasBuscar, pushRecienteDni, clearBuscarCliente, setBuscarClienteVivo,
 } from "../../store/slices/pagosSlice";
 import { renovarPoliza } from "../../store/slices/polizasSlice";
 import { useAuth } from "../../context/AuthContext";
+// 📡 Datos en vivo: si otra oficina cobra una cuota de lo que estás mirando, se actualiza sola.
+import useDatosVivos from "../../hooks/useDatosVivos";
+import api from "../../services/api";
 
 const onlyDigits       = (s) => String(s || "").replace(/\D+/g, "");
 const normalizePatente = (s) => String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
@@ -230,7 +233,7 @@ function AlertaModal({ poliza, cliente, onClose, onConfirm, loading }) {
 }
 
 /* ── Componente principal ─────────────────────────────────────── */
-export default function PagosSearch({ onBuscar }) {
+export default function PagosSearch({ onBuscar, onActualizarVivo }) {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const inputRef = useRef(null);
@@ -239,6 +242,9 @@ export default function PagosSearch({ onBuscar }) {
   const [alertaPoliza, setAlertaPoliza] = useState(null);
   const [renovarTarget, setRenovarTarget] = useState(null);
   const [renovando,     setRenovando]     = useState(false);
+  // 📡 Última búsqueda (para repetirla en silencio si llegan cambios).
+  //    { tipo: "poliza", id, dni } | { tipo: "patente", q } | { tipo: "dni", dni }
+  const ultimaRef = useRef(null);
 
   const hoyTxt = useMemo(() => dayjs().format("DD/MM/YYYY"), []);
   const coberturaISO = useMemo(() => dayjs().add(1, "day").format("YYYY-MM-DD"), []);
@@ -287,6 +293,7 @@ export default function PagosSearch({ onBuscar }) {
   }, [buscarClienteData]);
 
   const limpiar = useCallback(() => {
+    ultimaRef.current = null;
     setQuery(""); setAlertaPoliza(null);
     dispatch(clearBuscarCliente());
     requestAnimationFrame(() => inputRef.current?.focus?.());
@@ -295,7 +302,16 @@ export default function PagosSearch({ onBuscar }) {
   const traerCuotas = useCallback(async (pid, dniMeta = "") => {
     const id = String(pid || "").trim();
     if (!id) { toast.error("Elegí una póliza."); return; }
-    const res = await dispatch(fetchCuotasPorPoliza({ poliza_id: id, solo_pendientes: 0, page_size: 200, dni: dniMeta })).unwrap();
+    const previa = ultimaRef.current;
+    ultimaRef.current = null; // 📡 mientras busca, ninguna recarga en vivo vieja pisa nada
+    let res;
+    try {
+      res = await dispatch(fetchCuotasPorPoliza({ poliza_id: id, solo_pendientes: 0, page_size: 200, dni: dniMeta })).unwrap();
+    } catch (e) {
+      if (ultimaRef.current === null) ultimaRef.current = previa; // falló: sigue en vivo lo que se ve
+      throw e;
+    }
+    ultimaRef.current = { tipo: "poliza", id, dni: onlyDigits(dniMeta) };
     const items = Array.isArray(res?.items) ? res.items : [];
     onBuscar?.(items, res?.meta || { count: items.length, next: null, previous: null }, dniMeta || id);
     if (!items.length) toast("No hay cuotas para esa póliza.");
@@ -344,7 +360,16 @@ export default function PagosSearch({ onBuscar }) {
   const buscarPorDni = useCallback(async (dniRaw) => {
     const d = onlyDigits(dniRaw);
     if (!d) { toast.error("Escribí un DNI válido."); return; }
-    const res = await dispatch(fetchBuscarClientePorDni({ dni: d })).unwrap();
+    const previa = ultimaRef.current;
+    ultimaRef.current = null; // 📡 mientras busca, ninguna recarga en vivo vieja pisa nada
+    let res;
+    try {
+      res = await dispatch(fetchBuscarClientePorDni({ dni: d })).unwrap();
+    } catch (e) {
+      if (ultimaRef.current === null) ultimaRef.current = previa; // falló: sigue en vivo lo que se ve
+      throw e;
+    }
+    ultimaRef.current = { tipo: "dni", dni: d };
     if (!res?.cliente) { toast("No se encontró cliente con ese DNI."); return; }
     dispatch(pushRecienteDni(d));
     const pols = Array.isArray(res?.polizas) ? res.polizas : [];
@@ -354,8 +379,17 @@ export default function PagosSearch({ onBuscar }) {
   const buscarPorPatente = useCallback(async (raw) => {
     const q = normalizePatente(raw);
     if (!q) { toast.error("Escribí una patente."); return; }
+    const previa = ultimaRef.current;
+    ultimaRef.current = null; // 📡 mientras busca, ninguna recarga en vivo vieja pisa nada
     setAlertaPoliza(null); dispatch(clearBuscarCliente());
-    const res = await dispatch(fetchCuotasBuscar({ q, solo_pendientes: 0, page_size: 200 })).unwrap();
+    let res;
+    try {
+      res = await dispatch(fetchCuotasBuscar({ q, solo_pendientes: 0, page_size: 200 })).unwrap();
+    } catch (e) {
+      if (ultimaRef.current === null) ultimaRef.current = previa; // falló: sigue en vivo lo que se ve
+      throw e;
+    }
+    ultimaRef.current = { tipo: "patente", q };
     const items = Array.isArray(res?.items) ? res.items : [];
     onBuscar?.(items, res?.meta || { count: items.length, next: null, previous: null }, q);
     if (!items.length) { toast("No hay cuotas para esa patente."); return; }
@@ -380,6 +414,53 @@ export default function PagosSearch({ onBuscar }) {
     if (isLikelyDni(q)) await buscarPorDni(q);
     else await buscarPorPatente(q);
   }, [buscarPorDni, buscarPorPatente, query]);
+
+  // 📡 EN VIVO: cambió una cuota, un pago o una póliza → repetimos la última
+  //    búsqueda EN SILENCIO (sin tocar el buscador) y actualizamos lo que se ve.
+  //    Ej: Axion cobra la cuota 3 de este cliente → acá pasa a PAGADA sola.
+  //    · Nunca usa los pedidos "normales" del buscador (no los corta, no muestra
+  //      "cargando", no vacía las tarjetas si falla).
+  //    · Si empezaste otra búsqueda mientras tanto, la respuesta vieja se descarta.
+  const vivoCuotasAbort = useRef(null);
+  useDatosVivos(["cuotas", "pagos", "polizas"], async () => {
+    const u = ultimaRef.current;
+    if (!u || (u.tipo !== "poliza" && u.tipo !== "patente")) return;
+    try { vivoCuotasAbort.current?.abort(); } catch { /* nada */ }
+    const ctrl = new AbortController();
+    vivoCuotasAbort.current = ctrl;
+    const inicio = Date.now();
+    try {
+      const params = u.tipo === "poliza"
+        ? { poliza_id: u.id, solo_pendientes: 0, page_size: 200 }
+        : { q: u.q, solo_pendientes: 0, page_size: 200 };
+      const { data } = await api.get("pagos/buscar/", { params, signal: ctrl.signal });
+      const items = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      if (ultimaRef.current === u) onActualizarVivo?.(items, inicio);
+    } catch {
+      /* en vivo: si falla, dejamos lo que se ve */
+    }
+  });
+
+  // Las tarjetas del cliente (estado de cada póliza) cambian menos y ese pedido
+  // es más pesado en el servidor → como mucho 1 vez cada 30 s.
+  const vivoTarjetasAbort = useRef(null);
+  useDatosVivos(["polizas", "cuotas"], async () => {
+    const u = ultimaRef.current;
+    if (!u) return;
+    const dni = u.dni || onlyDigits(cliente?.dni || "");
+    if (!dni) return;
+    try { vivoTarjetasAbort.current?.abort(); } catch { /* nada */ }
+    const ctrl = new AbortController();
+    vivoTarjetasAbort.current = ctrl;
+    try {
+      const { data } = await api.get("pagos/buscar-cliente/", { params: { dni }, signal: ctrl.signal });
+      if (ultimaRef.current === u) {
+        dispatch(setBuscarClienteVivo({ cliente: data?.cliente || null, polizas: data?.polizas || [] }));
+      }
+    } catch {
+      /* en vivo: si falla, dejamos lo que se ve */
+    }
+  }, { cadaMs: 30_000 });
 
   const handleCardClick = useCallback((p) => {
     const st = polizaStatus(p);

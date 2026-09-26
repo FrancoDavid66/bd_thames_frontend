@@ -8,6 +8,7 @@ import { HiShieldCheck, HiExclamationCircle, HiExternalLink, HiPencil, HiTrash, 
 
 import { useAuth } from '../context/AuthContext';
 import { fetchClienteById, deleteCliente } from '../store/slices/clientesSlice';
+import useDatosVivos from '../hooks/useDatosVivos';
 
 import Boton3D from '../components/ui/Boton3D';
 import CardDuo from '../components/ui/CardDuo';
@@ -92,11 +93,20 @@ const ClienteProfilePage = () => {
     return () => { if (promesa?.abort) promesa.abort(); };
   }, [dispatch, id]);
 
+  // 📡 EN VIVO: si otra oficina cambia algo de este cliente o de sus pólizas,
+  //    la ficha se pone al día sola (sin el cartel de "Cargando ficha…").
+  useDatosVivos(
+    ["clientes", "polizas"],
+    () => dispatch(fetchClienteById({ id, force: true, silencioso: true })),
+    { activo: !!id }
+  );
+
   // El modal unificado (vía useClienteForm) ya hace el updateCliente + toast.
   // Acá solo cerramos y refrescamos la ficha para traer los datos nuevos.
+  // (force: antes no volvía a pedirla porque la ficha ya estaba en memoria.)
   const handleSaveCliente = useCallback(() => {
     setModalEditarAbierto(false);
-    if (id) dispatch(fetchClienteById(id));
+    if (id) dispatch(fetchClienteById({ id, force: true, silencioso: true }));
   }, [dispatch, id]);
 
   const handleBorrarCliente = useCallback(async () => {
