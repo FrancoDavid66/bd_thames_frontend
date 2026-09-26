@@ -24,6 +24,8 @@ import AuditoriaMontosPanel from "../components/estadisticas/AuditoriaMontosPane
 import PagosDuplicadosPanel from "../components/estadisticas/PagosDuplicadosPanel";
 import ContabilidadPanel from "../components/estadisticas/ContabilidadPanel";
 import EfectividadMensajesPanel from "../components/estadisticas/EfectividadMensajesPanel";
+// 🆕 Pólizas nuevas por oficina (día / semana / mes) — base de los Juegos THAMES
+import PolizasNuevasPanel from "../components/estadisticas/PolizasNuevasPanel";
 
 // 🚀 IMPORTAMOS EL NUEVO MODAL DE LISTADOS
 import ListadoClientesModal from "../components/estadisticas/ListadoClientesModal";
@@ -411,6 +413,12 @@ export default function EstadisticasPage() {
 
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-2">
           <TabButton active={tab === "general"} onClick={() => setTab("general")}>General</TabButton>
+          <TabButton active={tab === "nuevas"} onClick={() => setTab("nuevas")}>
+            <span className="flex items-center gap-1.5">
+              Pólizas nuevas
+              <span className={`rounded-full px-1.5 py-px text-[9px] font-bold ${tab === "nuevas" ? "bg-white text-oficina-fuerte" : "bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro"}`}>NUEVO</span>
+            </span>
+          </TabButton>
           <TabButton active={tab === "calidad"} onClick={() => setTab("calidad")}>Calidad de datos</TabButton>
           <TabButton active={tab === "duplicados"} onClick={() => setTab("duplicados")}>Duplicados</TabButton>
           <TabButton active={tab === "fechas"} onClick={() => setTab("fechas")}>Control de fechas</TabButton>
@@ -434,6 +442,12 @@ export default function EstadisticasPage() {
                 setDesde={setDesde}
                 setHasta={setHasta}
               />
+            </motion.div>
+          )}
+
+          {tab === "nuevas" && (
+            <motion.div key="nuevas" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+              <PolizasNuevasPanel oficinaInicial={oficina} mesInicial={`${anio}-${String(mes).padStart(2, "0")}`} />
             </motion.div>
           )}
 

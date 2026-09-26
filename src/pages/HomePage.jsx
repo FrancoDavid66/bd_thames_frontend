@@ -37,6 +37,8 @@ import { fetchClientes } from "../store/slices/clientesSlice";
 import useDatosVivos from "../hooks/useDatosVivos";
 // 📈 Gráfico con la serie sumada en el servidor (antes: últimos 500 movimientos)
 import useSerieBalance from "../hooks/useSerieBalance";
+// 🏁 Cartel de pólizas nuevas del mes por oficina (base de los Juegos THAMES)
+import PolizasNuevasCard from "../components/polizasNuevas/PolizasNuevasCard";
 // 🚀 Resumen de renovaciones (mismo que usa la campana del header)
 import {
   fetchRenovacionesGlobalResumen,
@@ -408,6 +410,9 @@ const HomePage = () => {
             </div>
           </KpiCard>
         </div>
+
+        {/* 🏁 PÓLIZAS NUEVAS DEL MES (puesto de cada oficina, en vivo) */}
+        <PolizasNuevasCard />
 
         {/* GRID PRINCIPAL: DASHBOARD + LATERAL */}
         <div className="grid gap-4 lg:grid-cols-3">
