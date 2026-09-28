@@ -27,9 +27,13 @@ import PagosPage from "./pages/PagosPage";
 // 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp
 import MensajesPage from "./pages/MensajesPage";
 import SiniestrosPage from "./pages/SiniestrosPage";
-// ⚖️ NUEVA APP: LEGALES (expedientes de abogados)
+// ⚖️ LEGALES: casos, turnos con el abogado y "Cargar una denuncia" (la ficha
+//    del caso vive adentro de LegalesPage: /legales/:id)
 import LegalesPage from "./pages/LegalesPage";
-import LegalesDetailPage from "./pages/LegalesDetailPage";
+import AbogadoLayout from "./components/legales/AbogadoLayout";
+// 🚗 NUEVA APP: GESTORÍA (trámites del automotor derivados a gestores)
+import GestoriaPage from "./pages/GestoriaPage";
+import GestorLayout from "./components/gestoria/GestorLayout";
 import ClienteProfilePage from "./pages/ClienteProfilePage";
 import PolizaDetails from "./components/polizas/PolizaDetails";
 import PropiedadesPage from "./pages/PropiedadesPage";
@@ -71,6 +75,8 @@ import PortalAseguradoPage from "./pages/PortalAseguradoPage";
 import PanelPortalPage from "./pages/PanelPortalPage";
 // ⚖️ PÁGINA PÚBLICA: "Mi caso" (expediente legal, sin login)
 import MiCasoPage from "./pages/MiCasoPage";
+// 🚗 PÁGINA PÚBLICA: "Mi trámite" (seguimiento del trámite de gestoría, sin login)
+import MiTramitePage from "./pages/MiTramitePage";
 
 // 🚀 Marca de "ya mostré la bienvenida en esta sesión". Se guarda en
 //    sessionStorage: vive mientras la pestaña esté abierta y se borra al
@@ -86,6 +92,13 @@ function App() {
 
   // 🚀 EXTRAEMOS DATOS DE AUTENTICACIÓN
   const { user, loading } = useAuth();
+  // 🚗 El GESTOR es alguien de afuera: solo usa Gestoría (sin menú, sin contadores).
+  const esGestor = user?.perfil?.rol === "GESTOR";
+  const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
+  // ⚖️ El ABOGADO también es de afuera: solo usa Legales (sus casos).
+  const esAbogadoRol = user?.perfil?.rol === "ABOGADO";
+  const veLegales = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
+  const soloUnModulo = esGestor || esAbogadoRol;
 
   // 🚀 ESTADO PARA LA PANTALLA DE BIENVENIDA
   //    Arranca APAGADA. Solo se prende una vez por login (ver useEffect abajo).
@@ -137,6 +150,12 @@ function App() {
 
   // 🆕 Contador Control Diario: tareas fijas de HOY que faltan hacer (sin foto).
   const [controlDiarioPendientes, setControlDiarioPendientes] = useState(0);
+
+  // 🚗 Contador Gestoría: trámites DEMORADOS (7 días o más sin moverse).
+  const [gestoriaDemorados, setGestoriaDemorados] = useState(0);
+
+  // ⚖️ Contador Legales: fechas vencidas sin marcar + casos demorados (30 días sin novedades).
+  const [legalesAlertas, setLegalesAlertas] = useState(0);
 
   // ====== Helper: API ROOT ======
   const getApiRoot = () => {
@@ -302,6 +321,36 @@ function App() {
     }
   };
 
+  // 🚗 ====== Gestoría: demorados (admin y oficina; la oficina, los suyos) ======
+  const fetchGestoriaCount = async () => {
+    if (!user || !veGestoria) {
+      setGestoriaDemorados(0);
+      return;
+    }
+    try {
+      const apiRoot = getApiRoot();
+      const data = await fetchJSON(`${apiRoot}gestoria/resumen/`);
+      if (data) setGestoriaDemorados(Number(data.demorados) || 0);
+    } catch {
+      /* se reintenta con el próximo refresco */
+    }
+  };
+
+  // ⚖️ ====== Legales: vencidas + demorados (admin y oficina; la oficina, los suyos) ======
+  const fetchLegalesCount = async () => {
+    if (!user || !veLegales) {
+      setLegalesAlertas(0);
+      return;
+    }
+    try {
+      const apiRoot = getApiRoot();
+      const data = await fetchJSON(`${apiRoot}legales/resumen/`);
+      if (data) setLegalesAlertas(Number(data.alertas) || 0);
+    } catch {
+      /* se reintenta con el próximo refresco */
+    }
+  };
+
   // 🚀 ====== Servicios Fijos: fetch (solo admin) ======
   const fetchServiciosCounters = async () => {
     if (!user) return;
@@ -362,6 +411,9 @@ function App() {
   const refrescarRef = useRef(() => {});
   refrescarRef.current = () => {
     ultimoRefrescoRef.current = Date.now();
+    if (soloUnModulo) return; // 🚗⚖️ el gestor y el abogado no usan los contadores del menú (y el servidor se los niega)
+    fetchGestoriaCount();
+    fetchLegalesCount();
     tryFetchCounters();
     fetchCuponerasCounters();
     fetchRenovacionesCounters();
@@ -387,11 +439,13 @@ function App() {
     if (toca("siniestros")) fetchSiniestrosCount();
     if (toca("tareas")) fetchControlDiarioCount();
     if (toca("servicios")) fetchServiciosCounters();
+    if (toca("gestoria")) fetchGestoriaCount();
+    if (toca("legales")) fetchLegalesCount();
   };
   useDatosVivos(
-    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios"],
+    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios", "gestoria", "legales"],
     (temas) => refrescarPorTemaRef.current(temas),
-    { activo: !!user, siempre: true }
+    { activo: !!user && !soloUnModulo, siempre: true }
   );
 
   // 📡 Cambió algo → se vacían las memorias rápidas que quedaron viejas:
@@ -409,7 +463,7 @@ function App() {
         invalidarCacheAlertasCliente();
       }
     },
-    { activo: !!user, siempre: true }
+    { activo: !!user && !soloUnModulo, siempre: true }
   );
 
   // 📡 El cartero anda mientras haya sesión (1 solo para toda la app).
@@ -499,6 +553,15 @@ function App() {
     );
   }
 
+  // 🚗 "MI TRÁMITE" (sin login): el cliente sigue su trámite de gestoría y sube papeles.
+  if (location.pathname.startsWith("/mi-tramite/")) {
+    return (
+      <Routes>
+        <Route path="/mi-tramite/:token" element={<MiTramitePage />} />
+      </Routes>
+    );
+  }
+
   // ⚖️ "MI CASO" (sin login): quien tiene un expediente legal ve su estado.
   //    Es la versión standalone del caso — para quien no tiene (o no
   //    necesita) el Portal del Asegurado completo.
@@ -556,6 +619,30 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+    );
+  }
+
+  // 🚗 GESTOR: solo su pantalla de Gestoría, sin menú ni barra de abajo.
+  if (esGestor) {
+    return (
+      <GestorLayout>
+        <Routes>
+          <Route path="/gestoria/*" element={<GestoriaPage />} />
+          <Route path="*" element={<Navigate to="/gestoria" replace />} />
+        </Routes>
+      </GestorLayout>
+    );
+  }
+
+  // ⚖️ ABOGADO: solo Legales (sus casos), sin menú ni barra de abajo.
+  if (esAbogadoRol) {
+    return (
+      <AbogadoLayout>
+        <Routes>
+          <Route path="/legales/*" element={<LegalesPage />} />
+          <Route path="*" element={<Navigate to="/legales" replace />} />
+        </Routes>
+      </AbogadoLayout>
     );
   }
 
@@ -626,6 +713,8 @@ function App() {
           siniestrosAbiertos={siniestrosAbiertos}
           serviciosAlertas={serviciosAlertas}
           controlDiarioPendientes={controlDiarioPendientes}
+          gestoriaDemorados={gestoriaDemorados}
+          legalesAlertas={legalesAlertas}
           user={user}
         />
 
@@ -686,9 +775,11 @@ function App() {
 
                 <Route path="/siniestros" element={<SiniestrosPage />} />
 
-                {/* ⚖️ LEGALES: listado y detalle del expediente */}
-                <Route path="/legales" element={<LegalesPage />} />
-                <Route path="/legales/:id" element={<LegalesDetailPage />} />
+                {/* ⚖️ LEGALES: hoy, tablero, cargar una denuncia, pedir turno, ficha, abogados… */}
+                <Route path="/legales/*" element={<LegalesPage />} />
+
+                {/* 🚗 GESTORÍA: tablero, ficha, nuevo, gestores, entregados y comisiones */}
+                <Route path="/gestoria/*" element={<GestoriaPage />} />
 
                 <Route path="/cuponeras" element={<CuponerasPage />} />
                 <Route path="/estadisticas" element={<EstadisticasPage />} />
@@ -728,6 +819,8 @@ function App() {
         siniestrosAbiertos={siniestrosAbiertos}
         serviciosAlertas={serviciosAlertas}
         controlDiarioPendientes={controlDiarioPendientes}
+        gestoriaDemorados={gestoriaDemorados}
+        legalesAlertas={legalesAlertas}
       />
     </>
   );

@@ -1,492 +1,545 @@
 // src/pages/LegalesDetailPage.jsx
 //
-// 📁 Detalle de un expediente. Página completa (no modal) porque hay mucho
-// para mostrar: datos + estado + vencimientos + documentos + bitácora.
-//
-// 🔒 El ABOGADO puede cambiar el estado y cargar movimientos/vencimientos,
-// pero NO reasignar el abogado (eso lo hace la oficina/admin). El backend
-// ya lo bloquea; acá además lo ocultamos para que no se confunda.
-//
-// 🔗 "Copiar link para el cliente": genera (si hacía falta) y copia el
-// link público /#/mi-caso/<token> — el cliente lo abre sin login y ve su
-// estado, vencimientos y las novedades marcadas como visibles.
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import dayjs from "dayjs";
+// 📄 Ficha de un caso legal (/legales/:id): en qué paso está, qué significa
+// (en palabras simples), las fechas importantes, los papeles, el abogado y sus
+// turnos, el WhatsApp al cliente (a mano) y la bitácora.
+//   - Admin: además «Plata 🔒» (honorarios, comisión, cobrarla, comprobantes).
+//   - Abogado: su caso con su plata; cambia el estado, anota, marca fechas.
+//   - Oficina: todo menos la plata (el servidor ni siquiera se la manda) y
+//     sin cambiar el estado (eso es del abogado).
+// En el celu se ordena distinto: primero "Cómo va", el turno y las fechas.
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { HiArrowLeft, HiPlus, HiCheck, HiClipboardCopy } from "react-icons/hi";
+import { HiArrowLeft, HiArrowRight, HiDocumentText, HiLink, HiPencil } from "react-icons/hi";
 
-import { useAuth } from "../context/AuthContext";
 import useDatosVivos from "../hooks/useDatosVivos";
+import { useLegales } from "../components/legales/legalesContext";
 import {
-  fetchExpediente,
-  updateExpediente,
-  fetchMovimientos,
-  addMovimiento,
-  fetchVencimientos,
-  addVencimiento,
-  updateVencimiento,
-  fetchAbogados,
-  fetchPortalLink,
-} from "../store/slices/legalesSlice";
-import { CAMPOS_POR_TEMA } from "../components/legales/camposPorTema";
-
+  agregarFecha,
+  anotar,
+  asignarAbogado,
+  avisoWhatsapp,
+  borrarDocumento,
+  borrarFecha,
+  cambiarEstado,
+  cambiarEstadoTurno,
+  cargarHonorarios,
+  cobrarComision,
+  darTurno,
+  deshacerComision,
+  editarCaso,
+  editarFecha,
+  guardarDocumento,
+  guardarNovedadEnPartes,
+  mensajeError,
+  pedirCaso,
+  subirArchivo,
+} from "../services/legales";
+import { Cargando, Demorado, Punto, Seccion } from "../components/gestoria/Piezas";
+import { EstadoPill, PasosCaso } from "../components/legales/PiezasLegales";
 import ExpedienteDocumentosPanel from "../components/legales/ExpedienteDocumentosPanel";
-import CardDuo from "../components/ui/CardDuo";
-import Boton3D from "../components/ui/Boton3D";
-import Badge from "../components/ui/Badge";
-import SelectDuo from "../components/ui/SelectDuo";
+import {
+  ComoVa,
+  SeccionAbogado,
+  SeccionAvisoCliente,
+  SeccionBitacora,
+  SeccionCliente,
+  SeccionDatos,
+  SeccionFechas,
+  SeccionPlata,
+} from "../components/legales/SeccionesCaso";
+import {
+  ModalCambiarFecha,
+  ModalCobrar,
+  ModalDatos,
+  ModalEstado,
+  ModalHonorarios,
+  ModalNovedad,
+  ModalTurno,
+} from "../components/legales/ModalesCaso";
+import { BotonWa } from "../components/legales/PiezasLegales";
+import {
+  ESTADOS,
+  colorOficina,
+  ddmm,
+  esDemorado,
+  linkCaso,
+  linkWhatsAppOElegir,
+  primerNombre,
+  textoConLink,
+  volverOIr,
+} from "../components/legales/legalesUtils";
 
-const ESTADOS = [
-  { value: "CONSULTA", label: "Consulta" },
-  { value: "ASIGNADO", label: "Asignado" },
-  { value: "EN_TRAMITE", label: "En trámite" },
-  { value: "DEMANDA_PRESENTADA", label: "Demanda presentada" },
-  { value: "EN_JUZGADO", label: "En juzgado" },
-  { value: "SENTENCIA", label: "Sentencia" },
-  { value: "COBRADO", label: "Cobrado" },
-  { value: "CERRADO", label: "Cerrado" },
-  { value: "DESISTIDO", label: "Desistido" },
-];
-
-const ESTADO_TONO = {
-  CONSULTA: "rojo", ASIGNADO: "amarillo", EN_TRAMITE: "amarillo",
-  DEMANDA_PRESENTADA: "azul", EN_JUZGADO: "violeta", SENTENCIA: "violeta",
-  COBRADO: "verde", CERRADO: "neutro", DESISTIDO: "neutro",
-};
-
-const TEMA_LABEL = {
-  LABORAL: "Laboral", ACCIDENTE: "Accidente / ART", FAMILIA: "Familia",
-  PENAL: "Penal", PROPIEDAD: "Propiedad", OTRO: "Otro",
-};
-
-function Dato({ label, value }) {
-  return (
-    <div>
-      <span className="block text-[12px] text-suave dark:text-suave-dark mb-0.5">{label}</span>
-      <span className="text-[14px] font-medium text-titulo dark:text-titulo-dark">{value || "—"}</span>
-    </div>
-  );
+const CELU = "(max-width: 1023.5px)";
+function useEsCelu() {
+  const [celu, setCelu] = useState(() => typeof window !== "undefined" && window.matchMedia(CELU).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(CELU);
+    const cambio = () => setCelu(mq.matches);
+    mq.addEventListener("change", cambio);
+    return () => mq.removeEventListener("change", cambio);
+  }, []);
+  return celu;
 }
 
 export default function LegalesDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const { catalogo, abogados, esAbogado, recargarAbogados } = useLegales();
+  const [e, setE] = useState(null);
+  const [error, setError] = useState("");
+  const [modal, setModal] = useState(null); // "estado" | "novedad" | "honorarios" | "cobrar" | "turno" | "datos" | {tipo: "fecha", v}
+  const [estadoInicial, setEstadoInicial] = useState("");
+  const celu = useEsCelu();
+  const staff = !esAbogado;
+  const miOficina = catalogo?.mi_oficina || e?.oficina || null;
 
-  const rol = user?.perfil?.rol;
-  const esAbogado = rol === "ABOGADO";
-  const esAdmin = rol === "ADMIN" || !!user?.is_superuser;
-  // Solo oficina/admin reasignan el abogado del expediente.
-  const puedeReasignarAbogado = !esAbogado || esAdmin;
-
-  const expediente = useSelector((s) => s.legales.actual);
-  const actualLoading = useSelector((s) => s.legales.actualLoading);
-  const abogados = useSelector((s) => s.legales.abogados);
-
-  const movimientos = useSelector((s) => s.legales.movimientos[String(id)] || []);
-  const vencimientos = useSelector((s) => s.legales.vencimientos[String(id)] || []);
-
-  const [notaTexto, setNotaTexto] = useState("");
-  const [notaVisible, setNotaVisible] = useState(false);
-  const [guardandoNota, setGuardandoNota] = useState(false);
-
-  const [nuevoVencTitulo, setNuevoVencTitulo] = useState("");
-  const [nuevoVencFecha, setNuevoVencFecha] = useState("");
-  const [agregandoVenc, setAgregandoVenc] = useState(false);
-  const [mostrarFormVenc, setMostrarFormVenc] = useState(false);
-
-  const [guardandoEstado, setGuardandoEstado] = useState(false);
-  const [guardandoAbogado, setGuardandoAbogado] = useState(false);
-  const [copiandoLink, setCopiandoLink] = useState(false);
+  // `enSegundoPlano`: el refresco automático. Si falla por un corte, la ficha
+  // queda como estaba (y lo que se está escribiendo no se pierde); se vuelve a
+  // intentar en el próximo refresco. Solo un 404 (el caso ya no está a la
+  // vista) cambia la pantalla.
+  const cargar = useCallback(async ({ enSegundoPlano = false } = {}) => {
+    try {
+      setE(await pedirCaso(id));
+      setError("");
+    } catch (err) {
+      const no404 = err?.response?.status !== 404;
+      if (enSegundoPlano && no404) return;
+      setError(no404 ? mensajeError(err, "No se pudo abrir el caso.") : "Ese caso no existe o no está a la vista para tu usuario.");
+    }
+  }, [id]);
 
   useEffect(() => {
-    dispatch(fetchExpediente(id));
-    dispatch(fetchMovimientos(id));
-    dispatch(fetchVencimientos(id));
-    dispatch(fetchAbogados());
-  }, [dispatch, id]);
+    setE(null);
+    setError("");
+    cargar();
+  }, [cargar]);
 
-  // 📡 EN VIVO: si otra persona agrega un movimiento o un vencimiento, o cambia
-  //    el estado, se ve acá solo. Lo que estás escribiendo no se toca.
-  useDatosVivos(["legales"], () => {
-    dispatch(fetchExpediente(id));
-    dispatch(fetchMovimientos(id));
-    dispatch(fetchVencimientos(id));
-  }, { activo: !!id });
+  useDatosVivos(["legales"], () => cargar({ enSegundoPlano: true }));
 
-  const handleEstadoChange = async (nuevoEstado) => {
-    setGuardandoEstado(true);
+  // Desde "Para hacer hoy" → "Darle turno": /legales/12?turno=1
+  useEffect(() => {
+    if (e && params.get("turno") === "1") {
+      if (e.puede?.turno) setModal("turno");
+      const p = new URLSearchParams(params);
+      p.delete("turno");
+      setParams(p, { replace: true });
+    }
+  }, [e, params, setParams]);
+
+  const hacer = async (fn, ok) => {
     try {
-      await dispatch(updateExpediente({ id, data: { estado: nuevoEstado } })).unwrap();
-      toast.success("Estado actualizado");
+      const nuevo = await fn();
+      if (nuevo && nuevo.id) setE(nuevo);
+      if (ok) toast.success(typeof ok === "function" ? ok(nuevo) : ok);
+      recargarAbogados?.();
+      return nuevo;
     } catch (err) {
-      toast.error(err?.detail || "No se pudo cambiar el estado");
-    } finally {
-      setGuardandoEstado(false);
+      toast.error(mensajeError(err));
+      throw err;
     }
   };
+  const intentar = (fn, ok) => hacer(fn, ok).catch(() => {});
 
-  const handleAbogadoChange = async (abogadoId) => {
-    setGuardandoAbogado(true);
-    try {
-      await dispatch(updateExpediente({ id, data: { abogado: abogadoId || null } })).unwrap();
-      toast.success("Abogado actualizado");
-    } catch {
-      toast.error("No se pudo cambiar el abogado");
-    } finally {
-      setGuardandoAbogado(false);
-    }
-  };
-
-  const handleAddNota = async () => {
-    if (!notaTexto.trim() || guardandoNota) return;
-    setGuardandoNota(true);
-    try {
-      await dispatch(addMovimiento({
-        expediente_id: Number(id),
-        descripcion: notaTexto.trim(),
-        visible_cliente: notaVisible,
-      })).unwrap();
-      setNotaTexto("");
-      setNotaVisible(false);
-      toast.success("Movimiento agregado");
-    } catch {
-      toast.error("Error al guardar el movimiento");
-    } finally {
-      setGuardandoNota(false);
-    }
-  };
-
-  const handleAddVencimiento = async () => {
-    if (!nuevoVencTitulo.trim() || !nuevoVencFecha || agregandoVenc) return;
-    setAgregandoVenc(true);
-    try {
-      await dispatch(addVencimiento({
-        expediente_id: Number(id),
-        titulo: nuevoVencTitulo.trim(),
-        fecha: nuevoVencFecha,
-      })).unwrap();
-      setNuevoVencTitulo("");
-      setNuevoVencFecha("");
-      setMostrarFormVenc(false);
-      toast.success("Vencimiento agregado");
-    } catch {
-      toast.error("Error al guardar el vencimiento");
-    } finally {
-      setAgregandoVenc(false);
-    }
-  };
-
-  const toggleCumplido = async (venc) => {
-    try {
-      await dispatch(updateVencimiento({ id: venc.id, data: { cumplido: !venc.cumplido } })).unwrap();
-    } catch {
-      toast.error("No se pudo actualizar");
-    }
-  };
-
-  const handleCopiarLink = async () => {
-    if (copiandoLink) return;
-    setCopiandoLink(true);
-    try {
-      const res = await dispatch(fetchPortalLink(id)).unwrap();
-      const url = `${window.location.origin}${res.portal_path}`;
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copiado — pegalo en el WhatsApp del cliente");
-    } catch {
-      toast.error("No se pudo generar el link");
-    } finally {
-      setCopiandoLink(false);
-    }
-  };
-
-  if (actualLoading && !expediente) {
+  if (error) {
     return (
-      <div className="flex justify-center py-24">
-        <div className="w-7 h-7 border-2 border-duo-violeta/25 border-t-duo-violeta rounded-full animate-spin" />
+      <div className="flex flex-col items-start gap-3 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5">
+        <p className="text-[14px] text-titulo dark:text-titulo-dark">{error}</p>
+        <Link to="/legales" className="text-[14px] font-semibold text-sky-700 dark:text-sky-400">
+          Volver
+        </Link>
+      </div>
+    );
+  }
+  if (!e) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Cargando alto="h-20" />
+        <Cargando alto="h-16" />
+        <div className="grid lg:grid-cols-2 gap-4">
+          <Cargando alto="h-72" />
+          <Cargando alto="h-72" />
+        </div>
       </div>
     );
   }
 
-  if (!expediente) return null;
+  const sig = e.estados?.siguiente;
+  const cerrado = e.estado === "CERRADO" || e.estado === "DESISTIDO";
+  const dem = esDemorado(e);
+  const docsCliente = (e.documentos || []).filter((d) => d.rol === "CLIENTE" && d.tipo === "PAPEL");
+  const ultimoDelCliente = e.cliente_subio_papeles ? docsCliente[0] : null;
 
-  const abogadoActual = abogados.find((a) => a.id === expediente.abogado);
+  // ── acciones ──
+  const abrirEstado = (inicial = "") => {
+    setEstadoInicial(inicial);
+    setModal("estado");
+  };
+  const guardarEstado = async (body) => {
+    const nuevo = await cambiarEstado(e.id, body);
+    setE(nuevo);
+    setModal(body.estado === "COBRADO" && nuevo.plata?.puede_cargar && !nuevo.plata?.honorarios ? "honorarios" : null);
+    toast.success(`${e.numero} → ${(ESTADOS[body.estado]?.n || body.estado).toUpperCase()}`);
+    recargarAbogados?.();
+  };
+  const guardarNovedad = async (datos, hecho = {}) => {
+    const nuevo = await guardarNovedadEnPartes(e, datos, hecho, setE);
+    const { estado } = datos;
+    setModal(estado === "COBRADO" && nuevo.plata?.puede_cargar && !nuevo.plata?.honorarios ? "honorarios" : null);
+    toast.success("Guardado");
+  };
+  const registrarAviso = (motivo, extra = {}) => {
+    avisoWhatsapp(e.id, motivo, extra)
+      .then((nuevo) => {
+        if (nuevo?.id) setE(nuevo);
+        toast.success("Anotado: se le mandó el WhatsApp");
+      })
+      .catch((err) => toast.error(mensajeError(err, "No se pudo anotar el aviso.")));
+  };
+  const copiarLink = async () => {
+    const link = linkCaso(e);
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Link copiado");
+    } catch {
+      window.prompt("Copiá este link:", link);
+    }
+  };
+  const subirPapel = async (file, papel = "") => {
+    try {
+      const arch = await subirArchivo(file, "legales/papeles");
+      await hacer(() => guardarDocumento(e.id, { ...arch, tipo: "PAPEL", papel }), `Subido: ${arch.nombre}`);
+    } catch (err) {
+      if (!err?.response) toast.error(err?.message || "No se pudo subir el archivo.");
+    }
+  };
+  const subirComprobante = async (file) => {
+    try {
+      const arch = await subirArchivo(file, "legales/comprobantes");
+      await hacer(() => guardarDocumento(e.id, { ...arch, tipo: "COMISION" }), "Comprobante subido");
+    } catch (err) {
+      if (!err?.response) toast.error(err?.message || "No se pudo subir el archivo.");
+    }
+  };
+  const borrarArchivo = (d) => {
+    if (!window.confirm(`¿Borrar «${d.nombre}»? No se puede deshacer.`)) return;
+    intentar(() => borrarDocumento(e.id, d.id), "Archivo borrado");
+  };
+  const cambiarTurno = (t, estado) => {
+    const txt = { LLEGO: "llegó", ATENDIDO: "atendido", NO_VINO: "no vino", CANCELADO: "cancelado" }[estado];
+    if (estado === "CANCELADO" && !window.confirm("¿Cancelar el turno? El horario queda libre para otro.")) return;
+    intentar(async () => {
+      await cambiarEstadoTurno(t.id, estado);
+      return pedirCaso(e.id);
+    }, `Turno: ${txt}`);
+  };
 
-  // Campos propios del tema (ej: Laboral → fechas de trabajo), ya con su
-  // etiqueta legible y formateados si son fecha. Solo se muestran los que
-  // realmente tienen un valor cargado.
-  const camposTemaConValor = (CAMPOS_POR_TEMA[expediente.tema] || [])
-    .map((campo) => {
-      const valor = expediente.datos_tema?.[campo.key];
-      if (!valor) return null;
-      const valorMostrado = campo.type === "date" ? dayjs(valor).format("DD/MM/YYYY") : valor;
-      return { key: campo.key, label: campo.label, valor: valorMostrado };
-    })
-    .filter(Boolean);
+  // ── piezas ──
+  const cabecera = (
+    <div className="flex flex-col gap-3">
+      <nav className="flex items-center gap-2 text-[13px] text-suave dark:text-suave-dark">
+        <button type="button" onClick={() => volverOIr(navigate)} className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-400">
+          <HiArrowLeft className="w-4 h-4" /> {esAbogado ? "Mis casos" : "Legales"}
+        </button>
+        <span>/</span>
+        <span>{e.numero}</span>
+      </nav>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex flex-col gap-1.5">
+          <h1 className="text-[22px] sm:text-[26px] font-bold leading-tight text-titulo dark:text-titulo-dark">
+            {e.motivo_titulo && celu ? e.persona_nombre : `${e.tema_nombre} · ${e.persona_nombre}`}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 text-[13px] text-suave dark:text-suave-dark">
+            <EstadoPill estado={e.estado} desde={e.estado_desde} />
+            {dem && <Demorado />}
+            {celu && <span>{e.tema_nombre} · {e.numero}</span>}
+          </div>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-suave dark:text-suave-dark">
+            {e.persona_dni && <span>DNI {e.persona_dni}</span>}
+            {e.persona_telefono && <span>· {e.persona_telefono}</span>}
+            <span className="inline-flex items-center gap-1">
+              · <Punto color={colorOficina(e.oficina)} /> Oficina {e.oficina_nombre || "—"}
+            </span>
+            {(e.cliente_polizas || []).length > 0 && (
+              <span>
+                · Cliente de THAMES:{" "}
+                {staff && e.cliente ? (
+                  <Link to={`/clientes/${e.cliente}`} className="font-semibold text-sky-700 dark:text-sky-400 underline">
+                    {e.cliente_polizas[0]}
+                  </Link>
+                ) : (
+                  <b>{e.cliente_polizas[0]}</b>
+                )}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={copiarLink}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3.5 py-2.5 text-[14px] font-semibold text-titulo dark:text-titulo-dark"
+          >
+            <HiLink className="w-4 h-4" /> Copiar link del cliente
+          </button>
+          {esAbogado && !cerrado && (
+            <button
+              type="button"
+              onClick={() => setModal("novedad")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-700/50 bg-card dark:bg-card-dark px-3.5 py-2.5 text-[14px] font-semibold text-sky-800 dark:text-sky-300"
+            >
+              <HiPencil className="w-4 h-4" /> Anotar novedad
+            </button>
+          )}
+          {e.puede?.cambiar_estado && (
+            <button
+              type="button"
+              onClick={() => abrirEstado("")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3.5 py-2.5 text-[14px] font-semibold text-titulo dark:text-titulo-dark"
+            >
+              Otro estado
+            </button>
+          )}
+          {e.puede?.cambiar_estado && sig && (
+            <button
+              type="button"
+              onClick={() => abrirEstado(sig)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 px-4 py-2.5 text-[14px] font-semibold text-white"
+            >
+              Pasar a {(ESTADOS[sig]?.n || sig).toUpperCase()} <HiArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const bannerCliente = ultimoDelCliente && (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-300 dark:border-sky-500/40 bg-sky-50 dark:bg-sky-500/10 px-4 py-3 text-[13px] text-sky-900 dark:text-sky-200">
+      <span className="inline-flex items-center gap-2">
+        <HiDocumentText className="w-4 h-4 shrink-0" />
+        <span>
+          {primerNombre(e.persona_nombre) || "El cliente"} subió un papel desde su link el {ddmm(ultimoDelCliente.fecha)}: <b>{ultimoDelCliente.nombre}</b>
+        </span>
+      </span>
+      <a href={ultimoDelCliente.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-sky-300 dark:border-sky-500/40 bg-card dark:bg-card-dark px-3 py-1.5 text-[13px] font-semibold text-sky-800 dark:text-sky-300">
+        Ver el papel
+      </a>
+    </div>
+  );
+
+  const bannerCerrado = cerrado && (
+    <div className="rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-[13px] text-titulo dark:text-titulo-dark">
+      Este caso está <b>{e.estado === "CERRADO" ? "cerrado" : "desistido"}</b>. Queda guardado con toda su historia.
+      {e.puede?.cambiar_estado ? " Si hace falta, se puede volver a abrir con «Otro estado»." : ""}
+    </div>
+  );
+
+  const papeles = (
+    <Seccion titulo={<h2 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">Papeles · fotos y PDF ({(e.documentos || []).filter((d) => d.tipo === "PAPEL").length})</h2>}>
+      <ExpedienteDocumentosPanel
+        e={e}
+        celu={celu}
+        onSubir={subirPapel}
+        onBorrar={borrarArchivo}
+        onPapeles={(lista) => intentar(() => editarCaso(e.id, { papeles: lista }), "Papeles actualizados")}
+      />
+    </Seccion>
+  );
+
+  const secDatos = (
+    <SeccionDatos
+      e={e}
+      catalogo={catalogo}
+      abogados={abogados}
+      onAsignar={(abId) => intentar(() => asignarAbogado(e.id, abId), abId ? "Abogado asignado" : "Quedó sin abogado")}
+      onEditar={() => setModal("datos")}
+    />
+  );
+  const secFechas = (
+    <SeccionFechas
+      e={e}
+      glosario={catalogo?.glosario}
+      staff={staff}
+      onAgregar={(body) => hacer(() => agregarFecha(e.id, body), "Fecha agregada")}
+      onMarcar={(v, cumplido) => intentar(() => editarFecha(e.id, v.id, { cumplido }), cumplido ? "Marcada como hecha" : "Quedó pendiente")}
+      onCambiar={(v) => setModal({ tipo: "fecha", v })}
+      onBorrar={(v) => {
+        if (window.confirm(`¿Borrar «${v.titulo}»?`)) intentar(() => borrarFecha(e.id, v.id), "Fecha borrada");
+      }}
+      onAvisado={(v) => registrarAviso("fecha", { fecha: v.id })}
+    />
+  );
+  const secAbogado = (
+    <SeccionAbogado e={e} catalogo={catalogo} esAbogado={esAbogado} miOficina={miOficina} onDarTurno={() => setModal("turno")} onTurnoEstado={cambiarTurno} />
+  );
+  const secAviso = staff ? <SeccionAvisoCliente e={e} onAvisado={registrarAviso} onCopiar={copiarLink} /> : null;
+  const secBitacora = <SeccionBitacora e={e} compacta={celu} onAnotar={(body) => hacer(() => anotar(e.id, body), "Anotado")} />;
+  const secPlata = e.ve_plata ? (
+    <SeccionPlata
+      e={e}
+      onHonorarios={() => setModal("honorarios")}
+      onCobrar={() => setModal("cobrar")}
+      onDeshacer={() => {
+        if (window.confirm("¿Deshacer el cobro? Se borra el ingreso de Balances y la comisión vuelve a quedar pendiente.")) {
+          intentar(() => deshacerComision(e.id), "Cobro deshecho");
+        }
+      }}
+      onSubirComprobante={subirComprobante}
+      onBorrarDoc={borrarArchivo}
+    />
+  ) : null;
+
+  const modales = (
+    <>
+      <ModalEstado e={e} catalogo={catalogo} abierto={modal === "estado"} inicial={estadoInicial} onCerrar={() => setModal(null)} onGuardar={guardarEstado} />
+      <ModalNovedad e={e} abierto={modal === "novedad"} onCerrar={() => setModal(null)} onGuardar={guardarNovedad} />
+      <ModalHonorarios
+        e={e}
+        abierto={modal === "honorarios"}
+        onCerrar={() => setModal(null)}
+        onGuardar={async (body, pactado) => {
+          let nuevo = await cargarHonorarios(e.id, body);
+          if (pactado !== null && pactado !== undefined) nuevo = await editarCaso(e.id, { honorarios_pactados: pactado });
+          setE(nuevo);
+          setModal(null);
+          toast.success("Honorarios guardados");
+          recargarAbogados?.();
+        }}
+      />
+      <ModalCobrar
+        e={e}
+        formas={catalogo?.formas_pago || []}
+        abierto={modal === "cobrar"}
+        onCerrar={() => setModal(null)}
+        onGuardar={async (body) => {
+          const nuevo = await cobrarComision(e.id, body);
+          setE(nuevo);
+          setModal(null);
+          toast.success("Comisión cobrada · entró a Balances");
+          recargarAbogados?.();
+        }}
+      />
+      <ModalTurno
+        e={e}
+        abogados={abogados}
+        temas={catalogo?.temas || []}
+        miOficina={miOficina}
+        abierto={modal === "turno"}
+        onCerrar={() => setModal(null)}
+        onDar={async (body) => {
+          const r = await darTurno({ expediente: e.id, ...body });
+          setE(r.expediente);
+          recargarAbogados?.();
+          return r.expediente;
+        }}
+        onAvisado={(turnoId) => registrarAviso("turno", turnoId ? { turno: turnoId } : {})}
+      />
+      <ModalDatos
+        e={e}
+        temas={catalogo?.temas || []}
+        abierto={modal === "datos"}
+        onCerrar={() => setModal(null)}
+        onGuardar={async (body) => {
+          const nuevo = await editarCaso(e.id, body);
+          setE(nuevo);
+          setModal(null);
+          toast.success("Datos guardados");
+        }}
+      />
+      <ModalCambiarFecha
+        v={modal?.tipo === "fecha" ? modal.v : null}
+        abierto={modal?.tipo === "fecha"}
+        onCerrar={() => setModal(null)}
+        onGuardar={async (body) => {
+          const nuevo = await editarFecha(e.id, modal.v.id, body);
+          setE(nuevo);
+          setModal(null);
+          toast.success("Fecha cambiada");
+        }}
+      />
+    </>
+  );
+
+  if (celu) {
+    const textoLink = textoConLink(e.whatsapp_textos?.link || "", e);
+    return (
+      <div className="flex flex-col gap-3">
+        {cabecera}
+        <ComoVa e={e} staff={staff} />
+        {bannerCerrado}
+        {bannerCliente}
+        {secAbogado}
+        {secFechas}
+        {esAbogado && <SeccionCliente e={e} />}
+        {papeles}
+        {secAviso}
+        {secBitacora}
+        {secDatos}
+        {secPlata}
+        <details className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
+          <summary className="cursor-pointer text-[14px] font-semibold text-titulo dark:text-titulo-dark">Ver los 7 pasos</summary>
+          <div className="mt-3">
+            <PasosCaso pasos={e.pasos} vertical />
+          </div>
+        </details>
+        {staff && !cerrado && (
+          <div className="grid grid-cols-2 gap-2 border-t border-linea dark:border-linea-dark pt-3">
+            <button
+              type="button"
+              onClick={() => setModal("turno")}
+              disabled={!e.puede?.turno}
+              className="min-h-[50px] rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[15px] font-bold text-titulo dark:text-titulo-dark disabled:opacity-50"
+            >
+              {e.proximo_turno ? "Otro turno" : "Pedir turno"}
+            </button>
+            <BotonWa href={linkWhatsAppOElegir(e.persona_telefono, textoLink)} onEnviado={() => registrarAviso("link")} size="lg">
+              Mandarle el link
+            </BotonWa>
+          </div>
+        )}
+        {modales}
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-0 py-4 sm:py-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3">
-        <button
-          onClick={() => navigate("/legales")}
-          className="h-9 w-9 shrink-0 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark hover:bg-surface dark:hover:bg-surface-dark inline-flex items-center justify-center transition-colors"
-          aria-label="Volver"
-        >
-          <HiArrowLeft className="w-4 h-4 text-titulo dark:text-titulo-dark" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold text-titulo dark:text-titulo-dark truncate">{expediente.persona_label}</h1>
-          <p className="text-[12px] text-suave dark:text-suave-dark font-mono">{expediente.numero} · {TEMA_LABEL[expediente.tema] || expediente.tema}</p>
+    <div className="flex flex-col gap-4">
+      {cabecera}
+      <PasosCaso pasos={e.pasos} />
+      {staff && (e.significa || e.vos) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {e.significa && (
+            <p className="rounded-xl bg-indigo-50 dark:bg-indigo-500/10 px-4 py-3 text-[14px] text-titulo dark:text-titulo-dark">
+              <b className="text-indigo-800 dark:text-indigo-300">¿Qué significa?</b> {e.significa}
+            </p>
+          )}
+          {e.vos && (
+            <p className="rounded-xl bg-green-50 dark:bg-green-500/10 px-4 py-3 text-[14px] text-titulo dark:text-titulo-dark">
+              <b className="text-green-800 dark:text-green-300">¿Qué hacés vos?</b> {e.vos}
+            </p>
+          )}
         </div>
-        <Badge tono={ESTADO_TONO[expediente.estado] || "neutro"}>{expediente.estado_label}</Badge>
-      </div>
-
-      <div className="flex justify-end mb-5">
-        <button
-          type="button"
-          onClick={handleCopiarLink}
-          disabled={copiandoLink}
-          className="h-9 px-3 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[12px] font-medium text-duo-violeta flex items-center gap-1.5 hover:border-duo-violeta transition-colors disabled:opacity-50"
-        >
-          <HiClipboardCopy className="w-4 h-4" /> {copiandoLink ? "Generando…" : "Copiar link para el cliente"}
-        </button>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* IZQUIERDA */}
-        <div className="flex-1 space-y-4 min-w-0">
-
-          {/* Estado */}
-          <CardDuo className="p-4">
-            <span className="block text-[12px] text-suave dark:text-suave-dark mb-2">Estado</span>
-            <SelectDuo
-              value={expediente.estado}
-              onChange={(e) => handleEstadoChange(e.target.value)}
-              disabled={guardandoEstado}
-              options={ESTADOS}
-            />
-            <div className="flex gap-1.5 mt-3 flex-wrap">
-              {ESTADOS.filter((e) => e.value !== "DESISTIDO").map((e) => {
-                const idxActual = ESTADOS.findIndex((x) => x.value === expediente.estado);
-                const idxEste = ESTADOS.findIndex((x) => x.value === e.value);
-                const pasado = expediente.estado !== "DESISTIDO" && idxEste <= idxActual;
-                return (
-                  <span
-                    key={e.value}
-                    className={`text-[11px] font-medium px-2 py-0.5 rounded ${
-                      pasado
-                        ? "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta"
-                        : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark"
-                    }`}
-                  >
-                    {e.label}
-                  </span>
-                );
-              })}
-            </div>
-          </CardDuo>
-
-          {/* Datos */}
-          <CardDuo className="p-4">
-            <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
-              <Dato label="DNI" value={expediente.persona_dni} />
-              <Dato label="Teléfono" value={expediente.persona_telefono} />
-              <Dato label="Tipo" value={expediente.cliente ? `Cliente — ${expediente.cliente_label || ""}` : "No cliente"} />
-              <Dato label="Fecha del hecho" value={expediente.fecha_hecho ? dayjs(expediente.fecha_hecho).format("DD/MM/YYYY") : "—"} />
-              <Dato label="Oficina" value={expediente.oficina_nombre || "—"} />
-              <Dato label="Cargado por" value={expediente.creado_por_nombre} />
-            </div>
-
-            {camposTemaConValor.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-linea dark:border-linea-dark">
-                <span className="block text-[12px] text-suave dark:text-suave-dark mb-2">
-                  Datos de {TEMA_LABEL[expediente.tema] || "este caso"}
-                </span>
-                <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
-                  {camposTemaConValor.map((c) => (
-                    <Dato key={c.key} label={c.label} value={c.valor} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {expediente.relato && (
-              <div className="mt-3">
-                <span className="block text-[12px] text-suave dark:text-suave-dark mb-2">Relato</span>
-                <div className="p-3 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg text-[13px] text-titulo dark:text-titulo-dark whitespace-pre-wrap">
-                  {expediente.relato}
-                </div>
-              </div>
-            )}
-          </CardDuo>
-
-          {/* Abogado asignado */}
-          <CardDuo className="p-4">
-            <span className="block text-[12px] text-suave dark:text-suave-dark mb-2">Abogado asignado</span>
-            {puedeReasignarAbogado ? (
-              <SelectDuo
-                value={expediente.abogado || ""}
-                onChange={(e) => handleAbogadoChange(e.target.value)}
-                disabled={guardandoAbogado}
-                placeholder="Sin asignar"
-                options={abogados.map((a) => ({ value: a.id, label: a.nombre_completo }))}
-              />
-            ) : (
-              <p className="text-[14px] font-medium text-titulo dark:text-titulo-dark">{abogadoActual?.nombre_completo || "Sin asignar"}</p>
-            )}
-          </CardDuo>
-
-          {/* Vencimientos */}
-          <CardDuo className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[12px] text-suave dark:text-suave-dark">Vencimientos</span>
-              <button
-                type="button"
-                onClick={() => setMostrarFormVenc((v) => !v)}
-                className="text-[12px] font-medium text-duo-violeta flex items-center gap-1"
-              >
-                <HiPlus className="w-3.5 h-3.5" /> Agregar
-              </button>
-            </div>
-
-            {mostrarFormVenc && (
-              <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                <input
-                  value={nuevoVencTitulo}
-                  onChange={(e) => setNuevoVencTitulo(e.target.value)}
-                  placeholder="Ej: Audiencia preliminar"
-                  className="flex-1 h-10 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta"
-                />
-                <input
-                  type="date"
-                  value={nuevoVencFecha}
-                  onChange={(e) => setNuevoVencFecha(e.target.value)}
-                  className="h-10 px-3 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[13px] text-titulo dark:text-titulo-dark outline-none focus:border-duo-violeta [color-scheme:light] dark:[color-scheme:dark]"
-                />
-                <Boton3D variant="violeta" size="sm" onClick={handleAddVencimiento} disabled={agregandoVenc}>
-                  {agregandoVenc ? "..." : "Guardar"}
-                </Boton3D>
-              </div>
-            )}
-
-            {vencimientos.length === 0 ? (
-              <p className="text-[13px] text-suave dark:text-suave-dark">Sin vencimientos cargados.</p>
-            ) : (
-              <div className="space-y-2">
-                {vencimientos.map((v) => {
-                  const dias = Math.ceil((new Date(v.fecha) - new Date()) / 86400000);
-                  const urgente = !v.cumplido && dias <= 3;
-                  return (
-                    <div
-                      key={v.id}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg ${
-                        v.cumplido
-                          ? "bg-surface dark:bg-surface-dark opacity-60"
-                          : urgente
-                          ? "bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]"
-                          : "bg-surface dark:bg-surface-dark"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleCumplido(v)}
-                        className={`h-5 w-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                          v.cumplido ? "bg-duo-verde border-duo-verde text-white" : "border-linea dark:border-linea-dark"
-                        }`}
-                        aria-label="Marcar cumplido"
-                      >
-                        {v.cumplido && <HiCheck className="w-3 h-3" />}
-                      </button>
-                      <span className={`flex-1 text-[13px] ${v.cumplido ? "line-through text-suave dark:text-suave-dark" : "text-titulo dark:text-titulo-dark"}`}>
-                        {v.titulo}
-                      </span>
-                      <span className={`text-[12px] font-medium shrink-0 ${urgente ? "text-duo-rojo" : "text-suave dark:text-suave-dark"}`}>
-                        {dayjs(v.fecha).format("DD/MM")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardDuo>
-
-          {/* Documentos */}
-          <CardDuo className="p-0 overflow-hidden">
-            <ExpedienteDocumentosPanel expedienteId={id} />
-          </CardDuo>
+      )}
+      {bannerCerrado}
+      {bannerCliente}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] items-start">
+        <div className="flex flex-col gap-4 min-w-0">
+          {secDatos}
+          {secFechas}
+          {papeles}
+          {secPlata}
         </div>
-
-        {/* DERECHA: bitácora */}
-        <div className="w-full lg:w-80 flex flex-col border-t lg:border-t-0 lg:border-l border-linea dark:border-linea-dark pt-5 lg:pt-0 lg:pl-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">Bitácora</h3>
-          </div>
-
-          <CardDuo className="p-3 mb-4 space-y-3">
-            <textarea
-              value={notaTexto}
-              onChange={(e) => setNotaTexto(e.target.value)}
-              rows={3}
-              placeholder="Qué se hizo, qué falta..."
-              className="w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 text-[13px] text-titulo dark:text-titulo-dark outline-none focus:border-duo-violeta resize-none"
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setNotaVisible(false)}
-                className={`flex-1 h-8 rounded-lg border text-[12px] font-medium transition-colors ${
-                  !notaVisible
-                    ? "border-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta"
-                    : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark"
-                }`}
-              >
-                Interno
-              </button>
-              <button
-                type="button"
-                onClick={() => setNotaVisible(true)}
-                className={`flex-1 h-8 rounded-lg border text-[12px] font-medium transition-colors ${
-                  notaVisible
-                    ? "border-duo-verde bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde"
-                    : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark"
-                }`}
-              >
-                Visible al cliente
-              </button>
-            </div>
-            <Boton3D variant="verde" size="sm" full onClick={handleAddNota} disabled={guardandoNota || !notaTexto.trim()}>
-              {guardandoNota ? "..." : "Guardar"}
-            </Boton3D>
-          </CardDuo>
-
-          <div className="flex-1 space-y-2.5">
-            {movimientos.length > 0 ? (
-              movimientos.map((m) => (
-                <div key={m.id} className="p-3 bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark rounded-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[11px] font-medium text-duo-violeta">{dayjs(m.creado_en).format("DD MMM YYYY HH:mm")}</p>
-                    {m.visible_cliente && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-duo-verde">
-                        Visible
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[13px] text-titulo dark:text-titulo-dark leading-relaxed">{m.descripcion}</p>
-                  <p className="text-[12px] text-suave dark:text-suave-dark mt-1">{m.autor_nombre}</p>
-                </div>
-              ))
-            ) : (
-              <div className="p-4 border border-dashed border-linea dark:border-linea-dark rounded-lg text-center">
-                <p className="text-[13px] text-suave dark:text-suave-dark">No hay movimientos registrados.</p>
-              </div>
-            )}
-          </div>
+        <div className="flex flex-col gap-4 min-w-0">
+          {secAbogado}
+          {esAbogado && <SeccionCliente e={e} />}
+          {secAviso}
+          {secBitacora}
         </div>
       </div>
+      {modales}
     </div>
   );
 }

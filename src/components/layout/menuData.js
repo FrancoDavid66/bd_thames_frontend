@@ -10,7 +10,7 @@ import {
   HiChartBar, HiClipboardList, HiClipboardCheck, HiRefresh,
   HiBan, HiCash, HiReceiptTax,
   HiShieldCheck, HiCog, HiViewGrid, HiStar,
-  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2,
+  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2, HiTruck,
 } from "react-icons/hi";
 // 🎮 Ícono del minijuego (Heroicons v1 no trae un joystick)
 import { FaGamepad } from "react-icons/fa";
@@ -23,6 +23,7 @@ export const ICON_MAP = {
   shield: HiShieldCheck, cog: HiCog, grid: HiViewGrid,
   pencil: HiPencilAlt, calc: HiCalculator, camera: HiCamera, chat: HiChatAlt2,
   game: FaGamepad,
+  truck: HiTruck,
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -71,8 +72,8 @@ export const QUICK_ACTIONS = [
     icon: "doc", bg: "var(--color-duo-rojo)", shadow: "var(--color-duo-rojo-sombra)",
   },
   {
-    // ⚖️ NUEVO: acceso directo a Legales (consultas/casos) — mismo motivo.
-    to: "/legales", label: "Legales", sub: "Nueva consulta o caso",
+    // ⚖️ Acceso directo a Legales: cargar una denuncia o dar un turno con el abogado.
+    to: "/legales", label: "Legales", sub: "Denuncia o turno con el abogado",
     icon: "doc", bg: "var(--color-duo-violeta)", shadow: "var(--color-duo-violeta-sombra)",
   },
 ];
@@ -85,6 +86,9 @@ export function buildMenuGroups({
   solTotal = 0, renovacionesPendientes = 0, cuponVencidas = 0,
   bajasPendientes = 0, serviciosAlertas = 0, siniestrosAbiertos = 0,
   controlDiarioPendientes = 0,   // 🆕 tareas fijas de hoy sin hacer (badge Control diario)
+  gestoriaDemorados = 0,         // 🚗 trámites de gestoría demorados (7 días o más sin moverse)
+  veGestoria = true,             // 🚗 admin y oficina (el abogado no)
+  legalesAlertas = 0,            // ⚖️ casos legales con fecha vencida sin marcar o demorados (30 días)
 }) {
   if (isVendedor) {
     return [{
@@ -128,7 +132,10 @@ export function buildMenuGroups({
         // 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp.
         { to: "/mensajes", label: "Mensajes", icon: "chat" },
         { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
-        { to: "/legales", label: "Legales", icon: "doc" },
+        // ⚖️ Legales: casos, turnos con el abogado y "Cargar una denuncia" (badge = vencidas + demorados).
+        { to: "/legales", label: "Legales", icon: "doc", badge: legalesAlertas, tone: "rojo" },
+        // 🚗 Gestoría: trámites del automotor derivados a gestores (badge = demorados).
+        ...(veGestoria ? [{ to: "/gestoria", label: "Gestoría", icon: "truck", badge: gestoriaDemorados, tone: "rojo" }] : []),
       ],
     },
     {

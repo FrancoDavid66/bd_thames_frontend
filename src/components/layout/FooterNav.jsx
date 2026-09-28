@@ -45,11 +45,14 @@ export default function FooterNav({
   bajasPendientes = 0,
   serviciosAlertas = 0,
   siniestrosAbiertos = 0,
+  gestoriaDemorados = 0,     // 🚗 badge de Gestoría (trámites demorados)
+  legalesAlertas = 0,        // ⚖️ badge de Legales (fechas vencidas + demorados)
 }) {
   const { user } = useAuth();
   const location = useLocation();
   const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const isVendedor = user?.perfil?.rol === "VENDEDOR";
+  const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -71,8 +74,9 @@ export default function FooterNav({
     () => buildMenuGroups({
       isAdmin, isVendedor, solTotal, renovacionesPendientes,
       cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos,
+      gestoriaDemorados, veGestoria, legalesAlertas,
     }),
-    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos]
+    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, gestoriaDemorados, veGestoria, legalesAlertas]
   );
 
   // Badges totales por RUTA (para pintar el puntito en un tab si corresponde)

@@ -106,6 +106,7 @@ export default function AdminUsuarios() {
                     u.perfil?.rol === 'ADMIN' ? 'bg-[var(--color-tarjeta)]/20 text-[#d97706]' :
                     u.perfil?.rol === 'VENDEDOR' ? 'bg-[var(--color-transferencia)]/20 text-[var(--color-transferencia)]' :
                     u.perfil?.rol === 'ABOGADO' ? 'bg-[#5b52e6]/15 text-[#5b52e6]' :
+                    u.perfil?.rol === 'GESTOR' ? 'bg-[#0f766e]/15 text-[#0f766e]' :
                     'bg-[var(--color-oficina)]/20 text-[var(--color-oficina-fuerte)]'
                   }`}>
                     {u.perfil?.rol}
@@ -159,6 +160,7 @@ export default function AdminUsuarios() {
                     <option value="OFICINA">Personal de oficina / cajero</option>
                     <option value="VENDEDOR">Vendedor externo</option>
                     <option value="ABOGADO">Abogado (módulo Legales)</option>
+                    <option value="GESTOR">Gestor (módulo Gestoría)</option>
                     <option value="ADMIN">Administrador global</option>
                   </select>
                 </div>
@@ -171,6 +173,7 @@ export default function AdminUsuarios() {
                       {formData.rol === 'ADMIN' ? '-- Acceso global (todas) --' :
                        formData.rol === 'VENDEDOR' ? '-- Independiente (sin sucursal) --' :
                        formData.rol === 'ABOGADO' ? '-- No aplica (ve sus casos, no por oficina) --' :
+                       formData.rol === 'GESTOR' ? '-- No aplica (ve solo sus trámites) --' :
                        '-- Seleccionar oficina --'}
                     </option>
 
@@ -178,6 +181,13 @@ export default function AdminUsuarios() {
                   </select>
                 </div>
               </div>
+
+              {/* 🚗 El gestor se da de alta desde Gestoría (ahí se le arma su ficha con el %). */}
+              {formData.rol === 'GESTOR' && (
+                <p className="rounded-lg border border-[#0f766e]/30 bg-[#0f766e]/10 px-3 py-2 text-[12px] text-[#0f766e]">
+                  Para un gestor nuevo usá <b>Gestoría → Gestores → Nuevo gestor</b>: ahí se crea su usuario y su ficha (con el % de comisión). Acá solo se cambia el rol.
+                </p>
+              )}
 
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-[var(--color-linea)] px-4 py-2 text-[13px] font-medium text-[var(--color-suave)] transition-colors hover:text-[var(--color-titulo)]">Cancelar</button>

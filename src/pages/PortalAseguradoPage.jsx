@@ -126,6 +126,9 @@ export default function PortalAseguradoPage() {
     () => (data?.polizas || []).map((p) => ({ ...p, __token: token })),
     [data, token]
   );
+  // ⚖️ Sus casos legales (si tiene). Un cliente puede tener solo eso, sin
+  //    ningún seguro: igual entra y ve sus casos (ver más abajo).
+  const casosLegales = data?.casos_legales || [];
   // En la base los nombres van en MAYÚSCULAS. En pantalla gritan, así que se
   // normalizan solo para mostrar.
   const nombreCliente = capitalizar(cliente.nombre_completo || cliente.nombre || "");
@@ -320,7 +323,7 @@ export default function PortalAseguradoPage() {
     );
   }
 
-  if (error || !polizas.length) {
+  if (error || (!polizas.length && !casosLegales.length)) {
     return (
       <div className="portal" data-tema={temaActivo}>
         <div
@@ -349,6 +352,33 @@ export default function PortalAseguradoPage() {
               <br />Si creés que es un error, escribinos.
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ⚖️ Sin seguros pero con casos legales: una pantalla simple con sus casos
+  //    (los pagos, la grúa y los papeles del seguro no tienen nada que mostrar).
+  if (!polizas.length) {
+    const primerNombre = capitalizar(cliente.nombre || "").split(" ")[0] || nombreCliente.split(" ")[0];
+    return (
+      <div className="portal" data-tema={temaActivo}>
+        <div className="portal-frame" style={{ minHeight: "100dvh", paddingBottom: 40 }}>
+          <div style={{ padding: "40px 24px 4px", textAlign: "center" }}>
+            <img
+              src={temaActivo === "oscuro" ? logoPieOscuro : logoPieClaro}
+              alt="Estudio Thames"
+              style={{ height: 56, width: "auto", opacity: 0.9, margin: "0 auto 20px", display: "block" }}
+            />
+            <h1 style={{ fontSize: 21, fontWeight: 700, margin: "0 0 6px" }}>
+              {primerNombre ? `Hola, ${primerNombre}` : "Hola"}
+            </h1>
+            <p style={{ fontSize: 14, color: "var(--t2)", lineHeight: 1.5, margin: 0 }}>
+              Tocá tu caso para ver cómo va.
+            </p>
+          </div>
+          <Seccion>{casosLegales.length > 1 ? "Tus casos legales" : "Tu caso legal"}</Seccion>
+          <CasosLegales casos={casosLegales} />
         </div>
       </div>
     );
@@ -472,10 +502,18 @@ export default function PortalAseguradoPage() {
                   Eran 37px de alto para no decir nada. */}
               <div style={{ height: 14 }} />
               <Lista>
-                {polizas.map((p, i) => (
+                {polizas.map((p) => (
                   <FilaSeguro key={p.id} poliza={p} onClick={() => abrirPoliza(p)} />
                 ))}
               </Lista>
+
+              {/* ⚖️ Sus casos legales (si tiene): cada uno abre su link «Mi caso». */}
+              {casosLegales.length ? (
+                <>
+                  <Seccion>Tus casos legales</Seccion>
+                  <CasosLegales casos={casosLegales} />
+                </>
+              ) : null}
             </>
           )}
           </div>
@@ -524,6 +562,37 @@ export default function PortalAseguradoPage() {
 
       <Toaster position="bottom-center" toastOptions={{ style: { marginBottom: 80 } }} />
     </div>
+  );
+}
+
+/* ══════════════════ ⚖️ Casos legales ══════════════════ */
+
+// Cada caso abre su página «Mi caso» (cómo va, próximas fechas, subir papeles).
+// Nunca muestra plata: el servidor ya la saca (legales/public_views.py).
+function CasosLegales({ casos }) {
+  return (
+    <Lista>
+      {casos.map((c, i) => (
+        <Fila
+          key={c.numero}
+          i={i}
+          primera={i === 0}
+          icono={<IconDoc size={21} />}
+          titulo={c.tema_label}
+          sub={
+            <>
+              {c.estado_label} · <span style={{ whiteSpace: "nowrap" }}>{c.numero}</span>
+            </>
+          }
+          derecha={
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>
+              Ver cómo va
+            </span>
+          }
+          href={c.link}
+        />
+      ))}
+    </Lista>
   );
 }
 

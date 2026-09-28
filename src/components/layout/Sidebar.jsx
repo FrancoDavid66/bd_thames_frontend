@@ -41,11 +41,14 @@ export default function Sidebar({
   serviciosAlertas = 0,
   siniestrosAbiertos = 0,
   controlDiarioPendientes = 0,   // 🆕 badge de Control diario (tareas de hoy sin hacer)
+  gestoriaDemorados = 0,         // 🚗 badge de Gestoría (trámites demorados)
+  legalesAlertas = 0,            // ⚖️ badge de Legales (fechas vencidas + demorados)
 }) {
   const { user } = useAuth();
   const location = useLocation();
   const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const isVendedor = user?.perfil?.rol === "VENDEDOR";
+  const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
   const oficinaNombre = user?.perfil?.oficina_nombre || "Sucursal";
@@ -54,9 +57,9 @@ export default function Sidebar({
     () => buildMenuGroups({
       isAdmin, isVendedor, solTotal, renovacionesPendientes,
       cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos,
-      controlDiarioPendientes,
+      controlDiarioPendientes, gestoriaDemorados, veGestoria, legalesAlertas,
     }),
-    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, controlDiarioPendientes]
+    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, controlDiarioPendientes, gestoriaDemorados, veGestoria, legalesAlertas]
   );
 
   // 🧠 Acordeones con memoria: arrancan CERRADOS. Si el usuario abre uno, se
