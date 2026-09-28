@@ -19,7 +19,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import toast from "react-hot-toast";
@@ -268,6 +268,7 @@ export default function RenovacionesPage() {
   dayjs.locale("es");
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const isWebAdmin =
     user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
@@ -300,8 +301,18 @@ export default function RenovacionesPage() {
     return localStorage.getItem("scope.renovaciones.oficina") || "";
   });
 
-  const [search, setSearch] = useState("");
+  // 🔁 Si venís del botón "Renovar" de una póliza, llegás con ese auto ya buscado.
+  const [search, setSearch] = useState(() => String(location.state?.buscar || ""));
   const [bucket, setBucket] = useState("");
+
+  // …y limpiamos ese "buscar" del historial: si recargás la página, arranca normal.
+  useEffect(() => {
+    if (location.state?.buscar) {
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+    // Solo al entrar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -740,7 +751,8 @@ export default function RenovacionesPage() {
             <HiSearch className="text-base shrink-0" />
             <span>
               Buscando <span className="font-medium">"{searchTrim}"</span> en{" "}
-              <span className="font-medium">todas las sucursales</span> — venzan cuando
+              {/* Cada oficina renueva solo SUS pólizas: el empleado busca en la suya. */}
+              <span className="font-medium">{isWebAdmin ? "todas las sucursales" : "tu oficina"}</span> — venzan cuando
               venzan, incluidas las ya renovadas y finalizadas.
             </span>
           </div>

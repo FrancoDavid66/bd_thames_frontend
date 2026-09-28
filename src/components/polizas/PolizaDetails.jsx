@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { FaCar, FaEdit, FaTrash, FaExchangeAlt } from "react-icons/fa";
 import {
   HiArrowLeft, HiChevronRight, HiOfficeBuilding,
-  HiCash, HiDocumentText, HiShieldCheck,
+  HiCash, HiDocumentText, HiShieldCheck, HiRefresh, HiLockClosed,
 } from "react-icons/hi";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -91,6 +91,11 @@ function mensajeError(e, fallback) {
 // 🔕 Estados que DEJAN de recibir el recordatorio de cuotas por WhatsApp.
 //    (Coincide con el backend: solo 'activa' y 'vencida' reciben mensajes.)
 const ESTADOS_SIN_RECORDATORIO = ["cancelada", "finalizada"];
+
+// 🔁 "Renovar" lleva a Renovaciones buscando ESTE auto. Por patente se ven todas
+//    sus versiones (la vieja y la ya renovada); si la patente es de relleno
+//    ("0KM", "A DESIGNAR"…) buscamos por número de póliza.
+const PATENTE_DE_RELLENO = /^(0\s*KM|SIN\s*PAT|EN\s*TR[AÁ]MIT|A\s*DESIGN|PROVIS)/i;
 
 /* ===================== Helpers de presentación ===================== */
 function SectionTitle({ Icon, title, right }) {
@@ -195,6 +200,31 @@ export default function PolizaDetails() {
 
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
+  // 🔐 Qué puede hacer ESTE usuario con esta póliza. Lo decide el backend
+  //    (polizas/permisos.py): el admin, todo; cada oficina, solo SUS pólizas
+  //    (las de otra oficina las ve y las cobra, pero no las toca).
+  //    Si el backend todavía no manda "permisos", queda todo como antes.
+  const permisos = poliza?.permisos || null;
+  const puedeEditar = permisos ? !!permisos.editar : true;
+  const puedeCambiarEstado = permisos ? !!permisos.editar : isWebAdmin;
+  // 🔁 "Renovar" lleva a la bandeja de Renovaciones, que para una oficina muestra
+  //    solo las pólizas con SU oficina cargada. Una póliza sin oficina no aparece
+  //    ahí: esas las renueva el admin (así el botón nunca lleva a "0 resultados").
+  const puedeRenovar = permisos ? !!permisos.renovar && (isWebAdmin || poliza?.oficina != null) : false;
+  // 🗑 El tacho: si se puede borrar, o si NO se puede porque tiene cobros/siniestros
+  //    (ahí explica y ofrece pasarla a Cancelada). Sin permiso (otra oficina,
+  //    vendedor) no aparece. Si todavía no se calculó (null), decide el backend al tocar.
+  const mostrarEliminar = permisos
+    ? permisos.eliminar === true || permisos.codigo_eliminar === "TIENE_COBROS" || (permisos.eliminar == null && !!permisos.editar)
+    : isWebAdmin;
+  // false = no se puede borrar (tiene cobros o siniestros) → se ofrece pasarla a Cancelada.
+  const sePuedeBorrar = permisos ? permisos.eliminar !== false : isWebAdmin;
+  // "No se puede eliminar: tiene cuotas cobradas. Pasala…" → "Tiene cuotas cobradas. Pasala…" (el título ya lo dice)
+  const motivoNoBorrar = String(permisos?.motivo_eliminar || "")
+    .replace(/^No se puede eliminar:\s*/i, "")
+    .replace(/^./, (c) => c.toUpperCase());
+  const bloqueoOficina = permisos && !permisos.editar ? permisos.motivo || "Esta póliza es de otra oficina." : "";
+
   const cuotas = useMemo(() => (Array.isArray(poliza?.cuotas) ? poliza.cuotas : []), [poliza?.cuotas]);
   const proxima = useMemo(() => getProximaCuota(cuotas), [cuotas]);
   const cuponesRobo = useMemo(() => (Array.isArray(poliza?.cupones_robo) ? poliza.cupones_robo : []), [poliza?.cupones_robo]);
@@ -223,10 +253,19 @@ export default function PolizaDetails() {
       toast.success("Póliza eliminada con éxito");
       navigate("/polizas", { replace: true });
     } catch (e) {
-      toast.error(e?.message || "Error al eliminar");
+      // Ej: "No se puede eliminar: tiene cuotas cobradas. Pasala a Cancelada…"
+      toast.error(mensajeError(e, "Error al eliminar"), { duration: 6000 });
+      dispatch(fetchPolizaPorId({ id: polizaId, force: true })); // botones al día
     } finally {
       setOpenConfirm(false);
     }
+  };
+
+  // 🔁 Renovar: abre Renovaciones buscando este auto (ahí está todo el circuito).
+  const irARenovar = () => {
+    const pat = String(poliza?.patente || "").trim();
+    const buscar = pat && !PATENTE_DE_RELLENO.test(pat) ? pat : String(poliza?.numero_poliza || pat || clienteDni || "").trim();
+    navigate("/polizas/renovaciones", { state: { buscar } });
   };
 
   // 🚫 Motivo y nota de la baja que tiene hoy la póliza (la nota automática no se edita).
@@ -242,6 +281,13 @@ export default function PolizaDetails() {
     setMotivoBaja(motivoActual || "INCUMPLIMIENTO_PAGO");
     setNotaBaja(notaActual);
     setOpenEstado(true);
+  };
+
+  // 🚫 No se puede borrar (tiene cobros o siniestros) → la pasamos a Cancelada.
+  const pasarACancelada = () => {
+    setOpenConfirm(false);
+    abrirCambioEstado();
+    setNuevoEstado("cancelada");
   };
 
   // 🆕 ¿El estado elegido deja SIN recordatorio de cuotas? (cancelada / finalizada)
@@ -332,17 +378,17 @@ export default function PolizaDetails() {
         </Boton3D>
       </div>
 
-      {/* 🆕 Banner GRANDE de estado (color semáforo). Para admin, clic = cambiar estado. */}
+      {/* 🆕 Banner GRANDE de estado (color semáforo). Admin y la oficina dueña: clic = cambiar estado. */}
       {(() => {
         const b = bannerEstado(poliza?.estado);
         return (
           <button
             type="button"
-            onClick={isWebAdmin ? abrirCambioEstado : undefined}
-            disabled={!isWebAdmin}
+            onClick={puedeCambiarEstado ? abrirCambioEstado : undefined}
+            disabled={!puedeCambiarEstado}
             className={`mb-5 flex w-full items-center justify-between gap-4 rounded-2xl px-6 py-5 text-left transition-colors
               ${b.clases}
-              ${isWebAdmin ? "cursor-pointer hover:brightness-110" : "cursor-default"}`}
+              ${puedeCambiarEstado ? "cursor-pointer hover:brightness-110" : "cursor-default"}`}
           >
             <div className="min-w-0">
               <div className="text-[11px] opacity-80">
@@ -358,7 +404,7 @@ export default function PolizaDetails() {
                     <div className="font-semibold">{bajaInfo.titulo}</div>
                   ) : (
                     <div className="opacity-80">
-                      Sin motivo cargado{isWebAdmin ? " · tocá para cargarlo" : ""}
+                      Sin motivo cargado{puedeCambiarEstado ? " · tocá para cargarlo" : ""}
                     </div>
                   )}
                   {bajaInfo?.detalle ? <div className="opacity-90">{bajaInfo.detalle}</div> : null}
@@ -369,7 +415,7 @@ export default function PolizaDetails() {
                 </div>
               ) : null}
             </div>
-            {isWebAdmin ? (
+            {puedeCambiarEstado ? (
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/20 px-3.5 py-2 text-xs font-medium">
                 <FaExchangeAlt className="h-3.5 w-3.5" /> Cambiar
               </span>
@@ -415,17 +461,35 @@ export default function PolizaDetails() {
         </Link>
       ) : null}
 
-      <div className="mb-5 flex gap-2">
-        <Boton3D variant="blanco" className="flex-1" onClick={() => setOpenEdit(true)}>
-          <FaEdit className="h-3.5 w-3.5" /> Editar
-        </Boton3D>
-        {/* El cambio de estado ahora se hace desde el banner grande de arriba. */}
-        {isWebAdmin ? (
-          <Boton3D variant="rojo" onClick={() => setOpenConfirm(true)} aria-label="Eliminar">
-            <FaTrash className="h-3.5 w-3.5" />
-          </Boton3D>
-        ) : null}
-      </div>
+      {/* 🔐 Botones según lo que puede hacer este usuario (admin: todo; oficina: sus pólizas).
+          El cambio de estado se hace desde el banner grande de arriba. */}
+      {puedeEditar || puedeRenovar || mostrarEliminar ? (
+        <div className="mb-5 flex gap-2">
+          {puedeEditar ? (
+            <Boton3D variant="blanco" className="flex-1" onClick={() => setOpenEdit(true)}>
+              <FaEdit className="h-3.5 w-3.5" /> Editar
+            </Boton3D>
+          ) : null}
+          {puedeRenovar ? (
+            <Boton3D variant="verde" className="flex-1" onClick={irARenovar}>
+              <HiRefresh className="h-4 w-4" /> Renovar
+            </Boton3D>
+          ) : null}
+          {mostrarEliminar ? (
+            <Boton3D variant="rojo" onClick={() => setOpenConfirm(true)} aria-label="Eliminar">
+              <FaTrash className="h-3.5 w-3.5" />
+            </Boton3D>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* 🔒 Póliza de otra oficina: se ve y se cobra, pero no se toca. */}
+      {bloqueoOficina ? (
+        <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 text-[13px] leading-snug text-titulo dark:text-titulo-dark">
+          <HiLockClosed className="mt-0.5 h-4 w-4 shrink-0 text-suave dark:text-suave-dark" />
+          <span>{bloqueoOficina}</span>
+        </div>
+      ) : null}
 
       <div className="mb-6 grid grid-cols-2 gap-2.5">
         <CardDuo className="p-3.5">
@@ -627,30 +691,63 @@ export default function PolizaDetails() {
         ) : null}
       </ModalDuo>
 
-      <ModalDuo
-        isOpen={openConfirm}
-        onClose={() => setOpenConfirm(false)}
-        title="Eliminar póliza"
-        subtitle="Esta acción no se puede deshacer"
-        icon={<FaTrash />}
-        iconTono="rojo"
-        size="sm"
-        footer={
-          <>
-            <Boton3D variant="blanco" onClick={() => setOpenConfirm(false)} full>
-              Cancelar
-            </Boton3D>
-            <Boton3D variant="rojo" onClick={handleConfirmDelete} full>
-              Sí, eliminar
-            </Boton3D>
-          </>
-        }
-      >
-        <p className="text-[15px] text-titulo dark:text-titulo-dark leading-relaxed">
-          ¿Confirmás la eliminación total de la póliza{" "}
-          <span className="text-duo-rojo">{poliza?.numero_poliza || "S/N"}</span>?
-        </p>
-      </ModalDuo>
+      {sePuedeBorrar ? (
+        <ModalDuo
+          isOpen={openConfirm}
+          onClose={() => setOpenConfirm(false)}
+          title="Eliminar póliza"
+          subtitle="Esta acción no se puede deshacer"
+          icon={<FaTrash />}
+          iconTono="rojo"
+          size="sm"
+          footer={
+            <>
+              <Boton3D variant="blanco" onClick={() => setOpenConfirm(false)} full>
+                Cancelar
+              </Boton3D>
+              <Boton3D variant="rojo" onClick={handleConfirmDelete} full>
+                Sí, eliminar
+              </Boton3D>
+            </>
+          }
+        >
+          <p className="text-[15px] text-titulo dark:text-titulo-dark leading-relaxed">
+            ¿Confirmás la eliminación total de la póliza{" "}
+            <span className="text-duo-rojo">{poliza?.numero_poliza || "S/N"}</span>?
+          </p>
+        </ModalDuo>
+      ) : (
+        /* 🚫 Tiene cobros o siniestros: no se borra (se perdería la plata de
+              Balances y el historial). Se pasa a Cancelada. */
+        <ModalDuo
+          isOpen={openConfirm}
+          onClose={() => setOpenConfirm(false)}
+          title="No se puede eliminar"
+          subtitle={`Póliza ${poliza?.numero_poliza || "S/N"}`}
+          icon={<FaTrash />}
+          iconTono="rojo"
+          size="sm"
+          footer={
+            <>
+              <Boton3D variant="blanco" onClick={() => setOpenConfirm(false)} full>
+                Cerrar
+              </Boton3D>
+              {estadoActual !== "cancelada" ? (
+                <Boton3D variant="rojo" onClick={pasarACancelada} full>
+                  Pasar a Cancelada
+                </Boton3D>
+              ) : null}
+            </>
+          }
+        >
+          <p className="text-[15px] text-titulo dark:text-titulo-dark leading-relaxed">
+            {motivoNoBorrar || "Esta póliza tiene cuotas cobradas o siniestros: no se puede eliminar."}
+          </p>
+          <p className="mt-2 text-[13px] text-suave dark:text-suave-dark leading-relaxed">
+            Así no se pierde la plata cobrada ni el historial del cliente.
+          </p>
+        </ModalDuo>
+      )}
     </div>
   );
 }

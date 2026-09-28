@@ -93,12 +93,15 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
     }
   }, [poliza]);
 
-  // Cargar catálogos al abrir
+  // Cargar catálogos al abrir.
+  // 🐛 FIX: se pedían a "companias/" y "coberturas/", que no existen (404): las
+  //    listas salían vacías y solo se veía la compañía/cobertura que ya tenía.
+  //    Viven en el módulo Cotizaciones (el mismo catálogo que edita el Admin).
   useEffect(() => {
     if (!isOpen) return;
 
     api
-      .get("companias/")
+      .get("cotizaciones/companias/")
       .then((res) => {
         const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
         setCompanias(arr.filter((c) => c.activa).map((c) => c.nombre));
@@ -106,7 +109,7 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
       .catch(console.warn);
 
     api
-      .get("coberturas/")
+      .get("cotizaciones/coberturas/")
       .then((res) => {
         const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
         setCoberturas(arr.filter((c) => c.activa).map((c) => c.nombre));
@@ -190,7 +193,10 @@ const PolizaEditModal = ({ isOpen, onClose, onSuccess, poliza }) => {
       onClose?.();
     } catch (err) {
       const apiErr = err?.response?.data || err;
-      if (apiErr && typeof apiErr === "object" && !Array.isArray(apiErr)) {
+      if (apiErr && typeof apiErr === "object" && typeof apiErr.detail === "string" && apiErr.detail) {
+        // 🔐 Mensaje armado por el backend (ej. "Esta póliza es de Km 39…"): va tal cual.
+        toast.error(apiErr.detail, { duration: 6000 });
+      } else if (apiErr && typeof apiErr === "object" && !Array.isArray(apiErr)) {
         const firstKey = Object.keys(apiErr)[0];
         const firstVal = Array.isArray(apiErr[firstKey]) ? apiErr[firstKey][0] : apiErr[firstKey];
         toast.error(firstKey ? `${firstKey}: ${firstVal}` : "Error al editar la póliza");

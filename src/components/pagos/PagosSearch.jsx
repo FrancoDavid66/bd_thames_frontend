@@ -564,7 +564,10 @@ export default function PagosSearch({ onBuscar, onActualizarVivo }) {
                 const needsAlert = ["vencida", "baja_reciente", "cancelada"].includes(st.type);
                 const diasDesdeFin = p?.fecha_fin ? dayjs().diff(dayjs(p.fecha_fin), "day") : null;
                 const dentroDeTolerancia = diasDesdeFin !== null && diasDesdeFin >= 0 && diasDesdeFin <= 3;
-                const puedeRenovar = st.type === "finalizada" && !p?.tiene_renovacion && dentroDeTolerancia;
+                const tocaRenovar = st.type === "finalizada" && !p?.tiene_renovacion && dentroDeTolerancia;
+                // 🔐 Cobrar cobra cualquiera; RENOVAR solo la oficina dueña (o el admin).
+                const puedeRenovar = tocaRenovar && p?.puede_renovar !== false;
+                const renuevaOtra = tocaRenovar && p?.puede_renovar === false;
 
                 return (
                   <div key={pid || idx} className="flex flex-col gap-2">
@@ -599,6 +602,11 @@ export default function PagosSearch({ onBuscar, onActualizarVivo }) {
                       className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-duo-verde text-white text-sm font-medium py-2.5 transition-colors hover:brightness-110">
                       <HiRefresh className="w-4 h-4" /> Renovar
                     </button>
+                  )}
+                  {renuevaOtra && (
+                    <p className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2 text-xs text-suave dark:text-suave-dark">
+                      🔒 La renueva {p?.oficina || "su oficina"} (o el admin). Cuando esté renovada, la cobrás desde acá.
+                    </p>
                   )}
                   </div>
                 );
