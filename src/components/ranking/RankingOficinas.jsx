@@ -2,17 +2,21 @@
 // ============================================================
 // 🏆 RANKING DE OFICINAS — "Juegos THAMES".
 //
-// Podio con la oficina que más pólizas nuevas hizo en el mes ARRIBA (al
-// centro, con corona), la 2ª a la izquierda y la 3ª a la derecha. Abajo:
-// las que quedaron fuera del podio, "La carrera", lo de hoy (o lo mejor del
-// mes si ya cerró) y los campeones de cada mes.
+// Gana la oficina que más CRECIÓ en el mes: pólizas que ENTRARON menos
+// autos que SE FUERON (no pagó, cancelada/de baja, terminó y no renovó;
+// vendió el auto también cuenta). Ejemplo fácil: Axión entraron 100 y se
+// fueron 150 → −50: está perdiendo clientes aunque venda mucho.
+// Una renovación o una póliza repetida del mismo auto no suma a "entraron".
+// Empate → mejor retención → más entraron → la que llegó primero.
+//
+// Podio con la 1ª ARRIBA (al centro, con corona), la 2ª a la izquierda y la
+// 3ª a la derecha. Abajo: las que quedaron fuera del podio, "La carrera"
+// (entraron vs se fueron), lo de hoy (o lo mejor del mes si ya cerró) y los
+// campeones de cada mes.
 //
 // Estilo propio (estadio de noche), NO el de la app: fondo oscuro siempre,
 // letras Anton/Barlow. Se mueve solo (en vivo); si alguien pasa al frente,
-// tira papelitos y avisa.
-//
-// Cuenta: pólizas cargadas en THAMES que no son renovación (mismo número
-// que Estadísticas y el Inicio). Empate: gana la que llegó primero.
+// tira papelitos y avisa. Si el cliente que no pagó paga, vuelve a sumar.
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -24,7 +28,10 @@ import { useNuevasMes, useNuevasSerie } from "../../hooks/usePolizasNuevas";
 import {
   colorOficina,
   siglaOficina,
-  ordenarPorMetrica,
+  rankingOficinas,
+  hayMovimiento as hayMov,
+  conSigno,
+  formatoRetencion,
   mesActual,
   moverMes,
   nombreMes,
@@ -50,6 +57,8 @@ const BRILLO = [
   "0 0 0 8px rgba(217,119,6,0.14)",
 ];
 const PUESTO_TXT = ["PRIMERO", "SEGUNDO", "TERCERO"];
+const ENTRA = "#34d399"; // verde: entraron
+const SALE = "#fb7185"; // rojo: se fueron
 
 // Tamaños del podio (celu → compu).
 const FORMA = [
@@ -116,6 +125,26 @@ function Escudo({ oficina, color, clase, claseSigla, borde, brillo }) {
   );
 }
 
+// Color del neto: verde si creció, rojo si perdió.
+const colorNeto = (n) => (n > 0 ? ENTRA : n < 0 ? SALE : "#e2e8f0");
+
+/** Barra partida: verde lo que entró, rojo lo que se fue (se ve de un vistazo si crece). */
+function BarraBalance({ entraron, seFueron, alto = "h-3" }) {
+  const e = Number(entraron || 0);
+  const s = Number(seFueron || 0);
+  const total = e + s;
+  return (
+    <div className={`flex ${alto} overflow-hidden rounded-full bg-[#1a2440]`} aria-hidden="true">
+      {total > 0 && (
+        <>
+          <div style={{ width: `${(e * 100) / total}%`, background: ENTRA }} />
+          <div style={{ width: `${(s * 100) / total}%`, background: SALE }} />
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function RankingOficinas({ onCambiarVista }) {
   useModoEstadio();
   const reducir = useReducedMotion();
@@ -130,25 +159,29 @@ export default function RankingOficinas({ onCambiarVista }) {
   const serie = useNuevasSerie({ desde: moverMes(hoyMes, -11), hasta: hoyMes });
   const r = resumen.data && !resumen.desactualizado ? resumen.data : null;
 
-  const orden = useMemo(() => ordenarPorMetrica(r?.oficinas, "nuevas"), [r]);
-  const valorLider = orden.length ? Number(orden[0].nuevas || 0) : 0;
+  // Orden del ranking: las que compiten por neto; al final, las que no tuvieron nada.
+  const orden = useMemo(() => rankingOficinas(r?.oficinas), [r]);
+  const enJuego = useMemo(() => orden.filter((o) => !o.sinMovimiento), [orden]);
+  const hayMovimiento = hayMov(enJuego);
+  const lider = hayMovimiento ? enJuego[0] || null : null;
+  const valorLider = lider ? Number(lider.neto || 0) : 0;
   const colorDe = (id) => colorOficina(r?.oficinas || serie.data?.oficinas, id);
 
-  // 🎉 Papelitos al abrir el mes, y si alguien pasa al frente (en vivo).
+  // 🎉 Papelitos al abrir el mes (si la 1ª creció), y si alguien pasa al frente (en vivo).
   const liderRef = useRef({ mes: null, id: null });
-  const idLider = valorLider > 0 ? orden[0].id : null;
+  const idLider = lider ? lider.id : null;
   useEffect(() => {
     if (!r || idLider === null) return;
     const antes = liderRef.current;
     liderRef.current = { mes: r.mes, id: idLider };
     const colores = [ORO, colorDe(idLider).base, "#f8fafc"];
     if (antes.mes !== r.mes) {
-      if (!reducir) {
+      if (!reducir && valorLider > 0) {
         const t = setTimeout(() => tirarPapelitos(colores), 900);
         return () => clearTimeout(t);
       }
     } else if (antes.id !== null && antes.id !== idLider) {
-      toast.success(`¡${orden[0].nombre} pasó al frente!`, { icon: "🏆" });
+      toast.success(`¡${lider.nombre} pasó al frente!`, { icon: "🏆" });
       if (!reducir) tirarPapelitos(colores);
     }
     return undefined;
@@ -165,10 +198,10 @@ export default function RankingOficinas({ onCambiarVista }) {
         : { grande: "HOY", chico: `CIERRA ${nombreMesSolo(r.mes).toUpperCase()}` }
       : { grande: "FINAL", chico: `${nombreMesSolo(r.mes).toUpperCase()} YA CERRÓ` };
 
-  // Podio: 2º - 1º - 3º (vacíos si hay menos de 3 oficinas).
-  const podio = [1, 0, 2].map((i) => ({ i, o: orden[i] || null }));
-  const resto = orden.slice(3);
-  const tercero = orden[2] ? Number(orden[2].nuevas || 0) : 0;
+  // Podio: 2º - 1º - 3º (vacíos si compiten menos de 3).
+  const podio = [1, 0, 2].map((i) => ({ i, o: hayMovimiento ? enJuego[i] || null : null }));
+  const resto = hayMovimiento ? orden.slice(Math.min(3, enJuego.length)) : [];
+  const tercero = enJuego[2] ? Number(enJuego[2].neto || 0) : 0;
 
   const mejor = useMemo(() => (r && !r.en_curso ? mejorDelMes(r) : null), [r]);
 
@@ -178,7 +211,7 @@ export default function RankingOficinas({ onCambiarVista }) {
     const ofis = serie.data?.oficinas || [];
     const ultimos = puntos.slice(-6).map((p) => {
       const g = ofis.find((o) => o.id === p.ganadora);
-      const v = g ? p.por_oficina?.[String(g.id)]?.nuevas : null;
+      const v = g ? p.por_oficina?.[String(g.id)]?.neto : null;
       return { periodo: p.periodo, enCurso: p.en_curso, ganadora: g || null, valor: v };
     });
     const anio = hoyMes.slice(0, 4);
@@ -194,13 +227,22 @@ export default function RankingOficinas({ onCambiarVista }) {
     return { ultimos, titulos: listaTitulos, anio };
   }, [serie.data, hoyMes]);
 
+  // Hoy: por oficina, lo que entró y lo que se fue (primero la que más creció hoy).
   const hoyLista = useMemo(
     () =>
-      (r?.en_curso ? ordenarPorMetrica(r.oficinas, "nuevas") : [])
-        .map((o) => ({ o, n: Number(o.hoy?.nuevas || 0) }))
-        .sort((a, b) => b.n - a.n),
-    [r]
+      (r?.en_curso ? enJuego : [])
+        .map((o) => ({ o, e: Number(o.hoy?.entraron ?? o.hoy?.nuevas ?? 0), s: Number(o.hoy?.se_fueron || 0) }))
+        .sort((a, b) => b.e - b.s - (a.e - a.s) || b.e - a.e),
+    [r, enJuego]
   );
+
+  // La carrera: las barras se miden contra el número más grande (entraron o se fueron).
+  const maxMov = Math.max(1, ...enJuego.map((o) => Math.max(o.entraron, o.se_fueron)));
+
+  // 💡 Los que se fueron por no pagar: si pagan, vuelven (y el neto sube).
+  //    El empleado ve los de SU oficina; el admin, los de todas.
+  const mia = miOficina !== null ? (r?.oficinas || []).find((o) => String(o.id) === String(miOficina)) || null : null;
+  const recuperables = miOficina !== null ? Number(mia?.recuperables || 0) : Number(r?.totales?.recuperables || 0);
 
   const verMes = (m) => {
     if (m && m <= hoyMes) setMes(m);
@@ -290,8 +332,8 @@ export default function RankingOficinas({ onCambiarVista }) {
         {r && (
           <p className="relative z-10 text-[13px] font-semibold tracking-[0.2em] text-slate-500 sm:text-[16px]" style={F_COND}>
             {enCurso
-              ? `PÓLIZAS NUEVAS DEL 1 AL ${dayjs(r.hasta).date()} DE ${nombreMesSolo(r.mes).toUpperCase()} · SIN RENOVACIONES`
-              : `PÓLIZAS NUEVAS DE ${nombreMesSolo(r.mes).toUpperCase()} · SIN RENOVACIONES`}
+              ? `CRECIMIENTO NETO DEL 1 AL ${dayjs(r.hasta).date()} DE ${nombreMesSolo(r.mes).toUpperCase()} · ENTRARON − SE FUERON`
+              : `CRECIMIENTO NETO DE ${nombreMesSolo(r.mes).toUpperCase()} · ENTRARON − SE FUERON`}
           </p>
         )}
 
@@ -313,7 +355,7 @@ export default function RankingOficinas({ onCambiarVista }) {
         {r && (
           <>
             {/* ── Podio ── */}
-            <section aria-label="Podio" className="relative flex min-h-[380px] items-end justify-center pt-6 sm:min-h-[640px]">
+            <section aria-label="Podio" className="relative flex min-h-[400px] items-end justify-center pt-6 sm:min-h-[680px]">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute left-1/2 top-[-40px] h-[115%] w-[92%] -translate-x-1/2 bg-white/[0.045]"
@@ -329,7 +371,7 @@ export default function RankingOficinas({ onCambiarVista }) {
                       left: `${x}%`,
                       top: `${y}%`,
                       transform: `rotate(${rot}deg)`,
-                      background: [ORO, colorDe(orden[0].id).base, "#f8fafc", "#38bdf8", "#34d399"][k % 5],
+                      background: [ORO, colorDe(lider.id).base, "#f8fafc", "#38bdf8", "#34d399"][k % 5],
                       opacity: k % 3 === 0 ? 0.95 : 0.7,
                     }}
                   />
@@ -342,7 +384,7 @@ export default function RankingOficinas({ onCambiarVista }) {
                   const demora = reducir ? 0 : [0.45, 0.2, 0.05][i];
                   return (
                     <div key={`${r.mes}-${i}`} className="flex w-[32%] max-w-[290px] flex-col items-center gap-2 sm:gap-3">
-                      {i === 0 && o && valorLider > 0 && (
+                      {i === 0 && o && (
                         <MotionDiv
                           initial={reducir ? false : { opacity: 0, y: -12 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -382,12 +424,33 @@ export default function RankingOficinas({ onCambiarVista }) {
                             </span>
                           )}
                           <div className="flex items-baseline gap-2">
-                            <span className={`leading-none ${forma.puntaje}`} style={{ ...F_DISPLAY, color: MEDALLA[i] }}>
-                              {o.nuevas}
+                            <span
+                              className={`leading-none ${forma.puntaje}`}
+                              style={{ ...F_DISPLAY, color: MEDALLA[i] }}
+                              aria-label={`Crecimiento neto ${conSigno(o.neto)}`}
+                            >
+                              {conSigno(o.neto)}
                             </span>
                             <span className="hidden text-[15px] font-semibold tracking-[0.16em] text-slate-400 sm:inline" style={F_COND}>
-                              PÓLIZAS
+                              NETO
                             </span>
+                          </div>
+                          <div
+                            className="flex flex-col items-center gap-0.5 text-center text-[11px] font-semibold leading-tight tracking-[0.08em] text-slate-400 sm:text-[15px]"
+                            style={F_COND}
+                          >
+                            <span className="flex flex-col items-center gap-0.5 sm:flex-row sm:gap-2">
+                              <span>
+                                <strong style={{ color: ENTRA }}>{o.entraron}</strong> ENTRARON
+                              </span>
+                              <span className="hidden sm:inline" aria-hidden="true">
+                                ·
+                              </span>
+                              <span>
+                                <strong style={{ color: SALE }}>{o.se_fueron}</strong> SE FUERON
+                              </span>
+                            </span>
+                            <span>RETENCIÓN {formatoRetencion(o.retencion)}</span>
                           </div>
                         </>
                       ) : (
@@ -416,24 +479,36 @@ export default function RankingOficinas({ onCambiarVista }) {
               <div aria-hidden="true" className="absolute bottom-[-14px] left-1/2 h-[14px] w-[98%] max-w-[1010px] -translate-x-1/2 rounded-b-xl border-t-2 border-[#22304f] bg-[#0d1528]" />
             </section>
 
-            {valorLider === 0 && (
+            {!hayMovimiento && (
               <p className="text-center text-[15px] tracking-[0.12em] text-slate-400" style={F_COND}>
-                TODAVÍA NO HAY PÓLIZAS NUEVAS ESTE MES · ¡LA PRIMERA ARRANCA LA CARRERA!
+                TODAVÍA NO HAY MOVIMIENTO ESTE MES · ¡LA PRIMERA PÓLIZA ARRANCA LA CARRERA!
+              </p>
+            )}
+
+            {recuperables > 0 && (
+              <p className="rounded-2xl border border-emerald-900/70 bg-emerald-950/30 px-4 py-3 text-[14px] leading-snug text-emerald-100 sm:px-5 sm:text-[15px]">
+                💡 {mia ? `${mia.nombre}: ` : ""}
+                <strong>
+                  {recuperables} {recuperables === 1 ? "se fue por no pagar y tiene" : "se fueron por no pagar y tienen"} la
+                  póliza vencida
+                </strong>{" "}
+                ({enCurso ? "este mes" : nombreMesSolo(r.mes).toLowerCase()}). Si {recuperables === 1 ? "paga, vuelve" : "pagan, vuelven"} y
+                el neto sube.
               </p>
             )}
 
             {/* ── Fuera del podio ── */}
             {resto.length > 0 && (
-              <section aria-label="Fuera del podio" className="mt-4 flex flex-col gap-3">
+              <section aria-label="Fuera del podio" className="mt-2 flex flex-col gap-3">
                 {resto.map((o, k) => {
                   const color = colorDe(o.id);
                   const puesto = k + 4;
-                  const falta = tercero - Number(o.nuevas || 0);
+                  const falta = tercero - Number(o.neto || 0);
                   return (
                     <div key={o.id} className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-[#0e1628] px-4 py-4 sm:flex-row sm:items-center sm:gap-5 sm:px-6">
-                      <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3 sm:w-[46%] sm:shrink-0 sm:gap-4">
                         <span className="text-[32px] leading-none text-slate-600 sm:text-[44px]" style={F_DISPLAY}>
-                          {puesto}º
+                          {o.sinMovimiento ? "–" : `${puesto}º`}
                         </span>
                         <Escudo oficina={o} color={color} clase="h-11 w-11 sm:h-14 sm:w-14" claseSigla="text-lg sm:text-2xl" />
                         <div className="flex min-w-0 flex-col">
@@ -442,18 +517,28 @@ export default function RankingOficinas({ onCambiarVista }) {
                             {esMia(o) ? <span className="ml-2 text-[11px] tracking-[0.2em] text-slate-300">· TU OFICINA</span> : null}
                           </span>
                           <span className="text-[13px] text-slate-400">
-                            {enCurso ? `Le faltan ${falta + 1} para el podio` : `Quedó a ${falta} del podio`}
+                            {o.sinMovimiento
+                              ? "Sin movimiento este mes"
+                              : enCurso
+                                ? `Le faltan ${falta + 1} para el podio`
+                                : `Quedó a ${falta} del podio`}
                           </span>
                         </div>
-                        <span className="ml-auto text-[32px] leading-none text-slate-100 sm:hidden" style={F_DISPLAY}>
-                          {o.nuevas}
+                        <span className="ml-auto text-[32px] leading-none sm:hidden" style={{ ...F_DISPLAY, color: colorNeto(o.neto) }}>
+                          {conSigno(o.neto)}
                         </span>
                       </div>
-                      <div className="h-3 flex-1 overflow-hidden rounded-full bg-[#1a2440]">
-                        <div className="h-3 rounded-full" style={{ width: `${tercero ? Math.min(100, Math.round((o.nuevas * 100) / tercero)) : 0}%`, background: color.base }} />
-                      </div>
-                      <span className="hidden text-[44px] leading-none text-slate-100 sm:block" style={F_DISPLAY}>
-                        {o.nuevas}
+                      {!o.sinMovimiento && (
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          <BarraBalance entraron={o.entraron} seFueron={o.se_fueron} />
+                          <span className="text-[13px] text-slate-400">
+                            <strong style={{ color: ENTRA }}>{o.entraron}</strong> entraron · <strong style={{ color: SALE }}>{o.se_fueron}</strong> se fueron ·
+                            retención {formatoRetencion(o.retencion)}
+                          </span>
+                        </div>
+                      )}
+                      <span className="hidden text-[44px] leading-none sm:ml-auto sm:block" style={{ ...F_DISPLAY, color: colorNeto(o.neto) }}>
+                        {conSigno(o.neto)}
                       </span>
                     </div>
                   );
@@ -467,23 +552,43 @@ export default function RankingOficinas({ onCambiarVista }) {
                 <h2 className="text-[18px] font-bold tracking-[0.24em] text-[#fbbf24]" style={F_COND}>
                   LA CARRERA
                 </h2>
-                {orden.map((o, k) => {
-                  const color = colorDe(o.id);
-                  const dif = valorLider - Number(o.nuevas || 0);
+                <div className="flex gap-4 text-[12px] font-semibold text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: ENTRA }} /> Entraron
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: SALE }} /> Se fueron
+                  </span>
+                </div>
+                {enJuego.map((o, k) => {
+                  const dif = valorLider - Number(o.neto || 0);
                   return (
                     <div key={o.id} className="flex flex-col gap-1.5">
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-[15px] font-semibold text-slate-100">{o.nombre}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colorDe(o.id).base }} />
+                          <span className="truncate text-[15px] font-semibold text-slate-100">{o.nombre}</span>
+                        </span>
                         <span className="shrink-0 text-[13px] text-slate-400">
-                          <strong className="text-[20px] font-normal text-slate-50" style={F_DISPLAY}>
-                            {o.nuevas}
+                          <strong className="text-[20px] font-normal" style={{ ...F_DISPLAY, color: colorNeto(o.neto) }}>
+                            {conSigno(o.neto)}
                           </strong>{" "}
-                          · {k === 0 && valorLider > 0 ? "lidera" : dif > 0 ? `a ${dif} del primero` : "empatada"}
+                          · {!hayMovimiento ? "—" : k === 0 ? "lidera" : dif > 0 ? `a ${dif} del primero` : "empatada"}
                         </span>
                       </div>
-                      <div className="h-3 overflow-hidden rounded-full bg-[#1a2440]">
-                        <div className="h-3 rounded-full" style={{ width: `${valorLider ? Math.max(3, Math.round((o.nuevas * 100) / valorLider)) : 0}%`, background: color.base }} />
-                      </div>
+                      {[
+                        { v: o.entraron, c: ENTRA, t: "entraron" },
+                        { v: Number(o.se_fueron || 0), c: SALE, t: "se fueron" },
+                      ].map((b) => (
+                        <div key={b.t} className="flex items-center gap-2">
+                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#1a2440]">
+                            <div className="h-2.5 rounded-full" style={{ width: `${b.v ? Math.max(3, Math.round((b.v * 100) / maxMov)) : 0}%`, background: b.c }} />
+                          </div>
+                          <span className="w-[98px] shrink-0 whitespace-nowrap text-right text-[12px] text-slate-400">
+                            {b.v} {b.t}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
@@ -496,22 +601,30 @@ export default function RankingOficinas({ onCambiarVista }) {
                       HOY
                     </h2>
                     <div className="flex items-baseline gap-2.5">
-                      <span className="text-[56px] leading-none text-slate-50" style={F_DISPLAY}>
-                        {r.totales?.hoy?.nuevas ?? 0}
+                      <span className="text-[56px] leading-none" style={{ ...F_DISPLAY, color: colorNeto(r.totales?.hoy?.neto) }}>
+                        {conSigno(r.totales?.hoy?.neto)}
                       </span>
-                      <span className="text-[15px] text-slate-400">{r.totales?.hoy?.nuevas === 1 ? "póliza nueva hoy" : "pólizas nuevas hoy"}</span>
+                      <span className="text-[15px] text-slate-400">
+                        entraron {r.totales?.hoy?.entraron ?? r.totales?.hoy?.nuevas ?? 0} · {r.totales?.hoy?.se_fueron === 1 ? "se fue" : "se fueron"}{" "}
+                        {r.totales?.hoy?.se_fueron ?? 0}
+                      </span>
                     </div>
-                    {hoyLista.map(({ o, n }) => (
+                    {hoyLista.map(({ o, e, s }) => (
                       <div key={o.id} className="flex items-center gap-2.5 border-t border-[#1a2440] py-2">
                         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colorDe(o.id).base }} />
                         <span className="flex-1 truncate text-[15px] font-semibold text-slate-200">{o.nombre}</span>
-                        <span className="text-[15px] text-slate-300">{n || "—"}</span>
+                        <span className="text-[15px] tabular-nums" style={{ color: e ? ENTRA : "#64748b" }}>
+                          +{e}
+                        </span>
+                        <span className="w-9 text-right text-[15px] tabular-nums" style={{ color: s ? SALE : "#64748b" }}>
+                          {s ? `−${s}` : "0"}
+                        </span>
                       </div>
                     ))}
                     <span className="text-[13px] text-slate-400">
                       {r.ultima
-                        ? `Última: ${r.ultima.oficina}, ${dayjs(r.ultima.creado_en).isSame(dayjs(r.hoy), "day") ? hora(r.ultima.creado_en) : dayjs(r.ultima.creado_en).format("DD/MM HH:mm")}${r.ultima.vehiculo ? ` · ${r.ultima.vehiculo}` : ""}`
-                        : "Todavía ninguna este mes."}
+                        ? `Última póliza nueva: ${r.ultima.oficina}, ${dayjs(r.ultima.creado_en).isSame(dayjs(r.hoy), "day") ? hora(r.ultima.creado_en) : dayjs(r.ultima.creado_en).format("DD/MM HH:mm")}${r.ultima.vehiculo ? ` · ${r.ultima.vehiculo}` : ""}`
+                        : "Todavía ninguna póliza nueva este mes."}
                     </span>
                   </>
                 ) : (
@@ -521,12 +634,13 @@ export default function RankingOficinas({ onCambiarVista }) {
                     </h2>
                     <div className="flex items-baseline gap-2.5">
                       <span className="text-[56px] leading-none text-slate-50" style={F_DISPLAY}>
-                        {valorLider}
+                        {lider ? conSigno(valorLider) : "—"}
                       </span>
-                      <span className="text-[15px] text-slate-400">{orden[0] && valorLider ? `${orden[0].nombre}, campeón` : "sin pólizas nuevas"}</span>
+                      <span className="text-[15px] text-slate-400">{lider ? `${lider.nombre}, campeón` : "sin movimiento"}</span>
                     </div>
                     {[
-                      { t: "Mejor día", v: mejor?.mejorDia ? `${mejor.mejorDia.fecha} · ${mejor.mejorDia.total}` : "—", c: ORO },
+                      { t: "Mejor retención", v: mejor?.mejorRetencion ? `${mejor.mejorRetencion.nombre} · ${formatoRetencion(mejor.mejorRetencion.retencion)}` : "—", c: mejor?.mejorRetencion ? colorDe(mejor.mejorRetencion.id).base : "#475569" },
+                      { t: "Mejor día", v: mejor?.mejorDia ? `${mejor.mejorDia.fecha} · ${mejor.mejorDia.total} nuevas` : "—", c: ORO },
                       { t: "Racha más larga", v: mejor?.racha ? `${mejor.racha.oficina.nombre} · ${mejor.racha.dias} días` : "—", c: mejor?.racha ? colorDe(mejor.racha.oficina.id).base : "#475569" },
                       { t: "Más clientes nuevos", v: mejor?.masClientes ? `${mejor.masClientes.nombre} · ${mejor.masClientes.clientes_nuevos}` : "—", c: mejor?.masClientes ? colorDe(mejor.masClientes.id).base : "#475569" },
                       { t: "Más pagaron la 1ª", v: mejor?.masPagaron ? `${mejor.masPagaron.nombre} · ${mejor.masPagaron.pagaron}` : "—", c: mejor?.masPagaron ? colorDe(mejor.masPagaron.id).base : "#475569" },
@@ -570,7 +684,7 @@ export default function RankingOficinas({ onCambiarVista }) {
                           <Escudo oficina={c.ganadora} color={color} clase="h-9 w-9 sm:h-10 sm:w-10" claseSigla="text-[13px] sm:text-[15px]" />
                         )}
                         <span className="text-center text-[11px] font-semibold leading-tight text-slate-300 sm:text-[12px]">
-                          {c.enCurso ? "en juego" : c.valor ?? "—"}
+                          {c.enCurso ? "en juego" : c.valor === null || c.valor === undefined ? "—" : conSigno(c.valor)}
                         </span>
                       </button>
                     );
@@ -585,9 +699,13 @@ export default function RankingOficinas({ onCambiarVista }) {
               </section>
             </div>
 
-            <p className="text-[13px] text-slate-500">
-              Cuenta las pólizas nuevas cargadas en THAMES (sin renovaciones). El podio se mueve solo, en vivo. Empate: gana la que llegó
-              primero a ese número.
+            <p className="text-[13px] leading-relaxed text-slate-500">
+              <strong className="text-slate-400">Cómo se cuenta.</strong> Entraron: autos nuevos que empezamos a asegurar (una
+              renovación o una póliza repetida del mismo auto no suma). Se fueron: autos que dejamos de asegurar porque la póliza quedó
+              vencida sin pagar, cancelada o de baja, o terminó y no se renovó (vender el auto también cuenta). Si paga o renueva antes
+              de los 30 días, es como si nunca se hubiera ido. Retención: de los autos que la oficina tenía el 1º del mes, cuántos
+              siguen. Gana la que más creció (entraron − se fueron); empate: mejor retención, después más entraron. Se mueve solo, en
+              vivo.
             </p>
           </>
         )}

@@ -3,6 +3,14 @@
 // 🧰 Lo que comparten Estadísticas → "Pólizas nuevas", el cartel del Inicio
 // y el RANKING de oficinas: colores de cada oficina, siglas, orden del
 // ranking (con desempate), nombres de meses, semanas y "lo mejor del mes".
+//
+// RANKING = crecimiento neto: autos que ENTRARON − autos que SE FUERON
+// (vencida sin pagar, cancelada/de baja, terminó y no renovó; vendió el auto
+// también cuenta). Ejemplo: Axión entraron 100, se fueron 150 → −50.
+// Una renovación o una póliza repetida del mismo auto no suma a "entraron";
+// si el auto vuelve antes de 30 días, es como si nunca se hubiera ido.
+// Empate → mejor retención → más entraron → la que llegó primero → la que
+// más autos tenía el 1º. (Lo calcula el servidor: estadisticas/polizas_nuevas.py.)
 // ============================================================
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -10,12 +18,58 @@ import "dayjs/locale/es";
 
 dayjs.locale("es");
 
+// menosEsMejor: si baja es bueno (se fueron) · conSigno: se muestra +38 / −50 (neto).
 export const METRICAS = [
   { id: "nuevas", label: "Pólizas nuevas", unidad: "pólizas nuevas", corta: "nuevas" },
   { id: "clientes_nuevos", label: "Clientes nuevos", unidad: "clientes nuevos", corta: "clientes nuevos" },
   { id: "pagaron", label: "Pagaron la 1ª cuota", unidad: "pagaron la 1ª cuota", corta: "pagaron la 1ª" },
+  { id: "se_fueron", label: "Se fueron", unidad: "se fueron", corta: "se fueron", menosEsMejor: true },
+  { id: "neto", label: "Crecimiento neto", unidad: "neto (entraron − se fueron)", corta: "neto", conSigno: true },
 ];
 export const metricaPorId = (id) => METRICAS.find((m) => m.id === id) || METRICAS[0];
+
+/** 38 → "+38" · −50 → "−50" (con el signo menos de verdad) · 0 → "0". */
+export function conSigno(n) {
+  const v = Number(n || 0);
+  return v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : "0";
+}
+
+/** El número como se muestra según la cuenta (el neto lleva signo). */
+export const valorMetrica = (met, v) => (met?.conSigno ? conSigno(v) : String(Number(v || 0)));
+
+/** Retención: 97.5 → "97%" (para abajo: si se fue alguien nunca muestra 100%). Sin cartera → "—". */
+export const formatoRetencion = (r) => (r === null || r === undefined ? "—" : `${Math.floor(Number(r))}%`);
+
+// 🚪 Por qué se fueron (el servidor manda también "motivos_texto").
+export const MOTIVOS = {
+  no_pago: "No pagó",
+  no_renovo: "No renovó",
+  otra_compania: "Se fue a otra compañía",
+  vendio: "Vendió el auto",
+  sin_uso: "No usa el auto",
+  otro: "Otro motivo",
+};
+const MOTIVO_CUANTOS = {
+  no_pago: ["no pagó", "no pagaron"],
+  no_renovo: ["no renovó", "no renovaron"],
+  otra_compania: ["se fue a otra compañía", "se fueron a otra compañía"],
+  vendio: ["vendió el auto", "vendieron el auto"],
+  sin_uso: ["no usa el auto", "no usan el auto"],
+  otro: ["otro motivo", "otros motivos"],
+};
+export const textoMotivo = (clave) => MOTIVOS[clave] || MOTIVOS.otro;
+
+/** {no_pago: 3, vendio: 1} → "3 no pagaron · 1 vendió el auto" (el más común primero). */
+export function resumenMotivos(motivos) {
+  return Object.entries(motivos || {})
+    .filter(([, n]) => Number(n) > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => {
+      const [uno, varios] = MOTIVO_CUANTOS[k] || MOTIVO_CUANTOS.otro;
+      return `${n} ${Number(n) === 1 ? uno : varios}`;
+    })
+    .join(" · ");
+}
 
 // 🎨 Un color fijo por oficina (el mismo en Estadísticas, Inicio y Ranking).
 //    base = barras · fuerte = rellenos con texto blanco · texto = letras sobre
@@ -64,13 +118,21 @@ export function siglaOficina(nombre) {
 
 /** Oficinas de verdad (sin la fila "Sin oficina"), ordenadas por la métrica.
  *  Empate: gana la que llegó primero a ese número (la última póliza que sumó
- *  en ESA cuenta fue antes). El servidor manda "ultimas" por cuenta. */
+ *  en ESA cuenta fue antes). El servidor manda "ultimas" por cuenta.
+ *  Con "neto" usa el orden del RANKING (ordenarPorNeto). Con "se_fueron",
+ *  primero la que más perdió (para ver dónde está el problema). */
 export function ordenarPorMetrica(oficinas, metrica = "nuevas") {
+  if (metrica === "neto") return ordenarPorNeto(oficinas);
+  const lista = (oficinas || []).filter(tieneId).map(conRetencion);
+  if (metrica === "se_fueron") {
+    // Primero la que más perdió; empate → la de id más bajo (la hora no aplica).
+    return lista.sort((a, b) => b.se_fueron - a.se_fueron || Number(a.id) - Number(b.id));
+  }
   const hora = (o) => {
     const u = o.ultimas?.[metrica] ?? o.ultima;
     return u ? Date.parse(u) : Infinity;
   };
-  return (oficinas || []).filter(tieneId).slice().sort((a, b) => {
+  return lista.sort((a, b) => {
     const d = Number(b[metrica] || 0) - Number(a[metrica] || 0);
     if (d) return d;
     const ua = hora(a);
@@ -80,10 +142,74 @@ export function ordenarPorMetrica(oficinas, metrica = "nuevas") {
   });
 }
 
-/** ▲ 4 / ▼ 2 / = 0 contra el período anterior. */
-export function delta(actual, antes) {
+/** Completa lo de retención si el servidor todavía no lo manda (backend viejo):
+ *  así la pantalla no se rompe mientras se sube la versión nueva. */
+export function conRetencion(o) {
+  if (!o) return o;
+  const entraron = Number(o.entraron ?? o.nuevas ?? 0);
+  const seFueron = Number(o.se_fueron ?? 0);
+  return {
+    ...o,
+    entraron,
+    se_fueron: seFueron,
+    neto: Number(o.neto ?? entraron - seFueron),
+    cartera_inicio: Number(o.cartera_inicio ?? 0),
+    retencion: o.retencion ?? null,
+    recuperables: Number(o.recuperables ?? 0),
+    motivos: o.motivos || {},
+  };
+}
+
+/** RANKING (igual que el servidor, clave_ranking): más crecimiento neto;
+ *  empate → mejor retención → más entraron → la que llegó primero (su último
+ *  auto que entró, más temprano) → la que más autos tenía el 1º → id más bajo. */
+export function ordenarPorNeto(oficinas) {
+  const ret = (o) => (o.retencion === null || o.retencion === undefined ? -1 : Number(o.retencion));
+  const hora = (o) => (o.ultima_entro ? Date.parse(o.ultima_entro) : Infinity);
+  return (oficinas || [])
+    .filter(tieneId)
+    .map(conRetencion)
+    .sort((a, b) => {
+      const d = b.neto - a.neto || ret(b) - ret(a) || b.entraron - a.entraron;
+      if (d) return d;
+      const ua = hora(a);
+      const ub = hora(b);
+      if (ua !== ub) return ua - ub;
+      return b.cartera_inicio - a.cartera_inicio || Number(a.id) - Number(b.id);
+    });
+}
+
+/** ¿Compite en el ranking este mes? Oficina de verdad, activa (o cerrada pero
+ *  con autos que entraron) y con algo en juego: autos el 1º o movimiento. Igual
+ *  que el servidor (así una oficina sin nada no queda 1ª con 0 si las demás bajan). */
+export function compite(o) {
+  if (!tieneId(o)) return false;
+  const x = conRetencion(o);
+  return (x.activa !== false || x.entraron > 0) && (x.cartera_inicio > 0 || x.entraron + x.se_fueron > 0);
+}
+
+/** ¿Hubo algo (entró o se fue un auto) en alguna de estas oficinas? */
+export const hayMovimiento = (oficinas) => (oficinas || []).some((o) => o.entraron + o.se_fueron > 0);
+
+/** Para el podio: primero las que compiten (en orden), después las activas
+ *  que no tuvieron nada este mes (marcadas sinMovimiento). */
+export function rankingOficinas(oficinas) {
+  const lista = (oficinas || []).filter(tieneId);
+  const quietas = lista
+    .filter((o) => !compite(o) && o.activa !== false)
+    .map((o) => ({ ...conRetencion(o), sinMovimiento: true }))
+    .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
+  return [...ordenarPorNeto(lista.filter(compite)), ...quietas];
+}
+
+/** ▲ 4 / ▼ 2 / = 0 contra el período anterior.
+ *  tono: "sube" = mejoró (verde) · "baja" = empeoró (rojo). Con menosEsMejor
+ *  (se fueron) es al revés: que suba es malo. */
+export function delta(actual, antes, { menosEsMejor = false } = {}) {
   const d = Number(actual || 0) - Number(antes || 0);
-  return { d, txt: d > 0 ? `▲ ${d}` : d < 0 ? `▼ ${-d}` : "= 0", tono: d > 0 ? "sube" : d < 0 ? "baja" : "igual" };
+  const mejor = menosEsMejor ? d < 0 : d > 0;
+  const peor = menosEsMejor ? d > 0 : d < 0;
+  return { d, txt: d > 0 ? `▲ ${d}` : d < 0 ? `▼ ${-d}` : "= 0", tono: mejor ? "sube" : peor ? "baja" : "igual" };
 }
 
 const mayus = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -148,7 +274,8 @@ export function semanasDelMes(resumen, metrica = "nuevas") {
   }));
 }
 
-/** Para un mes cerrado: mejor día, racha más larga, más clientes nuevos, más pagaron. */
+/** Para un mes cerrado: mejor día, racha más larga, más clientes nuevos, más
+ *  pagaron y mejor retención. */
 export function mejorDelMes(resumen) {
   const ofis = (resumen?.oficinas || []).filter(tieneId);
   if (!ofis.length) return null;
@@ -175,11 +302,17 @@ export function mejorDelMes(resumen) {
   const top = (m) => ordenarPorMetrica(ofis, m)[0];
   const masClientes = top("clientes_nuevos");
   const masPagaron = top("pagaron");
+  // Mejor retención: entre las que tenían autos el 1º (empate: la que más tenía).
+  const mejorRetencion =
+    ofis
+      .filter((o) => compite(o) && o.retencion !== null && o.retencion !== undefined && o.cartera_inicio > 0)
+      .sort((a, b) => b.retencion - a.retencion || b.cartera_inicio - a.cartera_inicio)[0] || null;
   return {
     mejorDia: mejorDia ? { ...mejorDia, fecha: dayjs(resumen.desde).date(mejorDia.dia).format("DD/MM") } : null,
     racha,
     masClientes: masClientes && masClientes.clientes_nuevos > 0 ? masClientes : null,
     masPagaron: masPagaron && masPagaron.pagaron > 0 ? masPagaron : null,
+    mejorRetencion,
   };
 }
 

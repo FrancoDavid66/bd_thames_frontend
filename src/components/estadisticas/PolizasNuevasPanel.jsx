@@ -1,14 +1,20 @@
 // src/components/estadisticas/PolizasNuevasPanel.jsx
 // ============================================================
 // 🆕 Estadísticas → "Pólizas nuevas": cuántas pólizas nuevas hace cada
-// oficina, día por día, por semana y mes a mes.
+// oficina y cuántos autos SE FUERON, día por día, por semana y mes a mes.
 //
-//   · Contar: Pólizas nuevas · Clientes nuevos · Pagaron la 1ª cuota
-//   · Tarjeta por oficina con su puesto, ▲/▼ contra el mes anterior y "Hoy"
+//   · Contar: Pólizas nuevas · Clientes nuevos · Pagaron la 1ª cuota ·
+//             Se fueron · Crecimiento neto (entraron − se fueron)
+//   · Tarjeta por oficina con su puesto, ▲/▼ contra el mes anterior, "Hoy"
+//     y la retención (de los autos que tenía el 1º, qué % sigue)
 //   · Gráfico apilado por oficina (tocá una barra → la lista de abajo)
-//   · Lista de las pólizas del día/semana (link a cada póliza) + CSV
-//   · Vista Mes: 12 meses, tabla y la ganadora de cada mes
+//   · Lista del día/semana: "Pólizas nuevas" (marca las de autos que ya
+//     teníamos: no suman a "entraron") o "Se fueron"
+//     (con el motivo), link a cada póliza + CSV
+//   · Vista Mes: 12 meses, tabla y la ganadora de cada mes (por neto)
 //
+// Ejemplo fácil: Axión entraron 100 y se fueron 150 → neto −50: está
+// perdiendo clientes aunque venda mucho.
 // Lo suma el servidor (estadisticas/polizas_nuevas.py) y se actualiza EN VIVO.
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +29,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceArea,
+  ReferenceLine,
 } from "recharts";
 import { HiChevronLeft, HiChevronRight, HiDownload, HiRefresh, HiStar } from "react-icons/hi";
 
@@ -35,6 +42,13 @@ import {
   colorOficina,
   varsColor,
   ordenarPorMetrica,
+  rankingOficinas,
+  hayMovimiento as hayMov,
+  conSigno,
+  valorMetrica,
+  formatoRetencion,
+  resumenMotivos,
+  textoMotivo,
   delta,
   mesActual,
   moverMes,
@@ -57,6 +71,10 @@ const VISTAS = [
   { id: "semana", label: "Semana" },
   { id: "mes", label: "Mes" },
 ];
+const LISTAS = [
+  { id: "nuevas", label: "Pólizas nuevas" },
+  { id: "perdidas", label: "Se fueron" },
+];
 
 const claveOfi = (id) => (id === null || id === undefined ? "sin" : String(id));
 const TONO_DELTA = {
@@ -64,6 +82,13 @@ const TONO_DELTA = {
   baja: "text-egreso-fuerte dark:text-egreso-claro",
   igual: "text-suave dark:text-suave-dark",
 };
+const tonoNeto = (n) =>
+  n > 0
+    ? "text-ingreso-fuerte dark:text-ingreso-claro"
+    : n < 0
+      ? "text-egreso-fuerte dark:text-egreso-claro"
+      : "text-titulo dark:text-titulo-dark";
+const ESTADO_TXT = { vencida: "Vencida", cancelada: "Cancelada", finalizada: "Terminó" };
 
 /* ── Botonera segmentada ─────────────────────────────────────────── */
 function Segmentado({ opciones, valor, onCambiar, etiqueta }) {
@@ -71,7 +96,7 @@ function Segmentado({ opciones, valor, onCambiar, etiqueta }) {
     <div
       role="group"
       aria-label={etiqueta}
-      className="flex gap-1 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1"
+      className="flex flex-wrap gap-1 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1"
     >
       {opciones.map((o) => {
         const activo = o.id === valor;
@@ -96,9 +121,10 @@ function Segmentado({ opciones, valor, onCambiar, etiqueta }) {
 }
 
 /* ── Cartelito del gráfico ───────────────────────────────────────── */
-function Cartelito({ active, payload, series, titulo }) {
+function Cartelito({ active, payload, series, titulo, conSignoValores }) {
   if (!active || !payload?.length) return null;
   const fila = payload[0]?.payload || {};
+  const fmt = (v) => (conSignoValores ? conSigno(v) : v || 0);
   return (
     <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3 text-[12px] shadow-lg">
       <p className="mb-1.5 font-semibold text-titulo dark:text-titulo-dark">{titulo(fila)}</p>
@@ -112,12 +138,12 @@ function Cartelito({ active, payload, series, titulo }) {
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color.base }} />
                 {s.nombre}
               </span>
-              <span className="font-semibold tabular-nums">{fila[s.key] || 0}</span>
+              <span className="font-semibold tabular-nums">{fmt(fila[s.key])}</span>
             </p>
           ))}
           <p className="mt-1.5 flex justify-between border-t border-linea dark:border-linea-dark pt-1.5 font-semibold text-titulo dark:text-titulo-dark">
             <span>Total</span>
-            <span className="tabular-nums">{fila.total || 0}</span>
+            <span className="tabular-nums">{fmt(fila.total)}</span>
           </p>
         </>
       )}
@@ -126,30 +152,16 @@ function Cartelito({ active, payload, series, titulo }) {
 }
 
 /* ── CSV (se abre con Excel) ─────────────────────────────────────── */
-function descargarCSV(items, nombreArchivo) {
-  const cols = ["Fecha", "Hora", "Oficina", "Cliente", "Vehículo", "Patente", "Compañía", "Cobertura", "Nº póliza", "Cliente nuevo", "Pagó la 1ª cuota"];
-  const esc = (v) => {
-    let s = String(v ?? "");
-    // Que Excel no lo tome como fórmula (=, +, -, @ al principio).
-    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-    // Números largos o con 0 adelante (nº de póliza) → como texto (si no: 2,03E+13).
-    if (/^\d{11,}$/.test(s) || /^0\d+$/.test(s)) return `="${s}"`;
-    return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const filas = items.map((p) => [
-    dayjs(p.creado_en).format("DD/MM/YYYY"),
-    hora(p.creado_en),
-    p.oficina,
-    p.cliente,
-    p.vehiculo,
-    p.patente,
-    p.compania,
-    p.cobertura,
-    p.numero,
-    p.cliente_nuevo ? "Sí" : "No",
-    p.pago_1a ? "Sí" : "No",
-  ]);
-  const texto = "﻿" + [cols, ...filas].map((f) => f.map(esc).join(";")).join("\n");
+const escCSV = (v) => {
+  let s = String(v ?? "");
+  // Que Excel no lo tome como fórmula (=, +, -, @ al principio).
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  // Números largos o con 0 adelante (nº de póliza) → como texto (si no: 2,03E+13).
+  if (/^\d{11,}$/.test(s) || /^0\d+$/.test(s)) return `="${s}"`;
+  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+function bajarCSV(cols, filas, nombreArchivo) {
+  const texto = "﻿" + [cols, ...filas].map((f) => f.map(escCSV).join(";")).join("\n");
   const url = URL.createObjectURL(new Blob([texto], { type: "text/csv;charset=utf-8;" }));
   const a = document.createElement("a");
   a.href = url;
@@ -159,8 +171,46 @@ function descargarCSV(items, nombreArchivo) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
+function descargarCSV(items, nombreArchivo) {
+  bajarCSV(
+    ["Fecha", "Hora", "Oficina", "Cliente", "Vehículo", "Patente", "Compañía", "Cobertura", "Nº póliza", "Cliente nuevo", "Pagó la 1ª cuota", "Suma a entraron"],
+    items.map((p) => [
+      dayjs(p.creado_en).format("DD/MM/YYYY"),
+      hora(p.creado_en),
+      p.oficina,
+      p.cliente,
+      p.vehiculo,
+      p.patente,
+      p.compania,
+      p.cobertura,
+      p.numero,
+      p.cliente_nuevo ? "Sí" : "No",
+      p.pago_1a ? "Sí" : "No",
+      p.entro === false ? `No (${(NO_SUMA[p.no_suma] || NO_SUMA.ya_estaba).txt.toLowerCase()})` : "Sí",
+    ]),
+    nombreArchivo
+  );
+}
+function descargarCSVPerdidas(items, nombreArchivo) {
+  bajarCSV(
+    ["Se fue el", "Oficina", "Cliente", "Vehículo", "Patente", "Compañía", "Nº póliza", "Estado", "Motivo", "Si paga, vuelve"],
+    items.map((p) => [
+      dayjs(p.fecha).format("DD/MM/YYYY"),
+      p.oficina,
+      p.cliente,
+      p.vehiculo,
+      p.patente,
+      p.compania,
+      p.numero,
+      ESTADO_TXT[p.estado] || p.estado,
+      p.motivo_texto || textoMotivo(p.motivo),
+      p.recuperable ? "Sí" : "No",
+    ]),
+    nombreArchivo
+  );
+}
 
-/* ── Chip de sí/no ───────────────────────────────────────────────── */
+/* ── Chips ───────────────────────────────────────────────────────── */
 const Chip = ({ si, textoSi, textoNo, tonoNo = "gris" }) => (
   <span
     className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
@@ -183,6 +233,59 @@ const ChipOficina = ({ nombre, color }) => (
     {nombre}
   </span>
 );
+
+// Motivo de la baja: "No pagó" en ámbar (si paga, vuelve); el resto en gris.
+const ChipMotivo = ({ p }) => (
+  <span
+    className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+      p.recuperable
+        ? "bg-tarjeta/15 text-[#b45309] dark:text-tarjeta-claro"
+        : "bg-egreso/10 text-egreso-fuerte dark:text-egreso-claro"
+    }`}
+  >
+    {p.motivo_texto || textoMotivo(p.motivo)}
+  </span>
+);
+
+// Póliza nueva que NO suma a "entraron" del ranking, y por qué.
+const NO_SUMA = {
+  ya_estaba: {
+    txt: "Auto que ya teníamos",
+    ayuda: "No suma a 'entraron': el auto ya estaba asegurado con nosotros (renovación cargada como nueva, póliza repetida o volvió antes de 30 días).",
+  },
+  sin_cobertura: {
+    txt: "Cargada sin cobertura",
+    ayuda: "No suma a 'entraron' ni a 'se fueron': se cargó ya vencida (o se anuló ese mismo día). Si la pagan, cuenta.",
+  },
+};
+const ChipNoSuma = ({ motivo }) => {
+  const m = NO_SUMA[motivo] || NO_SUMA.ya_estaba;
+  return (
+    <span
+      title={m.ayuda}
+      className="inline-flex rounded-full bg-titulo/5 px-2.5 py-0.5 text-[11px] font-semibold text-suave dark:bg-white/10 dark:text-suave-dark"
+    >
+      {m.txt}
+    </span>
+  );
+};
+
+/** Barra partida: verde lo que entró, rojo lo que se fue. */
+function BarraBalance({ entraron, seFueron }) {
+  const e = Number(entraron || 0);
+  const s = Number(seFueron || 0);
+  const total = e + s;
+  return (
+    <div className="flex h-2 overflow-hidden rounded-full bg-titulo/5 dark:bg-white/10" aria-hidden="true">
+      {total > 0 && (
+        <>
+          <div className="bg-ingreso" style={{ width: `${(e * 100) / total}%` }} />
+          <div className="bg-egreso" style={{ width: `${(s * 100) / total}%` }} />
+        </>
+      )}
+    </div>
+  );
+}
 
 // "2026-09" válido y no en el futuro (si piden un mes que todavía no llegó, va el actual).
 function mesValido(m) {
@@ -207,6 +310,8 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
     const m = leerPref("estadisticas.nuevas.metrica", "nuevas");
     return METRICAS.some((x) => x.id === m) ? m : "nuevas";
   });
+  // Qué lista se ve abajo: pólizas que entraron o autos que se fueron.
+  const [verLista, setVerLista] = useState(() => (metrica === "se_fueron" ? "perdidas" : "nuevas"));
   const [mes, setMes] = useState(() => mesValido(mesInicial) || mesActual());
   const [sel, setSel] = useState(null); // día (1..31) o índice de semana elegido
   const [ofiLista, setOfiLista] = useState(oficinaInicial ? String(oficinaInicial) : "ALL");
@@ -231,6 +336,10 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
   const setMetrica = (m) => {
     setMetricaEstado(m);
     guardarPref("estadisticas.nuevas.metrica", m);
+    // La lista acompaña: "Se fueron" muestra los que se fueron; las de pólizas
+    // nuevas, las que entraron. Con "Crecimiento neto" queda la que estaba.
+    if (m === "se_fueron") setVerLista("perdidas");
+    else if (m !== "neto") setVerLista("nuevas");
   };
   const cambiarMes = (n) => {
     setMes((m) => {
@@ -246,6 +355,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
   const serie = useNuevasSerie({ desde: moverMes(mes, -11), hasta: mes }, { activo: vista === "mes" });
   const r = resumen.data;
   const met = metricaPorId(metrica);
+  const esNeto = metrica === "neto";
 
   // Oficinas (con su color) que aparecen en el gráfico.
   const oficinas = useMemo(() => (vista === "mes" ? serie.data?.oficinas : r?.oficinas) || [], [vista, serie.data, r]);
@@ -260,13 +370,13 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
     [oficinas]
   );
 
-  // ── Día elegido por defecto: hoy (mes en curso) o el último día con pólizas ──
+  // ── Día elegido por defecto: hoy (mes en curso) o el último día con movimiento ──
   const diaPorDefecto = useMemo(() => {
     if (!r) return null;
     if (r.en_curso) return dayjs(r.hoy).date();
     const n = r.oficinas?.[0]?.dias?.nuevas?.length || 0;
     for (let i = n - 1; i >= 0; i--) {
-      if ((r.oficinas || []).some((o) => (o.dias?.nuevas?.[i] || 0) > 0)) return i + 1;
+      if ((r.oficinas || []).some((o) => (o.dias?.nuevas?.[i] || 0) > 0 || (o.dias?.se_fueron?.[i] || 0) > 0)) return i + 1;
     }
     return n || null;
   }, [r]);
@@ -343,33 +453,48 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
     return null;
   }, [r, vista, selDia, selSemana, semanas]);
 
-  const [lista, setLista] = useState({ items: [], total: 0, recortado: false, cargando: false, error: null });
+  const perdidas = verLista === "perdidas";
+  const [lista, setLista] = useState({ items: [], total: 0, recortado: false, cargando: false, error: null, tipo: verLista });
   const listaRef = useRef(0);
   const claveAnterior = useRef("");
-  const claveRango = rango ? `${rango.desde}|${rango.hasta}|${ofiLista}` : "";
-  // Cuando llega una póliza nueva (en vivo), la lista también se pone al día.
-  const refresco = r ? `${r.totales?.nuevas}|${r.totales?.pagaron}|${r.ultima?.creado_en || ""}` : "";
+  const claveRango = rango ? `${rango.desde}|${rango.hasta}|${ofiLista}|${verLista}` : "";
+  // Cuando entra una póliza nueva o se va un auto (en vivo), la lista también se pone al día.
+  const refresco = r ? `${r.totales?.nuevas}|${r.totales?.pagaron}|${r.totales?.se_fueron}|${r.ultima?.creado_en || ""}` : "";
   useEffect(() => {
     if (!rango) {
       // Se va la lista (vista Mes o día sin elegir): se olvida el rango y se
       // ignora cualquier respuesta que llegue tarde.
       claveAnterior.current = "";
       listaRef.current += 1;
-      setLista({ items: [], total: 0, recortado: false, cargando: false, error: null });
+      setLista({ items: [], total: 0, recortado: false, cargando: false, error: null, tipo: verLista });
       return;
     }
     const mio = ++listaRef.current;
     const cambioDeRango = claveAnterior.current !== claveRango;
     claveAnterior.current = claveRango;
-    if (cambioDeRango) setLista((s) => ({ ...s, cargando: true, error: null }));
+    // Otro día de la misma lista: se ve la anterior hasta que llega la nueva.
+    // Otra lista (entraron ↔ se fueron): se vacía (tienen columnas distintas).
+    if (cambioDeRango) {
+      setLista((s) =>
+        s.tipo === verLista
+          ? { ...s, cargando: true, error: null }
+          : { items: [], total: 0, recortado: false, cargando: true, error: null, tipo: verLista }
+      );
+    }
     const pedido =
       rango.desde === rango.hasta
-        ? { fecha: rango.desde, oficina: ofiLista }
-        : { desde: rango.desde, hasta: rango.hasta, oficina: ofiLista };
+        ? { fecha: rango.desde, oficina: ofiLista, tipo: verLista }
+        : { desde: rango.desde, hasta: rango.hasta, oficina: ofiLista, tipo: verLista };
     pedirNuevasDetalle(pedido)
       .then((d) => {
         if (mio !== listaRef.current) return;
-        setLista({ items: d.polizas || [], total: d.total || 0, recortado: !!d.recortado, cargando: false, error: null });
+        if ((d.tipo || "nuevas") !== verLista) {
+          // Servidor viejo (todavía sin "se fueron"): no mostramos la lista equivocada.
+          setLista({ items: [], total: 0, recortado: false, cargando: false, tipo: verLista,
+                     error: "Esta lista necesita la versión nueva del servidor (falta subir el backend)." });
+          return;
+        }
+        setLista({ items: d.polizas || [], total: d.total || 0, recortado: !!d.recortado, cargando: false, error: null, tipo: verLista });
       })
       .catch((e) => {
         if (mio !== listaRef.current) return;
@@ -384,9 +509,14 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
   }, [claveRango, refresco]);
 
   // ── Tarjetas por oficina (mes día por día o semana) ──
-  const ranking = useMemo(() => ordenarPorMetrica(r?.oficinas, metrica), [r, metrica]);
-  const lider = ranking.length ? Number(ranking[0][metrica] || 0) : 0;
-  const sinOficina = (r?.oficinas || []).find((o) => o.id === null && o.nuevas > 0);
+  //    Neto: el orden del RANKING (las que no tuvieron nada, al final).
+  const ranking = useMemo(
+    () => (esNeto ? rankingOficinas(r?.oficinas) : ordenarPorMetrica(r?.oficinas, metrica)),
+    [r, metrica, esNeto]
+  );
+  const hayMovimiento = hayMov(ranking);
+  const lider = ranking.length ? Math.max(0, ...ranking.map((o) => Number(o[metrica] || 0))) : 0;
+  const sinOficina = (r?.oficinas || []).find((o) => o.id === null && (o.nuevas > 0 || o.entraron > 0 || o.se_fueron > 0));
   const comparacion = etiquetaComparacion(r);
   const mejor = useMemo(() => (r && !r.en_curso ? mejorDelMes(r) : null), [r]);
 
@@ -396,10 +526,12 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
     if (!puntos.length) return null;
     const totales = puntos.map((p) => Object.values(p.por_oficina || {}).reduce((s, v) => s + (v?.[metrica] || 0), 0));
     const total = totales.reduce((a, b) => a + b, 0);
-    let iMejor = 0;
-    totales.forEach((t, i) => {
-      if (t > totales[iMejor]) iMejor = i;
-    });
+    // "Mes con menos" (se fueron): entre los meses ya cerrados; el que va todavía no terminó.
+    const elegibles = totales.map((_, i) => i).filter((i) => !met.menosEsMejor || !puntos[i].en_curso);
+    let iMejor = elegibles.length ? elegibles[0] : 0;
+    for (const i of elegibles) {
+      if (met.menosEsMejor ? totales[i] < totales[iMejor] : totales[i] > totales[iMejor]) iMejor = i;
+    }
     const cerrados = puntos.filter((p) => !p.en_curso).length || 1;
     const sumaCerrados = totales.filter((_, i) => !puntos[i].en_curso).reduce((a, b) => a + b, 0);
     return {
@@ -408,7 +540,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
       mejor: { periodo: puntos[iMejor].periodo, total: totales[iMejor] },
       ultimo: { periodo: puntos[puntos.length - 1].periodo, total: totales[totales.length - 1], enCurso: puntos[puntos.length - 1].en_curso },
     };
-  }, [serie.data, metrica]);
+  }, [serie.data, metrica, met.menosEsMejor]);
 
   const cargando = vista === "mes" ? serie.cargando : resumen.cargando;
   const error = vista === "mes" ? serie.error : resumen.error;
@@ -426,7 +558,12 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
 
   const tituloLista = (() => {
     if (!rango) return "";
-    const cuantas = `${lista.total} ${lista.total === 1 ? "póliza nueva" : "pólizas nuevas"}`;
+    const cuantas =
+      lista.tipo !== verLista || (lista.cargando && !lista.items.length)
+        ? "…"
+        : perdidas
+          ? `${lista.total} ${lista.total === 1 ? "se fue" : "se fueron"}`
+          : `${lista.total} ${lista.total === 1 ? "póliza nueva" : "pólizas nuevas"}`;
     if (rango.desde === rango.hasta) {
       const esHoy = r?.en_curso && rango.desde === r.hoy;
       return `${fechaLarga(rango.desde)}${esHoy ? " (hoy)" : ""} · ${cuantas}`;
@@ -453,6 +590,8 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
 
   const tituloGrafico =
     vista === "mes" ? "Mes a mes · últimos 12 meses" : vista === "semana" ? `Semana por semana · ${nombreMes(mes)}` : `Día por día · ${nombreMes(mes)}`;
+  const listaLista = lista.tipo === verLista; // ¿lo que se ve es de esta lista? (al cambiar, hasta que llega)
+  const archivo = rango ? `${rango.desde}${rango.hasta !== rango.desde ? `_al_${rango.hasta}` : ""}.csv` : "";
 
   return (
     <div className="flex flex-col gap-4">
@@ -509,18 +648,23 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
 
       {/* ── Resumen ── */}
       {vista !== "mes" && r && (
-        <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 transition-opacity ${desactualizado ? "opacity-60" : ""}`}>
+        <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 transition-opacity ${desactualizado ? "opacity-60" : ""}`}>
           {METRICAS.map((m) => {
-            const dd = delta(r.totales?.[m.id], r.totales?.antes?.[m.id]);
+            const t = r.totales || {};
+            const dd = delta(t[m.id], t.antes?.[m.id], { menosEsMejor: m.menosEsMejor });
             const activo = m.id === metrica;
             const nota =
               m.id === "pagaron"
-                ? `${r.totales?.nuevas ? Math.round((100 * (r.totales?.pagaron || 0)) / r.totales.nuevas) : 0}% de las pólizas nuevas`
+                ? `${t.nuevas ? Math.round((100 * (t.pagaron || 0)) / t.nuevas) : 0}% de las pólizas nuevas`
                 : m.id === "clientes_nuevos"
                   ? "DNI que nunca tuvo póliza"
-                  : r.en_curso
-                    ? `Del 1 al ${dayjs(r.hasta).date()} · sin renovaciones`
-                    : "Mes completo · sin renovaciones";
+                  : m.id === "se_fueron"
+                    ? `Retención ${formatoRetencion(t.retencion)}${t.cartera_inicio ? ` de ${t.cartera_inicio} autos al 1º` : ""}${t.recuperables ? ` · ${t.recuperables} vencidas sin pagar (si pagan, vuelven)` : ""}`
+                    : m.id === "neto"
+                      ? `Entraron ${t.entraron ?? t.nuevas ?? 0} − se fueron ${t.se_fueron ?? 0}`
+                      : r.en_curso
+                        ? `Del 1 al ${dayjs(r.hasta).date()} · sin renovaciones`
+                        : "Mes completo · sin renovaciones";
             return (
               <button
                 key={m.id}
@@ -533,7 +677,9 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
               >
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-suave dark:text-suave-dark">{m.label}</span>
                 <span className="flex items-baseline gap-2">
-                  <span className="text-[28px] font-bold tabular-nums text-titulo dark:text-titulo-dark">{r.totales?.[m.id] ?? 0}</span>
+                  <span className={`text-[28px] font-bold tabular-nums ${m.conSigno ? tonoNeto(Number(t[m.id] || 0)) : "text-titulo dark:text-titulo-dark"}`}>
+                    {valorMetrica(m, t[m.id])}
+                  </span>
                   <span className={`text-[12px] font-semibold ${TONO_DELTA[dd.tono]}`}>
                     {dd.txt} {comparacion}
                   </span>
@@ -547,11 +693,13 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
               <>
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-suave dark:text-suave-dark">Hoy</span>
                 <span className="flex items-baseline gap-2">
-                  <span className="text-[28px] font-bold tabular-nums text-titulo dark:text-titulo-dark">{r.totales?.hoy?.[metrica] ?? 0}</span>
+                  <span className={`text-[28px] font-bold tabular-nums ${esNeto ? tonoNeto(Number(r.totales?.hoy?.neto || 0)) : "text-titulo dark:text-titulo-dark"}`}>
+                    {valorMetrica(met, r.totales?.hoy?.[metrica])}
+                  </span>
                   <span className="text-[12px] text-suave dark:text-suave-dark">{met.unidad}</span>
                 </span>
                 <span className="text-[12px] text-suave dark:text-suave-dark">
-                  {r.ultima ? `Última: ${r.ultima.oficina}, ${dayjs(r.ultima.creado_en).format("DD/MM HH:mm")}` : "Todavía ninguna este mes"}
+                  {r.ultima ? `Última póliza nueva: ${r.ultima.oficina}, ${dayjs(r.ultima.creado_en).format("DD/MM HH:mm")}` : "Todavía ninguna póliza nueva este mes"}
                 </span>
               </>
             ) : (
@@ -572,7 +720,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
           {[
             { t: "Últimos 12 meses", v: resumen12.total, n: `${met.unidad}, todas las oficinas` },
             { t: "Promedio por mes", v: resumen12.promedio, n: "de los meses ya cerrados" },
-            { t: "Mejor mes", v: resumen12.mejor.total, n: nombreMes(resumen12.mejor.periodo) },
+            { t: met.menosEsMejor ? "Mes con menos" : "Mejor mes", v: resumen12.mejor.total, n: nombreMes(resumen12.mejor.periodo) },
             {
               t: resumen12.ultimo.enCurso ? `${nombreMesSolo(resumen12.ultimo.periodo)} va` : nombreMesSolo(resumen12.ultimo.periodo),
               v: resumen12.ultimo.total,
@@ -581,7 +729,9 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
           ].map((x) => (
             <div key={x.t} className="flex flex-col gap-1 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-suave dark:text-suave-dark">{x.t}</span>
-              <span className="text-[28px] font-bold tabular-nums text-titulo dark:text-titulo-dark">{x.v}</span>
+              <span className={`text-[28px] font-bold tabular-nums ${esNeto ? tonoNeto(x.v) : "text-titulo dark:text-titulo-dark"}`}>
+                {valorMetrica(met, x.v)}
+              </span>
               <span className="text-[12px] text-suave dark:text-suave-dark">{x.n}</span>
             </div>
           ))}
@@ -594,7 +744,10 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
           {ranking.map((o, i) => {
             const c = colorOficina(r.oficinas, o.id);
             const valor = Number(o[metrica] || 0);
-            const dd = delta(valor, o.antes?.[metrica]);
+            const dd = delta(valor, o.antes?.[metrica], { menosEsMejor: met.menosEsMejor });
+            // Estrella: el 1º del ranking (neto) o el que más hizo; con "Se fueron" no hay premio.
+            const estrella =
+              i === 0 && !met.menosEsMejor && (esNeto ? hayMovimiento && !o.sinMovimiento : valor > 0);
             return (
               <div key={o.id} style={varsColor(c)} className="flex flex-col gap-3 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -603,36 +756,57 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[color:var(--of-txt)] dark:text-[color:var(--of-claro)]"
                       style={{ backgroundColor: `${c.base}22` }}
                     >
-                      {i + 1}º
+                      {o.sinMovimiento ? "–" : `${i + 1}º`}
                     </span>
                     <span className="truncate text-[15px] font-bold text-[color:var(--of-txt)] dark:text-[color:var(--of-claro)]">{o.nombre}</span>
                   </div>
-                  {i === 0 && valor > 0 && (
+                  {estrella && (
                     <span className="flex shrink-0 items-center gap-1 rounded-full bg-tarjeta/15 px-2 py-0.5 text-[11px] font-semibold text-[#92400e] dark:text-tarjeta-claro">
                       <HiStar className="h-3.5 w-3.5" /> {r.en_curso ? "Va primera" : "Ganó"}
                     </span>
                   )}
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-[40px] font-extrabold leading-none tabular-nums text-titulo dark:text-titulo-dark">{valor}</span>
+                  <span className={`text-[40px] font-extrabold leading-none tabular-nums ${esNeto ? tonoNeto(valor) : "text-titulo dark:text-titulo-dark"}`}>
+                    {valorMetrica(met, valor)}
+                  </span>
                   <span className="text-[12px] text-suave dark:text-suave-dark">{met.unidad}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-titulo/5 dark:bg-white/10">
-                  <div className="h-2 rounded-full" style={{ width: `${lider ? Math.max(4, Math.round((valor * 100) / lider)) : 0}%`, background: c.base }} />
-                </div>
+                {esNeto ? (
+                  <BarraBalance entraron={o.entraron} seFueron={o.se_fueron} />
+                ) : (
+                  <div className="h-2 overflow-hidden rounded-full bg-titulo/5 dark:bg-white/10">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{
+                        width: `${valor > 0 && lider ? Math.max(4, Math.round((valor * 100) / lider)) : 0}%`,
+                        background: metrica === "se_fueron" ? "var(--color-egreso)" : c.base,
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[12px]">
                   <span className={`font-semibold ${TONO_DELTA[dd.tono]}`}>
                     {dd.txt} {comparacion}
                   </span>
                   {r.en_curso && (
                     <span className="text-titulo dark:text-titulo-dark">
-                      Hoy: <strong>{o.hoy?.[metrica] ?? 0}</strong>
+                      Hoy: <strong>{valorMetrica(met, o.hoy?.[metrica])}</strong>
                     </span>
                   )}
                 </div>
-                <span className="border-t border-linea dark:border-linea-dark pt-2 text-[11px] text-suave dark:text-suave-dark">
-                  {o.nuevas} nuevas · {o.clientes_nuevos} clientes nuevos · {o.pagaron} pagaron
-                </span>
+                <div className="flex flex-col gap-0.5 border-t border-linea dark:border-linea-dark pt-2 text-[11px] text-suave dark:text-suave-dark">
+                  <span>
+                    {o.nuevas} nuevas · {o.clientes_nuevos} clientes nuevos · {o.pagaron} pagaron
+                  </span>
+                  <span>
+                    {o.entraron} entraron · {o.se_fueron} se fueron · retención {formatoRetencion(o.retencion)} · neto{" "}
+                    {conSigno(o.neto)}
+                  </span>
+                  {metrica === "se_fueron" && o.se_fueron > 0 && (
+                    <span className="font-medium text-titulo dark:text-titulo-dark">{resumenMotivos(o.motivos)}</span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -640,7 +814,8 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
       )}
       {vista !== "mes" && sinOficina && (
         <p className="text-[12px] text-suave dark:text-suave-dark">
-          + {sinOficina.nuevas} {sinOficina.nuevas === 1 ? "póliza nueva" : "pólizas nuevas"} sin oficina (ni en la póliza ni en el cliente).
+          Sin oficina (ni en la póliza ni en el cliente): {sinOficina.nuevas} {sinOficina.nuevas === 1 ? "póliza nueva" : "pólizas nuevas"}
+          {sinOficina.se_fueron ? ` · ${sinOficina.se_fueron} ${sinOficina.se_fueron === 1 ? "se fue" : "se fueron"}` : ""}.
         </p>
       )}
 
@@ -650,7 +825,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
           <div>
             <h3 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">{tituloGrafico}</h3>
             <p className="mt-0.5 text-[12px] text-suave dark:text-suave-dark">
-              {met.label}, apiladas por oficina.{" "}
+              {esNeto ? "Crecimiento neto por oficina (para abajo = perdió más de lo que entró)." : `${met.label}, apiladas por oficina.`}{" "}
               {vista === "mes" ? "Tocá un mes para verlo día por día." : "Tocá una barra para ver la lista."}
             </p>
           </div>
@@ -666,7 +841,13 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
         <div className={`h-[260px] w-full transition-opacity ${desactualizado || cargando ? "opacity-60" : ""}`}>
           {datos.length ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={datos} onClick={tocarBarra} margin={{ top: 8, right: 8, left: mobile ? -24 : -12, bottom: 0 }} style={{ cursor: "pointer" }}>
+              <BarChart
+                data={datos}
+                onClick={tocarBarra}
+                stackOffset={esNeto ? "sign" : undefined}
+                margin={{ top: 8, right: 8, left: esNeto ? (mobile ? -12 : -4) : mobile ? -14 : -12, bottom: 0 }}
+                style={{ cursor: "pointer" }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke={colorGrilla} vertical={false} />
                 <XAxis
                   dataKey="etiqueta"
@@ -675,14 +856,22 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                   axisLine={{ stroke: colorGrilla }}
                   interval={vista === "dia" && mobile ? 4 : 0}
                 />
-                <YAxis allowDecimals={false} tick={{ fill: colorEje, fontSize: 11 }} tickLine={false} axisLine={false} width={36} />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: colorEje, fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={esNeto ? 44 : 36}
+                  tickFormatter={esNeto ? (v) => (v < 0 ? `−${Math.abs(v)}` : String(v)) : undefined}
+                />
                 <Tooltip
                   cursor={{ fill: dark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.05)" }}
-                  content={<Cartelito series={series} titulo={tituloCartel} />}
+                  content={<Cartelito series={series} titulo={tituloCartel} conSignoValores={esNeto} />}
                 />
                 {etiquetaSel && (
                   <ReferenceArea x1={etiquetaSel} x2={etiquetaSel} fill={dark ? "#ffffff" : "#0f172a"} fillOpacity={dark ? 0.08 : 0.06} />
                 )}
+                {esNeto && <ReferenceLine y={0} stroke={colorEje} strokeWidth={1} />}
                 {series.map((s, i) => (
                   <Bar
                     key={s.key}
@@ -690,7 +879,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                     name={s.nombre}
                     stackId="a"
                     fill={s.color.base}
-                    radius={i === series.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                    radius={!esNeto && i === series.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                     maxBarSize={vista === "dia" ? 26 : 56}
                     isAnimationActive={false}
                   />
@@ -731,6 +920,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Segmentado opciones={LISTAS} valor={verLista} onCambiar={setVerLista} etiqueta="Qué lista ver" />
               {esAdmin && (
                 <label className="flex items-center gap-2 text-[12px] text-suave dark:text-suave-dark">
                   Oficina
@@ -750,8 +940,12 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
               )}
               <button
                 type="button"
-                disabled={!lista.items.length}
-                onClick={() => descargarCSV(lista.items, `polizas_nuevas_${rango.desde}${rango.hasta !== rango.desde ? `_al_${rango.hasta}` : ""}.csv`)}
+                disabled={!lista.items.length || !listaLista}
+                onClick={() =>
+                  perdidas
+                    ? descargarCSVPerdidas(lista.items, `se_fueron_${archivo}`)
+                    : descargarCSV(lista.items, `polizas_nuevas_${archivo}`)
+                }
                 className="flex min-h-[36px] items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark px-3 text-[12px] font-medium text-titulo dark:text-titulo-dark hover:border-oficina disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <HiDownload className="h-4 w-4" /> Descargar lista (Excel)
@@ -761,10 +955,78 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
 
           {lista.error ? (
             <p className="px-5 py-6 text-[13px] text-egreso-fuerte dark:text-egreso-claro">{lista.error}</p>
-          ) : lista.cargando && !lista.items.length ? (
+          ) : (lista.cargando && !lista.items.length) || !listaLista ? (
             <p className="px-5 py-6 text-[13px] text-suave dark:text-suave-dark">Cargando…</p>
           ) : !lista.items.length ? (
-            <p className="px-5 py-6 text-[13px] text-suave dark:text-suave-dark">No hay pólizas nuevas en este período.</p>
+            <p className="px-5 py-6 text-[13px] text-suave dark:text-suave-dark">
+              {perdidas ? "No se fue ningún auto en este período." : "No hay pólizas nuevas en este período."}
+            </p>
+          ) : perdidas ? (
+            mobile ? (
+              <ul className="divide-y divide-linea dark:divide-linea-dark">
+                {lista.items.map((p) => (
+                  <li key={p.id} className="flex flex-col gap-1.5 px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Link to={`/polizas/${p.id}`} className="truncate text-[14px] font-semibold text-titulo dark:text-titulo-dark hover:underline">
+                        {p.cliente}
+                      </Link>
+                      <ChipOficina nombre={p.oficina} color={colorOficina(r?.oficinas, p.oficina_id)} />
+                    </div>
+                    <span className="text-[12px] text-suave dark:text-suave-dark">
+                      {dayjs(p.fecha).format("DD/MM")} · {p.vehiculo}
+                      {p.patente ? ` · ${p.patente}` : ""} · {p.compania}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <ChipMotivo p={p} />
+                      {p.recuperable && <Chip si textoSi="Si paga, vuelve" />}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-[12px]">
+                  <thead>
+                    <tr className="bg-surface dark:bg-surface-dark text-left text-suave dark:text-suave-dark">
+                      <th className="px-5 py-2.5 font-medium">Se fue el</th>
+                      <th className="px-3 py-2.5 font-medium">Oficina</th>
+                      <th className="px-3 py-2.5 font-medium">Cliente</th>
+                      <th className="px-3 py-2.5 font-medium">Vehículo</th>
+                      <th className="px-3 py-2.5 font-medium">Compañía</th>
+                      <th className="px-3 py-2.5 font-medium">Estado</th>
+                      <th className="px-5 py-2.5 font-medium">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-linea/60 dark:divide-linea-dark/60">
+                    {lista.items.map((p) => (
+                      <tr key={p.id} className="hover:bg-oficina/5">
+                        <td className="whitespace-nowrap px-5 py-2.5 tabular-nums text-suave dark:text-suave-dark">{dayjs(p.fecha).format("DD/MM")}</td>
+                        <td className="px-3 py-2.5">
+                          <ChipOficina nombre={p.oficina} color={colorOficina(r?.oficinas, p.oficina_id)} />
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-titulo dark:text-titulo-dark">
+                          <Link to={`/polizas/${p.id}`} className="hover:underline">
+                            {p.cliente}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5 text-titulo dark:text-titulo-dark">
+                          {p.vehiculo}
+                          {p.patente ? <span className="text-suave dark:text-suave-dark"> · {p.patente}</span> : null}
+                        </td>
+                        <td className="px-3 py-2.5 text-titulo dark:text-titulo-dark">{p.compania}</td>
+                        <td className="px-3 py-2.5 text-titulo dark:text-titulo-dark">{ESTADO_TXT[p.estado] || p.estado}</td>
+                        <td className="px-5 py-2.5">
+                          <span className="flex flex-wrap gap-1.5">
+                            <ChipMotivo p={p} />
+                            {p.recuperable && <Chip si textoSi="Si paga, vuelve" />}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           ) : mobile ? (
             <ul className="divide-y divide-linea dark:divide-linea-dark">
               {lista.items.map((p) => (
@@ -781,6 +1043,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     <Chip si={p.cliente_nuevo} textoSi="Cliente nuevo" textoNo="Ya tenía otra póliza" />
+                    {p.entro === false && <ChipNoSuma motivo={p.no_suma} />}
                     <Chip si={p.pago_1a} textoSi="Pagó la 1ª" textoNo="Falta la 1ª" tonoNo="ambar" />
                   </div>
                 </li>
@@ -820,7 +1083,10 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                       </td>
                       <td className="px-3 py-2.5 text-titulo dark:text-titulo-dark">{p.compania}</td>
                       <td className="px-3 py-2.5">
-                        <Chip si={p.cliente_nuevo} textoSi="Sí" textoNo="No, ya tenía otra" />
+                        <span className="flex flex-wrap gap-1.5">
+                          <Chip si={p.cliente_nuevo} textoSi="Sí" textoNo="No, ya tenía otra" />
+                          {p.entro === false && <ChipNoSuma motivo={p.no_suma} />}
+                        </span>
                       </td>
                       <td className="px-5 py-2.5">
                         <Chip si={p.pago_1a} textoSi="Pagó" textoNo="Falta" tonoNo="ambar" />
@@ -831,9 +1097,9 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
               </table>
             </div>
           )}
-          {lista.recortado && (
+          {lista.recortado && listaLista && (
             <p className="border-t border-linea dark:border-linea-dark px-5 py-2 text-[12px] text-suave dark:text-suave-dark">
-              Se muestran las primeras 1000.
+              Se muestran los primeros 1000.
             </p>
           )}
         </section>
@@ -856,6 +1122,7 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                     </th>
                   ))}
                   <th className="px-3 py-2.5 text-right font-semibold text-titulo dark:text-titulo-dark">Total</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Retención</th>
                   <th className="px-5 py-2.5 text-left font-medium">Ganó</th>
                 </tr>
               </thead>
@@ -883,11 +1150,14 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
                           {punto?.en_curso ? <span className="ml-1 font-normal text-suave dark:text-suave-dark">(en curso)</span> : null}
                         </td>
                         {series.map((s) => (
-                          <td key={s.key} className="px-3 py-2.5 text-right text-titulo dark:text-titulo-dark">
-                            {f[s.key] || "–"}
+                          <td key={s.key} className={`px-3 py-2.5 text-right ${esNeto ? tonoNeto(f[s.key] || 0) : "text-titulo dark:text-titulo-dark"}`}>
+                            {f[s.key] ? valorMetrica(met, f[s.key]) : "–"}
                           </td>
                         ))}
-                        <td className="px-3 py-2.5 text-right font-bold text-titulo dark:text-titulo-dark">{f.total}</td>
+                        <td className={`px-3 py-2.5 text-right font-bold ${esNeto ? tonoNeto(f.total) : "text-titulo dark:text-titulo-dark"}`}>
+                          {valorMetrica(met, f.total)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-titulo dark:text-titulo-dark">{formatoRetencion(punto?.total?.retencion)}</td>
                         <td className="px-5 py-2.5">
                           {g ? <ChipOficina nombre={`${punto?.en_curso ? "Va " : ""}${g.nombre}`} color={colorOficina(serie.data.oficinas, g.id)} /> : "–"}
                         </td>
@@ -898,15 +1168,20 @@ export default function PolizasNuevasPanel({ oficinaInicial = "", mesInicial = "
             </table>
           </div>
           <p className="border-t border-linea dark:border-linea-dark px-5 py-2 text-[12px] text-suave dark:text-suave-dark">
-            "Ganó" cuenta pólizas nuevas; si empatan, gana la que llegó primero a ese número.
+            "Ganó" = la que más creció (entraron − se fueron); si empatan, mejor retención y después más pólizas nuevas.
+            Retención = de todos los autos que había el 1º de cada mes, cuántos siguieron.
           </p>
         </section>
       )}
 
       <p className="text-[12px] leading-relaxed text-suave dark:text-suave-dark">
         <strong className="text-titulo dark:text-titulo-dark">Cómo se cuenta.</strong> Póliza nueva: la que se cargó en THAMES ese día y no es
-        renovación. Cliente nuevo: su DNI nunca tuvo otra póliza antes. Pagó la 1ª cuota: la 1ª cuota ya figura paga (en la oficina, por transferencia o con el comprobante de Rapipago). La comparación
-        es contra los mismos días del mes anterior{r && !r.en_curso ? " (con el mes cerrado, contra el mes anterior entero)" : ""}.
+        renovación. Cliente nuevo: su DNI nunca tuvo otra póliza antes. Pagó la 1ª cuota: la 1ª cuota ya figura paga (en la oficina, por
+        transferencia o con el comprobante de Rapipago). Entraron: autos nuevos que empezamos a asegurar (una póliza nueva de un auto que ya
+        teníamos no suma). Se fueron: autos que dejamos de asegurar porque la póliza quedó vencida sin pagar, cancelada o de baja, o terminó y
+        no se renovó (vender el auto también cuenta); si paga o renueva antes de los 30 días, es como si nunca se hubiera ido. Crecimiento
+        neto: entraron − se fueron. Retención: de los autos que la oficina tenía el 1º del mes, qué % sigue. La comparación es contra los
+        mismos días del mes anterior{r && !r.en_curso ? " (con el mes cerrado, contra el mes anterior entero)" : ""}.
       </p>
     </div>
   );

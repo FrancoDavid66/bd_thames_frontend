@@ -1,27 +1,65 @@
 // src/components/polizasNuevas/PolizasNuevasCard.jsx
 // ============================================================
-// 🏁 Cartel del Inicio: "Pólizas nuevas · Septiembre".
+// 🏁 Cartel del Inicio: "Ranking de oficinas · Septiembre".
 //
-// El puesto de cada oficina en el mes (pólizas nuevas, sin renovaciones),
-// cuánto sube o baja contra los mismos días del mes anterior, "Hoy" y
-// cuántas ya pagaron la 1ª cuota. Todos ven los números de todas las
-// oficinas (es un ranking); el empleado ve la suya resaltada.
+// El puesto de cada oficina en el mes por CRECIMIENTO NETO: autos que
+// entraron (nuevos, sin renovaciones ni repetidos) − autos que se fueron (no
+// pagó, cancelada/de baja, terminó y no renovó). Ejemplo: entraron 60 y se
+// fueron 22 → +38. Muestra cuánto sube o baja contra los mismos días del mes
+// anterior, la barra entraron/se fueron, la retención y "hoy".
+// Todos ven los números de todas las oficinas (es un ranking); el empleado ve
+// la suya resaltada y cuántos se fueron por no pagar (si pagan, vuelven).
 // Se actualiza solo (en vivo).
 // ============================================================
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import { HiDocumentAdd, HiArrowRight, HiStar } from "react-icons/hi";
+import { HiTrendingUp, HiArrowRight, HiStar } from "react-icons/hi";
 
 import { useAuth } from "../../context/AuthContext";
 import { useNuevasMes } from "../../hooks/usePolizasNuevas";
-import { colorOficina, varsColor, ordenarPorMetrica, delta, nombreMesSolo, etiquetaComparacion, guardarPref, mesActual } from "./comun";
+import {
+  colorOficina,
+  varsColor,
+  rankingOficinas,
+  hayMovimiento as hayMov,
+  conSigno,
+  formatoRetencion,
+  delta,
+  nombreMesSolo,
+  etiquetaComparacion,
+  guardarPref,
+  mesActual,
+} from "./comun";
 
 const TONO_DELTA = {
   sube: "text-ingreso-fuerte dark:text-ingreso-claro",
   baja: "text-egreso-fuerte dark:text-egreso-claro",
   igual: "text-suave dark:text-suave-dark",
 };
+const tonoNeto = (n) =>
+  n > 0
+    ? "text-ingreso-fuerte dark:text-ingreso-claro"
+    : n < 0
+      ? "text-egreso-fuerte dark:text-egreso-claro"
+      : "text-titulo dark:text-titulo-dark";
+
+/** Barra partida: verde lo que entró, rojo lo que se fue. */
+function BarraBalance({ entraron, seFueron }) {
+  const e = Number(entraron || 0);
+  const s = Number(seFueron || 0);
+  const total = e + s;
+  return (
+    <div className="flex h-2 overflow-hidden rounded-full bg-titulo/5 dark:bg-white/10" aria-hidden="true">
+      {total > 0 && (
+        <>
+          <div className="bg-ingreso" style={{ width: `${(e * 100) / total}%` }} />
+          <div className="bg-egreso" style={{ width: `${(s * 100) / total}%` }} />
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function PolizasNuevasCard() {
   const { user } = useAuth();
@@ -30,31 +68,36 @@ export default function PolizasNuevasCard() {
   const miOficina = user?.perfil?.oficina?.id ?? user?.perfil?.oficina ?? null;
 
   const { data: r, cargando, error, recargar } = useNuevasMes("");
-  const ranking = useMemo(() => ordenarPorMetrica(r?.oficinas, "nuevas"), [r]);
-  const lider = ranking.length ? Number(ranking[0].nuevas || 0) : 0;
+  const ranking = useMemo(() => rankingOficinas(r?.oficinas), [r]);
+  const enJuego = ranking.filter((o) => !o.sinMovimiento);
+  const hayMovimiento = hayMov(enJuego);
   const comparacion = etiquetaComparacion(r);
 
-  // Mensaje para el empleado: "Axión va 2ª, a 4 de 5 Esquinas".
+  // Mensaje para el empleado: "Axión va 2ª, a 6 de Km 39" (+ los que se pueden recuperar).
   const mensaje = useMemo(() => {
     if (esAdmin || miOficina === null || !ranking.length) return null;
     const i = ranking.findIndex((o) => String(o.id) === String(miOficina));
     if (i < 0) return null;
     const yo = ranking[i];
-    if (!lider) return { txt: "Todavía nadie cargó pólizas nuevas este mes: ¡la primera arranca la carrera!", pos: i };
+    const recup = Number(yo.recuperables || 0);
+    const extra =
+      recup > 0
+        ? `${recup} ${recup === 1 ? "se fue por no pagar y tiene" : "se fueron por no pagar y tienen"} la póliza vencida: si ${recup === 1 ? "paga, vuelve" : "pagan, vuelven"} y tu oficina sube.`
+        : "";
+    if (!hayMovimiento) return { txt: "Todavía no hay movimiento este mes: ¡la primera póliza arranca la carrera!", extra };
+    if (yo.sinMovimiento) return { txt: `${yo.nombre} todavía no tuvo movimiento este mes.`, extra };
+    const lider = enJuego[0];
     if (i === 0) {
-      const segundo = ranking[1];
-      const ventaja = segundo ? Number(yo.nuevas) - Number(segundo.nuevas) : null;
-      return {
-        txt: ventaja ? `${yo.nombre} va 1ª, le saca ${ventaja} a ${segundo.nombre}` : `${yo.nombre} va 1ª`,
-        pos: i,
-      };
+      const segundo = enJuego[1];
+      const ventaja = segundo ? Number(yo.neto || 0) - Number(segundo.neto || 0) : null;
+      return { txt: ventaja ? `${yo.nombre} va 1ª, le saca ${ventaja} a ${segundo.nombre}` : `${yo.nombre} va 1ª`, extra };
     }
-    const faltan = lider - Number(yo.nuevas || 0);
+    const faltan = Number(lider.neto || 0) - Number(yo.neto || 0);
     return {
-      txt: faltan > 0 ? `${yo.nombre} va ${i + 1}ª, a ${faltan} de ${ranking[0].nombre}` : `${yo.nombre} va ${i + 1}ª, empatada con ${ranking[0].nombre}`,
-      pos: i,
+      txt: faltan > 0 ? `${yo.nombre} va ${i + 1}ª, a ${faltan} de ${lider.nombre}` : `${yo.nombre} va ${i + 1}ª, empatada con ${lider.nombre}`,
+      extra,
     };
-  }, [esAdmin, miOficina, ranking, lider]);
+  }, [esAdmin, miOficina, ranking, enJuego, hayMovimiento]);
 
   const irAEstadisticas = () => {
     guardarPref("estadisticas.tab", "nuevas");
@@ -62,30 +105,31 @@ export default function PolizasNuevasCard() {
   };
 
   const mes = r?.mes || mesActual();
+  const hoyT = r?.totales?.hoy;
 
   return (
     <section
-      aria-label="Pólizas nuevas del mes"
+      aria-label="Ranking de oficinas del mes"
       className="rounded-xl border-2 border-oficina-fuerte/70 bg-card dark:bg-card-dark p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro">
-            <HiDocumentAdd className="h-5 w-5" />
+            <HiTrendingUp className="h-5 w-5" />
           </span>
           <div>
             <h2 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">
-              Pólizas nuevas · {nombreMesSolo(mes)}
+              Ranking de oficinas · {nombreMesSolo(mes)}
             </h2>
             <p className="text-[12px] text-suave dark:text-suave-dark">
-              {r ? `Del 1 al ${dayjs(r.hasta).date()} · sin contar renovaciones` : "Sin contar renovaciones"}
+              Crecimiento neto: entraron − se fueron{r ? ` · del 1 al ${dayjs(r.hasta).date()}` : ""}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {r?.en_curso && (
             <span className="rounded-full bg-oficina/15 px-3 py-1 text-[12px] font-semibold text-oficina-fuerte dark:text-oficina-claro">
-              Hoy: {r.totales?.hoy?.nuevas ?? 0} {r.totales?.hoy?.nuevas === 1 ? "nueva" : "nuevas"}
+              Hoy: entraron {hoyT?.entraron ?? hoyT?.nuevas ?? 0} · {hoyT?.se_fueron === 1 ? "se fue" : "se fueron"} {hoyT?.se_fueron ?? 0}
             </span>
           )}
           {esAdmin && (
@@ -125,8 +169,9 @@ export default function PolizasNuevasCard() {
           <div className={`mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 transition-opacity ${cargando ? "opacity-70" : ""}`}>
             {ranking.map((o, i) => {
               const c = colorOficina(r.oficinas, o.id);
-              const dd = delta(o.nuevas, o.antes?.nuevas);
+              const dd = delta(o.neto, o.antes?.neto);
               const mia = !esAdmin && String(o.id) === String(miOficina);
+              const neto = Number(o.neto || 0);
               return (
                 <div
                   key={o.id}
@@ -142,29 +187,34 @@ export default function PolizasNuevasCard() {
                       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[color:var(--of-txt)] dark:text-[color:var(--of-claro)]"
                       style={{ backgroundColor: `${c.base}22` }}
                     >
-                      {i + 1}º
+                      {o.sinMovimiento ? "–" : `${i + 1}º`}
                     </span>
                     <span className="truncate text-[14px] font-bold text-[color:var(--of-txt)] dark:text-[color:var(--of-claro)]">{o.nombre}</span>
                     {mia && (
                       <span className="shrink-0 rounded-full bg-[color:var(--of-base)] px-2 py-0.5 text-[10px] font-bold text-white">Tu oficina</span>
                     )}
-                    {i === 0 && lider > 0 && <HiStar className="h-5 w-5 shrink-0 text-[#d97706] dark:text-tarjeta-claro sm:ml-auto" aria-label="Va primera" />}
-                    <span className="ml-auto text-[26px] font-extrabold leading-none tabular-nums text-titulo dark:text-titulo-dark sm:hidden">{o.nuevas}</span>
+                    {i === 0 && hayMovimiento && !o.sinMovimiento && (
+                      <HiStar className="h-5 w-5 shrink-0 text-[#d97706] dark:text-tarjeta-claro sm:ml-auto" aria-label="Va primera" />
+                    )}
+                    <span className={`ml-auto text-[26px] font-extrabold leading-none tabular-nums sm:hidden ${tonoNeto(neto)}`}>{conSigno(neto)}</span>
                   </div>
                   <div className="hidden items-baseline gap-2 sm:flex">
-                    <span className="text-[36px] font-extrabold leading-none tabular-nums text-titulo dark:text-titulo-dark">{o.nuevas}</span>
+                    <span className={`text-[36px] font-extrabold leading-none tabular-nums ${tonoNeto(neto)}`}>{conSigno(neto)}</span>
                     <span className={`text-[12px] font-semibold ${TONO_DELTA[dd.tono]}`}>
                       {dd.txt} {comparacion}
                     </span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-titulo/5 dark:bg-white/10">
-                    <div className="h-2 rounded-full" style={{ width: `${lider ? Math.max(4, Math.round((o.nuevas * 100) / lider)) : 0}%`, background: c.base }} />
-                  </div>
-                  <span className="text-[12px] text-suave dark:text-suave-dark">
-                    <span className={`sm:hidden font-semibold ${TONO_DELTA[dd.tono]}`}>{dd.txt} · </span>
-                    {o.pagaron} ya {o.pagaron === 1 ? "pagó" : "pagaron"} la 1ª cuota
-                    {r.en_curso ? ` · hoy ${o.hoy?.nuevas ?? 0}` : ""}
-                  </span>
+                  <BarraBalance entraron={o.entraron} seFueron={o.se_fueron} />
+                  {o.sinMovimiento ? (
+                    <span className="text-[12px] text-suave dark:text-suave-dark">Sin movimiento este mes</span>
+                  ) : (
+                    <span className="text-[12px] text-suave dark:text-suave-dark">
+                      <span className={`sm:hidden font-semibold ${TONO_DELTA[dd.tono]}`}>{dd.txt} · </span>
+                      entraron <strong className="text-titulo dark:text-titulo-dark">{o.entraron}</strong> · se fueron{" "}
+                      <strong className="text-titulo dark:text-titulo-dark">{o.se_fueron}</strong> · retención {formatoRetencion(o.retencion)}
+                      {r.en_curso ? ` · hoy ${conSigno(o.hoy?.neto)}` : ""}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -172,6 +222,7 @@ export default function PolizasNuevasCard() {
           {mensaje && (
             <p className="mt-3 rounded-lg border border-ingreso/25 bg-ingreso/[0.06] px-3 py-2 text-[13px] font-semibold text-ingreso-fuerte dark:text-ingreso-claro">
               {mensaje.txt}
+              {mensaje.extra ? <span className="mt-0.5 block font-medium">💡 {mensaje.extra}</span> : null}
             </p>
           )}
         </>
