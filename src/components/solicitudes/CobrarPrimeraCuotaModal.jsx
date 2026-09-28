@@ -227,7 +227,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
             onClick={() => onClose?.()}
           >
             <motion.div
-              className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden"
+              className="max-h-[92dvh] w-full max-w-sm overflow-y-auto overscroll-contain rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl pb-[env(safe-area-inset-bottom)] sm:pb-0"
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
@@ -310,7 +310,7 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
             onClick={() => onClose?.()}
           >
             <motion.div
-              className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden text-center"
+              className="max-h-[92dvh] w-full max-w-sm overflow-y-auto overscroll-contain rounded-t-2xl sm:rounded-2xl bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark shadow-xl text-center pb-[env(safe-area-inset-bottom)] sm:pb-0"
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}

@@ -59,6 +59,21 @@ const formatMoney = (value) => {
   });
 };
 
+// 📱 En el celu las tarjetas van de a 2 por fila: la plata va sin centavos
+//    para que entre ("$ 53.869.306" en vez de "$ 53.869.306,00").
+const formatMoneyCorto = (value) =>
+  Number(value || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+
+// Muestra "$ 53.869.306" en el celu y "$ 53.869.306,00" desde sm.
+function Plata({ valor }) {
+  return (
+    <>
+      <span className="sm:hidden">$ {formatMoneyCorto(valor)}</span>
+      <span className="hidden sm:inline">$ {formatMoney(valor)}</span>
+    </>
+  );
+}
+
 // 🚀 Frases motivadoras aleatorias
 const FRASES_MOTIVADORAS = [
   "Hoy es un gran día para asegurar el futuro de alguien.",
@@ -80,23 +95,28 @@ function KpiCard({ titulo, children, icon, color = "oficina", nota, onClick }) {
     transferencia: "bg-transferencia/15 text-transferencia dark:text-transferencia-claro",
   }[color];
 
+  // 📱 Celu: tarjeta compacta (2 por fila, sin la nota de abajo).
+  //    Con onClick se puede tocar/entrar con teclado como un botón.
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5 transition-colors ${
-        onClick ? "cursor-pointer hover:border-duo-violeta/40" : ""
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      className={`min-w-0 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3.5 transition-colors sm:p-5 ${
+        onClick ? "cursor-pointer hover:border-duo-violeta/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-duo-violeta/40" : ""
       }`}
     >
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium text-suave dark:text-suave-dark">
+      <div className="flex flex-col gap-2 sm:gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="min-w-0 text-[12px] font-medium leading-tight text-suave dark:text-suave-dark">
             {titulo}
           </span>
-          <div className={`rounded-lg p-2 ${iconTone}`}>{icon}</div>
+          <div className={`shrink-0 rounded-lg p-1.5 sm:p-2 ${iconTone}`}>{icon}</div>
         </div>
         {children}
         {nota && (
-          <p className="text-[12px] text-suave dark:text-suave-dark">{nota}</p>
+          <p className="hidden text-[12px] text-suave dark:text-suave-dark sm:block">{nota}</p>
         )}
       </div>
     </div>
@@ -327,7 +347,7 @@ const HomePage = () => {
       <div className="mx-auto flex max-w-6xl flex-col gap-5">
 
         {/* HEADER / BIENVENIDA */}
-        <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6">
+        <div className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 sm:p-6">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div>
               <p className="text-[12px] font-medium text-oficina">
@@ -336,59 +356,60 @@ const HomePage = () => {
               <h1 className="mt-1 text-xl font-semibold text-titulo dark:text-titulo-dark sm:text-2xl">
                 Hola, {user?.username || 'Equipo'}
               </h1>
-              <p className="mt-2 max-w-xl text-[13px] italic text-suave dark:text-suave-dark">
+              <p className="mt-1.5 max-w-xl text-[13px] italic text-suave dark:text-suave-dark sm:mt-2">
                 "{fraseDelDia}"
               </p>
             </div>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-oficina/30 bg-oficina/10 px-3 py-1.5 text-[12px] font-medium text-oficina-fuerte dark:text-oficina-claro">
+            <span className="hidden items-center gap-1.5 rounded-full border border-oficina/30 bg-oficina/10 px-3 py-1.5 text-[12px] font-medium text-oficina-fuerte dark:text-oficina-claro sm:inline-flex">
               <HiSparkles className="h-3.5 w-3.5" />
               Dashboard activo
             </span>
           </div>
         </div>
 
-        {/* TARJETAS RESUMEN */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* TARJETAS RESUMEN — 📱 de a 2 en el celu (antes 1 por fila: 6 pantallazos
+            de scroll antes de ver algo más). */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
 
           {/* Ingresos del mes */}
           <KpiCard titulo="Ingresos del mes" color="ingreso" icon={<HiCash className="h-5 w-5" />} nota="Total cobrado este mes">
-            <p className="text-xl font-semibold text-ingreso-fuerte dark:text-ingreso-claro">
-              $ {formatMoney(totalIngresosMes)}
+            <p className="text-[17px] font-semibold tabular-nums text-ingreso-fuerte dark:text-ingreso-claro sm:text-xl">
+              <Plata valor={totalIngresosMes} />
             </p>
           </KpiCard>
 
           {/* Egresos del mes */}
           <KpiCard titulo="Egresos del mes" color="egreso" icon={<HiTrendingDown className="h-5 w-5" />} nota="Total gastado este mes">
-            <p className="text-xl font-semibold text-egreso-fuerte dark:text-egreso-claro">
-              $ {formatMoney(totalEgresosMes)}
+            <p className="text-[17px] font-semibold tabular-nums text-egreso-fuerte dark:text-egreso-claro sm:text-xl">
+              <Plata valor={totalEgresosMes} />
             </p>
           </KpiCard>
 
           {/* Balance del mes */}
           <KpiCard titulo="Balance neto" color="ingreso" icon={<HiTrendingUp className="h-5 w-5" />} nota="Ingresos − egresos del mes">
-            <p className={`text-xl font-semibold ${balanceMes >= 0 ? 'text-ingreso-fuerte dark:text-ingreso-claro' : 'text-egreso-fuerte dark:text-egreso-claro'}`}>
-              $ {formatMoney(balanceMes)}
+            <p className={`text-[17px] font-semibold tabular-nums sm:text-xl ${balanceMes >= 0 ? 'text-ingreso-fuerte dark:text-ingreso-claro' : 'text-egreso-fuerte dark:text-egreso-claro'}`}>
+              <Plata valor={balanceMes} />
             </p>
           </KpiCard>
 
           {/* Pólizas activas (FIX) */}
           <KpiCard titulo="Pólizas activas" color="oficina" icon={<HiShieldCheck className="h-5 w-5" />} nota='Solo en estado "activa"'>
-            <p className="text-xl font-semibold text-titulo dark:text-titulo-dark">
+            <p className="text-[17px] font-semibold tabular-nums text-titulo dark:text-titulo-dark sm:text-xl">
               {polizasActivas}
             </p>
           </KpiCard>
 
           {/* Clientes */}
           <KpiCard titulo="Total clientes" color="transferencia" icon={<HiUsers className="h-5 w-5" />} nota="Personas en tu base de datos">
-            <p className="text-xl font-semibold text-titulo dark:text-titulo-dark">
+            <p className="text-[17px] font-semibold tabular-nums text-titulo dark:text-titulo-dark sm:text-xl">
               {totalClientes}
             </p>
           </KpiCard>
 
           {/* Renovaciones por vencer */}
           <KpiCard titulo="Renovaciones" color="tarjeta" icon={<HiRefresh className="h-5 w-5" />} onClick={() => navigate("/polizas/renovaciones")}>
-            <div className="flex items-end gap-4">
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
               <div>
                 <p className="text-xl font-semibold leading-none text-[#d97706] dark:text-tarjeta-claro">
                   {renovHoy}
@@ -417,8 +438,10 @@ const HomePage = () => {
         {/* GRID PRINCIPAL: DASHBOARD + LATERAL */}
         <div className="grid gap-4 lg:grid-cols-3">
 
-          {/* Gráfico de balances */}
-          <div className="col-span-3 lg:col-span-2">
+          {/* Gráfico de balances
+              (antes "col-span-3": en celu/tablet la grilla tiene 1 columna y eso
+              creaba 3 columnas de mentira → Tareas y Accesos quedaban finitos) */}
+          <div className="min-w-0 lg:col-span-2">
             <BalanceChart
               puntos={serie.puntos}
               agrupar={serie.agruparDatos || grafico.agrupar}
@@ -453,7 +476,7 @@ const HomePage = () => {
               <ul className="mt-4 space-y-2.5 text-sm">
                 <li
                   onClick={() => navigate("/solicitudes")}
-                  className="group flex cursor-pointer items-center justify-between rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
+                  className="group flex min-h-[48px] cursor-pointer items-center justify-between rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
                 >
                   <span className="font-medium text-titulo dark:text-titulo-dark">Alta en compañía</span>
                   <span className="rounded-md bg-egreso/10 px-2 py-1 text-[12px] font-medium text-egreso-fuerte dark:text-egreso-claro">
@@ -462,7 +485,7 @@ const HomePage = () => {
                 </li>
                 <li
                   onClick={() => navigate("/solicitudes")}
-                  className="group flex cursor-pointer items-center justify-between rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
+                  className="group flex min-h-[48px] cursor-pointer items-center justify-between rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 transition-colors hover:border-oficina"
                 >
                   <span className="font-medium text-titulo dark:text-titulo-dark">Envío de póliza</span>
                   <span className="rounded-md bg-oficina/10 px-2 py-1 text-[12px] font-medium text-oficina-fuerte dark:text-oficina-claro">
@@ -485,7 +508,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => setModalTipo("INGRESO")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-verde p-3 text-white transition-colors hover:brightness-110"
+                  className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-verde p-3 text-white transition-colors hover:brightness-110"
                 >
                   <HiArrowCircleDown className="h-5 w-5" />
                   <span className="text-[12px] font-medium">Cargar ingreso</span>
@@ -495,7 +518,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => setModalTipo("EGRESO")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-rojo p-3 text-white transition-colors hover:brightness-110"
+                  className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-rojo p-3 text-white transition-colors hover:brightness-110"
                 >
                   <HiArrowCircleUp className="h-5 w-5" />
                   <span className="text-[12px] font-medium">Cargar egreso</span>
@@ -505,7 +528,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/solicitudes")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-violeta p-3 text-white transition-colors hover:brightness-110"
+                  className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-violeta p-3 text-white transition-colors hover:brightness-110"
                 >
                   <HiPlusSm className="h-5 w-5" />
                   <span className="text-[12px] font-medium">Nueva póliza</span>
@@ -515,7 +538,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/clientes")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-colors hover:border-duo-violeta"
+                  className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-colors hover:border-duo-violeta"
                 >
                   <HiUsers className="h-4 w-4" />
                   <span className="text-[12px] font-medium">Nuevo cliente</span>
@@ -525,7 +548,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/pagos")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-verde p-3 text-white transition-colors hover:brightness-110"
+                  className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-duo-verde p-3 text-white transition-colors hover:brightness-110"
                 >
                   <HiCash className="h-4 w-4" />
                   <span className="text-[12px] font-medium">Ir a pagos</span>
@@ -535,7 +558,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/polizas")}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-colors hover:border-duo-violeta"
+                  className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3 text-titulo dark:text-titulo-dark transition-colors hover:border-duo-violeta"
                 >
                   <HiShieldCheck className="h-4 w-4" />
                   <span className="text-[12px] font-medium">Ver pólizas</span>

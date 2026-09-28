@@ -31,7 +31,11 @@ export default function GestorLayout({ children }) {
 
   return (
     <div className="min-h-[100dvh] bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark">
-      <header className="sticky top-0 z-40 border-b border-linea dark:border-linea-dark bg-card/95 dark:bg-card-dark/95 backdrop-blur">
+      {/* 📱 safe-area: con viewport-fit=cover, en el iPhone nada queda debajo del notch */}
+      <header
+        className="sticky top-0 z-40 border-b border-linea dark:border-linea-dark bg-card/95 dark:bg-card-dark/95 backdrop-blur"
+        style={{ paddingTop: "env(safe-area-inset-top)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}
+      >
         <div className="max-w-5xl mx-auto flex items-center gap-3 px-3 sm:px-4 h-14">
           <img src={logoThames} alt="THAMES" className="h-7 w-auto" />
           <span className="text-[14px] font-semibold text-suave dark:text-suave-dark border-l border-linea dark:border-linea-dark pl-3">Gestoría</span>
@@ -58,7 +62,7 @@ export default function GestorLayout({ children }) {
           </button>
         </div>
       </header>
-      <main className="px-0 sm:px-4 pb-10">{children}</main>
+      <main className="px-0 sm:px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">{children}</main>
     </div>
   );
 }

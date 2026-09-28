@@ -71,7 +71,7 @@ export default function PolizaYaRenovadaModal({
             )}
           </div>
           <a
-            href={`/polizas/${nuevaId}`}
+            href={`#/polizas/${nuevaId}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-duo-azul hover:underline"
@@ -82,4 +82,4 @@ export default function PolizaYaRenovadaModal({
       )}
     </ModalDuo>
   );
-}
+}

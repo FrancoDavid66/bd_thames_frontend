@@ -99,7 +99,7 @@ function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, o
 
       {/* Ver */}
       <a
-        href={`/polizas/${p.id}`}
+        href={`#/polizas/${p.id}`}
         target="_blank"
         rel="noopener noreferrer"
         title="Ver detalle (nueva pestaña)"
@@ -316,4 +316,4 @@ export default function Renovacionestable({
       </div>
     </div>
   );
-}
+}

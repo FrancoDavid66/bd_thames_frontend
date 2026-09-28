@@ -81,7 +81,9 @@ export default function Sidebar({
         )}
       </AnimatePresence>
 
-      {/* 🚀 LENGÜETA lateral — aparece cuando el sidebar está CERRADO. */}
+      {/* 🚀 LENGÜETA lateral — aparece cuando el sidebar está CERRADO.
+          📱 Solo en la compu (≥ 1024 px): en celu y tablet el menú completo
+          está en "Más" de la barra de abajo, y la lengüeta tapaba el contenido. */}
       <AnimatePresence>
         {!isOpen && onOpen && (
           <motion.button
@@ -94,7 +96,7 @@ export default function Sidebar({
             transition={{ duration: 0.22 }}
             aria-label="Abrir menú lateral"
             title="Abrir menú"
-            className="group fixed left-0 top-1/2 -translate-y-1/2 z-[45] flex items-center justify-center
+            className="group fixed left-0 top-1/2 -translate-y-1/2 z-[45] hidden lg:flex items-center justify-center
                        h-16 w-6 rounded-r-lg bg-duo-azul text-white
                        hover:w-7 transition-all duration-200 active:scale-95"
           >
@@ -126,7 +128,9 @@ export default function Sidebar({
       </AnimatePresence>
 
       {/* Sidebar — 256px, coincide con "lg:ml-64" de App.jsx */}
-      <aside className={`
+      <aside
+        style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+        className={`
         fixed top-0 left-0 z-50 h-[100dvh] w-64 flex flex-col
         bg-card dark:bg-card-dark border-r border-linea dark:border-linea-dark
         shadow-sm

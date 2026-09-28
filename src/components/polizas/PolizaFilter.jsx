@@ -306,13 +306,16 @@ export default function PolizaFilter({
       </div>
 
       {/* ===== Filtros: sucursal + aseguradora (admin) · estado + vencimiento (todos) ===== */}
+      {/* 📱 En el celu van uno abajo del otro, todos a lo ancho (en 2 columnas
+          no entra "Todas las sucursales" y quedaba cortado); los días antes /
+          después sí van de a 2. Desde sm vuelven a ir en fila como antes. */}
       {mostrarFilaFiltros && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           {isWebAdmin && onOficinaChange && (
             <SelectDuo
               value={oficinaActual}
               onChange={(e) => onOficinaChange(e.target.value)}
-              className="min-w-[180px]"
+              className="col-span-2 min-w-0 sm:min-w-[180px]"
               aria-label="Sucursal"
             >
               <option value="ALL">Todas las sucursales</option>
@@ -324,7 +327,7 @@ export default function PolizaFilter({
             <SelectDuo
               value={companiaActual}
               onChange={(e) => onCompaniaChange(e.target.value)}
-              className="min-w-[180px]"
+              className="col-span-2 min-w-0 sm:min-w-[180px]"
               aria-label="Aseguradora"
             >
               <option value="">Todas las aseguradoras</option>
@@ -337,7 +340,7 @@ export default function PolizaFilter({
             <SelectDuo
               value={estadoValor}
               onChange={onEstadoSelect}
-              className="min-w-[170px]"
+              className="col-span-2 min-w-0 sm:min-w-[170px]"
               aria-label="Estado de la póliza"
             >
               {ESTADOS_POLIZA.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
@@ -348,7 +351,7 @@ export default function PolizaFilter({
           {fechaDisponible && (
             <label
               title="Muestra todo lo que vence ese día: cuotas (pagadas o no) y pólizas que terminan"
-              className={`${CAJA_CLS} cursor-pointer pl-3 pr-2`}
+              className={`${CAJA_CLS} col-span-2 h-11 cursor-pointer pl-3 pr-2 sm:h-10`}
             >
               <HiCalendar className="h-4 w-4 shrink-0 text-suave dark:text-suave-dark" />
               <span className="whitespace-nowrap text-[13px] text-suave dark:text-suave-dark">Vence el</span>
@@ -356,7 +359,7 @@ export default function PolizaFilter({
                 type="date"
                 value={fechaDia}
                 onChange={cambiarCampo("fecha")}
-                className="h-full min-w-0 cursor-pointer bg-transparent text-[14px] text-titulo dark:text-titulo-dark outline-none dark:[color-scheme:dark]"
+                className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-base text-titulo dark:text-titulo-dark outline-none dark:[color-scheme:dark] sm:flex-none sm:text-[14px]"
               />
             </label>
           )}
@@ -366,7 +369,7 @@ export default function PolizaFilter({
             <>
               <label
                 title="Incluye los días anteriores a la fecha elegida"
-                className={`${CAJA_CLS} pl-1.5 pr-3`}
+                className={`${CAJA_CLS} h-11 pl-1.5 pr-3 sm:h-10`}
               >
                 <input
                   type="number"
@@ -384,7 +387,7 @@ export default function PolizaFilter({
               </label>
               <label
                 title="Incluye los días posteriores a la fecha elegida"
-                className={`${CAJA_CLS} pl-1.5 pr-3`}
+                className={`${CAJA_CLS} h-11 pl-1.5 pr-3 sm:h-10`}
               >
                 <input
                   type="number"

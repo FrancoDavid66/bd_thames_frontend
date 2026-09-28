@@ -348,8 +348,8 @@ function Modal({ open, onClose, title, wide = false, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className={`relative max-h-[90vh] w-full overflow-y-auto rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-8 shadow-xl ${wide ? 'max-w-5xl' : 'max-w-md'}`}>
-        <button onClick={onClose} className="absolute right-6 top-6 text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX size={20}/></button>
+      <div className={`relative max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] p-5 sm:p-8 shadow-xl ${wide ? 'max-w-5xl' : 'max-w-md'}`}>
+        <button onClick={onClose} aria-label="Cerrar" className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-suave)] hover:text-[var(--color-titulo)] sm:right-5 sm:top-5"><HiX size={20}/></button>
         <h3 className="mb-6 text-[17px] font-semibold text-[var(--color-titulo)]">{title}</h3>
         {children}
       </div>

@@ -290,7 +290,7 @@ const MobileCard = memo(function MobileCard({ poliza, isWebAdmin, venceClave }) 
   return (
     <Link
       to={`/polizas/${poliza.id}`}
-      className="block rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 transition-transform active:scale-[0.99]"
+      className="flex flex-col rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-4 transition-colors hover:border-duo-azul/40 active:scale-[0.99]"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -318,7 +318,7 @@ const MobileCard = memo(function MobileCard({ poliza, isWebAdmin, venceClave }) 
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-end gap-2">
+      <div className="mt-auto flex items-center justify-end gap-2 pt-3">
         {isWebAdmin && (
           <span className="inline-flex items-center gap-1 text-[11px] text-duo-azul">
             <FaBuilding className="text-[10px]" /> {poliza?.oficina_nombre || "LOCAL"}
@@ -344,12 +344,17 @@ const PolizaTable = ({
   const isLoading = status === "loading";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
+    // 📐 @container: la tabla o las tarjetas se eligen por el ANCHO DE LA CAJA (no
+    //    de la pantalla). Así en una tablet parada, o en la compu con el menú
+    //    lateral abierto, no se aprieta la tabla (antes los nombres quedaban en 3
+    //    renglones): se ven tarjetas, de a 2 por fila.
+    //    Ejemplo: caja de 700 px → tarjetas en 2 columnas; caja de 900 px → tabla.
+    <div className="@container overflow-hidden rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
       {/* 🚫 Loader quitado a pedido: la barrita azul de "cargando" ya NO se muestra
           en la tabla. El loader queda SOLO para el inicio/cierre de sesión (App.jsx). */}
 
-      {/* ===== Desktop: tabla (md+) ===== */}
-      <div className="hidden overflow-x-auto md:block">
+      {/* ===== Tabla: cuando la caja mide 768 px o más ===== */}
+      <div className="hidden overflow-x-auto @3xl:block">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
@@ -376,13 +381,13 @@ const PolizaTable = ({
         )}
       </div>
 
-      {/* ===== Mobile: tarjetas (< md) ===== */}
-      <div className="space-y-3 p-3 md:hidden">
+      {/* ===== Tarjetas: caja angosta (celu, tablet, menú abierto) — de a 2 desde 576 px ===== */}
+      <div className="grid grid-cols-1 gap-3 p-3 @xl:grid-cols-2 @3xl:hidden">
         {polizas.map((p) => (
           <MobileCard key={p.id} poliza={p} isWebAdmin={isWebAdmin} venceClave={venceClave} />
         ))}
         {polizas.length === 0 && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
             <HiSearch className="mb-2 h-8 w-8 text-suave dark:text-suave-dark" />
             <p className="text-sm font-medium text-titulo dark:text-titulo-dark">Sin pólizas para los filtros aplicados.</p>
           </div>
@@ -390,7 +395,7 @@ const PolizaTable = ({
       </div>
 
       {/* ===== Paginación ===== */}
-      <div className="flex items-center justify-between border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-4 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-3 sm:px-6 sm:py-4">
         <div className="text-[11px] text-suave dark:text-suave-dark">
           {cursorEnabled ? `Registros: ${polizas.length}` : `Página ${page} de ${totalPages} · Total: ${total}`}
         </div>

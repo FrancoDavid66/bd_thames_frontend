@@ -310,7 +310,11 @@ export default function PolizaDetails() {
         </div>
         <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Acceso denegado / Error</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-suave dark:text-suave-dark">
-          {String(loadError || "No tenés permisos para ver esta póliza o no pertenece a tu sucursal.")}
+          {/* El error puede venir como objeto ({ detail: "…" }): antes se veía "[object Object]". */}
+          {(typeof loadError === "string"
+            ? loadError
+            : [loadError?.detail, loadError?.message, loadError?.error].find((t) => typeof t === "string" && t)) ||
+            "No tenés permisos para ver esta póliza o no pertenece a tu sucursal."}
         </p>
         <Boton3D variant="blanco" className="mt-6" onClick={() => navigate("/polizas")}>
           Volver al listado

@@ -150,6 +150,20 @@ function BajasTable({
         <div className="col-span-2 text-right">Estado</div>
       </div>
 
+      {/* 📱 Celu/tablet: "seleccionar todas" (en la compu está en el encabezado) */}
+      {rows.length > 0 && (
+        <label className="flex min-h-[48px] cursor-pointer items-center gap-3 border-b border-linea bg-surface px-4 py-2 text-[13px] font-medium text-suave dark:border-linea-dark dark:bg-surface-dark dark:text-suave-dark lg:hidden">
+          <input
+            type="checkbox"
+            checked={allVisibleSelected}
+            ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected; }}
+            onChange={(e) => onSelectAllVisible?.(e.target.checked)}
+            className="h-5 w-5 cursor-pointer accent-duo-azul"
+          />
+          Seleccionar las {rows.length} de esta lista
+        </label>
+      )}
+
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <HiSearch className="text-4xl text-suave dark:text-suave-dark mb-3" />
@@ -161,66 +175,133 @@ function BajasTable({
             const { nombre, clienteId } = resolveAsegurado(p);
             const isSelected = sel.has(String(p.id));
             const estado = p?._bajaStatus || p?.baja_estado || "PENDIENTE_ENVIO";
+            // 🔗 Con HashRouter la ficha va con "#/…" (antes "/polizas/ID" abría el Inicio).
+            const fichaHref = `#/polizas/${p.id}`;
 
             return (
               <div
                 key={p.id}
-                className={`grid grid-cols-2 lg:grid-cols-12 gap-x-3 gap-y-3 px-5 py-4 items-center transition-colors ${
+                className={`transition-colors ${
                   isSelected ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]" : "hover:bg-surface dark:hover:bg-surface-dark"
                 }`}
               >
-                {/* Check */}
-                <div className="lg:col-span-1 flex items-center justify-start lg:justify-center order-1">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => onToggleSelect?.(p.id)}
-                    className="w-5 h-5 cursor-pointer accent-duo-azul"
-                  />
-                </div>
-
-                {/* Asegurado (link) + Compañía */}
-                <div className="lg:col-span-4 min-w-0 order-3 lg:order-2 col-span-2">
-                  <NombreAsegurado nombre={nombre} clienteId={clienteId} />
-                  <div className="text-[11px] text-suave dark:text-suave-dark truncate mt-0.5">{p?.compania || "—"}</div>
-                </div>
-
-                {/* Póliza (últimos 4) / Patente */}
-                <div className="lg:col-span-3 min-w-0 order-4 lg:order-3">
-                  <div className="font-mono text-sm font-medium text-titulo dark:text-titulo-dark truncate" title={p?.numero_poliza || ""}>
-                    {numeroCorto(p?.numero_poliza)}
+                {/* ===== 🖥️ Compu: fila de la grilla de 12 columnas ===== */}
+                <div className="hidden lg:grid lg:grid-cols-12 gap-x-3 gap-y-3 px-5 py-4 items-center">
+                  {/* Check */}
+                  <div className="lg:col-span-1 flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelect?.(p.id)}
+                      className="w-5 h-5 cursor-pointer accent-duo-azul"
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1 group/pat">
-                    <span className="text-[12px] font-medium text-duo-azul uppercase bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg">
-                      {p?.patente || "—"}
-                    </span>
-                    <button
-                      onClick={() => handleCopyPatente(p?.patente)}
-                      className="p-1 rounded text-suave hover:text-duo-azul transition-all lg:opacity-0 lg:group-hover/pat:opacity-100"
-                      title="Copiar patente"
+
+                  {/* Asegurado (link) + Compañía */}
+                  <div className="lg:col-span-4 min-w-0">
+                    <NombreAsegurado nombre={nombre} clienteId={clienteId} />
+                    <div className="text-[11px] text-suave dark:text-suave-dark truncate mt-0.5">{p?.compania || "—"}</div>
+                  </div>
+
+                  {/* Póliza (últimos 4) / Patente */}
+                  <div className="lg:col-span-3 min-w-0">
+                    <div className="font-mono text-sm font-medium text-titulo dark:text-titulo-dark truncate" title={p?.numero_poliza || ""}>
+                      {numeroCorto(p?.numero_poliza)}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1 group/pat">
+                      <span className="text-[12px] font-medium text-duo-azul uppercase bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg">
+                        {p?.patente || "—"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPatente(p?.patente)}
+                        className="p-1 rounded text-suave hover:text-duo-azul transition-all lg:opacity-0 lg:group-hover/pat:opacity-100"
+                        title="Copiar patente"
+                      >
+                        <HiDuplicate size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mora (grande = dato clave) */}
+                  <div className="lg:col-span-2 flex flex-col items-start">
+                    <span className="text-2xl font-semibold text-duo-rojo leading-none">{p?._diasMora ?? 0}</span>
+                    <span className="text-[10px] text-suave dark:text-suave-dark mt-0.5">días de mora</span>
+                  </div>
+
+                  {/* Estado + Ver ficha */}
+                  <div className="lg:col-span-2 flex flex-col items-end gap-2">
+                    <BajaStatusBadge status={estado} />
+                    <a
+                      href={fichaHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-sm font-medium text-duo-azul hover:brightness-95 transition-all"
                     >
-                      <HiDuplicate size={14} />
-                    </button>
+                      Ver ficha <HiExternalLink />
+                    </a>
                   </div>
                 </div>
 
-                {/* Mora (grande = dato clave) */}
-                <div className="lg:col-span-2 order-2 lg:order-4 flex flex-col items-end lg:items-start">
-                  <span className="text-2xl font-semibold text-duo-rojo leading-none">{p?._diasMora ?? 0}</span>
-                  <span className="text-[10px] text-suave dark:text-suave-dark mt-0.5">días de mora</span>
-                </div>
+                {/* ===== 📱 Celu/tablet: tarjeta compacta (antes ocupaba media pantalla) =====
+                    [✓]  Nombre (link)               399
+                         Compañía                    días de mora
+                         …1293 · AB123CD ⧉
+                         Pendiente              [Ver ficha ↗] */}
+                <div className="flex gap-3 px-4 py-3 lg:hidden">
+                  <label className="-m-2 flex h-11 w-11 shrink-0 cursor-pointer items-start justify-center pt-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelect?.(p.id)}
+                      aria-label={`Seleccionar ${nombre}`}
+                      className="h-5 w-5 cursor-pointer accent-duo-azul"
+                    />
+                  </label>
 
-                {/* Estado + Ver ficha */}
-                <div className="lg:col-span-2 flex flex-col items-end gap-2 order-5 col-span-2">
-                  <BajaStatusBadge status={estado} />
-                  <a
-                    href={`/polizas/${p.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-sm font-medium text-duo-azul hover:brightness-95 transition-all"
-                  >
-                    Ver ficha <HiExternalLink />
-                  </a>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <NombreAsegurado nombre={nombre} clienteId={clienteId} />
+                        <div className="mt-0.5 truncate text-[12px] text-suave dark:text-suave-dark">{p?.compania || "—"}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="block text-xl font-semibold leading-none text-duo-rojo">{p?._diasMora ?? 0}</span>
+                        <span className="text-[10px] text-suave dark:text-suave-dark">días de mora</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-mono text-[13px] font-medium text-titulo dark:text-titulo-dark" title={p?.numero_poliza || ""}>
+                        {numeroCorto(p?.numero_poliza)}
+                      </span>
+                      <span className="rounded-lg bg-duo-azul-soft px-2 py-0.5 text-[12px] font-medium uppercase text-duo-azul dark:bg-[var(--color-duo-azul-soft-dark)]">
+                        {p?.patente || "—"}
+                      </span>
+                      {p?.patente && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPatente(p?.patente)}
+                          aria-label="Copiar patente"
+                          className="-my-2 inline-flex h-9 w-9 items-center justify-center rounded-lg text-suave hover:text-duo-azul dark:text-suave-dark"
+                        >
+                          <HiDuplicate size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <BajaStatusBadge status={estado} />
+                      <a
+                        href={fichaHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-duo-azul-soft px-3.5 text-[13px] font-medium text-duo-azul transition-all hover:brightness-95 dark:bg-[var(--color-duo-azul-soft-dark)]"
+                      >
+                        Ver ficha <HiExternalLink />
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
             );

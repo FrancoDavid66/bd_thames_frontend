@@ -73,6 +73,12 @@ const CotizacionesPage = () => {
     }));
   };
 
+  // Colores del select de estado (lo usan la tabla y las tarjetas del celu).
+  const claseEstado = (estado) =>
+    estado === 'VENDIDA' ? 'bg-ingreso/10 text-ingreso border-ingreso/25 hover:bg-ingreso/20' :
+    estado === 'RECHAZADA' ? 'bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark' :
+    'bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro border-tarjeta/25 hover:bg-tarjeta/20';
+
   if (!isWebAdmin) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] text-suave dark:text-suave-dark">
@@ -96,7 +102,7 @@ const CotizacionesPage = () => {
           <p className="text-[13px] text-suave dark:text-suave-dark mt-1">Armá propuestas rápido y descargá el PDF para tu cliente.</p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex w-full items-center gap-2.5 md:w-auto">
           <button
             onClick={() => setSettingsOpen(true)}
             className="flex items-center justify-center h-10 w-10 bg-card dark:bg-card-dark border border-linea dark:border-linea-dark hover:border-duo-violeta text-suave dark:text-suave-dark hover:text-duo-violeta rounded-lg transition-colors"
@@ -105,13 +111,61 @@ const CotizacionesPage = () => {
             <HiCog size={18} />
           </button>
 
-          <button onClick={handleCreate} className="flex items-center gap-2 bg-egreso text-white h-10 px-4 rounded-lg text-[13px] font-medium transition-colors hover:brightness-110">
+          <button onClick={handleCreate} className="flex flex-1 md:flex-none items-center justify-center gap-2 bg-egreso text-white h-11 md:h-10 px-4 rounded-lg text-[13px] font-medium transition-colors hover:brightness-110">
             <HiPlus /> Nueva cotización
           </button>
         </div>
       </div>
 
-      <div className="bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl overflow-hidden">
+      {/* 📱 Celu: tarjetas (la tabla de 6 columnas no entra) */}
+      <div className="space-y-3 md:hidden">
+        {status === 'loading' && !recargandoVivo ? (
+          <p className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark py-10 text-center text-sm text-suave dark:text-suave-dark">Cargando cotizaciones...</p>
+        ) : cotizaciones.length === 0 ? (
+          <p className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark py-10 text-center text-sm text-suave dark:text-suave-dark">No hay cotizaciones armadas aún.</p>
+        ) : (
+          cotizaciones.map(cot => (
+            <div key={cot.id} className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-semibold text-egreso">{cot.cliente_nombre}</p>
+                  <p className="mt-0.5 text-[13px] text-titulo dark:text-titulo-dark">
+                    {cot.marca_auto} {cot.modelo_auto} ({cot.anio_auto}) {cot.tiene_gnc && <span className="text-[10px] font-medium bg-egreso/10 text-egreso px-1.5 rounded ml-1 border border-egreso/25">GNC</span>}
+                  </p>
+                  <p className="mt-0.5 text-[12px] text-suave dark:text-suave-dark">
+                    {dayjs(cot.created_at).format("DD/MM/YYYY")} · {cot.opciones?.length || 0} {(cot.opciones?.length || 0) === 1 ? "opción" : "opciones"}
+                  </p>
+                </div>
+                <select
+                  value={cot.estado}
+                  onChange={(e) => handleStatusChange(cot, e.target.value)}
+                  aria-label="Estado de la cotización"
+                  className={`h-9 shrink-0 px-2 rounded-lg text-[12px] font-medium outline-none appearance-none text-center cursor-pointer transition-colors border dark:[color-scheme:dark] ${claseEstado(cot.estado)}`}
+                  style={{ textAlignLast: 'center' }}
+                >
+                  <option value="PENDIENTE">Pendiente</option>
+                  <option value="VENDIDA">Vendida</option>
+                  <option value="RECHAZADA">Rechazada</option>
+                </select>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <button onClick={() => handleViewPdf(cot)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[13px] font-medium text-titulo dark:text-titulo-dark">
+                  <HiDocumentText size={16} className="text-egreso" /> PDF
+                </button>
+                <button onClick={() => handleEdit(cot)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[13px] font-medium text-titulo dark:text-titulo-dark">
+                  <HiPencil size={16} className="text-duo-violeta" /> Editar
+                </button>
+                <button onClick={() => handleDelete(cot.id)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-[13px] font-medium text-egreso">
+                  <HiTrash size={16} /> Borrar
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 🖥️ Tablet/compu: tabla */}
+      <div className="hidden md:block bg-card dark:bg-card-dark border border-linea dark:border-linea-dark rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-b border-linea dark:border-linea-dark text-[12px]">
@@ -146,11 +200,7 @@ const CotizacionesPage = () => {
                       <select
                         value={cot.estado}
                         onChange={(e) => handleStatusChange(cot, e.target.value)}
-                        className={`px-2 py-1 rounded text-[11px] font-medium outline-none appearance-none text-center cursor-pointer transition-colors border dark:[color-scheme:dark] ${
-                          cot.estado === 'VENDIDA' ? 'bg-ingreso/10 text-ingreso border-ingreso/25 hover:bg-ingreso/20' :
-                          cot.estado === 'RECHAZADA' ? 'bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark' :
-                          'bg-tarjeta/10 text-[#d97706] dark:text-tarjeta-claro border-tarjeta/25 hover:bg-tarjeta/20'
-                        }`}
+                        className={`px-2 py-1 rounded text-[11px] font-medium outline-none appearance-none text-center cursor-pointer transition-colors border dark:[color-scheme:dark] ${claseEstado(cot.estado)}`}
                         style={{ textAlignLast: 'center' }}
                       >
                         <option value="PENDIENTE">Pendiente</option>

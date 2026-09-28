@@ -101,6 +101,16 @@ export default function PortalAseguradoPage() {
      oscuro lo cambia desde el pie. */
   const temaActivo = tema === "oscuro" ? "oscuro" : "claro";
 
+  /* 📱 La barra del navegador del celu (y los scrollbars) del color del
+     portal — no del tema de la app de la oficina (ThemeContext no la toca en
+     /portal/). Claro = el gris del fondo; oscuro = casi negro. */
+  useEffect(() => {
+    const root = document.documentElement;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    root.style.colorScheme = temaActivo === "oscuro" ? "dark" : "light";
+    if (meta) meta.setAttribute("content", temaActivo === "oscuro" ? "#0E0E11" : "#F2F3F5");
+  }, [temaActivo]);
+
   /* 🌓 El cambio de tema, con transición.
      Los colores viven en variables CSS y las variables NO transicionan solas
      en cascada. La solución: poner una clase JUSTO durante el cambio y

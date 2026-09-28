@@ -344,7 +344,7 @@ function ExportRenovacionesModal({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div
-        className="w-full max-w-xl rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl overflow-hidden"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto overscroll-contain rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

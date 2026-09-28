@@ -109,11 +109,14 @@ function tonoSituacion(item) {
   return "verde";
 }
 
+// 📱 La píldora puede partirse en 2 renglones si el texto es largo (ej. "Vence HOY ·
+//    NO PAGÓ LA 3 Y LA 4 · VENCIDA · DEBE 4 CUOTAS"): antes no cortaba y en el
+//    celu/tablet se salía de la tarjeta o quedaba debajo de los botones.
 function Pill({ tono = "gris", children, title }) {
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${TONOS[tono] || TONOS.gris}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium leading-snug [overflow-wrap:anywhere] ${TONOS[tono] || TONOS.gris}`}
     >
       {children}
     </span>

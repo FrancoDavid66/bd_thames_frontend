@@ -216,7 +216,7 @@ function AlertaModal({ poliza, cliente, onClose, onConfirm, loading }) {
             </button>
           )}
           {cfg.action === "nueva" && (
-            <a href={`/solicitudes?nueva=1&cliente_id=${cliente?.id || ""}&patente=${poliza?.patente || ""}&compania=${poliza?.compania || ""}`}
+            <a href={`#/solicitudes?nueva=1&cliente_id=${encodeURIComponent(cliente?.id || "")}&patente=${encodeURIComponent(poliza?.patente || "")}&compania=${encodeURIComponent(poliza?.compania || "")}`}
               className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-base font-semibold transition-colors ${B3D[cfg.btnVariant]}`}>
               <HiPlus className="w-5 h-5" /> {cfg.btnLabel}
             </a>
@@ -653,7 +653,7 @@ export default function PagosSearch({ onBuscar, onActualizarVivo }) {
             <motion.div
               initial={{ scale: 0.96, y: 16, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.96, y: 16, opacity: 0 }}
-              className="relative z-10 w-full max-w-md rounded-xl border border-duo-verde/35 bg-card dark:bg-card-dark shadow-xl overflow-hidden">
+              className="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-duo-verde/35 bg-card dark:bg-card-dark shadow-xl">
               <div className="px-5 py-4 border-b border-linea dark:border-linea-dark flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] flex items-center justify-center shrink-0">
                   <HiRefresh className="w-5 h-5 text-duo-verde" />

@@ -156,7 +156,7 @@ export default function AdminOficinas() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] shadow-xl">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] shadow-xl">
             <div className="flex items-center justify-between border-b border-[var(--color-linea)] p-4 text-[var(--color-titulo)]">
               <h3 className="font-semibold text-[15px]">{editingId ? "Editar oficina" : "Nueva oficina"}</h3>
               <button onClick={() => setModalOpen(false)} className="text-[var(--color-suave)] hover:text-[var(--color-titulo)]"><HiX size={18} /></button>

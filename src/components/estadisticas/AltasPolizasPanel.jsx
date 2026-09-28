@@ -215,7 +215,7 @@ function ExportExcelModal({
         if (e.target === e.currentTarget && !loading) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-linea dark:border-linea-dark p-4">
           <div>

@@ -123,8 +123,10 @@ export default function RecaudacionPage() {
   const { user } = useAuth();
   const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
+  // 📱 px-4 en el celu: antes la pantalla iba pegada a los bordes (el main no
+  //    tiene margen en el celu y esta página no ponía el suyo). pt: aire bajo el header.
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 px-4 pb-6 pt-5 sm:px-0 sm:pt-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-lg bg-oficina/15 flex items-center justify-center shrink-0">

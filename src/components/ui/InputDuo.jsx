@@ -7,6 +7,8 @@ import { forwardRef } from "react";
  * 🆕 Rediseño "profesional": borde de 1px (antes 3px), esquinas rounded-lg
  * (antes rounded-2xl) y una altura más estándar (antes h-13 = 52px, muy
  * alto). El label pasa de MAYÚSCULA+negrita a texto normal en gris medio.
+ * 📱 En el celu: 44 px de alto y letra de 16 px (cómodo para el dedo y el
+ *    iPhone no hace zoom al tocarlo). Desde sm: 40 px / 14 px como siempre.
  *
  * Props:
  *   label: texto arriba del input (opcional)
@@ -38,8 +40,8 @@ const InputDuo = forwardRef(function InputDuo(
         )}
         <input
           ref={ref}
-          className={`w-full h-10 rounded-lg border bg-card dark:bg-card-dark
-            text-[14px] font-normal text-titulo dark:text-titulo-dark
+          className={`w-full h-11 sm:h-10 rounded-lg border bg-card dark:bg-card-dark
+            text-base sm:text-[14px] font-normal text-titulo dark:text-titulo-dark
             placeholder:text-suave dark:placeholder:text-suave-dark
             outline-none transition-colors [color-scheme:light] dark:[color-scheme:dark]
             ${icon ? "pl-10 pr-3.5" : "px-3.5"}

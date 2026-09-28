@@ -819,7 +819,7 @@ export default function PanelPortalPage() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 12 }}
               transition={{ type: "spring", stiffness: 300, damping: 26 }}
-              className="relative z-[71] w-full max-w-sm rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-5 sm:px-6 sm:py-6 shadow-xl"
+              className="relative z-[71] max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-5 py-5 sm:px-6 sm:py-6 shadow-xl"
             >
               <div className="flex items-start justify-between gap-3 mb-4">
                 <h3 className="text-[15px] sm:text-[16px] font-semibold text-titulo dark:text-titulo-dark">

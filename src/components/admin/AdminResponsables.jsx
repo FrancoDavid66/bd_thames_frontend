@@ -223,7 +223,7 @@ export default function AdminResponsables() {
       {/* MODAL DE CRUD (CREAR / EDITAR) */}
       {modalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] shadow-xl">
+          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] shadow-xl">
             <div className="flex items-center justify-between border-b border-[var(--color-linea)] p-5">
               <h3 className="text-[16px] font-semibold text-[var(--color-titulo)]">
                 {editingId ? "Editar responsable" : "Nuevo responsable"}

@@ -232,7 +232,7 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
                   <tr key={it.id} className="hover:bg-oficina/5 transition-colors group">
                     <td className="px-3 py-2.5">
                       <a
-                        href={`/polizas/${it.id}`}
+                        href={`#/polizas/${it.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-oficina hover:text-oficina-fuerte transition-colors"
@@ -256,7 +256,7 @@ export default function ControlFechasPanel({ apiBase, oficina, getOficinaNombre 
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <a
-                        href={`/polizas/${it.id}`}
+                        href={`#/polizas/${it.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-oficina hover:text-oficina-fuerte text-[11px] font-medium"

@@ -6,6 +6,8 @@ import { forwardRef } from "react";
  *
  * 🆕 Rediseño "profesional": mismo tratamiento que InputDuo — borde de
  * 1px, esquinas rounded-lg, altura estándar, label en texto normal.
+ * 📱 En el celu: 44 px de alto y letra de 16 px (cómodo para el dedo y el
+ *    iPhone no hace zoom al tocarlo). Desde sm: 40 px / 14 px como siempre.
  *
  * Props:
  *   label: texto arriba (opcional)
@@ -34,8 +36,8 @@ const SelectDuo = forwardRef(function SelectDuo(
       <div className="relative">
         <select
           ref={ref}
-          className="w-full h-10 rounded-lg border border-linea dark:border-linea-dark
-            bg-card dark:bg-card-dark px-3.5 pr-9 text-[14px] font-normal
+          className="w-full h-11 sm:h-10 rounded-lg border border-linea dark:border-linea-dark
+            bg-card dark:bg-card-dark px-3.5 pr-9 text-base sm:text-[14px] font-normal
             text-titulo dark:text-titulo-dark outline-none focus:border-duo-violeta
             transition-colors cursor-pointer appearance-none"
           {...rest}

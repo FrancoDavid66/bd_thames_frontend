@@ -30,9 +30,11 @@ const VARIANTES = {
   blanco:   "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border border-linea dark:border-linea-dark hover:bg-surface dark:hover:bg-surface-dark",
 };
 
+// 📱 min-h: en el celu ningún botón queda más bajo que el dedo (40/44 px);
+//    desde sm se ven igual que antes.
 const TAMANOS = {
-  sm: "text-[13px] px-3.5 py-2 rounded-lg",
-  md: "text-[14px] px-4 py-2.5 rounded-lg",
+  sm: "text-[13px] px-3.5 py-2 rounded-lg min-h-10 sm:min-h-auto",
+  md: "text-[14px] px-4 py-2.5 rounded-lg min-h-11 sm:min-h-auto",
   lg: "text-[15px] px-5 py-3 rounded-lg",
 };
 

@@ -64,7 +64,10 @@ export default function ModalDuo({
           onClick={onClose}
         >
           <motion.div
-            className={`w-full ${ancho} rounded-t-2xl sm:rounded-2xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={typeof title === "string" ? title : undefined}
+            className={`w-full ${ancho} rounded-t-2xl sm:rounded-2xl bg-card dark:bg-card-dark border border-linea dark:border-linea-dark shadow-xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90dvh]`}
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
@@ -72,7 +75,7 @@ export default function ModalDuo({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-linea dark:border-linea-dark">
+            <div className="flex shrink-0 items-center justify-between gap-2 py-3 pl-5 pr-3 border-b border-linea dark:border-linea-dark sm:py-4">
               <div className="flex items-center gap-3 min-w-0">
                 {icon && (
                   <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg shrink-0 ${it}`}>
@@ -93,7 +96,7 @@ export default function ModalDuo({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-8 w-8 flex items-center justify-center rounded-lg text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors shrink-0"
+                className="h-10 w-10 flex items-center justify-center rounded-lg text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark transition-colors shrink-0"
                 aria-label="Cerrar"
               >
                 <HiX className="text-lg" />
@@ -101,11 +104,13 @@ export default function ModalDuo({
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 scrollbar-hide">{children}</div>
+            <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 scrollbar-hide ${footer ? "" : "pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5"}`}>{children}</div>
 
             {/* Footer (opcional) */}
             {footer && (
-              <div className="px-5 py-4 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex flex-col sm:flex-row items-center justify-end gap-2.5">
+              // 📱 En el celu los botones van a lo ancho, apilados y con el principal
+              //    (el último) ARRIBA, como en las apps; desde sm, en fila a la derecha.
+              <div className="shrink-0 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:py-4 border-t border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark flex flex-col-reverse items-stretch sm:flex-row sm:items-center justify-end gap-2.5 [&>*]:min-h-[44px] sm:[&>*]:min-h-0">
                 {footer}
               </div>
             )}

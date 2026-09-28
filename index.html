@@ -1,10 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./src/assets/logos/logo_thames.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 📱 viewport-fit=cover: la app usa toda la pantalla del celu (notch y
+         rayita de abajo incluidos); el header y la barra de abajo se corren
+         solos con env(safe-area-inset-*) para que nada quede tapado. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Color de la barra del navegador en el celu (lo actualiza el tema) -->
+    <meta name="theme-color" content="#ffffff" />
     <title>THAMES APLICACION</title>
+    <script>
+      // 📱 iPhone/iPad: al tocar un campo con letra chica, Safari hace zoom y
+      // la pantalla queda "agrandada". Con maximum-scale=1 no lo hace (y el
+      // pellizco para agrandar sigue andando: iOS lo permite igual).
+      // En Android no se toca nada (allá no pasa y así no se pierde el zoom).
+      (function () {
+        var ua = navigator.userAgent || "";
+        var esIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        if (!esIOS) return;
+        var m = document.querySelector('meta[name="viewport"]');
+        if (m && m.content.indexOf("maximum-scale") === -1) m.content += ", maximum-scale=1";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

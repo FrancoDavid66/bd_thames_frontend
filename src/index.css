@@ -195,6 +195,47 @@ select {
   color-scheme: light;
 }
 
+/* ==========================================================================
+   📱 CELUS Y TABLETS — que se sienta como una app
+   --------------------------------------------------------------------------
+   - Sin el "flash" gris/azul que pinta el navegador al tocar algo.
+   - touch-action: manipulation → el toque responde al instante (sin esperar
+     a ver si era un doble toque para hacer zoom).
+   - Al apretar un botón con el dedo se oscurece apenas (feedback táctil),
+     como en las apps nativas. Solo en pantallas táctiles (sin mouse).
+   ========================================================================== */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 📱 Celu ACOSTADO con notch: toda la app (y las páginas públicas, el login,
+   Gestoría/Legales de afuera) se corre lo justo para no quedar debajo del
+   notch. Parado o en la compu estos valores son 0 → no cambia nada.
+   (El header y la barra de abajo son "fixed": tienen su propio margen.) */
+#root {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+a,
+button,
+[role="button"],
+label,
+summary,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button:not(:disabled):active,
+  [role="button"]:active,
+  a[href]:active {
+    filter: brightness(0.94);
+  }
+}
+
 /* iOS Safari: evita scroll raro / rebote visual */
 @supports (-webkit-touch-callout: none) {
   body {

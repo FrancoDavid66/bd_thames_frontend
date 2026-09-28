@@ -731,9 +731,13 @@ function App() {
             siniestrosAbiertos={siniestrosAbiertos}
           />
 
+          {/* 📏 Arriba: el alto REAL del header (lo publica Header en --alto-header;
+              crece si aparece el aviso rojo de pagos o hay notch).
+              📱 Abajo: en celu/tablet la barra de abajo está siempre → lugar para
+              ella + la rayita del iPhone. 🖥️ En la compu depende de si está visible. */}
           <motion.main
-            className={`flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 overflow-y-auto transition-all duration-200 pt-16 ${
-              footerVisible ? "pb-24" : "pb-20 lg:pb-8"
+            className={`flex-1 min-h-0 min-w-0 px-0 sm:px-4 md:px-6 lg:px-8 overflow-y-auto transition-all duration-200 pt-[var(--alto-header,4rem)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] ${
+              footerVisible ? "lg:pb-24" : "lg:pb-8"
             }`}
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

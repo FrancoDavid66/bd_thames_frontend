@@ -28,10 +28,22 @@ function leerTemaInicial() {
   return DEFAULT_THEME;
 }
 
+// Páginas públicas con estilo PROPIO (no siguen el tema de la app de adentro):
+// el Portal del asegurado (tiene su propio claro/oscuro) y el cupón público.
+const RUTA_CON_TEMA_PROPIO = /^#\/(portal|cupon)\//;
+
 // Aplica (o saca) la clase "dark" en el <html>.
+// 📱 También pinta la barra del navegador del celu del mismo color que el
+//    header (blanco en claro, gris oscuro en oscuro) y avisa al navegador si
+//    es claro u oscuro (scrollbars, calendarios, etc.). En el portal y el
+//    cupón eso lo decide la propia página.
 function aplicarClase(theme) {
   const root = document.documentElement;
   root.classList.toggle("dark", theme === "dark");
+  if (RUTA_CON_TEMA_PROPIO.test(window.location.hash || "")) return;
+  root.style.colorScheme = theme === "dark" ? "dark" : "light";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#1e293b" : "#ffffff");
 }
 
 export function ThemeProvider({ children }) {

@@ -6,7 +6,10 @@ import toast from "react-hot-toast";
 
 // 🚀 IMPORTACIONES
 import { useAuth } from "../../context/AuthContext";
-import { solicitudesApi } from "../../api/solicitudes";
+// 🏢 Sucursales: se piden a usuarios/oficinas/ (antes se llamaba a
+//    solicitudesApi.oficinasListar, que NO existe → salía "Error al sincronizar
+//    sucursales" y el admin no podía elegir la sucursal del cliente nuevo).
+import api from "../../services/api";
 import { useClienteForm } from "../../hooks/clientes/useClienteForm";
 import Boton3D from "../ui/Boton3D";
 
@@ -44,11 +47,12 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
       const fetchOfis = async () => {
         setLoadingOficinas(true);
         try {
-          const res = await solicitudesApi.oficinasListar({});
-          const data = Array.isArray(res) ? res : res?.results || res?.data || [];
+          const res = await api.get("usuarios/oficinas/");
+          const body = res?.data;
+          const data = Array.isArray(body) ? body : body?.results || [];
           setOficinas(data);
         } catch (error) {
-          if (error.status !== 401) {
+          if ((error?.response?.status ?? error?.status) !== 401) {
             toast.error("Error al sincronizar sucursales.");
           }
         } finally {

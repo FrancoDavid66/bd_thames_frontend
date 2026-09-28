@@ -114,7 +114,7 @@ function ModalCorreo({ correo, companiasCatalogo, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] shadow-xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-[var(--color-linea)] bg-[var(--color-card)] shadow-xl">
 
         {/* Header modal */}
         <div className="flex items-center justify-between border-b border-[var(--color-linea)] px-6 py-4">
