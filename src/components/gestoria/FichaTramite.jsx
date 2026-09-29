@@ -11,6 +11,8 @@
 //     llamarlo, mandarle un mail o ir a llevarle papeles.
 //   - 🚗 Patente y vehículo: si se cargó sin patente, la agregan la oficina o
 //     el gestor del trámite desde "Datos del trámite" (Franco 28/09).
+//   - 🔒 "Póliza" solo para la oficina y el admin: el gestor no ve si el cliente
+//     tiene póliza (ni el servidor se lo manda, 29/09).
 //   - 📲 Aviso al cliente por WhatsApp (whatsapp_modo):
 //       · "apagado" (hoy): solo el link del cliente (Copiar / Ver como el cliente).
 //       · "manual": "Mandar por WhatsApp" abre el chat con el mensaje escrito (el
@@ -496,7 +498,8 @@ export default function FichaTramite() {
               />
               {/* 📅 Fecha estimada: ya no se carga (se sacó del alta el 28/09). Los trámites viejos que la tienen la muestran. */}
               {t.fecha_estimada && <Dato label="Fecha estimada">{fechaCorta(t.fecha_estimada)}</Dato>}
-              <Dato label="Póliza">{t.poliza_label || "Sin póliza en THAMES"}</Dato>
+              {/* 🔒 La póliza la ven solo la oficina y el admin: el gestor no sabe si el cliente tiene póliza (29/09). */}
+              {staff && <Dato label="Póliza">{t.poliza_label || "Sin póliza en THAMES"}</Dato>}
               <Dato label="Oficina">{t.oficina_nombre || "—"}</Dato>
               <Dato label="Cargado">
                 {ddmmhhmm(t.creado_en)}
