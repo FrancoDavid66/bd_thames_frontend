@@ -1,16 +1,22 @@
 // src/components/gestoria/FichaTramite.jsx
 //
 // 📄 Ficha de un trámite: en qué paso está, botones para avanzarlo, datos,
-// papeles (fotos/PDF), historial y el aviso al cliente.
+// papeles (fotos/PDF), historial y el link del cliente.
 //   - Admin: además la caja "Plata 🔒" (precio, comisión, cobrarla, comprobantes).
 //   - Gestor: "Precio al cliente" (lo carga él) y sus comprobantes.
+//     🎚️ Con las comisiones APAGADAS (hoy) no sale ninguna de las dos: el
+//     servidor no manda plata y el gestor pasa a LISTO sin precio.
 //   - Oficina: todo menos la plata (el servidor ni siquiera se la manda).
 //   - Oficina y admin: el gestor con su foto y botones para escribirle,
 //     llamarlo, mandarle un mail o ir a llevarle papeles.
-//   - 📲 WhatsApp al cliente MANUAL (por ahora): "Mandar por WhatsApp" abre el
-//     chat con el mensaje escrito (el link, o "ya está LISTO") y queda anotado.
-//     Si está LISTO y nadie le avisó, arriba sale el cartel verde para avisarle
-//     (con el automático prendido, solo si el WhatsApp automático no salió).
+//   - 🚗 Patente y vehículo: si se cargó sin patente, la agregan la oficina o
+//     el gestor del trámite desde "Datos del trámite" (Franco 28/09).
+//   - 📲 Aviso al cliente por WhatsApp (whatsapp_modo):
+//       · "apagado" (hoy): solo el link del cliente (Copiar / Ver como el cliente).
+//       · "manual": "Mandar por WhatsApp" abre el chat con el mensaje escrito (el
+//         link, o "ya está LISTO") y queda anotado. Si está LISTO y nadie le
+//         avisó, arriba sale el cartel verde para avisarle.
+//       · "automatico": sale solo (el cartel, solo si no salió).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
@@ -95,6 +101,83 @@ function BotonWhatsApp({ href, onClick, children, principal = false }) {
       <HiChatAlt2 className="w-4 h-4 shrink-0" />
       {children}
     </a>
+  );
+}
+
+/**
+ * 🚗 Patente y vehículo, con "Agregar patente" / "Cambiar" para la oficina y el
+ * gestor del trámite (ej: se cargó a mano sin patente y se completa después).
+ */
+function DatoVehiculo({ t, puede, ocupado, onGuardar }) {
+  const [editando, setEditando] = useState(false);
+  const [f, setF] = useState({ patente: "", vehiculo: "" });
+
+  const abrir = () => {
+    setF({ patente: t.patente || "", vehiculo: t.vehiculo || "" });
+    setEditando(true);
+  };
+  const guardar = async (e) => {
+    e.preventDefault();
+    try {
+      await onGuardar({ patente: f.patente.replace(/\s/g, ""), vehiculo: f.vehiculo.trim() });
+      setEditando(false);
+    } catch {
+      /* el error ya salió en el cartelito rojo: queda abierto para corregir */
+    }
+  };
+
+  if (editando) {
+    const campo =
+      "h-10 w-full rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 text-[14px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta";
+    return (
+      <form onSubmit={guardar} className="sm:col-span-3 flex flex-col gap-2 rounded-lg border border-duo-violeta/40 p-3">
+        <span className="text-[12px] font-medium text-suave dark:text-suave-dark">Vehículo</span>
+        <div className="grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)] gap-2">
+          <input
+            aria-label="Patente"
+            value={f.patente}
+            maxLength={20}
+            onChange={(e) => setF({ ...f, patente: e.target.value.toUpperCase() })}
+            placeholder="Patente (ej: AB123CD)"
+            className={`${campo} font-mono uppercase`}
+            autoFocus
+          />
+          <input
+            aria-label="Vehículo"
+            value={f.vehiculo}
+            maxLength={120}
+            onChange={(e) => setF({ ...f, vehiculo: e.target.value })}
+            placeholder="Marca y modelo (opcional)"
+            className={campo}
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={() => setEditando(false)} className="rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
+            Cancelar
+          </button>
+          <button type="submit" disabled={ocupado} className="rounded-lg bg-duo-violeta hover:bg-duo-violeta-sombra px-3.5 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50">
+            Guardar
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <Dato label="Vehículo">
+      {t.patente || t.vehiculo ? (
+        <span>
+          {t.vehiculo} <span className="font-mono tracking-wide">{t.patente || "sin patente"}</span>
+        </span>
+      ) : (
+        <span className="font-normal text-suave dark:text-suave-dark">Sin patente todavía</span>
+      )}
+      {puede && (
+        <button type="button" onClick={abrir} className="block text-[12px] font-semibold text-duo-violeta hover:underline">
+          {t.patente ? "Cambiar" : "Agregar patente"}
+        </button>
+      )}
+    </Dato>
   );
 }
 
@@ -200,9 +283,10 @@ export default function FichaTramite() {
   const docsPlata = (t.documentos || []).filter((x) => x.tipo !== "PAPEL");
   const puede = (e) => (a.estados || []).includes(e);
 
-  // 📲 WhatsApp al cliente (manual): el mensaje lo arma el servidor; el link va
-  //    con la dirección de esta misma app (igual que "Copiar").
+  // 📲 WhatsApp al cliente: el mensaje lo arma el servidor; el link va con la
+  //    dirección de esta misma app (igual que "Copiar"). Apagado = sin WhatsApp.
   const manual = t.whatsapp_modo === "manual";
+  const avisoActivo = !!t.whatsapp_modo && t.whatsapp_modo !== "apagado";
   const avisos = t.avisos_whatsapp || [];
   const yaMandoLink = avisos.some((w) => w.motivo === "alta" && w.ok);
   const textoWa = (motivo) => {
@@ -311,7 +395,14 @@ export default function FichaTramite() {
         <div className="flex flex-col gap-2 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold text-titulo dark:text-titulo-dark">
-              {t.tipo_txt} · {t.vehiculo} <span className="font-mono tracking-wide">{t.patente}</span>
+              {t.tipo_txt} ·{" "}
+              {t.patente || t.vehiculo ? (
+                <>
+                  {t.vehiculo} <span className="font-mono tracking-wide">{t.patente}</span>
+                </>
+              ) : (
+                <span className="font-semibold text-suave dark:text-suave-dark">sin patente</span>
+              )}
             </h2>
             <EstadoPill estado={t.estado} extra={cerrado ? "" : textoDias(d)} />
             {dem && <Demorado />}
@@ -397,28 +488,19 @@ export default function FichaTramite() {
                   )}
                 </Dato>
               )}
-              {a.puede_fecha ? (
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-suave dark:text-suave-dark">
-                  Fecha estimada
-                  <input
-                    type="date"
-                    value={t.fecha_estimada || ""}
-                    disabled={ocupado}
-                    onChange={(e) => {
-                      const v = e.target.value || null;
-                      intentar(() => editarTramite(t.id, { fecha_estimada: v }), v ? `Nueva fecha estimada: ${fechaCorta(v)}` : "Sin fecha estimada");
-                    }}
-                    className="h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-2 text-[14px] text-titulo dark:text-titulo-dark [color-scheme:light] dark:[color-scheme:dark]"
-                  />
-                </label>
-              ) : (
-                <Dato label="Fecha estimada">{fechaCorta(t.fecha_estimada)}</Dato>
-              )}
+              <DatoVehiculo
+                t={t}
+                puede={!!a.puede_vehiculo}
+                ocupado={ocupado}
+                onGuardar={(body) => hacer(() => editarTramite(t.id, body), body.patente ? `Patente ${body.patente} guardada` : "Vehículo guardado")}
+              />
+              {/* 📅 Fecha estimada: ya no se carga (se sacó del alta el 28/09). Los trámites viejos que la tienen la muestran. */}
+              {t.fecha_estimada && <Dato label="Fecha estimada">{fechaCorta(t.fecha_estimada)}</Dato>}
               <Dato label="Póliza">{t.poliza_label || "Sin póliza en THAMES"}</Dato>
               <Dato label="Oficina">{t.oficina_nombre || "—"}</Dato>
               <Dato label="Cargado">
                 {ddmmhhmm(t.creado_en)}
-                {t.creado_por_nombre ? ` · ${t.creado_por_nombre}` : ""}
+                {t.creado_por_nombre ? ` · ${t.creado_por_nombre}${t.cargado_por_gestor ? " (gestor)" : ""}` : ""}
               </Dato>
             </div>
           </Seccion>
@@ -577,7 +659,7 @@ export default function FichaTramite() {
           </Seccion>
 
           {staff && (
-            <Seccion titulo="Aviso al cliente">
+            <Seccion titulo={avisoActivo ? "Aviso al cliente" : "Link del cliente"}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[14px] text-titulo dark:text-titulo-dark">
                   Link de seguimiento <strong className="text-duo-verde-sombra dark:text-duo-verde">· activo</strong>
@@ -591,7 +673,12 @@ export default function FichaTramite() {
                   </a>
                 </span>
               </div>
-              {t.estado !== "CANCELADO" && (
+              {!avisoActivo && (
+                <span className="text-[12px] text-suave dark:text-suave-dark">
+                  Con este link el cliente ve cómo va su trámite y puede mandar fotos o papeles. Si querés, copialo y pasáselo.
+                </span>
+              )}
+              {avisoActivo && t.estado !== "CANCELADO" && (
                 <div className="flex flex-col gap-1.5">
                   <div className="flex flex-wrap gap-2">
                     {t.estado === "LISTO" && (
@@ -609,36 +696,44 @@ export default function FichaTramite() {
                   </span>
                 </div>
               )}
-              <div className="flex flex-col gap-1.5">
-                {avisos.length ? (
-                  avisos.map((w, i) => (
-                    <span key={i} className="inline-flex flex-wrap items-center gap-x-1.5 text-[13px] text-titulo dark:text-titulo-dark">
-                      {w.ok ? <HiCheck className="w-4 h-4 text-duo-verde" /> : <HiX className="w-4 h-4 text-duo-rojo" />}
-                      WhatsApp {w.motivo === "alta" ? (w.manual ? "con el link" : "al cargarlo") : "de LISTO"} · {ddmmhhmm(w.fecha)}
-                      {w.manual ? <span className="text-suave dark:text-suave-dark"> (a mano{w.autor ? ` · ${w.autor}` : ""})</span> : null}
-                      {w.simulado ? <span className="text-suave dark:text-suave-dark"> (simulado)</span> : null}
-                      {!w.ok ? <span className="text-duo-rojo"> · no salió</span> : null}
+              {avisoActivo && (
+                <div className="flex flex-col gap-1.5">
+                  {avisos.length ? (
+                    avisos.map((w, i) => (
+                      <span key={i} className="inline-flex flex-wrap items-center gap-x-1.5 text-[13px] text-titulo dark:text-titulo-dark">
+                        {w.ok ? <HiCheck className="w-4 h-4 text-duo-verde" /> : <HiX className="w-4 h-4 text-duo-rojo" />}
+                        WhatsApp {w.motivo === "alta" ? (w.manual ? "con el link" : "al cargarlo") : "de LISTO"} · {ddmmhhmm(w.fecha)}
+                        {w.manual ? <span className="text-suave dark:text-suave-dark"> (a mano{w.autor ? ` · ${w.autor}` : ""})</span> : null}
+                        {w.simulado ? <span className="text-suave dark:text-suave-dark"> (simulado)</span> : null}
+                        {!w.ok ? <span className="text-duo-rojo"> · no salió</span> : null}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[13px] text-suave dark:text-suave-dark">Todavía no se le avisó por WhatsApp.</span>
+                  )}
+                  {!manual && t.estado !== "LISTO" && !cerrado && (
+                    <span className="inline-flex items-center gap-1.5 text-[13px] text-suave dark:text-suave-dark">
+                      <HiClock className="w-4 h-4" /> Cuando pase a LISTO le llega solo
                     </span>
-                  ))
-                ) : (
-                  <span className="text-[13px] text-suave dark:text-suave-dark">Todavía no se le avisó por WhatsApp.</span>
-                )}
-                {!manual && t.estado !== "LISTO" && !cerrado && (
-                  <span className="inline-flex items-center gap-1.5 text-[13px] text-suave dark:text-suave-dark">
-                    <HiClock className="w-4 h-4" /> Cuando pase a LISTO le llega solo
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <button type="button" onClick={() => setModal("mensajes")} className="inline-flex items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
-                  <HiChatAlt2 className="w-4 h-4" /> Ver los mensajes
-                </button>
-                {a.puede_cancelar && (
-                  <button type="button" onClick={() => setModal("cancelar")} className="text-[13px] font-semibold text-duo-rojo hover:underline">
-                    Cancelar este trámite
-                  </button>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
+              {(avisoActivo || a.puede_cancelar) && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {avisoActivo ? (
+                    <button type="button" onClick={() => setModal("mensajes")} className="inline-flex items-center gap-1.5 rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
+                      <HiChatAlt2 className="w-4 h-4" /> Ver los mensajes
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  {a.puede_cancelar && (
+                    <button type="button" onClick={() => setModal("cancelar")} className="text-[13px] font-semibold text-duo-rojo hover:underline">
+                      Cancelar este trámite
+                    </button>
+                  )}
+                </div>
+              )}
             </Seccion>
           )}
         </div>
@@ -669,6 +764,7 @@ export default function FichaTramite() {
       />
       <ModalCancelar
         abierto={modal === "cancelar"}
+        conPlata={!!t.ve_plata}
         onCerrar={() => setModal(null)}
         onGuardar={async (body) => {
           const nuevo = await cambiarEstado(t.id, body);
@@ -723,7 +819,7 @@ function ContactoGestor({ t, esAdmin }) {
         <BotonesContacto
           c={c}
           nombre={c.nombre || t.gestor_nombre}
-          texto={`¡Hola! Te escribo de THAMES por el trámite ${t.numero} (${t.patente}).`}
+          texto={`¡Hola! Te escribo de THAMES por el trámite ${t.numero}${t.patente ? ` (${t.patente})` : ""}.`}
         />
       ) : (
         <span className="text-[13px] text-suave dark:text-suave-dark">

@@ -5,6 +5,8 @@
 //   - Celu: pestañas por estado.
 //   - Filtros: gestor, "solo demorados", oficina (admin), tipo y buscador.
 // Se actualiza solo (📡 en vivo) cuando otro cambia algo.
+// 🎚️ Con las comisiones apagadas (hoy) el admin ve "Entregados" en vez de
+//    "Comisiones"; con el aviso al cliente apagado, no hay "sin avisar".
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HiDocumentText, HiExclamation, HiSearch } from "react-icons/hi";
@@ -99,7 +101,8 @@ export default function TableroGestoria() {
     );
   }
 
-  const avisos = esAdmin ? resumen.avisos_pago || [] : [];
+  const conPlata = esAdmin && resumen.comisiones_a_cobrar !== undefined; // 🎚️ el servidor no la manda con las comisiones apagadas
+  const avisos = conPlata ? resumen.avisos_pago || [] : [];
   const quienes = [...new Set(avisos.map((a) => a.gestor_nombre))];
   const totalAvisos = avisos.reduce((a, x) => a + Number(x.monto || 0), 0);
 
@@ -140,15 +143,17 @@ export default function TableroGestoria() {
           k="LISTOS PARA ENTREGAR"
           v={resumen.listos}
           n={
-            catalogo?.whatsapp_auto
-              ? "Al cliente le llega un WhatsApp"
-              : sinAvisar
-                ? `${sinAvisar} sin avisar al cliente`
-                : "Se les avisa por WhatsApp desde la ficha"
+            !catalogo?.aviso_cliente
+              ? "Esperando que los retiren"
+              : catalogo?.whatsapp_auto
+                ? "Al cliente le llega un WhatsApp"
+                : sinAvisar
+                  ? `${sinAvisar} sin avisar al cliente`
+                  : "Se les avisa por WhatsApp desde la ficha"
           }
           tono="verde"
         />
-        {esAdmin ? (
+        {conPlata ? (
           <Tile
             k="COMISIONES · 30 DÍAS"
             extra={<Candado />}
@@ -163,7 +168,11 @@ export default function TableroGestoria() {
             }
           />
         ) : (
-          <Tile k="ENTREGADOS · 30 DÍAS" v={resumen.entregados_30d} n={`Terminados de la oficina ${miOficina}`} />
+          <Tile
+            k="ENTREGADOS · 30 DÍAS"
+            v={resumen.entregados_30d}
+            n={esAdmin ? "Terminados de todas las oficinas" : `Terminados de la oficina ${miOficina}`}
+          />
         )}
       </div>
 

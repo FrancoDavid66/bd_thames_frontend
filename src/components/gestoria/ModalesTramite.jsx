@@ -207,7 +207,7 @@ export function ModalObservar({ abierto, onCerrar, onGuardar }) {
   );
 }
 
-export function ModalCancelar({ abierto, onCerrar, onGuardar }) {
+export function ModalCancelar({ abierto, onCerrar, onGuardar, conPlata = false }) {
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -249,7 +249,9 @@ export function ModalCancelar({ abierto, onCerrar, onGuardar }) {
     >
       <div className="flex flex-col gap-3">
         <CartelError texto={error} />
-        <p className="text-[13px] text-suave dark:text-suave-dark">Deja de figurar en el tablero y ya no se espera la comisión.</p>
+        <p className="text-[13px] text-suave dark:text-suave-dark">
+          Deja de figurar en el tablero{conPlata ? " y ya no se espera la comisión" : ""}.
+        </p>
         <label className="flex flex-col gap-1.5 text-[13px] font-medium text-suave dark:text-suave-dark">
           Motivo
           <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: el cliente desistió" className={inputCls} autoFocus />

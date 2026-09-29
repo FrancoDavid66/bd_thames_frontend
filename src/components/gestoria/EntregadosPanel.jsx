@@ -1,7 +1,8 @@
 // src/components/gestoria/EntregadosPanel.jsx
 //
 // ✅ Entregados y cancelados (los trámites cerrados), del más nuevo al más viejo.
-// El admin ve además el precio de la gestoría y la comisión (cobrada o pendiente).
+// El admin ve además el precio de la gestoría y la comisión (cobrada o pendiente),
+// solo con las comisiones prendidas (🎚️ hoy apagadas).
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -49,6 +50,8 @@ export default function EntregadosPanel() {
 
   if (error && !filas) return <p className="rounded-xl border border-duo-rojo/40 p-4 text-[14px] text-duo-rojo">{error}</p>;
   if (!filas) return <Cargando alto="h-72" />;
+  // 🎚️ Precio y comisión: solo si el servidor los mandó (con las comisiones apagadas, no).
+  const conPlata = esAdmin && filas.some((t) => t.ve_plata);
 
   return (
     <div className="flex flex-col gap-4">
@@ -67,7 +70,7 @@ export default function EntregadosPanel() {
                 <th scope="col" className="px-3 py-2.5 font-semibold">Oficina</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold">Gestor</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold text-right">Tardó</th>
-                {esAdmin && (
+                {conPlata && (
                   <>
                     <th scope="col" className="px-3 py-2.5 font-semibold text-right">
                       <span className="inline-flex items-center gap-1">Precio (gestoría) <Candado texto={false} /></span>
@@ -91,7 +94,8 @@ export default function EntregadosPanel() {
                       {t.estado === "CANCELADO" && <span className="ml-1.5 text-[11px] font-bold text-duo-rojo">CANCELADO</span>}
                     </td>
                     <td className="px-3 py-3">
-                      <strong className="text-titulo dark:text-titulo-dark">{tipoCorto(t)}</strong> · <span className="font-mono">{t.patente}</span>
+                      <strong className="text-titulo dark:text-titulo-dark">{tipoCorto(t)}</strong> ·{" "}
+                      {t.patente ? <span className="font-mono">{t.patente}</span> : <span className="text-suave dark:text-suave-dark">sin patente</span>}
                       <br />
                       <span className="text-[11px] text-suave dark:text-suave-dark">{t.numero}</span>
                     </td>
@@ -101,7 +105,7 @@ export default function EntregadosPanel() {
                     </td>
                     <td className="px-3 py-3 text-titulo dark:text-titulo-dark">{t.gestor_nombre || "—"}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap text-titulo dark:text-titulo-dark">{t.listo_en ? `${diasEntre(t.creado_en, t.listo_en)} días` : "—"}</td>
-                    {esAdmin && (
+                    {conPlata && (
                       <>
                         <td className="px-3 py-3 text-right whitespace-nowrap text-titulo dark:text-titulo-dark">{t.precio_gestoria == null ? "—" : plata(t.precio_gestoria)}</td>
                         <td className="px-3 py-3 text-right whitespace-nowrap font-bold text-titulo dark:text-titulo-dark">

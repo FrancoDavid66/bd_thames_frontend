@@ -1,13 +1,21 @@
 // src/components/gestoria/NuevoTramite.jsx
 //
 // ➕ Cargar un trámite nuevo, en pasos:
-//   1 · Cliente y vehículo (se busca por patente, DNI o nombre; o a mano si no es cliente)
+//   1 · Cliente y vehículo (se busca por patente, DNI o nombre). Si no es
+//       cliente, a mano: nombre y apellido, DNI y teléfono. La patente NO es
+//       obligatoria: se agrega después desde la ficha (Franco 28/09).
 //   2 · Qué trámite es
 //   3 · Papeles que trae (la lista del tipo, se puede cambiar)
 //   4 · Qué gestor lo hace (con cuántos tiene y cuánto tarda)
-//   5 · Plata 🔒 (solo admin: si ya sabe el precio)
-//   · Aviso al cliente por WhatsApp con el link de seguimiento (hoy a mano:
-//     al cargarlo, la ficha muestra el botón «Mandar por WhatsApp»)
+//   5 · Dónde lo retira el cliente: la oficina de THAMES que sigue el trámite
+//       (NO es dónde trabaja el gestor; el admin la elige, la oficina es la suya)
+//   · Plata 🔒 (solo admin y solo con las comisiones prendidas; hoy apagadas)
+//   · Aviso al cliente por WhatsApp (solo si está prendido; hoy apagado)
+// 📅 La "fecha estimada" se sacó del alta (28/09).
+// 🚗 El GESTOR también carga trámites desde su usuario (Franco 29/09): el cliente
+//    va a mano (no busca en los clientes de THAMES), no elige gestor (queda con
+//    él) y elige la oficina de THAMES donde lo retira el cliente (paso 4). A esa
+//    oficina le aparece en el tablero con "Lo cargó el gestor".
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
@@ -17,7 +25,7 @@ import { useGestoria } from "./gestoriaContext";
 import { buscarClientes, crearTramite, mensajeError } from "../../services/gestoria";
 import Boton3D from "../ui/Boton3D";
 import { Avatar, Candado, Seccion } from "./Piezas";
-import { calcComision, fmtPct, plata, ymdMas } from "./gestoriaUtils";
+import { calcComision, fmtPct, plata } from "./gestoriaUtils";
 
 const inputCls =
   "w-full h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 text-[14px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta [color-scheme:light] dark:[color-scheme:dark]";
@@ -42,11 +50,12 @@ function Opcion({ on, onClick, children }) {
 
 export default function NuevoTramite() {
   const navigate = useNavigate();
-  const { esAdmin, catalogo, gestores, recargarGestores } = useGestoria();
+  const { esAdmin, esGestor, catalogo, gestores, recargarGestores } = useGestoria();
   const waAuto = !!catalogo?.whatsapp_auto; // false = el WhatsApp se manda a mano desde la ficha
+  const avisoCliente = !!catalogo?.aviso_cliente; // 🎚️ false = aviso al cliente apagado (hoy)
+  const conPlata = esAdmin && !!catalogo?.comisiones; // 🎚️ false = comisiones apagadas (hoy)
   const tipos = useMemo(() => catalogo?.tipos || [], [catalogo]);
   const papelesDe = (id) => (tipos.find((x) => x.id === id)?.papeles || []).map((n) => ({ nombre: n, ok: false }));
-  const diasDe = (id) => tipos.find((x) => x.id === id)?.dias || 7;
 
   const activos = useMemo(() => gestores.filter((g) => g.activo !== false), [gestores]);
   const masRapido = useMemo(() => {
@@ -61,20 +70,20 @@ export default function NuevoTramite() {
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [sel, setSel] = useState(null);
-  const [manual, setManual] = useState(false);
-  const [m, setM] = useState({ nombre: "", dni: "", tel: "", patente: "", vehiculo: "" });
+  const [manual, setManual] = useState(esGestor); // el gestor carga al cliente a mano
+  const [m, setM] = useState({ nombre: "", dni: "", tel: "" });
   const [tipo, setTipo] = useState("TRANSFERENCIA");
   const [detalle, setDetalle] = useState("");
   const [papeles, setPapeles] = useState([]);
   const [papelNuevo, setPapelNuevo] = useState("");
   const [gestorId, setGestorId] = useState(null);
-  const [fecha, setFecha] = useState(ymdMas(12));
   const [oficina, setOficina] = useState("");
   const [precio, setPrecio] = useState("");
   const [wa, setWa] = useState(true);
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const pedido = useRef(0);
+  const oficinaPuesta = useRef(false);
 
   // Al llegar el catálogo: papeles del tipo inicial y la oficina por defecto.
   useEffect(() => {
@@ -82,10 +91,13 @@ export default function NuevoTramite() {
     setPapeles((p) => (p.length ? p : papelesDe(tipo)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipos]);
+  // Oficina: una sola vez, la del usuario. El admin sin oficina la elige él (o sale
+  // sola al elegir un cliente con póliza): no se le pone la primera de la lista.
   useEffect(() => {
-    if (!catalogo || oficina) return;
-    setOficina(String(catalogo.mi_oficina || catalogo.oficinas?.[0]?.id || ""));
-  }, [catalogo, oficina]);
+    if (!catalogo || oficinaPuesta.current) return;
+    oficinaPuesta.current = true;
+    if (catalogo.mi_oficina) setOficina((o) => o || String(catalogo.mi_oficina));
+  }, [catalogo]);
   // Gestor sugerido: el más rápido (solo la primera vez).
   useEffect(() => {
     if (gestorId === null && activos.length) setGestorId(masRapido || "");
@@ -116,7 +128,6 @@ export default function NuevoTramite() {
   const elegirTipo = (id) => {
     setTipo(id);
     setPapeles(papelesDe(id));
-    setFecha(ymdMas(diasDe(id)));
   };
 
   const elegirCliente = (r) => {
@@ -137,34 +148,38 @@ export default function NuevoTramite() {
   const tel = manual ? m.tel : sel ? sel.telefono : "";
   const ofiNombre = (catalogo?.oficinas || []).find((o) => String(o.id) === String(catalogo?.mi_oficina))?.nombre || "tu oficina";
 
+  // Números de los pasos del final (el gestor no elige gestor; Plata y Aviso solo si están prendidos).
+  const pasoOficina = esGestor ? 4 : 5;
+  let paso = pasoOficina + 1;
+  const pasoPlata = conPlata ? paso++ : null;
+  const pasoAviso = avisoCliente ? paso : null;
+
   const cargar = async () => {
     setError("");
     if (manual) {
-      if (!m.nombre.trim() || !m.patente.trim()) return setError("Falta el nombre del cliente o la patente.");
+      if (!m.nombre.trim()) return setError("Falta el nombre y apellido del cliente.");
     } else if (!sel) {
       return setError("Elegí el cliente (buscalo por patente, DNI o nombre) o cargalo a mano.");
     }
-    if (precio.trim() !== "" && !(precioNum > 0)) {
+    if (conPlata && precio.trim() !== "" && !(precioNum > 0)) {
       return setError("El precio tiene que ser un número mayor a cero (o dejalo vacío y lo carga el gestor).");
     }
-    if (esAdmin && !oficina) return setError("Elegí la oficina donde lo va a retirar el cliente.");
+    if ((esAdmin || esGestor) && !oficina) return setError("Elegí la oficina de THAMES donde lo va a retirar el cliente.");
     const body = {
       tipo,
       detalle: detalle.trim(),
       papeles,
-      gestor: gestorId ? Number(gestorId) : null,
-      fecha_estimada: fecha || null,
-      avisar_whatsapp: waAuto && wa,
+      // El gestor no elige gestor: el trámite queda con él (lo pone el servidor).
+      ...(esGestor ? {} : { gestor: gestorId ? Number(gestorId) : null, avisar_whatsapp: avisoCliente && waAuto && wa }),
       ...(manual
         ? {
             persona_nombre: m.nombre.trim(),
             persona_dni: m.dni.trim(),
             persona_telefono: m.tel.trim(),
-            patente: m.patente.trim(),
-            vehiculo: m.vehiculo.trim(),
           }
         : { poliza: sel.poliza, cliente: sel.cliente }),
-      ...(esAdmin ? { oficina: Number(oficina), precio_gestoria: precio.trim() ? Math.round(precioNum) : null } : {}),
+      ...(esAdmin || esGestor ? { oficina: Number(oficina) } : {}),
+      ...(conPlata ? { precio_gestoria: precio.trim() ? Math.round(precioNum) : null } : {}),
     };
     setGuardando(true);
     try {
@@ -181,7 +196,7 @@ export default function NuevoTramite() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${esGestor ? "max-w-5xl mx-auto w-full" : ""}`}>
       <h2 className="text-xl font-bold text-titulo dark:text-titulo-dark">Nuevo trámite</h2>
       {error && (
         <p role="alert" className="rounded-lg border border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] px-3 py-2 text-[14px] font-semibold text-duo-rojo">
@@ -257,30 +272,25 @@ export default function NuevoTramite() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className={labelCls}>
+                  <label className={`${labelCls} sm:col-span-2`}>
                     Nombre y apellido
-                    <input value={m.nombre} onChange={(e) => setM({ ...m, nombre: e.target.value })} className={inputCls} />
+                    <input value={m.nombre} onChange={(e) => setM({ ...m, nombre: e.target.value })} className={inputCls} autoFocus />
                   </label>
                   <label className={labelCls}>
                     DNI
                     <input inputMode="numeric" value={m.dni} onChange={(e) => setM({ ...m, dni: e.target.value })} className={inputCls} />
                   </label>
                   <label className={labelCls}>
-                    Teléfono (WhatsApp)
+                    Teléfono
                     <input inputMode="tel" value={m.tel} onChange={(e) => setM({ ...m, tel: e.target.value })} className={inputCls} />
                   </label>
-                  <label className={labelCls}>
-                    Patente
-                    <input value={m.patente} onChange={(e) => setM({ ...m, patente: e.target.value.toUpperCase() })} className={`${inputCls} font-mono uppercase`} />
-                  </label>
-                  <label className={`${labelCls} sm:col-span-2`}>
-                    Vehículo (marca y modelo)
-                    <input value={m.vehiculo} onChange={(e) => setM({ ...m, vehiculo: e.target.value })} className={inputCls} />
-                  </label>
                 </div>
-                <button type="button" onClick={() => setManual(false)} className="self-start text-[13px] font-semibold text-duo-violeta hover:underline">
-                  Mejor buscarlo entre los clientes
-                </button>
+                <span className="text-[12px] text-suave dark:text-suave-dark">La patente y el vehículo no hacen falta ahora: se agregan después, desde la ficha del trámite.</span>
+                {!esGestor && (
+                  <button type="button" onClick={() => setManual(false)} className="self-start text-[13px] font-semibold text-duo-violeta hover:underline">
+                    Mejor buscarlo entre los clientes
+                  </button>
+                )}
               </>
             )}
           </Seccion>
@@ -356,61 +366,66 @@ export default function NuevoTramite() {
         </div>
 
         <div className="flex flex-col gap-4 min-w-0">
-          {/* 4 · Gestor */}
-          <Seccion titulo="4 · Qué gestor lo hace">
-            {activos.map((g) => {
-              const on = String(gestorId) === String(g.id);
-              return (
-                <Opcion key={g.id} on={on} onClick={() => setGestorId(g.id)}>
-                  <Avatar id={g.id} nombre={g.nombre} size={34} foto={g.foto_url} />
-                  <span className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <strong className="text-[14px] text-titulo dark:text-titulo-dark">{g.nombre}</strong>
-                    <span className="text-[13px] text-suave dark:text-suave-dark">
-                      {g.abiertos} abiertos ·{" "}
-                      {g.demorados ? <strong className="text-duo-rojo">{g.demorados} demorado{g.demorados > 1 ? "s" : ""}</strong> : "0 demorados"} · tarda{" "}
-                      {g.promedio_dias != null ? `${String(g.promedio_dias).replace(".", ",")} días` : "—"}
+          {/* 4 · Gestor (el gestor no elige: queda con él) */}
+          {!esGestor && (
+            <Seccion titulo="4 · Qué gestor lo hace">
+              {activos.map((g) => {
+                const on = String(gestorId) === String(g.id);
+                return (
+                  <Opcion key={g.id} on={on} onClick={() => setGestorId(g.id)}>
+                    <Avatar id={g.id} nombre={g.nombre} size={34} foto={g.foto_url} />
+                    <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <strong className="text-[14px] text-titulo dark:text-titulo-dark">{g.nombre}</strong>
+                      <span className="text-[13px] text-suave dark:text-suave-dark">
+                        {g.abiertos} abiertos ·{" "}
+                        {g.demorados ? <strong className="text-duo-rojo">{g.demorados} demorado{g.demorados > 1 ? "s" : ""}</strong> : "0 demorados"} · tarda{" "}
+                        {g.promedio_dias != null ? `${String(g.promedio_dias).replace(".", ",")} días` : "—"}
+                      </span>
                     </span>
-                  </span>
-                  {g.id === masRapido && g.promedio_dias != null && (
-                    <span className="shrink-0 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-2.5 py-1 text-[11px] font-bold text-duo-verde-sombra dark:text-duo-verde">
-                      El más rápido
-                    </span>
-                  )}
-                </Opcion>
-              );
-            })}
-            {!activos.length && <span className="text-[13px] text-suave dark:text-suave-dark">Todavía no hay gestores cargados.</span>}
-            <Opcion on={!gestorId} onClick={() => setGestorId("")}>
-              <Avatar id={null} size={34} />
-              <span className="flex-1 text-[14px] text-titulo dark:text-titulo-dark">Todavía sin gestor (queda en «Recibido»)</span>
-            </Opcion>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {g.id === masRapido && g.promedio_dias != null && (
+                      <span className="shrink-0 rounded-full bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-2.5 py-1 text-[11px] font-bold text-duo-verde-sombra dark:text-duo-verde">
+                        El más rápido
+                      </span>
+                    )}
+                  </Opcion>
+                );
+              })}
+              {!activos.length && <span className="text-[13px] text-suave dark:text-suave-dark">Todavía no hay gestores cargados.</span>}
+              <Opcion on={!gestorId} onClick={() => setGestorId("")}>
+                <Avatar id={null} size={34} />
+                <span className="flex-1 text-[14px] text-titulo dark:text-titulo-dark">Todavía sin gestor (queda en «Recibido»)</span>
+              </Opcion>
+            </Seccion>
+          )}
+
+          {/* 5 (o 4, el gestor) · Dónde lo retira: la oficina de THAMES que lo sigue (no la del gestor) */}
+          <Seccion titulo={`${pasoOficina} · Dónde lo retira el cliente`}>
+            {esAdmin || esGestor ? (
               <label className={labelCls}>
-                Fecha estimada
-                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
+                Oficina de THAMES
+                <select value={oficina} onChange={(e) => setOficina(e.target.value)} className={inputCls}>
+                  <option value="">Elegí…</option>
+                  {(catalogo?.oficinas || []).map((o) => (
+                    <option key={o.id} value={o.id}>{o.nombre}</option>
+                  ))}
+                </select>
               </label>
-              {esAdmin ? (
-                <label className={labelCls}>
-                  Oficina (donde lo retira)
-                  <select value={oficina} onChange={(e) => setOficina(e.target.value)} className={inputCls}>
-                    <option value="">Elegí…</option>
-                    {(catalogo?.oficinas || []).map((o) => (
-                      <option key={o.id} value={o.id}>{o.nombre}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <div className={labelCls}>
-                  Oficina
-                  <strong className="h-10 flex items-center text-[14px] text-titulo dark:text-titulo-dark">{ofiNombre}</strong>
-                </div>
-              )}
-            </div>
+            ) : (
+              <div className={labelCls}>
+                Oficina de THAMES
+                <strong className="h-10 flex items-center text-[14px] text-titulo dark:text-titulo-dark">{ofiNombre}</strong>
+              </div>
+            )}
+            <span className="text-[12px] text-suave dark:text-suave-dark">
+              {esGestor
+                ? "Elegí la oficina de THAMES donde el cliente va a retirar los papeles cuando estén listos. El trámite le aparece a esa oficina."
+                : "Es la oficina que sigue el trámite: ahí lo ven y ahí el cliente lo retira cuando está listo. No es donde trabaja el gestor."}
+            </span>
           </Seccion>
 
-          {/* 5 · Plata (solo admin) */}
-          {esAdmin && (
-            <Seccion titulo={<h2 className="inline-flex flex-wrap items-center gap-2 text-[15px] font-semibold text-titulo dark:text-titulo-dark">5 · Plata <span className="text-[13px] font-normal text-suave dark:text-suave-dark">(la cobra la gestoría)</span> <Candado /></h2>}>
+          {/* Plata (solo admin y con las comisiones prendidas) */}
+          {conPlata && (
+            <Seccion titulo={<h2 className="inline-flex flex-wrap items-center gap-2 text-[15px] font-semibold text-titulo dark:text-titulo-dark">{pasoPlata} · Plata <span className="text-[13px] font-normal text-suave dark:text-suave-dark">(la cobra la gestoría)</span> <Candado /></h2>}>
               <p className="rounded-lg border border-duo-verde/30 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2 text-[13px] text-duo-verde-sombra dark:text-duo-verde">
                 El cliente le paga directo a la gestoría. El precio lo carga el gestor cuando se lo pasa al cliente, y tu comisión se calcula sola con el % de esa gestoría.
               </p>
@@ -426,23 +441,25 @@ export default function NuevoTramite() {
             </Seccion>
           )}
 
-          {/* Aviso al cliente */}
-          <Seccion titulo={`${esAdmin ? "6" : "5"} · Aviso al cliente`}>
-            {waAuto ? (
-              <>
-                <label className="inline-flex items-center gap-2.5 text-[14px] text-titulo dark:text-titulo-dark cursor-pointer min-h-[40px]">
-                  <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} className="w-[18px] h-[18px]" />
-                  Mandarle WhatsApp con el link para seguir el trámite
-                </label>
-                <span className="text-[13px] text-suave dark:text-suave-dark">{tel ? `A: ${tel}` : "Elegí el cliente para ver a qué número va."}</span>
-              </>
-            ) : (
-              <span className="text-[14px] text-titulo dark:text-titulo-dark">
-                Al cargarlo te aparece el botón <strong>«Mandar por WhatsApp»</strong>: se abre el chat del cliente con el link ya escrito y lo mandás vos.
-                {tel ? ` Va a: ${tel}.` : ""}
-              </span>
-            )}
-          </Seccion>
+          {/* Aviso al cliente (solo si está prendido) */}
+          {avisoCliente && !esGestor && (
+            <Seccion titulo={`${pasoAviso} · Aviso al cliente`}>
+              {waAuto ? (
+                <>
+                  <label className="inline-flex items-center gap-2.5 text-[14px] text-titulo dark:text-titulo-dark cursor-pointer min-h-[40px]">
+                    <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} className="w-[18px] h-[18px]" />
+                    Mandarle WhatsApp con el link para seguir el trámite
+                  </label>
+                  <span className="text-[13px] text-suave dark:text-suave-dark">{tel ? `A: ${tel}` : "Elegí el cliente para ver a qué número va."}</span>
+                </>
+              ) : (
+                <span className="text-[14px] text-titulo dark:text-titulo-dark">
+                  Al cargarlo te aparece el botón <strong>«Mandar por WhatsApp»</strong>: se abre el chat del cliente con el link ya escrito y lo mandás vos.
+                  {tel ? ` Va a: ${tel}.` : ""}
+                </span>
+              )}
+            </Seccion>
+          )}
         </div>
       </div>
 

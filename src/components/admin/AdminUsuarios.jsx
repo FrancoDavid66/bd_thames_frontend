@@ -14,6 +14,9 @@ export default function AdminUsuarios() {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ username: "", first_name: "", last_name: "", email: "", password: "", rol: "OFICINA", oficina: "" });
   const [saving, setSaving] = useState(false);
+  // 🚗 Si se está editando el usuario de un gestor: su rol queda fijo (se maneja en Gestoría).
+  //    conFicha = false → usuario viejo hecho desde acá, sin ficha: no puede recibir trámites.
+  const [gestorEditado, setGestorEditado] = useState(null); // { conFicha: bool } | null
 
   useEffect(() => {
     dispatch(fetchAdminUsuarios());
@@ -24,9 +27,11 @@ export default function AdminUsuarios() {
     if (user) {
       setEditingId(user.id);
       setFormData({ username: user.username, first_name: user.first_name, last_name: user.last_name, email: user.email, password: "", rol: user.perfil?.rol || "OFICINA", oficina: user.perfil?.oficina || "" });
+      setGestorEditado(user.perfil?.rol === "GESTOR" ? { conFicha: user.gestor_con_ficha !== false } : null);
     } else {
       setEditingId(null);
       setFormData({ username: "", first_name: "", last_name: "", email: "", password: "", rol: "OFICINA", oficina: "" });
+      setGestorEditado(null);
     }
     setModalOpen(true);
   };
@@ -49,7 +54,13 @@ export default function AdminUsuarios() {
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error("Error al guardar el usuario. ¿Username duplicado?");
+      if (!res.ok) {
+        // El servidor dice qué pasó (ej: "Los gestores se crean desde Gestoría…" o usuario repetido).
+        const data = await res.json().catch(() => null);
+        const primero = data && typeof data === "object" ? Object.values(data)[0] : null;
+        const msg = Array.isArray(primero) ? primero[0] : typeof primero === "string" ? primero : "";
+        throw new Error(msg || "Error al guardar el usuario. ¿Username duplicado?");
+      }
       setModalOpen(false);
       dispatch(fetchAdminUsuarios());
     } catch (error) {
@@ -111,6 +122,12 @@ export default function AdminUsuarios() {
                   }`}>
                     {u.perfil?.rol}
                   </span>
+                  {/* 🚗 Gestor viejo hecho desde acá: sin ficha no puede recibir trámites. */}
+                  {u.perfil?.rol === 'GESTOR' && u.gestor_con_ficha === false && (
+                    <span title="No tiene ficha de gestor: no puede recibir trámites. Borralo y crealo desde Gestoría → Gestores." className="ml-1.5 rounded-md bg-[var(--color-egreso)]/15 px-2 py-1 text-[11px] font-medium text-[var(--color-egreso)]">
+                      sin ficha
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-[var(--color-titulo)]">{u.perfil?.oficina_nombre || "— Global —"}</td>
                 <td className="px-4 py-3 text-right">
@@ -156,17 +173,23 @@ export default function AdminUsuarios() {
               <div className="grid grid-cols-2 gap-4 border-t border-[var(--color-linea)] pt-4">
                 <div>
                   <label className="mb-1.5 block text-[12px] text-[#d97706]">Rol del sistema</label>
-                  <select value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value})} className="w-full rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 text-[14px] text-[var(--color-titulo)] outline-none focus:border-[var(--color-tarjeta)] dark:[color-scheme:dark]">
-                    <option value="OFICINA">Personal de oficina / cajero</option>
-                    <option value="VENDEDOR">Vendedor externo</option>
-                    <option value="ABOGADO">Abogado (módulo Legales)</option>
-                    <option value="GESTOR">Gestor (módulo Gestoría)</option>
-                    <option value="ADMIN">Administrador global</option>
-                  </select>
+                  {gestorEditado ? (
+                    /* 🚗 El rol del gestor no se cambia desde acá (se maneja en Gestoría). */
+                    <div className="w-full rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 text-[14px] text-[var(--color-suave)]">
+                      Gestor (módulo Gestoría)
+                    </div>
+                  ) : (
+                    <select value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value})} className="w-full rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 text-[14px] text-[var(--color-titulo)] outline-none focus:border-[var(--color-tarjeta)] dark:[color-scheme:dark]">
+                      <option value="OFICINA">Personal de oficina / cajero</option>
+                      <option value="VENDEDOR">Vendedor externo</option>
+                      <option value="ABOGADO">Abogado (módulo Legales)</option>
+                      <option value="ADMIN">Administrador global</option>
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[12px] text-[var(--color-oficina-fuerte)]">Asignar a oficina</label>
-                  <select value={formData.oficina} onChange={e => setFormData({...formData, oficina: e.target.value})} className="w-full rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 text-[14px] text-[var(--color-titulo)] outline-none focus:border-[var(--color-oficina)] dark:[color-scheme:dark]">
+                  <select value={formData.oficina} disabled={!!gestorEditado} onChange={e => setFormData({...formData, oficina: e.target.value})} className="w-full rounded-lg border border-[var(--color-linea)] bg-[var(--color-surface)] px-3 py-2.5 text-[14px] text-[var(--color-titulo)] outline-none focus:border-[var(--color-oficina)] disabled:opacity-60 dark:[color-scheme:dark]">
 
                     {/* 🚀 TEXTO DINÁMICO SEGÚN EL ROL SELECCIONADO */}
                     <option value="">
@@ -182,10 +205,18 @@ export default function AdminUsuarios() {
                 </div>
               </div>
 
-              {/* 🚗 El gestor se da de alta desde Gestoría (ahí se le arma su ficha con el %). */}
-              {formData.rol === 'GESTOR' && (
+              {/* 🚗 Los gestores se crean SOLO desde Gestoría → Gestores (usuario + ficha con el %). */}
+              {!gestorEditado ? (
+                <p className="text-[12px] text-[var(--color-suave)]">
+                  ¿Un gestor? Se crea en <b>Gestoría → Gestores → Nuevo gestor</b> (ahí se arma su ficha con el % de comisión).
+                </p>
+              ) : gestorEditado.conFicha ? (
                 <p className="rounded-lg border border-[#0f766e]/30 bg-[#0f766e]/10 px-3 py-2 text-[12px] text-[#0f766e]">
-                  Para un gestor nuevo usá <b>Gestoría → Gestores → Nuevo gestor</b>: ahí se crea su usuario y su ficha (con el % de comisión). Acá solo se cambia el rol.
+                  Es el usuario de un gestor. Su ficha (%, foto, contacto) y el alta o la baja se manejan en <b>Gestoría → Gestores</b>. Acá solo le cambiás el nombre o la contraseña.
+                </p>
+              ) : (
+                <p className="rounded-lg border border-[var(--color-egreso)]/30 bg-[var(--color-egreso)]/10 px-3 py-2 text-[12px] text-[var(--color-egreso)]">
+                  Este usuario no tiene ficha de gestor: entra, pero no puede recibir trámites. Borralo (tacho) y crealo de nuevo desde <b>Gestoría → Gestores → Nuevo gestor</b>.
                 </p>
               )}
 

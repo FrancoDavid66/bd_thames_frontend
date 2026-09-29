@@ -6,6 +6,10 @@
 //   - El % de comisión de cada uno se cambia ahí mismo (se aplica a sus
 //     trámites con la comisión sin cobrar).
 //   - Alta de gestor: crea también su usuario (rol GESTOR) para entrar a THAMES.
+//     (Es el ÚNICO lugar donde se crean gestores.)
+//   - 🎚️ Con las comisiones APAGADAS (hoy): sin plata. Se ve cómo viene cada
+//     uno (abiertos, demorados, listos, entregados, cuánto tarda) y el alta no
+//     pide el % (queda en 0; se pone cuando se prendan las comisiones).
 //   - 👤 Perfil de cada gestor: foto o logo, WhatsApp, email, dirección y
 //     horario (lápiz ✏️ para editarlo). La oficina lo ve en la ficha del
 //     trámite con botones para escribirle, llamarlo o ir a llevarle papeles.
@@ -29,7 +33,7 @@ import {
   subirFotoPerfil,
 } from "../../services/gestoria";
 import { Avatar, BotonArchivo, Candado, Cargando, Seccion, Tile } from "./Piezas";
-import { ddmm, fmtPct, plata } from "./gestoriaUtils";
+import { DIAS_DEMORADO, ddmm, fmtPct, plata } from "./gestoriaUtils";
 
 const inputCls =
   "w-full h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 text-[14px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta";
@@ -246,20 +250,34 @@ export default function GestoresPanel() {
   }
 
   const tot = data.totales || {};
+  // 🎚️ Con las comisiones apagadas (hoy) el servidor no manda plata: sin montos, sin % y sin "Nos debe".
+  const conPlata = tot.comisiones_a_cobrar !== undefined;
+  const suma = (k) => (data.gestores || []).reduce((a, g) => a + Number(g[k] || 0), 0);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="inline-flex items-center gap-2 text-xl font-bold text-titulo dark:text-titulo-dark">Gestores <Candado /></h2>
-        <span className="text-[13px] text-suave dark:text-suave-dark">Cómo viene cada uno y qué comisiones nos deben. El cliente le paga directo a la gestoría.</span>
+        <span className="text-[13px] text-suave dark:text-suave-dark">
+          {conPlata ? "Cómo viene cada uno y qué comisiones nos deben. El cliente le paga directo a la gestoría." : "Cómo viene cada uno."}
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile k="DERIVADOS · 30 DÍAS" v={tot.derivados_30d ?? 0} n="Trámites cargados en THAMES" />
-        <Tile k="PRECIO DE LAS GESTORÍAS · 30 DÍAS" v={plata(tot.precio_30d)} n={`Lo cargan los gestores · ${tot.sin_precio ?? 0} sin precio`} />
-        <Tile k="COMISIONES COBRADAS · 30 DÍAS" v={plata(tot.comisiones_cobradas_30d)} n="Entran a Balances (sin oficina)" tono="verde" />
-        <Tile k="COMISIONES A COBRAR" v={plata(tot.comisiones_a_cobrar)} n="Lo que nos deben las gestorías" tono="ambar" />
-      </div>
+      {conPlata ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Tile k="DERIVADOS · 30 DÍAS" v={tot.derivados_30d ?? 0} n="Trámites cargados en THAMES" />
+          <Tile k="PRECIO DE LAS GESTORÍAS · 30 DÍAS" v={plata(tot.precio_30d)} n={`Lo cargan los gestores · ${tot.sin_precio ?? 0} sin precio`} />
+          <Tile k="COMISIONES COBRADAS · 30 DÍAS" v={plata(tot.comisiones_cobradas_30d)} n="Entran a Balances (sin oficina)" tono="verde" />
+          <Tile k="COMISIONES A COBRAR" v={plata(tot.comisiones_a_cobrar)} n="Lo que nos deben las gestorías" tono="ambar" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Tile k="DERIVADOS · 30 DÍAS" v={tot.derivados_30d ?? 0} n="Trámites cargados en THAMES" />
+          <Tile k="ABIERTOS" v={suma("abiertos")} n="Los que tienen los gestores ahora" />
+          <Tile k="DEMORADOS" v={suma("demorados")} n={`${DIAS_DEMORADO} días o más sin moverse`} tono="rojo" />
+          <Tile k="ENTREGADOS · 30 DÍAS" v={suma("entregados_30d")} n="Terminados" tono="verde" />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
         <div className="flex flex-col gap-4 min-w-0">
@@ -274,8 +292,12 @@ export default function GestoresPanel() {
                     <th scope="col" className="px-3 py-2.5 font-semibold text-right">Listos</th>
                     <th scope="col" className="px-3 py-2.5 font-semibold text-right" title="Entregados en los últimos 30 días">Entregados</th>
                     <th scope="col" className="px-3 py-2.5 font-semibold text-right" title="Promedio de cargado a listo (últimos 6 meses)">Tarda</th>
-                    <th scope="col" className="px-3 py-2.5 font-semibold text-right">Sin precio</th>
-                    <th scope="col" className="px-3 py-2.5 font-semibold text-right">Nos debe</th>
+                    {conPlata && (
+                      <>
+                        <th scope="col" className="px-3 py-2.5 font-semibold text-right">Sin precio</th>
+                        <th scope="col" className="px-3 py-2.5 font-semibold text-right">Nos debe</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -312,7 +334,7 @@ export default function GestoresPanel() {
                                 {g.email ? ` · ${g.email}` : ""}
                               </span>
                               <span className="text-[12px] text-suave dark:text-suave-dark">usuario {g.usuario || "—"}</span>
-                              <PctInput g={g} onGuardar={(n) => guardarPct(g, n)} />
+                              {conPlata && <PctInput g={g} onGuardar={(n) => guardarPct(g, n)} />}
                             </div>
                           </div>
                         </td>
@@ -323,71 +345,75 @@ export default function GestoresPanel() {
                         <td className="px-3 py-3 text-right">{g.listos}</td>
                         <td className="px-3 py-3 text-right">{g.entregados_30d}</td>
                         <td className={`px-3 py-3 text-right font-bold whitespace-nowrap ${claseTarda(g.promedio_dias)}`}>{tardaTxt(g.promedio_dias)}</td>
-                        <td className="px-3 py-3 text-right">
-                          {g.sin_precio ? (
-                            <span className="rounded-md border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2 py-0.5 font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">
-                              {g.sin_precio}
-                            </span>
-                          ) : (
-                            "0"
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-right align-top">
-                          <div className="flex flex-col items-end gap-1.5">
-                            {debe > 0 ? (
-                              <span className="inline-flex items-center gap-2">
-                                <strong className="whitespace-nowrap text-titulo dark:text-titulo-dark">{plata(debe)}</strong>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setCobrando(g);
-                                  }}
-                                  className="rounded-lg bg-duo-verde hover:bg-duo-verde-sombra px-2.5 py-1 text-[12px] font-semibold text-white"
-                                  aria-label={`Marcar cobradas las comisiones de ${g.nombre}`}
-                                >
-                                  Cobrar
-                                </button>
-                              </span>
-                            ) : !(Number(g.comision_pct) > 0) ? (
-                              <span className="text-suave dark:text-suave-dark whitespace-nowrap">No paga comisión</span>
-                            ) : (
-                              <span className="font-semibold text-duo-verde-sombra dark:text-duo-verde">Al día</span>
-                            )}
-                            {/* Los "Ya pagué" se ven siempre (aunque ya no deba), para poder descartarlos. */}
-                            {(g.avisos || []).map((av) => (
-                              <span key={av.id} className="inline-flex max-w-[190px] flex-wrap items-center justify-end gap-x-2 text-right text-[12px]">
-                                <a
-                                  href={av.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 font-semibold text-duo-azul hover:underline"
-                                  title={`${av.nombre} · ${ddmm(av.fecha)}`}
-                                >
-                                  <HiDocumentText className="w-3.5 h-3.5 shrink-0" /> Avisó que pagó {plata(av.monto)}
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    descartar(av);
-                                  }}
-                                  className="font-semibold text-suave hover:text-duo-rojo"
-                                  title="Si el comprobante no corresponde, descartalo"
-                                >
-                                  Descartar
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        </td>
+                        {conPlata && (
+                          <>
+                            <td className="px-3 py-3 text-right">
+                              {g.sin_precio ? (
+                                <span className="rounded-md border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2 py-0.5 font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">
+                                  {g.sin_precio}
+                                </span>
+                              ) : (
+                                "0"
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-right align-top">
+                              <div className="flex flex-col items-end gap-1.5">
+                                {debe > 0 ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <strong className="whitespace-nowrap text-titulo dark:text-titulo-dark">{plata(debe)}</strong>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCobrando(g);
+                                      }}
+                                      className="rounded-lg bg-duo-verde hover:bg-duo-verde-sombra px-2.5 py-1 text-[12px] font-semibold text-white"
+                                      aria-label={`Marcar cobradas las comisiones de ${g.nombre}`}
+                                    >
+                                      Cobrar
+                                    </button>
+                                  </span>
+                                ) : !(Number(g.comision_pct) > 0) ? (
+                                  <span className="text-suave dark:text-suave-dark whitespace-nowrap">No paga comisión</span>
+                                ) : (
+                                  <span className="font-semibold text-duo-verde-sombra dark:text-duo-verde">Al día</span>
+                                )}
+                                {/* Los "Ya pagué" se ven siempre (aunque ya no deba), para poder descartarlos. */}
+                                {(g.avisos || []).map((av) => (
+                                  <span key={av.id} className="inline-flex max-w-[190px] flex-wrap items-center justify-end gap-x-2 text-right text-[12px]">
+                                    <a
+                                      href={av.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center gap-1 font-semibold text-duo-azul hover:underline"
+                                      title={`${av.nombre} · ${ddmm(av.fecha)}`}
+                                    >
+                                      <HiDocumentText className="w-3.5 h-3.5 shrink-0" /> Avisó que pagó {plata(av.monto)}
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        descartar(av);
+                                      }}
+                                      className="font-semibold text-suave hover:text-duo-rojo"
+                                      title="Si el comprobante no corresponde, descartalo"
+                                    >
+                                      Descartar
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}
                   {!data.gestores.length && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-6 text-center text-suave dark:text-suave-dark">Todavía no hay gestores. Cargá el primero a la derecha.</td>
+                      <td colSpan={conPlata ? 8 : 6} className="px-3 py-6 text-center text-suave dark:text-suave-dark">Todavía no hay gestores. Cargá el primero a la derecha.</td>
                     </tr>
                   )}
                 </tbody>
@@ -415,6 +441,7 @@ export default function GestoresPanel() {
         <div className="w-full max-w-2xl 2xl:max-w-none">
           <NuevoGestor
             tipos={tipos}
+            conPlata={conPlata}
             onCreado={() => {
               cargar();
               recargarGestores?.();
@@ -447,7 +474,7 @@ export default function GestoresPanel() {
   );
 }
 
-function NuevoGestor({ tipos, onCreado }) {
+function NuevoGestor({ tipos, conPlata, onCreado }) {
   const vacio = {
     nombre: "", telefono: "", email: "", direccion: "", horario: "", foto: { url: "", public_id: "" },
     username: "", password: "", comision_pct: "10", tipos: [],
@@ -464,7 +491,7 @@ function NuevoGestor({ tipos, onCreado }) {
     if (!f.username.trim()) return setError("Poné el usuario con el que va a entrar.");
     if (f.password.length < 6) return setError("La contraseña tiene que tener 6 letras o números como mínimo.");
     const pct = Number(f.comision_pct);
-    if (String(f.comision_pct).trim() === "" || !(pct >= 0 && pct <= 100)) return setError("El % de comisión tiene que ir de 0 a 100.");
+    if (conPlata && (String(f.comision_pct).trim() === "" || !(pct >= 0 && pct <= 100))) return setError("El % de comisión tiene que ir de 0 a 100.");
     setGuardando(true);
     try {
       await crearGestor({
@@ -477,7 +504,7 @@ function NuevoGestor({ tipos, onCreado }) {
         foto_public_id: f.foto.public_id,
         username: f.username.trim(),
         password: f.password,
-        comision_pct: pct,
+        ...(conPlata ? { comision_pct: pct } : {}), // apagadas: queda en 0 hasta que se prendan
         tipos: f.tipos,
       });
       toast.success(`Gestor creado. Ya puede entrar con el usuario «${f.username.trim()}».`);
@@ -510,10 +537,12 @@ function NuevoGestor({ tipos, onCreado }) {
           <input type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="••••••••" className={inputCls} />
         </label>
       </div>
-      <label className={labelCls}>
-        % de comisión que nos paga (0 = no paga)
-        <input type="number" min="0" max="100" step="0.5" value={f.comision_pct} onChange={(e) => setF({ ...f, comision_pct: e.target.value })} className={inputCls} />
-      </label>
+      {conPlata && (
+        <label className={labelCls}>
+          % de comisión que nos paga (0 = no paga)
+          <input type="number" min="0" max="100" step="0.5" value={f.comision_pct} onChange={(e) => setF({ ...f, comision_pct: e.target.value })} className={inputCls} />
+        </label>
+      )}
       <fieldset className="flex flex-col gap-1.5">
         <legend className="mb-1.5 text-[13px] font-medium text-suave dark:text-suave-dark">Qué trámites hace (para sugerirlo)</legend>
         <ChipsTipos tipos={tipos} valor={f.tipos} onChange={(v) => setF({ ...f, tipos: v })} />

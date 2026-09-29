@@ -7,12 +7,16 @@
 //     "Está LISTO", "Observado"...);
 //   - el precio que le cobra al cliente (lo carga él; sin precio no pasa a LISTO);
 //   - lo que le debe a THAMES de comisiones y "Ya pagué: subir comprobante";
+//     🎚️ esas dos cosas, SOLO con las comisiones prendidas (hoy apagadas: pasa
+//     a LISTO directo y no ve nada de plata);
 //   - "Tus datos": su foto y su contacto, tal como los ve la oficina (los
 //     carga el admin; si algo está mal, le avisa a THAMES).
+//   - ➕ "Nuevo trámite" (29/09): carga uno él mismo; queda con él y le aparece a
+//     la oficina de THAMES que elija (donde lo retira el cliente).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { HiCheck, HiChevronDown, HiDocumentText } from "react-icons/hi";
+import { HiCheck, HiChevronDown, HiDocumentText, HiPlus } from "react-icons/hi";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useGestoria } from "./gestoriaContext";
@@ -26,6 +30,7 @@ import {
   pedirResumen,
   subirArchivo,
 } from "../../services/gestoria";
+import Boton3D from "../ui/Boton3D";
 import { Avatar, BotonArchivo, Cargando, Demorado, DiasChip } from "./Piezas";
 import { ModalObservar, ModalPrecio } from "./ModalesTramite";
 import { ddmm, diasEnEstado, esDemorado, fmtPct, plata, textoDias, tipoCorto } from "./gestoriaUtils";
@@ -42,8 +47,12 @@ const btn = "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.
 export default function MisTramites() {
   const navigate = useNavigate();
   const { catalogo } = useGestoria();
-  // Qué se le dice al gestor cuando lo pasa a LISTO (el WhatsApp al cliente hoy lo manda la oficina a mano).
-  const avisoListo = catalogo?.whatsapp_auto ? "¡Listo! Al cliente le llega un WhatsApp." : "¡Listo! La oficina le avisa al cliente.";
+  // Qué se le dice al gestor cuando lo pasa a LISTO (según cómo esté el aviso al cliente).
+  const avisoListo = !catalogo?.aviso_cliente
+    ? "¡Listo! Ya le aparece a la oficina para entregarlo."
+    : catalogo?.whatsapp_auto
+      ? "¡Listo! Al cliente le llega un WhatsApp."
+      : "¡Listo! La oficina le avisa al cliente.";
   const [lista, setLista] = useState(null);
   const [res, setRes] = useState(null);
   const [error, setError] = useState("");
@@ -67,7 +76,8 @@ export default function MisTramites() {
   useDatosVivos(["gestoria"], () => cargar());
 
   const avanzar = async (t, nuevo) => {
-    if (nuevo === "LISTO" && t.precio_gestoria == null) {
+    // t.ve_plata lo manda el servidor en cada trámite (false con las comisiones apagadas).
+    if (t.ve_plata && nuevo === "LISTO" && t.precio_gestoria == null) {
       setModal({ tipo: "precio", t, luegoListo: true });
       return;
     }
@@ -130,14 +140,19 @@ export default function MisTramites() {
 
   return (
     <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
-      <div className="flex items-center gap-3">
-        {perfil && <Avatar id={perfil.id} nombre={perfil.nombre} foto={perfil.foto_url} size={52} />}
-        <div className="flex flex-col gap-1 min-w-0">
-          <h1 className="text-2xl font-bold text-titulo dark:text-titulo-dark">Hola{nombre ? `, ${nombre}` : ""}</h1>
-          <span className="text-[14px] text-suave dark:text-suave-dark">
-            Tenés {lista.length} trámite{lista.length === 1 ? "" : "s"} abierto{lista.length === 1 ? "" : "s"}. Tocá el botón cuando avanzás.
-          </span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {perfil && <Avatar id={perfil.id} nombre={perfil.nombre} foto={perfil.foto_url} size={52} />}
+          <div className="flex flex-col gap-1 min-w-0">
+            <h1 className="text-2xl font-bold text-titulo dark:text-titulo-dark">Hola{nombre ? `, ${nombre}` : ""}</h1>
+            <span className="text-[14px] text-suave dark:text-suave-dark">
+              Tenés {lista.length} trámite{lista.length === 1 ? "" : "s"} abierto{lista.length === 1 ? "" : "s"}. Tocá el botón cuando avanzás.
+            </span>
+          </div>
         </div>
+        <Boton3D variant="violeta" onClick={() => navigate("/gestoria/nuevo")} className="w-full sm:w-auto shrink-0">
+          <HiPlus className="w-4 h-4" /> Nuevo trámite
+        </Boton3D>
       </div>
 
       {perfil && <TusDatos p={perfil} />}
@@ -233,7 +248,11 @@ function TarjetaGestor({ t, ocupado, onAvanzar, onObservar, onPrecio, onSubirPap
         <DiasChip dias={d} texto={textoDias(d)} />
       </div>
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <strong className="font-mono text-lg tracking-wide text-titulo dark:text-titulo-dark">{t.patente}</strong>
+        {t.patente ? (
+          <strong className="font-mono text-lg tracking-wide text-titulo dark:text-titulo-dark">{t.patente}</strong>
+        ) : (
+          <span className="text-[14px] font-semibold text-suave dark:text-suave-dark">Sin patente</span>
+        )}
         <span className="text-[13px] text-suave dark:text-suave-dark">{t.vehiculo}</span>
         {dem && <span className="ml-auto self-center"><Demorado /></span>}
       </div>
@@ -248,19 +267,20 @@ function TarjetaGestor({ t, ocupado, onAvanzar, onObservar, onPrecio, onSubirPap
           <HiDocumentText className="w-3.5 h-3.5" /> El cliente subió papeles
         </span>
       )}
-      {t.precio_gestoria == null ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="rounded-md border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2 py-0.5 text-[12px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">Falta el precio</span>
-          <button type="button" onClick={onPrecio} className="rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
-            Cargar precio
-          </button>
-        </div>
-      ) : (
-        <span className="text-[13px] text-suave dark:text-suave-dark">
-          Precio al cliente: <strong className="text-titulo dark:text-titulo-dark">{plata(t.precio_gestoria)}</strong> ·{" "}
-          <button type="button" onClick={onPrecio} className="font-semibold text-duo-violeta hover:underline">cambiar</button>
-        </span>
-      )}
+      {t.ve_plata &&
+        (t.precio_gestoria == null ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="rounded-md border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2 py-0.5 text-[12px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">Falta el precio</span>
+            <button type="button" onClick={onPrecio} className="rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
+              Cargar precio
+            </button>
+          </div>
+        ) : (
+          <span className="text-[13px] text-suave dark:text-suave-dark">
+            Precio al cliente: <strong className="text-titulo dark:text-titulo-dark">{plata(t.precio_gestoria)}</strong> ·{" "}
+            <button type="button" onClick={onPrecio} className="font-semibold text-duo-violeta hover:underline">cambiar</button>
+          </span>
+        ))}
 
       {t.estado === "ASIGNADO" && (
         <button type="button" disabled={ocupado} onClick={() => onAvanzar("EN_REGISTRO")} className={`${btn} w-full bg-indigo-600 hover:bg-indigo-700`}>

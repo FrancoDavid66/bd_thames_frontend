@@ -1,10 +1,11 @@
 // src/pages/MiTramitePage.jsx
 //
 // 🔗 "MI TRÁMITE" — página pública, sin login. El cliente entra con el link
-// que le llega por WhatsApp: /#/mi-tramite/<token>
+// que le pasa la oficina: /#/mi-tramite/<token>
 //
 // Muestra cómo va su trámite de gestoría (pasos, novedades) y le deja subir
-// fotos/papeles o el comprobante de lo que le pagó a la gestoría.
+// fotos/papeles (y el comprobante de lo que le pagó a la gestoría, solo con
+// las comisiones prendidas: 🎚️ hoy apagadas, data.comprobantes = false).
 // 🔒 Nunca muestra plata (el servidor ni la manda): este link lo pueden abrir
 //    también los chicos de la oficina.
 import { useCallback, useEffect, useState } from "react";
@@ -119,7 +120,8 @@ export default function MiTramitePage() {
 
   const idx = PASOS.indexOf(data.estado === "OBSERVADO" ? "EN_REGISTRO" : data.estado);
   const cerrado = data.estado === "ENTREGADO" || data.estado === "CANCELADO";
-  const wa = linkWhatsApp(data.oficina?.whatsapp, `¡Hola! Te escribo por mi trámite ${data.numero} (${data.patente}).`);
+  const wa = linkWhatsApp(data.oficina?.whatsapp, `¡Hola! Te escribo por mi trámite ${data.numero}${data.patente ? ` (${data.patente})` : ""}.`);
+  const conComprobante = data.comprobantes !== false; // 🎚️ apagado con las comisiones
 
   return (
     <div className="min-h-screen bg-surface dark:bg-surface-dark">
@@ -135,7 +137,12 @@ export default function MiTramitePage() {
           <div className="flex flex-col gap-1">
             <span className="text-[14px] text-suave dark:text-suave-dark">Hola{data.nombre ? `, ${data.nombre}` : ""}</span>
             <h1 className="text-[22px] font-bold leading-tight text-titulo dark:text-titulo-dark">
-              Tu trámite de {String(data.tipo_txt || "").toLowerCase()} · {data.vehiculo} <span className="font-mono">{data.patente}</span>
+              Tu trámite de {String(data.tipo_txt || "").toLowerCase()}
+              {data.vehiculo || data.patente ? (
+                <>
+                  {" "}· {data.vehiculo} <span className="font-mono">{data.patente}</span>
+                </>
+              ) : null}
             </h1>
           </div>
 
@@ -163,7 +170,7 @@ export default function MiTramitePage() {
               const actual = i === idx && !cerrado;
               const obs = actual && data.estado === "OBSERVADO";
               const fecha = data.fechas?.[p];
-              const sub = fecha ? ddmm(fecha) : p === "LISTO" ? "Te avisamos por WhatsApp" : "";
+              const sub = fecha ? ddmm(fecha) : p === "LISTO" && data.aviso_whatsapp !== false ? "Te avisamos por WhatsApp" : "";
               const bola = hecho
                 ? "bg-duo-verde text-white"
                 : obs
@@ -229,13 +236,17 @@ export default function MiTramitePage() {
                   {subiendo === "papel" ? "Subiendo…" : "Subir foto o PDF"}
                   <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; subir(f, "papel"); }} />
                 </label>
-                <label className={`inline-flex items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3 text-[15px] font-semibold text-titulo dark:text-titulo-dark cursor-pointer ${subiendo ? "opacity-60 pointer-events-none" : ""}`}>
-                  <HiDocumentText className="w-5 h-5" />
-                  {subiendo === "comprobante" ? "Subiendo…" : "Subir comprobante de pago"}
-                  <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; subir(f, "comprobante"); }} />
-                </label>
+                {conComprobante && (
+                  <label className={`inline-flex items-center justify-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-3 text-[15px] font-semibold text-titulo dark:text-titulo-dark cursor-pointer ${subiendo ? "opacity-60 pointer-events-none" : ""}`}>
+                    <HiDocumentText className="w-5 h-5" />
+                    {subiendo === "comprobante" ? "Subiendo…" : "Subir comprobante de pago"}
+                    <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; subir(f, "comprobante"); }} />
+                  </label>
+                )}
               </div>
-              <span className="text-[12px] text-suave dark:text-suave-dark">El comprobante es de lo que le pagaste a la gestoría. Queda guardado en privado.</span>
+              {conComprobante && (
+                <span className="text-[12px] text-suave dark:text-suave-dark">El comprobante es de lo que le pagaste a la gestoría. Queda guardado en privado.</span>
+              )}
               {(data.archivos || []).length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   {data.archivos.map((x, i) => (

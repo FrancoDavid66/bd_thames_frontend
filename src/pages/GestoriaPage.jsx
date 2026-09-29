@@ -5,7 +5,11 @@
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
 //   - Admin:   Tablero · Gestores 🔒 · Entregados · Comisiones 🔒 (con plata).
 //   - Oficina: Tablero · Entregados (solo su oficina, SIN plata).
-//   - Gestor:  "Mis trámites" (lo suyo, con su precio y su comisión).
+//   - Gestor:  "Mis trámites" (lo suyo, con su precio y su comisión) y "Nuevo trámite"
+//              (29/09: lo carga él y queda con él).
+// 🎚️ Con las comisiones APAGADAS (hoy, catalogo.comisiones = false) no hay
+//    pestaña Comisiones ni plata en ningún lado. Se prenden en Railway con
+//    GESTORIA_COMISIONES=activas (ver gestoria/ajustes.py en el backend).
 //
 // Rutas:
 //   /gestoria                 tablero (o "Mis trámites" si es gestor)
@@ -100,6 +104,7 @@ export default function GestoriaPage() {
         {esGestor ? (
           <Routes>
             <Route index element={<MisTramites />} />
+            <Route path="nuevo" element={<NuevoTramite />} />
             <Route path="tramite/:id" element={<FichaTramite />} />
             <Route path="*" element={<Navigate to="/gestoria" replace />} />
           </Routes>
@@ -112,7 +117,12 @@ export default function GestoriaPage() {
               <Route path="tramite/:id" element={<FichaTramite />} />
               <Route path="entregados" element={<EntregadosPanel />} />
               <Route path="gestores" element={esAdmin ? <GestoresPanel /> : <Navigate to="/gestoria" replace />} />
-              <Route path="comisiones" element={esAdmin ? <ComisionesPanel /> : <Navigate to="/gestoria" replace />} />
+              <Route
+                path="comisiones"
+                element={
+                  !esAdmin ? <Navigate to="/gestoria" replace /> : !catalogo ? null : catalogo.comisiones ? <ComisionesPanel /> : <Navigate to="/gestoria" replace />
+                }
+              />
               <Route path="*" element={<Navigate to="/gestoria" replace />} />
             </Routes>
           </>
@@ -123,7 +133,7 @@ export default function GestoriaPage() {
 }
 
 function Cabecera() {
-  const { esAdmin } = useGestoria();
+  const { esAdmin, catalogo } = useGestoria();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const enFichaONuevo = pathname.startsWith("/gestoria/tramite/") || pathname.startsWith("/gestoria/nuevo");
@@ -132,7 +142,7 @@ function Cabecera() {
     { to: "/gestoria", label: "Tablero", end: true, activo: enFichaONuevo || pathname === "/gestoria" || pathname === "/gestoria/" },
     ...(esAdmin ? [{ to: "/gestoria/gestores", label: "Gestores", admin: true }] : []),
     { to: "/gestoria/entregados", label: "Entregados" },
-    ...(esAdmin ? [{ to: "/gestoria/comisiones", label: "Comisiones", admin: true }] : []),
+    ...(esAdmin && catalogo?.comisiones ? [{ to: "/gestoria/comisiones", label: "Comisiones", admin: true }] : []),
   ];
 
   return (
