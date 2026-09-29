@@ -5,16 +5,16 @@
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
 //   - Admin:   Tablero · Gestores 🔒 · Entregados · Comisiones 🔒 (con plata).
 //   - Oficina: Tablero · Entregados (solo su oficina, SIN plata).
-//   - Gestor:  "Mis trámites" (lo suyo, con su precio y su comisión) y "Nuevo trámite"
-//              (29/09: lo carga él y queda con él).
+//   - Gestor:  "Mis trámites" (lo suyo, en 3 pestañas), su ficha simple del trámite
+//              (FichaGestora) y "Nuevo trámite" (29/09: lo carga él y queda con él).
 // 🎚️ Con las comisiones APAGADAS (hoy, catalogo.comisiones = false) no hay
 //    pestaña Comisiones ni plata en ningún lado. Se prenden en Railway con
 //    GESTORIA_COMISIONES=activas (ver gestoria/ajustes.py en el backend).
 //
 // Rutas:
 //   /gestoria                 tablero (o "Mis trámites" si es gestor)
-//   /gestoria/nuevo           cargar un trámite
-//   /gestoria/tramite/:id     ficha
+//   /gestoria/nuevo           cargar un trámite (wizard de pasos)
+//   /gestoria/tramite/:id     ficha (el gestor ve FichaGestora, más simple)
 //   /gestoria/gestores        (admin)
 //   /gestoria/entregados
 //   /gestoria/comisiones      (admin)
@@ -31,6 +31,7 @@ import { GestoriaCtx, useGestoria } from "../components/gestoria/gestoriaContext
 
 import TableroGestoria from "../components/gestoria/TableroGestoria";
 import FichaTramite from "../components/gestoria/FichaTramite";
+import FichaGestora from "../components/gestoria/FichaGestora";
 import NuevoTramite from "../components/gestoria/NuevoTramite";
 import GestoresPanel from "../components/gestoria/GestoresPanel";
 import EntregadosPanel from "../components/gestoria/EntregadosPanel";
@@ -51,6 +52,8 @@ export default function GestoriaPage() {
   const [error, setError] = useState("");
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
   const [tabCelu, setTabCelu] = useState("EN_REGISTRO");
+  // 👷 Pestaña de "Mis trámites" del gestor (queda al volver de un trámite).
+  const [tabGestor, setTabGestor] = useState("hacer");
 
   useEffect(() => {
     if (!esStaff && !esGestor) return undefined; // sin acceso: ni se pide
@@ -82,9 +85,9 @@ export default function GestoriaPage() {
   const ctx = useMemo(
     () => ({
       user, rol, esAdmin, esGestor, esStaff, catalogo, gestores, recargarGestores,
-      filtros, setFiltros, tabCelu, setTabCelu,
+      filtros, setFiltros, tabCelu, setTabCelu, tabGestor, setTabGestor,
     }),
-    [user, rol, esAdmin, esGestor, esStaff, catalogo, gestores, recargarGestores, filtros, tabCelu]
+    [user, rol, esAdmin, esGestor, esStaff, catalogo, gestores, recargarGestores, filtros, tabCelu, tabGestor]
   );
 
   if (!esStaff && !esGestor) {
@@ -105,7 +108,7 @@ export default function GestoriaPage() {
           <Routes>
             <Route index element={<MisTramites />} />
             <Route path="nuevo" element={<NuevoTramite />} />
-            <Route path="tramite/:id" element={<FichaTramite />} />
+            <Route path="tramite/:id" element={<FichaGestora />} />
             <Route path="*" element={<Navigate to="/gestoria" replace />} />
           </Routes>
         ) : (

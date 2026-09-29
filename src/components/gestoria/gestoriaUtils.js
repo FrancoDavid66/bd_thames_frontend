@@ -18,6 +18,44 @@ export const ESTADOS = {
   CANCELADO: { n: "Cancelado", corto: "Cancelado", dot: "#94a3b8", cli: "Cancelado" },
 };
 
+// 👷 Cómo se le dice cada estado al GESTOR en su celu, con su color
+//    (texto = para la línea de arriba de la tarjeta; chip = la pastillita de la ficha).
+const NEUTRO_GESTOR = {
+  texto: "text-suave dark:text-suave-dark",
+  chip: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark",
+};
+export const ESTADO_GESTOR = {
+  RECIBIDO: { txt: "Recibido", ...NEUTRO_GESTOR },
+  ASIGNADO: {
+    txt: "Para presentar",
+    texto: "text-duo-azul dark:text-blue-300",
+    chip: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul dark:text-blue-300",
+  },
+  EN_REGISTRO: {
+    txt: "En el registro",
+    texto: "text-indigo-600 dark:text-indigo-300",
+    chip: "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  },
+  OBSERVADO: {
+    txt: "Observado",
+    texto: "text-orange-600 dark:text-orange-300",
+    chip: "bg-orange-50 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  },
+  LISTO: {
+    txt: "Listo",
+    texto: "text-duo-verde-sombra dark:text-green-400",
+    chip: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde-sombra dark:text-green-400",
+  },
+  ENTREGADO: { txt: "Entregado", ...NEUTRO_GESTOR },
+  CANCELADO: { txt: "Cancelado", ...NEUTRO_GESTOR },
+};
+
+/** Qué se le dice al gestor cuando pasa un trámite a LISTO (según cómo esté el aviso al cliente). */
+export function textoListoGestor(catalogo) {
+  if (!catalogo?.aviso_cliente) return "¡Listo! Ya le aparece a la oficina para entregarlo.";
+  return catalogo?.whatsapp_auto ? "¡Listo! Al cliente le llega un WhatsApp." : "¡Listo! La oficina le avisa al cliente.";
+}
+
 // Colores fijos por oficina y por gestor (según su número, así no cambian).
 const PALETA_OFICINAS = ["#0284c7", "#059669", "#4f46e5", "#d97706", "#db2777", "#0891b2", "#65a30d", "#7c3aed"];
 const PALETA_GESTORES = ["#0f766e", "#7c3aed", "#b45309", "#be185d", "#1d4ed8", "#047857", "#9333ea", "#0e7490", "#a16207"];

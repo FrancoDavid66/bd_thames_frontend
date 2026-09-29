@@ -2,6 +2,8 @@
 //
 // 📄 Ficha de un trámite: en qué paso está, botones para avanzarlo, datos,
 // papeles (fotos/PDF), historial y el link del cliente.
+//   👷 El GESTOR ve una ficha más simple, pensada para el celu: FichaGestora.jsx
+//      (29/09). Usa de acá DatoVehiculo y SeccionPrecioGestor (por eso se exportan).
 //   - Admin: además la caja "Plata 🔒" (precio, comisión, cobrarla, comprobantes).
 //   - Gestor: "Precio al cliente" (lo carga él) y sus comprobantes.
 //     🎚️ Con las comisiones APAGADAS (hoy) no sale ninguna de las dos: el
@@ -109,8 +111,9 @@ function BotonWhatsApp({ href, onClick, children, principal = false }) {
 /**
  * 🚗 Patente y vehículo, con "Agregar patente" / "Cambiar" para la oficina y el
  * gestor del trámite (ej: se cargó a mano sin patente y se completa después).
+ * La usa también la ficha del gestor (FichaGestora.jsx).
  */
-function DatoVehiculo({ t, puede, ocupado, onGuardar }) {
+export function DatoVehiculo({ t, puede, ocupado, onGuardar }) {
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState({ patente: "", vehiculo: "" });
 
@@ -175,7 +178,7 @@ function DatoVehiculo({ t, puede, ocupado, onGuardar }) {
         <span className="font-normal text-suave dark:text-suave-dark">Sin patente todavía</span>
       )}
       {puede && (
-        <button type="button" onClick={abrir} className="block text-[12px] font-semibold text-duo-violeta hover:underline">
+        <button type="button" onClick={abrir} className="block min-h-[36px] text-[13px] font-semibold text-duo-violeta hover:underline">
           {t.patente ? "Cambiar" : "Agregar patente"}
         </button>
       )}
@@ -205,27 +208,38 @@ export default function FichaTramite() {
   const volverA = "/gestoria";
   const volverTxt = esGestor ? "Mis trámites" : "Tablero";
 
+  // ✅ Papeles: se guardan un ratito después del último clic (si tocás 3 casillas
+  //    seguidas sale 1 solo pedido) y se ignoran respuestas viejas. Hasta que el
+  //    servidor confirma, manda la lista de la pantalla: si en el medio llega una
+  //    recarga "en vivo" (o la respuesta de otro botón), no se pierden los tildes.
+  const papelesSeq = useRef(0);
+  const papelesTimer = useRef(null);
+  const papelesPendientes = useRef(null);
+  const sinConfirmar = useRef(null);
+  const conMisPapeles = useCallback((nuevo) => {
+    const lista = sinConfirmar.current;
+    if (!nuevo || !lista) return nuevo;
+    return { ...nuevo, papeles: lista, papeles_ok: lista.filter((p) => p.ok).length, papeles_total: lista.length };
+  }, []);
+
   const cargar = useCallback(async () => {
     try {
-      setT(await pedirTramite(id));
+      const nuevo = await pedirTramite(id);
+      setT(conMisPapeles(nuevo));
       setError("");
     } catch (e) {
       setError(e?.response?.status === 404 ? "Ese trámite no existe o no está a la vista para tu usuario." : mensajeError(e, "No se pudo abrir el trámite."));
     }
-  }, [id]);
+  }, [id, conMisPapeles]);
 
   useEffect(() => {
     setT(null);
+    sinConfirmar.current = null;
     cargar();
   }, [cargar]);
 
   useDatosVivos(["gestoria"], () => cargar());
 
-  // ✅ Papeles: se guardan un ratito después del último clic (si tocás 3 casillas
-  //    seguidas sale 1 solo pedido) y se ignoran respuestas viejas.
-  const papelesSeq = useRef(0);
-  const papelesTimer = useRef(null);
-  const papelesPendientes = useRef(null);
   useEffect(
     () => () => {
       // Si salís de la ficha antes de que se guarde, se guarda igual.
@@ -241,7 +255,7 @@ export default function FichaTramite() {
     setOcupado(true);
     try {
       const nuevo = await fn();
-      if (nuevo && nuevo.id) setT(nuevo);
+      if (nuevo && nuevo.id) setT(conMisPapeles(nuevo));
       if (ok) toast.success(typeof ok === "function" ? ok(nuevo) : ok);
       recargarGestores?.();
       return nuevo;
@@ -299,7 +313,7 @@ export default function FichaTramite() {
   const registrarAviso = (motivo) => {
     avisoWhatsapp(t.id, motivo)
       .then((nuevo) => {
-        if (nuevo && nuevo.id) setT(nuevo);
+        if (nuevo && nuevo.id) setT(conMisPapeles(nuevo));
         toast.success(motivo === "listo" ? "Anotado: se le avisó que está LISTO" : "Anotado: se le mandó el link");
       })
       .catch((e) => toast.error(mensajeError(e, "No se pudo anotar el aviso.")));
@@ -315,6 +329,7 @@ export default function FichaTramite() {
   };
 
   const cambiarPapeles = (lista) => {
+    sinConfirmar.current = lista;
     setT((x) => ({ ...x, papeles: lista, papeles_ok: lista.filter((p) => p.ok).length, papeles_total: lista.length }));
     const n = ++papelesSeq.current;
     papelesPendientes.current = lista;
@@ -324,10 +339,16 @@ export default function FichaTramite() {
       papelesPendientes.current = null;
       try {
         const nuevo = await editarTramite(t.id, { papeles: lista });
-        if (n === papelesSeq.current) setT(nuevo);
+        if (n === papelesSeq.current) {
+          sinConfirmar.current = null;
+          setT(nuevo);
+        }
       } catch (e) {
         toast.error(mensajeError(e));
-        if (n === papelesSeq.current) cargar();
+        if (n === papelesSeq.current) {
+          sinConfirmar.current = null;
+          cargar();
+        }
       }
     }, 450);
   };
@@ -397,13 +418,13 @@ export default function FichaTramite() {
         <div className="flex flex-col gap-2 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold text-titulo dark:text-titulo-dark">
-              {t.tipo_txt} ·{" "}
-              {t.patente || t.vehiculo ? (
+              {t.tipo_txt}
+              {t.con_vehiculo === false ? null : t.patente || t.vehiculo ? (
                 <>
-                  {t.vehiculo} <span className="font-mono tracking-wide">{t.patente}</span>
+                  {" "}· {t.vehiculo} <span className="font-mono tracking-wide">{t.patente}</span>
                 </>
               ) : (
-                <span className="font-semibold text-suave dark:text-suave-dark">sin patente</span>
+                <span className="font-semibold text-suave dark:text-suave-dark"> · sin patente</span>
               )}
             </h2>
             <EstadoPill estado={t.estado} extra={cerrado ? "" : textoDias(d)} />
@@ -490,12 +511,15 @@ export default function FichaTramite() {
                   )}
                 </Dato>
               )}
-              <DatoVehiculo
-                t={t}
-                puede={!!a.puede_vehiculo}
-                ocupado={ocupado}
-                onGuardar={(body) => hacer(() => editarTramite(t.id, body), body.patente ? `Patente ${body.patente} guardada` : "Vehículo guardado")}
-              />
+              {/* 🪪 La licencia de conducir es de la persona: sin "Vehículo". */}
+              {t.con_vehiculo !== false && (
+                <DatoVehiculo
+                  t={t}
+                  puede={!!a.puede_vehiculo}
+                  ocupado={ocupado}
+                  onGuardar={(body) => hacer(() => editarTramite(t.id, body), body.patente ? `Patente ${body.patente} guardada` : "Vehículo guardado")}
+                />
+              )}
               {/* 📅 Fecha estimada: ya no se carga (se sacó del alta el 28/09). Los trámites viejos que la tienen la muestran. */}
               {t.fecha_estimada && <Dato label="Fecha estimada">{fechaCorta(t.fecha_estimada)}</Dato>}
               {/* 🔒 La póliza la ven solo la oficina y el admin: el gestor no sabe si el cliente tiene póliza (29/09). */}
@@ -749,7 +773,7 @@ export default function FichaTramite() {
         onCerrar={() => setModal(null)}
         onGuardar={async (body) => {
           const nuevo = await cargarPrecio(t.id, body);
-          setT(nuevo);
+          setT(conMisPapeles(nuevo));
           setModal(null);
           recargarGestores?.();
           toast.success(body.pasar_a_listo ? `${nuevo.numero} → LISTO PARA ENTREGAR` : "Precio guardado");
@@ -760,7 +784,7 @@ export default function FichaTramite() {
         onCerrar={() => setModal(null)}
         onGuardar={async (body) => {
           const nuevo = await cambiarEstado(t.id, body);
-          setT(nuevo);
+          setT(conMisPapeles(nuevo));
           setModal(null);
           toast.success(`${nuevo.numero} → OBSERVADO`);
         }}
@@ -771,7 +795,7 @@ export default function FichaTramite() {
         onCerrar={() => setModal(null)}
         onGuardar={async (body) => {
           const nuevo = await cambiarEstado(t.id, body);
-          setT(nuevo);
+          setT(conMisPapeles(nuevo));
           setModal(null);
           recargarGestores?.();
           toast.success(`${nuevo.numero} cancelado`);
@@ -784,7 +808,7 @@ export default function FichaTramite() {
         onCerrar={() => setModal(null)}
         onGuardar={async (body) => {
           const nuevo = await cobrarComision(t.id, body);
-          setT(nuevo);
+          setT(conMisPapeles(nuevo));
           setModal(null);
           recargarGestores?.();
           toast.success(`Comisión de ${plata(nuevo.comision)} cobrada · entró a Balances`);
@@ -933,7 +957,8 @@ function SeccionPlataAdmin({ t, a, docs, ocupado, setModal, onSubir, onBorrar, o
   );
 }
 
-function SeccionPrecioGestor({ t, a, docs, cerrado, setModal, onSubir }) {
+/** 💵 "Precio al cliente" del gestor (solo con las comisiones prendidas). La usa también FichaGestora.jsx. */
+export function SeccionPrecioGestor({ t, a, docs, cerrado, setModal, onSubir }) {
   const pct = t.comision_pct != null ? Number(t.comision_pct) : 0;
   return (
     <Seccion
