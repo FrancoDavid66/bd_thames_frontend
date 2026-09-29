@@ -7,9 +7,10 @@
 //   - Oficina: Tablero · Entregados (solo su oficina, SIN plata).
 //   - Gestor:  "Mis trámites" (lo suyo, en 3 pestañas), su ficha simple del trámite
 //              (FichaGestora) y "Nuevo trámite" (29/09: lo carga él y queda con él).
-// 🎚️ Con las comisiones APAGADAS (hoy, catalogo.comisiones = false) no hay
-//    pestaña Comisiones ni plata en ningún lado. Se prenden en Railway con
-//    GESTORIA_COMISIONES=activas (ver gestoria/ajustes.py en el backend).
+// 💵 Comisiones PRENDIDAS (29/09): el gestor carga el precio y el comprobante de
+//    cada cobro; la comisión de THAMES (y la pestaña Comisiones) la ve solo el admin.
+//    🎚️ Se apagan en Railway con GESTORIA_COMISIONES = apagadas (catalogo.comisiones
+//    = false): sin pestaña Comisiones ni plata en ningún lado (ver gestoria/ajustes.py).
 //
 // Rutas:
 //   /gestoria                 tablero (o "Mis trámites" si es gestor)

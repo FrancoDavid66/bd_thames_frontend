@@ -3,8 +3,8 @@
 // 🚗 GESTORÍA — todas las llamadas al servidor en un solo lugar.
 //
 // La plata (precio, %, comisión, comprobantes) la filtra el SERVIDOR según
-// quién pide: a la oficina directamente no le llega. Acá no se esconde nada,
-// solo se pide y se manda.
+// quién pide: a la oficina directamente no le llega y al gestor, nada de la
+// comisión de THAMES (solo el admin). Acá no se esconde nada, solo se pide y se manda.
 //
 // Ejemplo:
 //   const lista = await listarAbiertos();          // tablero
@@ -43,6 +43,8 @@ export const editarTramite = (id, body) => datos(api.patch(`${B}tramites/${id}/`
 export const cambiarEstado = (id, body) => datos(api.post(`${B}tramites/${id}/estado/`, body));
 export const asignarGestor = (id, gestor) => datos(api.post(`${B}tramites/${id}/asignar/`, { gestor: gestor || null }));
 export const cargarPrecio = (id, body) => datos(api.post(`${B}tramites/${id}/precio/`, body));
+// 💵 "Recibí plata": {monto, archivo | documento, precio_gestoria?, pasar_a_listo?}
+export const registrarCobro = (id, body) => datos(api.post(`${B}tramites/${id}/cobros/`, body));
 export const anotar = (id, body) => datos(api.post(`${B}tramites/${id}/nota/`, body));
 export const guardarDocumento = (id, body) => datos(api.post(`${B}tramites/${id}/documentos/`, body));
 export const borrarDocumento = (id, docId) => datos(api.delete(`${B}tramites/${id}/documentos/${docId}/`));
@@ -60,8 +62,9 @@ export const borrarGestor = (id) => datos(api.delete(`${B}gestores/${id}/`));
 export const cobrarGestor = (id, formaPago = "TRANSFERENCIA") =>
   datos(api.post(`${B}gestores/${id}/cobrar/`, { forma_pago: formaPago }));
 
+// 🔒 Comisiones: solo el admin (29/09). El gestor ya no manda "Ya pagué": los avisos
+//    viejos se ven y se descartan en Gestoría → Gestores.
 export const pedirComisiones = (dias = 90) => datos(api.get(`${B}comisiones/`, { params: { dias } }));
-export const avisarPago = (archivo) => datos(api.post(`${B}avisos/`, archivo));
 export const descartarAviso = (id) => datos(api.post(`${B}avisos/${id}/descartar/`, {}));
 
 /** El mensaje que mandó el servidor (o uno por defecto). */

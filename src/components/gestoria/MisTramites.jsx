@@ -10,20 +10,22 @@
 //     (o el nombre, si es la licencia de conducir), el cliente y la oficina, y
 //     EL botón de lo que le toca ("Lo presenté en el registro", "Está LISTO",
 //     "Observado", "Lo presenté otra vez") + «Ver» para abrir el trámite;
-//   - 🎚️ el precio al cliente y lo que le debe a THAMES: SOLO con las comisiones
-//     prendidas (hoy apagadas: no ve nada de plata y pasa a LISTO directo);
+//   - 💵 con las comisiones prendidas: en cada tarjeta, el precio y cuánto le pagó
+//     el cliente, con «Recibí plata» (monto + foto del comprobante). Sin al menos un
+//     comprobante no pasa a LISTO. 🔒 La comisión de THAMES (%, lo que debe, "Ya
+//     pagué") NO la ve: es solo del admin (Franco 29/09);
 //   - "Tus datos" (su foto y su contacto, como los ve la oficina) al final.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { HiCheck, HiChevronDown, HiDocumentText, HiPlus } from "react-icons/hi";
+import { HiCamera, HiChevronDown, HiDocumentText, HiPlus } from "react-icons/hi";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useGestoria } from "./gestoriaContext";
-import { avisarPago, cambiarEstado, cargarPrecio, listarAbiertos, mensajeError, pedirResumen, subirArchivo } from "../../services/gestoria";
-import { Avatar, BotonArchivo, Cargando } from "./Piezas";
-import { ModalObservar, ModalPrecio } from "./ModalesTramite";
-import { ESTADO_GESTOR, ddmm, diasEnEstado, esDemorado, fmtPct, plata, textoDias, textoListoGestor, tipoCorto } from "./gestoriaUtils";
+import { cambiarEstado, cargarPrecio, listarAbiertos, mensajeError, pedirResumen, registrarCobro } from "../../services/gestoria";
+import { Avatar, Cargando } from "./Piezas";
+import { ModalCobro, ModalObservar, ModalPrecio } from "./ModalesTramite";
+import { ESTADO_GESTOR, diasEnEstado, esDemorado, plata, textoDias, textoListoGestor, tipoCorto } from "./gestoriaUtils";
 
 const suave = "text-suave dark:text-suave-dark";
 
@@ -92,6 +94,11 @@ export default function MisTramites() {
 
   const avanzar = async (t, nuevo) => {
     // t.ve_plata lo manda el servidor en cada trámite (false con las comisiones apagadas).
+    // 💵 Para LISTO: al menos un comprobante de cobro (y el precio): se piden en la ventanita.
+    if (t.ve_plata && nuevo === "LISTO" && !t.cobros_n) {
+      setModal({ tipo: "cobro", t, luegoListo: true });
+      return;
+    }
     if (t.ve_plata && nuevo === "LISTO" && t.precio_gestoria == null) {
       setModal({ tipo: "precio", t, luegoListo: true });
       return;
@@ -108,20 +115,9 @@ export default function MisTramites() {
     }
   };
 
-  const yaPague = async (file) => {
-    try {
-      const arch = await subirArchivo(file, "gestoria/comisiones");
-      const a = await avisarPago(arch);
-      toast.success(`Listo: le avisamos a THAMES que pagaste ${plata(a.monto)}. Cuando lo confirmen, se descuenta.`);
-      cargar();
-    } catch (e) {
-      toast.error(e?.response ? mensajeError(e) : e?.message || "No se pudo subir.");
-    }
-  };
-
-  // El trámite que se le pasa a la ventanita del precio (fijo mientras está abierta).
-  const tPrecio = useMemo(
-    () => (modal?.tipo === "precio" ? { ...modal.t, acciones: { es_gestor: true, puede_pct: false } } : null),
+  // El trámite que se le pasa a las ventanitas del precio y del cobro (fijo mientras están abiertas).
+  const tModal = useMemo(
+    () => (modal?.tipo === "precio" || modal?.tipo === "cobro" ? { ...modal.t, acciones: { es_gestor: true, puede_pct: false } } : null),
     [modal]
   );
 
@@ -137,10 +133,6 @@ export default function MisTramites() {
   }
 
   const nombre = saludo(res.gestor_nombre);
-  const pct = Number(res.comision_pct || 0);
-  const deuda = Number(res.comisiones_a_cobrar || 0);
-  const avisos = res.avisos_pago || [];
-  const ultimo = avisos[avisos.length - 1];
   const perfil = res.perfil || null;
   const puedeCargar = !!catalogo?.gestor; // sin ficha de gestor no puede cargar
   const nHacer = porPestana.hacer.length;
@@ -177,34 +169,15 @@ export default function MisTramites() {
         )}
       </div>
 
-      {/* 🎚️ Plata: solo con las comisiones prendidas */}
+      {/* 💵 Solo con las comisiones prendidas (la comisión en sí la ve solo el admin) */}
       {res.sin_precio > 0 && (
         <div className="rounded-2xl border border-orange-300 dark:border-orange-500/40 bg-orange-50 dark:bg-orange-500/10 px-4 py-3 text-[14px] text-orange-700 dark:text-orange-300">
           <strong>
             Te falta cargar el precio de {res.sin_precio} trámite{res.sin_precio > 1 ? "s" : ""}.
           </strong>{" "}
-          Sin precio no se pueden pasar a LISTO.
+          Sin el precio y el comprobante de lo que te pagó el cliente, no pasan a LISTO.
         </div>
       )}
-      {pct > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-4 py-3">
-            <span className="text-[14px] text-duo-amarillo-sombra dark:text-duo-amarillo">Comisiones pendientes con THAMES ({fmtPct(pct)})</span>
-            <strong className="text-xl whitespace-nowrap text-duo-amarillo-sombra dark:text-duo-amarillo">{plata(deuda)}</strong>
-          </div>
-          {(ultimo || deuda > 0) && (
-            <div className="flex flex-wrap items-center gap-2.5">
-              {ultimo && (
-                <span className="inline-flex items-center gap-1.5 text-[13px] text-duo-azul">
-                  <HiCheck className="w-4 h-4" /> Avisaste que pagaste {plata(ultimo.monto)} el {ddmm(ultimo.fecha)}. Falta que THAMES lo confirme.
-                </span>
-              )}
-              {deuda > 0 && <BotonArchivo onElegir={yaPague}>Ya pagué: subir comprobante</BotonArchivo>}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Pestañas */}
       <div
         role="tablist"
@@ -250,7 +223,7 @@ export default function MisTramites() {
                 ocupado={ocupado}
                 onAvanzar={(n) => avanzar(t, n)}
                 onObservar={() => setModal({ tipo: "observar", t })}
-                onPrecio={() => setModal({ tipo: "precio", t, luegoListo: false })}
+                onCobro={() => setModal({ tipo: "cobro", t, luegoListo: false })}
                 onAbrir={() => navigate(`/gestoria/tramite/${t.id}`)}
               />
             ))}
@@ -260,8 +233,22 @@ export default function MisTramites() {
 
       {perfil && <TusDatos p={perfil} />}
 
+      <ModalCobro
+        t={tModal}
+        abierto={modal?.tipo === "cobro"}
+        luegoListo={!!modal?.luegoListo}
+        onCerrar={() => setModal(null)}
+        onGuardar={async (body) => {
+          const r = await registrarCobro(modal.t.id, body);
+          setModal(null);
+          // aviso = se guardó el cobro pero justo no pudo pasar a LISTO (ej: lo marcaron observado).
+          if (r?.aviso) toast.error(r.aviso, { duration: 7000 });
+          else toast.success(body.pasar_a_listo ? avisoListo : "Listo: quedó el comprobante del cobro");
+          cargar();
+        }}
+      />
       <ModalPrecio
-        t={tPrecio}
+        t={tModal}
         abierto={modal?.tipo === "precio"}
         luegoListo={!!modal?.luegoListo}
         onCerrar={() => setModal(null)}
@@ -287,7 +274,7 @@ export default function MisTramites() {
 }
 
 /** Un trámite, corto: en qué está, de quién es y EL botón de lo que le toca. */
-function TarjetaGestor({ t, ocupado, onAvanzar, onObservar, onPrecio, onAbrir }) {
+function TarjetaGestor({ t, ocupado, onAvanzar, onObservar, onCobro, onAbrir }) {
   const e = ESTADO_GESTOR[t.estado] || ESTADO_GESTOR.RECIBIDO;
   const d = diasEnEstado(t);
   const dem = esDemorado(t);
@@ -338,24 +325,36 @@ function TarjetaGestor({ t, ocupado, onAvanzar, onObservar, onPrecio, onAbrir })
           <HiDocumentText className="w-3.5 h-3.5" aria-hidden="true" /> El cliente mandó una foto
         </span>
       )}
-      {t.ve_plata &&
-        (t.precio_gestoria == null ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="rounded-lg border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-2 py-0.5 text-[12px] font-bold text-duo-amarillo-sombra dark:text-duo-amarillo">
-              Falta el precio
-            </span>
-            <button type="button" onClick={onPrecio} className="min-h-[36px] rounded-lg border border-linea dark:border-linea-dark px-3 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
-              Cargar precio
-            </button>
-          </div>
-        ) : (
-          <span className={`text-[13px] ${suave}`}>
-            Precio al cliente: <strong className="text-titulo dark:text-titulo-dark">{plata(t.precio_gestoria)}</strong> ·{" "}
-            <button type="button" onClick={onPrecio} className="font-semibold text-duo-violeta hover:underline">
-              cambiar
-            </button>
+      {/* 💵 Precio y cuánto le pagó el cliente, con «Recibí plata» (solo con las comisiones prendidas) */}
+      {t.ve_plata && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface dark:bg-surface-dark px-3 py-2">
+          <span className="text-[13px] text-titulo dark:text-titulo-dark">
+            {t.precio_gestoria == null ? (
+              <strong className="text-duo-amarillo-sombra dark:text-amber-300">Falta el precio</strong>
+            ) : (
+              <>
+                Precio <strong>{plata(t.precio_gestoria)}</strong>
+              </>
+            )}
+            {" · "}
+            {t.cobros_n ? (
+              <>
+                te pagó <strong>{plata(t.cobrado)}</strong>
+              </>
+            ) : (
+              <strong className="text-duo-amarillo-sombra dark:text-amber-300">sin comprobante</strong>
+            )}
           </span>
-        ))}
+          <button
+            type="button"
+            onClick={onCobro}
+            aria-label={`Recibí plata: ${ident}`}
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-duo-verde hover:bg-duo-verde-sombra px-3 text-[13px] font-bold text-white"
+          >
+            <HiCamera className="w-4 h-4" aria-hidden="true" /> Recibí plata
+          </button>
+        </div>
+      )}
 
       {t.estado === "ASIGNADO" && (
         <div className="flex gap-2">

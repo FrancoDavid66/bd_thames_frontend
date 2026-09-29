@@ -2,12 +2,15 @@
 //
 // 🪟 Ventanitas de la ficha:
 //   - ModalPrecio:    el gestor carga cuánto le cobra al cliente (el admin, además, el %).
+//                     🔒 Al gestor no se le muestra la comisión (la ve solo el admin, 29/09).
+//   - ModalCobro:     💵 "Recibí plata": cuánto pagó el cliente + la foto del comprobante
+//                     (si falta el precio, se carga acá también).
 //   - ModalObservar:  qué pidió el registro.
 //   - ModalCancelar:  motivo.
 //   - ModalCobrar:    el admin marca cobrada la comisión (+ comprobante opcional).
 //   - ModalMensajes:  los WhatsApp que se le mandaron al cliente (a mano o automáticos).
-import { useEffect, useState } from "react";
-import { HiCash, HiChatAlt2, HiExclamation, HiX } from "react-icons/hi";
+import { useEffect, useRef, useState } from "react";
+import { HiCamera, HiCash, HiChatAlt2, HiDocumentText, HiExclamation, HiX } from "react-icons/hi";
 
 import ModalDuo from "../ui/ModalDuo";
 import Boton3D from "../ui/Boton3D";
@@ -130,7 +133,200 @@ export function ModalPrecio({ t, abierto, onCerrar, onGuardar, luegoListo = fals
             </label>
           )}
         </div>
-        <p className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">{calc}</p>
+        {/* 🔒 La comisión la ve solo el admin (29/09): al gestor no se le muestra. */}
+        {!esGestor && <p className="text-[13px] font-semibold text-titulo dark:text-titulo-dark">{calc}</p>}
+      </div>
+    </ModalDuo>
+  );
+}
+
+/**
+ * 💵 "Recibí plata" (Franco 29/09: "cada vez que la gestora reciba plata, que suba
+ * el comprobante en la app"): cuánto pagó el cliente + la foto o el PDF.
+ * Si todavía no hay precio, también pide cuánto le cobra en total (sale igual a
+ * lo que pagó; se cambia si fue una seña).
+ * props: t, abierto, onCerrar, onGuardar(body), luegoListo (se abrió al querer pasar
+ *        a LISTO), documento (un comprobante que mandó el cliente: solo falta el monto).
+ * body: {monto, archivo | documento, precio_gestoria?, pasar_a_listo}
+ */
+export function ModalCobro({ t, abierto, onCerrar, onGuardar, luegoListo = false, documento = null }) {
+  const esGestor = !!t?.acciones?.es_gestor;
+  const [monto, setMonto] = useState("");
+  const [precio, setPrecio] = useState("");
+  const [precioTocado, setPrecioTocado] = useState(false);
+  const [archivo, setArchivo] = useState(null); // {url, public_id, nombre, mime, tamano} ya en Cloudinary
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const pedido = useRef(0); // si se cierra mientras sube, esa subida ya no cuenta
+
+  useEffect(() => {
+    if (!abierto) return;
+    pedido.current += 1;
+    setMonto("");
+    setPrecio("");
+    setPrecioTocado(false);
+    setArchivo(null);
+    setSubiendo(false);
+    setError("");
+  }, [abierto]);
+
+  if (!t) return null;
+  const pidePrecio = t.precio_gestoria == null;
+  const m = Number(monto);
+  const precioEf = precioTocado ? precio : monto; // si pagó todo, el precio es lo mismo
+  const p = pidePrecio ? Number(precioEf) : Number(t.precio_gestoria);
+  const yaCobrado = Number(t.cobrado || 0);
+  const pasa = m > 0 && p > 0 && yaCobrado + m > p;
+
+  const elegir = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const n = ++pedido.current;
+    setSubiendo(true);
+    setError("");
+    try {
+      const arch = await subirArchivo(f, "gestoria/comprobantes");
+      if (n === pedido.current) setArchivo(arch);
+    } catch (err) {
+      if (n === pedido.current) setError(err?.message || "No se pudo subir el archivo.");
+    } finally {
+      if (n === pedido.current) setSubiendo(false);
+    }
+  };
+
+  const guardar = async () => {
+    if (!(m > 0)) return setError(esGestor ? "Poné cuánto te pagó el cliente (en pesos)." : "Poné cuánto pagó el cliente (en pesos).");
+    if (!documento && !archivo) return setError("Subí la foto o el PDF del comprobante.");
+    if (pidePrecio && !(Number(precioEf) > 0)) return setError("Poné cuánto se le cobra en total por el trámite.");
+    setGuardando(true);
+    setError("");
+    try {
+      const body = { monto: Math.round(m), pasar_a_listo: luegoListo };
+      if (documento) body.documento = documento.id;
+      else body.archivo = archivo;
+      if (pidePrecio) body.precio_gestoria = Math.round(Number(precioEf));
+      await onGuardar(body);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const campo = `${inputCls} h-12 text-[16px]`;
+  const etiqueta = "flex flex-col gap-1.5 text-[14px] font-semibold text-titulo dark:text-titulo-dark";
+  return (
+    <ModalDuo
+      isOpen={abierto}
+      onClose={onCerrar}
+      size="sm"
+      icon={<HiCash />}
+      iconTono="verde"
+      title={luegoListo ? "Para pasarlo a LISTO" : esGestor ? "Recibí plata" : "Registrar un cobro"}
+      footer={
+        <>
+          <Boton3D variant="blanco" onClick={onCerrar} className="w-full sm:w-auto">Volver</Boton3D>
+          <Boton3D variant="verde" onClick={guardar} disabled={guardando || subiendo} className="w-full sm:w-auto">
+            {guardando ? "Guardando…" : subiendo ? "Subiendo…" : luegoListo ? "Guardar y pasar a LISTO" : "Guardar"}
+          </Boton3D>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <CartelError texto={error} />
+        <p className="text-[14px] text-suave dark:text-suave-dark">
+          {luegoListo
+            ? esGestor
+              ? "Primero cargá lo que te pagó el cliente y la foto del comprobante."
+              : `Falta el comprobante de lo que pagó el cliente. Normalmente lo sube ${t.gestor_nombre || "el gestor"} desde su usuario; si lo tenés vos, cargalo acá.`
+            : esGestor
+              ? "Cada vez que el cliente te paga: cuánto y la foto del comprobante (transferencia o recibo)."
+              : "Lo que el cliente le pagó a la gestoría, con su comprobante."}
+          {esGestor ? " Lo ve solo la administración de THAMES, no las oficinas." : ""}
+        </p>
+        <label className={etiqueta}>
+          {esGestor ? "¿Cuánto te pagó?" : "¿Cuánto pagó el cliente?"}
+          <input
+            type="number"
+            min="0"
+            step="1000"
+            inputMode="numeric"
+            placeholder="Ej: 100000"
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            className={campo}
+            autoFocus
+          />
+        </label>
+        {documento ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">Comprobante</span>
+            <a
+              href={documento.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 py-2.5 text-[14px] font-medium text-duo-azul hover:underline"
+            >
+              <HiDocumentText className="w-5 h-5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{documento.nombre || "comprobante"}</span>
+            </a>
+            <span className="text-[12px] text-suave dark:text-suave-dark">Lo mandó el cliente desde su link: solo falta el monto.</span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">Foto o PDF del comprobante</span>
+            {archivo ? (
+              <div className="flex items-center gap-2 rounded-lg border border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2.5">
+                <HiDocumentText className="w-5 h-5 shrink-0 text-duo-verde-sombra dark:text-duo-verde" aria-hidden="true" />
+                <a href={archivo.url} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 truncate text-[14px] font-medium text-titulo dark:text-titulo-dark hover:underline">
+                  {archivo.nombre}
+                </a>
+                <label className="shrink-0 cursor-pointer text-[13px] font-semibold text-duo-violeta hover:underline">
+                  Cambiar
+                  <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={elegir} />
+                </label>
+              </div>
+            ) : (
+              <label
+                className={`flex items-center justify-center gap-2 min-h-[52px] rounded-xl border-2 border-dashed border-duo-violeta/50 px-4 text-[15px] font-bold text-duo-violeta dark:text-[#a5a0ff] cursor-pointer hover:bg-duo-violeta-soft dark:hover:bg-[var(--color-duo-violeta-soft-dark)] focus-within:ring-2 focus-within:ring-duo-violeta/40 ${
+                  subiendo ? "opacity-60 pointer-events-none" : ""
+                }`}
+              >
+                <HiCamera className="w-5 h-5" aria-hidden="true" />
+                {subiendo ? "Subiendo…" : "Sacar foto o subir archivo"}
+                <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={elegir} disabled={subiendo} />
+              </label>
+            )}
+          </div>
+        )}
+        {pidePrecio && (
+          <label className={etiqueta}>
+            {esGestor ? "¿Cuánto le cobrás en total por el trámite?" : "¿Cuánto cobra la gestoría en total?"}
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              inputMode="numeric"
+              placeholder="Ej: 150000"
+              value={precioEf}
+              onChange={(e) => {
+                setPrecio(e.target.value);
+                setPrecioTocado(true);
+              }}
+              className={campo}
+            />
+            <span className="text-[12px] font-normal text-suave dark:text-suave-dark">
+              {esGestor ? "Si te pagó todo, es lo mismo." : "Si pagó todo, es lo mismo."} Si fue una seña, poné el total.
+            </span>
+          </label>
+        )}
+        {pasa && (
+          <p className="rounded-lg bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-3 py-2 text-[13px] font-medium text-duo-amarillo-sombra dark:text-amber-200">
+            Ojo: con esto suma {plata(yaCobrado + m)}, más que el precio ({plata(p)}). Fijate que esté bien.
+          </p>
+        )}
       </div>
     </ModalDuo>
   );

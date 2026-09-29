@@ -9,9 +9,13 @@
 //   3. El cliente (nombre, DNI, teléfono), dónde lo retira y el auto, con
 //      «Agregar patente» si se cargó sin patente.
 //   4. Los papeles: se tocan los que ya están, «Subir foto o PDF» y «Ver archivos».
-//   5. 🎚️ El precio al cliente: SOLO con las comisiones prendidas (hoy apagadas).
+//   5. 💵 La plata del cliente (con las comisiones prendidas): el precio y cada
+//      cobro con su comprobante. «Recibí plata» = cuánto te pagó + la foto (Franco
+//      29/09: "cada vez que la gestora reciba plata, que suba el comprobante").
+//      Sin al menos uno, no pasa a LISTO.
 //   6. «Anotar algo» y el historial (cerrado: se abre si hace falta).
-// 🔒 Sin póliza ni plata de THAMES: el servidor ni siquiera se las manda.
+// 🔒 Sin póliza ni la comisión de THAMES (%, monto, lo que debe): la ve solo el
+//    admin y el servidor ni siquiera se la manda.
 // La oficina y el admin siguen con la ficha completa (FichaTramite.jsx).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -28,12 +32,13 @@ import {
   guardarDocumento,
   mensajeError,
   pedirTramite,
+  registrarCobro,
   subirArchivo,
 } from "../../services/gestoria";
 import { Archivo, Cargando, Demorado, Etiqueta } from "./Piezas";
-import { ModalObservar, ModalPrecio } from "./ModalesTramite";
-import { DatoVehiculo, SeccionPrecioGestor } from "./FichaTramite";
-import { ESTADO_GESTOR, ddmm, ddmmhhmm, diasEnEstado, esDemorado, textoDias, textoListoGestor } from "./gestoriaUtils";
+import { ModalCobro, ModalObservar, ModalPrecio } from "./ModalesTramite";
+import { DatoVehiculo } from "./FichaTramite";
+import { ESTADO_GESTOR, ddmm, ddmmhhmm, diasEnEstado, esDemorado, plata, textoDias, textoListoGestor } from "./gestoriaUtils";
 
 const suave = "text-suave dark:text-suave-dark";
 const tarjeta = "flex flex-col gap-3 rounded-2xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-4 shadow-sm";
@@ -44,6 +49,94 @@ const BTN = {
   verde: `${btnBase} bg-duo-verde hover:bg-duo-verde-sombra`,
   naranja: `${btnBase} bg-orange-600 hover:bg-orange-700`,
 };
+
+/**
+ * 💵 La plata del cliente: el precio y cada cobro con su comprobante («Recibí plata»).
+ * Sin la comisión de THAMES (la ve solo el admin). Solo con las comisiones prendidas.
+ * Ej: «Precio $ 150.000 · Te pagó $ 50.000 · Falta $ 100.000».
+ */
+function PlataDelCliente({ t, a, onPrecio, onCobro }) {
+  const comprobantes = (t.documentos || []).filter((x) => x.tipo === "COMPROBANTE");
+  const cobros = comprobantes.filter((x) => x.monto != null);
+  const sinMonto = comprobantes.filter((x) => x.monto == null);
+  const precio = t.precio_gestoria != null ? Number(t.precio_gestoria) : null;
+  const cobrado = Number(t.cobrado || 0);
+  const falta = precio != null ? precio - cobrado : null;
+  let sub = "";
+  if (falta != null && cobros.length) sub = falta > 0 ? `Falta ${plata(falta)}` : falta === 0 ? "Pagó todo" : "Pagó más que el precio";
+  return (
+    <section className={tarjeta} aria-label="Plata del cliente">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-[16px] font-bold text-titulo dark:text-titulo-dark">Plata del cliente</h2>
+        {a.puede_precio && (
+          <button type="button" onClick={onPrecio} className="min-h-[40px] rounded-lg px-2 text-[14px] font-bold text-duo-violeta hover:underline">
+            {precio == null ? "Cargar precio" : "Cambiar precio"}
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-0.5 rounded-xl bg-surface dark:bg-surface-dark px-3 py-2.5">
+          <span className={`text-[12px] ${suave}`}>Precio al cliente</span>
+          {precio == null ? (
+            <strong className="text-[17px] text-duo-amarillo-sombra dark:text-amber-300">Falta</strong>
+          ) : (
+            <strong className="text-[17px] text-titulo dark:text-titulo-dark">{plata(precio)}</strong>
+          )}
+        </div>
+        <div className="flex flex-col gap-0.5 rounded-xl bg-surface dark:bg-surface-dark px-3 py-2.5">
+          <span className={`text-[12px] ${suave}`}>Te pagó</span>
+          <strong className="text-[17px] text-titulo dark:text-titulo-dark">{plata(cobrado)}</strong>
+          {sub ? <span className={`text-[12px] ${falta < 0 ? "text-duo-amarillo-sombra dark:text-amber-300" : suave}`}>{sub}</span> : null}
+        </div>
+      </div>
+      {cobros.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {cobros.map((x) => (
+            <li key={x.id} className="flex items-center gap-2">
+              <span className="shrink-0 min-w-[5.5rem] text-center rounded-lg bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-2 py-1 text-[13px] font-bold text-duo-verde-sombra dark:text-green-400">
+                {plata(x.monto)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <Archivo d={x} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-xl bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-3 py-2 text-[14px] text-duo-amarillo-sombra dark:text-amber-200">
+          Todavía no subiste ningún comprobante. Sin comprobante no se puede pasar a LISTO.
+        </p>
+      )}
+      {sinMonto.map((x) => (
+        <div key={x.id} className="flex flex-col gap-2 rounded-xl border border-duo-azul/40 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3">
+          <span className="text-[14px] font-semibold text-duo-azul dark:text-blue-200">
+            {x.rol === "CLIENTE" ? "El cliente mandó un comprobante:" : "Comprobante sin monto:"}
+          </span>
+          <Archivo d={x} />
+          {a.puede_cobro && (
+            <button
+              type="button"
+              onClick={() => onCobro(x)}
+              className="self-start min-h-[40px] rounded-lg bg-duo-azul hover:bg-duo-azul-sombra px-3.5 text-[14px] font-bold text-white"
+            >
+              Cargar cuánto pagó
+            </button>
+          )}
+        </div>
+      ))}
+      {a.puede_cobro && (
+        <button
+          type="button"
+          onClick={() => onCobro(null)}
+          className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-duo-verde hover:bg-duo-verde-sombra px-4 text-[16px] font-bold text-white active:scale-[0.99]"
+        >
+          <HiCamera className="w-5 h-5" aria-hidden="true" /> Recibí plata: subir comprobante
+        </button>
+      )}
+      <span className={`text-[13px] ${suave}`}>Cada vez que el cliente te pague, subí el comprobante acá. Lo ve solo la administración de THAMES.</span>
+    </section>
+  );
+}
 
 /** «Ahora te toca»: lo que tiene que hacer el gestor y el botón para hacerlo. */
 function AhoraTeToca({ t, ocupado, onAvanzar, onObservar }) {
@@ -68,6 +161,7 @@ function AhoraTeToca({ t, ocupado, onAvanzar, onObservar }) {
   } else if (t.estado === "EN_REGISTRO") {
     titulo = "Esperar la respuesta";
     texto = "Cuando esté, tocá «Está LISTO». Si pidieron algo más, «Observado».";
+    if (t.ve_plata && !t.cobros_n) texto += " Para LISTO vas a necesitar el comprobante de lo que te pagó el cliente.";
     botones = (
       <div className="grid grid-cols-2 gap-2">
         {puede("LISTO") && (
@@ -147,7 +241,8 @@ export default function FichaGestora() {
   const avisoListo = textoListoGestor(catalogo);
   const [t, setT] = useState(null);
   const [error, setError] = useState("");
-  const [modal, setModal] = useState(null); // "observar" | "precio" | "precioListo"
+  const [modal, setModal] = useState(null); // "observar" | "precio" | "precioListo" | "cobro" | "cobroListo"
+  const [cobroDoc, setCobroDoc] = useState(null); // comprobante del cliente al que se le carga el monto
   const [ocupado, setOcupado] = useState(false);
   const [subiendo, setSubiendo] = useState(""); // "" | "1" | "2 de 3"
   const [verArchivos, setVerArchivos] = useState(false);
@@ -250,12 +345,17 @@ export default function FichaGestora() {
   const dem = esDemorado(t);
   const papeles = Array.isArray(t.papeles) ? t.papeles : [];
   const docsPapel = (t.documentos || []).filter((x) => x.tipo === "PAPEL");
-  const docsPlata = (t.documentos || []).filter((x) => x.tipo !== "PAPEL");
   const delCliente = docsPapel.filter((x) => x.rol === "CLIENTE").length;
   const movs = t.movimientos || [];
   const persona = t.con_vehiculo === false;
 
   const avanzar = (nuevo) => {
+    // 💵 Para LISTO: al menos un comprobante de cobro (y el precio). Se piden en la misma ventanita.
+    if (nuevo === "LISTO" && t.ve_plata && !t.cobros_n) {
+      setCobroDoc(null);
+      setModal("cobroListo");
+      return;
+    }
     if (nuevo === "LISTO" && t.ve_plata && t.precio_gestoria == null) {
       setModal("precioListo");
       return;
@@ -310,16 +410,6 @@ export default function FichaGestora() {
     if (ok) {
       toast.success(ok === 1 ? "Archivo subido" : `${ok} archivos subidos`);
       setVerArchivos(true);
-    }
-  };
-
-  // Comprobantes (solo con las comisiones prendidas).
-  const subirComprobante = async (file) => {
-    try {
-      const arch = await subirArchivo(file, "gestoria/comprobantes");
-      await hacer(() => guardarDocumento(t.id, { ...arch, tipo: "COMPROBANTE" }), `Subido: ${arch.nombre}`);
-    } catch (err) {
-      if (!err?.response) toast.error(err?.message || "No se pudo subir el archivo.");
     }
   };
 
@@ -528,9 +618,17 @@ export default function FichaGestora() {
         )}
       </section>
 
-      {/* 5 · Precio al cliente (solo con las comisiones prendidas) */}
-      {t.ve_plata && a.es_gestor && (
-        <SeccionPrecioGestor t={t} a={a} docs={docsPlata} cerrado={cerrado} setModal={setModal} onSubir={subirComprobante} />
+      {/* 5 · La plata del cliente: precio y cobros (solo con las comisiones prendidas) */}
+      {t.ve_plata && (
+        <PlataDelCliente
+          t={t}
+          a={a}
+          onPrecio={() => setModal("precio")}
+          onCobro={(doc) => {
+            setCobroDoc(doc);
+            setModal("cobro");
+          }}
+        />
       )}
 
       {/* 6 · Anotar algo */}
@@ -624,6 +722,25 @@ export default function FichaGestora() {
           setT(conMisPapeles(nuevo));
           setModal(null);
           toast.success(body.pasar_a_listo ? avisoListo : "Precio guardado");
+        }}
+      />
+      <ModalCobro
+        t={t}
+        abierto={modal === "cobro" || modal === "cobroListo"}
+        luegoListo={modal === "cobroListo"}
+        documento={cobroDoc}
+        onCerrar={() => {
+          setModal(null);
+          setCobroDoc(null);
+        }}
+        onGuardar={async (body) => {
+          const nuevo = await registrarCobro(t.id, body);
+          setT(conMisPapeles(nuevo));
+          setModal(null);
+          setCobroDoc(null);
+          // aviso = se guardó el cobro pero justo no pudo pasar a LISTO (ej: lo marcaron observado).
+          if (nuevo.aviso) toast.error(nuevo.aviso, { duration: 7000 });
+          else toast.success(body.pasar_a_listo ? avisoListo : "Listo: quedó el comprobante del cobro");
         }}
       />
       <ModalObservar

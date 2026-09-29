@@ -3,11 +3,13 @@
 // 📄 Ficha de un trámite: en qué paso está, botones para avanzarlo, datos,
 // papeles (fotos/PDF), historial y el link del cliente.
 //   👷 El GESTOR ve una ficha más simple, pensada para el celu: FichaGestora.jsx
-//      (29/09). Usa de acá DatoVehiculo y SeccionPrecioGestor (por eso se exportan).
-//   - Admin: además la caja "Plata 🔒" (precio, comisión, cobrarla, comprobantes).
-//   - Gestor: "Precio al cliente" (lo carga él) y sus comprobantes.
-//     🎚️ Con las comisiones APAGADAS (hoy) no sale ninguna de las dos: el
-//     servidor no manda plata y el gestor pasa a LISTO sin precio.
+//      (29/09). Usa de acá DatoVehiculo (por eso se exporta).
+//   - Admin: además la caja "Plata 🔒" (29/09): el precio, lo que el cliente ya
+//     pagó (cada cobro con su comprobante, «Registrar un cobro») y la COMISIÓN de
+//     THAMES (el %, cuánto es y cobrarla): la comisión la ve SOLO el admin.
+//     Para pasar a LISTO hacen falta el precio y al menos un comprobante de cobro.
+//     🎚️ Con las comisiones apagadas (GESTORIA_COMISIONES = apagadas) no sale:
+//     el servidor no manda plata.
 //   - Oficina: todo menos la plata (el servidor ni siquiera se la manda).
 //   - Oficina y admin: el gestor con su foto y botones para escribirle,
 //     llamarlo, mandarle un mail o ir a llevarle papeles.
@@ -24,7 +26,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { HiArrowLeft, HiArrowRight, HiChatAlt2, HiCheck, HiClock, HiExternalLink, HiLink, HiX } from "react-icons/hi";
+import { HiArrowLeft, HiArrowRight, HiCamera, HiChatAlt2, HiCheck, HiClock, HiExternalLink, HiLink, HiX } from "react-icons/hi";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useGestoria } from "./gestoriaContext";
@@ -41,6 +43,7 @@ import {
   guardarDocumento,
   mensajeError,
   pedirTramite,
+  registrarCobro,
   subirArchivo,
 } from "../../services/gestoria";
 import {
@@ -57,7 +60,7 @@ import {
   Punto,
   Seccion,
 } from "./Piezas";
-import { ModalCancelar, ModalCobrar, ModalMensajes, ModalObservar, ModalPrecio } from "./ModalesTramite";
+import { ModalCancelar, ModalCobrar, ModalCobro, ModalMensajes, ModalObservar, ModalPrecio } from "./ModalesTramite";
 import {
   ESTADOS,
   colorOficina,
@@ -201,7 +204,9 @@ export default function FichaTramite() {
   const [t, setT] = useState(null);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
-  const [nota, setNota] = useState({ txt: "", vis: false, soloAdmin: false });
+  const [cobroDoc, setCobroDoc] = useState(null); // comprobante del cliente al que se le carga el monto
+  // soloAdmin = "que no la vea la oficina" (la ve el gestor); privada = 🔒 solo el admin.
+  const [nota, setNota] = useState({ txt: "", vis: false, soloAdmin: false, privada: false });
   const [papelNuevo, setPapelNuevo] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -321,6 +326,12 @@ export default function FichaTramite() {
 
   // ── acciones ──
   const avanzar = (nuevo) => {
+    // 💵 Para LISTO: al menos un cobro con comprobante (y el precio). Se piden en la misma ventanita.
+    if (nuevo === "LISTO" && t.ve_plata && !t.cobros_n) {
+      setCobroDoc(null);
+      setModal("cobroListo");
+      return;
+    }
     if (nuevo === "LISTO" && t.ve_plata && t.precio_gestoria == null) {
       setModal("precioListo");
       return;
@@ -603,17 +614,24 @@ export default function FichaTramite() {
             </div>
           </Seccion>
 
+          {/* 🔒 La plata: solo el admin (la oficina no; el gestor la ve en su ficha, FichaGestora). */}
           {t.ve_plata && a.es_admin && (
-            <SeccionPlataAdmin t={t} a={a} docs={docsPlata} ocupado={ocupado} setModal={setModal}
-              onSubir={(f) => subir(f, "COMPROBANTE")} onBorrar={borrarArchivo}
+            <SeccionPlataAdmin
+              t={t}
+              a={a}
+              docs={docsPlata}
+              ocupado={ocupado}
+              setModal={setModal}
+              onCobro={(doc) => {
+                setCobroDoc(doc);
+                setModal("cobro");
+              }}
+              onBorrar={borrarArchivo}
               onDeshacer={() => {
-                if (!window.confirm("¿Deshacer el cobro? Se borra el ingreso de Balances y la comisión vuelve a quedar pendiente.")) return;
-                intentar(() => deshacerComision(t.id), "Cobro deshecho");
+                if (!window.confirm("¿Deshacer el cobro de la comisión? Se borra el ingreso de Balances y la comisión vuelve a quedar pendiente.")) return;
+                intentar(() => deshacerComision(t.id), "Cobro de la comisión deshecho");
               }}
             />
-          )}
-          {t.ve_plata && a.es_gestor && (
-            <SeccionPrecioGestor t={t} a={a} docs={docsPlata} cerrado={cerrado} setModal={setModal} onSubir={(f) => subir(f, "COMPROBANTE")} />
           )}
         </div>
 
@@ -627,13 +645,20 @@ export default function FichaTramite() {
                   e.preventDefault();
                   const txt = nota.txt.trim();
                   if (!txt) return toast.error("Escribí algo para anotar");
-                  const soloAdmin = t.ve_plata && nota.soloAdmin;
+                  const privada = !!(t.ve_plata && a.es_admin && nota.privada);
+                  const soloAdmin = !!(t.ve_plata && (nota.soloAdmin || privada));
                   intentar(
-                    () => anotar(t.id, { texto: txt, visible_cliente: nota.vis && !soloAdmin, solo_admin: soloAdmin }).then((r) => {
-                      setNota({ txt: "", vis: false, soloAdmin: false });
+                    () => anotar(t.id, { texto: txt, visible_cliente: nota.vis && !soloAdmin, solo_admin: soloAdmin, privada }).then((r) => {
+                      setNota({ txt: "", vis: false, soloAdmin: false, privada: false });
                       return r;
                     }),
-                    soloAdmin ? "Anotado (la oficina no lo ve)" : nota.vis ? "Anotado (lo ve el cliente en su link)" : "Anotado en el historial"
+                    privada
+                      ? "Anotado (solo lo ve el admin)"
+                      : soloAdmin
+                        ? "Anotado (la oficina no lo ve)"
+                        : nota.vis
+                          ? "Anotado (lo ve el cliente en su link)"
+                          : "Anotado en el historial"
                   );
                 }}
               >
@@ -652,17 +677,29 @@ export default function FichaTramite() {
                     <label className="inline-flex items-center gap-2 text-[13px] text-titulo dark:text-titulo-dark cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={nota.vis && !nota.soloAdmin}
-                        disabled={nota.soloAdmin}
+                        checked={nota.vis && !nota.soloAdmin && !nota.privada}
+                        disabled={nota.soloAdmin || nota.privada}
                         onChange={(e) => setNota((n) => ({ ...n, vis: e.target.checked }))}
                         className="w-4 h-4"
                       />
                       Que lo vea el cliente
                     </label>
                     {t.ve_plata && (
-                      <label className="inline-flex items-center gap-2 text-[13px] text-titulo dark:text-titulo-dark cursor-pointer" title="Para notas con plata: la ven el admin y el gestor de este trámite, la oficina no">
-                        <input type="checkbox" checked={nota.soloAdmin} onChange={(e) => setNota((n) => ({ ...n, soloAdmin: e.target.checked }))} className="w-4 h-4" />
-                        Que no la vea la oficina
+                      <label className="inline-flex items-center gap-2 text-[13px] text-titulo dark:text-titulo-dark cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={nota.soloAdmin || nota.privada}
+                          disabled={nota.privada}
+                          onChange={(e) => setNota((n) => ({ ...n, soloAdmin: e.target.checked }))}
+                          className="w-4 h-4"
+                        />
+                        Que no la vea la oficina <span className="text-suave dark:text-suave-dark">(el gestor sí)</span>
+                      </label>
+                    )}
+                    {t.ve_plata && a.es_admin && (
+                      <label className="inline-flex items-center gap-2 text-[13px] text-titulo dark:text-titulo-dark cursor-pointer">
+                        <input type="checkbox" checked={nota.privada} onChange={(e) => setNota((n) => ({ ...n, privada: e.target.checked }))} className="w-4 h-4" />
+                        Solo yo (admin): tampoco el gestor
                       </label>
                     )}
                   </span>
@@ -678,6 +715,7 @@ export default function FichaTramite() {
                   <span className="text-[12px] text-suave dark:text-suave-dark">
                     {ddmmhhmm(m.fecha)} · {m.autor || "—"}
                     {m.visible_cliente && <span className="font-semibold text-duo-azul"> · lo ve el cliente</span>}
+                    {m.solo_admin && <span className="font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo"> · solo admin</span>}
                   </span>
                   <span className="text-[14px] text-titulo dark:text-titulo-dark whitespace-pre-line break-words">{m.texto}</span>
                 </li>
@@ -779,6 +817,26 @@ export default function FichaTramite() {
           toast.success(body.pasar_a_listo ? `${nuevo.numero} → LISTO PARA ENTREGAR` : "Precio guardado");
         }}
       />
+      <ModalCobro
+        t={t}
+        abierto={modal === "cobro" || modal === "cobroListo"}
+        luegoListo={modal === "cobroListo"}
+        documento={cobroDoc}
+        onCerrar={() => {
+          setModal(null);
+          setCobroDoc(null);
+        }}
+        onGuardar={async (body) => {
+          const nuevo = await registrarCobro(t.id, body);
+          setT(conMisPapeles(nuevo));
+          setModal(null);
+          setCobroDoc(null);
+          recargarGestores?.();
+          // aviso = se guardó el cobro pero justo no pudo pasar a LISTO (ej: lo marcaron observado).
+          if (nuevo.aviso) toast.error(nuevo.aviso, { duration: 7000 });
+          else toast.success(body.pasar_a_listo ? `${nuevo.numero} → LISTO PARA ENTREGAR` : `Cobro de ${plata(body.monto)} guardado`);
+        }}
+      />
       <ModalObservar
         abierto={modal === "observar"}
         onCerrar={() => setModal(null)}
@@ -857,16 +915,35 @@ function ContactoGestor({ t, esAdmin }) {
   );
 }
 
-function SeccionPlataAdmin({ t, a, docs, ocupado, setModal, onSubir, onBorrar, onDeshacer }) {
-  const hayCompCliente = docs.some((x) => x.tipo === "COMPROBANTE" && x.rol === "CLIENTE");
+/**
+ * 💵 "Plata 🔒" (solo el admin, 29/09): el precio que cobra la gestoría, lo que el
+ * cliente ya pagó (cada cobro con su comprobante) y la COMISIÓN de THAMES.
+ * Ej: Precio $ 150.000 · Ya pagó $ 50.000 (falta $ 100.000) · Comisión 10 % = $ 15.000.
+ */
+function SeccionPlataAdmin({ t, a, docs, ocupado, setModal, onCobro, onBorrar, onDeshacer }) {
   const pct = t.comision_pct != null ? Number(t.comision_pct) : null;
+  const precio = t.precio_gestoria != null ? Number(t.precio_gestoria) : null;
+  const cobrado = Number(t.cobrado || 0);
+  const falta = precio != null ? precio - cobrado : null;
+  const antesDeListo = ["RECIBIDO", "ASIGNADO", "EN_REGISTRO", "OBSERVADO"].includes(t.estado);
+  const quien = t.gestor ? t.gestor_nombre : "el gestor";
+  const comprobantes = docs.filter((x) => x.tipo === "COMPROBANTE");
+  const cobros = comprobantes.filter((x) => !x.anterior && x.monto != null);
+  const sinMonto = comprobantes.filter((x) => !x.anterior && x.monto == null);
+  const anteriores = comprobantes.filter((x) => x.anterior); // de antes del cambio de gestor: no suman
+  const deComision = docs.filter((x) => x.tipo === "COMISION");
+  const borrar = (x) => (a.puede_borrar_archivos ? () => onBorrar(x) : null);
+  const titulo = "text-[11px] font-bold tracking-wide text-suave dark:text-suave-dark";
+  const caja = "flex flex-col gap-1.5 rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3.5";
+  const nota = "text-[13px] text-suave dark:text-suave-dark";
+
   let comision;
   if (t.comision_cobrada) {
     comision = (
       <>
         <strong className="text-[22px] text-titulo dark:text-titulo-dark">{plata(t.comision)}</strong>
         <span className="inline-flex items-center gap-1 text-[13px] text-duo-verde-sombra dark:text-duo-verde">
-          <HiCheck className="w-4 h-4" /> Cobrada el {ddmm(t.comision_cobrada_en)} ({t.comision_forma_nombre}). Está en Balances como «Comisión gestoría», sin oficina (la oficina no la ve).
+          <HiCheck className="w-4 h-4 shrink-0" /> Cobrada el {ddmm(t.comision_cobrada_en)} ({t.comision_forma_nombre}). Está en Balances como «Comisión gestoría», sin oficina (la oficina no la ve).
         </span>
         {a.puede_deshacer_cobro && (
           <button type="button" onClick={onDeshacer} className="self-start text-[12px] font-semibold text-duo-rojo hover:underline">
@@ -879,21 +956,21 @@ function SeccionPlataAdmin({ t, a, docs, ocupado, setModal, onSubir, onBorrar, o
     comision = (
       <>
         <strong className="text-[22px]">—</strong>
-        <span className="text-[13px] text-suave dark:text-suave-dark">Se calcula cuando lo tome un gestor (con su %).</span>
+        <span className={nota}>Se calcula cuando lo tome un gestor (con su %).</span>
       </>
     );
   } else if (!(pct > 0)) {
     comision = (
       <>
         <strong className="text-[22px] text-titulo dark:text-titulo-dark">Sin comisión</strong>
-        <span className="text-[13px] text-suave dark:text-suave-dark">{t.gestor_nombre} no paga comisión.</span>
+        <span className={nota}>{t.gestor_nombre} no paga comisión.</span>
       </>
     );
   } else if (t.comision == null) {
     comision = (
       <>
         <strong className="text-[22px]">—</strong>
-        <span className="text-[13px] text-suave dark:text-suave-dark">Se calcula sola: {fmtPct(pct)} del precio, cuando lo cargue {t.gestor_nombre}.</span>
+        <span className={nota}>Se calcula sola: {fmtPct(pct)} del precio, cuando lo cargue {t.gestor_nombre}.</span>
       </>
     );
   } else {
@@ -914,118 +991,145 @@ function SeccionPlataAdmin({ t, a, docs, ocupado, setModal, onSubir, onBorrar, o
 
   return (
     <Seccion
-      titulo={<h2 className="inline-flex items-center gap-2 text-[15px] font-semibold text-titulo dark:text-titulo-dark">Plata <Candado /></h2>}
+      titulo={
+        <h2 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">
+          Plata <span className="text-[13px] font-medium text-suave dark:text-suave-dark">· la oficina no la ve</span>
+        </h2>
+      }
       derecha={
         a.puede_precio && (
           <button type="button" onClick={() => setModal("precio")} className="rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
-            {t.precio_gestoria == null ? "Cargar precio" : "Cambiar precio o %"}
+            {precio == null ? "Cargar precio" : a.puede_pct ? "Cambiar precio o %" : "Cambiar precio"}
           </button>
         )
       }
     >
       <p className="rounded-lg border border-duo-verde/30 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2 text-[13px] text-duo-verde-sombra dark:text-duo-verde">
-        El cliente le paga directo a la gestoría. El precio lo carga el gestor y la comisión se calcula sola. A la caja entra solo la comisión.
+        El cliente le paga directo a la gestoría: el gestor carga el precio y sube el comprobante de cada cobro. La comisión se calcula sola, la ves solo vos (el admin) y es lo único que entra a la caja.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5 rounded-xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-3.5">
-          <span className="text-[11px] font-bold tracking-wide text-suave dark:text-suave-dark">PRECIO QUE COBRA LA GESTORÍA</span>
-          {t.precio_gestoria == null ? (
+        <div className={caja}>
+          <span className={titulo}>PRECIO QUE COBRA LA GESTORÍA</span>
+          {precio == null ? (
             <>
               <strong className="text-[22px] text-duo-amarillo-sombra dark:text-duo-amarillo">Falta</strong>
-              <span className="text-[13px] text-suave dark:text-suave-dark">
-                {t.gestor ? `Lo carga ${t.gestor_nombre} cuando le pasa el precio al cliente.` : "Lo carga el gestor cuando lo tome."} Sin precio no se puede pasar a LISTO.
+              <span className={nota}>
+                {t.gestor ? `Lo carga ${t.gestor_nombre}.` : "Lo carga el gestor cuando lo tome."}
+                {antesDeListo ? " Sin precio no pasa a LISTO." : ""}
               </span>
             </>
           ) : (
             <>
-              <strong className="text-[22px] text-titulo dark:text-titulo-dark">{plata(t.precio_gestoria)}</strong>
-              <span className="text-[13px] text-suave dark:text-suave-dark">
-                Cargado por {t.precio_cargado_por_nombre || "—"}{t.precio_cargado_en ? ` el ${ddmm(t.precio_cargado_en)}` : ""}. No entra a la caja.
+              <strong className="text-[22px] text-titulo dark:text-titulo-dark">{plata(precio)}</strong>
+              <span className={nota}>
+                Lo cargó {t.precio_cargado_por_nombre || "—"}{t.precio_cargado_en ? ` el ${ddmm(t.precio_cargado_en)}` : ""}. No entra a la caja.
               </span>
             </>
           )}
         </div>
-        <div className="flex flex-col gap-1.5 rounded-xl border border-duo-verde/40 bg-duo-verde-soft/50 dark:bg-[var(--color-duo-verde-soft-dark)] p-3.5">
-          <span className="text-[11px] font-bold tracking-wide text-duo-verde-sombra dark:text-duo-verde">
-            COMISIÓN PARA THAMES{pct != null && !t.comision_cobrada ? ` · ${fmtPct(pct)}` : ""}
-          </span>
-          {comision}
-        </div>
-      </div>
-      <Comprobantes t={t} docs={docs} aviso={hayCompCliente && t.precio_gestoria != null} puedeSubir={a.puede_subir_comprobante} onSubir={onSubir} onBorrar={a.puede_borrar_archivos ? onBorrar : null} />
-    </Seccion>
-  );
-}
-
-/** 💵 "Precio al cliente" del gestor (solo con las comisiones prendidas). La usa también FichaGestora.jsx. */
-export function SeccionPrecioGestor({ t, a, docs, cerrado, setModal, onSubir }) {
-  const pct = t.comision_pct != null ? Number(t.comision_pct) : 0;
-  return (
-    <Seccion
-      titulo="Precio al cliente"
-      derecha={
-        a.puede_precio && !cerrado && (
-          <button type="button" onClick={() => setModal("precio")} className="rounded-lg border border-linea dark:border-linea-dark px-3 py-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
-            {t.precio_gestoria == null ? "Cargar precio" : "Cambiar precio"}
-          </button>
-        )
-      }
-    >
-      {t.precio_gestoria == null ? (
-        <p className="rounded-lg bg-orange-50 dark:bg-orange-500/10 px-3 py-2 text-[13px] font-medium text-orange-700 dark:text-orange-300">
-          Falta: cargá cuánto le cobrás al cliente. Sin precio no se puede pasar a LISTO.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          <strong className="text-[22px] text-titulo dark:text-titulo-dark">{plata(t.precio_gestoria)}</strong>
-          {pct > 0 && (
-            <span className="text-[13px] text-suave dark:text-suave-dark">
-              Comisión para THAMES ({fmtPct(pct)}): {plata(t.comision)}
-              {t.comision_cobrada ? " · ya la pagaste" : ""}.
-            </span>
+        <div className={caja}>
+          <span className={titulo}>EL CLIENTE YA PAGÓ</span>
+          {cobros.length ? (
+            <>
+              <strong className="text-[22px] text-titulo dark:text-titulo-dark">{plata(cobrado)}</strong>
+              <span className={nota}>
+                {cobros.length === 1 ? "1 comprobante" : `${cobros.length} comprobantes`}
+                {falta == null ? "" : falta > 0 ? ` · falta ${plata(falta)}` : falta === 0 ? " · pagó todo" : ""}
+              </span>
+              {falta != null && falta < 0 && (
+                <span className="text-[13px] font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo">
+                  Suma {plata(-falta)} más que el precio: fijate que esté bien.
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <strong className="text-[22px] text-duo-amarillo-sombra dark:text-duo-amarillo">$ 0</strong>
+              <span className={nota}>
+                Todavía no hay comprobantes. Los sube {quien} cada vez que el cliente le paga.
+                {antesDeListo ? " Sin al menos uno no pasa a LISTO." : ""}
+              </span>
+            </>
           )}
         </div>
-      )}
-      <Comprobantes t={t} docs={docs} puedeSubir={a.puede_subir_comprobante && !cerrado} onSubir={onSubir} />
-      <span className="text-[12px] text-suave dark:text-suave-dark">Los comprobantes los ve solo la administración de THAMES, no las oficinas.</span>
-    </Seccion>
-  );
-}
-
-function Comprobantes({ t, docs, aviso = false, puedeSubir, onSubir, onBorrar = null }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-semibold text-suave dark:text-suave-dark">Comprobantes ({docs.length})</span>
-      {docs.length ? (
-        docs.map((x) => (
-          <Archivo
-            key={x.id}
-            d={x}
-            onBorrar={onBorrar ? () => onBorrar(x) : null}
-            etiqueta={
-              x.tipo === "COMISION" ? (
-                <Etiqueta>Pago de la comisión</Etiqueta>
-              ) : (
-                <Etiqueta tono={x.rol === "CLIENTE" ? "azul" : "neutro"}>
-                  Pago del cliente{x.rol === "CLIENTE" ? " · lo subió el cliente" : x.rol === "GESTOR" ? " · lo subió el gestor" : ""}
-                </Etiqueta>
-              )
-            }
-          />
-        ))
-      ) : (
-        <span className="text-[13px] text-suave dark:text-suave-dark">Todavía no hay comprobantes.</span>
-      )}
-      {aviso && (
-        <span className="text-[13px] text-duo-amarillo-sombra dark:text-duo-amarillo">
-          Fijate que el comprobante del cliente coincida con el precio que cargó {t.gestor_nombre || "el gestor"}: <strong>{plata(t.precio_gestoria)}</strong>.
+      </div>
+      <div className="flex flex-col gap-1.5 rounded-xl border border-duo-verde/40 bg-duo-verde-soft/50 dark:bg-[var(--color-duo-verde-soft-dark)] p-3.5">
+        <span className="inline-flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-wide text-duo-verde-sombra dark:text-duo-verde">
+          COMISIÓN PARA THAMES{pct != null && !t.comision_cobrada ? ` · ${fmtPct(pct)}` : ""}
+          <Candado />
         </span>
-      )}
-      {puedeSubir && (
-        <BotonArchivo onElegir={onSubir} className="self-start">
-          Subir comprobante
-        </BotonArchivo>
-      )}
-    </div>
+        {comision}
+      </div>
+
+      {/* 🧾 Los comprobantes: cada cobro al cliente (con su monto) y el pago de la comisión */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[12px] font-semibold text-suave dark:text-suave-dark">Cobros al cliente ({cobros.length})</span>
+          {a.puede_cobro && (
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => onCobro(null)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-duo-verde hover:bg-duo-verde-sombra px-3 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50"
+            >
+              <HiCamera className="w-4 h-4" aria-hidden="true" /> Registrar un cobro
+            </button>
+          )}
+        </div>
+        {cobros.map((x) => (
+          <div key={x.id} className="flex items-center gap-2">
+            <span className="shrink-0 min-w-[5.5rem] text-center rounded-lg bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-2 py-1 text-[13px] font-bold text-duo-verde-sombra dark:text-duo-verde">
+              {plata(x.monto)}
+            </span>
+            <div className="flex-1 min-w-0">
+              <Archivo d={x} etiqueta={x.rol === "CLIENTE" ? <Etiqueta tono="azul">lo mandó el cliente</Etiqueta> : null} onBorrar={borrar(x)} />
+            </div>
+          </div>
+        ))}
+        {sinMonto.map((x) => (
+          <div key={x.id} className="flex flex-col gap-2 rounded-xl border border-duo-azul/40 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] p-3">
+            <span className="text-[13px] font-semibold text-duo-azul dark:text-blue-200">
+              {x.rol === "CLIENTE" ? "El cliente mandó un comprobante desde su link: falta cargar cuánto pagó." : "Comprobante sin monto: falta cargar cuánto pagó."}
+            </span>
+            <Archivo d={x} onBorrar={borrar(x)} />
+            {a.puede_cobro && (
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={() => onCobro(x)}
+                className="self-start rounded-lg bg-duo-azul hover:bg-duo-azul-sombra px-3 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50"
+              >
+                Cargar cuánto pagó
+              </button>
+            )}
+          </div>
+        ))}
+        {anteriores.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-semibold text-suave dark:text-suave-dark">De antes del cambio de gestor (no suman)</span>
+            {anteriores.map((x) => (
+              <div key={x.id} className="flex items-center gap-2 opacity-75">
+                {x.monto != null && (
+                  <span className="shrink-0 min-w-[5.5rem] text-center rounded-lg border border-linea dark:border-linea-dark px-2 py-1 text-[13px] font-semibold text-suave dark:text-suave-dark">
+                    {plata(x.monto)}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <Archivo d={x} onBorrar={borrar(x)} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {deComision.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-semibold text-suave dark:text-suave-dark">Pago de la comisión ({deComision.length})</span>
+            {deComision.map((x) => (
+              <Archivo key={x.id} d={x} onBorrar={borrar(x)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </Seccion>
   );
 }

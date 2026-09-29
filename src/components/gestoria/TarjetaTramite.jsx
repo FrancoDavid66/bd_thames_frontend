@@ -7,6 +7,7 @@
 // (se manda a mano desde la ficha; con el aviso apagado no aparece).
 // Sin patente (se carga después): dice "Sin patente".
 // "Lo cargó el gestor": lo dio de alta el mismo gestor desde su usuario (29/09).
+// 🪪 Trámites de la persona (licencia de conducir, con_vehiculo=false): sin renglón de auto.
 import { HiChatAlt2, HiDocumentText, HiUserAdd } from "react-icons/hi";
 
 import { Avatar, Demorado, DiasChip, Punto } from "./Piezas";
@@ -31,14 +32,16 @@ export default function TarjetaTramite({ t, onClick }) {
           {t.oficina_nombre || "Sin oficina"}
         </span>
       </span>
-      <span className="flex flex-wrap items-baseline gap-x-2">
-        {t.patente ? (
-          <strong className="font-mono text-[15px] tracking-wide text-titulo dark:text-titulo-dark">{t.patente}</strong>
-        ) : (
-          <span className="text-[13px] font-semibold text-suave dark:text-suave-dark">Sin patente</span>
-        )}
-        <span className="text-[12px] text-suave dark:text-suave-dark truncate">{t.vehiculo}</span>
-      </span>
+      {t.con_vehiculo !== false && (
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          {t.patente ? (
+            <strong className="font-mono text-[15px] tracking-wide text-titulo dark:text-titulo-dark">{t.patente}</strong>
+          ) : (
+            <span className="text-[13px] font-semibold text-suave dark:text-suave-dark">Sin patente</span>
+          )}
+          <span className="text-[12px] text-suave dark:text-suave-dark truncate">{t.vehiculo}</span>
+        </span>
+      )}
       <span className="text-[13px] text-titulo dark:text-titulo-dark truncate">{t.persona_nombre || "—"}</span>
       {t.estado === "OBSERVADO" && t.falta && (
         <span className="rounded-md bg-orange-50 dark:bg-orange-500/10 px-2 py-1 text-[12px] font-medium text-orange-700 dark:text-orange-300">

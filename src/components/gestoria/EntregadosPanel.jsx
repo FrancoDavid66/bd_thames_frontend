@@ -94,8 +94,14 @@ export default function EntregadosPanel() {
                       {t.estado === "CANCELADO" && <span className="ml-1.5 text-[11px] font-bold text-duo-rojo">CANCELADO</span>}
                     </td>
                     <td className="px-3 py-3">
-                      <strong className="text-titulo dark:text-titulo-dark">{tipoCorto(t)}</strong> ·{" "}
-                      {t.patente ? <span className="font-mono">{t.patente}</span> : <span className="text-suave dark:text-suave-dark">sin patente</span>}
+                      <strong className="text-titulo dark:text-titulo-dark">{tipoCorto(t)}</strong>
+                      {t.con_vehiculo === false ? null : t.patente ? (
+                        <>
+                          {" "}· <span className="font-mono">{t.patente}</span>
+                        </>
+                      ) : (
+                        <span className="text-suave dark:text-suave-dark"> · sin patente</span>
+                      )}
                       <br />
                       <span className="text-[11px] text-suave dark:text-suave-dark">{t.numero}</span>
                     </td>
