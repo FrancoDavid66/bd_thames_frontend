@@ -20,7 +20,6 @@ import {
   HiClock, HiCurrencyDollar, HiOfficeBuilding, HiCreditCard, HiIdentification,
 } from "react-icons/hi";
 import toast from "react-hot-toast";
-import { sendAdminPagoRegistrado } from "../../services/notifications/pagos";
 import { solicitudesApi } from "../../services/solicitudes.js";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -43,10 +42,6 @@ function isValidISODate(s) {
 }
 function safeGetLS(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } }
 function safeSetLS(k, v) { try { localStorage.setItem(k, String(v ?? "")); } catch {} }
-const fmtAR = (n) => {
-  const num = Number(String(n ?? "").replace(",", "."));
-  return Number.isFinite(num) ? `$ ${num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$ —";
-};
 
 export function ModalFormaPago({
   isOpen, onClose, onConfirm,
@@ -56,9 +51,6 @@ export function ModalFormaPago({
   billeterasVirtuales = [],
   mediosCobro = [],
   clienteNombreApellido = "",
-  clienteDni = "",
-  polizaCompania = "",
-  polizaCobertura = "",
   pagoCuota = "",
 }) {
   /* ── Estado del wizard ── */
@@ -213,21 +205,9 @@ export function ModalFormaPago({
       safeSetLS(LS_LAST_METODO, metodo);
       if (needsDestino) safeSetLS(LS_LAST_DESTINO, destinoId || "");
 
+      // 📭 30/09: ya no sale el mail «Pago registrado» por cada cobro (Franco: "es
+      //    muy tedioso"). El pago se registra igual que siempre.
       await Promise.resolve(onConfirm?.(payload));
-
-      try {
-        await sendAdminPagoRegistrado({
-          aviso: "Pago registrado",
-          cliente_nombre_apellido: clienteNombreApellido,
-          cliente_dni: clienteDni,
-          poliza_compania: polizaCompania,
-          poliza_cobertura: polizaCobertura,
-          pago_monto: fmtAR(montoNum),
-          pago_metodo: metodo,
-          pago_cuota: pagoCuota,
-          pago_destino: destino,
-        });
-      } catch {}
     } catch {
     } finally {
       setSubmitting(false);
