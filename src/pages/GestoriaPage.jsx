@@ -5,17 +5,19 @@
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
 //   - Admin:   Tablero · Gestores 🔒 · Entregados · Comisiones 🔒 (con plata).
 //   - Oficina: Tablero · Entregados (solo su oficina, SIN plata).
-//   - Gestor:  "Mis trámites" (lo suyo, en 3 pestañas), su ficha simple del trámite
-//              (FichaGestora) y "Nuevo trámite" (29/09: lo carga él y queda con él).
+//   - Gestor:  📱 SU APP (30/09, estilo Envíos Flex): Inicio · Trámites · ➕ · Cobros ·
+//              Perfil, con la ficha simple del trámite (FichaGestora) y "Nuevo trámite"
+//              (lo carga él y queda con él). Todo eso vive en gestoria/gestora/AppGestora.jsx.
 // 💵 Comisiones PRENDIDAS (29/09): el gestor carga el precio y el comprobante de
 //    cada cobro; la comisión de THAMES (y la pestaña Comisiones) la ve solo el admin.
 //    🎚️ Se apagan en Railway con GESTORIA_COMISIONES = apagadas (catalogo.comisiones
 //    = false): sin pestaña Comisiones ni plata en ningún lado (ver gestoria/ajustes.py).
 //
 // Rutas:
-//   /gestoria                 tablero (o "Mis trámites" si es gestor)
+//   /gestoria                 tablero (o el Inicio de su app si es gestor)
 //   /gestoria/nuevo           cargar un trámite (wizard de pasos)
 //   /gestoria/tramite/:id     ficha (el gestor ve FichaGestora, más simple)
+//   /gestoria/tramites, /gestoria/cobros, /gestoria/perfil   (solo el gestor: su app)
 //   /gestoria/gestores        (admin)
 //   /gestoria/entregados
 //   /gestoria/comisiones      (admin)
@@ -32,12 +34,11 @@ import { GestoriaCtx, useGestoria } from "../components/gestoria/gestoriaContext
 
 import TableroGestoria from "../components/gestoria/TableroGestoria";
 import FichaTramite from "../components/gestoria/FichaTramite";
-import FichaGestora from "../components/gestoria/FichaGestora";
 import NuevoTramite from "../components/gestoria/NuevoTramite";
 import GestoresPanel from "../components/gestoria/GestoresPanel";
 import EntregadosPanel from "../components/gestoria/EntregadosPanel";
 import ComisionesPanel from "../components/gestoria/ComisionesPanel";
-import MisTramites from "../components/gestoria/MisTramites";
+import AppGestora from "../components/gestoria/gestora/AppGestora";
 
 const FILTROS_INICIALES = { gestor: "todos", oficina: "todas", tipo: "todos", q: "", demorados: false };
 
@@ -53,7 +54,7 @@ export default function GestoriaPage() {
   const [error, setError] = useState("");
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
   const [tabCelu, setTabCelu] = useState("EN_REGISTRO");
-  // 👷 Pestaña de "Mis trámites" del gestor (queda al volver de un trámite).
+  // 👷 Filtro de «Trámites» en la app del gestor (queda al volver de un trámite).
   const [tabGestor, setTabGestor] = useState("hacer");
 
   useEffect(() => {
@@ -104,34 +105,28 @@ export default function GestoriaPage() {
 
   return (
     <GestoriaCtx.Provider value={ctx}>
-      <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
-        {esGestor ? (
+      {esGestor ? (
+        // 📱 La app de la gestora ocupa toda la pantalla (tiene sus barras arriba y abajo).
+        <AppGestora />
+      ) : (
+        <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
+          <Cabecera />
           <Routes>
-            <Route index element={<MisTramites />} />
+            <Route index element={<TableroGestoria />} />
             <Route path="nuevo" element={<NuevoTramite />} />
-            <Route path="tramite/:id" element={<FichaGestora />} />
+            <Route path="tramite/:id" element={<FichaTramite />} />
+            <Route path="entregados" element={<EntregadosPanel />} />
+            <Route path="gestores" element={esAdmin ? <GestoresPanel /> : <Navigate to="/gestoria" replace />} />
+            <Route
+              path="comisiones"
+              element={
+                !esAdmin ? <Navigate to="/gestoria" replace /> : !catalogo ? null : catalogo.comisiones ? <ComisionesPanel /> : <Navigate to="/gestoria" replace />
+              }
+            />
             <Route path="*" element={<Navigate to="/gestoria" replace />} />
           </Routes>
-        ) : (
-          <>
-            <Cabecera />
-            <Routes>
-              <Route index element={<TableroGestoria />} />
-              <Route path="nuevo" element={<NuevoTramite />} />
-              <Route path="tramite/:id" element={<FichaTramite />} />
-              <Route path="entregados" element={<EntregadosPanel />} />
-              <Route path="gestores" element={esAdmin ? <GestoresPanel /> : <Navigate to="/gestoria" replace />} />
-              <Route
-                path="comisiones"
-                element={
-                  !esAdmin ? <Navigate to="/gestoria" replace /> : !catalogo ? null : catalogo.comisiones ? <ComisionesPanel /> : <Navigate to="/gestoria" replace />
-                }
-              />
-              <Route path="*" element={<Navigate to="/gestoria" replace />} />
-            </Routes>
-          </>
-        )}
-      </div>
+        </div>
+      )}
     </GestoriaCtx.Provider>
   );
 }

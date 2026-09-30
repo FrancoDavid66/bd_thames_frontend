@@ -472,7 +472,7 @@ export default function NuevoTramite() {
     irA(id);
   };
   const hayDatos = !!tipo || !!sel || !!m.nombre.trim() || fotos.length > 0;
-  // Sale al tablero (o a "Mis trámites"). Si hay marca de "atrás" en el historial, la reemplaza.
+  // Sale al tablero (o al Inicio de la app del gestor). Si hay marca de "atrás" en el historial, la reemplaza.
   const irAlInicio = () => {
     const reemplazar = guarda.current;
     guarda.current = false;
@@ -610,7 +610,7 @@ export default function NuevoTramite() {
         }
       }
       recargarGestores?.();
-      if (esGestor) setTabGestor?.("hacer"); // al volver, lo ve en «Para hacer»
+      if (esGestor) setTabGestor?.("hacer"); // en «Trámites» lo ve en «Para hacer» (Para presentar)
       if (vivo.current) setCreado({ t, fallidas });
     } catch (e) {
       if (vivo.current) setError(mensajeError(e));
@@ -699,7 +699,7 @@ export default function NuevoTramite() {
               {t.persona_nombre ? ` de ${t.persona_nombre}` : ""}.{" "}
               {esGestor ? (
                 <>
-                  Quedó en tus trámites, en <strong className="text-titulo dark:text-titulo-dark">«Para hacer»</strong>
+                  Quedó en tus trámites, en <strong className="text-titulo dark:text-titulo-dark">«Para presentar»</strong>
                   {t.oficina_nombre ? `. Lo retira en THAMES ${t.oficina_nombre}.` : "."}
                 </>
               ) : t.gestor_nombre ? (
@@ -740,7 +740,7 @@ export default function NuevoTramite() {
               onClick={irAlInicio}
               className="self-center min-h-[44px] px-3 text-[15px] font-bold text-duo-violeta hover:underline"
             >
-              {esGestor ? "Volver a Mis trámites" : "Volver al tablero"}
+              {esGestor ? "Volver al inicio" : "Volver al tablero"}
             </button>
           </div>
         </div>

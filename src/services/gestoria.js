@@ -35,6 +35,8 @@ export function pedirCatalogo(forzar = false) {
 }
 
 export const pedirResumen = () => datos(api.get(`${B}resumen/`));
+// 💵 App de la gestora («Cobros», 30/09): lo que le pagaron en el mes y sus últimos cobros.
+export const pedirMisCobros = () => datos(api.get(`${B}mis-cobros/`));
 export const listarAbiertos = (params = {}) => datos(api.get(`${B}tramites/`, { params }));
 export const listarCerrados = (page = 1) => datos(api.get(`${B}tramites/`, { params: { cerrados: 1, page } }));
 export const pedirTramite = (id) => datos(api.get(`${B}tramites/${id}/`));
