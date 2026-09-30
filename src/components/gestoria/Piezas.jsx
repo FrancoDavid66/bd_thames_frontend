@@ -235,7 +235,8 @@ export function Pasos({ t, vertical = false }) {
         let nombre = ESTADOS[p].n;
         if (p === "ASIGNADO" && t.gestor_nombre) nombre = `Asignado a ${t.gestor_nombre.split(" ")[0]}`;
         if (obs) nombre = "Observado";
-        let sub = fechaDe[p] ? ddmm(fechaDe[p]) : p === "LISTO" && t.fecha_estimada ? `estimado ${ddmm(`${t.fecha_estimada}T12:00:00`)}` : "";
+        // (Sin la "fecha estimada": ya no se usa desde el 28/09 y confundía, Franco 29/09.)
+        let sub = fechaDe[p] ? ddmm(fechaDe[p]) : "";
         if (obs) sub = `desde ${ddmm(t.observado_en)}`;
         else if (actual && fechaDe[p]) {
           sub = `desde ${ddmm(fechaDe[p])}`;

@@ -1,9 +1,17 @@
 // src/components/gestoria/FichaTramite.jsx
 //
-// 📄 Ficha de un trámite: en qué paso está, botones para avanzarlo, datos,
-// papeles (fotos/PDF), historial y el link del cliente.
+// 📄 Ficha de un trámite (oficina y admin): en qué paso está, botones para
+// avanzarlo, el gestor, papeles (fotos/PDF), historial y el link del cliente.
 //   👷 El GESTOR ve una ficha más simple, pensada para el celu: FichaGestora.jsx
 //      (29/09). Usa de acá DatoVehiculo (por eso se exporta).
+//   - ✂️ Menos datos (Franco 29/09: "hay muchos datos"): arriba va qué trámite es,
+//     el auto (con «Cambiar» / «Agregar patente»), la aclaración, el cliente y la
+//     oficina. Ya no está la caja "Datos del trámite": el tipo y la oficina ya
+//     estaban arriba, "Cargado" está en el historial, la fecha estimada ya no se
+//     usa y la PÓLIZA no se muestra (Franco: "sacá el dato de la póliza").
+//   - 👤 Una sola tarjeta "Gestor": quién lo tiene, sus datos y botones para
+//     escribirle, llamarlo, mandarle un mail o ir a llevarle papeles, y
+//     «Cambiar» (o «Elegí un gestor» si todavía no tiene).
 //   - Admin: además la caja "Plata 🔒" (29/09): el precio, lo que el cliente ya
 //     pagó (cada cobro con su comprobante, «Registrar un cobro») y la COMISIÓN de
 //     THAMES (el %, cuánto es y cobrarla): la comisión la ve SOLO el admin.
@@ -11,12 +19,6 @@
 //     🎚️ Con las comisiones apagadas (GESTORIA_COMISIONES = apagadas) no sale:
 //     el servidor no manda plata.
 //   - Oficina: todo menos la plata (el servidor ni siquiera se la manda).
-//   - Oficina y admin: el gestor con su foto y botones para escribirle,
-//     llamarlo, mandarle un mail o ir a llevarle papeles.
-//   - 🚗 Patente y vehículo: si se cargó sin patente, la agregan la oficina o
-//     el gestor del trámite desde "Datos del trámite" (Franco 28/09).
-//   - 🔒 "Póliza" solo para la oficina y el admin: el gestor no ve si el cliente
-//     tiene póliza (ni el servidor se lo manda, 29/09).
 //   - 📲 Aviso al cliente por WhatsApp (whatsapp_modo):
 //       · "apagado" (hoy): solo el link del cliente (Copiar / Ver como el cliente).
 //       · "manual": "Mandar por WhatsApp" abre el chat con el mensaje escrito (el
@@ -26,7 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { HiArrowLeft, HiArrowRight, HiCamera, HiChatAlt2, HiCheck, HiClock, HiExternalLink, HiLink, HiX } from "react-icons/hi";
+import { HiArrowLeft, HiArrowRight, HiCamera, HiChatAlt2, HiCheck, HiClock, HiExternalLink, HiLink, HiPencil, HiX } from "react-icons/hi";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useGestoria } from "./gestoriaContext";
@@ -60,7 +62,7 @@ import {
   Punto,
   Seccion,
 } from "./Piezas";
-import { ModalCancelar, ModalCobrar, ModalCobro, ModalMensajes, ModalObservar, ModalPrecio } from "./ModalesTramite";
+import { ModalCancelar, ModalCobrar, ModalCobro, ModalMensajes, ModalObservar, ModalPrecio, ModalVehiculo } from "./ModalesTramite";
 import {
   ESTADOS,
   colorOficina,
@@ -68,7 +70,6 @@ import {
   ddmmhhmm,
   diasEnEstado,
   esDemorado,
-  fechaCorta,
   fmtPct,
   linkWhatsAppOElegir,
   plata,
@@ -388,16 +389,31 @@ export default function FichaTramite() {
     }
   };
 
-  const gestorOpciones = (() => {
-    const lista = gestores.filter((g) => g.activo !== false);
-    if (t.gestor && !lista.some((g) => g.id === t.gestor)) lista.push({ id: t.gestor, nombre: t.gestor_nombre, abiertos: null });
-    return lista;
-  })();
+  const gestorOpciones = gestores.filter((g) => g.activo !== false);
+
+  // 👤 Elegir o cambiar el gestor. Si ya tenía uno, pregunta antes (deja de verlo).
+  const elegirGestor = (g) => {
+    const nombre = gestorOpciones.find((x) => x.id === g)?.nombre || "otro gestor";
+    if (t.gestor) {
+      const precio = t.ve_plata && t.precio_gestoria != null ? " Se borra el precio que cargó." : "";
+      const txt = g
+        ? `¿Pasarle el trámite a ${nombre}? ${t.gestor_nombre} deja de verlo.${precio}`
+        : `¿Sacarle el trámite a ${t.gestor_nombre}? Queda sin gestor.${precio}`;
+      if (!window.confirm(txt)) return;
+    }
+    intentar(() => asignarGestor(t.id, g), g ? (t.estado === "RECIBIDO" ? `Derivado a ${nombre}` : `Ahora lo tiene ${nombre}`) : "Quedó sin gestor");
+  };
+
+  // Qué trámite es: "Transferencia" y, aparte, la aclaración ("Presupuesto de transferencia").
+  // "Otro": el nombre es lo que escribieron.
+  const conAuto = t.con_vehiculo !== false; // 🪪 la licencia es de la persona: sin auto
+  const nombreTipo = t.tipo === "OTRO" ? t.detalle || "Otro trámite" : t.tipo_nombre || t.tipo_txt;
+  const aclaracion = t.tipo === "OTRO" ? "" : t.detalle || "";
 
   // ── botones de estado (según lo que el servidor dice que se puede) ──
   const botones = [];
-  if (t.estado === "RECIBIDO" && staff) {
-    botones.push(<span key="h" className="self-center text-[13px] text-suave dark:text-suave-dark">Elegí un gestor en «Datos» para asignarlo.</span>);
+  if (t.estado === "RECIBIDO" && staff && a.puede_asignar) {
+    botones.push(<SelectorGestor key="g" t={t} opciones={gestorOpciones} ocupado={ocupado} onElegir={elegirGestor} principal />);
   }
   if (t.estado === "ASIGNADO" && puede("EN_REGISTRO")) {
     botones.push(<button key="r" type="button" disabled={ocupado} className={BTN.indigo} onClick={() => avanzar("EN_REGISTRO")}>{staff ? "Pasar a EN EL REGISTRO" : "Lo presenté en el registro"}</button>);
@@ -424,23 +440,38 @@ export default function FichaTramite() {
         <span className="font-mono">{t.numero}</span>
       </div>
 
-      {/* Cabecera */}
+      {/* Cabecera: qué trámite es, el auto, la aclaración, el cliente y la oficina */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
         <div className="flex flex-col gap-2 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             <h2 className="text-xl font-bold text-titulo dark:text-titulo-dark">
-              {t.tipo_txt}
-              {t.con_vehiculo === false ? null : t.patente || t.vehiculo ? (
+              {nombreTipo}
+              {!conAuto ? null : t.patente || t.vehiculo ? (
                 <>
-                  {" "}· {t.vehiculo} <span className="font-mono tracking-wide">{t.patente}</span>
+                  {" "}· {t.vehiculo} <span className="font-mono tracking-wide">{t.patente || "sin patente"}</span>
                 </>
               ) : (
                 <span className="font-semibold text-suave dark:text-suave-dark"> · sin patente</span>
               )}
             </h2>
+            {conAuto && a.puede_vehiculo && (
+              <button
+                type="button"
+                onClick={() => setModal("vehiculo")}
+                className="inline-flex min-h-[32px] items-center gap-1 rounded-md px-1.5 text-[13px] font-semibold text-duo-violeta hover:underline"
+              >
+                <HiPencil className="w-3.5 h-3.5" aria-hidden="true" />
+                {t.patente ? "Cambiar" : "Agregar patente"}
+              </button>
+            )}
             <EstadoPill estado={t.estado} extra={cerrado ? "" : textoDias(d)} />
             {dem && <Demorado />}
           </div>
+          {aclaracion && (
+            <p className="text-[14px] text-titulo dark:text-titulo-dark break-words">
+              <span className="text-suave dark:text-suave-dark">Aclaración:</span> {aclaracion}
+            </p>
+          )}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-suave dark:text-suave-dark">
             <span>{t.persona_nombre}</span>
             {t.persona_dni && <span>· DNI {t.persona_dni}</span>}
@@ -486,64 +517,14 @@ export default function FichaTramite() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* ── Columna izquierda ── */}
         <div className="flex flex-col gap-4 min-w-0">
-          <Seccion titulo="Datos del trámite">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Dato label="Tipo">{t.tipo_txt}</Dato>
-              {a.puede_asignar ? (
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-suave dark:text-suave-dark">
-                  Gestor
-                  <select
-                    value={t.gestor || ""}
-                    disabled={ocupado}
-                    onChange={(e) => {
-                      const g = e.target.value ? Number(e.target.value) : null;
-                      const nombre = gestorOpciones.find((x) => x.id === g)?.nombre;
-                      intentar(() => asignarGestor(t.id, g), g ? (t.estado === "RECIBIDO" ? `Derivado a ${nombre}` : `Ahora lo tiene ${nombre}`) : "Quedó sin gestor");
-                    }}
-                    className="h-10 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-2 text-[14px] text-titulo dark:text-titulo-dark"
-                  >
-                    <option value="">Sin gestor</option>
-                    {gestorOpciones.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.nombre}{g.abiertos != null ? ` · ${g.abiertos} abiertos` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <Dato label="Gestor">
-                  {t.gestor ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Avatar id={t.gestor} nombre={t.gestor_nombre} foto={t.gestor_foto} size={24} />
-                      {t.gestor_nombre}
-                    </span>
-                  ) : (
-                    "Sin gestor"
-                  )}
-                </Dato>
-              )}
-              {/* 🪪 La licencia de conducir es de la persona: sin "Vehículo". */}
-              {t.con_vehiculo !== false && (
-                <DatoVehiculo
-                  t={t}
-                  puede={!!a.puede_vehiculo}
-                  ocupado={ocupado}
-                  onGuardar={(body) => hacer(() => editarTramite(t.id, body), body.patente ? `Patente ${body.patente} guardada` : "Vehículo guardado")}
-                />
-              )}
-              {/* 📅 Fecha estimada: ya no se carga (se sacó del alta el 28/09). Los trámites viejos que la tienen la muestran. */}
-              {t.fecha_estimada && <Dato label="Fecha estimada">{fechaCorta(t.fecha_estimada)}</Dato>}
-              {/* 🔒 La póliza la ven solo la oficina y el admin: el gestor no sabe si el cliente tiene póliza (29/09). */}
-              {staff && <Dato label="Póliza">{t.poliza_label || "Sin póliza en THAMES"}</Dato>}
-              <Dato label="Oficina">{t.oficina_nombre || "—"}</Dato>
-              <Dato label="Cargado">
-                {ddmmhhmm(t.creado_en)}
-                {t.creado_por_nombre ? ` · ${t.creado_por_nombre}${t.cargado_por_gestor ? " (gestor)" : ""}` : ""}
-              </Dato>
-            </div>
-          </Seccion>
-
-          {staff && t.gestor_contacto && <ContactoGestor t={t} esAdmin={!!a.es_admin} />}
+          {/* 👤 El gestor: quién lo tiene, cómo contactarlo y «Cambiar». Sin gestor, se elige arriba. */}
+          {staff && t.gestor && (
+            <GestorDelTramite
+              t={t}
+              esAdmin={!!a.es_admin}
+              selector={a.puede_asignar ? <SelectorGestor t={t} opciones={gestorOpciones} ocupado={ocupado} onElegir={elegirGestor} /> : null}
+            />
+          )}
 
           <Seccion
             titulo={
@@ -873,37 +854,87 @@ export default function FichaTramite() {
         }}
       />
       <ModalMensajes t={t} abierto={modal === "mensajes"} onCerrar={() => setModal(null)} />
+      {/* Se monta al abrir: así arranca con la patente y el vehículo que tiene el trámite. */}
+      {modal === "vehiculo" && (
+        <ModalVehiculo
+          t={t}
+          onCerrar={() => setModal(null)}
+          onGuardar={async (body) => {
+            const nuevo = await editarTramite(t.id, body);
+            setT(conMisPapeles(nuevo));
+            setModal(null);
+            toast.success(body.patente ? `Patente ${body.patente} guardada` : "Vehículo guardado");
+          }}
+        />
+      )}
     </div>
   );
 }
 
 /**
- * 👤 El gestor del trámite: foto, horario, dirección y botones para
- * escribirle, llamarlo, mandarle un mail o ir a llevarle papeles.
- * Lo ven la oficina y el admin (el cliente no: su contacto es la oficina).
+ * 👤 Elegir o cambiar el gestor (select del celu/compu). Muestra cuántos abiertos
+ * tiene cada uno, así se elige al que está más libre. Ej: «Laura Ríos · 3 abiertos».
+ * principal = el botón grande de arriba cuando todavía no tiene gestor.
  */
-function ContactoGestor({ t, esAdmin }) {
-  const c = t.gestor_contacto || {};
-  const hayDatos = !!(c.telefono || c.email || c.direccion);
+function SelectorGestor({ t, opciones, ocupado, onElegir, principal = false }) {
+  const otros = opciones.filter((g) => g.id !== t.gestor);
   return (
-    <Seccion titulo="Gestor">
+    <select
+      value=""
+      disabled={ocupado}
+      aria-label={t.gestor ? "Cambiar el gestor" : "Elegir un gestor"}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v) onElegir(v === "sin" ? null : Number(v));
+      }}
+      className={
+        principal
+          ? "h-11 min-w-[220px] rounded-lg border-2 border-duo-violeta bg-card dark:bg-card-dark px-3 text-[14px] font-semibold text-duo-violeta dark:text-[#a5a0ff] cursor-pointer"
+          : "h-9 w-auto max-w-[190px] rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-2 text-[13px] font-semibold text-titulo dark:text-titulo-dark cursor-pointer"
+      }
+    >
+      <option value="" disabled hidden>
+        {t.gestor ? "Cambiar gestor" : "Elegí un gestor…"}
+      </option>
+      {otros.map((g) => (
+        <option key={g.id} value={g.id}>
+          {g.nombre}
+          {g.abiertos != null ? ` · ${g.abiertos} abiertos` : ""}
+        </option>
+      ))}
+      {t.gestor && <option value="sin">Sacarle el trámite (queda sin gestor)</option>}
+    </select>
+  );
+}
+
+/**
+ * 👤 El gestor del trámite en UNA tarjeta: foto, nombre, horario, dirección y
+ * botones para escribirle, llamarlo, mandarle un mail o ir a llevarle papeles,
+ * con «Cambiar gestor» arriba a la derecha. Lo ven la oficina y el admin.
+ */
+function GestorDelTramite({ t, esAdmin, selector }) {
+  const c = t.gestor_contacto || {};
+  const nombre = c.nombre || t.gestor_nombre;
+  const hayDatos = !!(c.telefono || c.email || c.direccion);
+  const donde = [c.direccion, c.email].filter(Boolean).join(" · ");
+  return (
+    <Seccion titulo="Gestor" derecha={selector}>
       <div className="flex items-center gap-3 min-w-0">
-        <Avatar id={t.gestor} nombre={c.nombre || t.gestor_nombre} foto={c.foto_url || t.gestor_foto} size={48} />
+        <Avatar id={t.gestor} nombre={nombre} foto={c.foto_url || t.gestor_foto} size={48} />
         <div className="flex flex-col gap-0.5 min-w-0">
-          <strong className="text-[15px] text-titulo dark:text-titulo-dark truncate">{c.nombre || t.gestor_nombre}</strong>
+          <strong className="text-[15px] text-titulo dark:text-titulo-dark truncate">{nombre}</strong>
           {c.horario && (
             <span className="inline-flex items-center gap-1 text-[13px] text-suave dark:text-suave-dark">
-              <HiClock className="w-3.5 h-3.5 shrink-0" /> {c.horario}
+              <HiClock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {c.horario}
             </span>
           )}
-          {c.direccion && <span className="text-[13px] text-suave dark:text-suave-dark break-words">{c.direccion}</span>}
-          {c.email && <span className="text-[13px] text-suave dark:text-suave-dark break-all">{c.email}</span>}
+          {donde && <span className="text-[13px] text-suave dark:text-suave-dark break-words">{donde}</span>}
         </div>
       </div>
       {hayDatos ? (
         <BotonesContacto
           c={c}
-          nombre={c.nombre || t.gestor_nombre}
+          nombre={nombre}
           texto={`¡Hola! Te escribo de THAMES por el trámite ${t.numero}${t.patente ? ` (${t.patente})` : ""}.`}
         />
       ) : (

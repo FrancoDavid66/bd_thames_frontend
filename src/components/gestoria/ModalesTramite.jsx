@@ -9,8 +9,9 @@
 //   - ModalCancelar:  motivo.
 //   - ModalCobrar:    el admin marca cobrada la comisión (+ comprobante opcional).
 //   - ModalMensajes:  los WhatsApp que se le mandaron al cliente (a mano o automáticos).
+//   - ModalVehiculo:  🚗 patente y vehículo (ej: se cargó sin patente y se agrega después).
 import { useEffect, useRef, useState } from "react";
-import { HiCamera, HiCash, HiChatAlt2, HiDocumentText, HiExclamation, HiX } from "react-icons/hi";
+import { HiCamera, HiCash, HiChatAlt2, HiDocumentText, HiExclamation, HiTruck, HiX } from "react-icons/hi";
 
 import ModalDuo from "../ui/ModalDuo";
 import Boton3D from "../ui/Boton3D";
@@ -554,6 +555,83 @@ export function ModalMensajes({ t, abierto, onCerrar }) {
             {!m.ok && m.error && <span className="text-[12px] text-duo-rojo">{m.error}</span>}
           </div>
         ))}
+      </div>
+    </ModalDuo>
+  );
+}
+
+/**
+ * 🚗 Patente y vehículo (la oficina, el admin o el gestor del trámite).
+ * Ej: se cargó sin patente y se agrega después. Se monta al abrir, así arranca con
+ * lo que tiene el trámite (y una recarga "en vivo" no le borra lo que está escribiendo).
+ * props: t, onCerrar, onGuardar({patente, vehiculo})
+ */
+export function ModalVehiculo({ t, onCerrar, onGuardar }) {
+  const [f, setF] = useState(() => ({ patente: t?.patente || "", vehiculo: t?.vehiculo || "" }));
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const guardar = async () => {
+    if (guardando) return;
+    setGuardando(true);
+    setError("");
+    try {
+      await onGuardar({ patente: f.patente.replace(/\s/g, ""), vehiculo: f.vehiculo.trim() });
+    } catch (e) {
+      setError(mensajeError(e));
+    } finally {
+      setGuardando(false);
+    }
+  };
+  const alEnter = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      guardar();
+    }
+  };
+
+  return (
+    <ModalDuo
+      isOpen
+      onClose={onCerrar}
+      size="sm"
+      icon={<HiTruck />}
+      iconTono="violeta"
+      title={t?.patente ? "Cambiar el vehículo" : "Agregar la patente"}
+      footer={
+        <>
+          <Boton3D variant="blanco" onClick={onCerrar} className="w-full sm:w-auto">Volver</Boton3D>
+          <Boton3D variant="violeta" onClick={guardar} disabled={guardando} className="w-full sm:w-auto">
+            {guardando ? "Guardando…" : "Guardar"}
+          </Boton3D>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <CartelError texto={error} />
+        <label className="flex flex-col gap-1.5 text-[13px] font-medium text-suave dark:text-suave-dark">
+          Patente
+          <input
+            value={f.patente}
+            maxLength={20}
+            onChange={(e) => setF({ ...f, patente: e.target.value.toUpperCase() })}
+            onKeyDown={alEnter}
+            placeholder="Ej: AB123CD"
+            className={`${inputCls} font-mono uppercase`}
+            autoFocus
+          />
+        </label>
+        <label className="flex flex-col gap-1.5 text-[13px] font-medium text-suave dark:text-suave-dark">
+          Marca y modelo (opcional)
+          <input
+            value={f.vehiculo}
+            maxLength={120}
+            onChange={(e) => setF({ ...f, vehiculo: e.target.value })}
+            onKeyDown={alEnter}
+            placeholder="Ej: Fiat Palio"
+            className={inputCls}
+          />
+        </label>
       </div>
     </ModalDuo>
   );
