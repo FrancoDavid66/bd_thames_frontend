@@ -22,15 +22,21 @@
 //    @react-pdf con los colores de marca del recibo impreso. Eso NO se toca
 //    (es el papel que se imprime, no la app). Solo los BOTONES y la vista en
 //    pantalla usan el diseño de la app (claro/oscuro).
+//
+// 🇦🇷 HOMENAJE (06/10/2026): por la despedida de Messi de la Selección, los
+//    tres formatos llevan un recuadro «GRACIAS, LEO». Se prende y se apaga
+//    SOLO por fecha (ver HOMENAJE más abajo): no hay que volver a subir nada.
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
-import { pdf, Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
+import { pdf, Page, Text, View, Document, StyleSheet, Image } from "@react-pdf/renderer";
 import {
   HiReceiptTax, HiUser, HiOfficeBuilding, HiCash, HiCalendar,
   HiDownload, HiPrinter,
 } from "react-icons/hi";
+
+import { HOMENAJE_LEO_IMG, HOMENAJE_LEO_ANCHO, HOMENAJE_LEO_ALTO } from "./homenajeLeo";
 
 /* =========================================================================
    Helpers compartidos
@@ -125,6 +131,44 @@ const slug = (s) =>
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .toLowerCase();
+
+/* 🇦🇷 HOMENAJE: LA DESPEDIDA DE MESSI DE LA SELECCIÓN.
+   ─────────────────────────────────────────────────
+   El 06/10/2026 juega su último partido con la celeste y blanca. Los
+   recibos que se impriman esos días llevan un recuadro de agradecimiento.
+
+   Sale según el día en que se IMPRIME (no el del pago): del `desde` al
+   `hasta`, los dos incluidos. Pasada la fecha desaparece solo.
+     Ej: hasta "2026-10-11" → el lunes 12/10 el recibo vuelve a ser el de siempre.
+   Para estirarlo o cortarlo antes, se cambia SOLO `hasta`.
+   Para cambiar lo que dice, se cambian los textos de acá: los tres
+   formatos (pantalla, A4 y ticket) leen de este mismo lugar.
+
+   La silueta es el dibujo que hizo Franco (está en ./homenajeLeo.js).
+   Sin fotos ni escudos de terceros. */
+const HOMENAJE = {
+  desde: "2026-10-06",
+  hasta: "2026-10-11",
+  titulo: "GRACIAS, LEO",
+  frase: "Por todo lo que nos diste con la celeste y blanca.",
+  // La misma frase cortada en 2 renglones parejos, para el ticket angosto.
+  fraseTicket: ["Por todo lo que nos diste", "con la celeste y blanca."],
+  pie1: "Despedida de la Selección Argentina",
+  pie2: "6 de octubre de 2026",
+};
+
+// El ancho que le toca a la silueta para un alto dado (no se deforma).
+const anchoSilueta = (alto) => (alto * HOMENAJE_LEO_ANCHO) / HOMENAJE_LEO_ALTO;
+
+// ¿Hoy toca el homenaje? (fecha de la compu que imprime, no UTC)
+const hayHomenaje = (hoy = new Date()) => {
+  try {
+    const ymd = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+    return ymd >= HOMENAJE.desde && ymd <= HOMENAJE.hasta;
+  } catch {
+    return false;
+  }
+};
 
 /* 💳 CÓMO PAGÓ, EN CRIOLLO.
    El backend guarda claves cortas ("ef", "tr", "mp") y a veces la palabra
@@ -354,6 +398,24 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
           </div>
         )}
 
+        {/* 🇦🇷 Homenaje (solo los días de la despedida) */}
+        {hayHomenaje() && (
+          <div className="overflow-hidden rounded-xl border border-sky-300 dark:border-sky-500/40">
+            <div className="h-2 bg-sky-400" />
+            <div className="flex items-center gap-4 bg-white px-4 py-3">
+              <img src={HOMENAJE_LEO_IMG} alt="Silueta del 10 de espaldas, con los brazos arriba" className="h-16 w-auto shrink-0" />
+              <div className="min-w-0 leading-tight">
+                <p className="text-base font-extrabold text-slate-900">{HOMENAJE.titulo}</p>
+                <p className="text-sm text-slate-900">{HOMENAJE.frase}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {HOMENAJE.pie1} · {HOMENAJE.pie2}
+                </p>
+              </div>
+            </div>
+            <div className="h-2 bg-sky-400" />
+          </div>
+        )}
+
         <div className="text-center text-xs text-suave dark:text-suave-dark">Gracias por confiar en nosotros.</div>
       </div>
     </div>
@@ -370,6 +432,8 @@ const PRIMARY = "#8B1E3F";
 const PRIMARY_DARK = "#5E1329";
 const BORDER = "#E6C9D2";
 const MUTED_BG = "#FBEFF3";
+const CELESTE = "#74ACDF"; // el celeste de la bandera (solo para el homenaje)
+const AZUL_NOCHE = "#1F3A5F";
 
 const a4 = StyleSheet.create({
   page: { width: A4_WIDTH, height: A4_HEIGHT, fontFamily: "Helvetica", color: "#111827", padding: 35, fontSize: 11 },
@@ -398,11 +462,40 @@ const a4 = StyleSheet.create({
   alertTitle: { fontSize: 13, color: "#991B1B", fontWeight: "bold", textAlign: "center", marginBottom: 10 },
   alertText: { fontSize: 11, color: "#991B1B", textAlign: "justify", lineHeight: 1.5 },
   alertBold: { fontWeight: "bold" },
+  // 🇦🇷 Homenaje: celeste · blanco · celeste, como la bandera.
+  //    Va PEGADO AL PIE de la hoja (no empuja nada). El tamaño lo decide
+  //    escalaHomenajeA4(): grande cuando sobra lugar, chico cuando no.
+  homenaje: { position: "absolute", left: 35, right: 35, bottom: 12, borderRadius: 8, borderWidth: 1, borderColor: CELESTE, overflow: "hidden" },
+  homenajeFranja: { backgroundColor: CELESTE },
+  homenajeCentro: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, backgroundColor: "#FFFFFF" },
+  homenajeTextos: { flex: 1, alignSelf: "center" },
+  homenajeTitulo: { fontWeight: "bold", color: AZUL_NOCHE, letterSpacing: 1 },
+  homenajeFrase: { color: "#111827" },
+  homenajePie: { color: "#6B7280" },
 });
+
+/* 📏 ¿QUÉ TAN GRANDE ENTRA EL HOMENAJE EN LA HOJA A4?
+   El homenaje va pegado al pie. Cuanto más corto es el recibo, más lugar
+   queda y más grande sale. Devuelve un número entre 0.8 (chico) y 2.6 (grande).
+     Ej: pago en efectivo (2 renglones de detalle)        → 2.6: bien grande.
+     Ej: 1ª cuota + transferencia con los 6 datos + aviso → 0.8: lo justo para
+         que siga entrando en UNA hoja sin pisar el aviso legal.
+   Las medidas son a ojo PARA EL LADO SEGURO (se cuenta de más lo que ocupa
+   el recibo), así el homenaje nunca tapa nada. */
+const escalaHomenajeA4 = (filasDetalle, conAviso) => {
+  const finRecibo = 450 + (filasDetalle ? 46 + filasDetalle * 29 : 0) + (conAviso ? 102 : 0);
+  const libre = A4_HEIGHT - 12 - 16 - finRecibo; // 12 = margen de abajo · 16 = aire arriba del homenaje
+  // 61 = alto del homenaje en tamaño 1. El piso es 0.8 para el recibo MÁS largo
+  // con un nombre que ocupa dos renglones (si no, rozaba el aviso legal).
+  return Math.max(0.8, Math.min(2.6, libre / 61));
+};
 
 export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
   const d = useDatosComprobante(cliente, poliza, cuota);
   const detalle = filasDelPago(d);
+  const conAviso = d.esPrimeraCuota || d.pagoFueraDeTermino;
+  const esc = escalaHomenajeA4(detalle.length, conAviso); // 0.8 = chico … 2.6 = grande
+  const altoSilueta = 46 * esc;
   return (
     <Document>
       <Page size={{ width: A4_WIDTH, height: A4_HEIGHT }} style={a4.page}>
@@ -483,6 +576,23 @@ export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
             </Text>
           </View>
         )}
+
+        {/* 🇦🇷 Homenaje (solo los días de la despedida), al pie de la hoja.
+               Todas las medidas salen de `esc`: crece parejo. */}
+        {hayHomenaje() && (
+          <View style={a4.homenaje} wrap={false}>
+            <View style={[a4.homenajeFranja, { height: Math.min(6 * esc, 12) }]} />
+            <View style={[a4.homenajeCentro, { paddingTop: 3 * esc }]}>
+              <Image src={HOMENAJE_LEO_IMG} style={{ width: anchoSilueta(altoSilueta), height: altoSilueta, marginRight: 8 + 6 * esc }} />
+              <View style={a4.homenajeTextos}>
+                <Text style={[a4.homenajeTitulo, { fontSize: Math.min(13 * esc, 28) }]}>{HOMENAJE.titulo}</Text>
+                <Text style={[a4.homenajeFrase, { fontSize: Math.min(9.5 * esc, 13.5), marginTop: 2 * esc }]}>{HOMENAJE.frase}</Text>
+                <Text style={[a4.homenajePie, { fontSize: Math.min(8 * esc, 10.5), marginTop: 2 * esc }]}>{HOMENAJE.pie1} · {HOMENAJE.pie2}</Text>
+              </View>
+            </View>
+            <View style={[a4.homenajeFranja, { height: Math.min(6 * esc, 12) }]} />
+          </View>
+        )}
       </Page>
     </Document>
   );
@@ -521,6 +631,14 @@ const tk = StyleSheet.create({
   legalTitle: { fontSize: 11, fontWeight: "bold", textAlign: "center", textDecoration: "underline", marginBottom: 8 },
   legalText: { fontSize: 9, textAlign: "justify", lineHeight: 1.35 },
   bold: { fontWeight: "bold" },
+  // 🇦🇷 Homenaje. La térmica imprime solo negro: van dos franjas negras
+  //    (arriba y abajo) en lugar del celeste.
+  homenaje: { marginTop: 14, borderWidth: 2, borderColor: "#000", borderRadius: 6, overflow: "hidden" },
+  homenajeFranja: { height: 6, backgroundColor: "#000" },
+  homenajeCentro: { paddingTop: 10, paddingBottom: 8, paddingHorizontal: 6, alignItems: "center" },
+  homenajeTitulo: { fontSize: 14, fontWeight: "bold", textAlign: "center", letterSpacing: 1, marginTop: 6 },
+  homenajeFrase: { fontSize: 9.5, textAlign: "center", lineHeight: 1.3, marginTop: 5 },
+  homenajePie: { fontSize: 8.5, textAlign: "center", marginTop: 5 },
 });
 
 export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} }) {
@@ -604,6 +722,22 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
               La cobertura comienza a partir del <Text style={tk.bold}>día siguiente</Text> a este pago
               (fecha estimada: <Text style={tk.bold}>{d.fechaCobertura}</Text>).
             </Text>
+          </View>
+        )}
+
+        {/* 🇦🇷 Homenaje (solo los días de la despedida) */}
+        {hayHomenaje() && (
+          <View style={tk.homenaje} wrap={false}>
+            <View style={tk.homenajeFranja} />
+            <View style={tk.homenajeCentro}>
+              <Image src={HOMENAJE_LEO_IMG} style={{ width: anchoSilueta(92), height: 92 }} />
+              <Text style={tk.homenajeTitulo}>{HOMENAJE.titulo}</Text>
+              <Text style={tk.homenajeFrase}>{HOMENAJE.fraseTicket[0]}</Text>
+              <Text style={[tk.homenajeFrase, { marginTop: 1 }]}>{HOMENAJE.fraseTicket[1]}</Text>
+              <Text style={tk.homenajePie}>{HOMENAJE.pie1}</Text>
+              <Text style={[tk.homenajePie, { marginTop: 1 }]}>{HOMENAJE.pie2}</Text>
+            </View>
+            <View style={tk.homenajeFranja} />
           </View>
         )}
       </Page>
