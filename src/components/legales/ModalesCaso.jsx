@@ -282,14 +282,14 @@ export function ModalHonorarios({ e, abierto, onCerrar, onGuardar }) {
       <div className="flex flex-col gap-3">
         <CartelError texto={error} />
         <p className="text-[13px] text-suave dark:text-suave-dark">
-          Lo que cobró {esAdmin ? "el abogado" : "vos"} por este caso. El cliente y la oficina no ven este número.
+          Lo que {esAdmin ? "cobró el abogado" : "cobraste vos"} por este caso. El cliente y la oficina no ven este número.
         </p>
-        <div className={`grid gap-3 ${esAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
+        <div className={`grid gap-3 ${esAdmin && !e.propio ? "grid-cols-2" : "grid-cols-1"}`}>
           <label className={labelCls}>
             Honorarios
             <input type="number" min="0" step="1000" inputMode="numeric" value={monto} onChange={(ev) => setMonto(ev.target.value)} placeholder="Ej: 900000" className={inputCls} autoFocus />
           </label>
-          {esAdmin && (
+          {esAdmin && !e.propio && (
             <label className={labelCls}>
               % para THAMES
               <input type="number" min="0" max="100" step="0.5" value={pct} onChange={(ev) => setPct(ev.target.value)} className={inputCls} />
@@ -301,7 +301,9 @@ export function ModalHonorarios({ e, abierto, onCerrar, onGuardar }) {
           <input value={pactado} onChange={(ev) => setPactado(ev.target.value)} maxLength={120} placeholder="Ej: cuota litis 20%" className={inputCls} />
         </label>
         <p className="text-[14px] font-semibold text-titulo dark:text-titulo-dark">
-          Comisión para THAMES ({fmtPct(c)}): {calc !== null ? plata(calc) : "se calcula con los honorarios"}
+          {e.propio
+            ? "Caso propio del abogado: THAMES no cobra comisión."
+            : `Comisión para THAMES (${fmtPct(c)}): ${calc !== null ? plata(calc) : "se calcula con los honorarios"}`}
         </p>
       </div>
     </ModalDuo>
@@ -440,7 +442,7 @@ export function ModalTurno({ e, abogados = [], temas = [], miOficina = null, abi
         // El abogado no manda WhatsApp: el aviso al cliente lo hace la oficina.
         <div className="flex flex-col gap-2 rounded-xl bg-green-50 dark:bg-green-500/10 px-3.5 py-3 text-[14px] text-titulo dark:text-titulo-dark">
           {hecho.proximo_turno ? <b>{textoTurnoElegido(hecho.proximo_turno)}</b> : null}
-          <span className="text-suave dark:text-suave-dark">La oficina le avisa al cliente por WhatsApp.</span>
+          <span className="text-suave dark:text-suave-dark">{hecho.propio ? "Es un caso tuyo: avisale vos al cliente." : "La oficina le avisa al cliente por WhatsApp."}</span>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

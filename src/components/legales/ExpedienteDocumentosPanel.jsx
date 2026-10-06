@@ -5,7 +5,7 @@
 //     ✅ lo tenemos · 🕒 lo trae después (o lo sube desde su link) · ⬜ falta.
 //   - Los archivos subidos (quién y cuándo; lo del cliente se marca en azul).
 //   - "Subir foto o PDF" (se achica la foto antes de subirla).
-//   - Borrar: solo el admin.
+//   - Borrar: el admin o el abogado del caso (el servidor manda `puede.borrar`).
 // Los comprobantes de la comisión NO están acá: van en «Plata» (solo admin).
 import { useState } from "react";
 import { HiCheck, HiClock, HiDocumentText, HiPhotograph, HiTrash } from "react-icons/hi";
@@ -131,7 +131,7 @@ function ArchivoCaso({ d, papeles, onBorrar }) {
           onClick={onBorrar}
           className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-md text-suave hover:text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)]"
           aria-label={`Borrar ${d.nombre}`}
-          title="Borrar (solo admin)"
+          title="Borrar"
         >
           <HiTrash className="w-4 h-4" />
         </button>

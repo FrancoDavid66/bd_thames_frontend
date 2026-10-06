@@ -85,6 +85,23 @@ export const avisoWhatsapp = (id, motivo, extra = {}) =>
   datos(api.post(`${B}expedientes/${id}/aviso-whatsapp/`, { motivo, ...extra }));
 export const buscarClientes = (q) => datos(api.get(`${B}buscar/`, { params: { q } }));
 
+// ── 🆕 05/10: la app del abogado (listas propias, mover, casos propios, agenda, plazos) ──
+/** { ESTADO: [...], INSTANCIA: [...], ETIQUETA: [...], puede_editar } — las listas que arma el estudio. */
+export const pedirListas = () => datos(api.get(`${B}listas/`));
+/** body: { tipo: "ESTADO" | "INSTANCIA" | "ETIQUETA", nombre, color?, etapa? } → { opcion, ESTADO, INSTANCIA, ETIQUETA } */
+export const crearOpcion = (body) => datos(api.post(`${B}listas/`, body));
+export const editarOpcion = (id, body) => datos(api.patch(`${B}listas/${id}/`, body));
+export const borrarOpcion = (id) => datos(api.delete(`${B}listas/${id}/`));
+export const ordenarOpciones = (tipo, ids) => datos(api.post(`${B}listas/ordenar/`, { tipo, ids }));
+/** Pasar el caso a uno de los estados propios. body: { estado: id, nota?, visible? } */
+export const moverCaso = (id, body) => datos(api.post(`${B}expedientes/${id}/mover/`, body));
+/** El abogado carga un caso suyo (sin oficina ni comisión). */
+export const crearCasoPropio = (body) => datos(api.post(`${B}expedientes/propio/`, body));
+/** Las fechas de sus casos. params: { desde, hasta, vencidas: 1 } → { fechas, vencidas?, feriados, hoy } */
+export const pedirAgenda = (params = {}) => datos(api.get(`${B}agenda/`, { params }));
+/** La calculadora. params: { desde: "AAAA-MM-DD", dias: 5, habiles: 1 | 0 } → { vence, texto, detalle, ya_paso } */
+export const calcularPlazo = (params) => datos(api.get(`${B}plazo/`, { params }));
+
 // ── abogados ──
 export const listarAbogados = () => datos(api.get(`${B}abogados/`));
 export const pedirAbogado = (id) => datos(api.get(`${B}abogados/${id}/`));

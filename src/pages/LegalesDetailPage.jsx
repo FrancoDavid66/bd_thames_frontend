@@ -38,6 +38,7 @@ import {
 } from "../services/legales";
 import { Cargando, Demorado, Punto, Seccion } from "../components/gestoria/Piezas";
 import { EstadoPill, PasosCaso } from "../components/legales/PiezasLegales";
+import { Etiqueta } from "../components/legales/abogado/piezasAbogado";
 import ExpedienteDocumentosPanel from "../components/legales/ExpedienteDocumentosPanel";
 import {
   ComoVa,
@@ -256,11 +257,22 @@ export default function LegalesDetailPage() {
             {dem && <Demorado />}
             {celu && <span>{e.tema_nombre} · {e.numero}</span>}
           </div>
+          {/* 🆕 05/10: lo que le puso el abogado desde su app (su estado propio, instancia y etiquetas). */}
+          {(e.estado_propio && e.estado_propio.nombre !== e.estado_nombre) || e.instancia || (e.etiquetas || []).length ? (
+            <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-suave dark:text-suave-dark">
+              <span>El abogado lo tiene en:</span>
+              {e.estado_propio && e.estado_propio.nombre !== e.estado_nombre ? <Etiqueta o={e.estado_propio} punto /> : null}
+              {e.instancia ? <Etiqueta o={e.instancia} /> : null}
+              {(e.etiquetas || []).map((q) => (
+                <Etiqueta key={q.id} o={q} />
+              ))}
+            </div>
+          ) : null}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-suave dark:text-suave-dark">
             {e.persona_dni && <span>DNI {e.persona_dni}</span>}
             {e.persona_telefono && <span>· {e.persona_telefono}</span>}
             <span className="inline-flex items-center gap-1">
-              · <Punto color={colorOficina(e.oficina)} /> Oficina {e.oficina_nombre || "—"}
+              · <Punto color={colorOficina(e.oficina)} /> {e.propio ? "Caso propio del abogado" : `Oficina ${e.oficina_nombre || "—"}`}
             </span>
             {(e.cliente_polizas || []).length > 0 && (
               <span>

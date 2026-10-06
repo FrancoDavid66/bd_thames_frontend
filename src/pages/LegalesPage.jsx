@@ -7,7 +7,8 @@
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
 //   - Admin:   Hoy · Tablero · Abogados 🔒 · Cerrados · Comisiones 🔒 (con plata).
 //   - Oficina: Hoy · Tablero · Cerrados (solo su oficina, SIN plata).
-//   - Abogado: "Mis casos" (lo suyo, con sus honorarios y su comisión).
+//   - Abogado: SU APP (05/10): inicio, casos, agenda, plata y sus listas
+//              (components/legales/abogado/AppAbogado.jsx). Ya no usa «Mis casos».
 //
 // Rutas:
 //   /legales               Hoy (en el celu) o Tablero (en la compu) · abogado: Mis casos
@@ -19,6 +20,7 @@
 //   /legales/abogados      (admin)
 //   /legales/cerrados
 //   /legales/comisiones    (admin)
+//   /legales/listas        (admin) los estados, instancias y etiquetas del estudio
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { HiCalendar, HiDocumentAdd, HiScale } from "react-icons/hi";
@@ -36,7 +38,8 @@ import PedirTurno from "../components/legales/PedirTurno";
 import AbogadosPanel from "../components/legales/AbogadosPanel";
 import CerradosPanel from "../components/legales/CerradosPanel";
 import ComisionesLegales from "../components/legales/ComisionesLegales";
-import MisCasos from "../components/legales/MisCasos";
+import AppAbogado from "../components/legales/abogado/AppAbogado";
+import ListasAbogado from "../components/legales/abogado/ListasAbogado";
 import LegalesDetailPage from "./LegalesDetailPage";
 
 const FILTROS_INICIALES = { abogado: "todos", oficina: "todas", tema: "todos", q: "", demorados: false };
@@ -48,7 +51,7 @@ function esCelu() {
 }
 
 export default function LegalesPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [catalogo, setCatalogo] = useState(null);
   // El rol en Legales lo dice el servidor (ej: un superusuario es ADMIN aunque su perfil diga otra cosa).
   const rol = catalogo?.rol || "";
@@ -105,7 +108,21 @@ export default function LegalesPage() {
   );
 
   if (error) {
-    return <div className="max-w-3xl mx-auto px-4 py-10 text-center text-[14px] text-duo-rojo">{error}</div>;
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10 flex flex-col items-center gap-4 text-center text-[14px] text-duo-rojo">
+        {error}
+        {/* El abogado no tiene menú: sin esto no tendría cómo salir. */}
+        {user?.perfil?.rol === "ABOGADO" && (
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-4 py-2.5 text-[14px] font-semibold text-titulo dark:text-titulo-dark"
+          >
+            Cerrar sesión
+          </button>
+        )}
+      </div>
+    );
   }
   if (!catalogo) {
     return (
@@ -115,36 +132,40 @@ export default function LegalesPage() {
     );
   }
 
+  // ⚖️📱 El abogado tiene su app (pantalla entera, con su barra de abajo).
+  if (esAbogado) {
+    return (
+      <LegalesCtx.Provider value={ctx}>
+        <AppAbogado />
+      </LegalesCtx.Provider>
+    );
+  }
+
   return (
     <LegalesCtx.Provider value={ctx}>
       <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
-        {esAbogado ? (
-          <Routes>
-            <Route index element={<MisCasos />} />
-            <Route path="cerrados" element={<CerradosPanel />} />
-            <Route path=":id" element={<FichaPorId />} />
-            <Route path="*" element={<Navigate to="/legales" replace />} />
-          </Routes>
-        ) : (
-          <Routes>
-            <Route index element={esCelu() ? <ConCabecera><InicioCelu /></ConCabecera> : <ConCabecera><TableroLegales /></ConCabecera>} />
-            <Route path="hoy" element={<ConCabecera><InicioCelu /></ConCabecera>} />
-            <Route path="casos" element={<ConCabecera><TableroLegales /></ConCabecera>} />
-            <Route path="nuevo" element={<LegalesWizard />} />
-            <Route path="turno" element={<PedirTurno />} />
-            <Route path="cerrados" element={<ConCabecera><CerradosPanel /></ConCabecera>} />
-            <Route
-              path="abogados"
-              element={esAdmin ? <ConCabecera><AbogadosPanel /></ConCabecera> : <Navigate to="/legales" replace />}
-            />
-            <Route
-              path="comisiones"
-              element={esAdmin ? <ConCabecera><ComisionesLegales /></ConCabecera> : <Navigate to="/legales" replace />}
-            />
-            <Route path=":id" element={<FichaPorId />} />
-            <Route path="*" element={<Navigate to="/legales" replace />} />
-          </Routes>
-        )}
+        <Routes>
+          <Route index element={esCelu() ? <ConCabecera><InicioCelu /></ConCabecera> : <ConCabecera><TableroLegales /></ConCabecera>} />
+          <Route path="hoy" element={<ConCabecera><InicioCelu /></ConCabecera>} />
+          <Route path="casos" element={<ConCabecera><TableroLegales /></ConCabecera>} />
+          <Route path="nuevo" element={<LegalesWizard />} />
+          <Route path="turno" element={<PedirTurno />} />
+          <Route path="cerrados" element={<ConCabecera><CerradosPanel /></ConCabecera>} />
+          <Route
+            path="abogados"
+            element={esAdmin ? <ConCabecera><AbogadosPanel /></ConCabecera> : <Navigate to="/legales" replace />}
+          />
+          <Route
+            path="comisiones"
+            element={esAdmin ? <ConCabecera><ComisionesLegales /></ConCabecera> : <Navigate to="/legales" replace />}
+          />
+          <Route
+            path="listas"
+            element={esAdmin ? <ConCabecera><ListasAbogado embebida /></ConCabecera> : <Navigate to="/legales" replace />}
+          />
+          <Route path=":id" element={<FichaPorId />} />
+          <Route path="*" element={<Navigate to="/legales" replace />} />
+        </Routes>
       </div>
     </LegalesCtx.Provider>
   );
@@ -167,7 +188,11 @@ function ConCabecera({ children }) {
 }
 
 function Cabecera() {
-  const { esAdmin } = useLegales();
+  const { esAdmin, user } = useLegales();
+  const { logout } = useAuth();
+  // Usuario con perfil de abogado pero que el servidor trata como admin (ej: un
+  // superusuario): entra sin el menú de THAMES, así que acá tiene cómo salir.
+  const sinMenu = user?.perfil?.rol === "ABOGADO";
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const raiz = pathname === "/legales" || pathname === "/legales/";
@@ -179,6 +204,7 @@ function Cabecera() {
     ...(esAdmin ? [{ to: "/legales/abogados", label: "Abogados", admin: true }] : []),
     { to: "/legales/cerrados", label: "Cerrados y desistidos" },
     ...(esAdmin ? [{ to: "/legales/comisiones", label: "Comisiones", admin: true }] : []),
+    ...(esAdmin ? [{ to: "/legales/listas", label: "Estados y listas", admin: true }] : []),
   ];
 
   return (
@@ -209,6 +235,15 @@ function Cabecera() {
             <HiDocumentAdd className="w-4 h-4" /> Cargar una denuncia
           </button>
         </div>
+        {sinMenu && (
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 py-2 text-[13px] font-semibold text-titulo dark:text-titulo-dark"
+          >
+            Cerrar sesión
+          </button>
+        )}
       </div>
       <nav
         className="flex gap-1 overflow-x-auto border-b border-linea dark:border-linea-dark scrollbar-hide"

@@ -113,7 +113,7 @@ export default function MiCasoPage() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-surface dark:bg-surface-dark px-6 text-center">
         <HiLockClosed className="w-7 h-7 text-suave dark:text-suave-dark" />
         <p className="font-semibold text-titulo dark:text-titulo-dark">Link inválido o vencido</p>
-        <p className="text-[13px] text-suave dark:text-suave-dark">Pedile a la oficina que te pase el link actualizado.</p>
+        <p className="text-[13px] text-suave dark:text-suave-dark">Pedí que te pasen el link actualizado.</p>
       </div>
     );
   }
@@ -329,7 +329,11 @@ export default function MiCasoPage() {
             </a>
           ) : null}
           <p className="text-center text-[12px] text-suave dark:text-suave-dark">
-            THAMES {ofi.nombre || ""} · tu oficina{ofi.direccion ? ` · ${ofi.direccion}` : ""}
+            {data.propio
+              ? data.abogado?.nombre
+                ? `Tu abogado: ${data.abogado.nombre}`
+                : ""
+              : `THAMES ${ofi.nombre || ""} · tu oficina${ofi.direccion ? ` · ${ofi.direccion}` : ""}`}
           </p>
         </div>
       </div>

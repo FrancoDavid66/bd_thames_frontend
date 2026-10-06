@@ -4,10 +4,14 @@
 // una línea, el estado, lo próximo (turno o fecha), quién lo tiene y hace
 // cuánto no hay novedades. "Faltan los honorarios" / "Comisión a cobrar" solo
 // le llegan al admin (el servidor no se lo manda a la oficina).
+// 🆕 05/10: también lo que le puso el abogado desde su app: su estado propio
+// ("Prueba"), la instancia y las etiquetas. Un caso PROPIO del abogado (no vino
+// de una oficina) dice "Caso del abogado" en vez de la oficina (lo ve solo el admin).
 import { HiCalendar, HiClock, HiDocumentText, HiExclamation } from "react-icons/hi";
 
 import { Demorado, Punto } from "../gestoria/Piezas";
 import { AvatarAbogado, Chip, DiasChip, EstadoPill } from "./PiezasLegales";
+import { Etiqueta } from "./abogado/piezasAbogado";
 import {
   colorOficina,
   diaCorto,
@@ -59,13 +63,19 @@ export default function TarjetaCaso({ e, onClick, mostrarOficina = true }) {
         {mostrarOficina && (
           <span className="inline-flex items-center gap-1 text-[11px] text-suave dark:text-suave-dark whitespace-nowrap">
             <Punto color={colorOficina(e.oficina)} />
-            {e.oficina_nombre || "Sin oficina"}
+            {e.propio ? "Caso del abogado" : e.oficina_nombre || "Sin oficina"}
           </span>
         )}
       </span>
       {e.resumen && <span className="text-[12px] leading-snug text-suave dark:text-suave-dark line-clamp-2">{e.resumen}</span>}
       <span className="flex flex-wrap gap-1.5">
         {mostrarEstado && <EstadoPill estado={e.estado} chico />}
+        {/* Lo del abogado: su estado propio (si dice algo más que la etapa), la instancia y las etiquetas. */}
+        {e.estado_propio && e.estado_propio.nombre !== e.estado_nombre && <Etiqueta o={e.estado_propio} chica punto />}
+        {e.instancia && <Etiqueta o={e.instancia} chica />}
+        {(e.etiquetas || []).slice(0, 3).map((q) => (
+          <Etiqueta key={q.id} o={q} chica />
+        ))}
         {e.proximo_turno && (
           <Chip tono="azul">
             <HiCalendar className="w-3 h-3" /> {textoTurno(e.proximo_turno)}
