@@ -26,6 +26,8 @@ import ContabilidadPanel from "../components/estadisticas/ContabilidadPanel";
 import EfectividadMensajesPanel from "../components/estadisticas/EfectividadMensajesPanel";
 // 🆕 Pólizas nuevas por oficina (día / semana / mes) — base de los Juegos THAMES
 import PolizasNuevasPanel from "../components/estadisticas/PolizasNuevasPanel";
+// 🚗 Gestoría (30/09): resumen del mes + "Ver todas las métricas" (Gestoría → Métricas)
+import GestoriaResumenPanel from "../components/estadisticas/GestoriaResumenPanel";
 
 // 🚀 IMPORTAMOS EL NUEVO MODAL DE LISTADOS
 import ListadoClientesModal from "../components/estadisticas/ListadoClientesModal";
@@ -426,6 +428,12 @@ export default function EstadisticasPage() {
           <TabButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")}>Contabilidad</TabButton>
           <TabButton active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>Cobranzas</TabButton>
           <TabButton active={tab === "auditoria"} onClick={() => setTab("auditoria")}>Auditoría</TabButton>
+          <TabButton active={tab === "gestoria"} onClick={() => setTab("gestoria")}>
+            <span className="flex items-center gap-1.5">
+              Gestoría
+              <span className={`rounded-full px-1.5 py-px text-[9px] font-bold ${tab === "gestoria" ? "bg-white text-oficina-fuerte" : "bg-oficina/15 text-oficina-fuerte dark:text-oficina-claro"}`}>NUEVO</span>
+            </span>
+          </TabButton>
         </div>
 
         <AnimatePresence mode="wait">
@@ -518,6 +526,12 @@ export default function EstadisticasPage() {
             <motion.div key="auditoria" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
               <AuditoriaMontosPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
               <PagosDuplicadosPanel apiBase={apiBase} oficina={oficina} getOficinaNombre={getOficinaNombre} />
+            </motion.div>
+          )}
+
+          {tab === "gestoria" && (
+            <motion.div key="gestoria" className="flex flex-col gap-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+              <GestoriaResumenPanel anio={anio} mes={mes} oficina={oficina} />
             </motion.div>
           )}
         </AnimatePresence>

@@ -4,6 +4,16 @@
 //    con hover, que en el celu no existe → en mobile quedan SIEMPRE visibles
 //    (con un velo oscuro suave para que se lean sobre la foto); en desktop (sm+)
 //    se mantiene el comportamiento hover de siempre. Botones a 44px en mobile.
+//
+// 🐛 FIX (fotos que se perdían al cargar un siniestro):
+//   1) Al elegir VARIAS fotos de la galería quedaba solo la ÚLTIMA: cada foto
+//      se sumaba a la lista "vieja" (la de antes de empezar) y pisaba a la
+//      anterior. Ahora se suma siempre a la lista AL DÍA (draftRef).
+//   2) Las fotos se achican antes de subir (comprimirImagen): una foto del
+//      celu de 6 MB pasa a ~300 KB → sube en 1-2 s y no rebota por tamaño.
+//   3) El panel le avisa al padre mientras está subiendo (onUploadingChange)
+//      para que el wizard no deje "Guardar" con una foto a medio subir.
+//   4) Si una foto falla, el cartel dice POR QUÉ.
 import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,6 +21,7 @@ import { HiPhotograph, HiCamera, HiX, HiTrash, HiZoomIn } from "react-icons/hi";
 import { toast } from "react-hot-toast";
 
 import { uploadToCloudinary } from "../../utils/cloudinary";
+import { comprimirImagen } from "../../utils/comprimirImagen";
 import { useAuth } from "../../context/AuthContext";
 import {
   getFotosBySiniestro,
@@ -29,13 +40,34 @@ import {
  * @param {Array} draftFotos           Fotos en memoria (modo borrador).
  * @param {Function} onDraftChange     Callback con la lista nueva (borrador).
  * @param {boolean} readOnly           Solo mostrar (no subir/borrar).
+ * @param {Function} onUploadingChange Avisa al padre: true = subiendo, false = terminó.
  */
+
+// Lista vacía ÚNICA: si el selector devolviera un [] nuevo cada vez, el panel
+// se redibujaría con cada cambio del store (y react-redux avisa en consola).
+const SIN_FOTOS = [];
+
+// Saca un motivo legible de un error (Cloudinary, backend o red).
+function motivoError(err) {
+  if (!err) return "";
+  if (typeof err === "string") return err.trim().startsWith("<") ? "" : err;
+  if (err.message) return String(err.message);
+  if (err.detail) return String(err.detail);
+  if (typeof err === "object") {
+    const primero = Object.values(err)[0];
+    if (Array.isArray(primero)) return String(primero[0] ?? "");
+    if (primero) return String(primero);
+  }
+  return "";
+}
+
 export default function SiniestroFotosPanel({
   siniestroId,
   compact = false,
   draftFotos,
   onDraftChange,
   readOnly = false,
+  onUploadingChange,
 }) {
   const dispatch = useDispatch();
   const { user } = useAuth();
@@ -45,7 +77,7 @@ export default function SiniestroFotosPanel({
   const key = siniestroId ? String(siniestroId) : null;
 
   const fotosPersistidas = useSelector(
-    (state) => (key ? state.siniestros.fotos?.[key] : null) || []
+    (state) => (key ? state.siniestros.fotos?.[key] : null) || SIN_FOTOS
   );
   const loading = useSelector(
     (state) => (key ? state.siniestros.fotosLoading?.[key] : false) || false
@@ -58,6 +90,18 @@ export default function SiniestroFotosPanel({
   const galeriaRef = useRef(null);  // input galería (sin capture)
   const camaraRef = useRef(null);   // input cámara (capture="environment")
 
+  // 🐛 FIX: lista borrador SIEMPRE al día. Mientras suben varias fotos seguidas,
+  // la prop `draftFotos` que ve la función es la de cuando arrancó (vieja).
+  const draftRef = useRef(draftFotos || []);
+  useEffect(() => { draftRef.current = draftFotos || []; }, [draftFotos]);
+
+  // ¿El panel sigue en pantalla? (si cerraron el wizard a mitad de una subida)
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
+
   useEffect(() => {
     if (siniestroId) dispatch(getFotosBySiniestro(siniestroId));
   }, [dispatch, siniestroId]);
@@ -67,14 +111,24 @@ export default function SiniestroFotosPanel({
     if (files.length === 0) return;
 
     setUploading(true);
+    onUploadingChange?.(true);
     const folder = `de-thames/siniestros/${siniestroId || "borrador"}/fotos`;
     let okCount = 0;
     let failCount = 0;
+    let motivo = "";
 
     for (const file of files) {
+      // Borrador + wizard cerrado: no seguimos sumando fotos a un wizard que ya no está.
+      if (isDraft && !aliveRef.current) break;
       try {
-        const up = await uploadToCloudinary(file, { folder });
+        // 📷 Achicamos antes de subir (si no se puede, sube la original).
+        const chica = await comprimirImagen(file);
+        const up = await uploadToCloudinary(chica, { folder });
+        if (!up?.secure_url || !up?.public_id) {
+          throw new Error("Cloudinary no devolvió la foto");
+        }
         if (isDraft) {
+          if (!aliveRef.current) break;
           const nuevaFoto = {
             id: `temp-${Date.now()}-${Math.random()}`,
             url: up.secure_url,
@@ -83,7 +137,10 @@ export default function SiniestroFotosPanel({
             mime: up.mime || file.type || "image/jpeg",
             _isDraft: true,
           };
-          onDraftChange?.([...(draftFotos || []), nuevaFoto]);
+          // 🐛 FIX: sumamos a la lista AL DÍA (antes: a la lista vieja → se pisaban).
+          const lista = [...draftRef.current, nuevaFoto];
+          draftRef.current = lista;
+          onDraftChange?.(lista);
         } else {
           await dispatch(addFoto({
             siniestro_id: Number(siniestroId),
@@ -97,12 +154,17 @@ export default function SiniestroFotosPanel({
       } catch (err) {
         console.error("[FotosPanel] Error subiendo", file.name, err);
         failCount++;
+        if (!motivo) motivo = motivoError(err);
       }
     }
 
-    setUploading(false);
+    if (aliveRef.current) setUploading(false);
+    onUploadingChange?.(false);
     if (okCount > 0) toast.success(`${okCount} foto${okCount > 1 ? "s" : ""} subida${okCount > 1 ? "s" : ""}`);
-    if (failCount > 0) toast.error(`${failCount} foto${failCount > 1 ? "s" : ""} falló${failCount > 1 ? "ron" : ""}`);
+    if (failCount > 0) {
+      const base = failCount > 1 ? `${failCount} fotos no se pudieron subir` : "1 foto no se pudo subir";
+      toast.error(motivo ? `${base}: ${motivo}` : base, { duration: 6000 });
+    }
   };
 
   const onGaleria = (e) => { procesarArchivos(e.target.files); if (galeriaRef.current) galeriaRef.current.value = ""; };
@@ -111,7 +173,9 @@ export default function SiniestroFotosPanel({
   const handleDelete = async (foto) => {
     if (!window.confirm("¿Eliminar esta foto? No se puede deshacer.")) return;
     if (isDraft) {
-      onDraftChange?.((draftFotos || []).filter((f) => f.id !== foto.id));
+      const lista = draftRef.current.filter((f) => f.id !== foto.id);
+      draftRef.current = lista;
+      onDraftChange?.(lista);
       return;
     }
     try {

@@ -3,8 +3,8 @@
 // 🚗 GESTORÍA — trámites del automotor que THAMES le deriva a un gestor.
 //
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
-//   - Admin:   Tablero · Gestores 🔒 · Entregados · Comisiones 🔒 (con plata).
-//   - Oficina: Tablero · Entregados (solo su oficina, SIN plata).
+//   - Admin:   Tablero · Gestores 🔒 · Entregados · Comisiones 🔒 · Métricas (con plata).
+//   - Oficina: Tablero · Entregados · Métricas (solo su oficina, SIN plata).
 //   - Gestor:  📱 SU APP (30/09, estilo Envíos Flex): Inicio · Trámites · ➕ · Cobros ·
 //              Perfil, con la ficha simple del trámite (FichaGestora) y "Nuevo trámite"
 //              (lo carga él y queda con él). Todo eso vive en gestoria/gestora/AppGestora.jsx.
@@ -21,7 +21,8 @@
 //   /gestoria/gestores        (admin)
 //   /gestoria/entregados
 //   /gestoria/comisiones      (admin)
-import { useCallback, useEffect, useMemo, useState } from "react";
+//   /gestoria/metricas        📊 (admin y oficina; ?mes=2026-09&oficina=2&gestor=5)
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { HiPlus, HiTruck } from "react-icons/hi";
 
@@ -38,6 +39,7 @@ import NuevoTramite from "../components/gestoria/NuevoTramite";
 import GestoresPanel from "../components/gestoria/GestoresPanel";
 import EntregadosPanel from "../components/gestoria/EntregadosPanel";
 import ComisionesPanel from "../components/gestoria/ComisionesPanel";
+import MetricasPanel from "../components/gestoria/metricas/MetricasPanel";
 import AppGestora from "../components/gestoria/gestora/AppGestora";
 
 const FILTROS_INICIALES = { gestor: "todos", oficina: "todas", tipo: "todos", q: "", demorados: false };
@@ -123,6 +125,7 @@ export default function GestoriaPage() {
                 !esAdmin ? <Navigate to="/gestoria" replace /> : !catalogo ? null : catalogo.comisiones ? <ComisionesPanel /> : <Navigate to="/gestoria" replace />
               }
             />
+            <Route path="metricas" element={<MetricasPanel />} />
             <Route path="*" element={<Navigate to="/gestoria" replace />} />
           </Routes>
         </div>
@@ -136,13 +139,28 @@ function Cabecera() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const enFichaONuevo = pathname.startsWith("/gestoria/tramite/") || pathname.startsWith("/gestoria/nuevo");
+  const barra = useRef(null);
 
   const tabs = [
     { to: "/gestoria", label: "Tablero", end: true, activo: enFichaONuevo || pathname === "/gestoria" || pathname === "/gestoria/" },
     ...(esAdmin ? [{ to: "/gestoria/gestores", label: "Gestores", admin: true }] : []),
     { to: "/gestoria/entregados", label: "Entregados" },
     ...(esAdmin && catalogo?.comisiones ? [{ to: "/gestoria/comisiones", label: "Comisiones", admin: true }] : []),
+    // 📊 30/09: admin y oficina (la oficina ve solo lo suyo y sin plata).
+    { to: "/gestoria/metricas", label: "Métricas", nuevo: true },
   ];
+
+  // 📱 En el celu las pestañas no entran todas: la que está elegida (ej: «Métricas», la
+  //    última) se corre a la vista, así se ve dónde estás. (También cuando aparece
+  //    «Comisiones», que llega un toque después y la empuja.)
+  useEffect(() => {
+    const nav = barra.current;
+    const activa = nav?.querySelector('[aria-current="page"]');
+    if (!nav || !activa) return;
+    const a = activa.getBoundingClientRect();
+    const n = nav.getBoundingClientRect();
+    if (a.right > n.right || a.left < n.left) nav.scrollLeft += a.left - n.left - 16;
+  }, [pathname, tabs.length]);
 
   return (
     <div className="mb-4 flex flex-col gap-3">
@@ -158,6 +176,7 @@ function Cabecera() {
         )}
       </div>
       <nav
+        ref={barra}
         className="flex gap-1 overflow-x-auto border-b border-linea dark:border-linea-dark scrollbar-hide"
         aria-label="Secciones de Gestoría"
       >
@@ -177,6 +196,11 @@ function Cabecera() {
           >
             {t.label}
             {t.admin && <Candado texto={false} />}
+            {t.nuevo && (
+              <span className="rounded-full bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] px-1.5 py-px text-[9px] font-extrabold tracking-wide text-duo-violeta-sombra dark:text-[#a5a0ff]">
+                NUEVO
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

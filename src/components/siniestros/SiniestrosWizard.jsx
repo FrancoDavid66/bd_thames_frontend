@@ -11,6 +11,15 @@
 //     nada se corta ni desborda en celulares bajitos.
 //   - Header de pasos: en mobile muestra solo los 6 puntitos + la etiqueta del
 //     PASO ACTIVO (las 6 etiquetas de texto se ven recién desde sm:, donde entran).
+//
+// 🐛 FIX (fotos que se perdían):
+//   - Mientras una foto está subiendo, "Volver / Siguiente / Guardar" quedan
+//     en pausa ("Subiendo fotos…"). Antes se podía guardar con la foto a medio
+//     subir y el siniestro quedaba SIN esa foto.
+//   - Al EDITAR, el paso Fotos ahora guarda las fotos directo en el siniestro.
+//     Antes quedaban como "borrador" y al guardar se descartaban sin avisar.
+//   - Los errores se muestran en criollo ("Modelo del vehículo: …" en vez de
+//     "modelo_auto: …") y si se venció la sesión lo dice claro.
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -59,6 +68,18 @@ const EMPTY = {
   descripcion: "", tercero_nombre: "", tercero_telefono: "",
   tercero_patente: "", tercero_compania: "", tercero_poliza: "",
   _clienteNombre: "", _clienteDni: "", _companiaNombre: "", _oficinaNombre: "",
+};
+
+/* Nombre "en criollo" de cada campo, para los carteles de error */
+const NOMBRE_CAMPO = {
+  cliente: "Cliente", poliza: "Póliza", estado: "Estado",
+  responsabilidad: "Tipo de siniestro", fecha_siniestro: "Fecha",
+  nro_reclamo_cia: "N° de reclamo", descripcion: "Relato",
+  marca_auto: "Marca del vehículo", modelo_auto: "Modelo del vehículo",
+  ano_auto: "Año del vehículo", patente: "Patente",
+  tercero_nombre: "Nombre del tercero", tercero_telefono: "Teléfono del tercero",
+  tercero_patente: "Patente del tercero", tercero_compania: "Compañía del tercero",
+  tercero_poliza: "Póliza del tercero",
 };
 
 /* Helpers para leer cliente (puede venir como objeto, número o null) */
@@ -236,6 +257,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
   const [oficinas, setOficinas] = useState([]);
   const [oficinaSel, setOficinaSel] = useState("");   // solo admin
   const [draftFotos, setDraftFotos] = useState([]);   // 📸 fotos en memoria
+  const [fotosSubiendo, setFotosSubiendo] = useState(false); // 📸 hay una foto subiendo ahora
 
   // Cargar oficinas para el admin
   useEffect(() => {
@@ -264,6 +286,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
     setSkipTercero(false);
     setOficinaSel("");
     setDraftFotos([]);
+    setFotosSubiendo(false);
   }, [isOpen, initialData]);
 
   const set = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
@@ -312,7 +335,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
   };
 
   const handleSubmit = async () => {
-    if (submitting) return;
+    if (submitting || fotosSubiendo) return;
     setSubmitting(true);
     try {
       // 🛡️ Payload con whitelist campo por campo (nada vacío/NaN llega al back).
@@ -367,11 +390,17 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
         err?.message;
 
       if (detalle && typeof detalle === "object") {
-        const entries = Object.entries(detalle).filter(([k]) => k !== "detail");
-        if (entries.length > 0) {
+        const entries = Object.entries(detalle).filter(
+          ([k]) => k !== "detail" && k !== "code" && k !== "messages"
+        );
+        if (detalle.code === "token_not_valid") {
+          // Sesión vencida (antes salía "code: token_not_valid").
+          toast.error("Se venció tu sesión. Volvé a iniciar sesión y cargalo de nuevo.", { duration: 7000 });
+        } else if (entries.length > 0) {
           const [campo, msg] = entries[0];
           const txt = Array.isArray(msg) ? msg[0] : String(msg);
-          toast.error(`${campo}: ${txt}`);
+          const nombre = NOMBRE_CAMPO[campo];
+          toast.error(campo === "non_field_errors" ? String(txt) : `${nombre || campo}: ${txt}`, { duration: 6000 });
         } else if (detalle.detail) {
           toast.error(String(detalle.detail));
         } else {
@@ -709,12 +738,22 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                     <p className="text-sm text-suave dark:text-suave-dark mt-1">Sacá una foto del daño o elegí de la galería</p>
                   </div>
 
-                  {/* Panel en modo BORRADOR: las fotos quedan en memoria hasta guardar */}
-                  <SiniestroFotosPanel
-                    compact
-                    draftFotos={draftFotos}
-                    onDraftChange={setDraftFotos}
-                  />
+                  {initialData?.id ? (
+                    /* EDICIÓN: las fotos se guardan directo en el siniestro (no se pierden) */
+                    <SiniestroFotosPanel
+                      compact
+                      siniestroId={initialData.id}
+                      onUploadingChange={setFotosSubiendo}
+                    />
+                  ) : (
+                    /* ALTA: modo BORRADOR, las fotos quedan en memoria hasta guardar */
+                    <SiniestroFotosPanel
+                      compact
+                      draftFotos={draftFotos}
+                      onDraftChange={setDraftFotos}
+                      onUploadingChange={setFotosSubiendo}
+                    />
+                  )}
                 </>
               )}
 
@@ -788,7 +827,8 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
             <button
               type="button"
               onClick={goBack}
-              className="h-12 px-4 sm:px-5 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark font-medium flex items-center justify-center gap-2 transition-colors"
+              disabled={fotosSubiendo}
+              className="h-12 px-4 sm:px-5 rounded-xl bg-surface dark:bg-surface-dark hover:brightness-95 text-titulo dark:text-titulo-dark font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <HiArrowLeft className="w-4 h-4" /> Volver
             </button>
@@ -798,20 +838,27 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
             <button
               type="button"
               onClick={goNext}
-              disabled={!canNext()}
+              disabled={!canNext() || fotosSubiendo}
               className={`flex-1 h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
-                canNext()
+                canNext() && !fotosSubiendo
                   ? "bg-duo-azul text-white hover:brightness-110"
                   : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark cursor-not-allowed"
               }`}
             >
-              Siguiente <HiArrowRight className="w-4 h-4" />
+              {fotosSubiendo ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-duo-azul border-t-transparent rounded-full animate-spin" />
+                  Subiendo fotos…
+                </>
+              ) : (
+                <>Siguiente <HiArrowRight className="w-4 h-4" /></>
+              )}
             </button>
           ) : (
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || fotosSubiendo}
               className={`flex-1 h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
                 submitting
                   ? "bg-duo-verde/70 text-white cursor-wait"

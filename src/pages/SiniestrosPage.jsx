@@ -45,8 +45,11 @@ const FILTROS = [
 ];
 
 // Sube las fotos borrador (del wizard) al siniestro recién creado.
+// 🐛 FIX: devuelve CUÁNTAS fotos no se pudieron adjuntar (antes fallaban calladas).
 async function subirFotosBorrador(dispatch, siniestroId, draftFotos) {
-  if (!siniestroId || !Array.isArray(draftFotos) || draftFotos.length === 0) return;
+  if (!Array.isArray(draftFotos) || draftFotos.length === 0) return 0;
+  if (!siniestroId) return draftFotos.length;
+  let fallidas = 0;
   for (const f of draftFotos) {
     try {
       await dispatch(addFoto({
@@ -57,9 +60,11 @@ async function subirFotosBorrador(dispatch, siniestroId, draftFotos) {
         mime: f.mime || "image/jpeg",
       })).unwrap();
     } catch {
-      // Si una foto falla no cortamos el resto.
+      // Si una foto falla no cortamos el resto, pero la contamos.
+      fallidas++;
     }
   }
+  return fallidas;
 }
 
 export default function SiniestrosPage() {
@@ -120,9 +125,17 @@ export default function SiniestrosPage() {
     } else {
       // Alta: creamos y luego subimos las fotos borrador.
       const creado = await dispatch(addSiniestro(payload)).unwrap();
-      await subirFotosBorrador(dispatch, creado?.id, draftFotos);
+      const fallidas = await subirFotosBorrador(dispatch, creado?.id, draftFotos);
       invalidarCacheSiniestrosCliente(creado?.cliente ?? payload.cliente);
-      toast.success("Siniestro cargado");
+      if (fallidas > 0) {
+        // El siniestro quedó guardado: avisamos que faltan fotos (antes no decía nada).
+        toast.error(
+          `El siniestro se guardó, pero ${fallidas} foto${fallidas > 1 ? "s" : ""} no se ${fallidas > 1 ? "pudieron" : "pudo"} adjuntar. Agregala${fallidas > 1 ? "s" : ""} desde "Ver detalle".`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success("Siniestro cargado");
+      }
     }
     // El error se propaga y lo maneja el propio wizard (toast rojo).
   };
