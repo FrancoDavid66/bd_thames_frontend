@@ -3,17 +3,21 @@
 // ✅ Entregados y cancelados (los trámites cerrados), del más nuevo al más viejo.
 // El admin ve además el precio de la gestoría y la comisión (cobrada o pendiente),
 // solo con las comisiones prendidas (🎚️ hoy apagadas).
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+// 🆕 09/10: misma tabla que el Tablero (TablaDuo): fila entera clickeable,
+//    orden por columna y, en el celu, renglones compactos.
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useGestoria } from "./gestoriaContext";
 import { listarCerrados, mensajeError } from "../../services/gestoria";
-import { Candado, Cargando, Punto } from "./Piezas";
+import { Avatar, Candado, Cargando, Punto } from "./Piezas";
+import TablaDuo, { MarcaTabla } from "../ui/TablaDuo";
 import { colorOficina, ddmm, diasEntre, plata, tipoCorto } from "./gestoriaUtils";
 
+const cierreDe = (t) => t.entregado_en || t.cancelado_en || "";
+const tardo = (t) => (t.listo_en ? diasEntre(t.creado_en, t.listo_en) : null);
+
 export default function EntregadosPanel() {
-  const navigate = useNavigate();
   const { esAdmin } = useGestoria();
   const [filas, setFilas] = useState(null);
   const [total, setTotal] = useState(0);
@@ -48,10 +52,136 @@ export default function EntregadosPanel() {
   }, [cargar]);
   useDatosVivos(["gestoria"], () => cargar(pagina), { cadaMs: 30000 });
 
+  // 🎚️ Precio y comisión: solo si el servidor los mandó (con las comisiones apagadas, no).
+  const conPlata = esAdmin && (filas || []).some((t) => t.ve_plata);
+
+  const columnas = useMemo(
+    () => [
+      {
+        key: "tramite",
+        header: "Trámite",
+        sortValue: (t) => tipoCorto(t),
+        render: (t) => (
+          <span className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark truncate max-w-[240px]">{tipoCorto(t)}</span>
+            <span className="text-[12px] text-suave dark:text-suave-dark">
+              {t.numero}
+              {t.con_vehiculo === false ? null : t.patente ? (
+                <>
+                  {" · "}
+                  <span className="font-mono font-bold text-titulo dark:text-titulo-dark">{t.patente}</span>
+                </>
+              ) : (
+                " · sin patente"
+              )}
+            </span>
+          </span>
+        ),
+      },
+      {
+        key: "cliente",
+        header: "Cliente",
+        sortValue: (t) => t.persona_nombre || "",
+        render: (t) => <span className="block truncate max-w-[220px]">{t.persona_nombre || "—"}</span>,
+      },
+      {
+        key: "oficina",
+        header: "Oficina",
+        desde: "lg",
+        sortValue: (t) => t.oficina_nombre || "",
+        render: (t) => (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <Punto color={colorOficina(t.oficina)} />
+            {t.oficina_nombre || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "gestor",
+        header: "Gestor",
+        sortValue: (t) => t.gestor_nombre || "",
+        render: (t) => (
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <Avatar id={t.gestor} nombre={t.gestor_nombre} foto={t.gestor_foto} size={24} />
+            <span className="truncate max-w-[160px]">{t.gestor_nombre || "—"}</span>
+          </span>
+        ),
+      },
+      {
+        key: "tardo",
+        header: "Tardó",
+        align: "right",
+        sortValue: (t) => tardo(t),
+        render: (t) => <span className="whitespace-nowrap">{tardo(t) === null ? "—" : `${tardo(t)} días`}</span>,
+      },
+      conPlata && {
+        key: "precio",
+        header: (
+          <span className="inline-flex items-center gap-1">
+            Precio (gestoría) <Candado texto={false} />
+          </span>
+        ),
+        align: "right",
+        sortValue: (t) => (t.precio_gestoria == null ? "" : Number(t.precio_gestoria)),
+        render: (t) => <span className="whitespace-nowrap">{t.precio_gestoria == null ? "—" : plata(t.precio_gestoria)}</span>,
+      },
+      conPlata && {
+        key: "comision",
+        header: "Comisión",
+        align: "right",
+        sortValue: (t) => (Number(t.comision) > 0 ? Number(t.comision) : ""),
+        render: (t) =>
+          Number(t.comision) > 0 ? (
+            <span className="inline-flex flex-col items-end">
+              <b className="whitespace-nowrap">{plata(t.comision)}</b>
+              {t.comision_cobrada ? <MarcaTabla tono="verde">cobrada</MarcaTabla> : <MarcaTabla tono="ambar">pendiente</MarcaTabla>}
+            </span>
+          ) : (
+            <span className="text-suave dark:text-suave-dark">—</span>
+          ),
+      },
+      {
+        key: "cierre",
+        header: "Cerrado",
+        align: "right",
+        primeroDesc: true,
+        sortValue: (t) => cierreDe(t),
+        render: (t) => (
+          <span className="inline-flex flex-col items-end">
+            <span className="whitespace-nowrap font-medium">{ddmm(cierreDe(t))}</span>
+            {t.estado === "CANCELADO" ? <MarcaTabla tono="rojo">Cancelado</MarcaTabla> : <span className="text-[12px] text-suave dark:text-suave-dark">Entregado</span>}
+          </span>
+        ),
+      },
+    ],
+    [conPlata]
+  );
+
+  const filaCelu = (t) => (
+    <span className="flex-1 min-w-0 flex flex-col gap-1">
+      <span className="flex items-center justify-between gap-2">
+        <strong className="truncate text-[14px] text-titulo dark:text-titulo-dark">{t.persona_nombre || "—"}</strong>
+        <span className="shrink-0 text-[12px] font-medium text-suave dark:text-suave-dark">{ddmm(cierreDe(t))}</span>
+      </span>
+      <span className="truncate text-[12px] text-suave dark:text-suave-dark">
+        {tipoCorto(t)}
+        {t.con_vehiculo !== false && t.patente ? (
+          <>
+            {" · "}
+            <span className="font-mono font-bold text-titulo dark:text-titulo-dark">{t.patente}</span>
+          </>
+        ) : null}
+      </span>
+      <span className="flex flex-wrap items-center gap-1.5 text-[12px] text-suave dark:text-suave-dark">
+        {t.estado === "CANCELADO" ? <MarcaTabla tono="rojo">Cancelado</MarcaTabla> : <MarcaTabla tono="verde">Entregado</MarcaTabla>}
+        {t.gestor_nombre ? t.gestor_nombre.split(" ")[0] : ""}
+        {tardo(t) !== null ? ` · tardó ${tardo(t)} días` : ""}
+      </span>
+    </span>
+  );
+
   if (error && !filas) return <p className="rounded-xl border border-duo-rojo/40 p-4 text-[14px] text-duo-rojo">{error}</p>;
   if (!filas) return <Cargando alto="h-72" />;
-  // 🎚️ Precio y comisión: solo si el servidor los mandó (con las comisiones apagadas, no).
-  const conPlata = esAdmin && filas.some((t) => t.ve_plata);
 
   return (
     <div className="flex flex-col gap-4">
@@ -59,89 +189,14 @@ export default function EntregadosPanel() {
         <h2 className="text-xl font-bold text-titulo dark:text-titulo-dark">Entregados y cancelados</h2>
         <span className="text-[13px] text-suave dark:text-suave-dark">{total} trámites cerrados. Tocá uno para ver su historial.</span>
       </div>
-      <section className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="bg-surface dark:bg-surface-dark text-left text-suave dark:text-suave-dark">
-                <th scope="col" className="px-3 py-2.5 font-semibold">Cerrado</th>
-                <th scope="col" className="px-3 py-2.5 font-semibold">Trámite</th>
-                <th scope="col" className="px-3 py-2.5 font-semibold">Cliente</th>
-                <th scope="col" className="px-3 py-2.5 font-semibold">Oficina</th>
-                <th scope="col" className="px-3 py-2.5 font-semibold">Gestor</th>
-                <th scope="col" className="px-3 py-2.5 font-semibold text-right">Tardó</th>
-                {conPlata && (
-                  <>
-                    <th scope="col" className="px-3 py-2.5 font-semibold text-right">
-                      <span className="inline-flex items-center gap-1">Precio (gestoría) <Candado texto={false} /></span>
-                    </th>
-                    <th scope="col" className="px-3 py-2.5 font-semibold text-right">Comisión</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((t) => {
-                const cierre = t.entregado_en || t.cancelado_en;
-                return (
-                  <tr
-                    key={t.id}
-                    onClick={() => navigate(`/gestoria/tramite/${t.id}`)}
-                    className="cursor-pointer border-t border-linea/70 dark:border-linea-dark/70 hover:bg-surface/70 dark:hover:bg-surface-dark/60"
-                  >
-                    <td className="px-3 py-3 whitespace-nowrap text-titulo dark:text-titulo-dark">
-                      {ddmm(cierre)}
-                      {t.estado === "CANCELADO" && <span className="ml-1.5 text-[11px] font-bold text-duo-rojo">CANCELADO</span>}
-                    </td>
-                    <td className="px-3 py-3">
-                      <strong className="text-titulo dark:text-titulo-dark">{tipoCorto(t)}</strong>
-                      {t.con_vehiculo === false ? null : t.patente ? (
-                        <>
-                          {" "}· <span className="font-mono">{t.patente}</span>
-                        </>
-                      ) : (
-                        <span className="text-suave dark:text-suave-dark"> · sin patente</span>
-                      )}
-                      <br />
-                      <span className="text-[11px] text-suave dark:text-suave-dark">{t.numero}</span>
-                    </td>
-                    <td className="px-3 py-3 text-titulo dark:text-titulo-dark">{t.persona_nombre}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 text-titulo dark:text-titulo-dark"><Punto color={colorOficina(t.oficina)} />{t.oficina_nombre || "—"}</span>
-                    </td>
-                    <td className="px-3 py-3 text-titulo dark:text-titulo-dark">{t.gestor_nombre || "—"}</td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap text-titulo dark:text-titulo-dark">{t.listo_en ? `${diasEntre(t.creado_en, t.listo_en)} días` : "—"}</td>
-                    {conPlata && (
-                      <>
-                        <td className="px-3 py-3 text-right whitespace-nowrap text-titulo dark:text-titulo-dark">{t.precio_gestoria == null ? "—" : plata(t.precio_gestoria)}</td>
-                        <td className="px-3 py-3 text-right whitespace-nowrap font-bold text-titulo dark:text-titulo-dark">
-                          {Number(t.comision) > 0 ? (
-                            <>
-                              {plata(t.comision)}{" "}
-                              {t.comision_cobrada ? (
-                                <span className="text-[11px] font-semibold text-duo-verde-sombra dark:text-duo-verde">cobrada</span>
-                              ) : (
-                                <span className="text-[11px] font-semibold text-duo-amarillo-sombra dark:text-duo-amarillo">pendiente</span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="font-normal text-suave dark:text-suave-dark">—</span>
-                          )}
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-              {!filas.length && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-suave dark:text-suave-dark">Todavía no hay trámites cerrados.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <TablaDuo
+        columns={columnas}
+        rows={filas}
+        rowHref={(t) => `/gestoria/tramite/${t.id}`}
+        rowLabel={(t) => `Abrir ${t.numero}`}
+        mobileRow={filaCelu}
+        emptyText="Todavía no hay trámites cerrados."
+      />
       {hayMas && (
         <button
           type="button"

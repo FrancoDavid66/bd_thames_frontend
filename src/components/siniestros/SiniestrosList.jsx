@@ -1,21 +1,30 @@
 // src/components/siniestros/SiniestrosList.jsx
 //
-// 📱 RESPONSIVE: en mobile los datos van ARRIBA y una fila con fecha + botones
-//    Ver/Editar/Borrar (44px) va ABAJO, separada por un borde. En desktop (sm+)
-//    vuelve a ser datos-izq / acciones-der.
-import { memo } from "react";
-import { HiEye, HiPencil, HiTrash, HiExclamationCircle } from "react-icons/hi";
+// 🚨 Lista de siniestros.
+// 🆕 09/10: TABLA (estilo Linear / Stripe) en vez de las tarjetas.
+//   - Tocás la fila en cualquier lado → se abre el detalle del siniestro.
+//   - Al final de la fila: Editar y Eliminar (este último solo admin).
+//     En la compu aparecen al pasar el mouse; en el celu queda el lápiz.
+//   - Los títulos de las columnas ordenan (cliente, patente, estado, fecha…).
+//   - Raya roja a la izquierda = siniestro reciente (30 días o menos) y abierto.
+//   - Celu: renglones compactos (sin tarjetas).
+// Va adentro de la tarjeta de SiniestrosPage (que tiene las pestañas y el buscador).
+import { useMemo } from "react";
+import { HiCamera, HiExclamationCircle, HiPencil, HiTrash } from "react-icons/hi";
 import dayjs from "dayjs";
+
 import Badge from "../ui/Badge";
+import TablaDuo, { MarcaTabla } from "../ui/TablaDuo";
 
 // Estado → tono del Badge + label corto.
-const ESTADO_CFG = {
-  PENDIENTE:   { tono: "amarillo", label: "Falta doc." },
-  DENUNCIADO:  { tono: "azul",     label: "Denunciado" },
-  INSPECCION:  { tono: "violeta",  label: "Inspección" },
-  LIQUIDACION: { tono: "azul",     label: "Liquidación" },
-  CERRADO:     { tono: "verde",    label: "Cerrado" },
+export const ESTADO_CFG = {
+  PENDIENTE: { tono: "amarillo", label: "Falta doc.", color: "#d97706" },
+  DENUNCIADO: { tono: "azul", label: "Denunciado", color: "#2563eb" },
+  INSPECCION: { tono: "violeta", label: "Inspección", color: "#5b52e6" },
+  LIQUIDACION: { tono: "azul", label: "Liquidación", color: "#2563eb" },
+  CERRADO: { tono: "verde", label: "Cerrado", color: "#16a34a" },
 };
+const ORDEN_ESTADO = ["PENDIENTE", "DENUNCIADO", "INSPECCION", "LIQUIDACION", "CERRADO"];
 
 const RESP_LABELS = {
   CHOCO: "Asegurado chocó",
@@ -25,113 +34,201 @@ const RESP_LABELS = {
   OTRO: "Otro",
 };
 
-const SiniestroCard = memo(({ s, isWebAdmin, onView, onEdit, onDelete }) => {
-  const cfg = ESTADO_CFG[s.estado] || { tono: "neutro", label: s.estado };
-  const dias = s.fecha_siniestro ? dayjs().diff(dayjs(s.fecha_siniestro), "day") : null;
-  const esReciente = dias !== null && dias <= 30 && s.estado !== "CERRADO";
+const respTxt = (s) => RESP_LABELS[s.responsabilidad] || s.responsabilidad_label || s.responsabilidad || "—";
+const vehiculoTxt = (s) => [s.marca_auto, s.modelo_auto, s.ano_auto].filter(Boolean).join(" ");
+const diasDesde = (s) => (s.fecha_siniestro ? dayjs().startOf("day").diff(dayjs(s.fecha_siniestro), "day") : null);
+const esReciente = (s) => {
+  const d = diasDesde(s);
+  return d !== null && d <= 30 && s.estado !== "CERRADO";
+};
+const textoHace = (d) => (d === 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`);
+const colorHace = (d) =>
+  d <= 30 ? "text-duo-rojo" : d <= 90 ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-suave dark:text-suave-dark";
 
+// En la tabla va el nombre corto (igual que las pestañas); el largo del servidor queda en el "title".
+function EstadoBadge({ s }) {
+  const cfg = ESTADO_CFG[s.estado] || { tono: "neutro", label: s.estado_label || s.estado };
   return (
-    <div className={`rounded-xl border bg-card dark:bg-card-dark p-4 sm:p-5 transition-colors hover:border-duo-azul ${
-      esReciente ? "border-duo-rojo/40" : "border-linea dark:border-linea-dark"
-    }`}>
-      {esReciente && (
-        <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] rounded-lg">
-          <HiExclamationCircle className="w-4 h-4 text-duo-rojo shrink-0" />
-          <p className="text-xs font-medium text-duo-rojo">Siniestro reciente — hace {dias} días</p>
-        </div>
-      )}
+    <span title={s.estado_label || cfg.label} className="inline-flex">
+      <Badge tono={cfg.tono} className="whitespace-nowrap">
+        {cfg.label}
+      </Badge>
+    </span>
+  );
+}
 
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge tono={cfg.tono} size="sm">{s.estado_label || cfg.label}</Badge>
-            <span className="text-xs text-suave dark:text-suave-dark">
-              {RESP_LABELS[s.responsabilidad] || s.responsabilidad_label || s.responsabilidad}
+export default function SiniestrosList({ siniestros, isWebAdmin, onView, onEdit, onDelete, vacio = null }) {
+  const columnas = useMemo(
+    () => [
+      {
+        key: "cliente",
+        header: "Cliente",
+        sortValue: (s) => s.cliente_label || "",
+        render: (s) => (
+          <span className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark truncate max-w-[240px]">{s.cliente_label || "Sin cliente"}</span>
+            <span className="flex items-center gap-2 text-[12px] text-suave dark:text-suave-dark">
+              #{s.id}
+              {s.fotos_count ? (
+                <span className="inline-flex items-center gap-0.5" title={`${s.fotos_count} foto${s.fotos_count > 1 ? "s" : ""}`}>
+                  <HiCamera className="w-3.5 h-3.5" /> {s.fotos_count}
+                </span>
+              ) : null}
             </span>
-          </div>
-
-          <p className="font-semibold text-base text-titulo dark:text-titulo-dark truncate">{s.cliente_label || "Sin cliente"}</p>
-
-          <div className="flex items-center gap-3 flex-wrap text-xs">
-            {s.nro_reclamo_cia ? (
-              <span className="font-mono text-duo-azul">Reclamo #{s.nro_reclamo_cia}</span>
+          </span>
+        ),
+      },
+      {
+        key: "vehiculo",
+        header: "Vehículo",
+        sortValue: (s) => s.patente || "",
+        render: (s) => (
+          <span className="flex flex-col min-w-0">
+            {s.patente ? (
+              <span className="font-mono text-[13px] font-bold uppercase tracking-wide text-titulo dark:text-titulo-dark whitespace-nowrap">{s.patente}</span>
             ) : (
-              <span className="text-duo-rojo">Sin N° de Cía</span>
+              <span className="text-[13px] font-semibold text-suave dark:text-suave-dark">Sin patente</span>
             )}
-            {s.poliza_label && (
-              <span className="text-suave dark:text-suave-dark truncate max-w-[180px]">Póliza: {s.poliza_label}</span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-titulo dark:text-titulo-dark">
-              {[s.marca_auto, s.modelo_auto, s.ano_auto].filter(Boolean).join(" ")}
-            </span>
-            {s.patente && (
-              <span className="font-mono text-xs text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg uppercase">
-                {s.patente}
+            <span className="text-[12px] text-suave dark:text-suave-dark truncate max-w-[200px]">{vehiculoTxt(s) || "—"}</span>
+          </span>
+        ),
+      },
+      {
+        key: "tipo",
+        header: "Qué pasó",
+        desde: "lg",
+        sortValue: (s) => respTxt(s),
+        render: (s) => <span className="whitespace-nowrap">{respTxt(s)}</span>,
+      },
+      {
+        key: "reclamo",
+        header: "N° de reclamo",
+        sortValue: (s) => s.nro_reclamo_cia || "",
+        render: (s) =>
+          s.nro_reclamo_cia ? (
+            <span className="font-mono text-[13px] font-semibold text-duo-azul dark:text-blue-300 whitespace-nowrap">{s.nro_reclamo_cia}</span>
+          ) : (
+            <MarcaTabla tono="rojo">Sin N° de Cía</MarcaTabla>
+          ),
+      },
+      {
+        key: "poliza",
+        header: "Póliza",
+        desde: "xl",
+        sortValue: (s) => (s.poliza_label && s.poliza_label !== "—" ? s.poliza_label : ""),
+        render: (s) => (
+          <span className="block truncate max-w-[220px] text-suave dark:text-suave-dark" title={s.poliza_label}>
+            {s.poliza_label || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "estado",
+        header: "Estado",
+        sortValue: (s) => ORDEN_ESTADO.indexOf(s.estado),
+        render: (s) => <EstadoBadge s={s} />,
+      },
+      {
+        key: "fecha",
+        header: "Fecha",
+        align: "right",
+        primeroDesc: true,
+        sortValue: (s) => s.fecha_siniestro || "",
+        render: (s) => {
+          const d = diasDesde(s);
+          return (
+            <span className="inline-flex flex-col items-end">
+              <span className="font-mono text-[13px] font-semibold whitespace-nowrap">
+                {s.fecha_siniestro ? dayjs(s.fecha_siniestro).format("DD/MM/YYYY") : "Sin fecha"}
               </span>
-            )}
-          </div>
-        </div>
-
-        {/* 📱 En mobile: fila abajo (fecha + botones) separada por borde. En sm+: columna a la derecha. */}
-        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-3 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-linea dark:border-linea-dark">
-          <div className="text-left sm:text-right">
-            <p className="text-sm font-mono font-semibold text-titulo dark:text-titulo-dark">
-              {s.fecha_siniestro ? dayjs(s.fecha_siniestro).format("DD/MM/YYYY") : "Sin fecha"}
-            </p>
-            {dias !== null && (
-              <p className={`text-xs mt-0.5 ${dias <= 30 ? "text-duo-rojo" : dias <= 90 ? "text-duo-amarillo-sombra dark:text-duo-amarillo" : "text-suave dark:text-suave-dark"}`}>
-                hace {dias}d
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 sm:gap-1.5">
-            <button onClick={() => onView(s)}
-              className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul hover:brightness-95 flex items-center justify-center transition-colors"
-              title="Ver detalle" aria-label="Ver detalle">
-              <HiEye className="w-5 h-5 sm:w-4 sm:h-4" />
-            </button>
-            <button onClick={() => onEdit(s)}
-              className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-duo-amarillo hover:brightness-95 flex items-center justify-center transition-colors"
-              title="Editar" aria-label="Editar">
-              <HiPencil className="w-5 h-5 sm:w-4 sm:h-4" />
-            </button>
-            {isWebAdmin && (
-              <button onClick={() => onDelete(s)}
-                className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] text-duo-rojo hover:brightness-95 flex items-center justify-center transition-colors"
-                title="Eliminar" aria-label="Eliminar">
-                <HiTrash className="w-5 h-5 sm:w-4 sm:h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+              {d !== null && <span className={`text-[12px] whitespace-nowrap ${colorHace(d)}`}>{textoHace(d)}</span>}
+            </span>
+          );
+        },
+      },
+    ],
+    []
   );
-});
 
-export default function SiniestrosList({ siniestros, isWebAdmin, onView, onEdit, onDelete }) {
-  if (!siniestros?.length) {
+  // ✏️🗑️ Botones al final de la fila (no abren el detalle).
+  const acciones = (s, { enCelu }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onEdit(s)}
+        className={`inline-flex items-center justify-center rounded-lg text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark transition focus:opacity-100 ${
+          enCelu ? "h-10 w-10" : "h-8 w-8 lg:opacity-0 lg:group-hover:opacity-100"
+        }`}
+        title="Editar"
+        aria-label={`Editar siniestro #${s.id}`}
+      >
+        <HiPencil className="w-4 h-4" />
+      </button>
+      {isWebAdmin && !enCelu && (
+        <button
+          type="button"
+          onClick={() => onDelete(s)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-suave dark:text-suave-dark hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)] hover:text-duo-rojo transition focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+          title="Eliminar"
+          aria-label={`Eliminar siniestro #${s.id}`}
+        >
+          <HiTrash className="w-4 h-4" />
+        </button>
+      )}
+    </>
+  );
+
+  // 📱 Renglón del celu.
+  const filaCelu = (s) => {
+    const d = diasDesde(s);
     return (
-      <div className="flex flex-col items-center justify-center py-20 rounded-xl border-2 border-dashed border-linea dark:border-linea-dark">
-        <HiExclamationCircle className="w-10 h-10 text-suave dark:text-suave-dark mb-3" />
-        <p className="text-titulo dark:text-titulo-dark font-medium">No hay siniestros para mostrar</p>
-        <p className="text-suave dark:text-suave-dark text-sm mt-1">Probá ajustando los filtros o cargá uno nuevo</p>
-      </div>
+      <span className="flex-1 min-w-0 flex flex-col gap-1">
+        <span className="flex items-center justify-between gap-2">
+          <strong className="truncate text-[14px] text-titulo dark:text-titulo-dark">{s.cliente_label || "Sin cliente"}</strong>
+          <span className={`shrink-0 text-[12px] font-medium ${d !== null ? colorHace(d) : "text-suave dark:text-suave-dark"}`}>
+            {s.fecha_siniestro ? dayjs(s.fecha_siniestro).format("DD/MM") : "Sin fecha"}
+          </span>
+        </span>
+        <span className="truncate text-[12px] text-suave dark:text-suave-dark">
+          {vehiculoTxt(s) || "Vehículo"}
+          {s.patente && (
+            <>
+              {" · "}
+              <span className="font-mono font-bold uppercase text-titulo dark:text-titulo-dark">{s.patente}</span>
+            </>
+          )}
+        </span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <EstadoBadge s={s} />
+          {s.nro_reclamo_cia ? (
+            <span className="text-[12px] text-suave dark:text-suave-dark">Reclamo {s.nro_reclamo_cia}</span>
+          ) : (
+            <MarcaTabla tono="rojo">Sin N° de Cía</MarcaTabla>
+          )}
+        </span>
+      </span>
     );
-  }
+  };
 
   return (
-    <div className="space-y-3">
-      {siniestros.map((s) => (
-        <SiniestroCard
-          key={s.id} s={s}
-          isWebAdmin={isWebAdmin}
-          onView={onView} onEdit={onEdit} onDelete={onDelete}
-        />
-      ))}
-    </div>
+    <TablaDuo
+      bare
+      columns={columnas}
+      rows={siniestros || []}
+      onRowClick={onView}
+      rowLabel={(s) => `Ver siniestro #${s.id} de ${s.cliente_label || "sin cliente"}`}
+      rowTone={(s) => (esReciente(s) ? "rojo" : null)}
+      mobileRow={filaCelu}
+      acciones={acciones}
+      vacio={
+        vacio || (
+          <div className="flex flex-col items-center">
+            <HiExclamationCircle className="w-10 h-10 text-suave dark:text-suave-dark mb-3" />
+            <p className="text-titulo dark:text-titulo-dark font-medium">No hay siniestros para mostrar</p>
+            <p className="text-suave dark:text-suave-dark text-sm mt-1">Probá ajustando los filtros o cargá uno nuevo</p>
+          </div>
+        )
+      }
+    />
   );
-}
+}

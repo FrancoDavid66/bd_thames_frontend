@@ -5,11 +5,13 @@
 //    pantallas muy chicas (<380px) y 2 desde ahí, para que los valores largos
 //    no se corten; botón "Nota" con buen tap.
 //    NOTA: el scroll interno del modal lo maneja <ModalDuo> (no se toca acá).
+// 🆕 09/10: como ahora se entra tocando la fila de la tabla, abajo del detalle
+//    están los botones Editar y Eliminar (este último solo si se pasa onDelete = admin).
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import dayjs from "dayjs";
 import { toast } from "react-hot-toast";
-import { HiPlus, HiExclamationCircle, HiClock } from "react-icons/hi";
+import { HiPlus, HiExclamationCircle, HiClock, HiPencil, HiTrash } from "react-icons/hi";
 
 import { getEventosBySiniestro, addEvento } from "../../store/slices/siniestrosSlice";
 import SiniestroFotosPanel from "./SiniestroFotosPanel";
@@ -35,7 +37,7 @@ function Dato({ label, value, mono = false }) {
   );
 }
 
-export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
+export default function SiniestrosDetails({ isOpen, onClose, siniestro, onEdit, onDelete }) {
   const dispatch = useDispatch();
   const sid = siniestro?.id;
   const key = sid != null ? String(sid) : null;
@@ -93,6 +95,26 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro }) {
       icon={<HiExclamationCircle />}
       iconTono="rojo"
       size="lg"
+      footer={
+        onEdit || onDelete ? (
+          <>
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(siniestro)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-duo-rojo/40 bg-card dark:bg-card-dark px-4 py-2.5 text-[14px] font-semibold text-duo-rojo hover:bg-duo-rojo-soft dark:hover:bg-[var(--color-duo-rojo-soft-dark)] transition-colors"
+              >
+                <HiTrash className="w-4 h-4" /> Eliminar
+              </button>
+            )}
+            {onEdit && (
+              <Boton3D variant="azul" onClick={() => onEdit(siniestro)}>
+                <HiPencil className="w-4 h-4" /> Editar siniestro
+              </Boton3D>
+            )}
+          </>
+        ) : null
+      }
     >
       <div className="flex flex-col lg:flex-row gap-6">
         {/* IZQUIERDA: datos */}

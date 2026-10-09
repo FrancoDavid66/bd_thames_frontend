@@ -55,7 +55,7 @@ export default function GestoriaPage() {
   const [gestores, setGestores] = useState([]);
   const [error, setError] = useState("");
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
-  const [tabCelu, setTabCelu] = useState("EN_REGISTRO");
+  const [tabCelu, setTabCelu] = useState("TODOS"); // 🆕 09/10: pestaña de estado de la tabla (arranca en "Todos")
   // 👷 Filtro de «Trámites» en la app del gestor (queda al volver de un trámite).
   const [tabGestor, setTabGestor] = useState("hacer");
 

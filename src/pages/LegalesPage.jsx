@@ -62,7 +62,7 @@ export default function LegalesPage() {
   const [abogados, setAbogados] = useState([]);
   const [error, setError] = useState("");
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
-  const [tabCelu, setTabCelu] = useState("CONSULTA");
+  const [tabCelu, setTabCelu] = useState("TODOS"); // 🆕 09/10: pestaña de estado de la tabla (arranca en "Todos")
 
   useEffect(() => {
     let vivo = true;

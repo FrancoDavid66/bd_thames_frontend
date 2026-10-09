@@ -4,16 +4,16 @@
 // Orquesta todo: lista + búsqueda + filtro por estado + wizard (alta/edición)
 // + detalle + borrar. Es autónoma (no recibe props; la ruta la monta sola).
 //
-// 🆕 Rediseño "profesional": bordes de 1px, esquinas menos redondeadas,
-// sin mayúsculas en los chips de filtro, sin emoji en el header.
-//
-// 📱 RESPONSIVE: encabezado apila el botón "Nuevo siniestro" full-width en
-//    mobile; los chips de estado hacen scroll horizontal (no se amontonan);
-//    buscador a 48px. El resto ya venía bien.
+// 🆕 09/10: TABLA (estilo Linear / Stripe) en vez de las tarjetas.
+//   - Una sola tarjeta: arriba las pestañas por estado CON SU NÚMERO
+//     (Todos · Falta doc. · Denunciado · …), abajo el buscador y la tabla.
+//   - Tocás una fila → se abre el detalle. Desde el detalle también podés
+//     Editar o Eliminar (admin). En la fila quedan el lápiz y el tacho.
+//   - Celu: renglones compactos (sin tarjetas).
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
-import { HiPlus, HiSearch, HiExclamationCircle } from "react-icons/hi";
+import { HiPlus, HiExclamationCircle } from "react-icons/hi";
 import { toast } from "react-hot-toast";
 
 import { useAuth } from "../context/AuthContext";
@@ -27,14 +27,15 @@ import {
 import { invalidarCacheSiniestrosCliente } from "../hooks/useSiniestrosCliente";
 import useDatosVivos from "../hooks/useDatosVivos";
 
-import SiniestrosList from "../components/siniestros/SiniestrosList";
+import SiniestrosList, { ESTADO_CFG } from "../components/siniestros/SiniestrosList";
 import SiniestrosDetails from "../components/siniestros/SiniestrosDetails";
 import SiniestrosWizard from "../components/siniestros/SiniestrosWizard";
 import ModalDuo from "../components/ui/ModalDuo";
 import Boton3D from "../components/ui/Boton3D";
 import Badge from "../components/ui/Badge";
+import { BarraTabla, BuscadorTabla, FranjaPestanas, PestanasTabla } from "../components/ui/TablaDuo";
 
-// Filtros por estado (chips). value === "" → todos.
+// Filtros por estado (pestañas). value === "" → todos.
 const FILTROS = [
   { value: "",            label: "Todos"      },
   { value: "PENDIENTE",   label: "Falta doc." },
@@ -43,6 +44,7 @@ const FILTROS = [
   { value: "LIQUIDACION", label: "Liquidación"},
   { value: "CERRADO",     label: "Cerrado"    },
 ];
+const TODOS = "TODOS";
 
 // Sube las fotos borrador (del wizard) al siniestro recién creado.
 // 🐛 FIX: devuelve CUÁNTAS fotos no se pudieron adjuntar (antes fallaban calladas).
@@ -92,19 +94,35 @@ export default function SiniestrosPage() {
   // 📡 EN VIVO: un siniestro cargado o actualizado en otra oficina aparece solo.
   useDatosVivos(["siniestros"], () => dispatch(getSiniestros()));
 
-  // Filtrado en memoria (búsqueda + estado)
-  const listaFiltrada = useMemo(() => {
+  // 1) Filtro por búsqueda (así cada pestaña muestra cuántos hay con esa búsqueda).
+  const porBusqueda = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
+    if (!q) return siniestros || [];
     return (siniestros || []).filter((s) => {
-      if (filtroEstado && s.estado !== filtroEstado) return false;
-      if (!q) return true;
       const campos = [
         s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia,
-        s.marca_auto, s.modelo_auto,
+        s.marca_auto, s.modelo_auto, s.id ? `#${s.id}` : "",
       ].filter(Boolean).join(" ").toLowerCase();
       return campos.includes(q);
     });
-  }, [siniestros, busqueda, filtroEstado]);
+  }, [siniestros, busqueda]);
+
+  // 2) Filtro por estado (la pestaña elegida).
+  const listaFiltrada = useMemo(
+    () => (filtroEstado ? porBusqueda.filter((s) => s.estado === filtroEstado) : porBusqueda),
+    [porBusqueda, filtroEstado]
+  );
+
+  const pestanas = useMemo(
+    () =>
+      FILTROS.map((f) => ({
+        id: f.value || TODOS,
+        label: f.label,
+        color: f.value ? ESTADO_CFG[f.value]?.color : undefined,
+        n: f.value ? porBusqueda.filter((s) => s.estado === f.value).length : porBusqueda.length,
+      })),
+    [porBusqueda]
+  );
 
   const abiertos = useMemo(
     () => (siniestros || []).filter((s) => s.estado !== "CERRADO").length,
@@ -155,11 +173,13 @@ export default function SiniestrosPage() {
     }
   };
 
+  const hayFiltro = !!(busqueda.trim() || filtroEstado);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto px-4 sm:px-0 py-4 sm:py-6 space-y-4"
+      className="max-w-7xl mx-auto px-4 sm:px-0 py-4 sm:py-6 space-y-4"
     >
       {/* ── Encabezado ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -184,52 +204,58 @@ export default function SiniestrosPage() {
         </div>
       </div>
 
-      {/* ── Búsqueda ── */}
-      <div className="relative">
-        <HiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-suave dark:text-suave-dark" />
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por cliente, patente, póliza o N° de reclamo..."
-          className="w-full h-10 pl-10 pr-4 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-[14px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-azul transition-colors"
+      {/* ── Tabla con sus pestañas y el buscador arriba (todo en una tarjeta) ── */}
+      <section className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-sm overflow-hidden">
+        <FranjaPestanas>
+          <PestanasTabla
+            items={pestanas}
+            valor={filtroEstado || TODOS}
+            onCambiar={(id) => setFiltroEstado(id === TODOS ? "" : id)}
+            ariaLabel="Estado del siniestro"
+          />
+        </FranjaPestanas>
+        <BarraTabla
+          buscador={
+            <BuscadorTabla
+              value={busqueda}
+              onChange={setBusqueda}
+              placeholder="Buscar por cliente, patente, póliza o N° de reclamo"
+              ancho="lg:w-96"
+            />
+          }
         />
-      </div>
 
-      {/* ── Chips de estado — 📱 scroll horizontal en mobile (no se amontonan) ── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {FILTROS.map((f) => {
-          const active = filtroEstado === f.value;
-          return (
-            <button
-              key={f.value || "todos"}
-              type="button"
-              onClick={() => setFiltroEstado(f.value)}
-              className={`shrink-0 min-h-[36px] px-3.5 rounded-lg border text-[12px] font-medium transition-colors ${
-                active
-                  ? "bg-duo-azul border-duo-azul text-white"
-                  : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark hover:border-duo-azul"
-              }`}
-            >
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Lista ── */}
-      {loading && (!siniestros || siniestros.length === 0) ? (
-        <div className="flex justify-center py-20">
-          <div className="w-8 h-8 border-2 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
-        </div>
-      ) : (
-        <SiniestrosList
-          siniestros={listaFiltrada}
-          isWebAdmin={isWebAdmin}
-          onView={setVerSiniestro}
-          onEdit={abrirEdicion}
-          onDelete={setBorrarSiniestro}
-        />
-      )}
+        {loading && (!siniestros || siniestros.length === 0) ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-2 border-duo-azul/25 border-t-duo-azul rounded-full animate-spin" />
+          </div>
+        ) : (
+          <SiniestrosList
+            siniestros={listaFiltrada}
+            isWebAdmin={isWebAdmin}
+            onView={setVerSiniestro}
+            onEdit={abrirEdicion}
+            onDelete={setBorrarSiniestro}
+            vacio={
+              hayFiltro ? (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-[14px] font-medium text-suave dark:text-suave-dark">Nada con este filtro.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusqueda("");
+                      setFiltroEstado("");
+                    }}
+                    className="text-[13px] font-semibold text-duo-azul hover:underline"
+                  >
+                    Ver todos los siniestros
+                  </button>
+                </div>
+              ) : null
+            }
+          />
+        )}
+      </section>
 
       {/* ── Wizard (alta / edición) ── */}
       <SiniestrosWizard
@@ -240,11 +266,23 @@ export default function SiniestrosPage() {
         isAdmin={isWebAdmin}
       />
 
-      {/* ── Detalle ── */}
+      {/* ── Detalle (con Editar / Eliminar abajo) ── */}
       <SiniestrosDetails
         isOpen={!!verSiniestro}
         siniestro={verSiniestro}
         onClose={() => setVerSiniestro(null)}
+        onEdit={(s) => {
+          setVerSiniestro(null);
+          abrirEdicion(s);
+        }}
+        onDelete={
+          isWebAdmin
+            ? (s) => {
+                setVerSiniestro(null);
+                setBorrarSiniestro(s);
+              }
+            : undefined
+        }
       />
 
       {/* ── Confirmar borrado ── */}

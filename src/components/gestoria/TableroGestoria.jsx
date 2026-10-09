@@ -1,41 +1,59 @@
 // src/components/gestoria/TableroGestoria.jsx
 //
 // 📋 Tablero de Gestoría: quién tiene cada trámite y cómo va.
-//   - Compu (pantalla ancha): 5 columnas, una por estado (tipo Trello).
-//   - Celu: pestañas por estado.
-//   - Filtros: gestor, "solo demorados", oficina (admin), tipo y buscador.
+//
+// 🆕 09/10: TABLA (estilo Linear / Stripe) en vez de las tarjetas tipo Trello.
+//   - Pestañas por estado con su número: Todos · Recibido · Asignado · En el
+//     registro · Observado · Listo (la elegida queda al volver de un trámite).
+//   - Barra: buscador, gestor, oficina (admin), tipo, "Solo demorados" y Limpiar.
+//   - Cada fila es un trámite: tocás en cualquier lado y entrás a su ficha
+//     (Ctrl o la rueda del mouse = en otra pestaña). Los títulos ordenan.
+//   - Raya roja a la izquierda = demorado (7 días o más sin moverse).
+//   - Celu: la misma lista en renglones compactos (sin tarjetas).
+// "Sin precio" solo le llega al admin (el servidor no se lo manda a la oficina).
 // Se actualiza solo (📡 en vivo) cuando otro cambia algo.
-// 🎚️ Con las comisiones apagadas (hoy) el admin ve "Entregados" en vez de
-//    "Comisiones"; con el aviso al cliente apagado, no hay "sin avisar".
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HiDocumentText, HiExclamation, HiSearch } from "react-icons/hi";
+import { HiChatAlt2, HiDocumentText, HiExclamation, HiUserAdd } from "react-icons/hi";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useGestoria } from "./gestoriaContext";
 import { listarAbiertos, mensajeError, pedirResumen } from "../../services/gestoria";
-import { Candado, Cargando, Punto, Tile } from "./Piezas";
-import TarjetaTramite from "./TarjetaTramite";
-import { ABIERTOS, DIAS_DEMORADO, ESTADOS, diasEnEstado, esDemorado, norm, plata } from "./gestoriaUtils";
+import { Avatar, Candado, Cargando, DiasChip, Punto, Tile } from "./Piezas";
+import TablaDuo, {
+  BarraTabla,
+  BuscadorTabla,
+  FranjaPestanas,
+  LimpiarTabla,
+  MarcaTabla,
+  PestanasTabla,
+  PildoraTabla,
+  SelectTabla,
+  ToggleTabla,
+} from "../ui/TablaDuo";
+import {
+  ABIERTOS,
+  DIAS_DEMORADO,
+  ESTADOS,
+  colorOficina,
+  diasEnEstado,
+  esDemorado,
+  norm,
+  plata,
+  textoDias,
+  tipoCorto,
+} from "./gestoriaUtils";
 
-// ¿Pantalla ancha (compu)? → columnas. Si no → pestañas. Se dibuja SOLO una de
-// las dos (antes de esto, las tarjetas quedaban repetidas escondidas).
-const ANCHO_COLUMNAS = "(min-width: 1280px)";
-function useEsAncho() {
-  const [ancho, setAncho] = useState(() => typeof window !== "undefined" && window.matchMedia(ANCHO_COLUMNAS).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(ANCHO_COLUMNAS);
-    const cambio = () => setAncho(mq.matches);
-    mq.addEventListener("change", cambio);
-    return () => mq.removeEventListener("change", cambio);
-  }, []);
-  return ancho;
+const TODOS = "TODOS";
+
+function PillEstado({ estado }) {
+  const e = ESTADOS[estado] || { corto: estado, dot: "#94a3b8" };
+  return <PildoraTabla color={e.dot}>{e.corto}</PildoraTabla>;
 }
 
 export default function TableroGestoria() {
   const { esAdmin, user, catalogo, gestores, filtros, setFiltros, tabCelu, setTabCelu } = useGestoria();
   const navigate = useNavigate();
-  const esAncho = useEsAncho();
   const [lista, setLista] = useState(null);
   const [resumen, setResumen] = useState(null);
   const [error, setError] = useState("");
@@ -61,6 +79,7 @@ export default function TableroGestoria() {
   // 📲 LISTOS a los que nadie le avisó todavía (el WhatsApp se manda a mano desde la ficha).
   const sinAvisar = useMemo(() => ab.filter((t) => t.aviso_listo_pendiente).length, [ab]);
 
+  // Todos los filtros MENOS la pestaña de estado (así cada pestaña muestra su número).
   const filtrada = useMemo(() => {
     const q = norm(filtros.q);
     return ab
@@ -75,17 +94,185 @@ export default function TableroGestoria() {
       .sort((a, b) => diasEnEstado(b) - diasEnEstado(a));
   }, [ab, filtros]);
 
-  // Chips de gestores: los activos + cualquiera que tenga trámites abiertos.
-  const chips = useMemo(() => {
+  // Gestores del desplegable: los activos + cualquiera que tenga trámites abiertos.
+  const opcionesGestor = useMemo(() => {
     const vistos = new Map(gestores.map((g) => [String(g.id), g.nombre]));
     ab.forEach((t) => {
       if (t.gestor && !vistos.has(String(t.gestor))) vistos.set(String(t.gestor), t.gestor_nombre);
     });
-    return [["todos", "Todos"], ...[...vistos.entries()], ["sin", "Sin gestor"]];
+    const cuenta = (id) => ab.filter((t) => (id === "todos" ? true : id === "sin" ? !t.gestor : String(t.gestor) === id)).length;
+    return [["todos", "Todos"], ...vistos.entries(), ["sin", "Sin gestor"]].map(([id, nombre]) => [id, nombre, cuenta(id)]);
   }, [gestores, ab]);
 
   const set = (k, v) => setFiltros((f) => ({ ...f, [k]: v }));
+  const hayFiltros = !!(filtros.q || filtros.gestor !== "todos" || filtros.oficina !== "todas" || filtros.tipo !== "todos" || filtros.demorados);
+  const limpiar = () => setFiltros((f) => ({ ...f, gestor: "todos", oficina: "todas", tipo: "todos", q: "", demorados: false }));
   const miOficina = user?.perfil?.oficina_nombre || "";
+
+  // Pestañas por estado (la de "Todos" primero).
+  const pestanas = useMemo(
+    () => [
+      { id: TODOS, label: "Todos", n: filtrada.length },
+      ...ABIERTOS.map((e) => ({ id: e, label: ESTADOS[e].corto, color: ESTADOS[e].dot, title: ESTADOS[e].n, n: filtrada.filter((t) => t.estado === e).length })),
+    ],
+    [filtrada]
+  );
+  const tab = pestanas.some((p) => p.id === tabCelu) ? tabCelu : TODOS;
+  const visibles = tab === TODOS ? filtrada : filtrada.filter((t) => t.estado === tab);
+
+  const columnas = useMemo(
+    () => [
+      {
+        key: "tramite",
+        header: "Trámite",
+        sortValue: (t) => tipoCorto(t),
+        render: (t) => (
+          <span className="flex flex-col gap-1 min-w-0">
+            <span className="text-[14px] font-semibold text-titulo dark:text-titulo-dark truncate max-w-[240px]">{tipoCorto(t) || "Trámite"}</span>
+            <span className="flex flex-wrap items-center gap-1.5 text-[12px] text-suave dark:text-suave-dark">
+              {t.numero}
+              {t.cargado_por_gestor && (
+                <MarcaTabla tono="violeta" icono={HiUserAdd}>
+                  Lo cargó el gestor
+                </MarcaTabla>
+              )}
+              {t.sin_precio && <MarcaTabla tono="ambar">Sin precio</MarcaTabla>}
+            </span>
+          </span>
+        ),
+      },
+      {
+        key: "vehiculo",
+        header: "Vehículo",
+        sortValue: (t) => (t.con_vehiculo === false ? "" : t.patente || ""),
+        render: (t) =>
+          // 🪪 Trámites de la persona (licencia, con_vehiculo=false): sin auto.
+          t.con_vehiculo === false ? (
+            <span className="text-suave dark:text-suave-dark">—</span>
+          ) : (
+            <span className="flex flex-col min-w-0">
+              {t.patente ? (
+                <span className="font-mono text-[13px] font-bold tracking-wide text-titulo dark:text-titulo-dark whitespace-nowrap">{t.patente}</span>
+              ) : (
+                <span className="text-[13px] font-semibold text-suave dark:text-suave-dark">Sin patente</span>
+              )}
+              {t.vehiculo && <span className="text-[12px] text-suave dark:text-suave-dark truncate max-w-[200px]">{t.vehiculo}</span>}
+            </span>
+          ),
+      },
+      {
+        key: "cliente",
+        header: "Cliente",
+        sortValue: (t) => t.persona_nombre || "",
+        render: (t) => (
+          <span className="flex flex-col min-w-0">
+            <span className="truncate max-w-[220px] text-titulo dark:text-titulo-dark">{t.persona_nombre || "—"}</span>
+            {t.persona_dni && <span className="text-[12px] text-suave dark:text-suave-dark">DNI {t.persona_dni}</span>}
+          </span>
+        ),
+      },
+      {
+        key: "estado",
+        header: "Estado",
+        sortValue: (t) => ABIERTOS.indexOf(t.estado),
+        render: (t) => (
+          <span className="flex flex-col items-start gap-1">
+            <PillEstado estado={t.estado} />
+            {t.estado === "OBSERVADO" && t.falta && (
+              <span className="max-w-[220px] truncate text-[12px] font-semibold text-orange-700 dark:text-orange-300" title={t.falta}>
+                Falta: {t.falta}
+              </span>
+            )}
+            {t.aviso_listo_pendiente && (
+              <MarcaTabla tono="verde" icono={HiChatAlt2}>
+                Avisar al cliente
+              </MarcaTabla>
+            )}
+            {t.cliente_subio_papeles && (
+              <MarcaTabla tono="azul" icono={HiDocumentText}>
+                Cliente subió papeles
+              </MarcaTabla>
+            )}
+          </span>
+        ),
+      },
+      {
+        key: "gestor",
+        header: "Gestor",
+        sortValue: (t) => t.gestor_nombre || "",
+        render: (t) => (
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <Avatar id={t.gestor} nombre={t.gestor_nombre} foto={t.gestor_foto} size={24} />
+            <span className={`truncate max-w-[160px] ${t.gestor_nombre ? "text-titulo dark:text-titulo-dark" : "italic text-suave dark:text-suave-dark"}`}>
+              {t.gestor_nombre || "Sin gestor"}
+            </span>
+          </span>
+        ),
+      },
+      // La oficina ve solo lo suyo: la columna le sobra.
+      esAdmin && {
+        key: "oficina",
+        header: "Oficina",
+        desde: "xl",
+        sortValue: (t) => t.oficina_nombre || "",
+        render: (t) => (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-titulo dark:text-titulo-dark">
+            <Punto color={colorOficina(t.oficina)} />
+            {t.oficina_nombre || "Sin oficina"}
+          </span>
+        ),
+      },
+      {
+        key: "dias",
+        header: "En este estado",
+        align: "right",
+        primeroDesc: true,
+        sortValue: (t) => diasEnEstado(t),
+        render: (t) => {
+          const d = diasEnEstado(t);
+          return <DiasChip dias={d} texto={textoDias(d)} />;
+        },
+      },
+    ],
+    [esAdmin]
+  );
+
+  // 📱 Renglón del celu.
+  const filaCelu = (t) => {
+    const d = diasEnEstado(t);
+    return (
+      <span className="flex-1 min-w-0 flex flex-col gap-1">
+        <span className="flex items-center justify-between gap-2">
+          <strong className="truncate text-[14px] text-titulo dark:text-titulo-dark">{t.persona_nombre || "Sin nombre"}</strong>
+          <DiasChip dias={d} texto={textoDias(d)} />
+        </span>
+        <span className="truncate text-[12px] text-suave dark:text-suave-dark">
+          {tipoCorto(t)}
+          {t.con_vehiculo !== false && (
+            <>
+              {" · "}
+              <span className="font-mono font-bold text-titulo dark:text-titulo-dark">{t.patente || "sin patente"}</span>
+            </>
+          )}
+        </span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <PillEstado estado={t.estado} />
+          <span className="text-[12px] text-suave dark:text-suave-dark">{t.gestor_nombre ? t.gestor_nombre.split(" ")[0] : "Sin gestor"}</span>
+          {t.aviso_listo_pendiente && (
+            <MarcaTabla tono="verde" icono={HiChatAlt2}>
+              Avisar
+            </MarcaTabla>
+          )}
+          {t.cliente_subio_papeles && (
+            <MarcaTabla tono="azul" icono={HiDocumentText}>
+              Papeles
+            </MarcaTabla>
+          )}
+          {t.sin_precio && <MarcaTabla tono="ambar">Sin precio</MarcaTabla>}
+        </span>
+      </span>
+    );
+  };
 
   if (error && !lista) {
     return <p className="rounded-xl border border-duo-rojo/40 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] p-4 text-[14px] text-duo-rojo">{error}</p>;
@@ -94,7 +281,9 @@ export default function TableroGestoria() {
     return (
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[0, 1, 2, 3].map((i) => <Cargando key={i} alto="h-24" />)}
+          {[0, 1, 2, 3].map((i) => (
+            <Cargando key={i} alto="h-24" />
+          ))}
         </div>
         <Cargando alto="h-64" />
       </div>
@@ -134,7 +323,11 @@ export default function TableroGestoria() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Tile k="ABIERTOS" v={resumen.abiertos} n={`${resumen.sin_gestor} sin gestor asignado`} />
         <Tile
-          k={<span className="inline-flex items-center gap-1"><HiExclamation className="w-3.5 h-3.5" /> DEMORADOS</span>}
+          k={
+            <span className="inline-flex items-center gap-1">
+              <HiExclamation className="w-3.5 h-3.5" /> DEMORADOS
+            </span>
+          }
           v={resumen.demorados}
           n={`${DIAS_DEMORADO} días o más sin moverse`}
           tono="rojo"
@@ -161,172 +354,78 @@ export default function TableroGestoria() {
             n={
               <>
                 A cobrar: {plata(resumen.comisiones_a_cobrar)}
-                {resumen.sin_precio ? (
-                  <b className="text-duo-amarillo-sombra dark:text-duo-amarillo"> · {resumen.sin_precio} sin precio</b>
-                ) : null}
+                {resumen.sin_precio ? <b className="text-duo-amarillo-sombra dark:text-duo-amarillo"> · {resumen.sin_precio} sin precio</b> : null}
               </>
             }
           />
         ) : (
-          <Tile
-            k="ENTREGADOS · 30 DÍAS"
-            v={resumen.entregados_30d}
-            n={esAdmin ? "Terminados de todas las oficinas" : `Terminados de la oficina ${miOficina}`}
-          />
+          <Tile k="ENTREGADOS · 30 DÍAS" v={resumen.entregados_30d} n={esAdmin ? "Terminados de todas las oficinas" : `Terminados de la oficina ${miOficina}`} />
         )}
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-col gap-2.5 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5" role="group" aria-label="Filtrar por gestor">
-          {chips.map(([id, nombre]) => {
-            const n = ab.filter((t) => (id === "todos" ? true : id === "sin" ? !t.gestor : String(t.gestor) === id)).length;
-            const on = String(filtros.gestor) === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => set("gestor", id)}
-                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                  on
-                    ? "bg-duo-violeta text-white border-duo-violeta"
-                    : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark hover:bg-surface dark:hover:bg-surface-dark"
-                }`}
-              >
-                {nombre}
-                <span className={`rounded-full px-1.5 text-[11px] font-bold ${on ? "bg-white/25" : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark"}`}>{n}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <label className="inline-flex items-center gap-2 text-[13px] text-titulo dark:text-titulo-dark cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filtros.demorados}
-              onChange={(e) => set("demorados", e.target.checked)}
-              className="w-4 h-4 accent-[var(--color-duo-rojo)]"
-            />
-            Solo demorados
-          </label>
+      {/* Tabla con sus pestañas y filtros arriba (todo en una tarjeta) */}
+      <section className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-sm overflow-hidden">
+        <FranjaPestanas>
+          <PestanasTabla items={pestanas} valor={tab} onCambiar={setTabCelu} ariaLabel="Estado del trámite" />
+        </FranjaPestanas>
+        <BarraTabla buscador={<BuscadorTabla value={filtros.q} onChange={(v) => set("q", v)} placeholder="Buscar patente, DNI o cliente" />}>
+          <SelectTabla etiqueta="Gestor" value={filtros.gestor} onChange={(v) => set("gestor", v)}>
+            {opcionesGestor.map(([id, nombre, n]) => (
+              <option key={id} value={id}>
+                {nombre} ({n})
+              </option>
+            ))}
+          </SelectTabla>
           {esAdmin && (
-            <label className="inline-flex items-center gap-1.5 text-[13px] text-suave dark:text-suave-dark">
-              Oficina
-              <select
-                value={filtros.oficina}
-                onChange={(e) => set("oficina", e.target.value)}
-                className="h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-2 text-[13px] text-titulo dark:text-titulo-dark"
-              >
-                <option value="todas">Todas</option>
-                {(catalogo?.oficinas || []).map((o) => (
-                  <option key={o.id} value={o.id}>{o.nombre}</option>
-                ))}
-              </select>
-            </label>
-          )}
-          <label className="inline-flex items-center gap-1.5 text-[13px] text-suave dark:text-suave-dark">
-            Tipo
-            <select
-              value={filtros.tipo}
-              onChange={(e) => set("tipo", e.target.value)}
-              className="h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-2 text-[13px] text-titulo dark:text-titulo-dark"
-            >
-              <option value="todos">Todos</option>
-              {(catalogo?.tipos || []).map((tp) => (
-                <option key={tp.id} value={tp.id}>{tp.corto}</option>
+            <SelectTabla etiqueta="Oficina" value={filtros.oficina} onChange={(v) => set("oficina", v)}>
+              <option value="todas">Todas</option>
+              {(catalogo?.oficinas || []).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nombre}
+                </option>
               ))}
-            </select>
-          </label>
-          <label className="relative w-full sm:w-auto sm:ml-auto sm:min-w-[280px]">
-            <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-suave dark:text-suave-dark pointer-events-none" />
-            <span className="sr-only">Buscar</span>
-            <input
-              type="search"
-              value={filtros.q}
-              onChange={(e) => set("q", e.target.value)}
-              placeholder="Buscar patente, DNI o cliente"
-              className="w-full h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark pl-9 pr-3 text-[13px] text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none focus:border-duo-violeta"
-            />
-          </label>
-        </div>
-      </div>
-
-      {esAncho ? (
-        <Columnas lista={filtrada} abrir={(t) => navigate(`/gestoria/tramite/${t.id}`)} />
-      ) : (
-        <PestanasCelu lista={filtrada} tab={tabCelu} setTab={setTabCelu} abrir={(t) => navigate(`/gestoria/tramite/${t.id}`)} />
-      )}
-    </div>
-  );
-}
-
-/** Compu: 5 columnas, una por estado (tipo Trello). */
-function Columnas({ lista, abrir }) {
-  return (
-    <div className="grid grid-cols-5 gap-3 items-start">
-      {ABIERTOS.map((e) => {
-        const cards = lista.filter((t) => t.estado === e);
-        return (
-          <section
-            key={e}
-            className="flex flex-col gap-2.5 rounded-xl bg-surface dark:bg-surface-dark/60 border border-linea dark:border-linea-dark p-2.5 min-h-[180px]"
-            aria-label={ESTADOS[e].n}
-          >
-            <header className="flex items-center gap-2 px-1">
-              <Punto color={ESTADOS[e].dot} />
-              <h2 className="flex-1 text-[13px] font-semibold text-titulo dark:text-titulo-dark">{ESTADOS[e].n}</h2>
-              <span className="rounded-full bg-card dark:bg-card-dark border border-linea dark:border-linea-dark px-2 text-[12px] font-bold text-suave dark:text-suave-dark">
-                {cards.length}
-              </span>
-            </header>
-            {cards.length ? (
-              cards.map((t) => <TarjetaTramite key={t.id} t={t} onClick={() => abrir(t)} />)
-            ) : (
-              <p className="px-1 py-6 text-center text-[12px] text-suave dark:text-suave-dark">Nada con este filtro</p>
-            )}
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Celu / pantalla chica: pestañas por estado. */
-function PestanasCelu({ lista, tab, setTab, abrir }) {
-  const cards = lista.filter((t) => t.estado === tab);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Estado">
-        {ABIERTOS.map((e) => {
-          const n = lista.filter((t) => t.estado === e).length;
-          const on = tab === e;
-          return (
-            <button
-              key={e}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => setTab(e)}
-              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-semibold ${
-                on
-                  ? "bg-titulo dark:bg-titulo-dark text-card dark:text-card-dark border-titulo dark:border-titulo-dark"
-                  : "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark border-linea dark:border-linea-dark"
-              }`}
-            >
-              <Punto color={ESTADOS[e].dot} />
-              {ESTADOS[e].corto} · {n}
-            </button>
-          );
-        })}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {cards.length ? (
-          cards.map((t) => <TarjetaTramite key={t.id} t={t} onClick={() => abrir(t)} />)
-        ) : (
-          <p className="py-8 text-center text-[13px] text-suave dark:text-suave-dark md:col-span-2">Nada con este filtro</p>
-        )}
-      </div>
+            </SelectTabla>
+          )}
+          <SelectTabla etiqueta="Tipo" value={filtros.tipo} onChange={(v) => set("tipo", v)}>
+            <option value="todos">Todos</option>
+            {(catalogo?.tipos || []).map((tp) => (
+              <option key={tp.id} value={tp.id}>
+                {tp.corto}
+              </option>
+            ))}
+          </SelectTabla>
+          <ToggleTabla activo={filtros.demorados} onChange={(v) => set("demorados", v)}>
+            <HiExclamation className="w-4 h-4" /> Solo demorados
+          </ToggleTabla>
+          {hayFiltros && <LimpiarTabla onClick={limpiar} />}
+        </BarraTabla>
+        <TablaDuo
+          bare
+          columns={columnas}
+          rows={visibles}
+          rowHref={(t) => `/gestoria/tramite/${t.id}`}
+          rowLabel={(t) => `Abrir ${t.numero}${t.patente ? `, ${t.patente}` : ""}`}
+          rowTone={(t) => (esDemorado(t) ? "rojo" : null)}
+          mobileRow={filaCelu}
+          vacio={
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-[14px] font-medium text-suave dark:text-suave-dark">Nada con este filtro.</p>
+              {(hayFiltros || tab !== TODOS) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    limpiar();
+                    setTabCelu(TODOS);
+                  }}
+                  className="text-[13px] font-semibold text-duo-violeta hover:underline"
+                >
+                  Ver todos los trámites
+                </button>
+              )}
+            </div>
+          }
+        />
+      </section>
     </div>
   );
 }
