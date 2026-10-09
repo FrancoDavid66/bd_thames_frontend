@@ -13,8 +13,12 @@
 //    🎚️ Se apagan en Railway con GESTORIA_COMISIONES = apagadas (catalogo.comisiones
 //    = false): sin pestaña Comisiones ni plata en ningún lado (ver gestoria/ajustes.py).
 //
+// 🎨 09/10: el Tablero (y el Inicio/Trámites del gestor) es la PLANILLA DE COLORES (estilo
+//    Monday.com): 🔥 Para hoy / 📋 Todos, se toca el color para cambiar el estado y el
+//    nombre para abrir el panel del costado (components/gestoria/PlanillaGestoria.jsx).
+//
 // Rutas:
-//   /gestoria                 tablero (o el Inicio de su app si es gestor)
+//   /gestoria                 tablero = la planilla (o «Para hoy» en la app del gestor)
 //   /gestoria/nuevo           cargar un trámite (wizard de pasos)
 //   /gestoria/tramite/:id     ficha (el gestor ve FichaGestora, más simple)
 //   /gestoria/tramites, /gestoria/cobros, /gestoria/perfil   (solo el gestor: su app)
@@ -33,7 +37,7 @@ import { Candado } from "../components/gestoria/Piezas";
 import { listarGestores, pedirCatalogo } from "../services/gestoria";
 import { GestoriaCtx, useGestoria } from "../components/gestoria/gestoriaContext";
 
-import TableroGestoria from "../components/gestoria/TableroGestoria";
+import PlanillaGestoria from "../components/gestoria/PlanillaGestoria";
 import FichaTramite from "../components/gestoria/FichaTramite";
 import NuevoTramite from "../components/gestoria/NuevoTramite";
 import GestoresPanel from "../components/gestoria/GestoresPanel";
@@ -114,7 +118,7 @@ export default function GestoriaPage() {
         <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
           <Cabecera />
           <Routes>
-            <Route index element={<TableroGestoria />} />
+            <Route index element={<PlanillaGestoria />} />
             <Route path="nuevo" element={<NuevoTramite />} />
             <Route path="tramite/:id" element={<FichaTramite />} />
             <Route path="entregados" element={<EntregadosPanel />} />

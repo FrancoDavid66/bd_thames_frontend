@@ -86,6 +86,25 @@ export const editSiniestro = createAsyncThunk(
   }
 );
 
+/**
+ * 🆕 09/10: cambia SOLO algunos campos (PATCH). Lo usa la planilla de colores para
+ * pasar de estado o cargar el N° de reclamo sin mandar todo el siniestro.
+ * Ej: dispatch(patchSiniestro({ id: 12, cambios: { estado: "DENUNCIADO" } }))
+ */
+export const patchSiniestro = createAsyncThunk(
+  'siniestros/patchSiniestro',
+  async ({ id, cambios }, { rejectWithValue }) => {
+    try {
+      const response = await axios.patch(`${BASE_URL}siniestros/${id}/`, cambios, {
+        headers: getAuthHeaders(),
+      });
+      return unwrapItem(response.data);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Error al actualizar el siniestro');
+    }
+  }
+);
+
 export const removeSiniestro = createAsyncThunk(
   'siniestros/removeSiniestro',
   async (id, { rejectWithValue }) => {
@@ -236,6 +255,13 @@ const siniestrosSlice = createSlice({
 
       // ── UPDATE ─────────────────────────────────────
       .addCase(editSiniestro.fulfilled, (state, action) => {
+        if (!action.payload || action.payload.id == null) return;
+        const index = state.siniestros.findIndex((s) => s.id === action.payload.id);
+        if (index !== -1) state.siniestros[index] = action.payload;
+      })
+
+      // ── UPDATE PARCIAL (planilla) ──────────────────
+      .addCase(patchSiniestro.fulfilled, (state, action) => {
         if (!action.payload || action.payload.id == null) return;
         const index = state.siniestros.findIndex((s) => s.id === action.payload.id);
         if (index !== -1) state.siniestros[index] = action.payload;

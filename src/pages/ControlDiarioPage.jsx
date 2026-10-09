@@ -154,7 +154,7 @@ function TareaFila({ tarea, oficina, empleados, onCumplida, subiendo, setSubiend
           </div>
 
           {/* Nombre + meta */}
-          <div className="min-w-0 flex-1" onClick={() => fotos[0] && setFoto(fotos[0].url)}>
+          <div className={`min-w-0 flex-1 ${fotos[0] ? "cursor-pointer" : ""}`} onClick={() => fotos[0] && setFoto(fotos[0].url)}>
             <div className={`text-[14px] font-medium leading-tight ${done ? "text-ingreso" : UI.txtTitulo}`}>{tarea.nombre}</div>
             <div className={`text-[12px] mt-0.5 ${UI.txtSuave}`}>{meta}</div>
           </div>

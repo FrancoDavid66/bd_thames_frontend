@@ -6,8 +6,10 @@
 // estados, instancias y etiquetas, cuenta plazos en días hábiles y carga casos propios.
 //
 // Pantallas (la barra de abajo: Inicio · Casos · ➕ · Agenda · Plata):
-//   /legales             Inicio: cuántas cosas hay hoy, 4 botones y lo que viene
-//   /legales/casos       Casos: buscar y filtrar por estado, instancia o etiqueta
+//   /legales             Inicio = 🎨 la PLANILLA DE COLORES en «🔥 Para hoy» (09/10)
+//   /legales/casos       Casos = la misma planilla en «📋 Todos» (agrupada por etapa, con SUS
+//                        estados y colores). Se toca el color para moverlo y el nombre para
+//                        el panel (components/legales/PlanillaLegales.jsx).
 //   /legales/agenda      Agenda: el mes, con los días inhábiles en gris
 //   /legales/plata       Plata: honorarios y la comisión de THAMES
 //   /legales/perfil      Perfil: sus datos, modo oscuro y salir        (pantalla completa)
@@ -43,8 +45,7 @@ import { AbogadoCtx } from "./abogadoContext";
 import { foco } from "./abogadoUtils";
 import { BarraVolver } from "./piezasAbogado";
 import { HojaCasoNuevo } from "./hojas";
-import InicioAbogado from "./InicioAbogado";
-import CasosAbogado from "./CasosAbogado";
+import PlanillaLegales from "../PlanillaLegales";
 import CasoAbogado from "./CasoAbogado";
 import AgendaAbogado from "./AgendaAbogado";
 import PlataAbogado from "./PlataAbogado";
@@ -93,6 +94,16 @@ function useScrollPorPantalla(pathname) {
 function CasoPorId() {
   const { id } = useParams();
   return /^\d+$/.test(String(id || "")) ? <CasoAbogado key={id} /> : <Navigate to="/legales" replace />;
+}
+
+/** 🎨 La planilla del abogado: «Para hoy» en Inicio y «Todos» en Casos. */
+function PlanillaApp({ vista }) {
+  const navigate = useNavigate();
+  return (
+    <div className="mx-auto w-full max-w-[1400px] px-3 pb-4 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-4 sm:pt-5">
+      <PlanillaLegales vista={vista} onVista={(v) => navigate(v === "todos" ? "/legales/casos" : "/legales")} />
+    </div>
+  );
 }
 
 function Cerrados() {
@@ -177,8 +188,8 @@ export default function AppAbogado() {
     <AbogadoCtx.Provider value={ctx}>
       <div className={completa ? "" : "pb-[calc(6rem+env(safe-area-inset-bottom))]"}>
         <Routes>
-          <Route index element={<InicioAbogado />} />
-          <Route path="casos" element={<CasosAbogado />} />
+          <Route index element={<PlanillaApp vista="hoy" />} />
+          <Route path="casos" element={<PlanillaApp vista="todos" />} />
           <Route path="agenda" element={<AgendaAbogado />} />
           <Route path="plata" element={<PlataAbogado />} />
           <Route path="perfil" element={<PerfilAbogado />} />

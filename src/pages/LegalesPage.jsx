@@ -5,15 +5,18 @@
 // use desde el celu con pasos guiados.
 //
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
-//   - Admin:   Hoy · Tablero · Abogados 🔒 · Cerrados · Comisiones 🔒 (con plata).
-//   - Oficina: Hoy · Tablero · Cerrados (solo su oficina, SIN plata).
+//   - Admin:   Tablero · Hoy · Abogados 🔒 · Cerrados · Comisiones 🔒 (con plata).
+//   - Oficina: Tablero · Hoy · Cerrados (solo su oficina, SIN plata).
 //   - Abogado: SU APP (05/10): inicio, casos, agenda, plata y sus listas
 //              (components/legales/abogado/AppAbogado.jsx). Ya no usa «Mis casos».
+// 🎨 09/10: el Tablero es la PLANILLA DE COLORES (estilo Monday.com, en la compu y en el
+//    celu): 🔥 Para hoy / 📋 Todos, se toca el color para cambiar el estado y el nombre
+//    para abrir el panel del costado (components/legales/PlanillaLegales.jsx).
 //
 // Rutas:
-//   /legales               Hoy (en el celu) o Tablero (en la compu) · abogado: Mis casos
+//   /legales               Tablero (la planilla) · abogado: su app
 //   /legales/hoy           turnos de hoy y "Para hacer hoy"
-//   /legales/casos         tablero
+//   /legales/casos         Tablero (la planilla, igual que /legales)
 //   /legales/nuevo         Cargar una denuncia (7 pasos)
 //   /legales/turno         Pedir turno con el abogado
 //   /legales/:id           ficha del caso
@@ -31,7 +34,7 @@ import { Candado } from "../components/gestoria/Piezas";
 import { listarAbogados, pedirCatalogo } from "../services/legales";
 import { LegalesCtx, useLegales } from "../components/legales/legalesContext";
 
-import TableroLegales from "../components/legales/TableroLegales";
+import PlanillaLegales from "../components/legales/PlanillaLegales";
 import InicioCelu from "../components/legales/InicioCelu";
 import LegalesWizard from "../components/legales/LegalesWizard";
 import PedirTurno from "../components/legales/PedirTurno";
@@ -43,12 +46,6 @@ import ListasAbogado from "../components/legales/abogado/ListasAbogado";
 import LegalesDetailPage from "./LegalesDetailPage";
 
 const FILTROS_INICIALES = { abogado: "todos", oficina: "todas", tema: "todos", q: "", demorados: false };
-
-// ¿Pantalla de celu? (el inicio de la oficina cambia: en el celu arranca en "Hoy").
-const CELU = "(max-width: 1023.5px)";
-function esCelu() {
-  return typeof window !== "undefined" && window.matchMedia(CELU).matches;
-}
 
 export default function LegalesPage() {
   const { user, logout } = useAuth();
@@ -145,9 +142,9 @@ export default function LegalesPage() {
     <LegalesCtx.Provider value={ctx}>
       <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
         <Routes>
-          <Route index element={esCelu() ? <ConCabecera><InicioCelu /></ConCabecera> : <ConCabecera><TableroLegales /></ConCabecera>} />
+          <Route index element={<ConCabecera><PlanillaLegales /></ConCabecera>} />
           <Route path="hoy" element={<ConCabecera><InicioCelu /></ConCabecera>} />
-          <Route path="casos" element={<ConCabecera><TableroLegales /></ConCabecera>} />
+          <Route path="casos" element={<ConCabecera><PlanillaLegales /></ConCabecera>} />
           <Route path="nuevo" element={<LegalesWizard />} />
           <Route path="turno" element={<PedirTurno />} />
           <Route path="cerrados" element={<ConCabecera><CerradosPanel /></ConCabecera>} />
@@ -196,11 +193,10 @@ function Cabecera() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const raiz = pathname === "/legales" || pathname === "/legales/";
-  const celu = esCelu();
 
   const tabs = [
-    { to: "/legales/hoy", label: "Hoy", activo: pathname.startsWith("/legales/hoy") || (raiz && celu) },
-    { to: "/legales/casos", label: "Tablero", activo: pathname.startsWith("/legales/casos") || (raiz && !celu) },
+    { to: "/legales/casos", label: "Tablero", activo: pathname.startsWith("/legales/casos") || raiz },
+    { to: "/legales/hoy", label: "Turnos de hoy", activo: pathname.startsWith("/legales/hoy") },
     ...(esAdmin ? [{ to: "/legales/abogados", label: "Abogados", admin: true }] : []),
     { to: "/legales/cerrados", label: "Cerrados y desistidos" },
     ...(esAdmin ? [{ to: "/legales/comisiones", label: "Comisiones", admin: true }] : []),
@@ -219,20 +215,22 @@ function Cabecera() {
             </p>
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
+        {/* 📱 09/10: también en el celu (antes estaban solo en «Hoy»). */}
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
           <button
             type="button"
             onClick={() => navigate("/legales/turno")}
-            className="inline-flex items-center gap-2 rounded-lg border border-sky-700/40 bg-card dark:bg-card-dark px-4 py-2.5 text-[14px] font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/10"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-700/40 bg-card dark:bg-card-dark px-3 sm:px-4 py-2.5 text-[14px] font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/10"
           >
             <HiCalendar className="w-4 h-4" /> Pedir turno
           </button>
           <button
             type="button"
             onClick={() => navigate("/legales/nuevo")}
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-700 hover:bg-sky-800 px-4 py-2.5 text-[14px] font-semibold text-white"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-700 hover:bg-sky-800 px-3 sm:px-4 py-2.5 text-[14px] font-semibold text-white"
           >
-            <HiDocumentAdd className="w-4 h-4" /> Cargar una denuncia
+            <HiDocumentAdd className="w-4 h-4 shrink-0" /> <span className="sm:hidden">Cargar denuncia</span>
+            <span className="hidden sm:inline">Cargar una denuncia</span>
           </button>
         </div>
         {sinMenu && (

@@ -228,6 +228,55 @@ textarea {
   touch-action: manipulation;
 }
 
+/* ==========================================================================
+   👆 MANITO EN TODO LO QUE SE PUEDE TOCAR O ELEGIR (09/10)
+   --------------------------------------------------------------------------
+   Tailwind v4 dejó los <button> con la flechita (cursor: default), por eso
+   en muchos lados no aparecía la manito. Acá vuelve para: botones, links,
+   pestañas, desplegables (select), checkbox, radios, "subir archivo", el
+   iconito del calendario de las fechas y los <label> que los envuelven.
+   Lo deshabilitado muestra el cursor de "prohibido".
+   Va en @layer base: si un componente pone su propia clase (cursor-default,
+   cursor-grab…), gana la del componente.
+   ========================================================================== */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="link"],
+  [role="menuitem"],
+  [role="option"],
+  [role="switch"],
+  [role="radio"],
+  [role="checkbox"],
+  a[href],
+  summary,
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="color"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input::-webkit-calendar-picker-indicator,
+  input[type="file"]::file-selector-button,
+  label:has(input[type="checkbox"]:not(:disabled)),
+  label:has(input[type="radio"]:not(:disabled)),
+  label:has(input[type="file"]:not(:disabled)),
+  label:has(select:not(:disabled)) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 @media (hover: none) and (pointer: coarse) {
   button:not(:disabled):active,
   [role="button"]:active,

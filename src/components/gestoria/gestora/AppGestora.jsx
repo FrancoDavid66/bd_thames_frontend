@@ -5,8 +5,10 @@
 // que hay que hacer y, adentro de cada trámite, UN botón grande por paso.
 //
 // Pantallas (la barra de abajo: Inicio · Trámites · ➕ · Cobros · Perfil):
-//   /gestoria               Inicio: "Hola, Laura", los números y lo primero para hacer (MisTramites.jsx)
-//   /gestoria/tramites      Trámites: buscar + Para hacer · En registro · Listos
+//   /gestoria               Inicio = 🎨 la PLANILLA DE COLORES en «🔥 Para hoy» (09/10)
+//   /gestoria/tramites      Trámites = la misma planilla en «📋 Todos» (agrupada por estado)
+//                           Se toca el color para cambiar el estado y el nombre para el panel
+//                           (components/gestoria/PlanillaGestoria.jsx).
 //   /gestoria/cobros        💵 Cobros: lo que le pagaron este mes y lo que falta cargar
 //                           (solo con las comisiones prendidas)
 //   /gestoria/perfil        Perfil: sus datos como los ve la oficina, modo oscuro y salir
@@ -19,7 +21,7 @@
 // acá (al volver a la pestaña ya está, y la lista sigue donde estaba).
 // La oficina y el admin siguen con el tablero de siempre (no pasan por acá).
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   HiBanknotes,
   HiHome,
@@ -35,10 +37,9 @@ import {
 import useDatosVivos from "../../../hooks/useDatosVivos";
 import { listarAbiertos, mensajeError, pedirMisCobros, pedirResumen } from "../../../services/gestoria";
 import { useGestoria } from "../gestoriaContext";
-import MisTramites from "../MisTramites";
 import FichaGestora from "../FichaGestora";
 import NuevoTramite from "../NuevoTramite";
-import TramitesGestora from "./TramitesGestora";
+import PlanillaGestoria from "../PlanillaGestoria";
 import CobrosGestora from "./CobrosGestora";
 import PerfilGestora from "./PerfilGestora";
 import { GestoraCtx } from "./gestoraContext";
@@ -85,6 +86,16 @@ function useScrollPorPantalla(pathname) {
   useLayoutEffect(() => {
     window.scrollTo(0, esPantallaCompleta(pathname) ? 0 : posiciones.current[pathname] || 0);
   }, [pathname]);
+}
+
+/** 🎨 La planilla de la gestora: «Para hoy» en Inicio y «Todos» en Trámites. */
+function PlanillaApp({ vista }) {
+  const navigate = useNavigate();
+  return (
+    <div className="mx-auto w-full max-w-[1400px] px-3 pb-4 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-4 sm:pt-5">
+      <PlanillaGestoria vista={vista} onVista={(v) => navigate(v === "todos" ? "/gestoria/tramites" : "/gestoria")} />
+    </div>
+  );
 }
 
 /** La ficha, una por trámite: con key = id, al pasar de uno a otro arranca de cero. */
@@ -154,8 +165,8 @@ export default function AppGestora() {
     <GestoraCtx.Provider value={ctx}>
       <div className={completa ? "" : "pb-[calc(6rem+env(safe-area-inset-bottom))]"}>
         <Routes>
-          <Route index element={<MisTramites />} />
-          <Route path="tramites" element={<TramitesGestora />} />
+          <Route index element={<PlanillaApp vista="hoy" />} />
+          <Route path="tramites" element={<PlanillaApp vista="todos" />} />
           <Route path="cobros" element={!catalogo ? null : conPlata ? <CobrosGestora /> : <Navigate to="/gestoria" replace />} />
           <Route path="perfil" element={<PerfilGestora />} />
           <Route
