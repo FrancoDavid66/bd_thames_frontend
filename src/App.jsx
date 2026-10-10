@@ -295,7 +295,8 @@ function App() {
     if (!user) return;
     try {
       const apiRoot = getApiRoot();
-      const data = await fetchJSON(`${apiRoot}siniestros/?page_size=1`);
+      // 🆕 09/10: `abiertos=1` → sin los cerrados (antes el número los contaba también).
+      const data = await fetchJSON(`${apiRoot}siniestros/?page_size=1&abiertos=1`);
       if (data) setSiniestrosAbiertos(Number(data.count) || 0);
     } catch {}
   };

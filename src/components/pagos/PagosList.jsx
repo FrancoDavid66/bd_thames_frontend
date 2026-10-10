@@ -542,8 +542,16 @@ export default function PagosList({
       setConfirmData(null);
       actualizarCuotas?.([conObs]);
       if (conObs.observaciones_pago) setObsAbiertaId(conObs.id);
-    } catch {
-      toast.error("No se pudo registrar el pago");
+    } catch (err) {
+      // 🔒 09/10: si la cuota ya la cobró otra oficina (o fue un doble clic), el
+      //    servidor la frena con un 409 y explica por qué: se muestra ese mensaje.
+      //    Ese caso cierra la ventana: así nadie vuelve a tocar "Confirmar".
+      const crudo = typeof err === "string" ? err : err?.detail || err?.error || err?.cuota;
+      const msj = Array.isArray(crudo) ? crudo.join(" ") : crudo ? String(crudo) : "";
+      // Si el servidor se cae, a veces devuelve una página HTML entera: esa no se muestra.
+      const legible = msj && !msj.trim().startsWith("<") && msj.length <= 300;
+      toast.error(legible ? msj : "No se pudo registrar el pago", { duration: 7000 });
+      if (err?.codigo === "ya_cobrada") setConfirmData(null);
     } finally {
       setConfirmandoPago(false);
     }

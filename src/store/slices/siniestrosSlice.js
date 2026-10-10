@@ -44,14 +44,43 @@ const keyOf = (id) => String(id);
 // 📦 THUNKS — SINIESTROS
 // ──────────────────────────────────────────────────────────────────
 
+// 🆕 09/10: de a 500 por pedido (el máximo que acepta el servidor).
+const POR_PAGINA = 500;
+
+/**
+ * Trae TODOS los siniestros, página por página.
+ * 🐛 FIX 09/10: antes pedía solo la 1ª página (100): si había 150 siniestros,
+ *    los 50 más viejos no aparecían en ningún lado y nadie se enteraba.
+ *    Ej: 1.200 siniestros → 3 pedidos (500 + 500 + 200).
+ */
 export const getSiniestros = createAsyncThunk(
   'siniestros/getSiniestros',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${BASE_URL}siniestros/`, {
-        headers: getAuthHeaders(),
-      });
-      return unwrapList(response.data);
+      // Map por id: si alguien carga un siniestro mientras se pide la página 2,
+      // la lista se corre uno y vendría repetido → acá se guarda una sola vez.
+      const porId = new Map();
+      for (let page = 1; page <= 40; page++) {
+        let data;
+        try {
+          const response = await axios.get(`${BASE_URL}siniestros/`, {
+            headers: getAuthHeaders(),
+            params: { page, page_size: POR_PAGINA },
+          });
+          data = response.data;
+        } catch (err) {
+          // Si borraron siniestros en el medio, la última página puede ya no
+          // existir (404): nos quedamos con lo que ya llegó.
+          if (page > 1 && err?.response?.status === 404) break;
+          throw err;
+        }
+        if (Array.isArray(data)) return data; // sin paginación: ya vino todo
+        const lote = unwrapList(data);
+        lote.forEach((s, i) => porId.set(s?.id ?? `sin-id-${page}-${i}`, s));
+        const total = Number(data?.count);
+        if (!data?.next || !lote.length || (Number.isFinite(total) && porId.size >= total)) break;
+      }
+      return [...porId.values()];
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Error al obtener los siniestros');
     }
