@@ -193,11 +193,12 @@ function descargarCSV(items, nombreArchivo) {
 }
 function descargarCSVPerdidas(items, nombreArchivo) {
   bajarCSV(
-    ["Se fue el", "Oficina", "Cliente", "Vehículo", "Patente", "Compañía", "Nº póliza", "Estado", "Motivo", "Si paga, vuelve"],
+    ["Se fue el", "Oficina", "Cliente", "Teléfono", "Vehículo", "Patente", "Compañía", "Nº póliza", "Estado", "Motivo", "Si paga, vuelve"],
     items.map((p) => [
       dayjs(p.fecha).format("DD/MM/YYYY"),
       p.oficina,
       p.cliente,
+      p.telefono || "",
       p.vehiculo,
       p.patente,
       p.compania,

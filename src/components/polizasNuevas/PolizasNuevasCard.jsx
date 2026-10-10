@@ -10,11 +10,16 @@
 // Todos ven los números de todas las oficinas (es un ranking); el empleado ve
 // la suya resaltada y cuántos se fueron por no pagar (si pagan, vuelven).
 // Se actualiza solo (en vivo).
+//
+// 📥 "Se fueron · descargar" (10/10/2026): la lista de los clientes que se
+// fueron, en Excel o PDF, con su teléfono y un link para escribirles por
+// WhatsApp. El empleado baja SOLO los de su oficina (lo filtra el servidor);
+// el admin elige la oficina o todas.
 // ============================================================
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import { HiTrendingUp, HiArrowRight, HiStar } from "react-icons/hi";
+import { HiTrendingUp, HiArrowRight, HiStar, HiDownload } from "react-icons/hi";
 
 import { useAuth } from "../../context/AuthContext";
 import { useNuevasMes } from "../../hooks/usePolizasNuevas";
@@ -30,7 +35,11 @@ import {
   etiquetaComparacion,
   guardarPref,
   mesActual,
+  moverMes,
+  nombreMes,
 } from "./comun";
+import { pedirNuevasDetalle } from "../../services/polizasNuevas";
+import { descargarSeFueronExcel, descargarSeFueronPDF } from "./descargarSeFueron";
 
 const TONO_DELTA = {
   sube: "text-ingreso-fuerte dark:text-ingreso-claro",
@@ -61,6 +70,130 @@ function BarraBalance({ entraron, seFueron }) {
   );
 }
 
+/** 📥 Panel "Clientes que se fueron": elegir mes (y oficina, el admin) y bajar Excel o PDF. */
+function DescargarSeFueron({ esAdmin, miOficina, oficinas, mes, onCerrar }) {
+  const [cual, setCual] = useState("este"); // "este" | "pasado"
+  const [oficina, setOficina] = useState("");
+  const [bajando, setBajando] = useState(null); // "excel" | "pdf" | null
+  const [aviso, setAviso] = useState(null); // { ok: bool, txt }
+
+  const mesElegido = cual === "este" ? mes : moverMes(mes, -1);
+  const idOfi = esAdmin ? oficina : miOficina;
+  const nombreOfi = (oficinas || []).find((o) => String(o.id) === String(idOfi))?.nombre || "";
+
+  async function bajar(formato) {
+    setBajando(formato);
+    setAviso(null);
+    try {
+      const lista = await pedirNuevasDetalle({
+        mes: mesElegido,
+        tipo: "perdidas",
+        oficina: esAdmin ? oficina : undefined, // el empleado: el servidor ya le da SOLO su oficina
+      });
+      const n = lista?.polizas?.length || 0;
+      if (!n) {
+        setAviso({ ok: true, txt: `En ${nombreMes(mesElegido)} no se fue ningún auto${nombreOfi ? ` de ${nombreOfi}` : ""} 🎉` });
+        return;
+      }
+      const meta = { mes: mesElegido, titulo: nombreMes(mesElegido), oficina: nombreOfi || (esAdmin ? "Todas las oficinas" : "") };
+      if (formato === "excel") await descargarSeFueronExcel(lista, meta);
+      else await descargarSeFueronPDF(lista, meta);
+      const sinTel = lista.polizas.filter((p) => !p.whatsapp).length;
+      setAviso({
+        ok: true,
+        txt:
+          `Listo: ${n} ${n === 1 ? "cliente" : "clientes"}` +
+          (sinTel ? ` · ${sinTel} sin teléfono válido para WhatsApp` : "") +
+          (lista.recortado ? " · son muchos: van los primeros 1000" : ""),
+      });
+    } catch (e) {
+      setAviso({ ok: false, txt: e?.response?.data?.detail || "No se pudo descargar. Probá de nuevo en un rato." });
+    } finally {
+      setBajando(null);
+    }
+  }
+
+  const chip = (activo) =>
+    `min-h-[36px] rounded-lg px-3 text-[13px] font-semibold transition-colors ${
+      activo
+        ? "bg-oficina-fuerte text-white dark:bg-oficina-claro dark:text-titulo"
+        : "bg-surface text-titulo hover:bg-oficina/10 dark:bg-surface-dark dark:text-titulo-dark"
+    }`;
+
+  return (
+    <div className="mt-4 rounded-xl border border-linea bg-surface/60 p-3 dark:border-linea-dark dark:bg-surface-dark/60 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[14px] font-bold text-titulo dark:text-titulo-dark">Clientes que se fueron</p>
+          <p className="text-[12px] text-suave dark:text-suave-dark">
+            Con teléfono y un link para escribirles por WhatsApp (el mensaje queda armado y se puede cambiar).
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="min-h-[36px] shrink-0 rounded-lg px-2 text-[12px] font-semibold text-suave hover:underline dark:text-suave-dark"
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" className={chip(cual === "este")} onClick={() => setCual("este")}>
+          {nombreMes(mes)}
+        </button>
+        <button type="button" className={chip(cual === "pasado")} onClick={() => setCual("pasado")}>
+          {nombreMes(moverMes(mes, -1))}
+        </button>
+        {esAdmin && (
+          <select
+            value={oficina}
+            onChange={(e) => setOficina(e.target.value)}
+            aria-label="Oficina"
+            className="min-h-[36px] rounded-lg border border-linea bg-card px-2 text-[13px] text-titulo dark:border-linea-dark dark:bg-card-dark dark:text-titulo-dark"
+          >
+            <option value="">Todas las oficinas</option>
+            {(oficinas || []).map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nombre}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={!!bajando}
+          onClick={() => bajar("excel")}
+          className="flex min-h-[40px] items-center gap-2 rounded-lg bg-ingreso-fuerte px-4 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-60"
+        >
+          <HiDownload className="h-4 w-4" /> {bajando === "excel" ? "Armando…" : "Excel"}
+        </button>
+        <button
+          type="button"
+          disabled={!!bajando}
+          onClick={() => bajar("pdf")}
+          className="flex min-h-[40px] items-center gap-2 rounded-lg bg-egreso-fuerte px-4 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-60"
+        >
+          <HiDownload className="h-4 w-4" /> {bajando === "pdf" ? "Armando…" : "PDF"}
+        </button>
+      </div>
+
+      {aviso && (
+        <p
+          className={`mt-3 text-[12px] font-semibold ${
+            aviso.ok ? "text-ingreso-fuerte dark:text-ingreso-claro" : "text-egreso-fuerte dark:text-egreso-claro"
+          }`}
+        >
+          {aviso.txt}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function PolizasNuevasCard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -68,6 +201,7 @@ export default function PolizasNuevasCard() {
   const miOficina = user?.perfil?.oficina?.id ?? user?.perfil?.oficina ?? null;
 
   const { data: r, cargando, error, recargar } = useNuevasMes("");
+  const [verDescarga, setVerDescarga] = useState(false);
   const ranking = useMemo(() => rankingOficinas(r?.oficinas), [r]);
   const enJuego = ranking.filter((o) => !o.sinMovimiento);
   const hayMovimiento = hayMov(enJuego);
@@ -141,6 +275,14 @@ export default function PolizasNuevasCard() {
               Ver detalle <HiArrowRight className="h-4 w-4" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setVerDescarga((v) => !v)}
+            aria-expanded={verDescarga}
+            className="flex min-h-[36px] items-center gap-1 rounded-lg px-2 text-[12px] font-semibold text-egreso-fuerte hover:underline dark:text-egreso-claro"
+          >
+            <HiDownload className="h-4 w-4" /> Se fueron · descargar
+          </button>
           <Link
             to="/ranking"
             state={{ vista: "oficinas" }}
@@ -150,6 +292,16 @@ export default function PolizasNuevasCard() {
           </Link>
         </div>
       </div>
+
+      {verDescarga && (
+        <DescargarSeFueron
+          esAdmin={esAdmin}
+          miOficina={miOficina}
+          oficinas={ranking}
+          mes={r?.mes || mesActual()}
+          onCerrar={() => setVerDescarga(false)}
+        />
+      )}
 
       {error && !r ? (
         <div className="mt-4 flex items-center gap-3 text-[13px] text-egreso-fuerte dark:text-egreso-claro">
