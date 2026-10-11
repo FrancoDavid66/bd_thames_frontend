@@ -25,7 +25,7 @@ export default function ListaCupones({ poliza, cupones = [], onVerCuponera, onCo
      idénticos el cliente dudaba cuál era el suyo. Ahora el primero impago
      —que es el más viejo, el que hay que pagar primero— ya está desplegado.
      Un toque menos y cero duda. */
-  const primerImpago = cupones.find((c) => estadoCupon(c) !== "pagado");
+  const primerImpago = cupones.find((c) => estadoCupon(c, poliza) !== "pagado");
   const [abierto, setAbierto] = useState(primerImpago?.id ?? null);
 
   /* 🧠 Qué cupones montar.
@@ -60,8 +60,8 @@ export default function ListaCupones({ poliza, cupones = [], onVerCuponera, onCo
 
   if (!cupones.length) return null;
 
-  const pendientes = cupones.filter((c) => estadoCupon(c) !== "pagado");
-  const pagados = cupones.filter((c) => estadoCupon(c) === "pagado");
+  const pendientes = cupones.filter((c) => estadoCupon(c, poliza) !== "pagado");
+  const pagados = cupones.filter((c) => estadoCupon(c, poliza) === "pagado");
 
   return (
     <div
@@ -78,7 +78,7 @@ export default function ListaCupones({ poliza, cupones = [], onVerCuponera, onCo
       }}
     >
       {pendientes.map((c, i) => {
-        const est = estadoCupon(c);
+        const est = estadoCupon(c, poliza);
         const E = ESTADOS[est];
         // "Revisando" se cierra: el cliente ya hizo lo suyo, no tiene sentido
         // que vuelva a elegir forma de pago.
@@ -223,7 +223,8 @@ export default function ListaCupones({ poliza, cupones = [], onVerCuponera, onCo
                         {c.vence_texto || fmtLargo(c.fecha_vencimiento)}
                       </span>
                       <span style={{ fontWeight: 600, flexShrink: 0 }}>
-                        {money(monto)}
+                        {/* AMCA sin importe: "Pagada", nunca "$0" (ver utils.js). */}
+                        {Number(monto) > 0 ? money(monto) : "Pagada"}
                       </span>
                       <span
                         className={`portal-flecha${abierta ? " abierta" : ""}`}
@@ -281,7 +282,7 @@ function Constancia({ cupon, monto, poliza, onVerCuponera }) {
 
   const compartir = async () => {
     const texto =
-      `Pagué ${money(monto)} del seguro` +
+      (Number(monto) > 0 ? `Pagué ${money(monto)} del seguro` : "Pagué el seguro") +
       (vehiculo ? ` de mi ${vehiculo}` : "") +
       (poliza?.patente ? ` (${poliza.patente})` : "") +
       (cuando ? ` el ${cuando}` : "") +
@@ -319,9 +320,11 @@ function Constancia({ cupon, monto, poliza, onVerCuponera }) {
           <IconTick size={24} />
         </span>
         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--t1)" }}>Pago registrado</div>
-        <div style={{ fontSize: 25, fontWeight: 600, color: "var(--t1)", marginTop: 5, letterSpacing: "-.02em" }}>
-          {money(monto)}
-        </div>
+        {Number(monto) > 0 ? (
+          <div style={{ fontSize: 25, fontWeight: 600, color: "var(--t1)", marginTop: 5, letterSpacing: "-.02em" }}>
+            {money(monto)}
+          </div>
+        ) : null}
         {cuando ? (
           <div style={{ fontSize: 13, color: "var(--t2)", marginTop: 3 }}>{cuando}</div>
         ) : null}
