@@ -16,7 +16,7 @@ import dayjs from "dayjs";
    ⚠️ Cuando esto se configure desde el Admin, estos valores pasan a venir
       del backend. Por ahora viven acá para que se puedan cambiar en un
       solo lugar.                                                          */
-export const DESCUENTO_EFECTIVO = 0.10;   // 10%
+export const DESCUENTO_EFECTIVO = 0.05;   // 5%  (antes 10%, cambiado el 11/10/2026)
 export const RECARGO_TRANSFERENCIA = 0.05; // 5%
 export const REDONDEO_EFECTIVO = 1000;     // múltiplo
 
@@ -29,7 +29,7 @@ export const REDONDEO_EFECTIVO = 1000;     // múltiplo
       A un cliente de NRE se le cobraba un 5% que la oficina no cobra:
       pagaba de más y el número del portal no coincidía con el del
       mostrador. Y al revés, si en alguna compañía el margen no da para el
-      10%, ese descuento sale del bolsillo de la oficina.
+      descuento, ese descuento sale del bolsillo de la oficina.
 
    La clave se busca CONTENIDA en el nombre, igual que en FormasPago:
    "nre" matchea "NRE" y "NRE Seguros S.A.".
@@ -37,8 +37,10 @@ export const REDONDEO_EFECTIVO = 1000;     // múltiplo
    Solo se escribe lo que cambia; lo que no está, hereda el valor normal. */
 const AJUSTES_POR_COMPANIA = {
   // NRE no tiene recargo por transferencia: la oficina la recibe sin costo.
-  // El descuento del 10% por efectivo sí se mantiene.
-  nre: { recargo: 0 },
+  // 🏷️ NRE sigue con el 10% de descuento por efectivo: el 11/10/2026 se bajó
+  //    a 5% para el resto (AMCA, La Equidad...) y NRE quedó como estaba.
+  //    Si NRE también tiene que pasar a 5%, se borra "descuento" de acá.
+  nre: { recargo: 0, descuento: 0.10 },
 };
 
 function _normCia(v) {

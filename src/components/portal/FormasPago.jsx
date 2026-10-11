@@ -306,6 +306,18 @@ function ModalThames({ monto, compania, onElegir, onCerrar }) {
   const ahorro = monto - ef;
   const rec = recargoTransferencia(monto, compania);
 
+  // 🆚 TODO COMPARADO CON EL PRECIO ORIGINAL (pedido de Franco, 11/10/2026).
+  //    Antes el cliente veía "Pagás $93.000" y "Pagás $103.780" sueltos, sin
+  //    saber de qué número salían. Ahora arriba va el precio del cupón y cada
+  //    opción dice cuánto le queda contra ese precio:
+  //
+  //      Precio original del cupón ........ $98.838
+  //      💵 Efectivo       ~~$98.838~~  $93.000   → ahorrás $5.838
+  //      🏦 Transferencia  $103.780                 → $4.942 más
+  //
+  //    Es la etiqueta de oferta del súper: el precio tachado al lado del
+  //    nuevo, así la diferencia se ve sin hacer cuentas.
+
   return (
     <div
       className="portal-fadein"
@@ -349,6 +361,18 @@ function ModalThames({ monto, compania, onElegir, onCerrar }) {
         </div>
 
         <div style={{ padding: "16px 20px 22px" }}>
+          {/* 🏷️ El precio original, el punto de comparación de las dos opciones. */}
+          <div
+            style={{
+              display: "flex", justifyContent: "space-between", alignItems: "baseline",
+              gap: 12, padding: "11px 15px", marginBottom: 12, borderRadius: 14,
+              background: "var(--bg)", border: "1px dashed var(--div)",
+            }}
+          >
+            <small style={{ fontSize: 12.5, color: "var(--t2)" }}>Precio original</small>
+            <b style={{ fontSize: 16, fontWeight: 650, letterSpacing: "-.015em" }}>{money(monto)}</b>
+          </div>
+
           {/* 💵 EFECTIVO — destacado. Es el que conviene a los dos: el cliente
               paga menos y a la oficina no le cuesta comisión bancaria. */}
           <button
@@ -386,12 +410,19 @@ function ModalThames({ monto, compania, onElegir, onCerrar }) {
               }}
             >
               <small style={{ fontSize: 12, color: "var(--t2)" }}>Pagás</small>
-              <b style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.025em", color: "var(--ok)" }}>
-                {money(ef)}
-              </b>
+              <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                {ahorro > 0 && (
+                  <s style={{ fontSize: 13, color: "var(--t3)", fontWeight: 500 }}>{money(monto)}</s>
+                )}
+                <b style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.025em", color: "var(--ok)" }}>
+                  {money(ef)}
+                </b>
+              </span>
             </span>
             <span style={{ display: "block", fontSize: 12, color: "var(--ok)", marginTop: 7, fontWeight: 600 }}>
-              Ahorrás {money(ahorro)}
+              {ahorro > 0
+                ? `Ahorrás ${money(ahorro)} contra el precio original`
+                : "Mismo precio que el original"}
             </span>
           </button>
 
@@ -436,6 +467,11 @@ function ModalThames({ monto, compania, onElegir, onCerrar }) {
               <b style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.025em" }}>
                 {money(monto + rec)}
               </b>
+            </span>
+            <span style={{ display: "block", fontSize: 12, color: "var(--t2)", marginTop: 7 }}>
+              {rec > 0
+                ? `Son ${money(rec)} más que el precio original`
+                : "Mismo precio que el original"}
             </span>
           </button>
         </div>
@@ -858,11 +894,11 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
     // 💵 EL DESCUENTO POR EFECTIVO, CON EL NÚMERO.
     //
     //    Antes esto era la última frase de un párrafo: "…si venís a la
-    //    oficina te hacemos 10% de descuento". Nadie la leía, y el que la
-    //    leía no sabía cuánto era 10% de su cuota.
+    //    oficina te hacemos X% de descuento". Nadie la leía, y el que la
+    //    leía no sabía cuánto era ese X% de su cuota.
     //
     //    Acá va el ahorro EN PESOS. "Ahorrás $10.200" mueve a alguien a
-    //    tomarse el colectivo; "10% de descuento" no le dice nada a nadie.
+    //    tomarse el colectivo; "5% de descuento" no le dice nada a nadie.
     //
     //    Y conviene a los dos: el cliente paga menos y la plata no pasa por
     //    la cuenta, que es lo que tiene el costo.
