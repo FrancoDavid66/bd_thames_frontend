@@ -169,14 +169,41 @@ export function fmtLargo(d) {
  * Estado de un cupón: pagado / vencido / a pagar.
  * De acá salen el color del puntito y el texto del chip.
  */
-export function estadoCupon(c) {
+export function estadoCupon(c, poliza) {
   if (c?.pagado || c?.estado === "PAGADA") return "pagado";
+  // 💸 AMCA sin importe = pagada (ver sinImporteEsPagada más abajo).
+  if (cuotaSinImporteYaPaga(c, poliza)) return "pagado";
   // El cliente ya mandó el comprobante y la oficina todavía no lo confirmó.
   // Es importante mostrarlo distinto de "vencido": el cliente ya cumplió su
   // parte y si sigue viendo rojo cree que no llegó nada.
   if (c?.estado === "REPORTADO") return "revisando";
   if (c?.fecha_vencimiento && dayjs(c.fecha_vencimiento).isBefore(dayjs(), "day")) return "vencido";
   return "a_pagar";
+}
+
+/* 💸 AMCA: CUOTA SIN IMPORTE = PAGADA (pedido de Franco, 11/10/2026)
+   ──────────────────────────────────────────────────────────────────
+   En AMCA el importe de cada cuota impaga se carga desde Pre-Liquidaciones,
+   que es la lista de cupones que el cliente TODAVÍA tiene que pagar. Si una
+   cuota quedó sin importe es porque AMCA no tiene ningún cupón pendiente
+   para ella: ya la pagó (o se la debita AMCA sola).
+
+   Mostrarle "$0 · A pagar" lo confunde ("¿le debo cero pesos?"), así que se
+   muestra como pagada. Es como el ticket del súper sin nada que cobrar: no
+   te dice "pagá $0", te dice "listo".
+
+   ⚠️ SOLO AMCA. En otras compañías una cuota en $0 puede ser una deuda real
+      que todavía no tiene importe cargado: ahí no se toca nada.
+   ⚠️ No cambia nada en Thames: la cuota sigue impaga adentro hasta que la
+      sincronización con AMCA la marque paga. Es solo cómo se ve en el portal. */
+export function sinImporteEsPagada(poliza) {
+  return _normCia(poliza?.compania).includes("amca");
+}
+
+/** ¿Este cupón/cuota impago de AMCA no tiene importe (ni propio ni de la póliza)? */
+export function cuotaSinImporteYaPaga(c, poliza) {
+  if (!poliza || !sinImporteEsPagada(poliza)) return false;
+  return !(Number(c?.monto || poliza?.precio_actual || 0) > 0);
 }
 
 /**
@@ -195,12 +222,12 @@ export function situacionPago(p) {
     ? cupones.map((c) => ({
         fecha: c.fecha_vencimiento,
         monto: c.monto || p?.precio_actual || 0,
-        estado: estadoCupon(c),
+        estado: estadoCupon(c, p),
       }))
     : (p?.cuotas || []).map((c) => ({
         fecha: c.fecha_vencimiento,
         monto: c.monto || 0,
-        estado: c.pagado
+        estado: c.pagado || cuotaSinImporteYaPaga(c, p)
           ? "pagado"
           : c.fecha_vencimiento && dayjs(c.fecha_vencimiento).isBefore(dayjs(), "day")
           ? "vencido"
