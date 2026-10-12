@@ -15,7 +15,10 @@
 //
 //    SIMPLIFICACIONES respecto a la versión vieja:
 //      - Solo 2 formas de pago: EFECTIVO y TRANSFERENCIA.
-//      - Sin selección de categoría: se guarda como "Sin categoría".
+//      - Ingreso: se guarda como "Sin categoría".
+//      - 🆕 Egreso: se elige EN QUÉ SE GASTÓ (las mismas categorías de la carga
+//        del Excel de las oficinas, 26/09), así "¿En qué se gastó?" no mezcla
+//        nombres. Ej: "Artículos de limpieza" → categoría "Limpieza y agua".
 //      - La billetera se escribe a mano (texto libre) y solo cuando es transferencia.
 //      - La fecha ya no se pide: se usa la de hoy automáticamente.
 //
@@ -75,6 +78,24 @@ const THEME = {
 // 🚀 Sin decimales: $ 40.000 en vez de $ 40.000,00
 const fmtMoney = (n) =>
   "$ " + Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+// 🏷️ Categorías de egreso: las MISMAS de la carga del Excel (26/09). No
+//    cambiarles el nombre: el reporte "¿En qué se gastó?" agrupa por este texto.
+const CATEGORIAS_EGRESO = [
+  "Limpieza y agua",
+  "Comida",
+  "Librería",
+  "Luz e internet",
+  "Mantenimiento",
+  "Publicidad",
+  "Alquiler",
+  "Impuestos y trámites",
+  "Transporte",
+  "Pagos a compañías",
+  "Devoluciones a clientes",
+  "Retiros y pagos a personas",
+  "Gastos varios (sin detalle)",
+];
 
 // Solo dos formas de pago en este modal.
 const FORMA_LABELS = { EFECTIVO: "Efectivo", TRANSFERENCIA: "Transferencia" };
@@ -140,6 +161,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
     forma_pago: "EFECTIVO",
     billetera: "",
     descripcion: "", // motivo del ingreso / egreso
+    categoria: "", // solo egreso
     oficina: "",
   });
   const [errors, setErrors] = useState({});
@@ -159,6 +181,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
       forma_pago: "EFECTIVO",
       billetera: "",
       descripcion: "",
+      categoria: "",
       oficina: "",
     });
   }, [isOpen, tipoInicial]);
@@ -200,6 +223,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
     }
     if (n === 3) {
       if (!form.descripcion?.trim()) e.descripcion = "El motivo es obligatorio.";
+      if (!esIngreso && !form.categoria) e.categoria = "Elegí en qué se gastó.";
       if (isWebAdmin && !form.oficina) e.oficina = "Seleccioná la sucursal.";
     }
     setErrors(e);
@@ -212,6 +236,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
     if (!form.monto || Number(form.monto) <= 0) e.monto = "Ingresá un monto válido.";
     if (isTransferencia && !form.billetera?.trim()) e.billetera = "Indicá la billetera / cuenta.";
     if (!form.descripcion?.trim()) e.descripcion = "El motivo es obligatorio.";
+    if (!esIngreso && !form.categoria) e.categoria = "Elegí en qué se gastó.";
     if (isWebAdmin && !form.oficina) e.oficina = "Seleccioná la sucursal.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -265,7 +290,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
         const payload = {
           descripcion: descripcionBase,
           monto: montoNum,
-          categoria: "Sin categoría",
+          categoria: form.categoria || "Sin categoría",
           fecha: today(),
           forma_pago: form.forma_pago,
           billetera: billeteraDetalle,
@@ -295,6 +320,7 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
     submitting ||
     !form.monto ||
     !form.descripcion?.trim() ||
+    (!esIngreso && !form.categoria) ||
     (isTransferencia && !form.billetera?.trim()) ||
     (isWebAdmin && !form.oficina);
 
@@ -456,6 +482,40 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
               {errors.descripcion && <p className="text-[11px] text-duo-rojo mt-1">{errors.descripcion}</p>}
             </div>
 
+            {/* 🏷️ EN QUÉ SE GASTÓ (solo egreso) */}
+            {!esIngreso && (
+              <div>
+                <label className="block text-xs mb-2 text-suave dark:text-suave-dark">
+                  ¿En qué se gastó? <span className="text-duo-rojo">*</span>
+                </label>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="¿En qué se gastó?">
+                  {CATEGORIAS_EGRESO.map((cat) => {
+                    const on = form.categoria === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => {
+                          setForm((p) => ({ ...p, categoria: cat }));
+                          setErrors((er) => ({ ...er, categoria: undefined }));
+                        }}
+                        className={`min-h-[44px] px-3.5 py-2 text-sm rounded-full font-medium transition-colors border ${
+                          on
+                            ? T.formaOn
+                            : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border-linea dark:border-linea-dark hover:text-titulo dark:hover:text-titulo-dark"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.categoria && <p className="text-[11px] text-duo-rojo mt-1">{errors.categoria}</p>}
+              </div>
+            )}
+
             {/* SUCURSAL (solo admin) */}
             {isWebAdmin && (
               <div>
@@ -495,6 +555,12 @@ export default function MovimientoCreateModal({ isOpen, onClose, tipoInicial = "
                 <span className="text-suave dark:text-suave-dark">Motivo</span>
                 <span className="font-medium text-titulo dark:text-titulo-dark truncate ml-3 text-right">{form.descripcion || "—"}</span>
               </div>
+              {!esIngreso && (
+                <div className="flex justify-between">
+                  <span className="text-suave dark:text-suave-dark">En qué</span>
+                  <span className="font-medium text-titulo dark:text-titulo-dark truncate ml-3 text-right">{form.categoria || "—"}</span>
+                </div>
+              )}
             </div>
           </div>
         )}

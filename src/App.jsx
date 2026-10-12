@@ -1,5 +1,8 @@
 // src/App.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+// ⚡ Cada pantalla se baja recién cuando se abre (antes la app entera pesaba
+//    6,4 MB y se bajaba toda al entrar, incluso el portal del cliente).
+import lazyConReintento, { CargandoPantalla } from "./utils/lazyConReintento";
 // 📡 Datos en vivo: el cartero (pregunta cada 20 s si cambió algo) y el hook para anotarse.
 import { iniciar as iniciarVivo, detener as detenerVivo, disponible as vivoDisponible } from "./services/vivo";
 import useDatosVivos from "./hooks/useDatosVivos";
@@ -20,33 +23,32 @@ import Header from "./components/layout/Header";
 // 🧠 Preferencias del menú (sidebar/footer + abierto/cerrado) con memoria
 import useMenuPrefs from "./hooks/useMenuPrefs";
 
-import HomePage from "./pages/HomePage";
-import ClientesPage from "./pages/ClientesPage";
-import PolizasPage from "./pages/PolizasPage";
-import PagosPage from "./pages/PagosPage";
+const HomePage = lazyConReintento(() => import("./pages/HomePage"));
+const ClientesPage = lazyConReintento(() => import("./pages/ClientesPage"));
+const PolizasPage = lazyConReintento(() => import("./pages/PolizasPage"));
+const PagosPage = lazyConReintento(() => import("./pages/PagosPage"));
 // 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp
-import MensajesPage from "./pages/MensajesPage";
-import SiniestrosPage from "./pages/SiniestrosPage";
+const MensajesPage = lazyConReintento(() => import("./pages/MensajesPage"));
+const SiniestrosPage = lazyConReintento(() => import("./pages/SiniestrosPage"));
 // ⚖️ LEGALES: casos, turnos con el abogado y "Cargar una denuncia" (la ficha
 //    del caso vive adentro de LegalesPage: /legales/:id)
-import LegalesPage from "./pages/LegalesPage";
+const LegalesPage = lazyConReintento(() => import("./pages/LegalesPage"));
 import AbogadoLayout from "./components/legales/AbogadoLayout";
 // 🚗 NUEVA APP: GESTORÍA (trámites del automotor derivados a gestores)
-import GestoriaPage from "./pages/GestoriaPage";
+const GestoriaPage = lazyConReintento(() => import("./pages/GestoriaPage"));
 import GestorLayout from "./components/gestoria/GestorLayout";
-import ClienteProfilePage from "./pages/ClienteProfilePage";
-import PolizaDetails from "./components/polizas/PolizaDetails";
-import PropiedadesPage from "./pages/PropiedadesPage";
-import BalanzesPage from "./pages/BalanzesPage";
-import SolicitudesPage from "./pages/SolicitudesPage";
-import CuponerasPage from "./pages/CuponerasPage";
-import EstadisticasPage from "./pages/EstadisticasPage";
-import RenovacionesPage from "./pages/RenovacionesPage";
-import BajasPage from "./pages/BajasPage";
-import RecaudacionPage from "./pages/RecaudacionPage";
+const ClienteProfilePage = lazyConReintento(() => import("./pages/ClienteProfilePage"));
+const PolizaDetails = lazyConReintento(() => import("./components/polizas/PolizaDetails"));
+const BalanzesPage = lazyConReintento(() => import("./pages/BalanzesPage"));
+const SolicitudesPage = lazyConReintento(() => import("./pages/SolicitudesPage"));
+const CuponerasPage = lazyConReintento(() => import("./pages/CuponerasPage"));
+const EstadisticasPage = lazyConReintento(() => import("./pages/EstadisticasPage"));
+const RenovacionesPage = lazyConReintento(() => import("./pages/RenovacionesPage"));
+const BajasPage = lazyConReintento(() => import("./pages/BajasPage"));
+const RecaudacionPage = lazyConReintento(() => import("./pages/RecaudacionPage"));
 
 // 🚀 NUEVA APP: SERVICIOS Y GASTOS FIJOS
-import ServiciosPage from "./pages/ServiciosPage";
+const ServiciosPage = lazyConReintento(() => import("./pages/ServiciosPage"));
 // 🚀 Thunk de contadores
 import { fetchContadoresServicios } from "./store/slices/serviciosSlice";
 import { invalidarCachesVivo } from "./store/slices/pagosSlice";
@@ -54,29 +56,29 @@ import { invalidarCacheSiniestrosCliente } from "./hooks/useSiniestrosCliente";
 import { invalidarCacheAlertasCliente } from "./hooks/useAlertasCliente";
 
 // 🚀 NUEVA APP: COTIZACIONES
-import CotizacionesPage from "./pages/CotizacionesPage";
+const CotizacionesPage = lazyConReintento(() => import("./pages/CotizacionesPage"));
 
 // 🚀 NUEVA APP: PANEL DE ADMINISTRADOR
-import AdminPage from "./pages/AdminPage";
+const AdminPage = lazyConReintento(() => import("./pages/AdminPage"));
 
 // 🆕 NUEVA APP: TAREAS DEL DÍA
-import TareasPage from "./pages/TareasPage";
+const TareasPage = lazyConReintento(() => import("./pages/TareasPage"));
 // 🆕 NUEVA APP: CONTROL DIARIO (tareas fijas con foto)
-import ControlDiarioPage from "./pages/ControlDiarioPage";
-import RankingPage from "./pages/RankingPage";
+const ControlDiarioPage = lazyConReintento(() => import("./pages/ControlDiarioPage"));
+const RankingPage = lazyConReintento(() => import("./pages/RankingPage"));
 // 🎮 MINIJUEGO "SINIESTRO CERO" (auto que esquiva el tráfico)
-import JuegoPage from "./pages/JuegoPage";
+const JuegoPage = lazyConReintento(() => import("./pages/JuegoPage"));
 import CierreCajaReminder from "./components/recaudacion/CierreCajaReminder";
 
 // 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
-import CuponPublicoPage from "./pages/CuponPublicoPage";
-import PortalAseguradoPage from "./pages/PortalAseguradoPage";
+const CuponPublicoPage = lazyConReintento(() => import("./pages/CuponPublicoPage"));
+const PortalAseguradoPage = lazyConReintento(() => import("./pages/PortalAseguradoPage"));
 // 🛠️ Panel de administración del Portal del Asegurado (lo usa la oficina).
-import PanelPortalPage from "./pages/PanelPortalPage";
+const PanelPortalPage = lazyConReintento(() => import("./pages/PanelPortalPage"));
 // ⚖️ PÁGINA PÚBLICA: "Mi caso" (expediente legal, sin login)
-import MiCasoPage from "./pages/MiCasoPage";
+const MiCasoPage = lazyConReintento(() => import("./pages/MiCasoPage"));
 // 🚗 PÁGINA PÚBLICA: "Mi trámite" (seguimiento del trámite de gestoría, sin login)
-import MiTramitePage from "./pages/MiTramitePage";
+const MiTramitePage = lazyConReintento(() => import("./pages/MiTramitePage"));
 
 // 🎉 El logo de bienvenida ("Preparando tu entorno...") sale SOLO cuando
 //    recién iniciás sesión. La marca la pone el login (ver AuthContext) y
@@ -534,27 +536,33 @@ function App() {
   // aunque no haya sesión iniciada.
   if (location.pathname.startsWith("/cupon/")) {
     return (
-      <Routes>
-        <Route path="/cupon/:token" element={<CuponPublicoPage />} />
-      </Routes>
+      <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
+        <Routes>
+          <Route path="/cupon/:token" element={<CuponPublicoPage />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   // 🆕 PORTAL DEL ASEGURADO (sin login): el cliente entra por link de WhatsApp.
   if (location.pathname.startsWith("/portal/")) {
     return (
-      <Routes>
-        <Route path="/portal/:token" element={<PortalAseguradoPage />} />
-      </Routes>
+      <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
+        <Routes>
+          <Route path="/portal/:token" element={<PortalAseguradoPage />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   // 🚗 "MI TRÁMITE" (sin login): el cliente sigue su trámite de gestoría y sube papeles.
   if (location.pathname.startsWith("/mi-tramite/")) {
     return (
-      <Routes>
-        <Route path="/mi-tramite/:token" element={<MiTramitePage />} />
-      </Routes>
+      <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
+        <Routes>
+          <Route path="/mi-tramite/:token" element={<MiTramitePage />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -563,9 +571,11 @@ function App() {
   //    necesita) el Portal del Asegurado completo.
   if (location.pathname.startsWith("/mi-caso/")) {
     return (
-      <Routes>
-        <Route path="/mi-caso/:token" element={<MiCasoPage />} />
-      </Routes>
+      <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
+        <Routes>
+          <Route path="/mi-caso/:token" element={<MiCasoPage />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -622,10 +632,12 @@ function App() {
   if (esGestor) {
     return (
       <GestorLayout>
-        <Routes>
-          <Route path="/gestoria/*" element={<GestoriaPage />} />
-          <Route path="*" element={<Navigate to="/gestoria" replace />} />
-        </Routes>
+        <Suspense fallback={<CargandoPantalla />}>
+          <Routes>
+            <Route path="/gestoria/*" element={<GestoriaPage />} />
+            <Route path="*" element={<Navigate to="/gestoria" replace />} />
+          </Routes>
+        </Suspense>
       </GestorLayout>
     );
   }
@@ -634,10 +646,12 @@ function App() {
   if (esAbogadoRol) {
     return (
       <AbogadoLayout>
-        <Routes>
-          <Route path="/legales/*" element={<LegalesPage />} />
-          <Route path="*" element={<Navigate to="/legales" replace />} />
-        </Routes>
+        <Suspense fallback={<CargandoPantalla />}>
+          <Routes>
+            <Route path="/legales/*" element={<LegalesPage />} />
+            <Route path="*" element={<Navigate to="/legales" replace />} />
+          </Routes>
+        </Suspense>
       </AbogadoLayout>
     );
   }
@@ -741,6 +755,7 @@ function App() {
             transition={{ duration: 0.25 }}
           >
             <AnimatePresence mode="wait">
+              <Suspense fallback={<CargandoPantalla />}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
 
@@ -797,6 +812,7 @@ function App() {
                 <Route path="/solicitudes" element={<SolicitudesPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </Suspense>
             </AnimatePresence>
           </motion.main>
 

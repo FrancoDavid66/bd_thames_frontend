@@ -1,5 +1,6 @@
 // src/services/api.js
 import axios from 'axios';
+import { instalarSesion } from './sesion';
 
 /**
  * Determinamos la URL base de forma robusta buscando en las 
@@ -33,25 +34,11 @@ api.interceptors.request.use(
     }
 );
 
-// 🚀 INTERCEPTOR DE RESPUESTA: Maneja errores globales como el 401
-api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        // Si el servidor responde 401 (No autorizado)
-        if (error.response?.status === 401) {
-            console.warn("Sesión expirada o token inválido. Redirigiendo al login...");
-            
-            // Limpiamos los tokens para evitar bucles de error
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-
-            // Solo redirigimos si no estamos ya en la página de login
-            if (!window.location.pathname.includes('/login')) {
-                window.location.href = '/login';
-            }
-        }
-        return Promise.reject(error);
-    }
-);
+// 🔐 SESIÓN: renueva el permiso sola y solo te saca si de verdad venció
+//    (ver services/sesion.js). Antes: cualquier 401 → afuera, y el permiso
+//    largo (refresh) nunca se usaba → al día siguiente te sacaba siempre.
+//    También se instala en el axios "suelto" que usan otras pantallas.
+instalarSesion(api, { siempreConToken: true });
+instalarSesion(axios);
 
 export default api;

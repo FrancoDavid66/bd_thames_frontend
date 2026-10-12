@@ -1,5 +1,5 @@
 // src/services/renovacionesCompania.js
-// 🔁 Trimestre nuevo de la compañía (La Equidad), listo para aprobar.
+// 🔁 Período nuevo de la compañía (La Equidad o AMCA), listo para aprobar.
 //    La tarea de las 8:30 lo deja preparado; acá se lista y se aprueba o descarta.
 import api from "./api";
 

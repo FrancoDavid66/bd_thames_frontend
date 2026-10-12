@@ -72,7 +72,9 @@ export const AuthProvider = ({ children }) => {
             //    copia, seguimos trabajando con ella (no te saca de la app).
             //    Si el servidor dijo "no sos vos" (401/403) → afuera, como siempre.
             const st = error?.response?.status;
-            const sinRespuesta = !error?.response || (st && st >= 500);
+            // 🔐 sesionNoRenovada: el permiso venció y el servidor no pudo
+            //    renovarlo (deploy en Railway): tampoco es motivo para sacarte.
+            const sinRespuesta = !error?.response || (st && st >= 500) || Boolean(error?.sesionNoRenovada);
             if (sinRespuesta && leerUsuarioGuardado()) {
                 console.warn('[auth] No se pudo confirmar la sesión; sigo con la copia guardada.');
             } else {

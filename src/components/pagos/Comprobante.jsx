@@ -442,8 +442,10 @@ const a4 = StyleSheet.create({
   headerSubtitle: { fontSize: 11, color: PRIMARY_DARK, textAlign: "center", marginTop: 6 },
   grid2: { flexDirection: "row", gap: 16, marginBottom: 16 },
   col: { flex: 1 },
-  box: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderRadius: 8, borderWidth: 1, borderColor: PRIMARY, backgroundColor: "#FFF6F8", paddingVertical: 12, paddingHorizontal: 16 },
-  boxLabel: { fontSize: 12, color: PRIMARY_DARK, fontWeight: "bold", textTransform: "uppercase" },
+  // 🐛 FIX: con la hora ("12/10/2026 14:35") el valor no entraba al lado del
+  //    título y se pisaban. Ahora el título va arriba y el valor abajo.
+  box: { flexDirection: "column", alignItems: "flex-start", borderRadius: 8, borderWidth: 1, borderColor: PRIMARY, backgroundColor: "#FFF6F8", paddingVertical: 10, paddingHorizontal: 16 },
+  boxLabel: { fontSize: 11, color: PRIMARY_DARK, fontWeight: "bold", textTransform: "uppercase", marginBottom: 4 },
   boxValue: { fontSize: 16, color: PRIMARY, fontWeight: "bold" },
   section: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", flex: 1 },
   sectionHead: { backgroundColor: PRIMARY, color: "#fff", paddingVertical: 8, paddingHorizontal: 12, fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
@@ -483,7 +485,7 @@ const a4 = StyleSheet.create({
    Las medidas son a ojo PARA EL LADO SEGURO (se cuenta de más lo que ocupa
    el recibo), así el homenaje nunca tapa nada. */
 const escalaHomenajeA4 = (filasDetalle, conAviso) => {
-  const finRecibo = 450 + (filasDetalle ? 46 + filasDetalle * 29 : 0) + (conAviso ? 102 : 0);
+  const finRecibo = 466 + (filasDetalle ? 46 + filasDetalle * 29 : 0) + (conAviso ? 102 : 0);
   const libre = A4_HEIGHT - 12 - 16 - finRecibo; // 12 = margen de abajo · 16 = aire arriba del homenaje
   // 61 = alto del homenaje en tamaño 1. El piso es 0.8 para el recibo MÁS largo
   // con un nombre que ocupa dos renglones (si no, rozaba el aviso legal).

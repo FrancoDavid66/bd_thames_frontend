@@ -1,10 +1,10 @@
 // src/components/renovaciones/PropuestasCompania.jsx
 // ============================================================
-// 🔁 "La Equidad emitió el trimestre que sigue" — listo para aprobar.
+// 🔁 "La Equidad / AMCA emitió el período que sigue" — listo para aprobar.
 //
-// La tarea de las 8:30 detecta el trimestre nuevo en La Equidad, baja el PDF y
-// los 3 cupones (fecha, importe, imagen y código) y lo deja preparado en la
-// póliza. Acá se ve una tarjeta por póliza: "Renovar" crea la póliza nueva con
+// La tarea de las 8:30 detecta el período nuevo en La Equidad o en AMCA, baja
+// el PDF y los cupones (fecha, importe, imagen y código) y lo deja preparado
+// en la póliza. Acá se ve una tarjeta por póliza: "Renovar" crea la póliza nueva con
 // esos cupones (la vieja queda finalizada con sus pagos); "Descartar" la saca
 // de la lista con el motivo.
 //
@@ -24,6 +24,14 @@ import {
 
 const ddmm = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : "—");
 const ddmmaa = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "—");
+// Nombre corto de la compañía de cada tarjeta ("La Equidad", "AMCA").
+const ciaDe = (it) => {
+  const c = String(it?.propuesta?.compania || it?.compania || "").trim();
+  if (/amca|ant[aá]rtida/i.test(c)) return "AMCA";
+  if (/equidad/i.test(c)) return "La Equidad";
+  return c || "La compañía";
+};
+
 const pesos = (n, dec = 0) =>
   n == null ? "—" : `$ ${Number(n).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 
@@ -54,6 +62,7 @@ function Chapa({ children, chica = false }) {
 
 function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
   const p = it.propuesta || {};
+  const cia = ciaDe(it);
   const est = estadoActual(it.actual);
   const cupones = p.cupones || [];
   const total = cupones.reduce((s, c) => s + (Number(c.importe) || 0), 0);
@@ -63,7 +72,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
   const avisos = [...(p.avisos || [])];
   if (it.actual?.debe > 0) {
     avisos.push(
-      `Del trimestre actual debe ${it.actual.debe} cuota${it.actual.debe === 1 ? "" : "s"}. Si no se paga, La Equidad puede anular la póliza aunque la renueves acá.`
+      `Del período actual debe ${it.actual.debe} cuota${it.actual.debe === 1 ? "" : "s"}. Si no se paga, ${cia} puede anular la póliza aunque la renueves acá.`
     );
   }
   const dias = it.actual?.dias_para_terminar;
@@ -77,7 +86,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold text-titulo dark:text-titulo-dark">{it.cliente?.nombre || "—"}</div>
             <div className="truncate text-[12px] text-suave dark:text-suave-dark">
-              {it.oficina || "Sin oficina"} · Póliza {p.poliza_compania || it.numero_poliza}
+              {it.oficina || "Sin oficina"} · {cia} · Póliza {p.poliza_compania || it.numero_poliza}
               {it.cobertura ? ` · ${it.cobertura}` : ""}
             </div>
           </div>
@@ -86,7 +95,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
         {/* Actual → nuevo */}
         <div className="flex items-center gap-2.5 text-[12px]">
           <div className="flex flex-col">
-            <span className="text-suave dark:text-suave-dark">Trimestre actual</span>
+            <span className="text-suave dark:text-suave-dark">Período actual</span>
             <span className="font-semibold text-titulo dark:text-titulo-dark">
               {ddmm(it.actual?.desde)} → {ddmm(it.actual?.hasta)}
             </span>
@@ -94,7 +103,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
           </div>
           <HiArrowRight className="shrink-0 text-lg text-suave dark:text-suave-dark" aria-hidden="true" />
           <div className="flex flex-col">
-            <span className="text-suave dark:text-suave-dark">Trimestre nuevo</span>
+            <span className="text-suave dark:text-suave-dark">Período nuevo</span>
             <span className="font-bold text-titulo dark:text-titulo-dark">
               {ddmm(p.inicio)} → {ddmm(p.fin)}
             </span>
@@ -150,7 +159,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
                 <img src={c.imagen_url} alt={`Cupón ${i + 1} de ${it.patente}`} loading="lazy" className="w-full rounded-md border border-slate-200" />
               ) : (
                 <div className="rounded-md bg-slate-100 px-2 py-3 text-center text-[11px] text-slate-600">
-                  {c.pagada ? "Ya paga: La Equidad no imprime el cupón" : "Sin imagen del cupón"}
+                  {c.pagada ? `Ya paga: ${cia} no imprime el cupón` : "Sin imagen del cupón"}
                 </div>
               )}
               {c.codigo_barras && (
@@ -161,7 +170,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
           ))}
           <div className="flex flex-col justify-center gap-1.5 text-[12px] text-suave dark:text-suave-dark">
             <span>
-              Total del trimestre: <strong className="text-titulo dark:text-titulo-dark">{pesos(total, 2)}</strong>
+              Total del período: <strong className="text-titulo dark:text-titulo-dark">{pesos(total, 2)}</strong>
             </span>
             {p.datos_extra?.pago?.codigo_link && (
               <span>
@@ -171,7 +180,7 @@ function Tarjeta({ it, abierto, onToggle, ocupado, onRenovar, onDescartar }) {
             )}
             {pdf && (
               <a href={pdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-duo-violeta">
-                <HiDocumentText aria-hidden="true" /> Abrir el PDF de {p.compania || "la compañía"}
+                <HiDocumentText aria-hidden="true" /> Abrir el PDF de {cia}
               </a>
             )}
           </div>
@@ -289,6 +298,9 @@ export default function PropuestasCompania({ oficina = "", onCambio }) {
   const resueltasIds = useMemo(() => new Set(resueltas.map((r) => r.it.id)), [resueltas]);
   const pendientes = useMemo(() => items.filter((i) => !resueltasIds.has(i.id)), [items, resueltasIds]);
   const renovables = pendientes.filter((i) => i.puede);
+  // "La Equidad emitió…", "AMCA emitió…" o "La Equidad y AMCA emitieron…"
+  const cias = useMemo(() => [...new Set(pendientes.map(ciaDe))], [pendientes]);
+  const quienes = cias.length ? cias.join(" y ") : "La compañía";
 
   const renovarUna = useCallback(async (it) => {
     const r = await aplicarPropuesta(it.id);
@@ -375,12 +387,12 @@ export default function PropuestasCompania({ oficina = "", onCambio }) {
           </div>
           <div className="min-w-0">
             <h2 id="prop-cia-titulo" className="text-[17px] font-bold text-titulo dark:text-titulo-dark">
-              La Equidad emitió el trimestre que sigue
+              {quienes} {cias.length > 1 ? "emitieron" : "emitió"} el período que sigue
             </h2>
             <p className="mt-0.5 max-w-2xl text-[13px] text-suave dark:text-suave-dark">
               La tarea de las 8:30 ya bajó el PDF y los cupones de cada una. Revisá y tocá{" "}
               <strong className="text-titulo dark:text-titulo-dark">Renovar</strong>: Thames arma la póliza nueva con las
-              mismas fechas e importes que La Equidad.
+              mismas fechas e importes que la compañía.
             </p>
           </div>
         </div>

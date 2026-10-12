@@ -325,8 +325,18 @@ export default function CuponerasPage() {
       const res = await http.get("polizas/cupones-robo/dashboard/", { params });
       if (mio !== pedidoRef.current) return;
       const data = res.data || {};
+      // 🐛 FIX: se mostraban solo los primeros 100 (había 377). Ahora se piden
+      //    las páginas que siguen hasta tenerlos todos (tope de seguridad: 20).
+      let lista = Array.isArray(data.results) ? data.results : [];
+      let siguiente = data.next;
+      for (let i = 0; siguiente && i < 20; i += 1) {
+        const mas = await http.get(siguiente);
+        if (mio !== pedidoRef.current) return;
+        lista = lista.concat(Array.isArray(mas.data?.results) ? mas.data.results : []);
+        siguiente = mas.data?.next;
+      }
       setCounters(data.counters_global || { total: 0, pendientes: 0, por_vencer_7: 0, vencidas: 0, reportados: 0 });
-      setCupones(Array.isArray(data.results) ? data.results : []);
+      setCupones(lista);
       if (silencioso) setError("");
     } catch (e) {
       if (silencioso || mio !== pedidoRef.current) return;

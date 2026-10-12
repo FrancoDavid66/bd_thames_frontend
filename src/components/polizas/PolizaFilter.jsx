@@ -164,7 +164,9 @@ export default function PolizaFilter({
   useEffect(() => { onSearchChange?.(localValue); }, [localValue, onSearchChange]);
 
   useEffect(() => {
-    api.get("companias/").then((res) => {
+    // 🐛 FIX: "companias/" no existe (404) → el filtro solo mostraba la lista fija.
+    //    El catálogo vive en Cotizaciones (el mismo que edita el Admin).
+    api.get("cotizaciones/companias/").then((res) => {
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       const dinamicas = arr.filter((c) => c.activa).map((c) => c.nombre);
       const unificadas = Array.from(new Set([...LEGACY_COMPANIAS, ...dinamicas])).sort();

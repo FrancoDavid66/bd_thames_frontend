@@ -1,3 +1,6 @@
+// 🔐 Primero que nada: la sesión que se renueva sola para todos los pedidos
+//    (tiene que cargarse antes que las pantallas que crean sus clientes HTTP).
+import './services/sesionGlobal'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'

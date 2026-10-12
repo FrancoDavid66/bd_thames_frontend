@@ -136,7 +136,8 @@ export default function TareaWizard({ isOpen, flujo, item, onClose, onSaved }) {
   // Cargar compañías (solo flujo datos-poliza)
   useEffect(() => {
     if (!isOpen || flujo !== "datos-poliza") return;
-    api.get("companias/")
+    // 🐛 FIX: "companias/" no existe (404). El catálogo vive en Cotizaciones.
+    api.get("cotizaciones/companias/")
       .then((res) => {
         const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
         setCompanias(arr.filter((c) => c.activa).map((c) => c.nombre));

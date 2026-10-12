@@ -339,6 +339,18 @@ export const fetchRenovaciones = createAsyncThunk(
       const { data } = await api.get(`polizas/renovaciones/${query}`);
       const normalized = normalizeRenovacionesResponse(data);
 
+      // 🐛 FIX: se traía solo la 1ª página (500). Con 544 renovaciones, las
+      //    últimas 44 no aparecían y nadie se enteraba. Ahora se siguen
+      //    pidiendo páginas hasta tenerlas todas (tope de seguridad: 20).
+      let siguiente = normalized.next;
+      for (let i = 0; siguiente && i < 20; i += 1) {
+        const { data: mas } = await api.get(siguiente);
+        const extra = normalizeRenovacionesResponse(mas);
+        normalized.items = normalized.items.concat(extra.items);
+        siguiente = extra.next;
+      }
+      normalized.next = null;
+
       return { params: cleanParams, query, fromCache: false, normalized };
     } catch (err) {
       const msg =

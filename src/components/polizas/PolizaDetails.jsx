@@ -226,7 +226,18 @@ export default function PolizaDetails() {
   const bloqueoOficina = permisos && !permisos.editar ? permisos.motivo || "Esta póliza es de otra oficina." : "";
 
   const cuotas = useMemo(() => (Array.isArray(poliza?.cuotas) ? poliza.cuotas : []), [poliza?.cuotas]);
-  const proxima = useMemo(() => getProximaCuota(cuotas), [cuotas]);
+  // 📅 Próximo pago: lo calcula el servidor con la regla de cada compañía
+  //    (NRE: hasta cuándo cubre lo pagado · AMCA / La Equidad: la fecha del cupón,
+  //    aunque ya haya pasado). 🐛 Antes salteaba la cuota atrasada y mostraba la
+  //    que venía: el cliente debía el 11/10 y decía "Próximo pago 11/11".
+  const proxima = useMemo(() => {
+    const pp = poliza?.proximo_pago;
+    if (pp?.fecha) {
+      return { fecha_vencimiento: pp.fecha, cuota_nro: pp.cuota_nro, en_mora: !!pp.en_mora, dias_mora: pp.dias_mora || 0 };
+    }
+    if (poliza && "proximo_pago" in poliza) return null; // el servidor dice: no debe nada
+    return getProximaCuota(cuotas);
+  }, [poliza, cuotas]);
   const cuponesRobo = useMemo(() => (Array.isArray(poliza?.cupones_robo) ? poliza.cupones_robo : []), [poliza?.cupones_robo]);
 
   const cli = poliza?.cliente || null;
@@ -508,8 +519,13 @@ export default function PolizaDetails() {
           <div className="flex flex-1 flex-col justify-center">
             {proxima?.fecha_vencimiento ? (
               <>
-                <div className="text-2xl font-semibold leading-tight text-duo-amarillo-sombra dark:text-duo-amarillo sm:text-3xl">{dayjs(proxima.fecha_vencimiento).format("DD/MM/YYYY")}</div>
-                <div className="mt-1.5 text-sm text-suave dark:text-suave-dark">Cuota {proxima.cuota_nro} de {cuotas.length}</div>
+                <div className={`text-2xl font-semibold leading-tight sm:text-3xl ${proxima.en_mora ? "text-duo-rojo" : "text-duo-amarillo-sombra dark:text-duo-amarillo"}`}>{dayjs(proxima.fecha_vencimiento).format("DD/MM/YYYY")}</div>
+                <div className="mt-1.5 text-sm text-suave dark:text-suave-dark">
+                  {proxima.cuota_nro ? `Cuota ${proxima.cuota_nro} de ${cuotas.length}` : null}
+                  {proxima.en_mora ? (
+                    <span className="font-semibold text-duo-rojo">{proxima.cuota_nro ? " · " : ""}Debe hace {proxima.dias_mora} {proxima.dias_mora === 1 ? "día" : "días"}</span>
+                  ) : null}
+                </div>
               </>
             ) : (
               <>

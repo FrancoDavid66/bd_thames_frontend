@@ -726,7 +726,7 @@ export default function RenovacionesPage() {
         </Boton3D>
       </div>
 
-      {/* ============ 🔁 La Equidad: trimestres nuevos listos para aprobar ============ */}
+      {/* ============ 🔁 La Equidad / AMCA: períodos nuevos listos para aprobar ============ */}
       <PropuestasCompania
         oficina={oficina}
         onCambio={() => {
