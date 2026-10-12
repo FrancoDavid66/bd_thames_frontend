@@ -293,7 +293,12 @@ const HomePage = () => {
 
   const loadCounters = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_BASE}solicitudes/counters/`);
+      // 🔒 Con el usuario: sin él, el servidor ahora contesta 401 (y antes
+      //    contestaba 0 de todo, por eso este cartel siempre decía 0).
+      const token = localStorage.getItem("access_token");
+      const res = await axios.get(`${API_BASE}solicitudes/counters/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!montadoRef.current) return;
       const data = res.data || {};
       setSolCounters({
