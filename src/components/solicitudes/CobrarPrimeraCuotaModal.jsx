@@ -165,9 +165,13 @@ export default function CobrarPrimeraCuotaModal({ open, polizaId, onClose }) {
       formaPago,
       monto: payload?.monto,
       responsableEmpleadoId: responsableId,
-      // ⚠️ false a propósito: el backend YA crea el ingreso solo (señal
-      //    crear_ingreso_automatico al registrar el Pago).
-      registrarEnBalance: false,
+      // 💰 TRUE: la 1ra cuota se cobra en la oficina → la plata entra a la caja.
+      //    🐛 Antes decía false creyendo que eso evitaba un ingreso DOBLE, y
+      //       funcionaba de casualidad porque el backend ignoraba el false. Desde
+      //       el 11/10/2026 el backend sí respeta "false" (no anota en la caja),
+      //       así que acá tiene que decir la verdad: sí, se anota.
+      //       (El ingreso lo crea el backend una sola vez; el front no lo duplica.)
+      registrarEnBalance: true,
       extraData: {
         destino_cuenta: payload?.destino_cuenta || "",
         enviado_por: payload?.enviado_por || "",

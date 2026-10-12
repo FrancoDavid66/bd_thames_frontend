@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import logoThames from "./assets/logos/logo_thames.svg";
 
 // 🚀 IMPORTACIONES DE SEGURIDAD
-import { useAuth } from "./context/AuthContext";
+import { useAuth, BIENVENIDA_KEY } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 
 import Sidebar from "./components/layout/Sidebar";
@@ -78,11 +78,10 @@ import MiCasoPage from "./pages/MiCasoPage";
 // 🚗 PÁGINA PÚBLICA: "Mi trámite" (seguimiento del trámite de gestoría, sin login)
 import MiTramitePage from "./pages/MiTramitePage";
 
-// 🚀 Marca de "ya mostré la bienvenida en esta sesión". Se guarda en
-//    sessionStorage: vive mientras la pestaña esté abierta y se borra al
-//    cerrar sesión. Así el logo "Preparando tu entorno..." aparece SOLO
-//    cuando recién iniciás sesión, y NO en cada cambio de pantalla.
-const WELCOME_FLAG = "welcomeShown";
+// 🎉 El logo de bienvenida ("Preparando tu entorno...") sale SOLO cuando
+//    recién iniciás sesión. La marca la pone el login (ver AuthContext) y
+//    acá se consume una vez. Abrir una ventana nueva (ej: "ver póliza") NO
+//    la tiene → entra directo, sin esperar el logo.
 
 function App() {
   // 🎨 El tema (claro/oscuro) ahora lo maneja ThemeProvider (context).
@@ -372,30 +371,26 @@ function App() {
   // 🚀 USE-EFFECTS
   // ========================================================
 
-  // 🚀 BIENVENIDA — solo 1 vez por login (no en cada pantalla).
-  //    - Con user y SIN marca en sessionStorage → mostramos el logo 2.2s
-  //      y dejamos la marca, para que no vuelva a salir al navegar.
-  //    - Sin user (logout / login nuevo) → borramos la marca, así el
-  //      próximo inicio de sesión sí muestra la bienvenida.
+  // 🚀 BIENVENIDA — solo justo después de iniciar sesión.
+  //    🐛 Antes la marca de "ya la mostré" vivía en la pestaña: cada ventana
+  //       nueva (abrir una póliza aparte) volvía a mostrar el logo 2 segundos.
+  //       Ahora la pone el login → solo sale al entrar con usuario y clave.
+  //    Depende de "hay usuario sí/no" (no del objeto entero): si el usuario se
+  //    refresca por atrás, no se vuelve a disparar ni queda trabado.
+  const hayUsuario = Boolean(user);
   useEffect(() => {
-    let yaMostrada = false;
-    try { yaMostrada = sessionStorage.getItem(WELCOME_FLAG) === "1"; } catch {}
-
-    if (user) {
-      if (!yaMostrada) {
-        setShowWelcome(true);
-        try { sessionStorage.setItem(WELCOME_FLAG, "1"); } catch {}
-        const timer = setTimeout(() => setShowWelcome(false), 2200);
-        return () => clearTimeout(timer);
-      }
-      // ya se mostró en esta sesión → nada (no molestar al navegar)
+    if (!hayUsuario) {
       setShowWelcome(false);
-    } else {
-      // sin sesión: limpiamos la marca para el próximo login
-      try { sessionStorage.removeItem(WELCOME_FLAG); } catch {}
-      setShowWelcome(false);
+      return undefined;
     }
-  }, [user]);
+    let recienEntro = false;
+    try { recienEntro = sessionStorage.getItem(BIENVENIDA_KEY) === "1"; } catch { /* nada */ }
+    if (!recienEntro) return undefined;
+    try { sessionStorage.removeItem(BIENVENIDA_KEY); } catch { /* nada */ }
+    setShowWelcome(true);
+    const timer = setTimeout(() => setShowWelcome(false), 2200);
+    return () => clearTimeout(timer);
+  }, [hayUsuario]);
 
   // 🚀 CONTADORES DEL MENÚ — una sola función los pide todos.
   //    ⚡ Antes se pedían los 7 en CADA cambio de pantalla, cada 60 s aunque la
