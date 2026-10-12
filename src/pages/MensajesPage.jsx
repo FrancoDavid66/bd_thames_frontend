@@ -98,8 +98,9 @@ const TONOS = {
 };
 
 // Mismo criterio de colores que el reporte: atrasado rojo, hoy amarillo,
-// faltan días verde, oferta azul, renovación violeta.
+// faltan días verde, oferta azul, renovación violeta, grúa activa verde.
 function tonoSituacion(item) {
+  if (item.tipo === "GRUA") return "verde";
   if (item.tipo === "OFERTA") return "azul";
   if (item.situacion === "RENOVACIÓN") return "violeta";
   const d = Number(item.delta);

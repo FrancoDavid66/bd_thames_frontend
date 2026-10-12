@@ -236,6 +236,12 @@ export default function ReporteContactosModal({ open, onClose }) {
             </div>
           </div>
 
+          {/* 🚨 Grúa: AMCA y La Equidad la dan a los 15 días de emitida (los lunes, también los del domingo). */}
+          <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark flex items-center gap-2 text-[12px] min-w-0">
+            <Chip tono="verde">GRÚA</Chip>
+            <span className="text-titulo dark:text-titulo-dark">Hoy se les activó la grúa — avisarles con el mensaje del PDF</span>
+          </div>
+
           <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark flex items-center gap-2 text-[12px] min-w-0">
             <Chip tono="azul">OFERTAS</Chip>
             <span className="text-titulo dark:text-titulo-dark">Pagaron hace 14 días — para ofrecerles otros seguros</span>
