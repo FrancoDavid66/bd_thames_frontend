@@ -58,6 +58,7 @@ import RenovacionesToolbar from "../components/renovaciones/RenovacionesToolbar"
 import Renovacionestable from "../components/renovaciones/Renovacionestable";
 import DescartarRenovacionModal from "../components/renovaciones/DescartarRenovacionModal";
 import PolizaYaRenovadaModal from "../components/renovaciones/PolizaYaRenovadaModal";
+import PropuestasCompania from "../components/renovaciones/PropuestasCompania";
 import { useRenovacionesProgreso } from "../hooks/useRenovacionesProgreso";
 import { useAuth } from "../context/AuthContext";
 import useDatosVivos from "../hooks/useDatosVivos";
@@ -724,6 +725,15 @@ export default function RenovacionesPage() {
           Actualizar
         </Boton3D>
       </div>
+
+      {/* ============ 🔁 La Equidad: trimestres nuevos listos para aprobar ============ */}
+      <PropuestasCompania
+        oficina={oficina}
+        onCambio={() => {
+          load({ force: true });
+          loadResumen({ force: true });
+        }}
+      />
 
       {/* ============ Toolbar: pestañas + buscador + sucursal ============ */}
       <RenovacionesToolbar
