@@ -1,52 +1,61 @@
 // src/components/renovaciones/PolizaYaRenovadaModal.jsx
 //
-// Aviso (NO bloqueo) que aparece cuando se intenta renovar una póliza que ya
-// tiene una versión más nueva. Cartel "¿Seguro?": Cancelar o "Renovar igual".
+// Aviso que aparece cuando se intenta renovar una póliza que YA tiene
+// renovación (una hija, o un alta nueva del mismo auto).
 // Estilo THAMES (ModalDuo + Boton3D).
+//
+// 🐛 13/10/2026: antes tenía un botón "Renovar igual" que nunca funcionó: el
+//    servidor siempre lo bloquea (crearía dos pólizas para el mismo auto) y el
+//    cartel volvía a aparecer una y otra vez. Ahora lleva directo a la
+//    renovación que ya existe, que es lo que hay que revisar.
 
-import { HiExclamationCircle, HiArrowRight, HiRefresh } from "react-icons/hi";
+import { HiExclamationCircle, HiArrowRight } from "react-icons/hi";
 import ModalDuo from "../ui/ModalDuo";
 import Boton3D from "../ui/Boton3D";
 
-export default function PolizaYaRenovadaModal({
-  open,
-  error,
-  onClose,
-  onConfirmar,
-  submitting = false,
-}) {
+export default function PolizaYaRenovadaModal({ open, error, onClose }) {
   if (!error) return null;
 
   const ctx = error.context || {};
   const nuevaId = ctx.nueva_poliza_id;
   const nuevoNumero = ctx.nueva_numero || "—";
-  const nuevaFecha = ctx.nueva_fecha || null;
+  // "2026-10-13" → "13/10/2026"
+  const nuevaFecha = ctx.nueva_fecha ? String(ctx.nueva_fecha).slice(0, 10).split("-").reverse().join("/") : null;
+
+  const verRenovacion = () => {
+    if (!nuevaId) return;
+    // La app usa rutas con "#" (HashRouter).
+    window.open(`#/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
+    onClose?.();
+  };
 
   return (
     <ModalDuo
       isOpen={open}
       onClose={onClose}
       title="Esta póliza ya se renovó"
-      subtitle="¿Querés renovarla de nuevo igual?"
+      subtitle="No hace falta renovarla otra vez"
       icon={<HiExclamationCircle />}
       iconTono="amarillo"
       size="sm"
       footer={
         <>
-          <Boton3D variant="blanco" onClick={onClose} disabled={submitting}>
-            Cancelar
+          <Boton3D variant="blanco" onClick={onClose}>
+            Cerrar
           </Boton3D>
-          <Boton3D variant="verde" onClick={onConfirmar} disabled={submitting}>
-            <HiRefresh className={submitting ? "animate-spin" : ""} />
-            {submitting ? "Renovando…" : "Renovar igual"}
-          </Boton3D>
+          {nuevaId && (
+            <Boton3D variant="verde" onClick={verRenovacion}>
+              Ver la renovación <HiArrowRight />
+            </Boton3D>
+          )}
         </>
       }
     >
       <p className="text-sm text-titulo dark:text-titulo-dark leading-relaxed">
-        Ya existe una versión renovada de esta póliza en el sistema. Podés
-        renovarla igual si estás seguro (por ejemplo, el cliente pagó antes de
-        tiempo), pero revisá que no estés duplicando por error.
+        Este auto ya tiene una póliza más nueva en el sistema. Renovar de nuevo
+        dejaría al cliente con <strong>dos pólizas para el mismo auto</strong>.
+        Si hay que corregir algo (fechas, precio, compañía), hacelo en la
+        renovación que ya existe.
       </p>
 
       {nuevaId && (
@@ -70,14 +79,6 @@ export default function PolizaYaRenovadaModal({
               </div>
             )}
           </div>
-          <a
-            href={`#/polizas/${nuevaId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-duo-azul hover:underline"
-          >
-            Ver la renovación existente <HiArrowRight />
-          </a>
         </div>
       )}
     </ModalDuo>

@@ -8,9 +8,13 @@
 // 🆕 MODO BÚSQUEDA (prop `buscando`): la página manda TODAS las coincidencias,
 //    sin filtrar por vencimiento ni por estado. Acá sumamos un chip informativo
 //    ("Ya renovada", "Finalizada", "No renueva"…) para que se vea qué se está
-//    por tocar, y el botón "Renovar" queda SIEMPRE disponible.
+//    por tocar.
+//
+// 🔁 13/10/2026: si la póliza YA tiene renovación (`tiene_renovacion`), en vez
+//    de "Renovar" (que el servidor rechaza para no duplicar) va "Ver renovación",
+//    que abre la póliza nueva.
 
-import { HiRefresh, HiX, HiEye, HiArrowLeft, HiTicket, HiUpload, HiSearch, HiCheckCircle } from "react-icons/hi";
+import { HiRefresh, HiX, HiEye, HiArrowLeft, HiTicket, HiUpload, HiSearch, HiCheckCircle, HiArrowRight } from "react-icons/hi";
 
 import Boton3D from "../ui/Boton3D";
 import Badge from "../ui/Badge";
@@ -34,9 +38,52 @@ function getOficina(p) {
   );
 }
 
+/* ============ Botón "Ver detalle" (ojo) ============ */
+function BotonVer({ p, submitting }) {
+  return (
+    <a
+      href={`#/polizas/${p.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Ver detalle (nueva pestaña)"
+      aria-label="Ver detalle"
+      className={cx(
+        "inline-flex items-center justify-center h-10 w-10 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul transition-transform active:scale-90",
+        submitting && "pointer-events-none opacity-40"
+      )}
+    >
+      <HiEye className="text-lg" />
+    </a>
+  );
+}
+
 /* ============ Acciones de una fila ============ */
 function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, onDesmarcarNoRenueva }) {
   const descartada = !!p?.renovacion_descartada;
+
+  // 🔁 Ya se renovó → no hay nada que renovar: se muestra la póliza nueva.
+  if (p?.tiene_renovacion) {
+    const nuevaId = p?.renovacion_id;
+    return (
+      <div className="flex items-center justify-end gap-2">
+        {nuevaId ? (
+          <a
+            href={`#/polizas/${nuevaId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir la póliza que la reemplazó"
+            className={cx(
+              "inline-flex items-center gap-1.5 h-10 rounded-lg px-3 text-[13px] font-medium bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] text-duo-violeta transition-transform active:scale-95",
+              submitting && "pointer-events-none opacity-40"
+            )}
+          >
+            Ver renovación <HiArrowRight />
+          </a>
+        ) : null}
+        <BotonVer p={p} submitting={submitting} />
+      </div>
+    );
+  }
 
   // Descartada + modo normal  → solo "Revertir" (la fila está fuera de juego).
   // Descartada + modo BÚSQUEDA → "Revertir" Y "Renovar": si la buscaste a mano
@@ -98,19 +145,7 @@ function AccionesFila({ p, submitting, buscando, onRenovar, onMarcarNoRenueva, o
       </button>
 
       {/* Ver */}
-      <a
-        href={`#/polizas/${p.id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Ver detalle (nueva pestaña)"
-        aria-label="Ver detalle"
-        className={cx(
-          "inline-flex items-center justify-center h-10 w-10 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul transition-transform active:scale-90",
-          submitting && "pointer-events-none opacity-40"
-        )}
-      >
-        <HiEye className="text-lg" />
-      </a>
+      <BotonVer p={p} submitting={submitting} />
     </div>
   );
 }

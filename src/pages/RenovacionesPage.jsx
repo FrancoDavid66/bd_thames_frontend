@@ -13,9 +13,20 @@
 //   Al limpiar el buscador, vuelven las pestañas normales.
 //
 // 🆕 Rediseño "profesional": bordes de 1px (antes 2), esquinas menos
-// redondeadas, sin MAYÚSCULA+tracking ancho. Ninguna función de lógica de
-// negocio (clasificación de pestañas, ejecutar renovación, códigos de
-// error del backend) se tocó — es exactamente la misma.
+// redondeadas, sin MAYÚSCULA+tracking ancho.
+//
+// 🐛 ARREGLOS 13/10/2026:
+//   · "Ya se renovó" ahora es `tiene_renovacion` (lo manda el backend: tiene
+//     hija o el auto tiene un alta más nueva). ANTES se usaba es_renovacion /
+//     poliza_origen, que dicen que la póliza NACIÓ de una renovación → toda
+//     póliza que alguna vez fue renovación quedaba escondida para siempre.
+//   · Las FINALIZADAS sin renovar (pagó todo y ya venció) aparecen en
+//     "Vencidas". Antes desaparecían al día siguiente de vencer.
+//   · "Vence hoy" ya no muestra las de mañana (el backend calculaba mal los días).
+//   · Al renovar, la póliza nueva se abre en su ficha (antes abría el Inicio).
+//   · "Renovar igual" se sacó: el servidor nunca lo permitía y el cartel
+//     volvía a aparecer. Ahora el aviso lleva a la renovación que ya existe.
+//   · El renovar con PDF (AMCA / La Equidad) ahora muestra los errores.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -41,14 +52,10 @@ import {
   fetchRenovacionesOficinas,
   fetchRenovacionesResumen,
   fetchRenovacionesGlobalResumen,
-  buildRenovacionesQuery,
   selectRenovacionesItems,
   selectRenovacionesStatus,
   selectRenovacionesError,
-  selectRenovacionesCount,
   selectRenovacionesOficinas,
-  selectRenovacionesResumen,
-  selectRenovacionesGlobalResumen,
 } from "../store/slices/renovacionesSlice";
 
 import RenovacionModal from "../components/renovaciones/RenovacionModal";
@@ -91,8 +98,13 @@ function diasVencidaDe(p) {
   }
 }
 
-function isRenovada(p) {
-  return !!p?.es_renovacion || !!p?.poliza_origen || !!p?.poliza_origen_id;
+// ¿YA SE RENOVÓ? Lo decide el backend (tiene hija, o el mismo auto tiene un
+// alta más nueva). OJO: es_renovacion / poliza_origen NO sirven para esto:
+// dicen que la póliza NACIÓ de una renovación (es la hija), no que ya se renovó.
+// Ej: FXO461 es la 2ª renovación del cliente → es_renovacion=true, pero cuando
+// le toque vencer HAY que renovarla de nuevo.
+function yaRenovada(p) {
+  return !!p?.tiene_renovacion;
 }
 
 // Días para que venza la póliza. Negativo = ya vencida, 0 = vence hoy, positivo = futuro.
@@ -125,7 +137,7 @@ function isVerificada(p) {
 
 function isVencidaSinGestion(p) {
   // Vencida hace 30+ días, no renovada, sin marca manual
-  if (isRenovada(p)) return false;
+  if (yaRenovada(p)) return false;
   if (isMarcadaNoRenueva(p)) return false;
   const dv = diasVencidaDe(p);
   return dv >= DIAS_SIN_GESTION_LIMITE;
@@ -136,13 +148,14 @@ function isVencidaSinGestion(p) {
 function clasificarTab(p) {
   // Las que marqué "no renueva" no se muestran en ningún lado.
   if (isMarcadaNoRenueva(p)) return null;
-  // Las que ya renové tampoco (esta pantalla es solo lo que falta hacer).
-  if (isRenovada(p)) return null;
+  // Las que ya se renovaron tampoco (esta pantalla es solo lo que falta hacer).
+  if (yaRenovada(p)) return null;
 
-  // Si ya tiene una renovación, o quedó finalizada/cancelada, se va de la tabla.
-  if (p?.tiene_renovacion) return null;
+  // Cancelada = dada de baja: no se renueva.
+  // ⚠️ La FINALIZADA sí entra: el que pagó todo pasa a "finalizada" al día
+  //    siguiente de vencer, y es justo el que hay que renovar.
   const estado = String(p?.estado || "").toLowerCase();
-  if (estado === "finalizada" || estado === "cancelada") return null;
+  if (estado === "cancelada") return null;
 
   const d = diasParaVencer(p);
   if (d == null) return null;
@@ -198,20 +211,6 @@ function ResumenInline({ tab, kpis }) {
     <span className="text-[13px] text-suave dark:text-suave-dark">
       <N>{kpis.total}</N> {label}
     </span>
-  );
-}
-
-/* Cajita del panel de diagnóstico (temporal) */
-function DiagBox({ label, value }) {
-  return (
-    <div className="rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2.5 py-1.5">
-      <div className="text-[10px] text-suave dark:text-suave-dark">
-        {label}
-      </div>
-      <div className="text-[15px] font-semibold tabular-nums text-titulo dark:text-titulo-dark">
-        {value}
-      </div>
-    </div>
   );
 }
 
@@ -277,11 +276,8 @@ export default function RenovacionesPage() {
   const items = useSelector(selectRenovacionesItems);
   const status = useSelector(selectRenovacionesStatus);
   const error = useSelector(selectRenovacionesError);
-  const count = useSelector(selectRenovacionesCount);
 
   const oficinas = useSelector(selectRenovacionesOficinas);
-  const resumen = useSelector(selectRenovacionesResumen);
-  const globalResumen = useSelector(selectRenovacionesGlobalResumen) || {};
 
   // 🆕 Tab activo (persistido en localStorage)
   const [tab, setTab] = useState(() => {
@@ -327,9 +323,7 @@ export default function RenovacionesPage() {
 
   // 🆕 Errores estructurados del backend
   const [renovarError, setRenovarError] = useState(null);    // banner dentro del modal de renovar
-  const [polizaRenovadaModal, setPolizaRenovadaModal] = useState({ open: false, error: null, item: null });
-  // Último payload del modal de renovar, para reintentar con confirmación
-  const [ultimoPayload, setUltimoPayload] = useState(null);
+  const [polizaRenovadaModal, setPolizaRenovadaModal] = useState({ open: false, error: null });
 
   // 🎮 Gamificación: tracking del progreso del día
   const {
@@ -371,20 +365,17 @@ export default function RenovacionesPage() {
      página). Así los contadores de las pestañas y las filas mostradas salen
      siempre del mismo conjunto y nunca quedan desfasados.
 
+     Sin búsqueda, el backend ya manda SOLO la bandeja: vencidas de los
+     últimos 30 días sin renovar + hoy + próximos 3 días (`dias: 3`).
+
      🆕 Cuando hay búsqueda activa:
-       - `dias` bien alto: el backend usa ese número para marcar "necesita
-         renovar", así una póliza que vence dentro de 8 meses también entra.
-       - `include_finalizadas: 1` ← 🔴 CLAVE. Sin esto el backend
-         (polizas/views/poliza.py, get_queryset) hace
-         `qs.exclude(estado__iexact="finalizada")` ANTES de buscar, y toda
-         póliza ya renovada o con cobertura terminada queda afuera para
-         siempre. Era el motivo real de "no hay resultados".
+       - `dias` bien alto: así una póliza que vence dentro de 8 meses también entra.
+       - `include_finalizadas: 1`: también las finalizadas que ya se renovaron
+         (la tabla les pone el cartel "Ya renovada" y el botón para verla).
        - `oficina: undefined`: la búsqueda a mano es GLOBAL. Si buscás una
          patente puntual no querés que el filtro de sucursal te la esconda.
   ============================================================== */
 
-  // 🔎 Payload de la consulta. Está separado de load() a propósito: el panel de
-  // diagnóstico lo reusa para mostrar la URL EXACTA que se le pidió al backend.
   const buildLoadPayload = useCallback(
     (opts = {}) => {
       const ofi =
@@ -401,7 +392,7 @@ export default function RenovacionesPage() {
       const oficinaFinal = buscando && isWebAdmin ? undefined : ofi || undefined;
 
       return {
-        dias: buscando ? 3650 : 30,
+        dias: buscando ? 3650 : 3,
         solo_pendientes: false,
         search: (search || "").trim(),
         ordering: "vto_referencia",
@@ -527,9 +518,7 @@ export default function RenovacionesPage() {
 
     // 🆕 En búsqueda avisamos cuántas de esas ya tienen renovación hecha.
     if (modoBusqueda) {
-      const yaRenovadas = itemsForTab.filter(
-        (p) => isRenovada(p) || !!p?.tiene_renovacion
-      ).length;
+      const yaRenovadas = itemsForTab.filter(yaRenovada).length;
       return { total, yaRenovadas };
     }
 
@@ -612,16 +601,15 @@ export default function RenovacionesPage() {
   );
 
   /* ============ Renovar (centralizado) ============
-     Se usa desde el modal de renovar Y desde el aviso "ya se renovó".
-     - payload: datos del modal (número, compañía, precio, etc.)
-     - confirmar: true cuando el usuario ya vio el aviso "ya se renovó"
-       y apretó "Renovar igual" → manda confirmar_renovacion al backend
-       para que renueve igual en vez de avisar de nuevo.
-     - itemOverride: la póliza a renovar (si no viene, usa `selected`).
+     Se usa desde los dos modales (NRE y con PDF).
+     - payload: datos del modal (compañía, precio, cupones del PDF, etc.)
+     🛡️ Si la póliza ya tenía renovación, el backend responde
+        POLIZA_YA_RENOVADA y se muestra el aviso con el link a la que ya existe.
+        No hay "renovar igual": eso crearía dos pólizas para el mismo auto.
   */
   const ejecutarRenovacion = useCallback(
-    async (payload, { confirmar = false, itemOverride = null } = {}) => {
-      const item = itemOverride || selected;
+    async (payload) => {
+      const item = selected;
       if (!item?.id) return;
 
       setSubmitting(true);
@@ -635,7 +623,6 @@ export default function RenovacionesPage() {
           payload?.grua ??
           1,
       };
-      if (confirmar) finalPayload.confirmar_renovacion = true;
 
       try {
         const res = await dispatch(
@@ -651,8 +638,9 @@ export default function RenovacionesPage() {
         setPolizaRenovadaModal({ open: false, error: null });
 
         // Abrimos la póliza nueva en otra pestaña, sin salir de Renovaciones.
+        // 🐛 La app usa rutas con "#" (HashRouter): "/polizas/ID" abría el Inicio.
         if (nuevaId) {
-          window.open(`/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
+          window.open(`#/polizas/${nuevaId}`, "_blank", "noopener,noreferrer");
         }
 
         // Recargamos para que la póliza renovada desaparezca de la tabla.
@@ -670,12 +658,13 @@ export default function RenovacionesPage() {
           const code = backendError.error;
 
           if (code === "POLIZA_YA_RENOVADA") {
-            // 🆕 AVISO (no bloqueo): cerramos el modal de renovar y abrimos el
-            // cartel "¿seguro? ya se renovó". Guardamos la póliza para poder
-            // reintentar con confirmación desde ese cartel.
+            // Cerramos el modal de renovar y avisamos cuál es la que ya existe.
             setModalOpen(false);
             setRenovarError(null);
-            setPolizaRenovadaModal({ open: true, error: backendError, item });
+            setPolizaRenovadaModal({ open: true, error: backendError });
+            // La lista quedó vieja (esa póliza no debería estar): recargamos.
+            load({ force: true });
+            loadResumen({ force: true });
           } else if (
             code === "COBERTURA_NO_CONFIGURADA" ||
             code === "SIN_CUOTAS_REFERENCIA" ||
@@ -774,48 +763,6 @@ export default function RenovacionesPage() {
             <HiX /> Limpiar
           </button>
         </div>
-      )}
-
-      {/* ====== PANEL DE DIAGNÓSTICO (temporal — BORRAR cuando funcione) ======
-          Sirve para saber DÓNDE se pierde una póliza:
-            · "Backend devolvió 0"  → el problema está en el backend / los params.
-            · "Backend devolvió 2, en pantalla 0" → el problema está en el front.
-      ==================================================================== */}
-      {modoBusqueda && (
-        <details className="mt-2 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3">
-          <summary className="cursor-pointer text-[12px] text-suave dark:text-suave-dark select-none">
-            Diagnóstico de la búsqueda
-          </summary>
-
-          <div className="mt-2 space-y-2 text-[12px] text-titulo dark:text-titulo-dark">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <DiagBox label="Backend devolvió" value={itemsRaw.length} />
-              <DiagBox label="Count del backend" value={Number(count || 0)} />
-              <DiagBox label="En pantalla" value={itemsForTab.length} />
-              <DiagBox label="Sos ADMIN" value={isWebAdmin ? "SÍ" : "NO"} />
-            </div>
-
-            <div>
-              <div className="text-[11px] text-suave dark:text-suave-dark mb-1">
-                URL pedida al backend
-              </div>
-              <code className="block break-all rounded-lg bg-surface dark:bg-surface-dark p-2 text-[11px] font-mono text-duo-azul">
-                polizas/renovaciones/
-                {buildRenovacionesQuery(buildLoadPayload())}
-              </code>
-            </div>
-
-            <div className="text-[11px] text-suave dark:text-suave-dark">
-              Sucursal del filtro: <strong className="font-medium">{oficina || "(todas)"}</strong> ·
-              Estados que llegaron:{" "}
-              <strong className="font-medium">
-                {itemsRaw.length
-                  ? Array.from(new Set(itemsRaw.map((x) => x?.estado || "?"))).join(", ")
-                  : "—"}
-              </strong>
-            </div>
-          </div>
-        </details>
       )}
 
       {!!error && (
@@ -920,6 +867,9 @@ export default function RenovacionesPage() {
         <RenovacionConPdfModal
           open={modalOpen}
           item={selected}
+          // 🐛 Antes no recibía el error: si el servidor rechazaba la
+          //    renovación, el botón volvía a "Crear renovación" sin decir nada.
+          error={renovarError}
           submitting={submitting}
           onClose={() => {
             if (submitting) return;
@@ -927,10 +877,7 @@ export default function RenovacionesPage() {
             setSelected(null);
             setRenovarError(null);
           }}
-          onSubmit={(payload) => {
-            setUltimoPayload(payload);
-            ejecutarRenovacion(payload);
-          }}
+          onSubmit={ejecutarRenovacion}
         />
       ) : (
       <RenovacionModal
@@ -943,31 +890,18 @@ export default function RenovacionesPage() {
           setSelected(null);
           setRenovarError(null);
         }}
-        onSubmit={(payload) => {
-          // Guardamos el último payload por si el usuario tiene que confirmar
-          // "renovar igual" en el cartel de aviso.
-          setUltimoPayload(payload);
-          ejecutarRenovacion(payload);
-        }}
+        onSubmit={ejecutarRenovacion}
         submitting={submitting}
       />
       )}
 
-      {/* ============ Modal "Póliza ya renovada" (AVISO Sí/No) ============ */}
+      {/* ============ Aviso "Esta póliza ya se renovó" (con link a la nueva) ============ */}
       <PolizaYaRenovadaModal
         open={polizaRenovadaModal.open}
         error={polizaRenovadaModal.error}
-        submitting={submitting}
         onClose={() => {
           setPolizaRenovadaModal({ open: false, error: null });
           setSelected(null);
-        }}
-        onConfirmar={() => {
-          // 🆕 "Renovar igual": reintenta con confirmar_renovacion=true.
-          ejecutarRenovacion(ultimoPayload, {
-            confirmar: true,
-            itemOverride: polizaRenovadaModal.item,
-          });
         }}
       />
 
