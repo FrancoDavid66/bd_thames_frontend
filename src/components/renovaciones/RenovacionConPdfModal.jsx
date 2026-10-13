@@ -27,6 +27,16 @@
 // ── QUÉ NO FRENA ──────────────────────────────────────────────────────
 // Si un cupón quedó sin imagen recortada, AVISA pero deja seguir. Mejor
 // tener la póliza cargada y la imagen después, que no poder renovar.
+//
+// ── ARREGLOS 13/10/2026 ───────────────────────────────────────────────
+//   · Muestra el error del servidor (antes el botón volvía a "Crear
+//     renovación" sin decir nada).
+//   · Manda las cuotas que la compañía ya no imprime porque el cliente YA LAS
+//     PAGÓ (`pagada_estimada`). Antes se perdía la marca y entraban como
+//     impagas → el cliente aparecía en mora sin deber nada.
+//   · Manda la patente corregida en el paso 2 (antes se ignoraba).
+//   · Si el PDF no trajo cupones, no deja crear la renovación (saldría con
+//     cuotas en $0 y el portal vacío, justo lo que este modal evita).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
@@ -40,6 +50,7 @@ import ModalDuo from "../ui/ModalDuo";
 import Boton3D from "../ui/Boton3D";
 import InputDuo from "../ui/InputDuo";
 import LoaderPantalla from "../ui/LoaderPantalla";
+import ErrorBanner from "./ErrorBanner";
 import api from "../../services/api";
 import { uploadToCloudinary } from "../../utils/cloudinary.js";
 import { cx, fmtMoney, getCompania } from "./utils";
@@ -128,6 +139,8 @@ export default function RenovacionConPdfModal({
   onClose,
   onSubmit,       // (payload) => void  — lo dispara el paso 4
   submitting = false,
+  // Error estructurado del backend: { error, message, detail, action, context }
+  error = null,
 }) {
   const [paso, setPaso] = useState(0);
   const [leyendo, setLeyendo] = useState(false);
@@ -201,16 +214,21 @@ export default function RenovacionConPdfModal({
   const extra = datos?.datos_extra || {};
   const cobertura = extra.cobertura || {};
   const asistencia = extra.asistencia || null;
-  const sinImagen = cupones.filter((c) => !c.imagen_url).length;
+  // Las que ya pagó no traen imagen (la compañía no las imprime): no cuentan como faltante.
+  const sinImagen = cupones.filter((c) => !c.imagen_url && !c.pagada_estimada).length;
+  const conImagenEsperada = cupones.filter((c) => !c.pagada_estimada).length;
+  const yaPagadas = cupones.length - conImagenEsperada;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
 
   const confirmar = () => {
+    if (!cupones.length) return; // sin cupones no se crea (ver aviso del paso 3)
     onSubmit?.({
       // Lo que el backend necesita para armar la póliza nueva COMPLETA.
       nuevaCompania: form.compania || undefined,
       nuevoNumero: form.numero_poliza || undefined,
       cobertura: form.cobertura || undefined,
       tipo: form.tipo || undefined,
+      patente: form.patente || undefined,
       marca: form.marca || undefined,
       modelo: form.modelo || undefined,
       anio: form.anio || undefined,
@@ -222,6 +240,9 @@ export default function RenovacionConPdfModal({
         importe: c.importe,
         imagen_url: c.imagen_url || "",
         codigo_barras: c.codigo_barras || "",
+        // 🏷️ Ya la pagó (la compañía dejó de imprimirla): entra como PAGADA.
+        pagada_estimada: !!c.pagada_estimada,
+        nota: c.nota || "",
       })),
       // 📦 Qué cubre, la letra chica, la grúa, la clave de pago.
       datos_extra: extra,
@@ -243,11 +264,16 @@ export default function RenovacionConPdfModal({
       )}
 
       {paso === 0 ? null : paso < 3 ? (
-        <Boton3D variant="violeta" onClick={() => setPaso((p) => p + 1)}>
+        <Boton3D
+          variant="violeta"
+          onClick={() => setPaso((p) => p + 1)}
+          // Sin cupones no se avanza: es el archivo equivocado (ver aviso).
+          disabled={paso === 2 && !cupones.length}
+        >
           Siguiente <HiArrowRight />
         </Boton3D>
       ) : (
-        <Boton3D variant="verde" onClick={confirmar} disabled={submitting}>
+        <Boton3D variant="verde" onClick={confirmar} disabled={submitting || !cupones.length}>
           {submitting ? "Creando…" : "Crear renovación"}
         </Boton3D>
       )}
@@ -279,6 +305,14 @@ export default function RenovacionConPdfModal({
       >
         <input ref={inputRef} type="file" accept=".pdf" className="hidden" onChange={leerPdf} />
         <Barra paso={paso} />
+
+        {/* Error del servidor al crear la renovación (ej: ya estaba renovada,
+            sin permiso, cobertura sin configurar). */}
+        {error && (
+          <div className="mb-4">
+            <ErrorBanner error={error} />
+          </div>
+        )}
 
         {/* ═══ PASO 1 — El PDF ═══ */}
         {paso === 0 && (
@@ -354,9 +388,10 @@ export default function RenovacionConPdfModal({
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] text-suave dark:text-suave-dark">
                     {cupones.length} {cupones.length === 1 ? "cuota" : "cuotas"}
+                    {yaPagadas ? ` · ${yaPagadas} ya ${yaPagadas === 1 ? "pagada" : "pagadas"}` : ""}
                   </span>
                   <span className="text-[12px] font-medium text-duo-violeta">
-                    {cupones.length - sinImagen} con imagen
+                    {conImagenEsperada - sinImagen} de {conImagenEsperada} con imagen
                   </span>
                 </div>
 
@@ -371,11 +406,20 @@ export default function RenovacionConPdfModal({
                           {c.numero ?? i + 1}
                         </span>
                         <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-semibold text-titulo dark:text-titulo-dark">
+                          <span className="flex items-center gap-2 text-sm font-semibold text-titulo dark:text-titulo-dark">
                             Vence {fmtFecha(c.vencimiento)}
+                            {c.pagada_estimada && (
+                              <span className="rounded-md bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-1.5 py-0.5 text-[10px] font-medium text-duo-verde-sombra dark:text-duo-verde">
+                                Ya pagada
+                              </span>
+                            )}
                           </span>
                           <span className="block text-[11px] text-suave dark:text-suave-dark truncate">
-                            {c.codigo_barras ? `Código ${c.codigo_barras.slice(0, 12)}…` : "Sin código de barras"}
+                            {c.pagada_estimada
+                              ? "La compañía ya no la imprime: entra como pagada."
+                              : c.codigo_barras
+                              ? `Código ${c.codigo_barras.slice(0, 12)}…`
+                              : "Sin código de barras"}
                           </span>
                         </span>
                         <span className="text-sm font-semibold text-titulo dark:text-titulo-dark shrink-0">
@@ -395,7 +439,7 @@ export default function RenovacionConPdfModal({
                             loading="lazy"
                           />
                         </div>
-                      ) : (
+                      ) : c.pagada_estimada ? null : (
                         <div className="border-t border-linea dark:border-linea-dark px-4 py-2.5 flex items-center gap-2 text-[12px] text-duo-amarillo-sombra dark:text-duo-amarillo">
                           <HiPhotograph className="shrink-0" />
                           Sin imagen recortada. Se puede cargar después desde el panel del portal.
@@ -407,9 +451,9 @@ export default function RenovacionConPdfModal({
 
                 {sinImagen ? (
                   <Aviso>
-                    {sinImagen === cupones.length
+                    {sinImagen === conImagenEsperada
                       ? "Ningún cupón se pudo recortar. La póliza se crea igual, pero el cliente va a ver el PDF entero en la caja."
-                      : `${sinImagen} de ${cupones.length} cupones quedaron sin imagen. No frena la renovación.`}
+                      : `${sinImagen} de ${conImagenEsperada} cupones quedaron sin imagen. No frena la renovación.`}
                   </Aviso>
                 ) : (
                   <Aviso tono="verde">
@@ -425,6 +469,7 @@ export default function RenovacionConPdfModal({
                 </strong>
                 Casi seguro es el archivo equivocado. Volvé atrás y subí la
                 propuesta / póliza completa, la que tiene la hoja de Rapipago.
+                Sin cupones no se puede crear la renovación.
               </Aviso>
             )}
           </div>
