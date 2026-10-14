@@ -18,6 +18,7 @@
 //     deploy), NO te saca: el pedido falla y se reintenta después.
 // ============================================================
 import axios from "axios";
+import { avisarSiEstabaDeBaja } from "../utils/pagos/avisoReactivacion";
 
 const RAW = (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/").toString().trim();
 export const API_BASE = RAW.endsWith("/") ? RAW : `${RAW}/`;
@@ -136,7 +137,12 @@ export function instalarSesion(instancia, { siempreConToken = false } = {}) {
   });
 
   instancia.interceptors.response.use(
-    (r) => r,
+    (r) => {
+      // 💳 Se cobró una póliza que estaba dada de baja → cartel "verificá en
+      //    la compañía" (ver utils/pagos/avisoReactivacion.js).
+      avisarSiEstabaDeBaja(r);
+      return r;
+    },
     async (error) => {
       const config = error?.config || {};
       const st = error?.response?.status;

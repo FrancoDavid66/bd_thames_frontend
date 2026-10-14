@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { FaCar, FaEdit, FaTrash, FaExchangeAlt } from "react-icons/fa";
 import {
   HiArrowLeft, HiChevronRight, HiOfficeBuilding,
-  HiCash, HiDocumentText, HiShieldCheck, HiRefresh, HiLockClosed,
+  HiCash, HiDocumentText, HiShieldCheck, HiRefresh, HiLockClosed, HiPencilAlt,
 } from "react-icons/hi";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -536,6 +536,19 @@ export default function PolizaDetails() {
           </div>
         </CardDuo>
       </div>
+
+      {/* 📝 Observaciones de la póliza (se editan con "Editar").
+          Ej: "[14/10/2026] Reactivada por pago: Sofi cobró la cuota 3…" */}
+      {String(poliza?.observaciones || "").trim() ? (
+        <section id="observaciones" className="mb-6 scroll-mt-4">
+          <SectionTitle Icon={HiPencilAlt} title="Observaciones" />
+          <CardDuo className="px-3.5 py-3">
+            <p className="whitespace-pre-line text-[13px] leading-relaxed text-titulo dark:text-titulo-dark">
+              {String(poliza.observaciones).trim()}
+            </p>
+          </CardDuo>
+        </section>
+      ) : null}
 
       <section id="vehiculo-datos" className="mb-6 scroll-mt-4">
         <SectionTitle Icon={FaCar} title="Datos del vehículo" />

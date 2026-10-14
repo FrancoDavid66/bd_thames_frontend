@@ -69,6 +69,8 @@ const RankingPage = lazyConReintento(() => import("./pages/RankingPage"));
 // 🎮 MINIJUEGO "SINIESTRO CERO" (auto que esquiva el tráfico)
 const JuegoPage = lazyConReintento(() => import("./pages/JuegoPage"));
 import CierreCajaReminder from "./components/recaudacion/CierreCajaReminder";
+// 💳 Cartel "esta póliza estaba dada de baja" al cobrarla (ver utils/pagos/avisoReactivacion.js)
+import AvisoPolizaReactivada from "./components/polizas/AvisoPolizaReactivada";
 
 // 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
 const CuponPublicoPage = lazyConReintento(() => import("./pages/CuponPublicoPage"));
@@ -817,6 +819,7 @@ function App() {
           </motion.main>
 
           <CierreCajaReminder />
+          <AvisoPolizaReactivada />
         </motion.div>
       </div>
 
