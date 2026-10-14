@@ -24,6 +24,11 @@
 //    retira el cliente. A esa oficina le aparece con "Lo cargó el gestor".
 // 🎚️ Plata (solo admin) y aviso al cliente por WhatsApp: salen solo si están
 //    prendidos en Railway (hoy apagados). 📅 Sin "fecha estimada" (28/09).
+// 📲 «¡Trámite cargado!» con gestor (Franco 14/10): 2 botones de WhatsApp, en orden.
+//    1) A la GESTORA: "te pasamos un trámite nuevo" (sin póliza ni plata) + el link
+//       para abrirlo en su app.  2) Al CLIENTE: "ya le pasamos tu trámite a la
+//       gestoría" + el link para seguirlo. Se abre WhatsApp con el mensaje escrito
+//       y lo mandás vos (no sale solo). Si lo cargó el gestor, no salen.
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
@@ -32,6 +37,7 @@ import {
   HiArrowRight,
   HiBan,
   HiCamera,
+  HiChatAlt2,
   HiCheck,
   HiCreditCard,
   HiDocumentSearch,
@@ -54,7 +60,7 @@ import {
 import { useGestoria } from "./gestoriaContext";
 import { buscarClientes, crearTramite, guardarDocumento, mensajeError, subirArchivo } from "../../services/gestoria";
 import { Avatar, Candado, Cargando } from "./Piezas";
-import { calcComision, fmtPct, plata } from "./gestoriaUtils";
+import { calcComision, fmtPct, linkWhatsAppOElegir, plata } from "./gestoriaUtils";
 
 const MAX_FOTOS = 12; // en el alta; el resto se sube desde el trámite
 
@@ -244,6 +250,193 @@ function MiniFoto({ f, onSacar }) {
         <HiX className="w-4 h-4" />
       </button>
     </li>
+  );
+}
+
+// ───────────── 📲 Los 2 WhatsApp de «¡Trámite cargado!» (14/10) ─────────────
+
+/** Dirección de ESTA app + una ruta (la app usa "#/"). Ej: …/#/gestoria/tramite/12 */
+function linkApp(ruta) {
+  const base = `${window.location.origin}${window.location.pathname}`.replace(/\/$/, "");
+  return `${base}/#${ruta}`;
+}
+
+/** Link «Mi trámite» del cliente (el mismo que «Copiar» en la ficha). */
+function linkSeguimiento(t) {
+  const token = String(t?.portal_path || "").split("/mi-tramite/")[1] || "";
+  return token ? linkApp(`/mi-tramite/${token}`) : "";
+}
+
+function primerNombre(nombre) {
+  const p = String(nombre || "").trim().split(/\s+/)[0] || "";
+  return p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : "";
+}
+
+/** "VW Gol AB123CD" (vacío si no es de un auto o todavía no tiene patente). */
+function autoDe(t) {
+  if (t?.con_vehiculo === false) return "";
+  return `${t?.vehiculo || ""} ${t?.patente || ""}`.trim();
+}
+
+/** "Transferencia con cédula azul…" ("Otro": lo que escribieron). */
+function queTramite(t) {
+  return t?.tipo === "OTRO" && t?.detalle ? t.detalle : t?.tipo_txt || "trámite";
+}
+
+/** Para el cliente, corto: "Transferencia", "Duplicado"… ("Otro": lo que escribieron). */
+function queTramiteCorto(t) {
+  return t?.tipo === "OTRO" && t?.detalle ? t.detalle : t?.tipo_corto || queTramite(t);
+}
+
+/** Los papeles que no trajo (para que la gestora y el cliente lo sepan). */
+function papelesQueFaltan(t) {
+  return (Array.isArray(t?.papeles) ? t.papeles : []).filter((p) => p && !p.ok && p.nombre).map((p) => p.nombre);
+}
+
+/**
+ * 1) A la gestora. 🔒 Sin póliza ni plata (Franco 29/09: el gestor no ve si es cliente de THAMES).
+ * Ej: ¡Hola Laura Gómez! Te escribo de THAMES: te pasamos un trámite nuevo (G-0012).
+ *     • Transferencia · • Cliente: Juan Pérez · • Auto: VW Gol AB123CD · • Falta: firma del titular
+ *     • Lo retira en: THAMES 5 Esquinas · Lo ves en tu app: …/#/gestoria/tramite/12
+ */
+function textoGestora(t) {
+  const nombre = String(t?.gestor_contacto?.nombre || t?.gestor_nombre || "").trim();
+  const auto = autoDe(t);
+  const faltan = papelesQueFaltan(t);
+  const papeles = Array.isArray(t?.papeles) ? t.papeles : [];
+  const lineas = [
+    `¡Hola${nombre ? ` ${nombre}` : ""}! Te escribo de THAMES: te pasamos un trámite nuevo (${t.numero}).`,
+    "",
+    `• Trámite: ${queTramite(t)}`,
+    t.persona_nombre ? `• Cliente: ${t.persona_nombre}` : null,
+    auto ? `• Auto: ${auto}` : null,
+    faltan.length ? `• Falta: ${faltan.join(", ")}` : papeles.length ? "• Trajo todos los papeles" : null,
+    t.oficina_nombre ? `• Lo retira en: THAMES ${t.oficina_nombre}` : null,
+    "",
+    `Lo ves en tu app: ${linkApp(`/gestoria/tramite/${t.id}`)}`,
+  ];
+  return lineas.filter((x) => x !== null).join("\n");
+}
+
+/**
+ * 2) Al cliente: que ya le avisamos a la gestoría.
+ * Ej: ¡Hola Juan! Te escribimos de THAMES. Ya le pasamos tu trámite de transferencia
+ *     del VW Gol AB123CD a la gestoría (Laura Gómez), que se encarga de hacerlo. …
+ */
+function textoCliente(t) {
+  const nombre = primerNombre(t?.persona_nombre);
+  const gestora = String(t?.gestor_contacto?.nombre || t?.gestor_nombre || "").trim();
+  const auto = autoDe(t);
+  const faltan = papelesQueFaltan(t);
+  const link = linkSeguimiento(t);
+  const lineas = [
+    `¡Hola${nombre ? ` ${nombre}` : ""}! Te escribimos de THAMES. Ya le pasamos tu trámite de ${queTramiteCorto(t).toLowerCase()}${
+      auto ? ` del ${auto}` : ""
+    } a la gestoría${gestora ? ` (${gestora})` : ""}, que se encarga de hacerlo. El pago del trámite se lo hacés directo a la gestoría.`,
+    faltan.length ? `Para avanzar falta: ${faltan.join(", ").toLowerCase()}.` : null,
+    "Te avisamos cuando haya novedades.",
+    link ? `Lo podés seguir acá: ${link}` : null,
+  ];
+  return lineas.filter((x) => x !== null).join("\n");
+}
+
+/**
+ * 📲 Los 2 botones, en orden: 1) a la gestora, 2) al cliente. Cada uno abre WhatsApp
+ * con el mensaje escrito (lo mandás vos). Sin teléfono, WhatsApp te deja elegir el chat.
+ * El botón verde es el que toca ahora; al tocarlo queda con ✓.
+ */
+function AvisosWhatsApp({ t }) {
+  const [hecho, setHecho] = useState({ gestora: false, cliente: false });
+  const c = t.gestor_contacto || {};
+  const telGestora = String(c.telefono || "").trim();
+  const telCliente = String(t.persona_telefono || "").trim();
+  // Si algún día prenden el WhatsApp automático, al cliente ya le llegó el link solo.
+  const autoCliente = (t.avisos_whatsapp || []).some((w) => w && w.motivo === "alta" && w.ok && !w.manual);
+
+  const filas = [
+    {
+      id: "gestora",
+      n: 1,
+      titulo: `A la gestoría: ${c.nombre || t.gestor_nombre}`,
+      sub: "Que tiene un trámite nuevo para hacer.",
+      tel: telGestora,
+      href: linkWhatsAppOElegir(telGestora, textoGestora(t)),
+      boton: "Avisar a la gestoría",
+    },
+    {
+      id: "cliente",
+      n: 2,
+      titulo: `Al cliente: ${t.persona_nombre || "sin nombre"}`,
+      sub: autoCliente ? "Ya le llegó el WhatsApp automático con el link." : "Que ya le pasamos el trámite a la gestoría.",
+      tel: telCliente,
+      href: linkWhatsAppOElegir(telCliente, textoCliente(t)),
+      boton: "Avisar al cliente",
+      ya: autoCliente,
+    },
+  ];
+  const toca = filas.find((f) => !hecho[f.id] && !f.ya)?.id || "";
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-linea dark:border-linea-dark p-4">
+      <div className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-2 text-[16px] font-bold text-titulo dark:text-titulo-dark">
+          <HiChatAlt2 className="w-5 h-5 text-duo-verde" aria-hidden="true" /> Avisar por WhatsApp
+        </span>
+        <span className={`text-[13px] ${suave}`}>Tocá en orden: se abre WhatsApp con el mensaje escrito y lo mandás vos.</span>
+      </div>
+      <ol className="flex flex-col gap-2.5">
+        {filas.map((f) => {
+          const listo = hecho[f.id] || f.ya;
+          const principal = toca === f.id;
+          return (
+            <li
+              key={f.id}
+              className={`flex flex-col gap-3 rounded-xl border px-3.5 py-3 ${
+                principal
+                  ? "border-duo-verde/50 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]"
+                  : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
+              }`}
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <span
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[14px] font-bold ${
+                    listo ? "bg-duo-verde text-white" : principal ? "bg-duo-violeta text-white" : "border-2 border-slate-300 dark:border-slate-600 text-suave dark:text-suave-dark"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {listo ? <HiCheck className="w-4 h-4" /> : f.n}
+                </span>
+                <span className="flex flex-col gap-0.5 min-w-0 flex-1">
+                  <strong className="text-[15px] leading-snug text-titulo dark:text-titulo-dark break-words">{f.titulo}</strong>
+                  <span className={`text-[13px] leading-snug ${suave}`}>
+                    {hecho[f.id] ? "Listo: se abrió WhatsApp con el mensaje." : f.sub}
+                  </span>
+                  <span className={`text-[12px] ${suave}`}>
+                    {f.tel ? `WhatsApp: ${f.tel}` : "Sin teléfono cargado: en WhatsApp elegís el chat."}
+                  </span>
+                </span>
+              </div>
+              {!f.ya && (
+                <a
+                  href={f.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setHecho((h) => ({ ...h, [f.id]: true }))}
+                  className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-bold transition-colors active:scale-[0.99] ${
+                    principal
+                      ? "bg-duo-verde hover:bg-duo-verde-sombra text-white"
+                      : "border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark hover:bg-surface dark:hover:bg-surface-dark"
+                  }`}
+                >
+                  <HiChatAlt2 className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  {hecho[f.id] ? "Mandar de nuevo" : f.boton}
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -723,6 +916,8 @@ export default function NuevoTramite() {
               {creado.fallidas === 1 ? "Una foto no se pudo guardar. Subila" : `${creado.fallidas} fotos no se pudieron guardar. Subilas`} de nuevo desde el trámite.
             </Aviso>
           )}
+          {/* 📲 1) a la gestoría · 2) al cliente (solo si lo cargó la oficina/admin y tiene gestor) */}
+          {!esGestor && t.gestor ? <AvisosWhatsApp key={t.id} t={t} /> : null}
           <div className="flex flex-col gap-2.5 pt-3">
             <BotonGrande
               onClick={() => {
