@@ -26,13 +26,14 @@ const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
 // 🏷️ Los días que trae el reporte (mismos que el backend: REPORT_DELTAS + MESES_ATRASO).
 //    "dias" = el número de la primera columna del PDF (0 = hoy · 3 = hace 3 días · -3 = en 3 días).
+//    🗓️ Calendario de la oficina: 7 y 3 días antes, el mismo día, 3, 15 y 30 días después.
 const DIAS_REPORTE = [
+  { dias: "-7", texto: "Vence en 7 días", sumar: { dias: 7 }, tono: "verde" },
+  { dias: "-3", texto: "Vence en 3 días", sumar: { dias: 3 }, tono: "verde" },
   { dias: "0", texto: "Vence hoy", sumar: { dias: 0 }, tono: "amarillo" },
   { dias: "3", texto: "Venció hace 3 días", sumar: { dias: -3 }, tono: "rojo" },
-  { dias: "7", texto: "Venció hace 7 días", sumar: { dias: -7 }, tono: "rojo" },
   { dias: "15", texto: "Venció hace 15 días", sumar: { dias: -15 }, tono: "rojo" },
   { dias: "1 mes", texto: "Venció hace un mes", sumar: { meses: -1 }, tono: "rojo" },
-  { dias: "-3", texto: "Vence en 3 días", sumar: { dias: 3 }, tono: "verde" },
 ];
 
 // Qué dice la columna "Pago" de cada fila.
