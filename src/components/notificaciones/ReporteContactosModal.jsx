@@ -3,8 +3,12 @@
 // 📋 Descarga el reporte de contactos (PDF o Excel) para mandar los WhatsApp a mano.
 //
 // El backend YA arma todo (notificaciones/services_reporte_contactos.py):
-//   GET /api/notificaciones/cuotas/reporte-contactos/?formato=pdf|excel&oficina=1
+//   GET /api/notificaciones/cuotas/reporte-contactos/?formato=pdf|excel&oficina=1&fecha=AAAA-MM-DD
 // Este modal solo junta los filtros y dispara la descarga.
+//
+// 📅 "¿De qué día?": cualquier usuario elige el día de la lista (por defecto hoy).
+//    Ej: el lunes bajan la del domingo, así no se pierde ningún mensaje.
+//    Los que pagaron hasta hoy no salen.
 //
 // 📅 Cada día del reporte trae LO MISMO que el filtro "Vence el" de Pólizas con
 // esa fecha: cuotas que vencen ese día (pagadas o no) y pólizas que terminan ese
@@ -20,6 +24,7 @@ import { PolizasAPI } from "../../api/polizas";
 
 import ModalDuo from "../ui/ModalDuo";
 import SelectDuo from "../ui/SelectDuo";
+import InputDuo from "../ui/InputDuo";
 import Boton3D from "../ui/Boton3D";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api/";
@@ -53,11 +58,31 @@ const TONOS = {
   gris: "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark border border-linea dark:border-linea-dark",
 };
 
+// 📅 Hasta cuántos días para atrás / adelante se puede elegir (igual que el backend).
+const DIAS_ATRAS = 31;
+const DIAS_ADELANTE = 7;
+
+// "2026-10-14" del día de hoy + n días (hora local).
+function ymd(n = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// "2026-10-18" → "domingo 18/10"
+function nombreDia(fecha) {
+  const [a, m, d] = String(fecha || "").split("-").map(Number);
+  if (!a || !m || !d) return "";
+  const dia = new Date(a, m - 1, d).toLocaleDateString("es-AR", { weekday: "long" });
+  return `${dia} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+}
+
 // Fecha de cada día (dd/mm), para compararla con el filtro "Vence el" de Pólizas.
 // "Hace un mes" es el mismo día del mes anterior (si no existe, el último: 31/03 → 28/02).
-function fechaDelDia({ dias = 0, meses = 0 }) {
-  const hoy = new Date();
-  let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+// `base` = el día elegido ("2026-10-18"); sin base, hoy.
+function fechaDelDia({ dias = 0, meses = 0 }, base) {
+  const [a, m, dd] = String(base || ymd()).split("-").map(Number);
+  let d = new Date(a, m - 1, dd);
   if (meses) {
     const primero = new Date(d.getFullYear(), d.getMonth() + meses, 1);
     const ultimoDia = new Date(primero.getFullYear(), primero.getMonth() + 1, 0).getDate();
@@ -85,6 +110,7 @@ export default function ReporteContactosModal({ open, onClose }) {
 
   const [formato, setFormato] = useState("pdf");
   const [oficinaId, setOficinaId] = useState("");
+  const [fecha, setFecha] = useState(ymd());
   const [oficinas, setOficinas] = useState([]);
   const [descargando, setDescargando] = useState(false);
 
@@ -100,6 +126,7 @@ export default function ReporteContactosModal({ open, onClose }) {
     if (open) {
       setFormato("pdf");
       setOficinaId("");
+      setFecha(ymd());
     }
   }, [open]);
 
@@ -110,6 +137,7 @@ export default function ReporteContactosModal({ open, onClose }) {
       const params = new URLSearchParams();
       params.set("formato", formato === "excel" ? "excel" : "pdf");
       if (isWebAdmin && oficinaId) params.set("oficina", oficinaId);
+      if (fecha) params.set("fecha", fecha);
 
       const res = await axios.get(
         `${BASE_URL.replace(/\/+$/, "")}/notificaciones/cuotas/reporte-contactos/?${params.toString()}`,
@@ -137,7 +165,15 @@ export default function ReporteContactosModal({ open, onClose }) {
       onClose?.();
     } catch (err) {
       console.error("[ReporteContactos] Error:", err);
-      toast.error("No se pudo generar el reporte");
+      // El error viene como archivo (blob): se lee para mostrar el motivo (ej: "Elegí un día entre…").
+      let motivo = "";
+      try {
+        const txt = await err?.response?.data?.text?.();
+        motivo = JSON.parse(txt || "{}")?.error || "";
+      } catch {
+        /* sin motivo */
+      }
+      toast.error(motivo || "No se pudo generar el reporte");
     } finally {
       setDescargando(false);
     }
@@ -194,6 +230,46 @@ export default function ReporteContactosModal({ open, onClose }) {
           </div>
         </div>
 
+        {/* 📅 ¿De qué día es la lista? (cualquier usuario). Ej: el lunes, la del domingo. */}
+        <div>
+          <InputDuo
+            label="¿De qué día?"
+            type="date"
+            value={fecha}
+            min={ymd(-DIAS_ATRAS)}
+            max={ymd(DIAS_ADELANTE)}
+            onChange={(e) => setFecha(e.target.value || ymd())}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {[
+              { txt: "Hoy", f: ymd() },
+              { txt: "Ayer", f: ymd(-1) },
+              { txt: "Anteayer", f: ymd(-2) },
+            ].map((b) => (
+              <button
+                key={b.txt}
+                type="button"
+                onClick={() => setFecha(b.f)}
+                className={`h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors ${
+                  fecha === b.f
+                    ? "border-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
+                    : "border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark hover:border-duo-azul/50"
+                }`}
+              >
+                {b.txt}
+              </button>
+            ))}
+            <span className="text-[12px] text-suave dark:text-suave-dark">
+              Lista del <b className="text-titulo dark:text-titulo-dark">{nombreDia(fecha)}</b>
+            </span>
+          </div>
+          {fecha !== ymd() ? (
+            <p className="mt-2 text-[12px] text-duo-amarillo-sombra dark:text-duo-amarillo">
+              Es la lista de otro día: los que pagaron hasta hoy no salen.
+            </p>
+          ) : null}
+        </div>
+
         {/* Oficina (solo admin — el empleado ve automáticamente la suya) */}
         {isWebAdmin && (
           <SelectDuo
@@ -215,7 +291,7 @@ export default function ReporteContactosModal({ open, onClose }) {
               <div key={d.dias} className="flex items-center gap-2 text-[12px] min-w-0">
                 <Chip tono={d.tono}>{d.dias}</Chip>
                 <span className="text-titulo dark:text-titulo-dark truncate">
-                  {d.texto} <span className="text-suave dark:text-suave-dark">· {fechaDelDia(d.sumar)}</span>
+                  {d.texto} <span className="text-suave dark:text-suave-dark">· {fechaDelDia(d.sumar, fecha)}</span>
                 </span>
               </div>
             ))}
@@ -240,12 +316,12 @@ export default function ReporteContactosModal({ open, onClose }) {
           {/* 🚨 Grúa: AMCA y La Equidad la dan a los 15 días de emitida (los lunes, también los del domingo). */}
           <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark flex items-center gap-2 text-[12px] min-w-0">
             <Chip tono="verde">GRÚA</Chip>
-            <span className="text-titulo dark:text-titulo-dark">Hoy se les activó la grúa — avisarles con el mensaje del PDF</span>
+            <span className="text-titulo dark:text-titulo-dark">Hoy se les activó la grúa — avisarles (solo en el Excel)</span>
           </div>
 
           <div className="mt-2.5 pt-2.5 border-t border-linea dark:border-linea-dark flex items-center gap-2 text-[12px] min-w-0">
             <Chip tono="azul">OFERTAS</Chip>
-            <span className="text-titulo dark:text-titulo-dark">Pagaron hace 14 días — para ofrecerles otros seguros</span>
+            <span className="text-titulo dark:text-titulo-dark">Pagaron hace 14 días — ofrecerles otros seguros (solo en el Excel)</span>
           </div>
         </div>
 
