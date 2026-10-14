@@ -20,6 +20,11 @@
 //     Antes quedaban como "borrador" y al guardar se descartaban sin avisar.
 //   - Los errores se muestran en criollo ("Modelo del vehículo: …" en vez de
 //     "modelo_auto: …") y si se venció la sesión lo dice claro.
+//
+// 🏢 14/10 (Franco: "que todas las oficinas puedan cargar denuncias de cualquier
+//    oficina"): el buscador usa /siniestros/buscar-poliza/ → trae pólizas de TODAS las
+//    oficinas (antes cada oficina veía solo las suyas). Cada resultado dice de qué
+//    oficina es. El siniestro lo ven la oficina de la póliza y la que lo cargó.
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -119,8 +124,9 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
     if (!text.trim() || text.length < 2) { setResults([]); setOpen(false); return; }
     setLoading(true);
     try {
+      // 🏢 Todas las oficinas (el admin puede filtrar por una con los chips).
       const { data: polData } = await api.get(
-        `polizas/?search=${encodeURIComponent(text)}&page_size=8${oficinaSel ? `&oficina=${oficinaSel}` : ""}`
+        `siniestros/buscar-poliza/?q=${encodeURIComponent(text)}${oficinaSel ? `&oficina=${oficinaSel}` : ""}`
       );
       const polizas = polData.results || polData || [];
 
@@ -209,7 +215,14 @@ function SearchPoliza({ value, displayValue, onSelect, oficinaSel = "" }) {
                     <span>{nombreCliente}</span>
                     {dni && <span className="text-suave dark:text-suave-dark">· DNI {dni}</span>}
                   </p>
-                  {vehiculo && <p className="text-xs text-suave dark:text-suave-dark mt-0.5">{vehiculo}</p>}
+                  <p className="text-xs text-suave dark:text-suave-dark mt-0.5 flex items-center gap-2 flex-wrap">
+                    {vehiculo && <span>{vehiculo}</span>}
+                    {p.oficina_nombre && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-1.5 py-0.5 text-[11px] font-medium text-duo-azul">
+                        <HiOfficeBuilding className="w-3 h-3" /> {p.oficina_nombre}
+                      </span>
+                    )}
+                  </p>
                 </button>
               );
             })}
@@ -537,14 +550,13 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                       </div>
                     </div>
                   ) : (
-                    oficinaPropiaNombre && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]">
-                        <span className="text-[11px] text-duo-azul">Tu oficina</span>
-                        <span className="text-sm font-medium text-duo-azul flex items-center gap-1">
-                          <HiOfficeBuilding className="w-3.5 h-3.5" /> {oficinaPropiaNombre}
-                        </span>
-                      </div>
-                    )
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)]">
+                      <HiOfficeBuilding className="w-4 h-4 text-duo-azul shrink-0 mt-0.5" />
+                      <span className="text-[13px] text-duo-azul">
+                        Buscá en <b className="font-semibold">todas las oficinas</b>.
+                        {oficinaPropiaNombre ? <> Queda cargado desde {oficinaPropiaNombre}.</> : null}
+                      </span>
+                    </div>
                   )}
 
                   <SearchPoliza value={form.poliza} displayValue={polizaDisplay} onSelect={onPolizaSelect} oficinaSel={oficinaSel} />
@@ -578,7 +590,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                             </div>
                           )}
                         </div>
-                        {isAdmin && form._oficinaNombre && (
+                        {form._oficinaNombre && (
                           <div className="flex items-center gap-2 px-3 py-2 bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] rounded-lg">
                             <span className="text-[11px] text-duo-azul">Oficina</span>
                             <span className="text-sm font-medium text-duo-azul">{form._oficinaNombre}</span>

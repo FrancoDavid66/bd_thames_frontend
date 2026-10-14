@@ -18,6 +18,8 @@
 //   decidir/cambiar, solo el admin (en el panel o tocando el color → «También»).
 //   Al admin le sale en «Para hoy» hasta que decide. Derivado: «Copiar los datos» para
 //   pasárselos a TuveUnChoque y el link a su web. Todo queda anotado en la bitácora.
+// 🏢 14/10: cualquier oficina carga siniestros de cualquier oficina. Abajo del nombre
+//   dice de qué oficina es la póliza (y en Datos: «Oficina» y «Lo cargó»).
 // props: onEditar(s), onBorrar(s), isWebAdmin  (el «Nuevo siniestro» está arriba, en la página)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -259,7 +261,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       esTerminado: (s) => s.estado === "CERRADO",
       abierto: () => true,
       nombre: (s) => s.cliente_label || "Sin cliente",
-      sub: (s) => [vehiculoDe(s), `#${s.id}`].filter(Boolean).join(" · "),
+      sub: (s) => [vehiculoDe(s), `#${s.id}`, s.oficina_nombre].filter(Boolean).join(" · "),
       // En el celu no hay columnas: quién lo reclama va primero (ej: "⚖️ TuveUnChoque · Chocó · AE040SN").
       subCelu: (s) => [RECLAMA[s.quien_reclama] && `⚖️ ${RECLAMA[s.quien_reclama].n}`, tipoDe(s).corto, s.patente].filter(Boolean).join(" · "),
       marcas: (s) =>
@@ -448,7 +450,9 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         phNovedad: "Escribí una novedad (ej: llamé a la compañía, el perito va el lunes)…",
         datos: (d) => [
           ["Cliente", d.cliente_label],
-          ["Póliza", d.poliza_label],
+          ["Póliza", [d.poliza_label, d.compania_nombre].filter(Boolean).join(" · ")],
+          ["Oficina", d.oficina_nombre || null],
+          ["Lo cargó", [d.cargado_por_nombre, d.oficina_carga_nombre && `desde ${d.oficina_carga_nombre}`].filter(Boolean).join(" · ") || null],
           ["Lo reclama", <QuienReclama key="q" s={d} admin={isWebAdmin} grande />],
           ["Qué pasó", d.responsabilidad_label || tipoDe(d).n],
           ["Fecha del siniestro", d.fecha_siniestro ? fechaCorta(d.fecha_siniestro) : null],
