@@ -13,6 +13,14 @@
 //
 // 👁️ ES SOLO LECTURA. El cliente no marca nada como pagado: paga afuera y
 //    manda el comprobante por WhatsApp. La oficina lo sube.
+//
+// 🔑 PORTAL ÚNICO (Franco 14/10/2026: "lo ideal sería unificar todo, porque si no
+//    tienen ningún auto asegurado pueden ver sus trámites o sus reclamos jurídicos"):
+//    el mismo link muestra, debajo de los seguros:
+//      🚨 Tus siniestros  → en qué paso está (con una barrita) y «Consultar» por WhatsApp
+//      📂 Tus trámites    → cómo va el trámite de gestoría (abre «Mi trámite»)
+//      ⚖️ Tus casos legales → abre «Mi caso»
+//    Sin seguros con cuponera pero con algo de eso, entra igual a una pantalla simple.
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -32,7 +40,7 @@ import ListaCupones from "../components/portal/ListaCupones";
 import Papeles, { nombreLindoDoc } from "../components/portal/Papeles";
 import VisorDocumento from "../components/portal/VisorDocumento";
 import { Seccion, Lista, Fila, Chip, Vacio } from "../components/portal/Lista";
-import { IconoTipo, IconDoc, IconAlerta, IconTick, IconAbajo, IconReloj } from "../components/portal/Iconos";
+import { IconoTipo, IconDoc, IconAlerta, IconTick, IconAbajo, IconReloj, IconAuto } from "../components/portal/Iconos";
 import {
   money, fmt, fmtLargo, situacionPago, contarVencidos, deudaTotal, hayDeudaSinPrecio,
   proximoPago, tituloSeguros, nombreBien, tipoIcono, waLink, capitalizar,
@@ -139,6 +147,10 @@ export default function PortalAseguradoPage() {
   // ⚖️ Sus casos legales (si tiene). Un cliente puede tener solo eso, sin
   //    ningún seguro: igual entra y ve sus casos (ver más abajo).
   const casosLegales = data?.casos_legales || [];
+  // 🔑 Portal único: sus siniestros y sus trámites de gestoría (si tiene).
+  const siniestros = data?.siniestros || [];
+  const tramites = data?.tramites || [];
+  const hayOtros = casosLegales.length + siniestros.length + tramites.length > 0;
   // En la base los nombres van en MAYÚSCULAS. En pantalla gritan, así que se
   // normalizan solo para mostrar.
   const nombreCliente = capitalizar(cliente.nombre_completo || cliente.nombre || "");
@@ -333,7 +345,7 @@ export default function PortalAseguradoPage() {
     );
   }
 
-  if (error || (!polizas.length && !casosLegales.length)) {
+  if (error || (!polizas.length && !hayOtros)) {
     return (
       <div className="portal" data-tema={temaActivo}>
         <div
@@ -355,7 +367,7 @@ export default function PortalAseguradoPage() {
               <IconAlerta size={26} />
             </div>
             <h1 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>
-              {error ? "No pudimos abrir tu portal" : "No tenés seguros activos"}
+              {error ? "No pudimos abrir tu portal" : "No hay nada para mostrar"}
             </h1>
             <p style={{ fontSize: 14, color: "var(--t2)", lineHeight: 1.6, margin: 0, maxWidth: 300 }}>
               {error || "En este momento no hay nada para mostrar."}
@@ -367,8 +379,9 @@ export default function PortalAseguradoPage() {
     );
   }
 
-  // ⚖️ Sin seguros pero con casos legales: una pantalla simple con sus casos
-  //    (los pagos, la grúa y los papeles del seguro no tienen nada que mostrar).
+  // 🔑 Sin seguros con cuponera pero con siniestros, trámites o casos legales:
+  //    una pantalla simple con lo suyo (los pagos, la grúa y los papeles del
+  //    seguro no tienen nada que mostrar).
   if (!polizas.length) {
     const primerNombre = capitalizar(cliente.nombre || "").split(" ")[0] || nombreCliente.split(" ")[0];
     return (
@@ -384,11 +397,15 @@ export default function PortalAseguradoPage() {
               {primerNombre ? `Hola, ${primerNombre}` : "Hola"}
             </h1>
             <p style={{ fontSize: 14, color: "var(--t2)", lineHeight: 1.5, margin: 0 }}>
-              Tocá tu caso para ver cómo va.
+              Tocá cada uno para ver cómo va.
             </p>
           </div>
-          <Seccion>{casosLegales.length > 1 ? "Tus casos legales" : "Tu caso legal"}</Seccion>
-          <CasosLegales casos={casosLegales} />
+          <OtrasCosas
+            siniestros={siniestros}
+            tramites={tramites}
+            casosLegales={casosLegales}
+            nombreCliente={nombreCliente}
+          />
         </div>
       </div>
     );
@@ -517,13 +534,13 @@ export default function PortalAseguradoPage() {
                 ))}
               </Lista>
 
-              {/* ⚖️ Sus casos legales (si tiene): cada uno abre su link «Mi caso». */}
-              {casosLegales.length ? (
-                <>
-                  <Seccion>Tus casos legales</Seccion>
-                  <CasosLegales casos={casosLegales} />
-                </>
-              ) : null}
+              {/* 🔑 Sus siniestros, trámites y casos legales (si tiene). */}
+              <OtrasCosas
+                siniestros={siniestros}
+                tramites={tramites}
+                casosLegales={casosLegales}
+                nombreCliente={nombreCliente}
+              />
             </>
           )}
           </div>
@@ -572,6 +589,126 @@ export default function PortalAseguradoPage() {
 
       <Toaster position="bottom-center" toastOptions={{ style: { marginBottom: 80 } }} />
     </div>
+  );
+}
+
+/* ══════════════════ 🔑 Siniestros, trámites y casos legales ══════════════════ */
+
+// Las tres listas juntas, en este orden (lo más urgente primero). Si no tiene
+// nada de una, esa sección no aparece.
+function OtrasCosas({ siniestros = [], tramites = [], casosLegales = [], nombreCliente = "" }) {
+  return (
+    <>
+      {siniestros.length ? (
+        <>
+          <Seccion>{siniestros.length > 1 ? "Tus siniestros" : "Tu siniestro"}</Seccion>
+          <Siniestros items={siniestros} nombreCliente={nombreCliente} />
+        </>
+      ) : null}
+      {tramites.length ? (
+        <>
+          <Seccion>{tramites.length > 1 ? "Tus trámites" : "Tu trámite"}</Seccion>
+          <Tramites items={tramites} />
+        </>
+      ) : null}
+      {casosLegales.length ? (
+        <>
+          <Seccion>{casosLegales.length > 1 ? "Tus casos legales" : "Tu caso legal"}</Seccion>
+          <CasosLegales casos={casosLegales} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** Barrita de pasos (ej: 3 de 5). Verde si terminó. */
+function Pasos({ paso = 1, pasos = 5, fin = false }) {
+  return (
+    <span style={{ display: "flex", gap: 3, marginTop: 7, maxWidth: 160 }} aria-label={`Paso ${paso} de ${pasos}`}>
+      {Array.from({ length: pasos }).map((_, k) => (
+        <span
+          key={k}
+          style={{
+            flex: 1, height: 4, borderRadius: 4,
+            background: k < paso ? (fin ? "var(--ok)" : "var(--m)") : "var(--div)",
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// 🚨 Cada siniestro: qué pasó, en qué paso está y «Consultar» por WhatsApp a la
+//    oficina (con el mensaje ya escrito). Sin notas internas: el servidor no las manda.
+function Siniestros({ items, nombreCliente }) {
+  return (
+    <Lista>
+      {items.map((s, i) => {
+        const cuando = fmtLargo(s.fecha || s.cargado);
+        const msg = `Hola, soy ${nombreCliente || ""}. Quería saber cómo va mi siniestro del ${cuando}${
+          s.patente ? ` (${s.patente})` : ""
+        }.`;
+        const href = waLink(s.oficina_whatsapp, msg);
+        return (
+          <Fila
+            key={s.id}
+            i={i}
+            primera={i === 0}
+            icono={s.abierto ? <IconAlerta size={21} /> : <IconTick size={19} />}
+            tono={s.abierto ? "aviso" : "ok"}
+            resaltado={!s.abierto}
+            titulo={[s.que_paso, s.patente].filter(Boolean).join(" · ")}
+            sub={
+              <>
+                {s.estado_cliente} · <span style={{ whiteSpace: "nowrap" }}>{cuando}</span>
+                {s.nro_reclamo ? (
+                  <span style={{ display: "block", marginTop: 1 }}>Reclamo en {s.compania || "la compañía"}: {s.nro_reclamo}</span>
+                ) : null}
+                <Pasos paso={s.paso} pasos={s.pasos} fin={!s.abierto} />
+              </>
+            }
+            derecha={
+              href ? (
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>Consultar</span>
+              ) : null
+            }
+            href={href || undefined}
+          />
+        );
+      })}
+    </Lista>
+  );
+}
+
+// 📂 Cada trámite de gestoría abre su página «Mi trámite» (cómo va, subir papeles).
+function Tramites({ items }) {
+  return (
+    <Lista>
+      {items.map((t, i) => (
+        <Fila
+          key={t.numero}
+          i={i}
+          primera={i === 0}
+          icono={t.con_vehiculo ? <IconAuto size={21} /> : <IconDoc size={21} />}
+          tono="ok"
+          resaltado={t.listo}
+          titulo={[t.tipo_txt, t.patente].filter(Boolean).join(" · ")}
+          sub={
+            <>
+              <span style={t.listo ? { color: "var(--ok)", fontWeight: 600 } : undefined}>{t.estado_cliente}</span>
+              {" · "}
+              <span style={{ whiteSpace: "nowrap" }}>{t.numero}</span>
+            </>
+          }
+          derecha={
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>
+              Ver cómo va
+            </span>
+          }
+          href={t.link}
+        />
+      ))}
+    </Lista>
   );
 }
 
@@ -1001,4 +1138,4 @@ function FilaDato({ label, valor, mas, onClick, primera }) {
 
   if (onClick) return <button onClick={onClick} style={estilo}>{contenido}</button>;
   return <div style={estilo}>{contenido}</div>;
-}
+}
