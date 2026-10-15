@@ -41,6 +41,7 @@ import { linkWhatsApp } from "../components/gestoria/gestoriaUtils";
 
 // Sube las fotos borrador (del wizard) al siniestro recién creado.
 // 🐛 FIX: devuelve CUÁNTAS fotos no se pudieron adjuntar (antes fallaban calladas).
+// 🏷️ La etiqueta que le pusieron en el wizard viaja con la foto (opcional).
 async function subirFotosBorrador(dispatch, siniestroId, draftFotos) {
   if (!Array.isArray(draftFotos) || draftFotos.length === 0) return 0;
   if (!siniestroId) return draftFotos.length;
@@ -53,6 +54,7 @@ async function subirFotosBorrador(dispatch, siniestroId, draftFotos) {
         public_id: f.public_id,
         nombre: f.nombre || "",
         mime: f.mime || "image/jpeg",
+        etiqueta: f.etiqueta || "",
       })).unwrap();
     } catch {
       // Si una foto falla no cortamos el resto, pero la contamos.

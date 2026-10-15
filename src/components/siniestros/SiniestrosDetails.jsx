@@ -144,7 +144,7 @@ export default function SiniestrosDetails({ isOpen, onClose, siniestro, onEdit, 
 
           {/* Fotos */}
           <CardDuo className="p-0 overflow-hidden">
-            <SiniestroFotosPanel siniestroId={siniestro.id} />
+            <SiniestroFotosPanel siniestroId={siniestro.id} responsabilidad={siniestro.responsabilidad} />
           </CardDuo>
 
           {/* Tercero (solo si hay) */}

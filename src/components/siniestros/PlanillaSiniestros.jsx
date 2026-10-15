@@ -20,6 +20,9 @@
 //   pasárselos a TuveUnChoque y el link a su web. Todo queda anotado en la bitácora.
 // 🏢 14/10: cualquier oficina carga siniestros de cualquier oficina. Abajo del nombre
 //   dice de qué oficina es la póliza (y en Datos: «Oficina» y «Lo cargó»).
+// 🏢 15/10: columna «Oficina» (la de la póliza) y filtro «Oficina» arriba.
+//   Ej: filtrás «El Talita» y ves solo los siniestros de esa oficina.
+//   En el celu (sin columnas) la oficina va al final de la línea de abajo.
 // props: onEditar(s), onBorrar(s), isWebAdmin  (el «Nuevo siniestro» está arriba, en la página)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -224,6 +227,14 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
     [guardar, anotarEnBitacora]
   );
 
+  // 🏢 Opciones del filtro «Oficina»: las que aparecen en los siniestros, en orden alfabético.
+  const opcionesOficina = useMemo(() => {
+    const nombres = [...new Set((siniestros || []).map((s) => s.oficina_nombre).filter(Boolean))].sort((x, y) => x.localeCompare(y, "es"));
+    const ops = nombres.map((n) => [n, n]);
+    if ((siniestros || []).some((s) => !s.oficina_nombre)) ops.push(["SIN", "Sin oficina"]);
+    return ops;
+  }, [siniestros]);
+
   const a = useMemo(() => {
     // "PEREYRA, Lucas" → "Lucas" · "Lucas Pereyra (5 Esquinas)" → "Lucas"
     const clienteDe = (s) => {
@@ -261,9 +272,12 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       esTerminado: (s) => s.estado === "CERRADO",
       abierto: () => true,
       nombre: (s) => s.cliente_label || "Sin cliente",
-      sub: (s) => [vehiculoDe(s), `#${s.id}`, s.oficina_nombre].filter(Boolean).join(" · "),
-      // En el celu no hay columnas: quién lo reclama va primero (ej: "⚖️ TuveUnChoque · Chocó · AE040SN").
-      subCelu: (s) => [RECLAMA[s.quien_reclama] && `⚖️ ${RECLAMA[s.quien_reclama].n}`, tipoDe(s).corto, s.patente].filter(Boolean).join(" · "),
+      // 🏢 La oficina ya tiene su columna: abajo del nombre queda el auto y el número.
+      sub: (s) => [vehiculoDe(s), `#${s.id}`].filter(Boolean).join(" · "),
+      // En el celu no hay columnas: quién lo reclama va primero y la oficina al final
+      // (ej: "⚖️ TuveUnChoque · Chocó · AE040SN · El Talita").
+      subCelu: (s) =>
+        [RECLAMA[s.quien_reclama] && `⚖️ ${RECLAMA[s.quien_reclama].n}`, tipoDe(s).corto, s.patente, s.oficina_nombre].filter(Boolean).join(" · "),
       marcas: (s) =>
         [
           s.estado !== "CERRADO" && !s.fotos_count && { txt: "Sin fotos", tono: "ambar" },
@@ -280,6 +294,19 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           ),
         },
         { titulo: "Patente", ancho: "110px", render: (s) => <PatenteChica p={s.patente} /> },
+        // 🏢 De qué oficina es (la de la póliza).
+        {
+          titulo: "Oficina",
+          ancho: "130px",
+          render: (s) =>
+            s.oficina_nombre ? (
+              <span className="truncate text-[13px] text-titulo dark:text-titulo-dark" title={s.oficina_nombre}>
+                {s.oficina_nombre}
+              </span>
+            ) : (
+              <span className="text-[12.5px] text-suave dark:text-suave-dark">—</span>
+            ),
+        },
         {
           titulo: "N° de reclamo",
           ancho: "130px",
@@ -297,7 +324,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       diasTitulo: "Último cambio",
       demorado: quieto,
       buscar: (s) =>
-        [s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia, s.marca_auto, s.modelo_auto, `#${s.id}`, s.tercero_nombre, s.tercero_patente, s.tercero_compania, RECLAMA[s.quien_reclama]?.n].filter(Boolean).join(" "),
+        [s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia, s.marca_auto, s.modelo_auto, `#${s.id}`, s.tercero_nombre, s.tercero_patente, s.tercero_compania, RECLAMA[s.quien_reclama]?.n, s.oficina_nombre].filter(Boolean).join(" "),
       buscarPh: "Buscar cliente, patente o reclamo",
       filtros: [
         { id: "tipo", etiqueta: "Qué pasó", opciones: Object.entries(TIPO).map(([k, v]) => [k, v.n]), pasa: (s, v) => s.responsabilidad === v },
@@ -306,6 +333,13 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           etiqueta: "Lo reclama",
           opciones: [["SIN", "Sin decidir"], ["THAMES", "THAMES"], ["TUVEUNCHOQUE", "TuveUnChoque"]],
           pasa: (s, v) => (s.quien_reclama || "SIN") === v,
+        },
+        // 🏢 Las oficinas salen de los siniestros que hay (ej: 5 Esquinas, Axion, El Talita…).
+        {
+          id: "oficina",
+          etiqueta: "Oficina",
+          opciones: opcionesOficina,
+          pasa: (s, v) => (v === "SIN" ? !s.oficina_nombre : s.oficina_nombre === v),
         },
       ],
 
@@ -465,7 +499,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           ["Seguro del tercero", [d.tercero_compania, d.tercero_poliza].filter(Boolean).join(" · ") || null],
           ["Fotos", d.fotos_count ? `${d.fotos_count}` : "Ninguna"],
         ],
-        papeles: (d) => <SiniestroFotosPanel siniestroId={d.id} />,
+        papeles: (d) => <SiniestroFotosPanel siniestroId={d.id} responsabilidad={d.responsabilidad} />,
         acciones: (d, onRecargar) => {
           const B = [];
           // 🙋 Admin: decidir quién lo reclama (si todavía no lo decidió).
@@ -527,7 +561,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         ficha: onEditar ? { txt: "Editar todo", onClick: (s) => onEditar(s) } : null,
       },
     };
-  }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin]);
+  }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin, opcionesOficina]);
 
   return <Planilla a={a} />;
 }

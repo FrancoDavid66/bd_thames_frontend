@@ -747,7 +747,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                       <HiPhotograph className="w-7 h-7 text-duo-violeta" />
                     </div>
                     <h2 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Agregá fotos (opcional)</h2>
-                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Sacá una foto del daño o elegí de la galería</p>
+                    <p className="text-sm text-suave dark:text-suave-dark mt-1">Sacá una foto del daño o elegí de la galería. Si querés, etiquetalas (auto del tercero, papeles…)</p>
                   </div>
 
                   {initialData?.id ? (
@@ -756,6 +756,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                       compact
                       siniestroId={initialData.id}
                       onUploadingChange={setFotosSubiendo}
+                      responsabilidad={form.responsabilidad}
                     />
                   ) : (
                     /* ALTA: modo BORRADOR, las fotos quedan en memoria hasta guardar */
@@ -764,6 +765,7 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                       draftFotos={draftFotos}
                       onDraftChange={setDraftFotos}
                       onUploadingChange={setFotosSubiendo}
+                      responsabilidad={form.responsabilidad}
                     />
                   )}
                 </>

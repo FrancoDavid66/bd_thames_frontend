@@ -220,6 +220,26 @@ export const addFoto = createAsyncThunk(
   }
 );
 
+/**
+ * 🏷️ Cambiar la etiqueta de una foto (o quitarla con etiqueta = "").
+ * Lo puede hacer cualquiera de la oficina del siniestro.
+ */
+export const updateFoto = createAsyncThunk(
+  'siniestros/updateFoto',
+  async ({ fotoId, etiqueta }, { rejectWithValue }) => {
+    try {
+      const response = await axios.patch(
+        `${BASE_URL}siniestro-fotos/${fotoId}/`,
+        { etiqueta: etiqueta || "" },
+        { headers: getAuthHeaders() }
+      );
+      return unwrapItem(response.data);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Error al guardar la etiqueta');
+    }
+  }
+);
+
 /** Borrar foto (solo admin). */
 export const removeFoto = createAsyncThunk(
   'siniestros/removeFoto',
@@ -379,6 +399,29 @@ const siniestrosSlice = createSlice({
         }
       })
 
+      // ── 🏷️ FOTOS: ETIQUETA ─────────────────────────
+      .addCase(updateFoto.fulfilled, (state, action) => {
+        const foto = action.payload;
+        const { fotoId, siniestroId } = action.meta.arg;
+        const sid = foto?.siniestro ?? siniestroId;
+        if (sid == null) return;
+        const cambio = foto && typeof foto === 'object'
+          ? foto
+          : { etiqueta: action.meta.arg.etiqueta || '' };
+        const k = keyOf(sid);
+        if (state.fotos[k]) {
+          state.fotos[k] = state.fotos[k].map((f) => (f.id === fotoId ? { ...f, ...cambio } : f));
+        }
+        // Si el siniestro de la lista trae sus fotos adentro, también las actualizamos.
+        const idx = state.siniestros.findIndex((s) => s.id === Number(sid));
+        if (idx !== -1 && Array.isArray(state.siniestros[idx].fotos)) {
+          state.siniestros[idx] = {
+            ...state.siniestros[idx],
+            fotos: state.siniestros[idx].fotos.map((f) => (f.id === fotoId ? { ...f, ...cambio } : f)),
+          };
+        }
+      })
+
       // ── 📸 FOTOS: DELETE ───────────────────────────
       .addCase(removeFoto.fulfilled, (state, action) => {
         const { fotoId, siniestroId } = action.payload;
@@ -397,4 +440,4 @@ const siniestrosSlice = createSlice({
   },
 });
 
-export default siniestrosSlice.reducer;
+export default siniestrosSlice.reducer;
