@@ -26,11 +26,27 @@
 // 👁️ 15/10: botón «Ver portal» arriba, al lado del nombre: abre en otra pestaña el
 //   Portal del Asegurado de ESE cliente, para ver cómo le aparece el siniestro
 //   (en qué paso está y el N° de reclamo). Si cambiás el color, recargá esa pestaña.
+// 🛡️ 15/10: en Datos, el SEGURO DEL TERCERO va arriba (después de «Qué pasó») y con
+//   color, para verlo de un vistazo. Si es un choque y no está cargado: «Sin cargar».
+//   Se sacó «Lo cargó» de Datos (repetía la oficina).
+// 🔗 15/10: en Datos, la PÓLIZA es un link: abre la póliza en otra pestaña.
+// ⚖️ 15/10: el NOMBRE de cada siniestro (tabla y panel) es la CARÁTULA que arma el
+//   servidor: "Gomez C/ Rivadavia Seguros (daños y lesiones)" (apellido del cliente
+//   C/ compañía del tercero + qué se reclama). El cliente pasa a la línea gris de abajo.
+//   En Datos: «Qué se reclama» (si es un choque y no lo eligieron: «Sin elegir»).
 // props: onEditar(s), onBorrar(s), isWebAdmin  (el «Nuevo siniestro» está arriba, en la página)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
-import { HiOutlineChatBubbleLeftRight, HiOutlineClipboardDocument, HiOutlineEye, HiOutlineGlobeAlt, HiOutlineTrash } from "react-icons/hi2";
+import {
+  HiOutlineChatBubbleLeftRight,
+  HiOutlineArrowTopRightOnSquare,
+  HiOutlineClipboardDocument,
+  HiOutlineEye,
+  HiOutlineGlobeAlt,
+  HiOutlineShieldCheck,
+  HiOutlineTrash,
+} from "react-icons/hi2";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { invalidarCacheSiniestrosCliente } from "../../hooks/useSiniestrosCliente";
@@ -92,6 +108,30 @@ async function abrirPortalCliente(clienteId) {
     if (ventana) ventana.close();
     toast.error(e?.message || "No se pudo abrir el portal del cliente.", { duration: 6000 });
   }
+}
+
+/**
+ * 🛡️ La compañía de seguros del tercero, bien a la vista (con color) en Datos.
+ * Ej: [🛡️ Federación Patronal] y abajo «Póliza 12345».
+ */
+function SeguroTercero({ s }) {
+  const cia = String(s?.tercero_compania || "").trim();
+  const pol = String(s?.tercero_poliza || "").trim();
+  if (!cia && !pol) return null;
+  return (
+    <span className="inline-flex max-w-full flex-col gap-0.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3 py-2 dark:border-sky-400/40 dark:bg-sky-500/15">
+      <span className="inline-flex items-center gap-1.5 text-[15px] font-extrabold text-sky-900 dark:text-sky-100">
+        <HiOutlineShieldCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+        <span className="break-words">{cia || "Compañía sin cargar"}</span>
+      </span>
+      {pol ? <span className="text-[12.5px] font-semibold text-sky-800 dark:text-sky-200">Póliza {pol}</span> : null}
+    </span>
+  );
+}
+
+/** "julian, martinez (axion (2))" → "julian, martinez" (sin la oficina entre paréntesis). */
+function clienteCorto(s) {
+  return String(s?.cliente_label || "").replace(/\s*\(.*\)\s*$/, "").trim();
 }
 
 /** Avatar + nombre de quién reclama (columna «Lo reclama» y Datos). */
@@ -311,9 +351,10 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       colorEstado: (s) => ESTADOS[s.estado]?.c,
       esTerminado: (s) => s.estado === "CERRADO",
       abierto: () => true,
-      nombre: (s) => s.cliente_label || "Sin cliente",
+      // ⚖️ La carátula: "Gomez C/ Rivadavia Seguros (daños y lesiones)".
+      nombre: (s) => s.caratula || s.cliente_label || "Sin cliente",
       // 🏢 La oficina ya tiene su columna: abajo del nombre queda el auto y el número.
-      sub: (s) => [vehiculoDe(s), `#${s.id}`].filter(Boolean).join(" · "),
+      sub: (s) => [clienteCorto(s), vehiculoDe(s), `#${s.id}`].filter(Boolean).join(" · "),
       // En el celu no hay columnas: quién lo reclama va primero y la oficina al final
       // (ej: "⚖️ TuveUnChoque · Chocó · AE040SN · El Talita").
       subCelu: (s) =>
@@ -364,7 +405,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       diasTitulo: "Último cambio",
       demorado: quieto,
       buscar: (s) =>
-        [s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia, s.marca_auto, s.modelo_auto, `#${s.id}`, s.tercero_nombre, s.tercero_patente, s.tercero_compania, RECLAMA[s.quien_reclama]?.n, s.oficina_nombre].filter(Boolean).join(" "),
+        [s.caratula, s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia, s.marca_auto, s.modelo_auto, `#${s.id}`, s.tercero_nombre, s.tercero_patente, s.tercero_compania, RECLAMA[s.quien_reclama]?.n, s.oficina_nombre].filter(Boolean).join(" "),
       buscarPh: "Buscar cliente, patente o reclamo",
       filtros: [
         { id: "tipo", etiqueta: "Qué pasó", opciones: Object.entries(TIPO).map(([k, v]) => [k, v.n]), pasa: (s, v) => s.responsabilidad === v },
@@ -516,7 +557,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           const eventos = await correr(getEventosBySiniestro(s.id));
           return { ...s, eventos: Array.isArray(eventos) ? eventos : [] };
         },
-        sub: (s) => [tipoDe(s).n, vehiculoDe(s), s.patente, `#${s.id}`].filter(Boolean).join(" · "),
+        sub: (s) => [clienteCorto(s), tipoDe(s).n, vehiculoDe(s), s.patente, `#${s.id}`].filter(Boolean).join(" · "),
         // 👁️ Arriba, al lado del nombre: ver el portal del cliente (cómo le aparece el siniestro).
         cabecera: (s) =>
           s.cliente ? (
@@ -531,11 +572,45 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         phNovedad: "Escribí una novedad (ej: llamé a la compañía, el perito va el lunes)…",
         datos: (d) => [
           ["Cliente", d.cliente_label],
-          ["Póliza", [d.poliza_label, d.compania_nombre].filter(Boolean).join(" · ")],
+          // 🔗 La póliza abre su ficha en otra pestaña.
+          [
+            "Póliza",
+            d.poliza ? (
+              <a
+                key="pol"
+                href={`/#/polizas/${d.poliza}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir la póliza en otra pestaña"
+                className="inline-flex items-center gap-1.5 font-semibold text-sky-700 underline decoration-sky-500/40 underline-offset-2 hover:decoration-sky-500 dark:text-sky-300"
+              >
+                {[d.poliza_label, d.compania_nombre].filter(Boolean).join(" · ") || `Póliza #${d.poliza}`}
+                <HiOutlineArrowTopRightOnSquare className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </a>
+            ) : (
+              [d.poliza_label, d.compania_nombre].filter(Boolean).join(" · ") || null
+            ),
+          ],
           ["Oficina", d.oficina_nombre || null],
-          ["Lo cargó", [d.cargado_por_nombre, d.oficina_carga_nombre && `desde ${d.oficina_carga_nombre}`].filter(Boolean).join(" · ") || null],
           ["Lo reclama", <QuienReclama key="q" s={d} admin={isWebAdmin} grande />],
           ["Qué pasó", d.responsabilidad_label || tipoDe(d).n],
+          // ⚖️ Qué se reclama (sale en el título). En un choque sin elegir: «Sin elegir».
+          [
+            "Qué se reclama",
+            d.que_reclama_label ||
+              (d.responsabilidad === "CHOCO" || d.responsabilidad === "CHOCARON" ? (
+                <Marca key="qr" tono="ambar">Sin elegir</Marca>
+              ) : null),
+          ],
+          // 🛡️ Arriba y con color. En un choque, si falta, se marca «Sin cargar».
+          [
+            "Seguro del tercero",
+            d.tercero_compania || d.tercero_poliza ? (
+              <SeguroTercero key="st" s={d} />
+            ) : d.responsabilidad === "CHOCO" || d.responsabilidad === "CHOCARON" ? (
+              <Marca key="st" tono="ambar">Sin cargar</Marca>
+            ) : null,
+          ],
           ["Fecha del siniestro", d.fecha_siniestro ? fechaCorta(d.fecha_siniestro) : null],
           ["Vehículo", vehiculoDe(d) || null],
           ["Patente", d.patente || null],
@@ -543,7 +618,6 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           ["Lo que contó", d.descripcion ? <span className="whitespace-pre-line">{d.descripcion}</span> : null],
           ["Tercero", [d.tercero_nombre, d.tercero_telefono].filter(Boolean).join(" · ") || null],
           ["Auto del tercero", d.tercero_patente || null],
-          ["Seguro del tercero", [d.tercero_compania, d.tercero_poliza].filter(Boolean).join(" · ") || null],
           ["Fotos", d.fotos_count ? `${d.fotos_count}` : "Ninguna"],
         ],
         papeles: (d) => <SiniestroFotosPanel siniestroId={d.id} responsabilidad={d.responsabilidad} />,

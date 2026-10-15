@@ -25,6 +25,11 @@
 //    oficina"): el buscador usa /siniestros/buscar-poliza/ → trae pólizas de TODAS las
 //    oficinas (antes cada oficina veía solo las suyas). Cada resultado dice de qué
 //    oficina es. El siniestro lo ven la oficina de la póliza y la que lo cargó.
+//
+// ⚖️ 15/10 (Franco): en el paso «Tipo», si es un CHOQUE se elige también
+//    «¿Qué se reclama?»: Daños · Lesiones · Daños y lesiones (obligatorio para
+//    seguir). Sale en el título del siniestro, como la carátula de un expediente:
+//    "Gomez C/ Rivadavia Seguros (daños y lesiones)". En robo/incendio/otro no se pide.
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -49,6 +54,14 @@ const TIPOS = [
   { key: "OTRO",     Icon: HiDotsHorizontal,    label: "Otro",         desc: "Granizo, vandalismo, etc.",    tono: "violeta"  },
 ];
 
+/* ── ⚖️ Qué se reclama (solo en choques) ── */
+const QUE_RECLAMA = [
+  { key: "DANOS",          label: "Daños" },
+  { key: "LESIONES",       label: "Lesiones" },
+  { key: "DANOS_LESIONES", label: "Daños y lesiones" },
+];
+const esChoque = (resp) => resp === "CHOCO" || resp === "CHOCARON";
+
 // tono → clases (activo / inactivo)
 const TIPO_CLASES = {
   amarillo: { on: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] border-duo-amarillo", icon: "text-duo-amarillo-sombra dark:text-duo-amarillo" },
@@ -68,7 +81,7 @@ const STEPS = [
 
 const EMPTY = {
   cliente: "", poliza: "", estado: "PENDIENTE", fecha_siniestro: "",
-  nro_reclamo_cia: "", responsabilidad: "CHOCO",
+  nro_reclamo_cia: "", responsabilidad: "CHOCO", que_reclama: "",
   marca_auto: "", modelo_auto: "", ano_auto: "", patente: "",
   descripcion: "", tercero_nombre: "", tercero_telefono: "",
   tercero_patente: "", tercero_compania: "", tercero_poliza: "",
@@ -78,7 +91,7 @@ const EMPTY = {
 /* Nombre "en criollo" de cada campo, para los carteles de error */
 const NOMBRE_CAMPO = {
   cliente: "Cliente", poliza: "Póliza", estado: "Estado",
-  responsabilidad: "Tipo de siniestro", fecha_siniestro: "Fecha",
+  responsabilidad: "Tipo de siniestro", que_reclama: "Qué se reclama", fecha_siniestro: "Fecha",
   nro_reclamo_cia: "N° de reclamo", descripcion: "Relato",
   marca_auto: "Marca del vehículo", modelo_auto: "Modelo del vehículo",
   ano_auto: "Año del vehículo", patente: "Patente",
@@ -309,7 +322,8 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
 
   const canNext = () => {
     if (step === 1) return !!form.poliza;
-    if (step === 2) return !!form.responsabilidad;
+    // ⚖️ En un choque también hay que elegir qué se reclama.
+    if (step === 2) return !!form.responsabilidad && (!esChoque(form.responsabilidad) || !!form.que_reclama);
     if (step === 3) return !!form.fecha_siniestro;
     if (step === 4) return form.descripcion.trim().length >= 10;
     return true; // paso 5 (fotos) y 6 (tercero) son opcionales
@@ -358,6 +372,8 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
       if (form.poliza)  payload.poliza  = Number(form.poliza);
       payload.estado          = form.estado || "PENDIENTE";
       payload.responsabilidad = form.responsabilidad || "CHOCO";
+      // ⚖️ Qué se reclama: solo en choques (en robo/incendio/otro va vacío).
+      payload.que_reclama     = esChoque(payload.responsabilidad) ? (form.que_reclama || "") : "";
       payload.descripcion     = String(form.descripcion || "").trim();
 
       const anoNum = Number(form.ano_auto);
@@ -656,6 +672,36 @@ export default function SiniestrosWizard({ isOpen, onClose, onSubmit, initialDat
                       );
                     })}
                   </div>
+
+                  {/* ⚖️ Qué se reclama (solo choques): sale en el título del siniestro */}
+                  {esChoque(form.responsabilidad) && (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold text-titulo dark:text-titulo-dark mb-2">¿Qué se reclama?</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {QUE_RECLAMA.map(({ key, label }) => {
+                          const active = form.que_reclama === key;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => set("que_reclama", key)}
+                              className={`min-h-[44px] rounded-lg border-2 px-2 text-sm font-semibold transition-colors ${
+                                active
+                                  ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] border-duo-azul text-duo-azul"
+                                  : "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-titulo dark:text-titulo-dark hover:border-duo-azul"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {!form.que_reclama && (
+                        <p className="text-xs mt-2 text-suave dark:text-suave-dark">Elegí una para seguir.</p>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
