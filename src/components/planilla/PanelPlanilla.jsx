@@ -8,6 +8,8 @@
 //     📋 Datos     → los datos importantes, uno abajo del otro.
 //     📎 Papeles   → los archivos y fotos (y subir uno nuevo).
 //   Abajo:  «Ficha completa» (la pantalla de siempre, con todo).
+//   👁️ 15/10: a.panel.cabecera(it, det) → botones chicos al lado del nombre
+//      (ej: «Ver portal» en Siniestros). Si la planilla no lo manda, no sale nada.
 // En la compu sale al costado; en el celu ocupa toda la pantalla.
 import { useEffect, useRef, useState } from "react";
 import { HiArrowRight, HiChevronLeft, HiXMark } from "react-icons/hi2";
@@ -184,6 +186,8 @@ export default function PanelPlanilla({ a, it, id, det, cargando, error, tab, se
           <h2 className="line-clamp-2 text-[18px] font-extrabold leading-snug text-titulo dark:text-titulo-dark">{x ? a.nombre(x) : "Cargando…"}</h2>
           {x && <p className="line-clamp-2 text-[13px] text-suave dark:text-suave-dark">{a.panel?.sub ? a.panel.sub(x) : a.sub ? a.sub(x) : ""}</p>}
         </div>
+        {/* 👁️ Botones de la cabecera (ej: «Ver portal»). */}
+        {x && a.panel?.cabecera ? <div className="flex shrink-0 items-center gap-2">{a.panel.cabecera(x, det)}</div> : null}
       </div>
 
       <div ref={cuerpo} className="flex-1 overflow-y-auto overscroll-contain">

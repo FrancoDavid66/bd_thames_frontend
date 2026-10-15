@@ -23,11 +23,14 @@
 // 🏢 15/10: columna «Oficina» (la de la póliza) y filtro «Oficina» arriba.
 //   Ej: filtrás «El Talita» y ves solo los siniestros de esa oficina.
 //   En el celu (sin columnas) la oficina va al final de la línea de abajo.
+// 👁️ 15/10: botón «Ver portal» arriba, al lado del nombre: abre en otra pestaña el
+//   Portal del Asegurado de ESE cliente, para ver cómo le aparece el siniestro
+//   (en qué paso está y el N° de reclamo). Si cambiás el color, recargá esa pestaña.
 // props: onEditar(s), onBorrar(s), isWebAdmin  (el «Nuevo siniestro» está arriba, en la página)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
-import { HiOutlineChatBubbleLeftRight, HiOutlineClipboardDocument, HiOutlineGlobeAlt, HiOutlineTrash } from "react-icons/hi2";
+import { HiOutlineChatBubbleLeftRight, HiOutlineClipboardDocument, HiOutlineEye, HiOutlineGlobeAlt, HiOutlineTrash } from "react-icons/hi2";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { invalidarCacheSiniestrosCliente } from "../../hooks/useSiniestrosCliente";
@@ -53,6 +56,43 @@ const RECLAMA = {
   },
 };
 const TUC = RECLAMA.TUVEUNCHOQUE;
+
+/**
+ * 👁️ Abre el Portal del Asegurado del cliente (lo que ve él) en otra pestaña.
+ * La pestaña se abre YA, al tocar, y después se le pone el link: si se abriera
+ * recién cuando llega la respuesta, el navegador la puede bloquear como ventana emergente.
+ * Mismo pedido que «Ver portal» de la ficha del cliente (GET /api/clientes/<id>/portal-link/).
+ */
+async function abrirPortalCliente(clienteId) {
+  const ventana = window.open("about:blank", "_blank");
+  try {
+    const API_ROOT = String(import.meta.env.VITE_API_URL || "")
+      .trim()
+      .replace(/\/+$/, "")
+      .replace(/\/api$/i, "");
+    const token = localStorage.getItem("access_token") || localStorage.getItem("token") || localStorage.getItem("jwt");
+    const res = await fetch(`${API_ROOT}/api/clientes/${clienteId}/portal-link/`, {
+      headers: {
+        Accept: "application/json",
+        ...(token && token !== "undefined" && token !== "null" ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.detail || "No se pudo abrir el portal del cliente.");
+    const path = data?.portal_path || (data?.token ? `/#/portal/${data.token}` : "");
+    if (!path) throw new Error("Este cliente todavía no tiene portal.");
+    const url = `${window.location.origin}${path}`;
+    if (ventana) {
+      ventana.opener = null;
+      ventana.location.href = url;
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  } catch (e) {
+    if (ventana) ventana.close();
+    toast.error(e?.message || "No se pudo abrir el portal del cliente.", { duration: 6000 });
+  }
+}
 
 /** Avatar + nombre de quién reclama (columna «Lo reclama» y Datos). */
 function QuienReclama({ s, admin = false, grande = false }) {
@@ -477,6 +517,13 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           return { ...s, eventos: Array.isArray(eventos) ? eventos : [] };
         },
         sub: (s) => [tipoDe(s).n, vehiculoDe(s), s.patente, `#${s.id}`].filter(Boolean).join(" · "),
+        // 👁️ Arriba, al lado del nombre: ver el portal del cliente (cómo le aparece el siniestro).
+        cabecera: (s) =>
+          s.cliente ? (
+            <BotonPanel onClick={() => abrirPortalCliente(s.cliente)} icono={<HiOutlineEye className="h-4 w-4" />}>
+              Ver portal
+            </BotonPanel>
+          ) : null,
         novedades: (d) => (d.eventos || []).map((ev) => ({ id: ev.id, autor: "Bitácora", fecha: ev.fecha_evento, texto: ev.descripcion_evento })),
         puedeAnotar: () => true,
         anotar: (d, texto) => anotarEnBitacora(d.id, texto),
