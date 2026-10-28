@@ -72,6 +72,20 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
     "direccion",
     "localidad",
     "fecha_nacimiento",
+    // 🎁 Club Thames (28/10/2026)
+    "estado_civil",
+    "ocupacion",
+    "invitado_por_codigo",
+  ];
+
+  // 🎁 Mismas opciones que el backend (clientes/models.py → EstadoCivil).
+  const OPCIONES_ESTADO_CIVIL = [
+    ["SOLTERO", "Soltero/a"],
+    ["EN_PAREJA", "En pareja"],
+    ["CASADO", "Casado/a"],
+    ["CON_HIJOS", "Con hijos"],
+    ["SEPARADO", "Separado/a"],
+    ["VIUDO", "Viudo/a"],
   ];
 
   const getLabel = (key) => {
@@ -80,6 +94,14 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
         return "DNI / CUIT / CUIL";
       case "fecha_nacimiento":
         return "Fecha de Nacimiento";
+      case "estado_civil":
+        return "Estado civil";
+      case "ocupacion":
+        return "¿De qué trabaja?";
+      case "invitado_por_codigo":
+        return modoEditar && cliente?.invitado_por_nombre
+          ? `Lo invitó: ${cliente.invitado_por_nombre} (escribí otro código para cambiar)`
+          : "Código del amigo que lo trajo (Club Thames)";
       default:
         return key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
     }
@@ -184,14 +206,32 @@ const ClienteFormModal = ({ isOpen, onClose, cliente = null, onSuccess, onSave }
                         {isRequired(key) && <span className="text-duo-rojo ml-1.5">*</span>}
                       </span>
                     </label>
-                    <input
-                      type={key.includes("fecha") ? "date" : "text"}
-                      name={key}
-                      value={formData[key] ?? ""}
-                      onChange={handleChange}
-                      className="h-14 w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-4 text-sm text-titulo dark:text-titulo-dark placeholder:text-suave/50 dark:placeholder:text-suave-dark/50 focus:outline-none focus:border-duo-azul transition-colors"
-                      placeholder={`Escribir ${getLabel(key).toLowerCase()}...`}
-                    />
+                    {key === "estado_civil" ? (
+                      <select
+                        name={key}
+                        value={formData[key] ?? ""}
+                        onChange={handleChange}
+                        className="h-14 w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-4 text-sm text-titulo dark:text-titulo-dark focus:outline-none focus:border-duo-azul transition-colors cursor-pointer"
+                      >
+                        <option value="">— Sin dato —</option>
+                        {OPCIONES_ESTADO_CIVIL.map(([v, l]) => (
+                          <option key={v} value={v}>{l}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={key.includes("fecha") ? "date" : "text"}
+                        name={key}
+                        value={formData[key] ?? ""}
+                        onChange={handleChange}
+                        className="h-14 w-full rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark px-4 text-sm text-titulo dark:text-titulo-dark placeholder:text-suave/50 dark:placeholder:text-suave-dark/50 focus:outline-none focus:border-duo-azul transition-colors"
+                        placeholder={
+                          key === "invitado_por_codigo"
+                            ? "Ej: JOSE-7K2M"
+                            : `Escribir ${getLabel(key).toLowerCase()}...`
+                        }
+                      />
+                    )}
                   </div>
                 ))}
               </div>

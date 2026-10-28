@@ -39,15 +39,30 @@ function IconTelefono({ size = 22, w = 1.8 }) {
 
       Si NINGÚN auto tiene grúa cargada (todo NRE), la pestaña no aparece:
       un botón que no llama a ningún lado es peor que no tenerlo. */
+/* 🎁 "Mi perfil" (28/10/2026): el cliente ve y completa sus datos. Si su
+   oficina está en el Club Thames, ahí también están sus beneficios.
+   Lleva un puntito rojo mientras le falten datos. */
+function IconPerfil({ size = 22, w = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
+
 const TABS = [
   { id: "seguros", Icono: IconSeguros,  label: "Mis seguros" },
   { id: "pagos",   Icono: IconPagos,    label: "Pagos" },
   { id: "grua",    Icono: IconTelefono, label: "Grúa" },
   { id: "papeles", Icono: IconPapeles,  label: "Papeles" },
+  { id: "perfil",  Icono: IconPerfil,   label: "Mi perfil" },
 ];
 
 export default function TabsPortal({
   activa, onChange, vencidos = 0, totalSeguros = 1, mostrarGrua = false,
+  perfilIncompleto = false,
 }) {
   const tabs = mostrarGrua ? TABS : TABS.filter((t) => t.id !== "grua");
 
@@ -104,6 +119,16 @@ export default function TabsPortal({
             <span style={{ fontSize: 11.5, fontWeight: on ? 700 : 500, letterSpacing: "-.01em" }}>
               {texto}
             </span>
+
+            {id === "perfil" && perfilIncompleto ? (
+              <span
+                aria-label="Faltan datos"
+                style={{
+                  position: "absolute", top: 7, right: "calc(50% - 15px)",
+                  width: 8, height: 8, borderRadius: "50%", background: "var(--al)",
+                }}
+              />
+            ) : null}
 
             {id === "pagos" && vencidos > 0 ? (
               <span

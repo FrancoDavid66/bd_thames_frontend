@@ -17,7 +17,8 @@
 // 🔑 PORTAL ÚNICO (Franco 14/10/2026: "lo ideal sería unificar todo, porque si no
 //    tienen ningún auto asegurado pueden ver sus trámites o sus reclamos jurídicos"):
 //    el mismo link muestra, debajo de los seguros:
-//      🚨 Tus siniestros  → en qué paso está (con una barrita) y «Consultar» por WhatsApp
+//      🚨 Tus siniestros  → en qué paso está (con una barrita). 🆕 16/10: al tocarlo se abre
+//                           el detalle «Gestión de su siniestro» (SiniestroDetalle.jsx)
 //      📂 Tus trámites    → cómo va el trámite de gestoría (abre «Mi trámite»)
 //      ⚖️ Tus casos legales → abre «Mi caso»
 //    Sin seguros con cuponera pero con algo de eso, entra igual a una pantalla simple.
@@ -39,6 +40,10 @@ import TabsPortal from "../components/portal/TabsPortal";
 import ListaCupones from "../components/portal/ListaCupones";
 import Papeles, { nombreLindoDoc } from "../components/portal/Papeles";
 import VisorDocumento from "../components/portal/VisorDocumento";
+import SiniestroDetalle from "../components/portal/SiniestroDetalle";
+// 🎁 "Mi perfil" + Club Thames (28/10/2026)
+import MiPerfil from "../components/portal/MiPerfil";
+import BienvenidaClub from "../components/portal/BienvenidaClub";
 import { Seccion, Lista, Fila, Chip, Vacio } from "../components/portal/Lista";
 import { IconoTipo, IconDoc, IconAlerta, IconTick, IconAbajo, IconReloj, IconAuto } from "../components/portal/Iconos";
 import {
@@ -65,6 +70,7 @@ export default function PortalAseguradoPage() {
   const [polizaAbierta, setPolizaAbierta] = useState(null);
   const [filtroPagos, setFiltroPagos] = useState(null);
   const [verDoc, setVerDoc] = useState(null);
+  const [siniestroAbierto, setSiniestroAbierto] = useState(null); // 🚨 id del siniestro abierto
   const [importesVisibles, setImportesVisibles] = useState(true);
   const [verCobertura, setVerCobertura] = useState(false);
   const [tema, setTema] = useState(null); // null = oscuro (el de arranque)
@@ -153,7 +159,9 @@ export default function PortalAseguradoPage() {
   const hayOtros = casosLegales.length + siniestros.length + tramites.length > 0;
   // En la base los nombres van en MAYÚSCULAS. En pantalla gritan, así que se
   // normalizan solo para mostrar.
-  const nombreCliente = capitalizar(cliente.nombre_completo || cliente.nombre || "");
+  // 👋 16/10: el servidor manda el nombre en orden aunque la ficha esté al revés
+  //    ("rimoli" / "dennis daniel" → "Dennis Daniel Rimoli", y "Hola, Dennis").
+  const nombreCliente = capitalizar(cliente.nombre_mostrar || cliente.nombre_completo || cliente.nombre || "");
 
   const vencidos = useMemo(() => contarVencidos(polizas), [polizas]);
   const deuda = useMemo(() => deudaTotal(polizas), [polizas]);
@@ -244,7 +252,7 @@ export default function PortalAseguradoPage() {
     try { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; } catch { /* nada */ }
   };
 
-  const VISTA_RAIZ = { tab: "seguros", poliza: null, filtro: null, doc: null };
+  const VISTA_RAIZ = { tab: "seguros", poliza: null, filtro: null, doc: null, siniestro: null };
 
   const aplicarVista = (v) => {
     const x = v || VISTA_RAIZ;
@@ -252,12 +260,13 @@ export default function PortalAseguradoPage() {
     setPolizaAbierta(x.poliza ?? null);
     setFiltroPagos(x.filtro ?? null);
     setVerDoc(x.doc ?? null);
+    setSiniestroAbierto(x.siniestro ?? null);
   };
 
   /* Ir a una pantalla nueva. Lo que no se pasa se hereda de la actual. */
   const navegar = (cambios) => {
     const v = {
-      tab, poliza: polizaAbierta, filtro: filtroPagos, doc: verDoc,
+      tab, poliza: polizaAbierta, filtro: filtroPagos, doc: verDoc, siniestro: siniestroAbierto,
       ...cambios,
     };
     try {
@@ -292,6 +301,9 @@ export default function PortalAseguradoPage() {
   /* 📄 Abrir un documento TAMBIÉN es navegar. Por eso entra al historial:
      es lo que hace que "atrás" lo cierre en vez de dejarlo colgado arriba. */
   const abrirDoc = (d) => navegar({ doc: d });
+
+  /* 🚨 Abrir el detalle de un siniestro también es navegar: "atrás" lo cierra. */
+  const abrirSiniestro = (s) => navegar({ siniestro: s.id });
 
   useEffect(() => {
     // La entrada actual pasa a ser la raíz del portal. Es `replaceState`, no
@@ -379,11 +391,17 @@ export default function PortalAseguradoPage() {
     );
   }
 
+  // 🚨 El siniestro que se está mirando (si hay uno abierto).
+  const siniestroVer = siniestroAbierto != null ? siniestros.find((x) => x.id === siniestroAbierto) || null : null;
+  const detalleSiniestro = siniestroVer ? (
+    <SiniestroDetalle s={siniestroVer} nombreCliente={nombreCliente} onCerrar={atras} />
+  ) : null;
+
   // 🔑 Sin seguros con cuponera pero con siniestros, trámites o casos legales:
   //    una pantalla simple con lo suyo (los pagos, la grúa y los papeles del
   //    seguro no tienen nada que mostrar).
   if (!polizas.length) {
-    const primerNombre = capitalizar(cliente.nombre || "").split(" ")[0] || nombreCliente.split(" ")[0];
+    const primerNombre = cliente.nombre_pila || capitalizar(cliente.nombre || "").split(" ")[0] || nombreCliente.split(" ")[0];
     return (
       <div className="portal" data-tema={temaActivo}>
         <div className="portal-frame" style={{ minHeight: "100dvh", paddingBottom: 40 }}>
@@ -405,8 +423,10 @@ export default function PortalAseguradoPage() {
             tramites={tramites}
             casosLegales={casosLegales}
             nombreCliente={nombreCliente}
+            onAbrirSiniestro={abrirSiniestro}
           />
         </div>
+        {detalleSiniestro}
       </div>
     );
   }
@@ -423,6 +443,7 @@ export default function PortalAseguradoPage() {
     : tab === "pagos" ? "Tus pagos"
     : tab === "grua" ? "Grúa"
     : tab === "papeles" ? "Tus papeles"
+    : tab === "perfil" ? "Mi perfil"
     : detalle ? nombreBien(detalle)
     : tituloSeguros(polizas.length);
 
@@ -528,6 +549,48 @@ export default function PortalAseguradoPage() {
                   abajo hay una lista de seguros. Nadie se pregunta qué es.
                   Eran 37px de alto para no decir nada. */}
               <div style={{ height: 14 }} />
+
+              {/* 🎁 Club Thames: invitación a completar el perfil (solo piloto). */}
+              {data?.club?.activo && data?.perfil && !data.perfil.completo ? (
+                <button
+                  type="button"
+                  onClick={() => irA("perfil")}
+                  style={{
+                    margin: "0 16px 12px", width: "calc(100% - 32px)", textAlign: "left",
+                    background: "var(--card)", border: "var(--lista-borde)", borderRadius: 18,
+                    boxShadow: "var(--lista-sombra)", padding: "14px 16px", display: "flex",
+                    gap: 14, alignItems: "center", cursor: "pointer", fontFamily: "inherit",
+                    color: "var(--t1)",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+                      background: `conic-gradient(var(--m) 0 ${data.perfil.porcentaje}%, var(--div) ${data.perfil.porcentaje}% 100%)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 36, height: 36, borderRadius: "50%", background: "var(--card)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11.5, fontWeight: 800, color: "var(--m)",
+                      }}
+                    >
+                      {data.perfil.porcentaje}%
+                    </span>
+                  </span>
+                  <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>
+                      Completá tu perfil y ahorrá {data.club.descuento_pct}%
+                    </span>
+                    <span style={{ fontSize: 13, color: "var(--t2)" }}>
+                      Te falta: {data.perfil.faltan.join(", ").toLowerCase()}
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+
               <Lista>
                 {polizas.map((p) => (
                   <FilaSeguro key={p.id} poliza={p} onClick={() => abrirPoliza(p)} />
@@ -540,6 +603,7 @@ export default function PortalAseguradoPage() {
                 tramites={tramites}
                 casosLegales={casosLegales}
                 nombreCliente={nombreCliente}
+                onAbrirSiniestro={abrirSiniestro}
               />
             </>
           )}
@@ -550,6 +614,21 @@ export default function PortalAseguradoPage() {
         {tab === "grua" ? (
           <div className="portal-pant">
             <PantallaGrua polizas={conGrua} />
+          </div>
+        ) : null}
+
+        {/* ══════════ 🎁 MI PERFIL (+ Club Thames) ══════════ */}
+        {tab === "perfil" ? (
+          <div className="portal-pant">
+            <MiPerfil
+              portalBase={PORTAL_BASE}
+              token={token}
+              perfil={data?.perfil}
+              club={data?.club}
+              fotosAuto={data?.fotos_auto || []}
+              nombreCliente={nombreCliente}
+              onActualizado={(j) => setData((d) => ({ ...d, ...j }))}
+            />
           </div>
         ) : null}
 
@@ -583,9 +662,21 @@ export default function PortalAseguradoPage() {
         vencidos={vencidos}
         totalSeguros={polizas.length}
         mostrarGrua={conGrua.length > 0}
+        perfilIncompleto={!!data?.perfil && !data.perfil.completo}
+      />
+
+      {/* 🎁 Bienvenida al Club: una sola vez, solo en la oficina piloto. */}
+      <BienvenidaClub
+        token={token}
+        club={data?.club}
+        perfil={data?.perfil}
+        nombre={capitalizar(cliente.nombre_pila || "")}
+        onCompletar={() => irA("perfil")}
       />
 
       {verDoc ? <VisorDocumento doc={verDoc} onCerrar={atras} /> : null}
+
+      {detalleSiniestro}
 
       <Toaster position="bottom-center" toastOptions={{ style: { marginBottom: 80 } }} />
     </div>
@@ -596,13 +687,13 @@ export default function PortalAseguradoPage() {
 
 // Las tres listas juntas, en este orden (lo más urgente primero). Si no tiene
 // nada de una, esa sección no aparece.
-function OtrasCosas({ siniestros = [], tramites = [], casosLegales = [], nombreCliente = "" }) {
+function OtrasCosas({ siniestros = [], tramites = [], casosLegales = [], onAbrirSiniestro }) {
   return (
     <>
       {siniestros.length ? (
         <>
           <Seccion>{siniestros.length > 1 ? "Tus siniestros" : "Tu siniestro"}</Seccion>
-          <Siniestros items={siniestros} nombreCliente={nombreCliente} />
+          <Siniestros items={siniestros} onAbrir={onAbrirSiniestro} />
         </>
       ) : null}
       {tramites.length ? (
@@ -638,44 +729,36 @@ function Pasos({ paso = 1, pasos = 5, fin = false }) {
   );
 }
 
-// 🚨 Cada siniestro: qué pasó, en qué paso está y «Consultar» por WhatsApp a la
-//    oficina (con el mensaje ya escrito). Sin notas internas: el servidor no las manda.
-function Siniestros({ items, nombreCliente }) {
+// 🚨 Cada siniestro: qué pasó, en qué paso está (con la fecha del último paso, ej. la de
+//    la denuncia; no la del choque) y la barrita. 🆕 16/10: al tocarlo se abre el detalle
+//    «Gestión de su siniestro» (SiniestroDetalle.jsx). El WhatsApp quedó adentro.
+//    Sin notas internas: el servidor no las manda.
+function Siniestros({ items, onAbrir }) {
   return (
     <Lista>
-      {items.map((s, i) => {
-        const cuando = fmtLargo(s.fecha || s.cargado);
-        const msg = `Hola, soy ${nombreCliente || ""}. Quería saber cómo va mi siniestro del ${cuando}${
-          s.patente ? ` (${s.patente})` : ""
-        }.`;
-        const href = waLink(s.oficina_whatsapp, msg);
-        return (
-          <Fila
-            key={s.id}
-            i={i}
-            primera={i === 0}
-            icono={s.abierto ? <IconAlerta size={21} /> : <IconTick size={19} />}
-            tono={s.abierto ? "aviso" : "ok"}
-            resaltado={!s.abierto}
-            titulo={[s.que_paso, s.patente].filter(Boolean).join(" · ")}
-            sub={
-              <>
-                {s.estado_cliente} · <span style={{ whiteSpace: "nowrap" }}>{cuando}</span>
-                {s.nro_reclamo ? (
-                  <span style={{ display: "block", marginTop: 1 }}>Reclamo en {s.compania || "la compañía"}: {s.nro_reclamo}</span>
-                ) : null}
-                <Pasos paso={s.paso} pasos={s.pasos} fin={!s.abierto} />
-              </>
-            }
-            derecha={
-              href ? (
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>Consultar</span>
-              ) : null
-            }
-            href={href || undefined}
-          />
-        );
-      })}
+      {items.map((s, i) => (
+        <Fila
+          key={s.id}
+          i={i}
+          primera={i === 0}
+          icono={s.abierto ? <IconAlerta size={21} /> : <IconTick size={19} />}
+          tono={s.abierto ? "aviso" : "ok"}
+          resaltado={!s.abierto}
+          titulo={[s.titulo || s.que_paso, s.patente].filter(Boolean).join(" · ")}
+          sub={
+            <>
+              {s.estado_cliente}
+              {s.fecha_estado ? <> · <span style={{ whiteSpace: "nowrap" }}>{fmt(s.fecha_estado)}</span></> : null}
+              {s.fecha ? (
+                <span style={{ display: "block", marginTop: 1 }}>Hecho del {fmtLargo(s.fecha)}</span>
+              ) : null}
+              <Pasos paso={s.paso} pasos={s.pasos} fin={!s.abierto} />
+            </>
+          }
+          derecha={<span style={{ fontSize: 13, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>Ver</span>}
+          onClick={onAbrir ? () => onAbrir(s) : undefined}
+        />
+      ))}
     </Lista>
   );
 }
@@ -1138,4 +1221,4 @@ function FilaDato({ label, valor, mas, onClick, primera }) {
 
   if (onClick) return <button onClick={onClick} style={estilo}>{contenido}</button>;
   return <div style={estilo}>{contenido}</div>;
-}
+}

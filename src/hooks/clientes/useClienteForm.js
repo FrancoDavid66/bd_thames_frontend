@@ -14,6 +14,10 @@ const VACIO = {
   direccion: "",
   localidad: "",
   fecha_nacimiento: "",
+  // 🎁 Club Thames (28/10/2026)
+  estado_civil: "",
+  ocupacion: "",
+  invitado_por_codigo: "", // el código del amigo que lo trajo (ej. JOSE-7K2M)
   oficina: "", // 🚀 blindaje multi-tenant
 };
 
@@ -48,6 +52,10 @@ export const useClienteForm = ({ cliente = null, onClose, onSuccess, onSave } = 
         direccion: cliente.direccion || "",
         localidad: cliente.localidad || "",
         fecha_nacimiento: cliente.fecha_nacimiento || "",
+        estado_civil: cliente.estado_civil || "",
+        ocupacion: cliente.ocupacion || "",
+        // Se muestra vacío: solo se manda si la oficina escribe un código nuevo.
+        invitado_por_codigo: "",
         oficina: cliente.oficina || "",
       });
     } else {
@@ -95,7 +103,14 @@ export const useClienteForm = ({ cliente = null, onClose, onSuccess, onSave } = 
           email: formData.email?.trim() || null,
           fecha_nacimiento:
             formData.fecha_nacimiento?.trim() === "" ? null : formData.fecha_nacimiento,
+          ocupacion: (formData.ocupacion || "").trim(),
         };
+        // 🎁 El código de invitación solo viaja si se escribió uno (si no, no se toca).
+        if (!String(formData.invitado_por_codigo || "").trim()) {
+          delete dataAEnviar.invitado_por_codigo;
+        } else {
+          dataAEnviar.invitado_por_codigo = formData.invitado_por_codigo.trim().toUpperCase();
+        }
 
         await dispatch(updateCliente(dataAEnviar)).unwrap();
         toast.success("Ficha actualizada correctamente");

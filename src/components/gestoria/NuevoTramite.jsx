@@ -4,10 +4,17 @@
 //    grandes (Franco 29/09: "que sea fácil de usar"). Abajo, "Atrás" y "Siguiente".
 //   1 · Qué trámite es: botones con ícono. Al tocar uno pasa solo al paso 2
 //       ("Otro" pide cuál es).
-//   2 · De quién es: se busca por patente, DNI o nombre. Si no es cliente, a
-//       mano: nombre y apellido, DNI y teléfono. La patente NO es obligatoria:
-//       se agrega después desde el trámite (Franco 28/09). La licencia de
-//       conducir es de la persona: no lleva auto.
+//   2 · De quién es: se busca por patente, DNI o nombre (una fila por cliente).
+//       Si no es cliente, a mano: nombre y apellido, DNI y teléfono.
+//       📞 (Franco 17/10) Si el cliente de THAMES no tiene teléfono, se lo pide
+//       acá y queda guardado en su ficha.
+//   2b · 🚗 ¿Con qué vehículo? (Franco 17/10): uno de los que tiene en THAMES
+//       (de sus pólizas) u «Otro vehículo» que no está en THAMES (ej: Gramajo
+//       quería dar de baja un auto que vendió hace 10 años y el trámite se llevó
+//       la Gilera de su póliza). Del otro se piden patente, marca, modelo y año:
+//       con la patente alcanza; si no la sabe, marca y modelo (la patente se
+//       agrega después desde el trámite, Franco 28/09). La licencia de conducir
+//       es de la persona: no tiene este paso.
 //   3 · Qué papeles trajo (se tocan) y las fotos de los papeles (opcional). Las
 //       fotos se suben mientras seguís y quedan en el trámite al cargarlo
 //       (la miniatura es chiquita, de Cloudinary: no se carga la foto entera).
@@ -53,6 +60,7 @@ import {
   HiReceiptTax,
   HiSearch,
   HiSwitchHorizontal,
+  HiTruck,
   HiUserAdd,
   HiX,
 } from "react-icons/hi";
@@ -91,6 +99,47 @@ const TONOS = {
   amarillo: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-duo-amarillo-sombra dark:text-amber-300",
   neutro: "bg-surface dark:bg-surface-dark text-suave dark:text-slate-300",
 };
+const ANIO_MAX = new Date().getFullYear() + 1;
+
+/** ¿Es un teléfono de verdad? Al menos 8 números (la misma regla que el servidor). */
+const telOk = (t) => String(t || "").replace(/\D/g, "").length >= 8;
+
+/** "Fiat Duna 1995" con lo que cargaron de «Otro vehículo» (vacío si nada). */
+const armarVehiculo = (v) => [v.marca.trim(), v.modelo.trim(), v.anio.trim()].filter(Boolean).join(" ");
+
+/**
+ * El buscador trae una fila por auto: acá queda UNA por cliente, con todos sus autos
+ * en `vehiculos` (si el servidor todavía no los manda, se arman con las filas).
+ */
+function agruparClientes(filas) {
+  const porCliente = new Map();
+  (filas || []).forEach((r) => {
+    const k = r.cliente || `${r.nombre}-${r.dni}`;
+    if (!porCliente.has(k)) {
+      porCliente.set(k, { ...r, vehiculos: Array.isArray(r.vehiculos) ? r.vehiculos : [], _armar: !Array.isArray(r.vehiculos) });
+    }
+    const c = porCliente.get(k);
+    if (c._armar && r.poliza && (r.patente || r.vehiculo) && !c.vehiculos.some((a) => a.poliza === r.poliza)) {
+      c.vehiculos.push({ poliza: r.poliza, patente: r.patente, vehiculo: r.vehiculo, poliza_label: r.poliza_label, estado_poliza: r.estado_poliza });
+    }
+  });
+  return [...porCliente.values()];
+}
+
+/** Los pasos del alta (según quién carga y si el trámite lleva vehículo). */
+function armarPasos({ esGestor, eligeOficina, conVehiculo }) {
+  const p = [
+    { id: "tipo", corto: "Qué trámite" },
+    { id: "cliente", corto: "Cliente" },
+  ];
+  if (conVehiculo) p.push({ id: "vehiculo", corto: "Vehículo" });
+  p.push({ id: "papeles", corto: "Papeles" });
+  if (!esGestor) p.push({ id: "gestor", corto: "Gestor" });
+  if (eligeOficina) p.push({ id: "oficina", corto: "Dónde lo retira" });
+  p.push({ id: "revisar", corto: "Revisar y cargar" });
+  return p;
+}
+
 // Ejemplo para la "Aclaración" (último paso), según el tipo.
 const EJEMPLO = {
   TRANSFERENCIA: "Ej: con cédula azul para el hijo",
@@ -473,6 +522,10 @@ export default function NuevoTramite() {
   const [sel, setSel] = useState(null);
   const [manual, setManual] = useState(false);
   const [m, setM] = useState({ nombre: "", dni: "", tel: "" });
+  const [telNuevo, setTelNuevo] = useState(""); // 📞 el cliente de THAMES no tenía teléfono
+  const [vehSel, setVehSel] = useState(null); // 🚗 uno de los autos que tiene en THAMES
+  const [otroAuto, setOtroAuto] = useState(false); // 🚗 «Otro vehículo» (no está en THAMES)
+  const [v, setV] = useState({ patente: "", marca: "", modelo: "", anio: "" });
   const [papeles, setPapeles] = useState([]);
   const [papelNuevo, setPapelNuevo] = useState("");
   const [fotos, setFotos] = useState([]); // {id, nombre, esPdf, estado: "subiendo"|"ok", arch}
@@ -568,34 +621,40 @@ export default function NuevoTramite() {
     if (el && el.getBoundingClientRect().top < 72) el.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [i, creado]);
 
-  // ── Los pasos (según quién carga) ──
-  const pasos = useMemo(() => {
-    const p = [
-      { id: "tipo", corto: "Qué trámite" },
-      { id: "cliente", corto: "Cliente" },
-      { id: "papeles", corto: "Papeles" },
-    ];
-    if (!esGestor) p.push({ id: "gestor", corto: "Gestor" });
-    if (eligeOficina) p.push({ id: "oficina", corto: "Dónde lo retira" });
-    p.push({ id: "revisar", corto: "Revisar y cargar" });
-    return p;
-  }, [esGestor, eligeOficina]);
+  // ── Los pasos (según quién carga y si lleva vehículo) ──
+  const tipoInfo = tipos.find((x) => x.id === tipo) || null;
+  const conVehiculo = tipoInfo ? tipoInfo.vehiculo !== false : true; // la licencia es de la persona
+  const pasos = useMemo(() => armarPasos({ esGestor, eligeOficina, conVehiculo }), [esGestor, eligeOficina, conVehiculo]);
   const paso = pasos[i]?.id || "tipo";
   const total = pasos.length;
 
   // ── Lo que se va cargando ──
-  const tipoInfo = tipos.find((x) => x.id === tipo) || null;
-  const conVehiculo = tipoInfo ? tipoInfo.vehiculo !== false : true; // la licencia es de la persona
   const tipoNombre = tipo === "OTRO" ? (detalle.trim() ? `Otro: ${detalle.trim()}` : "Otro") : tipoInfo?.nombre || "";
   const manualEf = esGestor || manual; // el gestor siempre carga al cliente a mano
   const cliNombre = manualEf ? m.nombre.trim() : sel?.nombre || "";
-  const cliSub = manualEf
-    ? [m.dni.trim() && `DNI ${m.dni.trim()}`, m.tel.trim()].filter(Boolean).join(" · ")
-    : sel
-      ? [sel.dni && `DNI ${sel.dni}`, sel.telefono].filter(Boolean).join(" · ")
-      : "";
-  const auto = conVehiculo && !manualEf && sel && (sel.vehiculo || sel.patente) ? { vehiculo: sel.vehiculo, patente: sel.patente } : null;
+  // 📞 Cliente de THAMES sin teléfono: se pide (y se guarda en su ficha al cargar).
+  const pideTel = !manualEf && !!sel && !telOk(sel.telefono);
+  const tel = manualEf ? m.tel.trim() : pideTel ? telNuevo.trim() : sel?.telefono || "";
+  const cliDni = manualEf ? m.dni.trim() : sel?.dni || "";
+  const cliSub = [cliDni && `DNI ${cliDni}`, tel].filter(Boolean).join(" · ");
+  // 🚗 Los autos del cliente en THAMES, o «Otro vehículo» (a mano siempre es «otro»).
+  const autosThames = !manualEf && sel ? sel.vehiculos || [] : [];
+  const otroEf = otroAuto || !autosThames.length;
+  const vehOtro = { vehiculo: armarVehiculo(v), patente: v.patente.replace(/\s/g, "").toUpperCase() };
+  const anioTxt = v.anio.trim();
+  const anioOk = !anioTxt || (/^\d{4}$/.test(anioTxt) && Number(anioTxt) >= 1900 && Number(anioTxt) <= ANIO_MAX);
+  const datosAutoOk = !!vehOtro.patente || (!!v.marca.trim() && !!v.modelo.trim());
+  const auto = !conVehiculo
+    ? null
+    : !otroEf
+      ? vehSel
+        ? { vehiculo: vehSel.vehiculo, patente: vehSel.patente }
+        : null
+      : vehOtro.vehiculo || vehOtro.patente
+        ? vehOtro
+        : null;
   const autoTxt = auto ? `${auto.vehiculo || ""} ${auto.patente || ""}`.trim() : "";
+  const autoSub = !auto ? "" : !otroEf ? `En THAMES${vehSel?.poliza_label ? ` · póliza ${vehSel.poliza_label}` : ""}` : autosThames.length ? "Otro vehículo (no está en THAMES)" : "";
   const subiendoN = fotos.filter((f) => f.estado === "subiendo").length;
   const fotosOk = fotos.filter((f) => f.estado === "ok");
   const papelesOk = papeles.filter((p) => p.ok).length;
@@ -608,7 +667,6 @@ export default function NuevoTramite() {
   const oficinaSel = oficina || (esAdmin && catalogo?.mi_oficina ? String(catalogo.mi_oficina) : "");
   const nombreOficina = (id) => oficinas.find((o) => String(o.id) === String(id))?.nombre || "";
   const retiraEn = eligeOficina ? nombreOficina(oficinaSel) : nombreOficina(catalogo?.mi_oficina) || "tu oficina";
-  const tel = manualEf ? m.tel.trim() : sel?.telefono || "";
 
   // Plata (solo admin con las comisiones prendidas).
   const pctSel = gSel ? Number(gSel.comision_pct) : null;
@@ -619,22 +677,14 @@ export default function NuevoTramite() {
   else if (!(pctSel > 0)) calc = `${gSel.nombre} no paga comisión.`;
   else calc = `Comisión para THAMES (${fmtPct(pctSel)}): ${plata(calcComision(precioNum, pctSel))}`;
 
-  // Para la licencia no importa el auto: una fila por cliente.
-  const resultadosVista = useMemo(() => {
-    if (conVehiculo) return resultados;
-    const vistos = new Set();
-    return resultados.filter((r) => {
-      const k = r.cliente || `${r.nombre}-${r.dni}`;
-      if (vistos.has(k)) return false;
-      vistos.add(k);
-      return true;
-    });
-  }, [resultados, conVehiculo]);
+  // Una fila por cliente (el auto se elige en el paso que sigue).
+  const resultadosVista = useMemo(() => agruparClientes(resultados), [resultados]);
 
   // ── ¿Está completo cada paso? (y qué decir si no) ──
   const listo = {
     tipo: !!tipo && (tipo !== "OTRO" || !!detalle.trim()),
-    cliente: manualEf ? !!m.nombre.trim() : !!sel,
+    cliente: manualEf ? !!m.nombre.trim() : !!sel && (!pideTel || telOk(telNuevo)),
+    vehiculo: otroEf ? datosAutoOk && anioOk : !!vehSel,
     papeles: true, // las fotos siguen subiendo mientras avanzás (se espera al cargar)
     gestor: true,
     oficina: !!oficinaSel,
@@ -642,7 +692,17 @@ export default function NuevoTramite() {
   };
   const falta = {
     tipo: !tipo ? "Elegí qué trámite es." : "Escribí qué trámite es (ej: «Informe de multas»).",
-    cliente: manualEf ? "Falta el nombre y apellido del cliente." : "Elegí al cliente de la lista, o tocá «Es alguien nuevo».",
+    cliente: manualEf
+      ? "Falta el nombre y apellido del cliente."
+      : !sel
+        ? "Elegí al cliente de la lista, o tocá «Es alguien nuevo»."
+        : "Falta el teléfono del cliente: poné la característica y el número (ej: 11 5555-0000).",
+    vehiculo:
+      !otroEf && !vehSel
+        ? "Elegí el vehículo, o tocá «Otro vehículo»."
+        : !anioOk
+          ? `El año tiene que tener 4 números (ej: 2015), hasta ${ANIO_MAX}.`
+          : "Poné la patente, o la marca y el modelo del vehículo.",
     papeles: "Esperá que terminen de subir las fotos.",
     oficina: "Elegí la oficina de THAMES donde lo retira el cliente.",
   };
@@ -691,11 +751,16 @@ export default function NuevoTramite() {
       setTipo(id);
     }
     if (id !== "OTRO") {
-      // Pasa solo al paso que sigue (o vuelve a "Revisar" si vino de ahí).
-      const destino = desdeRevisar ? pasos.length - 1 : 1;
+      // Pasa solo al paso que sigue (o vuelve a "Revisar" si vino de ahí). Ojo: con
+      // otro tipo pueden cambiar los pasos (la licencia no tiene «Vehículo»); si
+      // ahora lleva vehículo y todavía no está, pasa primero por ese paso.
+      const conVehNuevo = tipos.find((x) => x.id === id)?.vehiculo !== false;
+      const nuevos = armarPasos({ esGestor, eligeOficina, conVehiculo: conVehNuevo });
+      const revisarN = nuevos.length - 1;
+      const destino = !desdeRevisar ? 1 : conVehNuevo && !listo.vehiculo ? nuevos.findIndex((p) => p.id === "vehiculo") : revisarN;
       setTimeout(() => {
         if (!vivo.current) return;
-        if (destino === pasos.length - 1) setDesdeRevisar(false);
+        if (destino === revisarN) setDesdeRevisar(false);
         setI(destino);
       }, 220);
     }
@@ -703,6 +768,10 @@ export default function NuevoTramite() {
 
   const elegirCliente = (r) => {
     setSel(r);
+    setTelNuevo("");
+    setVehSel(null);
+    setOtroAuto(false);
+    setV({ patente: "", marca: "", modelo: "", anio: "" });
     setError("");
     // El admin: sale sola la oficina del cliente, si está activa (la puede cambiar).
     if (esAdmin && r.oficina && oficinas.some((o) => String(o.id) === String(r.oficina))) setOficina(String(r.oficina));
@@ -774,13 +843,25 @@ export default function NuevoTramite() {
       return setError("El precio tiene que ser un número mayor a cero (o dejalo vacío y lo carga el gestor).");
     }
     setError("");
-    const cliente = manualEf
-      ? { persona_nombre: m.nombre.trim(), persona_dni: m.dni.trim(), persona_telefono: m.tel.trim() }
-      : conVehiculo
-        ? { poliza: sel.poliza, cliente: sel.cliente }
-        : sel.cliente
-          ? { cliente: sel.cliente } // licencia: el cliente, sin el auto de la póliza
-          : { poliza: sel.poliza };
+    // 🚗 «Otro vehículo»: patente, marca, modelo y año (el servidor arma "Fiat Duna 1995").
+    const datosAuto = {
+      patente: vehOtro.patente,
+      marca: v.marca.trim(),
+      modelo: v.modelo.trim(),
+      anio: anioTxt ? Number(anioTxt) : null,
+    };
+    let cliente;
+    if (manualEf) {
+      cliente = { persona_nombre: m.nombre.trim(), persona_dni: m.dni.trim(), persona_telefono: m.tel.trim(), ...(conVehiculo ? datosAuto : {}) };
+    } else {
+      const quien = sel.cliente
+        ? { cliente: sel.cliente }
+        : { persona_nombre: sel.nombre || "", persona_dni: sel.dni || "", persona_telefono: sel.telefono || "" };
+      if (!conVehiculo) cliente = sel.cliente ? quien : { poliza: sel.poliza }; // licencia: la persona, sin auto
+      else if (!otroEf && vehSel) cliente = { ...quien, poliza: vehSel.poliza }; // un auto suyo de THAMES
+      else cliente = { ...quien, ...datosAuto }; // otro vehículo: sin póliza
+      if (pideTel) cliente.cliente_telefono = telNuevo.trim(); // 📞 queda en su ficha
+    }
     const body = {
       tipo,
       detalle: detalle.trim(),
@@ -836,6 +917,10 @@ export default function NuevoTramite() {
     setSel(null);
     setManual(false);
     setM({ nombre: "", dni: "", tel: "" });
+    setTelNuevo("");
+    setVehSel(null);
+    setOtroAuto(false);
+    setV({ patente: "", marca: "", modelo: "", anio: "" });
     setPapeles([]);
     setPapelNuevo("");
     setFotos([]);
@@ -949,6 +1034,9 @@ export default function NuevoTramite() {
     cliente: manualEf
       ? [esGestor ? "¿De quién es el trámite?" : "Cliente nuevo", "Solo 3 datos. El nombre es lo único obligatorio."]
       : ["¿De quién es el trámite?", "Buscalo por patente, DNI o nombre."],
+    vehiculo: autosThames.length
+      ? ["¿Con qué vehículo es el trámite?", `¿Es uno de los que ${primerNombre(cliNombre) || "el cliente"} tiene en THAMES, o es otro?`]
+      : ["¿Qué vehículo es?", "Con la patente alcanza. Si no la sabe, poné la marca y el modelo."],
     papeles: ["¿Qué papeles trajo?", "Tocá los que tiene. Los que faltan quedan marcados en el trámite."],
     gestor: ["¿Qué gestor lo hace?", activos.length > 1 ? "Arriba, el que más rápido viene." : "Elegí quién lo hace."],
     oficina: [
@@ -963,6 +1051,7 @@ export default function NuevoTramite() {
   const resumenPaso = {
     tipo: tipoNombre,
     cliente: cliNombre,
+    vehiculo: autoTxt,
     papeles: papelesTxt,
     gestor: gSel ? gSel.nombre : "Sin gestor",
     oficina: retiraEn,
@@ -1147,30 +1236,54 @@ export default function NuevoTramite() {
             {paso === "cliente" && !manualEf && (
               <div className="flex flex-col gap-3">
                 {sel ? (
-                  <div className="flex items-center gap-3 rounded-2xl border border-duo-violeta ring-1 ring-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] px-3.5 py-3">
-                    <Tilde on />
-                    <span className="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <strong className="text-[16px] text-titulo dark:text-titulo-dark">{sel.nombre || "Sin nombre"}</strong>
-                      <span className={`text-[13px] ${suave}`}>
-                        <DniTel dni={sel.dni} tel={sel.telefono} vacio="Sin DNI ni teléfono" />
-                      </span>
-                      {conVehiculo && (sel.vehiculo || sel.patente) && (
-                        <span className="text-[13px] text-titulo dark:text-titulo-dark">
-                          {sel.vehiculo} <strong className="font-mono tracking-wide">{sel.patente}</strong>
+                  <>
+                    <div className="flex items-center gap-3 rounded-2xl border border-duo-violeta ring-1 ring-duo-violeta bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)] px-3.5 py-3">
+                      <Tilde on />
+                      <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+                        <strong className="text-[16px] text-titulo dark:text-titulo-dark">{sel.nombre || "Sin nombre"}</strong>
+                        <span className={`text-[13px] ${suave}`}>
+                          <DniTel dni={sel.dni} tel={pideTel ? "" : sel.telefono} vacio={pideTel ? "" : "Sin DNI ni teléfono"} />
+                          {pideTel ? <span className="whitespace-nowrap">{sel.dni ? " · " : ""}Sin teléfono</span> : null}
                         </span>
-                      )}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSel(null);
-                        setQ("");
-                      }}
-                      className="shrink-0 min-h-[40px] rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 text-[14px] font-bold text-titulo dark:text-titulo-dark"
-                    >
-                      Cambiar
-                    </button>
-                  </div>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSel(null);
+                          setQ("");
+                        }}
+                        className="shrink-0 min-h-[40px] rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 text-[14px] font-bold text-titulo dark:text-titulo-dark"
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                    {/* 📞 No tiene teléfono: se lo pedís y queda en su ficha */}
+                    {pideTel && (
+                      <div className="flex flex-col gap-3 rounded-2xl border border-linea dark:border-linea-dark p-3.5">
+                        <Aviso tono="amarillo" icono={HiExclamation}>
+                          No tiene teléfono cargado. Pedíselo: queda guardado en su ficha de cliente.
+                        </Aviso>
+                        <label className={labelCls}>
+                          Teléfono (celular)
+                          <input
+                            type="tel"
+                            inputMode="tel"
+                            value={telNuevo}
+                            maxLength={20}
+                            onChange={(e) => {
+                              setTelNuevo(e.target.value);
+                              setError("");
+                            }}
+                            onKeyDown={enterSigue}
+                            placeholder="Ej: 11 5555-0000"
+                            autoComplete="off"
+                            className={inputCls}
+                            autoFocus
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <>
                     <label className="relative block">
@@ -1198,22 +1311,31 @@ export default function NuevoTramite() {
                           <span className={`text-[13px] font-semibold ${suave}`}>
                             {resultadosVista.length} encontrado{resultadosVista.length > 1 ? "s" : ""}
                           </span>
-                          {resultadosVista.map((r) => (
-                            <Opcion key={`${r.poliza}-${r.patente}`} on={false} conTilde={false} onClick={() => elegirCliente(r)}>
-                              <span className="flex flex-col gap-0.5 flex-1 min-w-0">
-                                <strong className="text-[16px] text-titulo dark:text-titulo-dark">{r.nombre || "Sin nombre"}</strong>
-                                <span className={`text-[13px] ${suave}`}>
-                                  <DniTel dni={r.dni} tel={r.telefono} />
+                          {resultadosVista.map((r) => {
+                            const n = r.vehiculos.length;
+                            const uno = n === 1 ? r.vehiculos[0] : null;
+                            return (
+                              <Opcion key={r.cliente || `${r.nombre}-${r.dni}`} on={false} conTilde={false} onClick={() => elegirCliente(r)}>
+                                <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                  <strong className="text-[16px] text-titulo dark:text-titulo-dark">{r.nombre || "Sin nombre"}</strong>
+                                  <span className={`text-[13px] ${suave}`}>
+                                    <DniTel dni={r.dni} tel={telOk(r.telefono) ? r.telefono : ""} />
+                                  </span>
                                 </span>
-                              </span>
-                              {conVehiculo && (r.vehiculo || r.patente) && (
-                                <span className="flex flex-col items-end gap-0.5 shrink-0 max-w-[45%] text-right">
-                                  <span className={`text-[13px] truncate max-w-full ${suave}`}>{r.vehiculo}</span>
-                                  <strong className="font-mono text-[14px] tracking-wide text-titulo dark:text-titulo-dark">{r.patente}</strong>
-                                </span>
-                              )}
-                            </Opcion>
-                          ))}
+                                {conVehiculo &&
+                                  (uno ? (
+                                    <span className="flex flex-col items-end gap-0.5 shrink-0 max-w-[45%] text-right">
+                                      <span className={`text-[13px] truncate max-w-full ${suave}`}>{uno.vehiculo}</span>
+                                      <strong className="font-mono text-[14px] tracking-wide text-titulo dark:text-titulo-dark">{uno.patente}</strong>
+                                    </span>
+                                  ) : (
+                                    <span className={`shrink-0 max-w-[45%] text-right text-[13px] ${suave}`}>
+                                      {n ? `${n} vehículos` : "Sin vehículos en THAMES"}
+                                    </span>
+                                  ))}
+                              </Opcion>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className={`text-[14px] ${suave}`}>No encontré a nadie con «{q.trim()}».</p>
@@ -1282,9 +1404,7 @@ export default function NuevoTramite() {
                   />
                 </label>
                 <Aviso>
-                  {conVehiculo
-                    ? "La patente no hace falta ahora: se agrega después, desde el trámite."
-                    : "La licencia es de la persona: no hace falta patente."}
+                  {conVehiculo ? "El vehículo lo cargás en el paso que sigue." : "La licencia es de la persona: no hace falta patente."}
                 </Aviso>
                 {!esGestor && (
                   <button
@@ -1297,6 +1417,133 @@ export default function NuevoTramite() {
                   >
                     ← Buscar entre los clientes
                   </button>
+                )}
+              </div>
+            )}
+
+            {/* ── 2b · 🚗 Vehículo: uno de THAMES u «Otro vehículo» ── */}
+            {paso === "vehiculo" && (
+              <div className="flex flex-col gap-2.5">
+                {autosThames.map((a) => {
+                  const on = !otroAuto && vehSel?.poliza === a.poliza;
+                  return (
+                    <Opcion
+                      key={a.poliza}
+                      on={on}
+                      onClick={() => {
+                        setVehSel(a);
+                        setOtroAuto(false);
+                        setError("");
+                      }}
+                    >
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${on ? "bg-duo-violeta text-white" : TONOS.neutro}`}>
+                        <HiTruck className="w-[22px] h-[22px]" aria-hidden="true" />
+                      </span>
+                      <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+                        <strong className="text-[16px] text-titulo dark:text-titulo-dark break-words">
+                          {a.vehiculo || "Vehículo"}
+                          {a.anio ? ` ${a.anio}` : ""}
+                        </strong>
+                        <span className={`text-[13px] ${suave}`}>
+                          <strong className="font-mono tracking-wide text-titulo dark:text-titulo-dark">{a.patente || "Sin patente"}</strong>
+                          {a.poliza_label ? ` · Póliza ${a.poliza_label}` : ""}
+                        </span>
+                      </span>
+                    </Opcion>
+                  );
+                })}
+                {autosThames.length > 0 && (
+                  <Opcion
+                    on={otroAuto}
+                    onClick={() => {
+                      setOtroAuto(true);
+                      setError("");
+                    }}
+                  >
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${otroAuto ? "bg-duo-violeta text-white" : TONOS.neutro}`}>
+                      <HiPlus className="w-[22px] h-[22px]" aria-hidden="true" />
+                    </span>
+                    <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <strong className="text-[16px] text-titulo dark:text-titulo-dark">Otro vehículo</strong>
+                      <span className={`text-[13px] ${suave}`}>No está en THAMES (ej: uno que ya vendió)</span>
+                    </span>
+                  </Opcion>
+                )}
+                {otroEf && (
+                  <div
+                    className={`grid grid-cols-2 gap-3 ${
+                      autosThames.length ? "mt-1 rounded-2xl border border-linea dark:border-linea-dark p-3.5" : ""
+                    }`}
+                  >
+                    <label className={labelCls}>
+                      Patente
+                      <input
+                        value={v.patente}
+                        maxLength={10}
+                        onChange={(e) => {
+                          setV({ ...v, patente: e.target.value.toUpperCase() });
+                          setError("");
+                        }}
+                        onKeyDown={enterSigue}
+                        placeholder="AB123CD"
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        className={`${inputCls} font-mono tracking-wide`}
+                        autoFocus
+                      />
+                    </label>
+                    <label className={labelCls}>
+                      Año
+                      <input
+                        inputMode="numeric"
+                        value={v.anio}
+                        maxLength={4}
+                        onChange={(e) => {
+                          setV({ ...v, anio: e.target.value.replace(/\D/g, "") });
+                          setError("");
+                        }}
+                        onKeyDown={enterSigue}
+                        placeholder="Ej: 2015"
+                        autoComplete="off"
+                        className={inputCls}
+                      />
+                    </label>
+                    <label className={labelCls}>
+                      Marca
+                      <input
+                        value={v.marca}
+                        maxLength={50}
+                        onChange={(e) => {
+                          setV({ ...v, marca: e.target.value });
+                          setError("");
+                        }}
+                        onKeyDown={enterSigue}
+                        placeholder="Ej: Fiat"
+                        autoComplete="off"
+                        autoCapitalize="words"
+                        className={inputCls}
+                      />
+                    </label>
+                    <label className={labelCls}>
+                      Modelo
+                      <input
+                        value={v.modelo}
+                        maxLength={60}
+                        onChange={(e) => {
+                          setV({ ...v, modelo: e.target.value });
+                          setError("");
+                        }}
+                        onKeyDown={enterSigue}
+                        placeholder="Ej: Duna"
+                        autoComplete="off"
+                        autoCapitalize="words"
+                        className={inputCls}
+                      />
+                    </label>
+                    <p className={`col-span-2 text-[13px] leading-snug ${suave}`}>
+                      Con la patente alcanza. Si no la sabe, poné la marca y el modelo: la patente se agrega después, desde el trámite.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -1487,27 +1734,27 @@ export default function NuevoTramite() {
                     label="Cliente"
                     valor={cliNombre}
                     sub={
-                      <DniTel
-                        dni={manualEf ? m.dni.trim() : sel?.dni}
-                        tel={manualEf ? m.tel.trim() : sel?.telefono}
-                        vacio="Sin DNI ni teléfono"
-                      />
+                      <>
+                        <DniTel dni={cliDni} tel={tel} vacio="Sin DNI ni teléfono" />
+                        {pideTel ? " · se guarda en su ficha" : ""}
+                      </>
                     }
                     onCambiar={() => cambiar("cliente")}
                   />
                   {conVehiculo && (
                     <FilaResumen
-                      label="Auto"
+                      label="Vehículo"
                       valor={
                         auto ? (
                           <>
                             {auto.vehiculo} <span className="font-mono tracking-wide">{auto.patente}</span>
                           </>
                         ) : (
-                          "Sin patente todavía"
+                          "Falta elegir"
                         )
                       }
-                      sub={auto ? "" : "Se agrega después, desde el trámite."}
+                      sub={[autoSub, auto && !auto.patente ? "Sin patente: se agrega después, desde el trámite." : ""].filter(Boolean).join(" · ")}
+                      onCambiar={() => cambiar("vehiculo")}
                     />
                   )}
                   <FilaResumen
@@ -1634,9 +1881,7 @@ export default function NuevoTramite() {
           <span className={`text-[12px] font-bold tracking-wide ${suave}`}>LO QUE VAS CARGANDO</span>
           <ResumenDato label="Trámite" valor={tipoNombre} />
           <ResumenDato label="Cliente" valor={cliNombre} sub={cliSub} />
-          {conVehiculo && (
-            <ResumenDato label="Auto" valor={autoTxt || (cliNombre ? "Sin patente todavía" : "")} sub={autoTxt ? "" : cliNombre ? "Se agrega después." : ""} />
-          )}
+          {conVehiculo && <ResumenDato label="Vehículo" valor={autoTxt} sub={autoSub} />}
           <ResumenDato label="Papeles" valor={papelesTxt} />
           {!esGestor && <ResumenDato label="Gestor" valor={gSel ? gSel.nombre : "Todavía sin gestor"} />}
           <ResumenDato label="Lo retira en" valor={retiraEn ? `THAMES ${retiraEn}` : ""} />

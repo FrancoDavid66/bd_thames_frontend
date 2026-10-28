@@ -8,7 +8,16 @@ import {
   HiMail,
   HiLocationMarker,
   HiCalendar,
+  HiBriefcase,
+  HiHeart,
+  HiGift,
 } from "react-icons/hi";
+
+// 🎁 Club Thames (28/10/2026) — mismas opciones que el backend.
+const ESTADO_CIVIL = {
+  SOLTERO: "Soltero/a", EN_PAREJA: "En pareja", CASADO: "Casado/a",
+  CON_HIJOS: "Con hijos", SEPARADO: "Separado/a", VIUDO: "Viudo/a",
+};
 
 const fmt = (d) => (d ? dayjs(d).format("DD-MM-YYYY") : "-");
 
@@ -137,6 +146,60 @@ function ClienteDatosPersonalesCard({ cliente }) {
               </span>
             </div>
           </div>
+
+          {/* 🎁 Estado civil */}
+          <div className="flex gap-3 items-start bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark p-3 sm:p-4 rounded-xl">
+            <div className="h-9 w-9 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark flex items-center justify-center shrink-0">
+              <HiHeart className="text-duo-azul text-lg" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[11px] text-suave dark:text-suave-dark mb-0.5">Estado civil</span>
+              {cliente.estado_civil ? (
+                <span className="text-sm font-medium text-titulo dark:text-titulo-dark">
+                  {ESTADO_CIVIL[cliente.estado_civil] || cliente.estado_civil}
+                </span>
+              ) : (
+                <span className={faltaBadge}>Falta</span>
+              )}
+            </div>
+          </div>
+
+          {/* 🎁 Ocupación */}
+          <div className="flex gap-3 items-start bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark p-3 sm:p-4 rounded-xl">
+            <div className="h-9 w-9 rounded-lg bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark flex items-center justify-center shrink-0">
+              <HiBriefcase className="text-duo-azul text-lg" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[11px] text-suave dark:text-suave-dark mb-0.5">Ocupación</span>
+              {cliente.ocupacion ? (
+                <span className="text-sm font-medium text-titulo dark:text-titulo-dark truncate">{cliente.ocupacion}</span>
+              ) : (
+                <span className={faltaBadge}>Falta</span>
+              )}
+            </div>
+          </div>
+
+          {/* 🎁 Club Thames (solo si la oficina está en la prueba) */}
+          {cliente.club?.activo && (
+            <div className="flex gap-3 items-start bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] border border-linea dark:border-linea-dark p-3 sm:p-4 rounded-xl sm:col-span-2">
+              <div className="h-9 w-9 rounded-lg bg-card dark:bg-card-dark flex items-center justify-center shrink-0">
+                <HiGift className="text-duo-verde-sombra dark:text-duo-verde text-lg" />
+              </div>
+              <div className="flex flex-col min-w-0 gap-0.5">
+                <span className="text-[11px] text-suave dark:text-suave-dark">Club Thames</span>
+                <span className="text-sm font-semibold text-titulo dark:text-titulo-dark">
+                  {cliente.club.perfil_porcentaje === 100
+                    ? "Perfil completo · 5% off activo (si está al día)"
+                    : `Perfil al ${cliente.club.perfil_porcentaje}% · falta: ${(cliente.club.perfil_faltan || []).join(", ").toLowerCase()}`}
+                </span>
+                <span className="text-[12px] text-suave dark:text-suave-dark">
+                  Código: <b className="font-mono">{cliente.club.codigo_invitacion || "se crea al entrar al portal"}</b>
+                  {" · "}Invitó a {cliente.club.invitados || 0}
+                  {cliente.invitado_por_nombre ? ` · Lo trajo: ${cliente.invitado_por_nombre}` : ""}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Fecha de Nacimiento */}
           <div className="flex gap-3 items-start bg-surface dark:bg-surface-dark border border-linea dark:border-linea-dark p-3 sm:p-4 rounded-xl sm:col-span-2">

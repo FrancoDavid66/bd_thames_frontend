@@ -34,6 +34,10 @@
 //   servidor: "Gomez C/ Rivadavia Seguros (daños y lesiones)" (apellido del cliente
 //   C/ compañía del tercero + qué se reclama). El cliente pasa a la línea gris de abajo.
 //   En Datos: «Qué se reclama» (si es un choque y no lo eligieron: «Sin elegir»).
+// 🔑 16/10: botón «Portal del cliente» (solo admin) en el panel: abre SiniestroPortalEditor,
+//   donde se cambia TODO lo que ve el cliente al tocar su siniestro: la barra de avance, cada
+//   paso de «Gestión de su siniestro», el próximo paso, las etapas, la documentación pendiente
+//   y a quién le paga la compañía (al cliente o a THAMES con poder).
 // props: onEditar(s), onBorrar(s), isWebAdmin  (el «Nuevo siniestro» está arriba, en la página)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -58,6 +62,7 @@ import { diasDesde, mensajeDe, primerNombre } from "../planilla/planillaUtils";
 import { Avatar } from "../gestoria/Piezas";
 import { fechaCorta, linkWhatsApp, plata } from "../gestoria/gestoriaUtils";
 import SiniestroFotosPanel from "./SiniestroFotosPanel";
+import SiniestroPortalEditor from "./SiniestroPortalEditor";
 
 const COLOR = "#dc2626";
 
@@ -245,6 +250,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
   const dispatch = useDispatch();
   const { siniestros, error: errorStore } = useSelector((s) => s.siniestros);
   const [cargado, setCargado] = useState(false);
+  // 🔑 El siniestro cuyo «Portal del cliente» se está editando (solo admin).
+  const [portalDe, setPortalDe] = useState(null);
 
   const recargar = useCallback(() => dispatch(getSiniestros()).finally(() => setCargado(true)), [dispatch]);
   useEffect(() => {
@@ -623,6 +630,14 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         papeles: (d) => <SiniestroFotosPanel siniestroId={d.id} responsabilidad={d.responsabilidad} />,
         acciones: (d, onRecargar) => {
           const B = [];
+          // 🔑 Lo que ve el cliente en su portal (gestión, próximo paso, documentación…).
+          if (isWebAdmin) {
+            B.push(
+              <BotonPanel key="portal" onClick={() => setPortalDe(d)} icono={<HiOutlineGlobeAlt className="h-4 w-4" />}>
+                Portal del cliente
+              </BotonPanel>
+            );
+          }
           // 🙋 Admin: decidir quién lo reclama (si todavía no lo decidió).
           if (isWebAdmin && !d.quien_reclama && d.estado !== "CERRADO") {
             const decidir = async (quien) => {
@@ -684,5 +699,15 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
     };
   }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin, opcionesOficina]);
 
-  return <Planilla a={a} />;
+  return (
+    <>
+      <Planilla a={a} />
+      <SiniestroPortalEditor
+        isOpen={!!portalDe}
+        onClose={() => setPortalDe(null)}
+        siniestro={portalDe}
+        onVerPortal={(s) => s?.cliente && abrirPortalCliente(s.cliente)}
+      />
+    </>
+  );
 }
