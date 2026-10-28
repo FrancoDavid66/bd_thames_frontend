@@ -73,8 +73,8 @@ export default function BienvenidaClub({ token, club, perfil, nombre, onCompleta
         />
         <Beneficio
           color="var(--wa)" fondo="var(--wa-bg)"
-          titulo="Si te chocan, te queda más plata"
-          texto="Reclamamos por vos y de lo que cobres te queda el 80% (sin el Club, el 70%). Además: consulta legal gratis y precio de socio en gestoría y escribanía."
+          titulo="Beneficios de socio"
+          texto="Descuento en gastos administrativos si te chocan, consulta legal gratis y precio de socio en gestoría y escribanía."
           icono={<><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z" /><path d="M9 12l2 2 4-4" /></>}
         />
       </div>
