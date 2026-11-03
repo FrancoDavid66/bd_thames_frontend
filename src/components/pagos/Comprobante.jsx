@@ -26,6 +26,18 @@
 // 🇦🇷 HOMENAJE (06/10/2026): por la despedida de Messi de la Selección, los
 //    tres formatos llevan un recuadro «GRACIAS, LEO». Se prende y se apaga
 //    SOLO por fecha (ver HOMENAJE más abajo): no hay que volver a subir nada.
+//
+// 🏷️ MARCA (02/11/2026): el recibo sale con la marca de la OFICINA DE LA
+//    PÓLIZA. Una póliza de la oficina Malvinas → recibo verde de Malvinas, con
+//    su logo y su nombre (lo imprima quien lo imprima, incluso el admin).
+//    Cualquier otra → el recibo bordó de siempre, sin cambiar nada.
+//    Si la póliza no trae la oficina, se usa la del usuario que lo imprime.
+//    Los colores y textos de cada marca están en src/marca/marcas.js.
+//
+// 🟢 RECIBO PROPIO DE MALVINAS (03/11/2026): Malvinas ya no usa este papel
+//    pintado de verde: tiene su PROPIO diseño (A4 y ticket), en
+//    ./ReciboMalvinas.jsx. Los datos son los mismos (se arman acá, en
+//    datosParaRecibo); cambia solo el dibujo. THAMES sigue igual que siempre.
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -37,6 +49,17 @@ import {
 } from "react-icons/hi";
 
 import { HOMENAJE_LEO_IMG, HOMENAJE_LEO_ANCHO, HOMENAJE_LEO_ALTO } from "./homenajeLeo";
+import { THAMES, marcaDePoliza } from "../../marca/marcas";
+import { useMarca } from "../../marca/MarcaContext";
+import { ReciboMalvinasA4, ReciboMalvinasTicket } from "./ReciboMalvinas";
+
+/* 🏷️ ¿Con qué marca sale ESTE recibo?
+   1) la que pasen a mano (prop `marca`)
+   2) la de la oficina de la póliza (o de la cuota, que a veces la trae)
+   3) la del usuario que está imprimiendo
+   Ej: el admin (THAMES) imprime la cuota de una póliza de Malvinas → Malvinas. */
+const elegirMarca = (marcaProp, poliza, cuota, marcaUsuario) =>
+  marcaProp || marcaDePoliza(poliza) || marcaDePoliza(cuota?.poliza) || marcaDePoliza(cuota) || marcaUsuario || THAMES;
 
 /* =========================================================================
    Helpers compartidos
@@ -265,12 +288,43 @@ function filasDelPago(d) {
   ].filter(([, v]) => v);
 }
 
+/* 🏢 La compañía, solo si viene como TEXTO (a veces llega el id: 3 → no sirve). */
+const textoCompania = (poliza = {}) => {
+  const v = poliza.compania_nombre ?? poliza.compania;
+  const t = typeof v === "string" ? v.trim() : "";
+  return t && !/^\d+$/.test(t) ? t : "";
+};
+
+/* 📦 Todo lo que necesita un recibo con diseño PROPIO (ej. Malvinas), ya
+   formateado para mostrar. Sale de los MISMOS datos que el recibo de
+   siempre: así los dos diseños nunca dicen cosas distintas. */
+function datosParaRecibo(d, detalle, poliza = {}, cuota = {}) {
+  return {
+    numero: String(cuota?.id ?? "").padStart(6, "0"),
+    emitido: fmtDateOnly(new Date()),
+    montoTxt: fmtMoney(d.monto),
+    pagado: d.pagado,
+    cuotaNro: d.cuotaNro,
+    fechaHoraPago: d.fechaHoraPago,
+    vencimiento: d.vencimiento,
+    fechaCobertura: d.fechaCobertura,
+    aviso: d.esPrimeraCuota || d.pagoFueraDeTermino,
+    titular: d.titular,
+    dni: d.dni,
+    vehiculo: [d.marca, d.modelo].filter((x) => x && x !== "—").join(" ") || "—",
+    patente: d.patente,
+    compania: textoCompania(poliza),
+    cobertura: safe(poliza?.cobertura, ""),
+    detalle,
+  };
+}
+
 /* =========================================================================
    1) VISTA EN PANTALLA (HTML)
       La usa el portal del cliente para previsualizar el recibo.
    ========================================================================= */
 
-export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza = false }) {
+export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza = false, marca: marcaProp = null }) {
   // ⚠️ EL HOOK VA ANTES DEL RETURN, SIEMPRE.
   //    Antes el `if (!cliente...) return null` estaba arriba y el useMemo
   //    quedaba adentro del camino condicional. React exige que los hooks se
@@ -278,9 +332,13 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
   //    datos" a "con datos", tiraba el error de cantidad de hooks y la
   //    pantalla quedaba en blanco.
   const d = useDatosComprobante(cliente || {}, poliza || {}, cuota || {});
+  const marcaUsuario = useMarca();
   if (!cliente || !poliza || !cuota) return null;
 
   const detalle = filasDelPago(d);
+  // 🏷️ THAMES: la cabecera azul de siempre. Otra marca: su color y su logo.
+  const marca = elegirMarca(marcaProp, poliza, cuota, marcaUsuario);
+  const conMarca = marca.id !== THAMES.id;
 
   const Item = ({ label, value }) => (
     <li className="flex justify-between gap-2">
@@ -292,12 +350,24 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
   return (
     <div className="max-w-3xl mx-auto rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark overflow-hidden">
       {/* Header */}
-      <div className="bg-duo-azul text-white px-5 py-4 flex items-center justify-between">
+      <div
+        className={`${conMarca ? "" : "bg-duo-azul "}text-white px-5 py-4 flex items-center justify-between`}
+        style={conMarca ? { background: marca.recibo.primario } : undefined}
+      >
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white/15">
-            <HiReceiptTax className="w-6 h-6" />
-          </span>
+          {conMarca ? (
+            <img src={marca.logo} alt={marca.nombre} className="w-10 h-10 rounded-lg" />
+          ) : (
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white/15">
+              <HiReceiptTax className="w-6 h-6" />
+            </span>
+          )}
           <div className="leading-tight">
+            {conMarca && (
+              <p className="text-[11px] font-bold tracking-wider" style={{ color: marca.amarillo || "#fff" }}>
+                {marca.nombreCorto}
+              </p>
+            )}
             <h1 className="text-base font-semibold">Comprobante de Pago de Cuota</h1>
             <p className="text-xs text-white/70">Emitido el {fmtDateOnly(new Date())}</p>
           </div>
@@ -416,65 +486,96 @@ export function ComprobanteVista({ cliente, poliza, cuota, ocultarNumeroPoliza =
           </div>
         )}
 
-        <div className="text-center text-xs text-suave dark:text-suave-dark">Gracias por confiar en nosotros.</div>
+        <div className="text-center text-xs text-suave dark:text-suave-dark">
+          {conMarca ? `Gracias por confiar en ${marca.nombre}.` : "Gracias por confiar en nosotros."}
+          {conMarca && marca.recibo.pie ? <span className="block mt-0.5">{marca.recibo.pie}</span> : null}
+        </div>
       </div>
     </div>
   );
 }
 
 /* =========================================================================
-   2) PDF A4 — documento @react-pdf  (StyleSheet de marca — NO se toca)
+   2) PDF A4 — documento @react-pdf  (colores de la MARCA de la póliza)
+      THAMES → el bordó de siempre (mismos números de antes, no cambió nada).
+      MALVINAS → verde, con su logo arriba y su pie abajo.
    ========================================================================= */
 
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
-const PRIMARY = "#8B1E3F";
-const PRIMARY_DARK = "#5E1329";
-const BORDER = "#E6C9D2";
-const MUTED_BG = "#FBEFF3";
 const CELESTE = "#74ACDF"; // el celeste de la bandera (solo para el homenaje)
 const AZUL_NOCHE = "#1F3A5F";
 
-const a4 = StyleSheet.create({
-  page: { width: A4_WIDTH, height: A4_HEIGHT, fontFamily: "Helvetica", color: "#111827", padding: 35, fontSize: 11 },
-  header: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, backgroundColor: MUTED_BG, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 16 },
-  headerTitle: { fontSize: 22, color: PRIMARY, textAlign: "center", fontWeight: "bold" },
-  headerSubtitle: { fontSize: 11, color: PRIMARY_DARK, textAlign: "center", marginTop: 6 },
-  grid2: { flexDirection: "row", gap: 16, marginBottom: 16 },
-  col: { flex: 1 },
-  // 🐛 FIX: con la hora ("12/10/2026 14:35") el valor no entraba al lado del
-  //    título y se pisaban. Ahora el título va arriba y el valor abajo.
-  box: { flexDirection: "column", alignItems: "flex-start", borderRadius: 8, borderWidth: 1, borderColor: PRIMARY, backgroundColor: "#FFF6F8", paddingVertical: 10, paddingHorizontal: 16 },
-  boxLabel: { fontSize: 11, color: PRIMARY_DARK, fontWeight: "bold", textTransform: "uppercase", marginBottom: 4 },
-  boxValue: { fontSize: 16, color: PRIMARY, fontWeight: "bold" },
-  section: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", flex: 1 },
-  sectionHead: { backgroundColor: PRIMARY, color: "#fff", paddingVertical: 8, paddingHorizontal: 12, fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
-  sectionBody: { padding: 12, backgroundColor: "#FFFFFF", flexGrow: 1 },
-  label: { fontSize: 10, color: PRIMARY_DARK, fontWeight: "bold", marginTop: 8 },
-  value: { fontSize: 11, marginTop: 3 },
-  patente: { fontSize: 16, marginTop: 3, fontWeight: "bold", letterSpacing: 1 },
-  table: { marginTop: 8, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", marginBottom: 16 },
-  tableHeader: { flexDirection: "row", justifyContent: "space-between", backgroundColor: PRIMARY, color: "#fff", paddingVertical: 8, paddingHorizontal: 12, fontSize: 11, fontWeight: "bold" },
-  tableRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", fontSize: 11 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, paddingHorizontal: 12, fontSize: 13, fontWeight: "bold", backgroundColor: "#FCF7F9" },
-  pagoBox: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", marginBottom: 16 },
-  pagoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#F1E4E9", fontSize: 10 },
-  pagoLabel: { color: PRIMARY_DARK, fontWeight: "bold" },
-  alertBox: { marginTop: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "#991B1B", backgroundColor: "#FEF2F2", padding: 16 },
-  alertTitle: { fontSize: 13, color: "#991B1B", fontWeight: "bold", textAlign: "center", marginBottom: 10 },
-  alertText: { fontSize: 11, color: "#991B1B", textAlign: "justify", lineHeight: 1.5 },
-  alertBold: { fontWeight: "bold" },
-  // 🇦🇷 Homenaje: celeste · blanco · celeste, como la bandera.
-  //    Va PEGADO AL PIE de la hoja (no empuja nada). El tamaño lo decide
-  //    escalaHomenajeA4(): grande cuando sobra lugar, chico cuando no.
-  homenaje: { position: "absolute", left: 35, right: 35, bottom: 12, borderRadius: 8, borderWidth: 1, borderColor: CELESTE, overflow: "hidden" },
-  homenajeFranja: { backgroundColor: CELESTE },
-  homenajeCentro: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, backgroundColor: "#FFFFFF" },
-  homenajeTextos: { flex: 1, alignSelf: "center" },
-  homenajeTitulo: { fontWeight: "bold", color: AZUL_NOCHE, letterSpacing: 1 },
-  homenajeFrase: { color: "#111827" },
-  homenajePie: { color: "#6B7280" },
-});
+/* 🎨 Los estilos del A4 se arman con la paleta de la marca (marca.recibo):
+     primario = el color fuerte (títulos, cabeceras de tabla)
+     oscuro   = etiquetas
+     borde / fondo / caja / total / linea = los tonos suaves
+   Se arman una vez por marca y se guardan (no en cada recibo). */
+const _estilosA4 = {};
+function estilosA4(marca) {
+  const m = marca || THAMES;
+  if (!_estilosA4[m.id]) _estilosA4[m.id] = crearEstilosA4(m.recibo);
+  return _estilosA4[m.id];
+}
+
+function crearEstilosA4(r) {
+  const PRIMARY = r.primario;
+  const PRIMARY_DARK = r.oscuro;
+  const BORDER = r.borde;
+  const MUTED_BG = r.fondo;
+  return StyleSheet.create({
+    page: { width: A4_WIDTH, height: A4_HEIGHT, fontFamily: "Helvetica", color: "#111827", padding: 35, fontSize: 11 },
+    header: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, backgroundColor: MUTED_BG, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 16 },
+    // 🏷️ Cabecera CON LOGO (marcas que no son THAMES): franja del color de la
+    //    marca, logo a la izquierda, nombre y lema, y "COMPROBANTE DE PAGO" a la
+    //    derecha. Mide lo mismo que la de siempre, así nada se corre de lugar.
+    headerMarca: { flexDirection: "row", alignItems: "center", borderRadius: 8, backgroundColor: PRIMARY, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 16 },
+    headerLogo: { width: 48, height: 48, marginRight: 12 },
+    headerMarcaTextos: { flex: 1 },
+    headerMarcaNombre: { fontSize: 22, fontWeight: "bold", letterSpacing: 1.5 },
+    headerMarcaLema: { fontSize: 9.5, color: "#FFFFFF", marginTop: 3 },
+    headerMarcaDerecha: { alignItems: "flex-end" },
+    headerMarcaTitulo: { fontSize: 13, color: "#FFFFFF", fontWeight: "bold", letterSpacing: 0.5 },
+    headerMarcaFranja: { height: 3, width: 70, marginTop: 5 },
+    pieMarca: { position: "absolute", left: 35, right: 35, bottom: 18, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER, fontSize: 9, color: PRIMARY_DARK, textAlign: "center" },
+    headerTitle: { fontSize: 22, color: PRIMARY, textAlign: "center", fontWeight: "bold" },
+    headerSubtitle: { fontSize: 11, color: PRIMARY_DARK, textAlign: "center", marginTop: 6 },
+    grid2: { flexDirection: "row", gap: 16, marginBottom: 16 },
+    col: { flex: 1 },
+    // 🐛 FIX: con la hora ("12/10/2026 14:35") el valor no entraba al lado del
+    //    título y se pisaban. Ahora el título va arriba y el valor abajo.
+    box: { flexDirection: "column", alignItems: "flex-start", borderRadius: 8, borderWidth: 1, borderColor: PRIMARY, backgroundColor: r.caja, paddingVertical: 10, paddingHorizontal: 16 },
+    boxLabel: { fontSize: 11, color: PRIMARY_DARK, fontWeight: "bold", textTransform: "uppercase", marginBottom: 4 },
+    boxValue: { fontSize: 16, color: PRIMARY, fontWeight: "bold" },
+    section: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", flex: 1 },
+    sectionHead: { backgroundColor: PRIMARY, color: "#fff", paddingVertical: 8, paddingHorizontal: 12, fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
+    sectionBody: { padding: 12, backgroundColor: "#FFFFFF", flexGrow: 1 },
+    label: { fontSize: 10, color: PRIMARY_DARK, fontWeight: "bold", marginTop: 8 },
+    value: { fontSize: 11, marginTop: 3 },
+    patente: { fontSize: 16, marginTop: 3, fontWeight: "bold", letterSpacing: 1 },
+    table: { marginTop: 8, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", marginBottom: 16 },
+    tableHeader: { flexDirection: "row", justifyContent: "space-between", backgroundColor: PRIMARY, color: "#fff", paddingVertical: 8, paddingHorizontal: 12, fontSize: 11, fontWeight: "bold" },
+    tableRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", fontSize: 11 },
+    totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, paddingHorizontal: 12, fontSize: 13, fontWeight: "bold", backgroundColor: r.total },
+    pagoBox: { borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden", marginBottom: 16 },
+    pagoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: r.linea, fontSize: 10 },
+    pagoLabel: { color: PRIMARY_DARK, fontWeight: "bold" },
+    alertBox: { marginTop: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "#991B1B", backgroundColor: "#FEF2F2", padding: 16 },
+    alertTitle: { fontSize: 13, color: "#991B1B", fontWeight: "bold", textAlign: "center", marginBottom: 10 },
+    alertText: { fontSize: 11, color: "#991B1B", textAlign: "justify", lineHeight: 1.5 },
+    alertBold: { fontWeight: "bold" },
+    // 🇦🇷 Homenaje: celeste · blanco · celeste, como la bandera.
+    //    Va PEGADO AL PIE de la hoja (no empuja nada). El tamaño lo decide
+    //    escalaHomenajeA4(): grande cuando sobra lugar, chico cuando no.
+    homenaje: { position: "absolute", left: 35, right: 35, bottom: 12, borderRadius: 8, borderWidth: 1, borderColor: CELESTE, overflow: "hidden" },
+    homenajeFranja: { backgroundColor: CELESTE },
+    homenajeCentro: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, backgroundColor: "#FFFFFF" },
+    homenajeTextos: { flex: 1, alignSelf: "center" },
+    homenajeTitulo: { fontWeight: "bold", color: AZUL_NOCHE, letterSpacing: 1 },
+    homenajeFrase: { color: "#111827" },
+    homenajePie: { color: "#6B7280" },
+  });
+}
 
 /* 📏 ¿QUÉ TAN GRANDE ENTRA EL HOMENAJE EN LA HOJA A4?
    El homenaje va pegado al pie. Cuanto más corto es el recibo, más lugar
@@ -492,19 +593,42 @@ const escalaHomenajeA4 = (filasDetalle, conAviso) => {
   return Math.max(0.8, Math.min(2.6, libre / 61));
 };
 
-export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
+export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {}, marca = null }) {
   const d = useDatosComprobante(cliente, poliza, cuota);
+  // 🏷️ El PDF se dibuja fuera de la app (no ve el usuario): la marca llega
+  //    por prop desde el botón. Si no vino, se mira la oficina de la póliza.
+  const m = elegirMarca(marca, poliza, cuota, null);
+  const a4 = estilosA4(m);
+  const conLogo = Boolean(m.logoPng) && m.id !== THAMES.id;
   const detalle = filasDelPago(d);
+  // 🟢 Marca con recibo propio → su diseño (los mismos datos, otro papel).
+  if (m.recibo?.diseno === "malvinas") {
+    return <ReciboMalvinasA4 marca={m} r={datosParaRecibo(d, detalle, poliza, cuota)} />;
+  }
   const conAviso = d.esPrimeraCuota || d.pagoFueraDeTermino;
   const esc = escalaHomenajeA4(detalle.length, conAviso); // 0.8 = chico … 2.6 = grande
   const altoSilueta = 46 * esc;
   return (
     <Document>
       <Page size={{ width: A4_WIDTH, height: A4_HEIGHT }} style={a4.page}>
-        <View style={a4.header}>
-          <Text style={a4.headerTitle}>COMPROBANTE DE PAGO</Text>
-          <Text style={a4.headerSubtitle}>Servicios Jurídicos y Seguros</Text>
-        </View>
+        {conLogo ? (
+          <View style={a4.headerMarca}>
+            <Image src={m.logoPng} style={a4.headerLogo} />
+            <View style={a4.headerMarcaTextos}>
+              <Text style={[a4.headerMarcaNombre, { color: m.amarillo || "#FFFFFF" }]}>{m.nombreCorto}</Text>
+              <Text style={a4.headerMarcaLema}>{m.recibo.subtitulo}</Text>
+            </View>
+            <View style={a4.headerMarcaDerecha}>
+              <Text style={a4.headerMarcaTitulo}>COMPROBANTE DE PAGO</Text>
+              <View style={[a4.headerMarcaFranja, { backgroundColor: m.amarillo || "#FFFFFF" }]} />
+            </View>
+          </View>
+        ) : (
+          <View style={a4.header}>
+            <Text style={a4.headerTitle}>COMPROBANTE DE PAGO</Text>
+            <Text style={a4.headerSubtitle}>{m.recibo.subtitulo}</Text>
+          </View>
+        )}
 
         <View style={a4.grid2}>
           <View style={[a4.box, a4.col]}>
@@ -595,6 +719,11 @@ export function ComprobantePDF_A4({ cliente = {}, poliza = {}, cuota = {} }) {
             <View style={[a4.homenajeFranja, { height: Math.min(6 * esc, 12) }]} />
           </View>
         )}
+
+        {/* 🏷️ Pie de la marca (Malvinas: nombre + WhatsApp). THAMES no lleva
+               pie, como siempre. Si justo hay homenaje, el pie no va (el
+               homenaje ocupa ese lugar). */}
+        {m.recibo.pie && !hayHomenaje() ? <Text style={a4.pieMarca}>{m.recibo.pie}</Text> : null}
       </Page>
     </Document>
   );
@@ -641,17 +770,35 @@ const tk = StyleSheet.create({
   homenajeTitulo: { fontSize: 14, fontWeight: "bold", textAlign: "center", letterSpacing: 1, marginTop: 6 },
   homenajeFrase: { fontSize: 9.5, textAlign: "center", lineHeight: 1.3, marginTop: 5 },
   homenajePie: { fontSize: 8.5, textAlign: "center", marginTop: 5 },
+  // 🏷️ Nombre de la marca arriba de todo (solo marcas que no son THAMES).
+  //    La térmica imprime en negro: va el nombre en letras, sin logo de color.
+  marcaNombre: { fontSize: 20, fontWeight: "bold", textAlign: "center", letterSpacing: 2 },
+  marcaLema: { fontSize: 8.5, textAlign: "center", marginTop: 2, marginBottom: 8 },
+  marcaPie: { fontSize: 8.5, textAlign: "center", marginTop: 14 },
 });
 
-export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} }) {
+export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {}, marca = null }) {
   const d = useDatosComprobante(cliente, poliza, cuota);
+  const m = elegirMarca(marca, poliza, cuota, null);
+  const conMarca = m.id !== THAMES.id;
   const detalle = filasDelPago(d);
+  // 🟢 Marca con recibo propio → su ticket.
+  if (m.recibo?.diseno === "malvinas") {
+    return <ReciboMalvinasTicket marca={m} r={datosParaRecibo(d, detalle, poliza, cuota)} />;
+  }
   return (
     <Document>
       <Page size={{ width: TICKET_WIDTH, height: TICKET_HEIGHT }} style={tk.page}>
+        {conMarca ? (
+          <View>
+            <Text style={tk.marcaNombre}>{m.nombreCorto}</Text>
+            <Text style={tk.marcaLema}>{m.recibo.subtitulo}</Text>
+          </View>
+        ) : null}
         <View style={tk.block}>
           <Text style={tk.title}>COMPROBANTE DE PAGO</Text>
-          <Text style={tk.subtitle}>Servicios Jurídicos y Seguros</Text>
+          {/* THAMES: el subtítulo de siempre. Con marca, ya está arriba. */}
+          {conMarca ? null : <Text style={tk.subtitle}>{m.recibo.subtitulo}</Text>}
         </View>
 
         <View style={tk.pill}>
@@ -742,6 +889,8 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
             <View style={tk.homenajeFranja} />
           </View>
         )}
+
+        {conMarca && m.recibo.pie ? <Text style={tk.marcaPie}>{m.recibo.pie}</Text> : null}
       </Page>
     </Document>
   );
@@ -751,14 +900,18 @@ export function ComprobantePDF_Ticket({ cliente = {}, poliza = {}, cuota = {} })
    4) BOTÓN: DESCARGAR PDF A4
    ========================================================================= */
 
-export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar PDF", className = "" }) {
+export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar PDF", className = "", marca = null }) {
   const [downloading, setDownloading] = useState(false);
+  // 🏷️ La marca se decide ACÁ (dentro de la app, donde se sabe quién imprime)
+  //    y se le pasa al PDF.
+  const marcaUsuario = useMarca();
+  const marcaRecibo = elegirMarca(marca, poliza, cuota, marcaUsuario);
 
   const handleDownload = useCallback(async () => {
     if (!cliente || !poliza || !cuota) return;
     try {
       setDownloading(true);
-      const doc = <ComprobantePDF_A4 cliente={cliente} poliza={poliza} cuota={cuota} />;
+      const doc = <ComprobantePDF_A4 cliente={cliente} poliza={poliza} cuota={cuota} marca={marcaRecibo} />;
       const blob = await pdf(doc).toBlob();
       const url = URL.createObjectURL(blob);
       const nombre = `Comprobante_Cuota_${slug(cuota?.cuota_nro)}_${slug(poliza?.patente)}_${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -775,7 +928,7 @@ export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar P
     } finally {
       setDownloading(false);
     }
-  }, [cliente, poliza, cuota]);
+  }, [cliente, poliza, cuota, marcaRecibo]);
 
   return (
     <button
@@ -800,8 +953,9 @@ export function BotonDescargarPDF({ cliente, poliza, cuota, label = "Descargar P
    5) BOTÓN: IMPRIMIR TICKET (impresora térmica de calor)
    ========================================================================= */
 
-export function BotonImprimirTicket({ cliente, poliza, cuota, label = "Imprimir ticket", className = "" }) {
+export function BotonImprimirTicket({ cliente, poliza, cuota, label = "Imprimir ticket", className = "", marca = null }) {
   const [printing, setPrinting] = useState(false);
+  const marcaUsuario = useMarca();
   const iframeRef = useRef(null);
   const urlRef = useRef(null);
   const timerRef = useRef(null);
@@ -828,7 +982,8 @@ export function BotonImprimirTicket({ cliente, poliza, cuota, label = "Imprimir 
     try {
       cleanup();
       setPrinting(true);
-      const doc = <ComprobantePDF_Ticket cliente={cli} poliza={pol} cuota={cuota} />;
+      const marcaRecibo = elegirMarca(marca, pol, cuota, marcaUsuario);
+      const doc = <ComprobantePDF_Ticket cliente={cli} poliza={pol} cuota={cuota} marca={marcaRecibo} />;
       const blob = await pdf(doc).toBlob();
       const url = URL.createObjectURL(blob);
       urlRef.current = url;
@@ -865,7 +1020,7 @@ export function BotonImprimirTicket({ cliente, poliza, cuota, label = "Imprimir 
       toast.error("No se pudo generar el ticket.");
       cleanup();
     }
-  }, [cliente, poliza, cuota, printing, cleanup]);
+  }, [cliente, poliza, cuota, printing, cleanup, marca, marcaUsuario]);
 
   return (
     <motion.button

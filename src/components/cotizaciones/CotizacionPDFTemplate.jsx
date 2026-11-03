@@ -1,8 +1,13 @@
-// src/components/cotizaciones/CotizacionPDFTemplate.jsx  (diseño Duo limpio · rojo THAMES)
+// src/components/cotizaciones/CotizacionPDFTemplate.jsx  (diseño Duo limpio · color de la MARCA)
 // Documento A4 para imprimir: fondo claro siempre (no usa tema oscuro).
+//
+// 🏷️ MARCA (02/11/2026): la propuesta sale con la marca del usuario que la
+//    arma. Oficina Malvinas → verde, logo y teléfono de Malvinas.
+//    THAMES → exactamente igual que antes (rojo, "THAMES Seguros").
 import React from "react";
 import { FaCar, FaPhoneAlt, FaShieldAlt } from "react-icons/fa";
 import { HiCheckCircle, HiClock } from "react-icons/hi";
+import { useMarca } from "../../marca/MarcaContext";
 
 const parseToNumber = (val) => {
   if (val === "" || val === null || val === undefined) return 0;
@@ -10,8 +15,7 @@ const parseToNumber = (val) => {
 };
 
 // Colores fijos del documento (no tokens: es imprimible).
-const ROJO = "#e11d48";
-const ROJO_FUERTE = "#be123c";
+// El color de marca (ROJO / ROJO_FUERTE) sale de la marca: ver adentro del componente.
 const TINTA = "#0f172a";
 const GRIS = "#64748b";
 const LINEA = "#e2e8f0";
@@ -20,6 +24,11 @@ const AMBAR = "#d97706";
 const OK = "#059669";
 
 const CotizacionPDFTemplate = ({ formData, opciones, companiasBackend, coberturasBackend }) => {
+  // 🏷️ Color, nombre y teléfono de la marca (THAMES: rojo de siempre).
+  const marca = useMarca();
+  const ROJO = marca.cotizacion.color;
+  const ROJO_FUERTE = marca.cotizacion.fuerte;
+  const conLogo = marca.id !== "thames" && Boolean(marca.logoPng);
   // Precio EXACTO (sin redondeo). El "monto" ya es el precio al cliente.
   const opcionesCalculadas = [...opciones].map(op => {
     const precio = op.precio_cliente != null ? Number(op.precio_cliente) : parseToNumber(op.monto);
@@ -47,8 +56,13 @@ const CotizacionPDFTemplate = ({ formData, opciones, companiasBackend, cobertura
       {/* ===== HEADER limpio ===== */}
       <div className="px-10 pt-8 pb-6" style={{ borderBottom: `3px solid ${LINEA}` }}>
         <div className="flex justify-between items-center">
-          <div className="text-3xl font-black tracking-tight" style={{ color: TINTA }}>
-            THAMES <span style={{ color: ROJO }}>Seguros</span>
+          <div className="flex items-center gap-3">
+            {/* Con marca: su logo al lado del nombre (PNG adentro del código,
+                así sale en la imagen del PDF sin depender de nada). */}
+            {conLogo && <img src={marca.logoPng} alt="" style={{ width: 44, height: 44, borderRadius: 10 }} />}
+            <div className="text-3xl font-black tracking-tight" style={{ color: TINTA }}>
+              {marca.cotizacion.nombre[0]} <span style={{ color: ROJO }}>{marca.cotizacion.nombre[1]}</span>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: GRIS }}>Fecha de propuesta</p>
@@ -152,7 +166,7 @@ const CotizacionPDFTemplate = ({ formData, opciones, companiasBackend, cobertura
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest mb-1.5" style={{ color: GRIS }}>Tu Productor Asesor</p>
           <p className="text-[13px] font-black flex items-center gap-2" style={{ color: TINTA }}>
-            <FaPhoneAlt style={{ color: ROJO }} /> +54 9 11 2424-8190
+            <FaPhoneAlt style={{ color: ROJO }} /> {marca.telefono}
           </p>
         </div>
         <p className="text-[10px] font-bold text-right max-w-[220px]" style={{ color: GRIS }}>

@@ -23,6 +23,8 @@
 import { useEffect } from "react";
 import { IconAtras, IconDoc, IconWhatsapp } from "./Iconos";
 import { fmt, waLink } from "./utils";
+// 🏷️ "ESTUDIO THAMES" / "MALVINAS · SEGUROS Y ABOGADOS" según la oficina del cliente.
+import { useMarca } from "../../marca/MarcaContext";
 
 const FUENTES_ID = "portal-fuente-serif";
 const FUENTES =
@@ -92,6 +94,7 @@ function Dato({ label, children }) {
 }
 
 export default function SiniestroDetalle({ s, nombreCliente = "", onCerrar }) {
+  const marca = useMarca();
   // Fuente serif para los títulos (como un estudio): se carga una sola vez.
   useEffect(() => {
     if (document.getElementById(FUENTES_ID)) return;
@@ -156,7 +159,7 @@ export default function SiniestroDetalle({ s, nombreCliente = "", onCerrar }) {
           </button>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "4px 8px 0" }}>
             <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".16em", color: "rgba(255,255,255,.85)" }}>
-              EXPEDIENTE N° {s.id} · ESTUDIO THAMES
+              EXPEDIENTE N° {s.id} · {marca.estudioMayus}
             </span>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontSize: 26, fontWeight: 600, lineHeight: 1.2 }}>{s.titulo || "Siniestro"}</h1>
             {s.caratula ? (
@@ -383,7 +386,7 @@ export default function SiniestroDetalle({ s, nombreCliente = "", onCerrar }) {
           ) : null}
 
           <footer style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 8px 0", textAlign: "center" }}>
-            <span style={{ fontFamily: SERIF, fontSize: 15, fontWeight: 600, letterSpacing: ".14em", color: "var(--m)" }}>ESTUDIO THAMES</span>
+            <span style={{ fontFamily: SERIF, fontSize: 15, fontWeight: 600, letterSpacing: ".14em", color: "var(--m)" }}>{marca.estudioMayus}</span>
             <span style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.4 }}>Esta información se actualiza a medida que avanza la gestión.</span>
           </footer>
         </main>

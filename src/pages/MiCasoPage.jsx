@@ -15,6 +15,10 @@ import { HiCalendar, HiCamera, HiChatAlt2, HiCheck, HiLockClosed, HiPhone } from
 import { subirArchivo } from "../services/legales";
 import { AvatarAbogado, CajaFecha } from "../components/legales/PiezasLegales";
 import { ddmm, diaCorto, diaLargo, linkWhatsApp, textoFalta, ymdDeIso } from "../components/legales/legalesUtils";
+// 🏷️ MARCA: el caso de un cliente de la oficina Malvinas se ve de Malvinas.
+import { useForzarMarca } from "../marca/MarcaContext";
+import { THAMES, marcaDeTextos, nombreLugar } from "../marca/marcas";
+import CabeceraPublica from "../marca/CabeceraPublica";
 
 const API_ORIGIN = String(
   import.meta.env.VITE_API_BASE ||
@@ -81,6 +85,10 @@ export default function MiCasoPage() {
     }
   };
 
+  // 🏷️ La marca sale de la oficina del caso (o la del turno): "Malvinas" → MALVINAS.
+  const marca = data ? marcaDeTextos(data.oficina?.nombre, data.proximo_turno?.oficina_nombre) || THAMES : null;
+  useForzarMarca(marca);
+
   if (cargando) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface dark:bg-surface-dark">
@@ -127,12 +135,7 @@ export default function MiCasoPage() {
   return (
     <div className="min-h-screen bg-surface dark:bg-surface-dark">
       <div className="max-w-[480px] mx-auto">
-        <header className="flex items-center justify-between bg-slate-900 px-4 py-4 text-white">
-          <b className="tracking-[0.08em]">
-            THAMES <span className="text-red-300">SEGUROS</span>
-          </b>
-          <span className="text-[13px] text-slate-300">Tu caso</span>
-        </header>
+        <CabeceraPublica marca={marca} derecha="Tu caso" />
 
         <div className="flex flex-col gap-4 px-4 pt-5 pb-10">
           <div className="flex flex-col gap-1">
@@ -166,7 +169,7 @@ export default function MiCasoPage() {
                   <b>
                     {turno.hoy ? "Hoy" : diaLargo(turno.fecha)} a las {turno.hora}
                   </b>{" "}
-                  con {turno.abogado_nombre}, en THAMES {turno.oficina_nombre}
+                  con {turno.abogado_nombre}, en {nombreLugar(marca, turno.oficina_nombre)}
                   {turno.oficina_direccion ? ` (${turno.oficina_direccion})` : ""}. Traé tu DNI.
                 </p>
               )}
@@ -333,7 +336,7 @@ export default function MiCasoPage() {
               ? data.abogado?.nombre
                 ? `Tu abogado: ${data.abogado.nombre}`
                 : ""
-              : `THAMES ${ofi.nombre || ""} · tu oficina${ofi.direccion ? ` · ${ofi.direccion}` : ""}`}
+              : `${nombreLugar(marca, ofi.nombre)} · tu oficina${ofi.direccion ? ` · ${ofi.direccion}` : ""}`}
           </p>
         </div>
       </div>

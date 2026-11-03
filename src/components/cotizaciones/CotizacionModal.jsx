@@ -9,6 +9,8 @@ import { toast } from "react-hot-toast";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 import CotizacionPDFTemplate from "./CotizacionPDFTemplate";
+// 🏷️ El nombre del archivo lleva la marca (Propuesta_..._ThamesSeguros.pdf / _Malvinas.pdf)
+import { useMarca } from "../../marca/MarcaContext";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 const getAuthHeaders = () => {
@@ -41,6 +43,7 @@ const STEPS = [
 
 const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = false }) => {
   const dispatch = useDispatch();
+  const marca = useMarca();
 
   const [step, setStep] = useState(1);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -244,7 +247,7 @@ const CotizacionModal = ({ isOpen, onClose, cotizacionEdit = null, isPdfMode = f
       const pdf = await generatePDFDocument();
       if (pdf) {
         const safeName = formData.cliente_nombre ? formData.cliente_nombre.replace(/[^a-zA-Z0-9]/g, "_") : "Cliente";
-        pdf.save(`Propuesta_${safeName}_ThamesSeguros.pdf`);
+        pdf.save(`Propuesta_${safeName}_${marca.cotizacion.archivo}.pdf`);
         toast.success("¡PDF descargado!", { id: t });
       } else { toast.error("Error al crear el archivo.", { id: t }); }
     } catch { toast.error("Error al crear el archivo.", { id: t }); }

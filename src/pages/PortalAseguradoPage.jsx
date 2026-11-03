@@ -35,6 +35,14 @@ import "../styles/portal.css";
 import logoPieClaro from "../assets/logos/vert-rojo-negro-sm.webp";
 import logoPieOscuro from "../assets/logos/vert-rojo-blanco-sm.webp";
 
+// 🏷️ MARCA (02/11/2026): el portal se viste con la marca de la OFICINA DEL
+//    CLIENTE. Cliente de la oficina Malvinas → portal verde con la balanza,
+//    "Pagarnos a Malvinas", etc. Cualquier otro → THAMES, igual que siempre.
+//    No importa quién tenga la sesión abierta en esa compu: manda la oficina.
+import { useMarca, useForzarMarca } from "../marca/MarcaContext";
+import { THAMES, marcaDeTextos } from "../marca/marcas";
+import { LogoVerticalMarca } from "../marca/LogoMarca";
+
 import PortalHeader from "../components/portal/PortalHeader";
 import TabsPortal from "../components/portal/TabsPortal";
 import ListaCupones from "../components/portal/ListaCupones";
@@ -157,6 +165,24 @@ export default function PortalAseguradoPage() {
   const siniestros = data?.siniestros || [];
   const tramites = data?.tramites || [];
   const hayOtros = casosLegales.length + siniestros.length + tramites.length > 0;
+
+  // 🏷️ ¿De qué marca es este cliente? La de la oficina de lo primero que
+  //    tenga: sus pólizas, después sus casos, siniestros y trámites.
+  //    Ej: póliza de "Malvinas" → MALVINAS · póliza de "Axion" → THAMES.
+  const marcaPortal = useMemo(() => {
+    if (!data) return null;
+    const oficinas = [
+      ...(data.polizas || []).map((p) => p?.oficina_nombre),
+      ...(data.casos_legales || []).map((c) => c?.oficina_nombre),
+      ...(data.siniestros || []).map((x) => x?.oficina_nombre),
+      ...(data.tramites || []).map((t) => t?.oficina_nombre || t?.oficina?.nombre),
+    ].filter(Boolean);
+    if (!oficinas.length) return null;
+    return marcaDeTextos(oficinas[0]) || THAMES;
+  }, [data]);
+  useForzarMarca(marcaPortal);
+  const marca = useMarca();
+  const esThames = marca.id === THAMES.id;
   // En la base los nombres van en MAYÚSCULAS. En pantalla gritan, así que se
   // normalizan solo para mostrar.
   // 👋 16/10: el servidor manda el nombre en orden aunque la ficha esté al revés
@@ -331,7 +357,7 @@ export default function PortalAseguradoPage() {
      "esperá" sin decir qué. */
   if (cargando) {
     return (
-      <div className="portal" data-tema={temaActivo}>
+      <div className="portal" data-tema={temaActivo} data-marca={marca.id}>
         <div className="portal-frame">
           <div style={{ padding: "calc(14px + env(safe-area-inset-top)) 18px 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
@@ -359,17 +385,21 @@ export default function PortalAseguradoPage() {
 
   if (error || (!polizas.length && !hayOtros)) {
     return (
-      <div className="portal" data-tema={temaActivo}>
+      <div className="portal" data-tema={temaActivo} data-marca={marca.id}>
         <div
           className="portal-frame"
           style={{ display: "grid", placeItems: "center", minHeight: "100dvh", padding: 28, textAlign: "center" }}
         >
           <div>
-            <img
-              src={logoPieClaro}
-              alt="Estudio Thames"
-              style={{ height: 60, width: "auto", opacity: 0.7, margin: "0 auto 24px", display: "block" }}
-            />
+            {esThames ? (
+              <img
+                src={logoPieClaro}
+                alt={marca.estudio}
+                style={{ height: 60, width: "auto", opacity: 0.7, margin: "0 auto 24px", display: "block" }}
+              />
+            ) : (
+              <LogoVerticalMarca marca={marca} alto={60} conLema={false} style={{ opacity: 0.8, margin: "0 auto 24px" }} />
+            )}
             <div
               style={{
                 height: 56, width: 56, borderRadius: "50%", background: "var(--al-bg)",
@@ -403,14 +433,18 @@ export default function PortalAseguradoPage() {
   if (!polizas.length) {
     const primerNombre = cliente.nombre_pila || capitalizar(cliente.nombre || "").split(" ")[0] || nombreCliente.split(" ")[0];
     return (
-      <div className="portal" data-tema={temaActivo}>
+      <div className="portal" data-tema={temaActivo} data-marca={marca.id}>
         <div className="portal-frame" style={{ minHeight: "100dvh", paddingBottom: 40 }}>
           <div style={{ padding: "40px 24px 4px", textAlign: "center" }}>
-            <img
-              src={temaActivo === "oscuro" ? logoPieOscuro : logoPieClaro}
-              alt="Estudio Thames"
-              style={{ height: 56, width: "auto", opacity: 0.9, margin: "0 auto 20px", display: "block" }}
-            />
+            {esThames ? (
+              <img
+                src={temaActivo === "oscuro" ? logoPieOscuro : logoPieClaro}
+                alt={marca.estudio}
+                style={{ height: 56, width: "auto", opacity: 0.9, margin: "0 auto 20px", display: "block" }}
+              />
+            ) : (
+              <LogoVerticalMarca marca={marca} alto={56} oscuro={temaActivo === "oscuro"} style={{ margin: "0 auto 20px" }} />
+            )}
             <h1 style={{ fontSize: 21, fontWeight: 700, margin: "0 0 6px" }}>
               {primerNombre ? `Hola, ${primerNombre}` : "Hola"}
             </h1>
@@ -468,7 +502,7 @@ export default function PortalAseguradoPage() {
       : { tipo: "al_dia", label: "Tu situación", monto: 0, sub: "No tenés pagos pendientes" };
 
   return (
-    <div className="portal" data-tema={temaActivo}>
+    <div className="portal" data-tema={temaActivo} data-marca={marca.id}>
       <div className="portal-frame">
         <PortalHeader
           cliente={cliente}
@@ -645,11 +679,15 @@ export default function PortalAseguradoPage() {
             gap: 12, padding: "34px 20px 16px",
           }}
         >
-          <img
-            src={temaActivo === "oscuro" ? logoPieOscuro : logoPieClaro}
-            alt="Estudio Thames"
-            style={{ height: 64, width: "auto", display: "block", opacity: 0.9 }}
-          />
+          {esThames ? (
+            <img
+              src={temaActivo === "oscuro" ? logoPieOscuro : logoPieClaro}
+              alt={marca.estudio}
+              style={{ height: 64, width: "auto", display: "block", opacity: 0.9 }}
+            />
+          ) : (
+            <LogoVerticalMarca marca={marca} alto={64} oscuro={temaActivo === "oscuro"} />
+          )}
           <p style={{ textAlign: "center", fontSize: 12, color: "var(--t3)", margin: 0, letterSpacing: ".02em" }}>
             Estamos para ayudarte
           </p>

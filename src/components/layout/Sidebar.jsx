@@ -7,8 +7,8 @@ import {
   HiChevronDown, HiChevronRight, HiChevronLeft, HiHome,
 } from "react-icons/hi";
 import ThemeToggle from "./ThemeToggle";
-// 🚀 Isotipo oficial (columna)
-import logoThames from "../../assets/logos/logo_thames.svg";
+// 🏷️ Isotipo y nombre: los de la MARCA del usuario (THAMES o MALVINAS)
+import { useMarca } from "../../marca/MarcaContext";
 // 📚 Fuente única del menú (compartida con el Footer)
 import { ICON_MAP, buildMenuGroups } from "./menuData";
 // 🧠 Memoria de los acordeones (arrancan cerrados; recuerda si el usuario los abre)
@@ -45,6 +45,7 @@ export default function Sidebar({
   legalesAlertas = 0,            // ⚖️ badge de Legales (fechas vencidas + demorados)
 }) {
   const { user } = useAuth();
+  const marca = useMarca();
   const location = useLocation();
   const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const isVendedor = user?.perfil?.rol === "VENDEDOR";
@@ -142,12 +143,18 @@ export default function Sidebar({
         <div className="px-4 py-4 border-b border-linea dark:border-linea-dark flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-9 w-9 rounded-lg bg-card dark:bg-card-dark border border-linea dark:border-linea-dark flex items-center justify-center shrink-0 p-1.5">
-              <img src={logoThames} alt="Thames Seguros" className="h-full w-full object-contain" />
+              <img src={marca.logo} alt={marca.nombre} className="h-full w-full object-contain" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-[13px] font-semibold text-titulo dark:text-titulo-dark truncate leading-tight">Thames Seguros</h1>
+              <h1 className="text-[13px] font-semibold text-titulo dark:text-titulo-dark truncate leading-tight">{marca.nombre}</h1>
+              {/* Abajo del nombre: la oficina. Si la oficina se llama igual que
+                  la marca ("Malvinas" / "Malvinas"), va el lema de la marca. */}
               <p className="text-[11px] text-suave dark:text-suave-dark font-medium truncate leading-tight">
-                {isVendedor ? "Recomendador" : oficinaNombre}
+                {isVendedor
+                  ? "Recomendador"
+                  : marca.id !== "thames" && oficinaNombre.toLowerCase().includes(marca.nombre.toLowerCase())
+                    ? marca.lema
+                    : oficinaNombre}
               </p>
             </div>
           </div>
@@ -258,7 +265,7 @@ export default function Sidebar({
         {/* Footer del sidebar */}
         <div className="px-4 py-3 border-t border-linea dark:border-linea-dark shrink-0 space-y-2">
           <ThemeToggle />
-          <p className="text-center text-[11px] text-suave dark:text-suave-dark">Thames Seguros © 2026</p>
+          <p className="text-center text-[11px] text-suave dark:text-suave-dark">{marca.nombre} © 2026</p>
         </div>
       </aside>
     </>

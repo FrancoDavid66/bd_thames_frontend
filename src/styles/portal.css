@@ -55,6 +55,24 @@
   --lista-borde: 1px solid rgba(255,255,255,.05);
 }
 
+/* ── 🏷️ MARCA MALVINAS (02/11/2026) ─────────────────────────────────────
+   Clientes de la oficina Malvinas: el rojo de marca pasa a ser el VERDE del
+   cartel (y la tarjeta grande, verde). Lo pone PortalAseguradoPage con
+   data-marca="malvinas". Todo lo demás (alertas, ok, fondos) queda igual.
+   Va DESPUÉS del bloque oscuro: así le gana en claro, y en oscuro gana el
+   bloque de abajo (que es más específico).                              */
+.portal[data-marca="malvinas"] {
+  --m:#1E6B2E; --m-head:#1E6B2E; --m-deep:#134A1F; --m-soft:#E8F3EA; --m-line:#CFE6D3;
+  --tarj: linear-gradient(133deg, #2A8A3E 0%, #1A5E28 52%, #0D3415 100%);
+  --tarj-sombra: 0 12px 32px rgba(20,80,35,.28);
+}
+
+.portal[data-marca="malvinas"][data-tema="oscuro"] {
+  --m:#4CC46A; --m-head:#1A5E28; --m-deep:#0D3415; --m-soft:#132A19; --m-line:#1D3A24;
+  --tarj: linear-gradient(133deg, #2A8A3E 0%, #1A5E28 48%, #0A2C11 100%);
+  --tarj-sombra: 0 14px 40px rgba(20,80,35,.42);
+}
+
 .portal *, .portal *::before, .portal *::after { box-sizing: border-box; }
 .portal button { -webkit-tap-highlight-color: transparent; }
 .portal svg { display: block; flex-shrink: 0; }
