@@ -8,8 +8,8 @@ import { useTheme } from "../../context/ThemeContext";
 import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
 
-// 🚀 Logo oficial para la pantalla de desconexión
-import logoThames from "../../assets/logos/logo_thames.svg";
+// 🏷️ Logo y nombre: los de la MARCA del usuario (THAMES o MALVINAS)
+import { useMarca } from "../../marca/MarcaContext";
 
 // Slices
 // 🧹 Se quitó `fetchResumen` (borrado del slice). El contador de solicitudes
@@ -285,6 +285,7 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
   const shiftForSidebar = sidebarOpen && !isFooter;
   const dispatch = useDispatch();
   const { user, logout } = useAuth();
+  const marca = useMarca();
 
   const [isLoggingOut, setIsLoggingOut]           = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -522,8 +523,8 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
               transition={{ duration: 0.4, ease: "easeOut" }}
             >
               <motion.img
-                src={logoThames}
-                alt="Estudio Thames"
+                src={marca.logo}
+                alt={marca.nombre}
                 className="h-14 w-auto sm:h-16"
                 animate={{ opacity: [1, 0.55, 1] }}
                 transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
@@ -577,10 +578,10 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
                 className="flex h-10 min-w-0 items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-duo-azul/50"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1.5">
-                  <img src={logoThames} alt="" className="h-full w-full object-contain" />
+                  <img src={marca.logo} alt="" className="h-full w-full object-contain" />
                 </span>
                 <span className="hidden whitespace-nowrap text-[16px] font-semibold text-titulo dark:text-titulo-dark min-[400px]:inline">
-                  THAMES<span className="hidden text-marca sm:inline"> APP</span>
+                  {marca.nombreCorto}<span className="hidden text-marca sm:inline"> APP</span>
                 </span>
               </Link>
               {/* 📡 ● EN VIVO: puntito en celu/tablet, cartel en la compu */}

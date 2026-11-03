@@ -29,6 +29,10 @@ import { num } from "./utils";
 import logoColor from "../../assets/logos/horiz-rojo-negro-sm.webp";
 import logoBlanco from "../../assets/logos/horiz-blanco-sm.webp";
 import isoBlanco from "../../assets/logos/iso-blanco.webp";
+// 🏷️ MARCA: el portal muestra la de la oficina del cliente (la elige
+//    PortalAseguradoPage). THAMES → los logos de siempre. Malvinas → el suyo.
+import { useMarca } from "../../marca/MarcaContext";
+import { LogoHorizontalMarca, MARCA_DE_AGUA } from "../../marca/LogoMarca";
 
 export default function PortalHeader({
   cliente,
@@ -46,6 +50,8 @@ export default function PortalHeader({
   onCambiarTema,
 }) {
   const oscuro = tema === "oscuro";
+  const marca = useMarca();
+  const esThames = marca.id === "thames";
   // Cuenta los cambios de tema. Se usa como `key` del ícono para que React lo
   // vuelva a montar y la animación de giro se dispare cada vez.
   const [giros, setGiros] = useState(0);
@@ -76,11 +82,15 @@ export default function PortalHeader({
           ) : null}
 
           {/* El logo de color sobre el fondo de la app. */}
-          <img
-            src={oscuro ? logoBlanco : logoColor}
-            alt="Estudio Thames"
-            style={{ height: 20, width: "auto", display: "block", opacity: oscuro ? 0.9 : 1 }}
-          />
+          {esThames ? (
+            <img
+              src={oscuro ? logoBlanco : logoColor}
+              alt={marca.estudio}
+              style={{ height: 20, width: "auto", display: "block", opacity: oscuro ? 0.9 : 1 }}
+            />
+          ) : (
+            <LogoHorizontalMarca marca={marca} alto={18} oscuro={oscuro} />
+          )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -152,7 +162,7 @@ export default function PortalHeader({
           />
           {/* La columna del logo, muy tenue, como marca de agua. */}
           <img
-            src={isoBlanco}
+            src={esThames ? isoBlanco : MARCA_DE_AGUA[marca.id] || isoBlanco}
             alt=""
             aria-hidden="true"
             style={{

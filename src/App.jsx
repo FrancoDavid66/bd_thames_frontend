@@ -10,8 +10,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
-// 🚀 IMPORTAMOS EL LOGO OFICIAL
-import logoThames from "./assets/logos/logo_thames.svg";
+// 🏷️ El logo sale de la MARCA del usuario (THAMES o MALVINAS)
+import { useMarca } from "./marca/MarcaContext";
 
 // 🚀 IMPORTACIONES DE SEGURIDAD
 import { useAuth, BIENVENIDA_KEY } from "./context/AuthContext";
@@ -95,6 +95,8 @@ function App() {
 
   // 🚀 EXTRAEMOS DATOS DE AUTENTICACIÓN
   const { user, loading } = useAuth();
+  // 🏷️ THAMES o MALVINAS (según la oficina del que entró)
+  const marca = useMarca();
   // 🚗 El GESTOR es alguien de afuera: solo usa Gestoría (sin menú, sin contadores).
   const esGestor = user?.perfil?.rol === "GESTOR";
   const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
@@ -596,8 +598,8 @@ function App() {
           transition={{ duration: 0.4, ease: "easeOut" }}
         >
           <motion.img
-            src={logoThames}
-            alt="Estudio Thames"
+            src={marca.logo}
+            alt={marca.nombre}
             className="h-14 w-auto sm:h-16"
             animate={{ scale: [1, 1.04, 1] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
@@ -683,8 +685,8 @@ function App() {
                 className="mb-8 flex h-32 w-32 items-center justify-center rounded-2xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5"
               >
                 <img
-                  src={logoThames}
-                  alt="Logo Thames"
+                  src={marca.logo}
+                  alt={`Logo ${marca.nombre}`}
                   className="h-full w-full object-contain"
                 />
               </motion.div>
@@ -845,4 +847,4 @@ function App() {
   );
 }
 
-export default App;
+export default App;

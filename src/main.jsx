@@ -13,6 +13,8 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 // 🎨 MOTOR ÚNICO DE TEMA (claro/oscuro)
 import { ThemeProvider } from './context/ThemeContext'
+// 🏷️ MARCA (THAMES / MALVINAS): logo, colores y nombre según la oficina del usuario
+import { MarcaProvider } from './marca/MarcaContext'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -23,10 +25,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <HashRouter>
           {/* 🚀 ENVOLVEMOS LA APP */}
           <AuthProvider>
-            <App />
+            {/* 🏷️ Adentro del Auth: necesita saber quién entró para elegir la marca */}
+            <MarcaProvider>
+              <App />
+            </MarcaProvider>
           </AuthProvider>
         </HashRouter>
       </ThemeProvider>
     </Provider>
   </React.StrictMode>
-)
+)

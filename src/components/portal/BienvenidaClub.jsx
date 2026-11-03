@@ -38,25 +38,33 @@ export default function BienvenidaClub({ token, club, perfil, nombre, onCompleta
       aria-modal="true"
       aria-label="Bienvenida al Club Thames"
       style={{
-        position: "fixed", inset: 0, zIndex: 200, background: "var(--bg)",
+        // 🔝 Por encima de TODO (pestañas, avisos, visor): con 200 algún otro
+        //    cartel del portal le quedaba arriba y tapaba el título.
+        position: "fixed", inset: 0, zIndex: 1000, background: "var(--bg)",
         display: "flex", flexDirection: "column", maxWidth: 412, margin: "0 auto",
         overflowY: "auto",
       }}
     >
-      <div style={{ background: "var(--tarj)", color: "#fff", padding: "48px 26px 76px", position: "relative", overflow: "hidden" }}>
-        <span style={{ position: "absolute", width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,.08)", top: -110, right: -90 }} />
-        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.78)", position: "relative" }}>
+      {/* 📱 env(safe-area-inset-top): en iPhone el título quedaba debajo de la
+          hora y la batería. Ahora arranca siempre debajo de esa barra. */}
+      <div style={{ background: "var(--tarj)", color: "#fff", padding: "calc(28px + env(safe-area-inset-top)) 24px 64px", position: "relative", overflow: "hidden", flexShrink: 0 }}>
+        <span style={{ position: "absolute", width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,.08)", top: -110, right: -90, pointerEvents: "none" }} />
+        <span style={{ display: "block", fontSize: 12, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.78)", position: "relative" }}>
           Thames Seguros
         </span>
-        <h1 style={{ margin: "18px 0 0", fontSize: 32, lineHeight: 1.05, fontWeight: 800, position: "relative" }}>
-          ¡Hola{nombre ? ` ${nombre}` : ""}!<br />Bienvenido al Club Thames
+        <p style={{ margin: "16px 0 0", fontSize: 18, fontWeight: 700, lineHeight: 1.2, position: "relative" }}>
+          ¡Hola{nombre ? ` ${nombre}` : ""}!
+        </p>
+        <h1 style={{ margin: "4px 0 0", fontSize: "clamp(26px, 7.6vw, 30px)", lineHeight: 1.08, fontWeight: 800, letterSpacing: "-.01em", position: "relative", textWrap: "balance" }}>
+          Bienvenido al Club Thames
         </h1>
-        <p style={{ margin: "12px 0 0", fontSize: 16, lineHeight: 1.4, color: "rgba(255,255,255,.86)", position: "relative" }}>
+        <p style={{ margin: "10px 0 0", fontSize: 15, lineHeight: 1.4, color: "rgba(255,255,255,.86)", position: "relative" }}>
           Por ser cliente tenés beneficios todos los meses.
         </p>
       </div>
 
-      <div style={{ margin: "-48px 16px 0", background: "var(--card)", borderRadius: 22, boxShadow: "0 10px 30px rgba(0,0,0,.10)", padding: "4px 18px", position: "relative" }}>
+      {/* La tarjeta se monta apenas 36px sobre el rojo: queda lejos del texto. */}
+      <div style={{ margin: "-36px 16px 0", background: "var(--card)", borderRadius: 22, boxShadow: "0 10px 30px rgba(0,0,0,.10)", padding: "4px 18px", position: "relative", zIndex: 1, flexShrink: 0 }}>
         <Beneficio
           color="var(--m)" fondo="var(--m-soft)"
           titulo={`${club.descuento_pct}% off todos los meses`}

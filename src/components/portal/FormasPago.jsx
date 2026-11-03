@@ -24,6 +24,8 @@
 
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
+// 🏷️ "Pagarnos a Thames" / "Pagarnos a Malvinas": según la oficina del cliente.
+import { useMarca } from "../../marca/MarcaContext";
 import { uploadToCloudinary } from "../../utils/cloudinary";
 import {
   IconCelular, IconLocal, IconEfectivo, IconTransfer,
@@ -560,6 +562,7 @@ function BotonesComprobante({ waUrl, onArchivo, subiendo, refCamara, refArchivo 
 /* ══════════════════ El componente ══════════════════ */
 
 export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobanteSubido }) {
+  const marca = useMarca();
   const [forma, setForma] = useState(null);
   const [modal, setModal] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
@@ -633,7 +636,8 @@ export default function FormasPago({ poliza, cupon, onVerCuponera, onComprobante
     //    hay nada que elegir. Decir "elegí cómo querés pagar" frente a un
     //    único botón hace dudar: el cliente se pregunta si le falta cargar
     //    algo o si la app está rota.
-    const _formas = formasDe(poliza?.compania);
+    // 🏷️ La clave interna sigue siendo "thames"; lo que lee el cliente es el nombre de SU marca.
+    const _formas = formasDe(poliza?.compania).map((f) => (f.k === "thames" ? { ...f, nom: marca.pagarnos } : f));
     const _unica = _formas.length === 1;
     return (
       <>

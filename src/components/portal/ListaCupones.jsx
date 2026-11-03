@@ -11,6 +11,8 @@ import { IconAbajo, IconTick } from "./Iconos";
 import { Chip } from "./Lista";
 import FormasPago from "./FormasPago";
 import { money, fmtLargo, estadoCupon } from "./utils";
+// 🏷️ "Constancia interna de Estudio Thames" / "... de Malvinas" según la oficina del cliente.
+import { useMarca } from "../../marca/MarcaContext";
 
 const ESTADOS = {
   pagado:    { chip: "ok",     texto: "Pagado",           punto: "var(--ok)" },
@@ -276,6 +278,7 @@ export default function ListaCupones({ poliza, cupones = [], onVerCuponera, onCo
    (escritorio viejo), copia el texto al portapapeles y avisa.
 */
 function Constancia({ cupon, monto, poliza, onVerCuponera }) {
+  const marca = useMarca();
   const comp = (cupon.comprobante_url || "").trim();
   const cuando = cupon.fecha_pago ? fmtLargo(cupon.fecha_pago) : null;
   const vehiculo = [poliza?.marca, poliza?.modelo].filter(Boolean).join(" ");
@@ -366,7 +369,7 @@ function Constancia({ cupon, monto, poliza, onVerCuponera }) {
       {/* ⚖️ Thames es correduría: el recibo con validez legal lo emite la
              compañía. Sin esta línea, esto puede parecer el oficial. */}
       <p style={{ fontSize: 11, color: "var(--t3)", margin: "12px 0 0", lineHeight: 1.5, textAlign: "center" }}>
-        Constancia interna de Estudio Thames. El recibo oficial lo emite la compañía.
+        Constancia interna de {marca.estudio}. El recibo oficial lo emite la compañía.
       </p>
     </div>
   );

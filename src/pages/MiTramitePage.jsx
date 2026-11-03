@@ -15,6 +15,10 @@ import { HiCamera, HiChatAlt2, HiCheck, HiDocumentText, HiLockClosed } from "rea
 import { subirArchivo } from "../services/gestoria";
 import { Avatar } from "../components/gestoria/Piezas";
 import { ESTADOS, PASOS, ddmm, fechaCorta, linkWhatsApp } from "../components/gestoria/gestoriaUtils";
+// 🏷️ MARCA: el trámite de un cliente de la oficina Malvinas se ve de Malvinas.
+import { useForzarMarca } from "../marca/MarcaContext";
+import { THAMES, marcaDeTextos, nombreLugar } from "../marca/marcas";
+import CabeceraPublica from "../marca/CabeceraPublica";
 
 const API_ORIGIN = String(
   import.meta.env.VITE_API_BASE ||
@@ -32,7 +36,7 @@ const COLORES = {
   CANCELADO: "bg-surface dark:bg-surface-dark border-linea dark:border-linea-dark text-suave dark:text-suave-dark",
 };
 
-function detalleEstado(d) {
+function detalleEstado(d, marca = THAMES) {
   switch (d.estado) {
     case "RECIBIDO":
       return "Ya tenemos tus papeles. En breve lo toma un gestor.";
@@ -43,9 +47,9 @@ function detalleEstado(d) {
     case "OBSERVADO":
       return "El registro pidió algo más. Nosotros nos ocupamos; si necesitamos algo tuyo, te escribimos.";
     case "LISTO":
-      return `¡Ya está! Pasá a retirarlo por THAMES ${d.oficina?.nombre || ""}.`.replace(" .", ".");
+      return `¡Ya está! Pasá a retirarlo por ${nombreLugar(marca, d.oficina?.nombre)}.`;
     case "ENTREGADO":
-      return "Ya lo retiraste. ¡Gracias por confiar en THAMES!";
+      return `Ya lo retiraste. ¡Gracias por confiar en ${marca.id === THAMES.id ? "THAMES" : marca.nombre}!`;
     case "CANCELADO":
       return "Este trámite se canceló. Cualquier duda, escribinos.";
     default:
@@ -100,6 +104,10 @@ export default function MiTramitePage() {
     }
   };
 
+  // 🏷️ La marca sale de la oficina del trámite ("Malvinas" → MALVINAS).
+  const marca = data ? marcaDeTextos(data.oficina?.nombre) || THAMES : null;
+  useForzarMarca(marca);
+
   if (cargando) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface dark:bg-surface-dark">
@@ -126,12 +134,7 @@ export default function MiTramitePage() {
   return (
     <div className="min-h-screen bg-surface dark:bg-surface-dark">
       <div className="max-w-[480px] mx-auto">
-        <header className="flex items-center justify-between bg-slate-900 px-4 py-4 text-white">
-          <b className="tracking-[0.08em]">
-            THAMES <span className="text-red-300">SEGUROS</span>
-          </b>
-          <span className="text-[13px] text-slate-300">Seguimiento de trámite</span>
-        </header>
+        <CabeceraPublica marca={marca} derecha="Seguimiento de trámite" />
 
         <div className="flex flex-col gap-4 px-4 pt-5 pb-10">
           <div className="flex flex-col gap-1">
@@ -149,7 +152,7 @@ export default function MiTramitePage() {
           <div className={`flex flex-col gap-1.5 rounded-2xl border p-4 ${COLORES[data.estado] || COLORES.RECIBIDO}`}>
             <span className="text-[12px] font-bold tracking-wide">CÓMO VA</span>
             <strong className="text-2xl">{data.estado_cliente}</strong>
-            <span className="text-[14px]">{detalleEstado(data)}</span>
+            <span className="text-[14px]">{detalleEstado(data, marca)}</span>
           </div>
 
           {data.gestor_nombre && data.estado !== "CANCELADO" && (
@@ -268,7 +271,7 @@ export default function MiTramitePage() {
               <h2 className="text-[15px] font-semibold">Para retirarlo</h2>
               <span>El pago del trámite se lo hacés directo a la gestoría{data.gestor_nombre ? ` (${data.gestor_nombre})` : ""}.</span>
               <span>
-                Lo retirás en THAMES {data.oficina?.nombre}
+                Lo retirás en {nombreLugar(marca, data.oficina?.nombre)}
                 {data.oficina?.direccion ? ` · ${data.oficina.direccion}` : ""}
               </span>
             </section>

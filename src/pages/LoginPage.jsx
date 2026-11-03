@@ -4,14 +4,17 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { HiOutlineUser, HiOutlineLockClosed } from 'react-icons/hi';
 
-// 🚀 IMPORTAMOS TU LOGO OFICIAL
-import logoThames from '../assets/logos/logo_thames.svg';
+// 🏷️ Logo y nombre de la MARCA: antes de entrar no hay usuario, así que
+//    sale de la dirección web o de la última marca que entró en esta compu
+//    (en la compu de Malvinas, el login ya aparece de Malvinas).
+import { useMarca } from '../marca/MarcaContext';
 
 export const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const marca = useMarca();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,18 +46,18 @@ export const LoginPage = () => {
           <div className="mb-6 flex justify-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-linea bg-surface p-3 dark:border-linea-dark dark:bg-surface-dark">
               <img
-                src={logoThames}
-                alt="Logo Thames Seguros"
+                src={marca.logo}
+                alt={`Logo ${marca.nombre}`}
                 className="h-full w-full object-contain"
               />
             </div>
           </div>
 
           <h2 className="mb-2 text-2xl font-semibold text-titulo dark:text-titulo-dark">
-            Thames <span className="text-marca">Seguros</span>
+            {marca.partesLogin[0]} <span className="text-marca">{marca.partesLogin[1]}</span>
           </h2>
           <p className="text-[13px] text-suave dark:text-suave-dark">
-            Portal de gestión operativa
+            {marca.lema}
           </p>
         </div>
 
