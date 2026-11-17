@@ -34,6 +34,7 @@ const SiniestrosPage = lazyConReintento(() => import("./pages/SiniestrosPage"));
 //    del caso vive adentro de LegalesPage: /legales/:id)
 const LegalesPage = lazyConReintento(() => import("./pages/LegalesPage"));
 import AbogadoLayout, { InicioAbogado } from "./components/legales/AbogadoLayout";
+import EntradaTelon from "./components/layout/EntradaTelon";
 // 🚗 NUEVA APP: GESTORÍA (trámites del automotor derivados a gestores)
 const GestoriaPage = lazyConReintento(() => import("./pages/GestoriaPage"));
 import GestorLayout from "./components/gestoria/GestorLayout";
@@ -105,9 +106,10 @@ function App() {
   const veLegales = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   const soloUnModulo = esGestor || esAbogadoRol;
 
-  // 🚀 ESTADO PARA LA PANTALLA DE BIENVENIDA
-  //    Arranca APAGADA. Solo se prende una vez por login (ver useEffect abajo).
-  const [showWelcome, setShowWelcome] = useState(false);
+  // 🎭 ENTRADA «TELÓN» (17/11/2026): reemplaza a la pantalla de bienvenida de antes.
+  //    Arranca APAGADA. Solo se prende una vez por login (ver useEffect abajo) y para
+  //    TODOS los roles (también el abogado y la gestora, que antes no tenían nada).
+  const [entrada, setEntrada] = useState(false);
 
   const isMobile = useMemo(
     () =>
@@ -386,17 +388,20 @@ function App() {
   const hayUsuario = Boolean(user);
   useEffect(() => {
     if (!hayUsuario) {
-      setShowWelcome(false);
+      setEntrada(false);
       return undefined;
     }
     let recienEntro = false;
     try { recienEntro = sessionStorage.getItem(BIENVENIDA_KEY) === "1"; } catch { /* nada */ }
     if (!recienEntro) return undefined;
     try { sessionStorage.removeItem(BIENVENIDA_KEY); } catch { /* nada */ }
-    setShowWelcome(true);
-    const timer = setTimeout(() => setShowWelcome(false), 2200);
+    setEntrada(true);
+    // El telón se saca solo al subir; esto es solo por las dudas (nunca traba la app).
+    const timer = setTimeout(() => setEntrada(false), 9000);
     return () => clearTimeout(timer);
   }, [hayUsuario]);
+  // 🎭 El telón de entrada (lo mismo en las tres pantallas: oficina, gestora y abogado).
+  const telon = entrada ? <EntradaTelon user={user} marca={marca} onTerminado={() => setEntrada(false)} /> : null;
 
   // 🚀 CONTADORES DEL MENÚ — una sola función los pide todos.
   //    ⚡ Antes se pedían los 7 en CADA cambio de pantalla, cada 60 s aunque la
@@ -635,6 +640,8 @@ function App() {
   // 🚗 GESTOR: solo su pantalla de Gestoría, sin menú ni barra de abajo.
   if (esGestor) {
     return (
+      <>
+      {telon}
       <GestorLayout>
         <Suspense fallback={<CargandoPantalla />}>
           <Routes>
@@ -643,6 +650,7 @@ function App() {
           </Routes>
         </Suspense>
       </GestorLayout>
+      </>
     );
   }
 
@@ -650,6 +658,8 @@ function App() {
   //    sin menú lateral ni barra de abajo. Arriba, la tira para pasar de uno a otro.
   if (esAbogadoRol) {
     return (
+      <>
+      {telon}
       <AbogadoLayout>
         <Suspense fallback={<CargandoPantalla />}>
           <Routes>
@@ -659,59 +669,15 @@ function App() {
           </Routes>
         </Suspense>
       </AbogadoLayout>
+      </>
     );
   }
 
   // ====== RENDER DASHBOARD (USUARIO AUTENTICADO) ======
   return (
     <>
-      <AnimatePresence>
-        {showWelcome && (
-          <motion.div
-            key="welcome-overlay"
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-surface dark:bg-surface-dark"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
-            transition={{ duration: 0.6, ease: "easeInOut" }}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
-              className="flex flex-col items-center px-4 text-center"
-            >
-              {/* Isotipo grande en cuadrado */}
-              <motion.div
-                animate={{ y: [-5, 5, -5] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="mb-8 flex h-32 w-32 items-center justify-center rounded-2xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-5"
-              >
-                <img
-                  src={marca.logo}
-                  alt={`Logo ${marca.nombre}`}
-                  className="h-full w-full object-contain"
-                />
-              </motion.div>
-
-              <h1 className="text-3xl font-semibold tracking-tight text-titulo dark:text-titulo-dark sm:text-4xl">
-                Bienvenido, <span className="text-marca">{user?.username}</span>
-              </h1>
-              <p className="mt-3 text-[13px] font-medium text-suave dark:text-suave-dark sm:text-sm">
-                Preparando tu entorno de trabajo…
-              </p>
-
-              <div className="relative mt-8 h-2 w-64 overflow-hidden rounded-full border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
-                <motion.div
-                  className="absolute left-0 top-0 h-full bg-marca"
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 1.8, ease: "easeInOut" }}
-                />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 🎭 Telón de entrada (solo justo después de iniciar sesión) */}
+      {telon}
 
       <div className="flex min-h-[100dvh] overflow-x-hidden bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark transition-colors duration-300">
         {/* Sidebar — SIEMPRE montado; se abre/cierra con su lengüeta */}
@@ -849,4 +815,4 @@ function App() {
   );
 }
 
-export default App;
+export default App;

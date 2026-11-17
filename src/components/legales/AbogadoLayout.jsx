@@ -17,6 +17,7 @@ import { Navigate, NavLink, useLocation } from "react-router-dom";
 import axios from "axios";
 
 import { useAuth } from "../../context/AuthContext";
+import { CargandoPantalla } from "../../utils/lazyConReintento";
 import { LETRA } from "../gestoria/gestora/gestoraUtils";
 
 // Figtree (textos) e IBM Plex Mono (números). Si no cargan (sin internet), queda
@@ -67,7 +68,8 @@ function useReclamos() {
 /** Al entrar (o una dirección que no existe): a sus reclamos si tiene, si no a Legales. */
 export function InicioAbogado() {
   const { total } = useContext(ReclamosCtx);
-  if (total === null) return null;
+  // Mientras averigua si tiene reclamos: la ruedita de siempre (antes, medio segundo en blanco).
+  if (total === null) return <CargandoPantalla />;
   return <Navigate to={total > 0 ? "/siniestros" : "/legales"} replace />;
 }
 
