@@ -12,11 +12,15 @@
 //     · Editar montos: para corregir. Si cambia lo ofrecido / el convenio / lo cobrado, la nota
 //       también sale sola.
 //     · Papeles básicos: el checklist (✓ hay archivo · ? revisar · ✗ falta).
+//     · 🆕 Datos del reclamo: qué se reclama, N° de siniestro y los datos del tercero
+//       (compañía, póliza, patente, nombre, teléfono). El abogado los carga acá.
+//     · 📣 Al asignar: le sale un mail solo al abogado y acá el botón «Avisarle por WhatsApp».
 //   🔒 Los montos NUNCA se ven en el portal del cliente.
 //   Quién edita: el admin y el abogado del caso. La oficina lo ve, sin tocar.
 //
 // props: s (el siniestro con lo del servidor), puedeEditar, esAdmin, abogados ([{id, nombre}]),
-//        onCambio(siniestroNuevo) → para refrescar el panel.
+//        onCambio(siniestroNuevo) → para refrescar el panel,
+//        aviso / onAviso → el aviso de la última asignación (vive en la planilla: el panel se rearma).
 import { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { toast } from "react-hot-toast";
@@ -24,7 +28,7 @@ import { toast } from "react-hot-toast";
 import { eventoReclamo, patchSiniestro } from "../../store/slices/siniestrosSlice";
 import { invalidarCacheSiniestrosCliente } from "../../hooks/useSiniestrosCliente";
 import { mensajeDe } from "../planilla/planillaUtils";
-import { plata } from "../gestoria/gestoriaUtils";
+import { linkWhatsAppOElegir, plata } from "../gestoria/gestoriaUtils";
 
 // Los botones, en orden (monto: pide plata · obligatorio: no se guarda sin monto).
 export const EVENTOS = [
@@ -296,8 +300,157 @@ function FormMontos({ s, onListo, onCancelar }) {
   );
 }
 
+// ⚖️ Lo que se reclama y los datos del tercero (el abogado los carga acá).
+const QUE_RECLAMA = [
+  ["", "Sin elegir"],
+  ["DANOS", "Daños"],
+  ["LESIONES", "Lesiones"],
+  ["DANOS_LESIONES", "Daños y lesiones"],
+];
+const CAMPOS_TERCERO = [
+  ["tercero_compania", "Compañía del tercero", "Ej: Rivadavia", 50],
+  ["tercero_poliza", "Póliza del tercero", "", 50],
+  ["tercero_patente", "Patente del tercero", "Ej: AA123BB", 15],
+  ["tercero_nombre", "Nombre del tercero", "", 100],
+  ["tercero_telefono", "Teléfono del tercero", "", 50],
+  ["nro_reclamo_cia", "N° de siniestro (compañía del cliente)", "", 50],
+];
+
+function DatosReclamo({ s, puedeEditar, onListo }) {
+  const dispatch = useDispatch();
+  const ini = () => Object.fromEntries([["que_reclama", s.que_reclama || ""], ...CAMPOS_TERCERO.map(([k]) => [k, s[k] || ""])]);
+  const [editando, setEditando] = useState(false);
+  const [v, setV] = useState(ini);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const abrir = () => {
+    setV(ini());
+    setError("");
+    setEditando(true);
+  };
+  const guardar = async () => {
+    const antes = ini();
+    const cambios = {};
+    Object.keys(v).forEach((k) => {
+      const nuevo = typeof v[k] === "string" ? v[k].trim() : v[k];
+      if (nuevo !== antes[k]) cambios[k] = nuevo;
+    });
+    if (!Object.keys(cambios).length) return setEditando(false);
+    setGuardando(true);
+    setError("");
+    try {
+      const r = await dispatch(patchSiniestro({ id: s.id, cambios })).unwrap();
+      invalidarCacheSiniestrosCliente(s.cliente);
+      toast.success("Datos del reclamo guardados");
+      setEditando(false);
+      onListo?.(r);
+    } catch (e) {
+      setError(mensajeDe({ response: { data: e } }, "No se pudo guardar. Probá de nuevo."));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const tercero = [s.tercero_compania, s.tercero_poliza && `póliza ${s.tercero_poliza}`, s.tercero_patente].filter(Boolean).join(" · ");
+  const quien = [s.tercero_nombre, s.tercero_telefono].filter(Boolean).join(" · ");
+  const qr = QUE_RECLAMA.find(([k]) => k === (s.que_reclama || ""))?.[1] || "Sin elegir";
+
+  return (
+    <div>
+      <Titulo
+        derecha={
+          puedeEditar && !editando ? (
+            <button type="button" onClick={abrir} className="text-[13px] font-bold text-[var(--acc)]">
+              ✏️ Editar
+            </button>
+          ) : null
+        }
+      >
+        🛡️ Datos del reclamo
+      </Titulo>
+      {editando ? (
+        <div className={`${CAJA} flex flex-col gap-3 p-3`}>
+          <label className="flex flex-col gap-1">
+            <span className={ETIQ}>Qué se reclama</span>
+            <select value={v.que_reclama} onChange={(e) => setV((p) => ({ ...p, que_reclama: e.target.value }))} className={INPUT}>
+              {QUE_RECLAMA.map(([k, n]) => (
+                <option key={k} value={k}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {CAMPOS_TERCERO.map(([k, n, ph, max]) => (
+              <label key={k} className={`flex flex-col gap-1 ${k === "nro_reclamo_cia" ? "sm:col-span-2" : ""}`}>
+                <span className={ETIQ}>{n}</span>
+                <input
+                  value={v[k]}
+                  maxLength={max}
+                  placeholder={ph}
+                  inputMode={k === "tercero_telefono" ? "tel" : undefined}
+                  onChange={(e) => setV((p) => ({ ...p, [k]: k === "tercero_patente" ? e.target.value.toUpperCase() : e.target.value }))}
+                  className={INPUT}
+                />
+              </label>
+            ))}
+          </div>
+          {error && <p className="text-[13px] font-semibold text-duo-rojo">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setEditando(false)} disabled={guardando} className="flex-1 rounded-lg border border-linea dark:border-linea-dark px-3 py-2 text-[13.5px] font-semibold text-titulo dark:text-titulo-dark">
+              Cancelar
+            </button>
+            <button type="button" onClick={guardar} disabled={guardando} className="flex-1 rounded-lg bg-[var(--acc)] px-3 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">
+              {guardando ? "Guardando…" : "Guardar datos"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <dl className={`${CAJA} divide-y divide-linea dark:divide-linea-dark overflow-hidden`}>
+          {[
+            ["Qué se reclama", qr, !s.que_reclama],
+            ["Tercero", tercero || "Sin cargar", !tercero],
+            ["Contacto", quien || "—", false],
+            ["N° de siniestro", s.nro_reclamo_cia || "Sin cargar", !s.nro_reclamo_cia],
+          ].map(([k, val, falta]) => (
+            <div key={k} className="flex items-start gap-3 px-3 py-2">
+              <dt className={`${ETIQ} w-[118px] shrink-0 pt-0.5`}>{k}</dt>
+              <dd className={`m-0 min-w-0 break-words text-[14px] ${falta ? "font-semibold text-duo-amarillo" : "text-titulo dark:text-titulo-dark"}`}>{val}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+/** 📣 Después de asignar: el mail que salió solo y el botón de WhatsApp al abogado. */
+function AvisoAsignacion({ aviso, onCerrar }) {
+  if (!aviso?.texto) return null;
+  return (
+    <div className="rounded-xl border border-duo-verde/40 bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] px-3 py-2.5">
+      <p className="m-0 text-[13.5px] font-bold text-titulo dark:text-titulo-dark">
+        {aviso.mail ? `📧 Le mandamos un mail a ${aviso.nombre || "el abogado"} (${aviso.mail}).` : `${aviso.nombre || "El abogado"} no tiene mail cargado: cargalo en Admin → Usuarios para que le llegue solo.`}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <a
+          href={linkWhatsAppOElegir(aviso.numero, aviso.texto)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-duo-verde px-3 text-[13.5px] font-bold text-white"
+        >
+          📲 Avisarle por WhatsApp
+        </a>
+        <button type="button" onClick={onCerrar} className="min-h-[40px] rounded-lg px-3 text-[13px] font-semibold text-suave dark:text-suave-dark">
+          Listo
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** ⚖️ «Lo lleva»: el admin elige el abogado (o lo saca). */
-function SelectorAbogado({ s, abogados = [], onListo }) {
+function SelectorAbogado({ s, abogados = [], onListo, onAviso }) {
   const dispatch = useDispatch();
   const [guardando, setGuardando] = useState(false);
   const cambiar = async (valor) => {
@@ -305,6 +458,7 @@ function SelectorAbogado({ s, abogados = [], onListo }) {
     try {
       const r = await dispatch(patchSiniestro({ id: s.id, cambios: { abogado_asignado: valor ? Number(valor) : null } })).unwrap();
       toast.success(valor ? `Asignado a ${r?.abogado_nombre || "el abogado"}` : "Quedó sin asignar");
+      onAviso?.(r?.aviso_abogado || null);
       onListo?.(r);
     } catch (e) {
       toast.error(mensajeDe({ response: { data: e } }), { duration: 6000 });
@@ -330,7 +484,7 @@ function SelectorAbogado({ s, abogados = [], onListo }) {
   );
 }
 
-export default function SiniestroReclamoPanel({ s, puedeEditar = false, esAdmin = false, abogados = [], onCambio }) {
+export default function SiniestroReclamoPanel({ s, puedeEditar = false, esAdmin = false, abogados = [], onCambio, aviso = null, onAviso }) {
   const [evento, setEvento] = useState(null); // el evento rápido abierto
   const [editando, setEditando] = useState(false);
 
@@ -354,8 +508,9 @@ export default function SiniestroReclamoPanel({ s, puedeEditar = false, esAdmin 
           <p className="truncate text-[15px] font-extrabold text-titulo dark:text-titulo-dark">⚖️ {s.abogado_nombre || "Sin asignar"}</p>
           {s.fecha_asignacion ? <p className="text-[12px] text-suave dark:text-suave-dark">Desde el {ddmmaaaa(s.fecha_asignacion)}</p> : null}
         </div>
-        {esAdmin && <SelectorAbogado s={s} abogados={abogados} onListo={onCambio} />}
+        {esAdmin && <SelectorAbogado s={s} abogados={abogados} onListo={onCambio} onAviso={onAviso} />}
       </div>
+      {esAdmin && <AvisoAsignacion aviso={aviso} onCerrar={() => onAviso?.(null)} />}
 
       {/* 🚨 Atrasado */}
       {alertas.length > 0 && (
@@ -390,6 +545,9 @@ export default function SiniestroReclamoPanel({ s, puedeEditar = false, esAdmin 
           {s.proximo_paso ? <p className="mt-2 text-[13px] text-suave dark:text-suave-dark">👉 Próximo: {s.proximo_paso}</p> : null}
         </div>
       )}
+
+      {/* 🛡️ Qué se reclama, N° de siniestro y el tercero */}
+      <DatosReclamo s={s} puedeEditar={puedeEditar} onListo={onCambio} />
 
       {/* 💰 La plata */}
       <div>

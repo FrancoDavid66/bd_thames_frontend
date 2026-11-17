@@ -285,6 +285,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
   const [cargado, setCargado] = useState(false);
   // 🔑 El siniestro cuyo «Portal del cliente» se está editando (solo admin).
   const [portalDe, setPortalDe] = useState(null);
+  // 📣 El aviso de la última asignación de abogado, por siniestro (el panel se rearma al guardar).
+  const [avisos, setAvisos] = useState({});
 
   const recargar = useCallback(() => dispatch(getSiniestros()).finally(() => setCargado(true)), [dispatch]);
   useEffect(() => {
@@ -419,6 +421,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           : [RECLAMA[s.quien_reclama] && `⚖️ ${s.abogado_nombre || RECLAMA[s.quien_reclama].n}`, tipoDe(s).corto, s.patente, s.oficina_nombre].filter(Boolean).join(" · "),
       marcas: (s) =>
         [
+          esAbogado && s.nuevo_para_abogado && { txt: "🆕 Nuevo", tono: "azul" },
           s.estado !== "CERRADO" && !s.fotos_count && { txt: "Sin fotos", tono: "ambar" },
           s.estado !== "PENDIENTE" && s.estado !== "CERRADO" && !s.nro_reclamo_cia && { txt: "Sin N° de reclamo", tono: "ambar" },
         ].filter(Boolean),
@@ -551,6 +554,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         if (s.estado === "CERRADO") return T;
         // ⚖️ TABLERO DEL ABOGADO: lo atrasado primero (rojo), después lo que falta.
         if (esAbogado) {
+          if (s.nuevo_para_abogado) T.push({ tono: "ambar", txt: "Caso nuevo: te lo asignaron, revisalo" });
           (s.alertas || []).forEach((al) => T.push({ tono: "rojo", txt: al.txt }));
           if (!s.fecha_presentacion && ["PENDIENTE", "DENUNCIADO"].includes(s.estado))
             T.push({ tono: "ambar", txt: `Presentar el reclamo${s.tercero_compania ? ` ante ${s.tercero_compania}` : ""}` });
@@ -775,6 +779,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
                       esAdmin={isWebAdmin}
                       puedeEditar={puedeReclamar(det)}
                       abogados={abogados}
+                      aviso={avisos[det.id] || null}
+                      onAviso={(av) => setAvisos((p) => ({ ...p, [det.id]: av }))}
                       onCambio={async (nuevo) => {
                         if (nuevo && nuevo.id) frescos.current[nuevo.id] = nuevo;
                         await Promise.resolve(onRecargar?.()).catch(() => {});
@@ -861,7 +867,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         ficha: onEditar ? { txt: "Editar todo", onClick: (s) => onEditar(s) } : null,
       },
     };
-  }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin, opcionesOficina, esAbogado, abogados, opcionesAbogado, puedeReclamar, filtroExterno]);
+  }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin, opcionesOficina, esAbogado, abogados, opcionesAbogado, puedeReclamar, filtroExterno, avisos]);
 
   return (
     <>
