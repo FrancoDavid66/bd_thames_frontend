@@ -20,6 +20,15 @@
 //      document.body (createPortal): adentro de un modal animado, `fixed` se
 //      corre de lugar.
 //
+// 📄 17/11/2026 · PAPELES DEL RECLAMO (para que todo el reclamo viva en THAMES):
+//    · Además de fotos, PDF (presupuesto, denuncia, carta, convenio, recibos…). El PDF se ve
+//      como una tarjeta con «Ver» (pestaña nueva) y «Descargar». Máx. 10 MB por archivo.
+//    · Varios archivos a la vez y, en la compu, ARRASTRAR Y SOLTAR sobre el panel.
+//    · Etiquetas nuevas: DNI, Registro, Cédula, Título / 08, CBU, Denuncia, Certificado de
+//      cobertura, Presupuesto, Carta de reclamo, Oferta / convenio, Comprobante de pago,
+//      Médico y Policial (las de siempre siguen). Agrupadas: primero las fotos, después los papeles.
+//    · Con la etiqueta correcta se tilda solo el checklist de «⚖️ Reclamo».
+//
 // 📱 RESPONSIVE: en el celu los botones de cada foto se ven siempre (no hay
 //    hover); en la compu, el de borrar aparece al pasar el mouse.
 //
@@ -32,7 +41,7 @@
 //   3) El panel le avisa al padre mientras está subiendo (onUploadingChange)
 //      para que el wizard no deje "Guardar" con una foto a medio subir.
 //   4) Si una foto falla, el cartel dice POR QUÉ.
-import { useState, useEffect, useRef, useMemo } from "react";
+import { Fragment, useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,6 +49,8 @@ import {
   HiPhotograph, HiCamera, HiX, HiTrash, HiTruck, HiIdentification,
   HiLocationMarker, HiHeart, HiDotsHorizontal, HiTag, HiCheck,
   HiChevronLeft, HiChevronRight, HiPlus,
+  HiDocumentText, HiClipboardList, HiCurrencyDollar, HiShieldCheck, HiMail, HiCash,
+  HiCreditCard, HiScale, HiBadgeCheck, HiUser, HiDownload, HiExternalLink, HiUpload, HiKey,
 } from "react-icons/hi";
 import { toast } from "react-hot-toast";
 
@@ -73,13 +84,29 @@ import {
 // 🏷️ Etiquetas (las mismas que SiniestroFoto.ETIQUETAS del backend)
 // ──────────────────────────────────────────────────────────────────
 const ETIQUETAS = [
+  // 📷 Fotos del hecho
   { key: "AUTO_ASEGURADO", label: "Auto del asegurado", desc: "Daños, frente, cola y patente del auto de nuestro cliente", tono: "azul", Icon: HiTruck, lado: "asegurado" },
-  { key: "DOC_ASEGURADO", label: "Papeles del asegurado", desc: "Registro, cédula del auto, DNI", tono: "azul", Icon: HiIdentification },
   { key: "AUTO_TERCERO", label: "Auto del tercero", desc: "Daños y patente del otro auto", tono: "rojo", Icon: HiTruck, lado: "tercero" },
-  { key: "DOC_TERCERO", label: "Papeles del tercero", desc: "Registro, cédula, DNI y seguro del tercero", tono: "rojo", Icon: HiIdentification },
   { key: "LUGAR", label: "Lugar del hecho", desc: "Esquina, calle, semáforo, marcas en el piso", tono: "verde", Icon: HiLocationMarker },
-  { key: "LESIONES", label: "Lesiones", desc: "Heridas, constancia médica", tono: "amarillo", Icon: HiHeart },
-  { key: "OTRO", label: "Otro", desc: "Denuncia policial, presupuesto, lo que sea", tono: "gris", Icon: HiDotsHorizontal },
+  { key: "LESIONES", label: "Lesiones", desc: "Fotos de las heridas", tono: "amarillo", Icon: HiHeart },
+  // 🪪 Papeles del asegurado (sueltos: así se tilda el checklist)
+  { key: "DNI", label: "DNI del asegurado", desc: "Frente y dorso", tono: "azul", Icon: HiUser, papel: true },
+  { key: "REGISTRO", label: "Registro de conducir", desc: "Frente y dorso", tono: "azul", Icon: HiIdentification, papel: true },
+  { key: "CEDULA", label: "Cédula del auto", desc: "Verde o azul", tono: "azul", Icon: HiIdentification, papel: true },
+  { key: "TITULO_08", label: "Título / 08", desc: "Título del auto o formulario 08", tono: "azul", Icon: HiKey, papel: true },
+  { key: "CBU", label: "CBU / datos para el cobro", desc: "Constancia de CBU o alias del cliente", tono: "verde", Icon: HiCreditCard, papel: true },
+  { key: "DOC_ASEGURADO", label: "Papeles del asegurado (varios)", desc: "Registro, cédula, DNI juntos", tono: "azul", Icon: HiIdentification, papel: true },
+  { key: "DOC_TERCERO", label: "Papeles del tercero", desc: "Registro, cédula, DNI y seguro del tercero", tono: "rojo", Icon: HiIdentification, papel: true },
+  // ⚖️ Papeles del reclamo
+  { key: "DENUNCIA", label: "Denuncia", desc: "Constancia de la denuncia en la compañía", tono: "violeta", Icon: HiClipboardList, papel: true },
+  { key: "CERTIFICADO_COBERTURA", label: "Certificado de cobertura", desc: "De la compañía del cliente", tono: "violeta", Icon: HiShieldCheck, papel: true },
+  { key: "PRESUPUESTO", label: "Presupuesto del arreglo", desc: "Del taller", tono: "amarillo", Icon: HiCurrencyDollar, papel: true },
+  { key: "CARTA_RECLAMO", label: "Carta de reclamo", desc: "La que se presentó al tercero", tono: "violeta", Icon: HiMail, papel: true },
+  { key: "OFERTA_CONVENIO", label: "Oferta / convenio", desc: "Lo que mandó la compañía o el convenio firmado", tono: "violeta", Icon: HiScale, papel: true },
+  { key: "COMPROBANTE_PAGO", label: "Comprobante de pago", desc: "Recibos, transferencias, tickets", tono: "verde", Icon: HiCash, papel: true },
+  { key: "MEDICO", label: "Médico", desc: "Historia clínica, certificados, alta", tono: "amarillo", Icon: HiBadgeCheck, papel: true },
+  { key: "POLICIAL", label: "Policial", desc: "Acta o exposición civil", tono: "gris", Icon: HiDocumentText, papel: true },
+  { key: "OTRO", label: "Otro", desc: "Lo que sea", tono: "gris", Icon: HiDotsHorizontal, papel: true },
 ];
 const POR_KEY = Object.fromEntries(ETIQUETAS.map((e) => [e.key, e]));
 const SIN = "SIN";                                   // grupo "Sin etiqueta"
@@ -92,7 +119,20 @@ const TONO = {
   verde:    { txt: "text-duo-verde",    soft: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)]",       dot: "bg-duo-verde" },
   amarillo: { txt: "text-duo-amarillo", soft: "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)]", dot: "bg-duo-amarillo" },
   gris:     { txt: "text-suave dark:text-suave-dark", soft: "bg-surface dark:bg-surface-dark",                      dot: "bg-suave" },
+  violeta:  { txt: "text-duo-violeta",  soft: "bg-duo-violeta-soft dark:bg-[var(--color-duo-violeta-soft-dark)]",   dot: "bg-duo-violeta" },
 };
+
+// 📄 ¿Es un PDF? (el servidor manda es_pdf; las del borrador traen el mime)
+const esPdf = (f) =>
+  !!f?.es_pdf || f?.mime === "application/pdf" || /\.pdf($|\?)/i.test(String(f?.url || ""));
+const esArchivoPdf = (file) => file?.type === "application/pdf" || /\.pdf$/i.test(file?.name || "");
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/** Link para descargar (Cloudinary: fl_attachment). Si no es de Cloudinary, el mismo link. */
+function urlDescarga(url) {
+  const u = String(url || "");
+  return u.includes("/upload/") && !u.includes("/fl_attachment") ? u.replace("/upload/", "/upload/fl_attachment/") : u;
+}
 
 const grupoDe = (foto) => (foto?.etiqueta && POR_KEY[foto.etiqueta] ? foto.etiqueta : SIN);
 
@@ -167,6 +207,7 @@ export default function SiniestroFotosPanel({
   const [hoja, setHoja] = useState(null);               // { ids, subida } → "¿Qué muestra?"
   const [visor, setVisor] = useState(null);             // { ids, i } → foto en grande
   const [ultima, setUltima] = useState(null);           // última etiqueta usada
+  const [arrastrando, setArrastrando] = useState(false); // 📥 arrastrando archivos encima (compu)
   const galeriaRef = useRef(null);  // input galería (sin capture)
   const camaraRef = useRef(null);   // input cámara (capture="environment")
   const toqueX = useRef(null);      // deslizar en el visor (celu)
@@ -201,7 +242,8 @@ export default function SiniestroFotosPanel({
       .map((g) => ({ key: g, fotos: fotos.filter((f) => grupoDe(f) === g) })),
     [fotos, conteo, filtroOk]
   );
-  const visibles = useMemo(() => grupos.flatMap((g) => g.fotos), [grupos]); // orden del visor
+  // Orden del visor: solo las FOTOS (los PDF se abren en otra pestaña).
+  const visibles = useMemo(() => grupos.flatMap((g) => g.fotos).filter((f) => !esPdf(f)), [grupos]);
   const agrupar = hayEtiquetas; // sin ninguna etiqueta: una sola grilla, como siempre
   const puedeEtiquetar = !readOnly;
 
@@ -222,12 +264,16 @@ export default function SiniestroFotosPanel({
       // Borrador + wizard cerrado: no seguimos sumando fotos a un wizard que ya no está.
       if (isDraft && !aliveRef.current) break;
       try {
-        // 📷 Achicamos antes de subir (si no se puede, sube la original).
-        const chica = await comprimirImagen(file);
-        const up = await uploadToCloudinary(chica, { folder });
+        const pdf = esArchivoPdf(file);
+        if (!pdf && !String(file.type || "").startsWith("image/")) throw new Error(`«${file.name}» no es foto ni PDF`);
+        // 📷 Las fotos se achican antes de subir (si no se puede, sube la original). Los PDF van tal cual.
+        const chica = pdf ? file : await comprimirImagen(file);
+        if (chica.size > MAX_BYTES) throw new Error(`«${file.name}» pesa más de 10 MB`);
+        const up = await uploadToCloudinary(chica, { folder: pdf ? folder.replace(/\/fotos$/, "/papeles") : folder });
         if (!up?.secure_url || !up?.public_id) {
-          throw new Error("Cloudinary no devolvió la foto");
+          throw new Error("Cloudinary no devolvió el archivo");
         }
+        if (pdf) up.mime = "application/pdf";
         if (isDraft) {
           if (!aliveRef.current) break;
           const nuevaFoto = {
@@ -265,7 +311,7 @@ export default function SiniestroFotosPanel({
     if (aliveRef.current) setUploading(false);
     onUploadingChange?.(false);
     if (failCount > 0) {
-      const base = failCount > 1 ? `${failCount} fotos no se pudieron subir` : "1 foto no se pudo subir";
+      const base = failCount > 1 ? `${failCount} archivos no se pudieron subir` : "1 archivo no se pudo subir";
       toast.error(motivo ? `${base}: ${motivo}` : base, { duration: 6000 });
     }
     if (okCount > 0 && aliveRef.current) {
@@ -274,13 +320,33 @@ export default function SiniestroFotosPanel({
         setFiltro("TODAS");
         setHoja({ ids: nuevas, subida: true });
       } else {
-        toast.success(`${okCount} foto${okCount > 1 ? "s" : ""} subida${okCount > 1 ? "s" : ""}`);
+        toast.success(`${okCount} archivo${okCount > 1 ? "s" : ""} subido${okCount > 1 ? "s" : ""}`);
       }
     }
   };
 
   const onGaleria = (e) => { procesarArchivos(e.target.files); if (galeriaRef.current) galeriaRef.current.value = ""; };
   const onCamara = (e) => { procesarArchivos(e.target.files); if (camaraRef.current) camaraRef.current.value = ""; };
+
+  // 📥 Arrastrar y soltar (compu): fotos y PDF sobre el panel.
+  const arrastre = readOnly || uploading
+    ? {}
+    : {
+        onDragOver: (e) => {
+          if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+          e.preventDefault();
+          if (!arrastrando) setArrastrando(true);
+        },
+        onDragLeave: (e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setArrastrando(false);
+        },
+        onDrop: (e) => {
+          if (!e.dataTransfer?.files?.length) return;
+          e.preventDefault();
+          setArrastrando(false);
+          procesarArchivos(e.dataTransfer.files);
+        },
+      };
 
   // ── Etiquetar ───────────────────────────────────────────────────
   const salirSeleccion = () => { setModoSel(false); setSeleccion([]); };
@@ -344,6 +410,11 @@ export default function SiniestroFotosPanel({
   const tocarFoto = (foto) => {
     if (modoSel) {
       setSeleccion((s) => (s.includes(foto.id) ? s.filter((x) => x !== foto.id) : [...s, foto.id]));
+      return;
+    }
+    // 📄 El PDF se abre en otra pestaña.
+    if (esPdf(foto)) {
+      window.open(foto.url, "_blank", "noopener,noreferrer");
       return;
     }
     const ids = visibles.map((f) => f.id);
@@ -431,13 +502,46 @@ export default function SiniestroFotosPanel({
           className={`absolute inset-0 w-full h-full ${modoSel ? "cursor-pointer" : "cursor-zoom-in"}`}
           aria-label={modoSel ? (sel ? "Desmarcar foto" : "Marcar foto") : "Ver en grande"}
         >
-          <img
-            src={foto.url}
-            alt={foto.nombre || "Foto"}
-            loading="lazy"
-            className={`w-full h-full object-cover transition-transform ${sel ? "scale-[.92] rounded-md" : ""}`}
-          />
+          {esPdf(foto) ? (
+            <span className={`flex h-full w-full flex-col items-center justify-center gap-1 bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)] px-2 pb-9 transition-transform ${sel ? "scale-[.92] rounded-md" : ""}`}>
+              <HiDocumentText className="h-9 w-9 text-duo-rojo" aria-hidden="true" />
+              <span className="rounded bg-duo-rojo px-1.5 text-[10px] font-extrabold text-white">PDF</span>
+              <span className="line-clamp-2 w-full break-all text-center text-[11px] font-semibold text-titulo dark:text-titulo-dark">{foto.nombre || "Archivo"}</span>
+            </span>
+          ) : (
+            <img
+              src={foto.url}
+              alt={foto.nombre || "Foto"}
+              loading="lazy"
+              className={`w-full h-full object-cover transition-transform ${sel ? "scale-[.92] rounded-md" : ""}`}
+            />
+          )}
         </button>
+        {/* 📄 PDF: ver y descargar */}
+        {esPdf(foto) && !modoSel && !foto._isDraft && (
+          <span className="absolute right-1.5 bottom-1.5 flex gap-1">
+            <a
+              href={foto.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(ev) => ev.stopPropagation()}
+              className="h-8 w-8 rounded-full bg-card dark:bg-card-dark shadow-md flex items-center justify-center text-titulo dark:text-titulo-dark"
+              title="Ver"
+              aria-label="Ver el PDF"
+            >
+              <HiExternalLink className="h-4 w-4" />
+            </a>
+            <a
+              href={urlDescarga(foto.url)}
+              onClick={(ev) => ev.stopPropagation()}
+              className="h-8 w-8 rounded-full bg-card dark:bg-card-dark shadow-md flex items-center justify-center text-titulo dark:text-titulo-dark"
+              title="Descargar"
+              aria-label="Descargar el PDF"
+            >
+              <HiDownload className="h-4 w-4" />
+            </a>
+          </span>
+        )}
 
         {foto._isDraft && !modoSel && (
           <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-medium uppercase bg-duo-amarillo text-duo-texto pointer-events-none">
@@ -485,7 +589,7 @@ export default function SiniestroFotosPanel({
     const etiquetasSel = new Set(sel.map((f) => f.etiqueta || ""));
     const actual = etiquetasSel.size === 1 ? [...etiquetasSel][0] : null;
     const algunaConEtiqueta = sel.some((f) => f.etiqueta);
-    const titulo = n === 1 ? "¿Qué muestra esta foto?" : `¿Qué muestran estas ${n} fotos?`;
+    const titulo = n === 1 ? (esPdf(sel[0]) ? "¿Qué papel es?" : "¿Qué muestra esta foto?") : `¿Qué son estos ${n} archivos?`;
     const sub = hoja.subida
       ? `${n === 1 ? "Foto subida" : `${n} fotos subidas`}. La etiqueta es opcional.`
       : n === 1 ? "Elegí una etiqueta o quitala." : "Se les pone la misma etiqueta a todas.";
@@ -511,7 +615,11 @@ export default function SiniestroFotosPanel({
           <div className="sm:hidden w-10 h-1 rounded-full bg-linea dark:bg-linea-dark mx-auto mb-3" />
 
           <div className="flex items-center gap-3 mb-3">
-            {n === 1 ? (
+            {n === 1 && esPdf(sel[0]) ? (
+              <span className="h-14 w-14 rounded-xl border border-linea dark:border-linea-dark shrink-0 flex items-center justify-center bg-duo-rojo-soft dark:bg-[var(--color-duo-rojo-soft-dark)]">
+                <HiDocumentText className="h-7 w-7 text-duo-rojo" />
+              </span>
+            ) : n === 1 ? (
               <img src={sel[0].url} alt="" className="h-14 w-14 rounded-xl object-cover border border-linea dark:border-linea-dark shrink-0" />
             ) : (
               <div className="relative h-14 w-16 shrink-0">
@@ -542,12 +650,15 @@ export default function SiniestroFotosPanel({
           )}
 
           <div className="flex flex-col gap-0.5" role="menu">
-            {ETIQUETAS.map((e) => {
+            {ETIQUETAS.map((e, i) => {
               const t = TONO[e.tono];
               const on = actual === e.key;
+              // 📷 / 📎 Separadores: primero las fotos, después los papeles.
+              const titulo = i === 0 ? "📷 Fotos" : e.papel && !ETIQUETAS[i - 1].papel ? "📎 Papeles" : "";
               return (
+                <Fragment key={e.key}>
+                {titulo && <p className="px-2 pt-2 pb-0.5 text-[11.5px] font-extrabold uppercase tracking-wide text-suave dark:text-suave-dark">{titulo}</p>}
                 <button
-                  key={e.key}
                   type="button"
                   role="menuitemradio"
                   aria-checked={on}
@@ -567,6 +678,7 @@ export default function SiniestroFotosPanel({
                   </span>
                   {on && <HiCheck className="w-5 h-5 text-duo-violeta shrink-0" />}
                 </button>
+                </Fragment>
               );
             })}
           </div>
@@ -731,11 +843,21 @@ export default function SiniestroFotosPanel({
   );
 
   return (
-    <div className={compact ? "" : "p-4"}>
+    <div
+      className={`${compact ? "" : "p-4"} relative rounded-xl ${arrastrando ? "ring-2 ring-duo-violeta ring-offset-2 ring-offset-card dark:ring-offset-card-dark" : ""}`}
+      {...arrastre}
+    >
+      {/* 📥 Soltá acá */}
+      {arrastrando && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl bg-duo-violeta-soft/90 dark:bg-[var(--color-duo-violeta-soft-dark)]">
+          <HiUpload className="h-8 w-8 text-duo-violeta" />
+          <p className="text-[14px] font-bold text-titulo dark:text-titulo-dark">Soltá las fotos o los PDF acá</p>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <HiPhotograph className="w-5 h-5 text-duo-azul shrink-0" />
-        <h3 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">Fotos del siniestro</h3>
+        <h3 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">Fotos y papeles</h3>
         {fotos.length > 0 && (
           <span className="text-xs font-medium text-duo-azul bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 rounded-lg tabular-nums">
             {fotos.length}
@@ -781,14 +903,19 @@ export default function SiniestroFotosPanel({
             className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border-2 border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark hover:border-duo-violeta transition-colors disabled:opacity-50"
           >
             <HiPhotograph className="text-2xl text-duo-violeta" />
-            <span className="text-[11px] font-medium text-titulo dark:text-titulo-dark">Elegir de galería</span>
+            <span className="text-[11px] font-medium text-titulo dark:text-titulo-dark">Fotos o PDF</span>
           </button>
         </div>
+      )}
+      {!readOnly && (
+        <p className="-mt-1.5 mb-3 hidden text-center text-[11.5px] text-suave dark:text-suave-dark sm:block">
+          También podés arrastrar varios archivos (fotos o PDF, hasta 10 MB) y soltarlos acá.
+        </p>
       )}
 
       {/* Inputs ocultos */}
       <input ref={camaraRef} type="file" accept="image/*" capture="environment" onChange={onCamara} className="hidden" />
-      <input ref={galeriaRef} type="file" accept="image/*" multiple onChange={onGaleria} className="hidden" />
+      <input ref={galeriaRef} type="file" accept="image/*,application/pdf" multiple onChange={onGaleria} className="hidden" />
 
       {/* 🏷️ Filtros por etiqueta (solo si alguna foto tiene etiqueta) */}
       {!loading && hayEtiquetas && (
@@ -828,7 +955,7 @@ export default function SiniestroFotosPanel({
         <div className="py-8 text-center border-2 border-dashed border-linea dark:border-linea-dark rounded-xl">
           <HiPhotograph className="w-9 h-9 text-suave dark:text-suave-dark mx-auto mb-2" />
           <p className="text-sm text-suave dark:text-suave-dark">
-            {readOnly ? "Sin fotos" : "Todavía no agregaste fotos"}
+            {readOnly ? "Sin fotos ni papeles" : "Todavía no agregaste fotos ni papeles"}
           </p>
         </div>
       ) : !agrupar ? (

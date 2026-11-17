@@ -155,11 +155,17 @@ export default function PanelPlanilla({ a, it, id, det, cargando, error, tab, se
   const tareas = x && a.tareas ? a.tareas(x) || [] : [];
   const sigue = x && a.sigue ? a.sigue(x) : "";
   const nNov = det && a.panel?.novedades ? (a.panel.novedades(det) || []).length : null;
+  // ➕ 17/11: pestañas propias de la sección (ej: «⚖️ Reclamo» en Siniestros).
+  //    a.panel.tabsExtra(x) → [{ k: "rec", txt: "⚖️ Reclamo", render: (det, onRecargar, x) => … , primero }]
+  const extra = x && a.panel?.tabsExtra ? (a.panel.tabsExtra(x) || []).filter(Boolean) : [];
   const tabs = [
+    ...extra.filter((t) => t.primero).map((t) => [t.k, t.txt]),
     ["nov", `💬 Novedades${nNov != null ? ` (${nNov})` : ""}`],
     ["datos", "📋 Datos"],
+    ...extra.filter((t) => !t.primero).map((t) => [t.k, t.txt]),
     ["pap", "📎 Papeles"],
   ];
+  const tabExtra = extra.find((t) => t.k === tab);
 
   return (
     <aside
@@ -243,6 +249,8 @@ export default function PanelPlanilla({ a, it, id, det, cargando, error, tab, se
             x ? <Datos a={a} det={det} it={x} /> : <Esqueleto />
           ) : !det || cargando ? (
             <Esqueleto />
+          ) : tabExtra ? (
+            tabExtra.render(det, onRecargar, x)
           ) : tab === "pap" ? (
             a.panel?.papeles ? a.panel.papeles(det, onRecargar, x) : null
           ) : (

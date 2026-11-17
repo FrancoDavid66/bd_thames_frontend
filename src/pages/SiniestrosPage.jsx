@@ -16,7 +16,11 @@
 //   corto ya escrito — culpa, auto y patente, compañía y oficina — y lo mandás vos).
 //   El mail con TODO el siniestro le llega solo (lo manda el servidor).
 //   🏢 Cualquier oficina puede cargar siniestros de pólizas de cualquier oficina.
-import { useMemo, useState } from "react";
+//
+// ⚖️ 17/11/2026 · ABOGADO DE RECLAMOS: con el usuario de abogado (Maxi) esta página es
+//   «Mis reclamos»: solo sus casos, sin «Nuevo siniestro», sin «Editar todo» ni «Eliminar».
+//   El ADMIN ve arriba una tira con cada abogado: casos abiertos, cobrado y honorarios que se deben.
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -29,6 +33,7 @@ import {
   editSiniestro,
   removeSiniestro,
   addFoto,
+  pedirAbogadosSiniestros,
 } from "../store/slices/siniestrosSlice";
 import { invalidarCacheSiniestrosCliente } from "../hooks/useSiniestrosCliente";
 
@@ -37,7 +42,52 @@ import SiniestrosWizard from "../components/siniestros/SiniestrosWizard";
 import ModalDuo from "../components/ui/ModalDuo";
 import Boton3D from "../components/ui/Boton3D";
 import Badge from "../components/ui/Badge";
-import { linkWhatsApp } from "../components/gestoria/gestoriaUtils";
+import { linkWhatsApp, plata } from "../components/gestoria/gestoriaUtils";
+
+/** ⚖️ La tira del admin: cada abogado con sus casos abiertos y la plata. Tocás uno → filtro «Lo lleva». */
+function TiraAbogados({ datos, onElegir }) {
+  const lista = datos?.abogados || [];
+  if (!lista.length) return null;
+  const sin = datos?.sin_asignar;
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {lista.map((ab) => (
+        <button
+          key={ab.id}
+          type="button"
+          onClick={() => onElegir(String(ab.id))}
+          className="min-w-[210px] shrink-0 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3.5 py-2.5 text-left hover:border-duo-violeta"
+          title="Ver sus casos"
+        >
+          <p className="truncate text-[14px] font-extrabold text-titulo dark:text-titulo-dark">⚖️ {ab.nombre}</p>
+          <p className="text-[12.5px] text-suave dark:text-suave-dark">
+            {ab.abiertos} abierto{ab.abiertos === 1 ? "" : "s"} · {ab.total} en total
+          </p>
+          <p className="mt-1 text-[12.5px] tabular-nums text-titulo dark:text-titulo-dark">
+            Cobrado <b>{plata(ab.cobrado)}</b>
+          </p>
+          <p className="text-[12.5px] tabular-nums text-titulo dark:text-titulo-dark">
+            Honorarios <b>{plata(ab.honorarios)}</b>
+            {Number(ab.honorarios_pendientes) > 0 ? <span className="text-duo-rojo"> · se deben {plata(ab.honorarios_pendientes)}</span> : null}
+          </p>
+        </button>
+      ))}
+      {sin && sin.abiertos > 0 && (
+        <button
+          type="button"
+          onClick={() => onElegir("SIN")}
+          className="min-w-[180px] shrink-0 rounded-xl border border-dashed border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3.5 py-2.5 text-left hover:border-duo-violeta"
+          title="Reclamos al tercero sin abogado"
+        >
+          <p className="text-[14px] font-extrabold text-titulo dark:text-titulo-dark">Sin asignar</p>
+          <p className="text-[12.5px] text-suave dark:text-suave-dark">
+            {sin.abiertos} reclamo{sin.abiertos === 1 ? "" : "s"} al tercero abierto{sin.abiertos === 1 ? "" : "s"}
+          </p>
+        </button>
+      )}
+    </div>
+  );
+}
 
 // Sube las fotos borrador (del wizard) al siniestro recién creado.
 // 🐛 FIX: devuelve CUÁNTAS fotos no se pudieron adjuntar (antes fallaban calladas).
@@ -68,9 +118,28 @@ export default function SiniestrosPage() {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const isWebAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN" || !!user?.is_superuser;
+  // ⚖️ El abogado de reclamos: solo sus casos, sin cargar ni borrar.
+  const esAbogado = !isWebAdmin && user?.perfil?.rol === "ABOGADO";
 
   const { siniestros } = useSelector((s) => s.siniestros);
   const [sp, setSp] = useSearchParams();
+
+  // ⚖️ Admin: los abogados (selector «Lo lleva» y la tira de arriba). Se pide de nuevo
+  //    cuando cambia la lista (ej: asignaste un caso o cargaron un cobro).
+  const [abogadosInfo, setAbogadosInfo] = useState(null);
+  useEffect(() => {
+    if (!isWebAdmin) return undefined;
+    let vivo = true;
+    pedirAbogadosSiniestros()
+      .then((d) => vivo && setAbogadosInfo(d))
+      .catch(() => vivo && setAbogadosInfo(null));
+    return () => {
+      vivo = false;
+    };
+  }, [isWebAdmin, siniestros]);
+  // Tocar un abogado de la tira → filtro «Lo lleva» de la planilla.
+  const [filtroLleva, setFiltroLleva] = useState(null);
+  const elegirAbogado = (id) => setFiltroLleva({ id: "lleva", valor: id, n: Date.now() });
 
   // Modales
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -170,7 +239,7 @@ export default function SiniestrosPage() {
             <HiExclamationCircle className="text-duo-rojo text-xl" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-titulo dark:text-titulo-dark">Siniestros</h1>
+            <h1 className="text-xl font-semibold text-titulo dark:text-titulo-dark">{esAbogado ? "Mis reclamos" : "Siniestros"}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[13px] text-suave dark:text-suave-dark">{siniestros?.length || 0} en total</span>
               {abiertos > 0 && <Badge tono="rojo" size="sm">{abiertos} abierto{abiertos !== 1 ? "s" : ""}</Badge>}
@@ -179,24 +248,39 @@ export default function SiniestrosPage() {
         </div>
 
         {/* 📱 Full-width en mobile; ancho natural en desktop (el wrapper w-auto lo encoge). */}
-        <div className="w-full sm:w-auto shrink-0">
-          <Boton3D variant="verde" full onClick={abrirAlta}>
-            <HiPlus className="w-4 h-4" /> Nuevo siniestro
-          </Boton3D>
-        </div>
+        {/* ⚖️ El abogado no carga siniestros (los carga la oficina). */}
+        {!esAbogado && (
+          <div className="w-full sm:w-auto shrink-0">
+            <Boton3D variant="verde" full onClick={abrirAlta}>
+              <HiPlus className="w-4 h-4" /> Nuevo siniestro
+            </Boton3D>
+          </div>
+        )}
       </div>
 
+      {/* ⚖️ Admin: cada abogado con sus casos y la plata (tocás uno → sus casos). */}
+      {isWebAdmin && <TiraAbogados datos={abogadosInfo} onElegir={elegirAbogado} />}
+
       {/* ── La planilla de colores (con el panel del costado) ── */}
-      <PlanillaSiniestros onEditar={abrirEdicion} onBorrar={setBorrarSiniestro} isWebAdmin={isWebAdmin} />
+      <PlanillaSiniestros
+        onEditar={esAbogado ? null : abrirEdicion}
+        onBorrar={esAbogado ? null : setBorrarSiniestro}
+        isWebAdmin={isWebAdmin}
+        esAbogado={esAbogado}
+        abogados={abogadosInfo?.abogados || []}
+        filtroExterno={filtroLleva}
+      />
 
       {/* ── Wizard (alta / edición) ── */}
-      <SiniestrosWizard
-        isOpen={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        onSubmit={handleGuardar}
-        initialData={editData}
-        isAdmin={isWebAdmin}
-      />
+      {!esAbogado && (
+        <SiniestrosWizard
+          isOpen={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          onSubmit={handleGuardar}
+          initialData={editData}
+          isAdmin={isWebAdmin}
+        />
+      )}
 
       {/* ── ✅ ¡Siniestro cargado! + Avisar a Franco por WhatsApp (manual) ── */}
       <ModalDuo

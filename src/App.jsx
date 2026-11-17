@@ -33,7 +33,7 @@ const SiniestrosPage = lazyConReintento(() => import("./pages/SiniestrosPage"));
 // ⚖️ LEGALES: casos, turnos con el abogado y "Cargar una denuncia" (la ficha
 //    del caso vive adentro de LegalesPage: /legales/:id)
 const LegalesPage = lazyConReintento(() => import("./pages/LegalesPage"));
-import AbogadoLayout from "./components/legales/AbogadoLayout";
+import AbogadoLayout, { InicioAbogado } from "./components/legales/AbogadoLayout";
 // 🚗 NUEVA APP: GESTORÍA (trámites del automotor derivados a gestores)
 const GestoriaPage = lazyConReintento(() => import("./pages/GestoriaPage"));
 import GestorLayout from "./components/gestoria/GestorLayout";
@@ -646,14 +646,16 @@ function App() {
     );
   }
 
-  // ⚖️ ABOGADO: solo Legales (sus casos), sin menú ni barra de abajo.
+  // ⚖️ ABOGADO: Legales (sus casos) y 🆕 17/11 Siniestros (los reclamos que tiene asignados),
+  //    sin menú lateral ni barra de abajo. Arriba, la tira para pasar de uno a otro.
   if (esAbogadoRol) {
     return (
       <AbogadoLayout>
         <Suspense fallback={<CargandoPantalla />}>
           <Routes>
             <Route path="/legales/*" element={<LegalesPage />} />
-            <Route path="*" element={<Navigate to="/legales" replace />} />
+            <Route path="/siniestros" element={<SiniestrosPage />} />
+            <Route path="*" element={<InicioAbogado />} />
           </Routes>
         </Suspense>
       </AbogadoLayout>

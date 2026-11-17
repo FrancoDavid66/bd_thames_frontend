@@ -255,6 +255,38 @@ export const removeFoto = createAsyncThunk(
   }
 );
 
+/**
+ * ⚡ Evento rápido del reclamo (17/11/2026): Presentado, Oferta, Convenio, Cobrado…
+ * El servidor guarda el monto, empuja el estado y anota la nota «RECLAMO · fecha · EVENTO».
+ * Ej: dispatch(eventoReclamo({ id: 12, evento: "OFERTA", fecha: "2026-11-17", monto: 700000 }))
+ * Devuelve el siniestro actualizado (+ `nota`).
+ */
+export const eventoReclamo = createAsyncThunk(
+  'siniestros/eventoReclamo',
+  async ({ id, evento, fecha, monto, detalle }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}siniestros/${id}/evento/`,
+        { evento, fecha, monto, detalle },
+        { headers: getAuthHeaders() }
+      );
+      return unwrapItem(response.data);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Error al cargar el evento');
+    }
+  }
+);
+
+/**
+ * ⚖️ Abogados (solo admin): para el selector «Lo lleva» y el resumen de plata.
+ * {abogados: [{id, nombre, username, abiertos, total, reclamado, cobrado, honorarios, honorarios_pendientes}],
+ *  sin_asignar: {...}}
+ */
+export async function pedirAbogadosSiniestros() {
+  const response = await axios.get(`${BASE_URL}siniestros/abogados/`, { headers: getAuthHeaders() });
+  return response.data || { abogados: [], sin_asignar: null };
+}
+
 // ──────────────────────────────────────────────────────────────────
 // 🧩 SLICE
 // ──────────────────────────────────────────────────────────────────
@@ -314,6 +346,13 @@ const siniestrosSlice = createSlice({
         if (!action.payload || action.payload.id == null) return;
         const index = state.siniestros.findIndex((s) => s.id === action.payload.id);
         if (index !== -1) state.siniestros[index] = action.payload;
+      })
+      // ⚡ Evento rápido del reclamo: el siniestro vuelve actualizado (montos, estado).
+      .addCase(eventoReclamo.fulfilled, (state, action) => {
+        if (!action.payload || action.payload.id == null) return;
+        const { nota, ...s } = action.payload; // eslint-disable-line no-unused-vars
+        const index = state.siniestros.findIndex((x) => x.id === s.id);
+        if (index !== -1) state.siniestros[index] = s;
       })
 
       // ── DELETE ─────────────────────────────────────

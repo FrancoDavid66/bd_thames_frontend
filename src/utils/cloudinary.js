@@ -56,10 +56,12 @@ export async function uploadToCloudinary(file, folderOrOptions = "rc-admin/uploa
 
   // Deducción de MIME útil para guardarlo en tu backend
   let mime = "application/octet-stream";
-  if (data.resource_type === "image") {
-    mime = `image/${data.format || "jpeg"}`;
-  } else if (data.resource_type === "raw" && data.format === "pdf") {
+  // 🐛 FIX 17/11/2026: con /auto/upload Cloudinary guarda los PDF como resource_type "image"
+  //    (format "pdf"): antes eso quedaba como "image/pdf".
+  if (data.format === "pdf") {
     mime = "application/pdf";
+  } else if (data.resource_type === "image") {
+    mime = `image/${data.format || "jpeg"}`;
   } else if (typeof data.secure_url === "string") {
     const low = data.secure_url.toLowerCase();
     if (low.endsWith(".pdf")) mime = "application/pdf";

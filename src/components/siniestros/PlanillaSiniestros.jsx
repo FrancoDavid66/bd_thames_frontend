@@ -38,7 +38,16 @@
 //   donde se cambia TODO lo que ve el cliente al tocar su siniestro: la barra de avance, cada
 //   paso de «Gestión de su siniestro», el próximo paso, las etapas, la documentación pendiente
 //   y a quién le paga la compañía (al cliente o a THAMES con poder).
-// props: onEditar(s), onBorrar(s), isWebAdmin  (el «Nuevo siniestro» está arriba, en la página)
+// ⚖️💰 17/11: ABOGADO DE RECLAMOS (Maxi, rol ABOGADO). Pestaña «⚖️ Reclamo» en el panel
+//   (SiniestroReclamoPanel): quién lo lleva (el admin lo asigna), montos, eventos rápidos,
+//   alertas y checklist de papeles. Estado nuevo «Reclamo presentado» (PRESENTADO).
+//   · El ADMIN: columna y filtro «Lo lleva», y «Para hoy» con las ofertas / convenios atrasados.
+//   · El ABOGADO (esAbogado): ve solo sus casos, con columnas de tablero (contra quién, paso,
+//     reclamado / ofrecido), lo atrasado primero y el panel abre en «Reclamo». No carga, no
+//     edita todo, no borra y no ve la póliza ni el portal del cliente.
+//   · La bitácora dice quién anotó cada cosa (autor).
+// props: onEditar(s), onBorrar(s), isWebAdmin, esAbogado, abogados ([{id, nombre}])
+//        (el «Nuevo siniestro» está arriba, en la página)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
@@ -54,7 +63,7 @@ import {
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { invalidarCacheSiniestrosCliente } from "../../hooks/useSiniestrosCliente";
-import { addEvento, getEventosBySiniestro, getSiniestros, patchSiniestro } from "../../store/slices/siniestrosSlice";
+import { addEvento, eventoReclamo, getEventosBySiniestro, getSiniestros, patchSiniestro } from "../../store/slices/siniestrosSlice";
 import fotoTuveUnChoque from "../../assets/logos/tuveunchoque.jpg";
 import Planilla from "../planilla/Planilla";
 import { BotonPanel, Marca, PatenteChica } from "../planilla/PiezasPlanilla";
@@ -63,6 +72,7 @@ import { Avatar } from "../gestoria/Piezas";
 import { fechaCorta, linkWhatsApp, plata } from "../gestoria/gestoriaUtils";
 import SiniestroFotosPanel from "./SiniestroFotosPanel";
 import SiniestroPortalEditor from "./SiniestroPortalEditor";
+import SiniestroReclamoPanel from "./SiniestroReclamoPanel";
 
 const COLOR = "#dc2626";
 
@@ -209,12 +219,14 @@ async function copiar(texto) {
     }
   }
 }
-const CAMINO = ["PENDIENTE", "DENUNCIADO", "INSPECCION", "LIQUIDACION", "CERRADO"];
+const CAMINO = ["PENDIENTE", "DENUNCIADO", "PRESENTADO", "INSPECCION", "LIQUIDACION", "CERRADO"];
 const DIAS_QUIETO = 15;
 
 const ESTADOS = {
   PENDIENTE: { n: "Faltan papeles", c: "#d97706" },
   DENUNCIADO: { n: "Denunciado en la compañía", c: "#2563eb" },
+  // ⚖️ 17/11: el reclamo ya se presentó en la compañía del tercero.
+  PRESENTADO: { n: "Reclamo presentado", c: "#4f46e5" },
   INSPECCION: { n: "Esperando inspección", c: "#7c3aed" },
   LIQUIDACION: { n: "Por cobrar", c: "#0891b2" },
   CERRADO: { n: "Terminado", c: "#16a34a" },
@@ -246,7 +258,28 @@ function ahora() {
   return `${x.getFullYear()}-${dosDig(x.getMonth() + 1)}-${dosDig(x.getDate())}T${x.toISOString().slice(11, 19)}`;
 }
 
-export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = false }) {
+/** "Paso 3/6" para la columna del tablero. */
+function pasoCorto(s) {
+  const p = s?.paso_portal;
+  return p ? `${p.hecho}/${p.total}` : "—";
+}
+
+/** "Reclamado $ 850.000 · ofrecen $ 700.000 (82 %)" en corto para la columna. */
+function MontosCortos({ s }) {
+  const rec = s.monto_reclamado;
+  const ofr = s.monto_ofrecido;
+  if (!rec && !ofr) return <span className="text-[12.5px] text-suave dark:text-suave-dark">—</span>;
+  return (
+    <span className="flex min-w-0 flex-col text-[12.5px] leading-tight tabular-nums">
+      <span className="truncate font-semibold text-titulo dark:text-titulo-dark">{rec ? plata(rec) : "—"}</span>
+      <span className="truncate text-suave dark:text-suave-dark">
+        {ofr ? `ofrecen ${plata(ofr)}${s.oferta_porcentaje != null ? ` (${s.oferta_porcentaje} %)` : ""}` : "sin oferta"}
+      </span>
+    </span>
+  );
+}
+
+export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = false, esAbogado = false, abogados = [], filtroExterno = null }) {
   const dispatch = useDispatch();
   const { siniestros, error: errorStore } = useSelector((s) => s.siniestros);
   const [cargado, setCargado] = useState(false);
@@ -322,6 +355,16 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
     return ops;
   }, [siniestros]);
 
+  // ⚖️ Montos y eventos rápidos: el admin o el abogado (que solo ve los suyos).
+  const puedeReclamar = useCallback(() => isWebAdmin || esAbogado, [isWebAdmin, esAbogado]);
+
+  // ⚖️ Opciones del filtro «Lo lleva»: los abogados (del servidor) + los que aparecen en la lista.
+  const opcionesAbogado = useMemo(() => {
+    const m = new Map((abogados || []).map((x) => [String(x.id), x.nombre]));
+    (siniestros || []).forEach((s) => s.abogado_asignado && !m.has(String(s.abogado_asignado)) && m.set(String(s.abogado_asignado), s.abogado_nombre || `#${s.abogado_asignado}`));
+    return [["SIN", "Sin asignar"], ...[...m.entries()].sort((x, y) => x[1].localeCompare(y[1], "es"))];
+  }, [abogados, siniestros]);
+
   const a = useMemo(() => {
     // "PEREYRA, Lucas" → "Lucas" · "Lucas Pereyra (5 Esquinas)" → "Lucas"
     const clienteDe = (s) => {
@@ -333,6 +376,9 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
     const askDe = (est, s) => {
       if (est === "DENUNCIADO")
         return [{ k: "reclamo", t: "linea", l: "¿Qué N° de reclamo te dio la compañía?", ayuda: "Si todavía no te lo dieron, dejalo vacío", opcional: true, def: s.nro_reclamo_cia || "" }];
+      // ⚖️ Presentado: lo que se reclama (si lo carga el abogado o el admin, queda en los montos).
+      if (est === "PRESENTADO" && puedeReclamar(s))
+        return [{ k: "monto", t: "plata", l: "¿Cuánto se reclama?", ayuda: "Si todavía no lo sabés, dejalo vacío", opcional: true }];
       if (est === "INSPECCION") return [{ k: "cuando", t: "fechaHora", l: "¿Cuándo es la inspección?", opcional: true }];
       if (est === "CERRADO")
         return [
@@ -342,9 +388,12 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       return null;
     };
     return {
-      clave: "siniestros",
-      titulo: "Siniestros",
-      icono: "🚨",
+      clave: esAbogado ? "siniestros-abogado" : "siniestros",
+      titulo: esAbogado ? "Mis reclamos" : "Siniestros",
+      icono: esAbogado ? "⚖️" : "🚨",
+      // ⚖️ El abogado abre el panel directo en «Reclamo».
+      tabInicial: esAbogado ? "rec" : undefined,
+      filtroExterno,
       color: COLOR,
       item: "siniestro",
       items: "siniestros",
@@ -352,7 +401,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       error,
       recargar,
       estados: ESTADOS,
-      grupos: [...CAMINO.slice(0, 4).map((e) => ({ id: e, n: ESTADOS[e].n, c: ESTADOS[e].c })), { id: "fin", n: "Terminados", c: ESTADOS.CERRADO.c, ic: "🏁" }],
+      grupos: [...CAMINO.filter((e) => e !== "CERRADO").map((e) => ({ id: e, n: ESTADOS[e].n, c: ESTADOS[e].c })), { id: "fin", n: "Terminados", c: ESTADOS.CERRADO.c, ic: "🏁" }],
       estadoDe: (s) => (s.estado === "CERRADO" ? "fin" : s.estado),
       etiquetaEstado: (s) => ESTADOS[s.estado]?.n || s.estado_label || s.estado,
       colorEstado: (s) => ESTADOS[s.estado]?.c,
@@ -365,13 +414,42 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       // En el celu no hay columnas: quién lo reclama va primero y la oficina al final
       // (ej: "⚖️ TuveUnChoque · Chocó · AE040SN · El Talita").
       subCelu: (s) =>
-        [RECLAMA[s.quien_reclama] && `⚖️ ${RECLAMA[s.quien_reclama].n}`, tipoDe(s).corto, s.patente, s.oficina_nombre].filter(Boolean).join(" · "),
+        esAbogado
+          ? [s.tercero_compania && `c/ ${s.tercero_compania}`, `Paso ${pasoCorto(s)}`, s.monto_reclamado && plata(s.monto_reclamado), s.patente].filter(Boolean).join(" · ")
+          : [RECLAMA[s.quien_reclama] && `⚖️ ${s.abogado_nombre || RECLAMA[s.quien_reclama].n}`, tipoDe(s).corto, s.patente, s.oficina_nombre].filter(Boolean).join(" · "),
       marcas: (s) =>
         [
           s.estado !== "CERRADO" && !s.fotos_count && { txt: "Sin fotos", tono: "ambar" },
           s.estado !== "PENDIENTE" && s.estado !== "CERRADO" && !s.nro_reclamo_cia && { txt: "Sin N° de reclamo", tono: "ambar" },
         ].filter(Boolean),
-      columnas: [
+      columnas: esAbogado
+        ? [
+            // ⚖️ TABLERO DEL ABOGADO: contra quién, en qué paso y la plata.
+            {
+              titulo: "Contra",
+              ancho: "170px",
+              render: (s) =>
+                s.tercero_compania ? (
+                  <span className="truncate text-[13px] font-semibold text-titulo dark:text-titulo-dark" title={s.tercero_compania}>
+                    🛡️ {s.tercero_compania}
+                  </span>
+                ) : (
+                  <Marca tono="ambar">Sin cargar</Marca>
+                ),
+            },
+            {
+              titulo: "Paso",
+              ancho: "150px",
+              render: (s) => (
+                <span className="truncate text-[13px] text-titulo dark:text-titulo-dark" title={s.paso_portal?.nombre || ""}>
+                  <b className="tabular-nums">{pasoCorto(s)}</b> {s.paso_portal?.nombre || ""}
+                </span>
+              ),
+            },
+            { titulo: "Reclamado / ofrecido", ancho: "170px", render: (s) => <MontosCortos s={s} /> },
+            { titulo: "Patente", ancho: "110px", render: (s) => <PatenteChica p={s.patente} /> },
+          ]
+        : [
         {
           titulo: "Qué pasó",
           ancho: "150px",
@@ -407,12 +485,26 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         },
         // 🙋 Quién hace el reclamo (lo decide el admin).
         { titulo: "Lo reclama", ancho: "172px", render: (s) => <QuienReclama s={s} admin={isWebAdmin && s.estado !== "CERRADO"} /> },
+        // ⚖️ 17/11: el abogado que lo lleva.
+        {
+          titulo: "Lo lleva",
+          ancho: "150px",
+          render: (s) =>
+            s.abogado_nombre ? (
+              <span className="truncate text-[13px] font-semibold text-titulo dark:text-titulo-dark" title={s.abogado_nombre}>
+                ⚖️ {s.abogado_nombre}
+              </span>
+            ) : (
+              <span className="text-[12.5px] text-suave dark:text-suave-dark">—</span>
+            ),
+        },
       ],
-      dias: (s) => diasDesde(s.fecha_modificacion || s.fecha_creacion),
-      diasTitulo: "Último cambio",
-      demorado: quieto,
+      // ⚖️ Para el abogado: días sin novedad (desde la última nota de la bitácora).
+      dias: (s) => (esAbogado && s.dias_sin_novedad != null ? s.dias_sin_novedad : diasDesde(s.fecha_modificacion || s.fecha_creacion)),
+      diasTitulo: esAbogado ? "Sin novedad" : "Último cambio",
+      demorado: (s) => (esAbogado ? (s.alertas || []).length > 0 : quieto(s)),
       buscar: (s) =>
-        [s.caratula, s.cliente_label, s.poliza_label, s.patente, s.nro_reclamo_cia, s.marca_auto, s.modelo_auto, `#${s.id}`, s.tercero_nombre, s.tercero_patente, s.tercero_compania, RECLAMA[s.quien_reclama]?.n, s.oficina_nombre].filter(Boolean).join(" "),
+        [s.caratula, s.cliente_label, s.cliente_dni, s.poliza_label, s.patente, s.nro_reclamo_cia, s.marca_auto, s.modelo_auto, `#${s.id}`, s.tercero_nombre, s.tercero_patente, s.tercero_compania, RECLAMA[s.quien_reclama]?.n, s.oficina_nombre, s.abogado_nombre].filter(Boolean).join(" "),
       buscarPh: "Buscar cliente, patente o reclamo",
       filtros: [
         { id: "tipo", etiqueta: "Qué pasó", opciones: Object.entries(TIPO).map(([k, v]) => [k, v.n]), pasa: (s, v) => s.responsabilidad === v },
@@ -429,15 +521,26 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           opciones: opcionesOficina,
           pasa: (s, v) => (v === "SIN" ? !s.oficina_nombre : s.oficina_nombre === v),
         },
-      ],
+        // ⚖️ 17/11: quién lo lleva (el admin ve los casos de cada abogado).
+        isWebAdmin && {
+          id: "lleva",
+          etiqueta: "Lo lleva",
+          opciones: opcionesAbogado,
+          pasa: (s, v) => (v === "SIN" ? !s.abogado_asignado : String(s.abogado_asignado) === v),
+        },
+      ].filter((f) => f && !(esAbogado && ["reclama", "oficina"].includes(f.id))),
 
       sigue: (s) => {
+        // ⚖️ El abogado: el próximo paso del reclamo (el mismo que ve el cliente).
+        if (esAbogado) return s.estado === "CERRADO" ? "Terminado." : s.proximo_paso || "Cargá el próximo movimiento.";
         const tuc = s.quien_reclama === "TUVEUNCHOQUE";
         if (s.estado !== "CERRADO" && isWebAdmin && !s.quien_reclama) return "Decidir si lo reclamás vos o lo derivás a TuveUnChoque.";
         if (s.estado === "PENDIENTE" && tuc) return s.fotos_count ? "Pasarle los datos y las fotos a TuveUnChoque." : "Pedirle al cliente las fotos y los papeles (para TuveUnChoque).";
         if (tuc && s.estado !== "CERRADO") return "Lo lleva TuveUnChoque: pediles novedades y actualizá el estado.";
         if (s.estado === "PENDIENTE") return s.fotos_count ? "Cuando estén los papeles, denunciarlo en la compañía." : "Pedirle al cliente las fotos y los papeles.";
-        if (s.estado === "DENUNCIADO") return s.nro_reclamo_cia ? "Esperar que la compañía mande a inspeccionar." : "Cargar el N° de reclamo de la compañía.";
+        if (s.estado === "DENUNCIADO")
+          return s.abogado_nombre ? `Lo lleva ${s.abogado_nombre}: presentar el reclamo.` : s.nro_reclamo_cia ? "Esperar que la compañía mande a inspeccionar." : "Cargar el N° de reclamo de la compañía.";
+        if (s.estado === "PRESENTADO") return "Esperar la respuesta o la inspección de la compañía del tercero.";
         if (s.estado === "INSPECCION") return "Esperar que el perito vea el auto.";
         if (s.estado === "LIQUIDACION") return "Esperar el pago o el arreglo, y confirmarlo.";
         return "Terminado.";
@@ -446,6 +549,17 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       tareas: (s) => {
         const T = [];
         if (s.estado === "CERRADO") return T;
+        // ⚖️ TABLERO DEL ABOGADO: lo atrasado primero (rojo), después lo que falta.
+        if (esAbogado) {
+          (s.alertas || []).forEach((al) => T.push({ tono: "rojo", txt: al.txt }));
+          if (!s.fecha_presentacion && ["PENDIENTE", "DENUNCIADO"].includes(s.estado))
+            T.push({ tono: "ambar", txt: `Presentar el reclamo${s.tercero_compania ? ` ante ${s.tercero_compania}` : ""}` });
+          const faltan = (s.checklist || []).filter((i) => i.estado === "falta").map((i) => i.nombre);
+          if (faltan.length) T.push({ tono: "azul", txt: `Faltan papeles: ${faltan.slice(0, 4).join(", ")}${faltan.length > 4 ? "…" : ""}` });
+          return T;
+        }
+        // 💰 Oferta sin responder / convenio sin pago (para el admin y la oficina).
+        (s.alertas || []).filter((al) => al.tipo !== "SIN_NOVEDAD").forEach((al) => T.push({ tono: "rojo", txt: `${al.txt}${s.abogado_nombre ? ` (lo lleva ${s.abogado_nombre})` : ""}` }));
         const d = diasDesde(s.fecha_modificacion || s.fecha_creacion);
         const tuc = s.quien_reclama === "TUVEUNCHOQUE";
         // 🙋 Al admin: decidir quién lo reclama (rojo si ya pasaron 2 días desde que lo cargaron).
@@ -479,7 +593,9 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
                   ? "Vuelve para atrás"
                   : e === "DENUNCIADO"
                     ? "Ya lo denunciaste en la compañía"
-                    : e === "INSPECCION"
+                    : e === "PRESENTADO"
+                      ? "Ya presentaste el reclamo al tercero"
+                      : e === "INSPECCION"
                       ? "La compañía mandó a inspeccionar"
                       : e === "LIQUIDACION"
                         ? "Ya lo inspeccionaron: falta que paguen"
@@ -509,6 +625,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           }
           if (s.quien_reclama) extras.push({ id: "quien-", quien: "", ic: "↩️", txt: "Volver a «Sin decidir»" });
         }
+        // ⚖️ Los movimientos del reclamo (oferta, convenio, cobro…).
+        if (puedeReclamar(s)) extras.push({ id: "mov", ic: "⚡", txt: "Cargar un movimiento del reclamo", sub: "Oferta, convenio, cobro…", abrirPanel: "rec" });
         if (s.estado !== "PENDIENTE") {
           extras.push({
             id: "reclamo",
@@ -521,7 +639,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           });
         }
         extras.push({ id: "nota", ic: "📝", txt: "Anotar en la bitácora", abrirPanel: "nov" });
-        extras.push({ id: "fotos", ic: "📷", txt: "Ver o subir fotos", abrirPanel: "pap" });
+        extras.push({ id: "fotos", ic: "📷", txt: "Ver o subir fotos y PDF", abrirPanel: "pap" });
         if (onEditar) extras.push({ id: "editar", ic: "✏️", txt: "Editar todos los datos", onClick: (x) => onEditar(x) });
         if (isWebAdmin && onBorrar) extras.push({ id: "borrar", ic: "🗑️", txt: "Eliminar el siniestro", peligro: true, onClick: (x) => onBorrar(x) });
         return { opciones, extras };
@@ -538,6 +656,14 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           return "N° de reclamo guardado";
         }
         if (!op.a) throw new Error("Esa opción todavía no está.");
+        // ⚖️ «Reclamo presentado» del abogado / admin: evento rápido (guarda lo reclamado y anota
+        //    la nota RECLAMO, así el cliente ve «Presentación del reclamo» en su portal).
+        if (op.a === "PRESENTADO" && puedeReclamar(s) && CAMINO.indexOf(s.estado) < CAMINO.indexOf("PRESENTADO")) {
+          const r = await correr(eventoReclamo({ id, evento: "PRESENTADO", monto: Number(vals.monto) > 0 ? Number(vals.monto) : null }));
+          if (r && r.id) frescos.current[r.id] = r;
+          invalidarCacheSiniestrosCliente(s.cliente);
+          return op.ok;
+        }
         const cambios = { estado: op.a };
         if (op.a === "DENUNCIADO" && vals.reclamo) cambios.nro_reclamo_cia = String(vals.reclamo).slice(0, 50);
         await guardar(id, cambios);
@@ -566,23 +692,29 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         },
         sub: (s) => [clienteCorto(s), tipoDe(s).n, vehiculoDe(s), s.patente, `#${s.id}`].filter(Boolean).join(" · "),
         // 👁️ Arriba, al lado del nombre: ver el portal del cliente (cómo le aparece el siniestro).
+        // (El abogado no entra a Clientes: no ve el portal.)
         cabecera: (s) =>
-          s.cliente ? (
+          s.cliente && !esAbogado ? (
             <BotonPanel onClick={() => abrirPortalCliente(s.cliente)} icono={<HiOutlineEye className="h-4 w-4" />}>
               Ver portal
             </BotonPanel>
           ) : null,
-        novedades: (d) => (d.eventos || []).map((ev) => ({ id: ev.id, autor: "Bitácora", fecha: ev.fecha_evento, texto: ev.descripcion_evento })),
+        // ✍️ 17/11: quién anotó cada cosa (las notas viejas dicen «Bitácora»).
+        novedades: (d) => (d.eventos || []).map((ev) => ({ id: ev.id, autor: ev.autor_nombre || "Bitácora", fecha: ev.fecha_evento, texto: ev.descripcion_evento })),
         puedeAnotar: () => true,
         anotar: (d, texto) => anotarEnBitacora(d.id, texto),
         opcionCliente: null,
         phNovedad: "Escribí una novedad (ej: llamé a la compañía, el perito va el lunes)…",
         datos: (d) => [
-          ["Cliente", d.cliente_label],
+          ["Cliente", esAbogado ? d.cliente_nombre || clienteCorto(d) : d.cliente_label],
+          // 👤 17/11: DNI y teléfono del cliente (el abogado no entra a Clientes).
+          ["DNI / CUIT", d.cliente_dni || null],
+          ["Teléfono", d.cliente_telefono || null],
+          ["Lo lleva", d.abogado_nombre ? `⚖️ ${d.abogado_nombre}` : null],
           // 🔗 La póliza abre su ficha en otra pestaña.
           [
             "Póliza",
-            d.poliza ? (
+            d.poliza && !esAbogado ? (
               <a
                 key="pol"
                 href={`/#/polizas/${d.poliza}`}
@@ -599,7 +731,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
             ),
           ],
           ["Oficina", d.oficina_nombre || null],
-          ["Lo reclama", <QuienReclama key="q" s={d} admin={isWebAdmin} grande />],
+          ["Lo reclama", esAbogado ? null : <QuienReclama key="q" s={d} admin={isWebAdmin} grande />],
           ["Qué pasó", d.responsabilidad_label || tipoDe(d).n],
           // ⚖️ Qué se reclama (sale en el título). En un choque sin elegir: «Sin elegir».
           [
@@ -628,6 +760,30 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           ["Fotos", d.fotos_count ? `${d.fotos_count}` : "Ninguna"],
         ],
         papeles: (d) => <SiniestroFotosPanel siniestroId={d.id} responsabilidad={d.responsabilidad} />,
+        // ⚖️💰 17/11: la pestaña «Reclamo» (abogado, montos, eventos rápidos, checklist).
+        //    Sale en los choques en que lo chocaron, en los que tienen abogado o montos, y siempre al abogado.
+        tabsExtra: (x) =>
+          esAbogado || x.responsabilidad === "CHOCARON" || x.abogado_asignado || x.monto_reclamado || x.monto_ofrecido
+            ? [
+                {
+                  k: "rec",
+                  txt: "⚖️ Reclamo",
+                  primero: esAbogado,
+                  render: (det, onRecargar) => (
+                    <SiniestroReclamoPanel
+                      s={det}
+                      esAdmin={isWebAdmin}
+                      puedeEditar={puedeReclamar(det)}
+                      abogados={abogados}
+                      onCambio={async (nuevo) => {
+                        if (nuevo && nuevo.id) frescos.current[nuevo.id] = nuevo;
+                        await Promise.resolve(onRecargar?.()).catch(() => {});
+                      }}
+                    />
+                  ),
+                },
+              ]
+            : [],
         acciones: (d, onRecargar) => {
           const B = [];
           // 🔑 Lo que ve el cliente en su portal (gestión, próximo paso, documentación…).
@@ -675,6 +831,14 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
               </BotonPanel>
             );
           }
+          // 📲 17/11: WhatsApp al cliente (para el abogado, que no entra a Clientes).
+          if (esAbogado && linkWhatsApp(d.cliente_telefono)) {
+            B.push(
+              <BotonPanel key="cli" tono="verde" href={linkWhatsApp(d.cliente_telefono)} icono={<HiOutlineChatBubbleLeftRight className="h-4 w-4" />}>
+                WhatsApp al cliente
+              </BotonPanel>
+            );
+          }
           if (linkWhatsApp(d.tercero_telefono)) {
             B.push(
               <BotonPanel key="ter" tono="verde" href={linkWhatsApp(d.tercero_telefono)} icono={<HiOutlineChatBubbleLeftRight className="h-4 w-4" />}>
@@ -697,7 +861,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         ficha: onEditar ? { txt: "Editar todo", onClick: (s) => onEditar(s) } : null,
       },
     };
-  }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin, opcionesOficina]);
+  }, [filas, error, recargar, correr, anotarEnBitacora, guardar, decidirQuien, onEditar, onBorrar, isWebAdmin, opcionesOficina, esAbogado, abogados, opcionesAbogado, puedeReclamar, filtroExterno]);
 
   return (
     <>

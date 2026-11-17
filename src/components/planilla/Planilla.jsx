@@ -185,6 +185,13 @@ export default function Planilla({ a }) {
   const [cerrados, setCerrados] = useState(() => leerSesion(`${clave}:cerrados`, { fin: true, esperando: true }));
   useEffect(() => guardarSesion(`${clave}:q`, q), [clave, q]);
   useEffect(() => guardarSesion(`${clave}:filtros`, filtros), [clave, filtros]);
+  // ➕ 17/11: la página puede poner un filtro desde afuera (ej: tocar un abogado → «Lo lleva»).
+  //    a.filtroExterno = { id: "lleva", valor: "7", n: <cualquier número que cambie> }
+  useEffect(() => {
+    const fx = a.filtroExterno;
+    if (fx?.id) setFiltros((f) => ({ ...f, [fx.id]: fx.valor }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.filtroExterno?.id, a.filtroExterno?.valor, a.filtroExterno?.n]);
   const tocarGrupo = (id) =>
     setCerrados((c) => {
       const n = { ...c, [id]: !c[id] };
@@ -296,7 +303,8 @@ export default function Planilla({ a }) {
   // ── Panel del costado (?ver=12 en la dirección) ──
   const verId = sp.get("ver");
   const [panel, setPanel] = useState({ id: null, it: null, det: null, cargando: false, error: "" });
-  const [tab, setTab] = useState("nov");
+  // ➕ 17/11: la sección puede elegir con qué pestaña se abre el panel (a.tabInicial, ej. "rec").
+  const [tab, setTab] = useState(a.tabInicial || "nov");
   const buscarIt = useCallback((id) => filas.find((x) => claveDe(a, x) === id) || fin.lista.find((x) => claveDe(a, x) === id) || null, [filas, fin.lista, a]);
   const pedidoPanel = useRef(0);
   const cargarPanel = useCallback(
@@ -341,7 +349,7 @@ export default function Planilla({ a }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.filas]);
 
-  const abrirPanel = (it, pestana = "nov") => {
+  const abrirPanel = (it, pestana = a.tabInicial || "nov") => {
     const id = claveDe(a, it);
     setTab(pestana);
     if (verId === id) return;
@@ -445,7 +453,7 @@ export default function Planilla({ a }) {
     if (op.abrirPanel) {
       // «Anotar algo», «Subir un papel», «Avisar por WhatsApp»: se hace en el panel.
       setMenu(null);
-      abrirPanel(m.it, op.abrirPanel === true ? "nov" : op.abrirPanel);
+      abrirPanel(m.it, op.abrirPanel === true ? a.tabInicial || "nov" : op.abrirPanel);
       return;
     }
     if (op.onClick) {
