@@ -77,9 +77,9 @@ const FORMAS_POR_COMPANIA = {
   //    cuponera. Sin cupón no hay código de barras, y sin código de barras
   //    no hay nada que escanear en la caja ni que pegar en Mercado Pago.
   //
-  //    Verificado sobre dos certificados y un frente de póliza reales
-  //    (12002174 y 12022568): cero cupones, cero códigos, cero importes
-  //    identificatorios de cobranza.
+  //    Verificado sobre dos certificados y un frente de póliza reales:
+  //    cero cupones, cero códigos, cero importes identificatorios de
+  //    cobranza.
   //
   //    Ofrecerlas igual sería mandar al cliente a hacer la cola para que le
   //    digan que no. Peor que no ofrecer nada: pierde el viaje y encima

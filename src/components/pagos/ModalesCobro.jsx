@@ -452,7 +452,7 @@ export function ModalFormaPago({
                             </label>
                             <input type="text" inputMode="numeric" value={cuitRemitente}
                               onChange={e => setCuitRemitente(e.target.value)}
-                              placeholder="Ej: 20-38721209-5"
+                              placeholder="Ej: 20-30111222-0"
                               className="w-full px-3 py-2.5 rounded-lg bg-card dark:bg-card-dark border border-duo-amarillo/35 focus:border-duo-amarillo text-sm text-titulo dark:text-titulo-dark placeholder:text-suave dark:placeholder:text-suave-dark outline-none transition-colors font-mono" />
                           </div>
 

@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Accesos directos de Windows (muestran rutas y usuario de la PC)
+*.lnk

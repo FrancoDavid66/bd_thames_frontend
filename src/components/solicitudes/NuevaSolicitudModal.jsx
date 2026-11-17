@@ -122,8 +122,8 @@ function categoriaVehiculo(txt) {
    No alcanza con comparar los números tal cual: el CUIT ES el DNI con un
    prefijo y un verificador pegados.
 
-       DNI      94841586
-       CUIT   20 94841586 7
+       DNI      30111222
+       CUIT   20 30111222 0
 
    Si el operador cargó el CUIT y el PDF trae el DNI (o al revés), es el
    MISMO cliente. Avisar de un conflicto ahí sería enseñarle a ignorar los
