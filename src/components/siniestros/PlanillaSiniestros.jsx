@@ -73,6 +73,7 @@ import { fechaCorta, linkWhatsApp, plata } from "../gestoria/gestoriaUtils";
 import SiniestroFotosPanel from "./SiniestroFotosPanel";
 import SiniestroPortalEditor from "./SiniestroPortalEditor";
 import SiniestroReclamoPanel from "./SiniestroReclamoPanel";
+import NotaLegible, { leerNota } from "./NotaLegible";
 
 const COLOR = "#dc2626";
 
@@ -712,7 +713,19 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
             </BotonPanel>
           ) : null,
         // ✍️ 17/11: quién anotó cada cosa (las notas viejas dicen «Bitácora»).
-        novedades: (d) => (d.eventos || []).map((ev) => ({ id: ev.id, autor: ev.autor_nombre || "Bitácora", fecha: ev.fecha_evento, texto: ev.descripcion_evento })),
+        // 📝 18/11: la nota armada para leer rápido (NotaLegible). Las del conector dicen «· vía Claude».
+        novedades: (d) =>
+          (d.eventos || []).map((ev) => {
+            const via = leerNota(ev.descripcion_evento).via;
+            const autor = ev.autor_nombre || via || "Bitácora";
+            return {
+              id: ev.id,
+              autor: via ? `${autor} · vía Claude` : autor,
+              fecha: ev.fecha_evento,
+              texto: ev.descripcion_evento,
+              cuerpo: <NotaLegible texto={ev.descripcion_evento} />,
+            };
+          }),
         puedeAnotar: () => true,
         anotar: (d, texto) => anotarEnBitacora(d.id, texto),
         opcionCliente: null,

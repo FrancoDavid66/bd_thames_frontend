@@ -111,7 +111,12 @@ function Novedades({ a, det, onRecargar }) {
                 <b className="min-w-0 flex-1 truncate text-[13.5px] text-titulo dark:text-titulo-dark">{n.autor || "THAMES"}</b>
                 <small className="shrink-0 text-[12px] text-suave dark:text-suave-dark">{n.fecha ? ddmmhhmm(n.fecha) : ""}</small>
               </div>
-              <p className="mt-1.5 whitespace-pre-line break-words text-[13.5px] leading-snug text-titulo dark:text-titulo-dark">{n.texto}</p>
+              {/* 18/11: el módulo puede mandar la nota ya armada (n.cuerpo). Ej: siniestros → NotaLegible. */}
+              {n.cuerpo ? (
+                <div className="mt-1.5">{n.cuerpo}</div>
+              ) : (
+                <p className="mt-1.5 whitespace-pre-line break-words text-[13.5px] leading-snug text-titulo dark:text-titulo-dark">{n.texto}</p>
+              )}
               {n.chips?.length ? (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {n.chips.map((c) => (
