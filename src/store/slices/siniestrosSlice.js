@@ -282,6 +282,17 @@ export const eventoReclamo = createAsyncThunk(
  * {abogados: [{id, nombre, username, abiertos, total, reclamado, cobrado, honorarios, honorarios_pendientes}],
  *  sin_asignar: {...}}
  */
+/** 🔗 18/11: un siniestro solo (para abrir un link ?ver=ID antes de que llegue la lista). null = no existe / no lo podés ver. */
+export async function pedirSiniestro(id) {
+  try {
+    const response = await axios.get(`${BASE_URL}siniestros/${id}/`, { headers: getAuthHeaders() });
+    return response.data || null;
+  } catch (e) {
+    if (e?.response?.status === 404) return null;
+    throw e;
+  }
+}
+
 export async function pedirAbogadosSiniestros() {
   const response = await axios.get(`${BASE_URL}siniestros/abogados/`, { headers: getAuthHeaders() });
   return response.data || { abogados: [], sin_asignar: null };
@@ -479,4 +490,4 @@ const siniestrosSlice = createSlice({
   },
 });
 
-export default siniestrosSlice.reducer;
+export default siniestrosSlice.reducer;

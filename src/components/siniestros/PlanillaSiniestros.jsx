@@ -63,7 +63,7 @@ import {
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { invalidarCacheSiniestrosCliente } from "../../hooks/useSiniestrosCliente";
-import { addEvento, eventoReclamo, getEventosBySiniestro, getSiniestros, patchSiniestro } from "../../store/slices/siniestrosSlice";
+import { addEvento, eventoReclamo, getEventosBySiniestro, getSiniestros, patchSiniestro, pedirSiniestro } from "../../store/slices/siniestrosSlice";
 import fotoTuveUnChoque from "../../assets/logos/tuveunchoque.jpg";
 import Planilla from "../planilla/Planilla";
 import { BotonPanel, Marca, PatenteChica } from "../planilla/PiezasPlanilla";
@@ -695,7 +695,9 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         cargar: async (id) => {
           const deLista = (listaRef.current || []).find((x) => String(x.id) === String(id));
           const fresco = frescos.current[id];
-          const s = fresco && (!deLista || String(fresco.fecha_modificacion || "") >= String(deLista.fecha_modificacion || "")) ? fresco : deLista;
+          let s = fresco && (!deLista || String(fresco.fecha_modificacion || "") >= String(deLista.fecha_modificacion || "")) ? fresco : deLista;
+          // 🔗 18/11: abierto desde un link (o recargando la página) antes de que llegue la lista → lo pido solo.
+          if (!s) s = await pedirSiniestro(id);
           if (!s) throw new Error("No encontré ese siniestro (puede que lo hayan borrado).");
           const eventos = await correr(getEventosBySiniestro(s.id));
           return { ...s, eventos: Array.isArray(eventos) ? eventos : [] };
