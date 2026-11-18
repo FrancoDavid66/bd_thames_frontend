@@ -523,6 +523,19 @@ export default function SiniestroReclamoPanel({ s, puedeEditar = false, esAdmin 
         </ul>
       )}
 
+      {/* 📋 Lo que se le pidió al cliente en su portal (18/11/2026). Ej: 08 firmado, exposición civil. */}
+      {(s.pendiente_cliente || []).length > 0 && (
+        <div className="rounded-xl border border-duo-amarillo/50 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-3 py-2.5 text-amber-900 dark:text-amber-200">
+          <p className="text-[13.5px] font-extrabold">📋 Pendiente del cliente ({s.pendiente_cliente.length})</p>
+          <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5 text-[13.5px] font-semibold">
+            {s.pendiente_cliente.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[12px] opacity-80">El cliente lo ve en su portal como documentación a mandar.</p>
+        </div>
+      )}
+
       {/* 👣 Dónde está (lo mismo que ve el cliente en la barra, sin plata) */}
       {paso && (
         <div className={`${CAJA} px-3 py-2.5`}>

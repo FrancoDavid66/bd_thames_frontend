@@ -259,6 +259,9 @@ function ahora() {
 }
 
 /** "Paso 3/6" para la columna del tablero. */
+// ⚖️ 18/11: denunciado y con abogado = falta presentar el reclamo → todavía no hay N° de reclamo.
+const antesDePresentar = (s) => s.estado === "DENUNCIADO" && !!s.abogado_asignado;
+
 function pasoCorto(s) {
   const p = s?.paso_portal;
   return p ? `${p.hecho}/${p.total}` : "—";
@@ -423,7 +426,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
         [
           esAbogado && s.nuevo_para_abogado && { txt: "🆕 Nuevo", tono: "azul" },
           s.estado !== "CERRADO" && !s.fotos_count && { txt: "Sin fotos", tono: "ambar" },
-          s.estado !== "PENDIENTE" && s.estado !== "CERRADO" && !s.nro_reclamo_cia && { txt: "Sin N° de reclamo", tono: "ambar" },
+          // 18/11: con abogado y todavía sin presentar no hay N° de reclamo: no se marca (era ruido).
+          s.estado !== "PENDIENTE" && s.estado !== "CERRADO" && !s.nro_reclamo_cia && !antesDePresentar(s) && { txt: "Sin N° de reclamo", tono: "ambar" },
         ].filter(Boolean),
       columnas: esAbogado
         ? [
@@ -558,6 +562,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           (s.alertas || []).forEach((al) => T.push({ tono: "rojo", txt: al.txt }));
           if (!s.fecha_presentacion && ["PENDIENTE", "DENUNCIADO"].includes(s.estado))
             T.push({ tono: "ambar", txt: `Presentar el reclamo${s.tercero_compania ? ` ante ${s.tercero_compania}` : ""}` });
+          const pend = s.pendiente_cliente || [];
+          if (pend.length) T.push({ tono: "ambar", txt: `Pendiente del cliente: ${pend.slice(0, 3).join(", ")}${pend.length > 3 ? "…" : ""}` });
           const faltan = (s.checklist || []).filter((i) => i.estado === "falta").map((i) => i.nombre);
           if (faltan.length) T.push({ tono: "azul", txt: `Faltan papeles: ${faltan.slice(0, 4).join(", ")}${faltan.length > 4 ? "…" : ""}` });
           return T;
@@ -575,7 +581,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
             txt: !s.fotos_count ? `Pedirle a ${clienteDe(s)} las fotos y los papeles` : tuc ? `Pasale los datos a TuveUnChoque (ya hay ${fotos})` : `Denunciarlo en la compañía (ya hay ${fotos})`,
           });
         }
-        if (s.estado === "DENUNCIADO" && !s.nro_reclamo_cia) T.push({ tono: "ambar", txt: "Cargar el N° de reclamo de la compañía" });
+        if (s.estado === "DENUNCIADO" && !s.nro_reclamo_cia && !antesDePresentar(s)) T.push({ tono: "ambar", txt: "Cargar el N° de reclamo de la compañía" });
         if (quieto(s)) T.push({ tono: "rojo", txt: `Hace ${d} días sin novedades: ${tuc ? "preguntale a TuveUnChoque cómo va" : "llamá a la compañía"}` });
         if (s.estado === "INSPECCION" && d >= 7) T.push({ tono: "azul", txt: "¿Ya fue el perito? Preguntá a la compañía" });
         if (s.estado === "LIQUIDACION") T.push({ tono: "azul", txt: "¿Ya pagaron o lo arreglaron? Confirmalo" });
