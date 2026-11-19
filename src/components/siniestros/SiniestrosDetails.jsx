@@ -23,8 +23,8 @@ import Badge from "../ui/Badge";
 import InputDuo from "../ui/InputDuo";
 
 const ESTADO_TONO = {
-  PENDIENTE: "amarillo", DENUNCIADO: "azul", INSPECCION: "violeta",
-  LIQUIDACION: "azul", CERRADO: "verde",
+  PENDIENTE: "amarillo", DENUNCIADO: "azul", PRESENTADO: "violeta", INSPECCION: "violeta",
+  MEDIACION: "violeta", LIQUIDACION: "azul", CERRADO: "verde",
 };
 
 // Un dato (label + valor) para la grilla.

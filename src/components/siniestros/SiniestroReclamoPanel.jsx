@@ -6,9 +6,12 @@
 //     · Atrasado: 15 días sin novedad, oferta sin responder hace +5 días, convenio sin pago hace 15.
 //     · Dónde está: el paso de la barra del cliente (ej. «Paso 3 de 6 · Reclamo presentado»).
 //     · La plata: reclamado → ofrecido (% de lo reclamado) → convenio → cobrado → honorarios 30 %.
-//     · Eventos rápidos: Presentado, Reiterado, Inspección, Oferta, Contraoferta, Aceptado,
-//       Convenio, Cobrado, Rechazado. Cada uno pide la fecha (y el monto si va) y el servidor
-//       anota la nota «RECLAMO · fecha · EVENTO · …» (así el portal del cliente avanza solo).
+//     · Eventos rápidos: Presentado, Reiterado, Inspección, Mediación, Oferta, Contraoferta,
+//       Aceptado, Convenio, Cobrado, Rechazado. Cada uno pide la fecha (y el monto si va) y el
+//       servidor anota la nota «RECLAMO · fecha · EVENTO · …» (así el portal del cliente avanza solo).
+//     · 🏛️ 18/11 Mediación (pedido de Maxi): pide el DÍA y la HORA de la audiencia (puede ser
+//       a futuro). Pasa a «En mediación» y arriba queda la cajita «Audiencia de mediación».
+//       Si se reprograma, se vuelve a tocar «Mediación» con el día nuevo.
 //     · Editar montos: para corregir. Si cambia lo ofrecido / el convenio / lo cobrado, la nota
 //       también sale sola.
 //     · Papeles básicos: el checklist (✓ hay archivo · ? revisar · ✗ falta).
@@ -35,6 +38,7 @@ export const EVENTOS = [
   { id: "PRESENTADO", n: "Presentado", ic: "📨", monto: true, ph: "Monto reclamado", ayuda: "Lo que se reclama" },
   { id: "REITERADO", n: "Reiterado", ic: "🔁" },
   { id: "INSPECCION", n: "Inspección", ic: "🔍" },
+  { id: "MEDIACION", n: "Mediación", ic: "🏛️", audiencia: true },
   { id: "OFERTA", n: "Oferta", ic: "💬", monto: true, obligatorio: true, ph: "Lo que ofrecen" },
   { id: "CONTRAOFERTA", n: "Contraoferta", ic: "↩️", monto: true, ph: "Lo que pedimos" },
   { id: "ACEPTADO", n: "Aceptado", ic: "🤝" },
@@ -133,7 +137,9 @@ export function ChecklistPapeles({ items = [] }) {
 /** El cuadrito que se abre al tocar un evento: fecha, monto (si va) y detalle interno. */
 function FormEvento({ ev, s, onListo, onCancelar }) {
   const dispatch = useDispatch();
-  const [fecha, setFecha] = useState(hoyYmd());
+  // 🏛️ Mediación: la fecha es la de la audiencia (arranca con la que ya hay, si hay).
+  const [fecha, setFecha] = useState(ev.audiencia ? s.fecha_mediacion || "" : hoyYmd());
+  const [hora, setHora] = useState(ev.audiencia && s.hora_mediacion ? String(s.hora_mediacion).slice(0, 5) : "");
   const [monto, setMonto] = useState(ev.id === "PRESENTADO" && s.monto_reclamado ? String(Number(s.monto_reclamado)) : "");
   const [detalle, setDetalle] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -143,11 +149,11 @@ function FormEvento({ ev, s, onListo, onCancelar }) {
     const n = ev.monto ? aNumero(monto) : null;
     if (ev.monto && Number.isNaN(n)) return setError("El monto no se entiende. Ej: 850.000");
     if (ev.obligatorio && (n === null || n === undefined)) return setError(`Para «${ev.n}» poné el monto.`);
-    if (!fecha) return setError("Poné la fecha.");
+    if (!fecha) return setError(ev.audiencia ? "Poné el día de la audiencia." : "Poné la fecha.");
     setGuardando(true);
     setError("");
     try {
-      const r = await dispatch(eventoReclamo({ id: s.id, evento: ev.id, fecha, monto: n, detalle: detalle.trim() })).unwrap();
+      const r = await dispatch(eventoReclamo({ id: s.id, evento: ev.id, fecha, monto: n, detalle: detalle.trim(), hora: ev.audiencia ? hora || null : undefined })).unwrap();
       invalidarCacheSiniestrosCliente(s.cliente);
       toast.success(`${ev.ic} ${ev.n}: anotado`);
       onListo?.(r);
@@ -165,9 +171,15 @@ function FormEvento({ ev, s, onListo, onCancelar }) {
       </p>
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className={ETIQ}>Fecha</span>
-          <input type="date" value={fecha} max={hoyYmd()} onChange={(e) => setFecha(e.target.value)} className={INPUT} />
+          <span className={ETIQ}>{ev.audiencia ? "Día de la audiencia" : "Fecha"}</span>
+          <input type="date" value={fecha} max={ev.audiencia ? undefined : hoyYmd()} onChange={(e) => setFecha(e.target.value)} className={INPUT} />
         </label>
+        {ev.audiencia && (
+          <label className="flex flex-col gap-1">
+            <span className={ETIQ}>Hora (opcional)</span>
+            <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className={INPUT} />
+          </label>
+        )}
         {ev.monto && (
           <label className="flex flex-col gap-1">
             <span className={ETIQ}>
@@ -556,6 +568,17 @@ export default function SiniestroReclamoPanel({ s, puedeEditar = false, esAdmin 
             ))}
           </div>
           {s.proximo_paso ? <p className="mt-2 text-[13px] text-suave dark:text-suave-dark">👉 Próximo: {s.proximo_paso}</p> : null}
+        </div>
+      )}
+
+      {/* 🏛️ La audiencia de mediación (18/11) */}
+      {s.fecha_mediacion && (
+        <div className="rounded-xl border border-fuchsia-400/50 bg-fuchsia-50 dark:bg-fuchsia-950/30 px-3 py-2.5 text-fuchsia-900 dark:text-fuchsia-200">
+          <p className="text-[13.5px] font-extrabold">
+            🏛️ Audiencia de mediación: {ddmmaaaa(s.fecha_mediacion)}
+            {s.hora_mediacion ? ` · ${String(s.hora_mediacion).slice(0, 5)} hs` : ""}
+          </p>
+          <p className="mt-0.5 text-[12px] opacity-80">El cliente ve el día en su portal. Si cambia, tocá «Mediación» de nuevo.</p>
         </div>
       )}
 

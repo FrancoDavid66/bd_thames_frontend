@@ -28,7 +28,9 @@ import Boton3D from "../ui/Boton3D";
 const ESTADO_TONO = {
   PENDIENTE: "amarillo",
   DENUNCIADO: "azul",
+  PRESENTADO: "violeta",
   INSPECCION: "violeta",
+  MEDIACION: "violeta",
   LIQUIDACION: "azul",
   CERRADO: "verde",
 };

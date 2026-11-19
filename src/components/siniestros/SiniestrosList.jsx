@@ -21,10 +21,12 @@ export const ESTADO_CFG = {
   PENDIENTE: { tono: "amarillo", label: "Falta doc.", color: "#d97706" },
   DENUNCIADO: { tono: "azul", label: "Denunciado", color: "#2563eb" },
   INSPECCION: { tono: "violeta", label: "Inspección", color: "#5b52e6" },
+  PRESENTADO: { tono: "violeta", label: "Presentado", color: "#4f46e5" },
+  MEDIACION: { tono: "violeta", label: "Mediación", color: "#c026d3" },
   LIQUIDACION: { tono: "azul", label: "Liquidación", color: "#2563eb" },
   CERRADO: { tono: "verde", label: "Cerrado", color: "#16a34a" },
 };
-const ORDEN_ESTADO = ["PENDIENTE", "DENUNCIADO", "INSPECCION", "LIQUIDACION", "CERRADO"];
+const ORDEN_ESTADO = ["PENDIENTE", "DENUNCIADO", "PRESENTADO", "INSPECCION", "MEDIACION", "LIQUIDACION", "CERRADO"];
 
 const RESP_LABELS = {
   CHOCO: "Asegurado chocó",

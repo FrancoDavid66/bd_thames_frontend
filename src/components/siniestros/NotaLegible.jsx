@@ -20,6 +20,7 @@ const EVENTOS = {
   PRESENTADO: { ic: "📨", n: "Reclamo presentado" },
   REITERADO: { ic: "🔁", n: "Reiterado" },
   INSPECCION: { ic: "🔍", n: "Inspección" },
+  MEDIACION: { ic: "🏛️", n: "Mediación" },
   OFERTA: { ic: "💬", n: "Oferta" },
   CONTRAOFERTA: { ic: "↩️", n: "Contraoferta" },
   ACEPTADO: { ic: "🤝", n: "Aceptado" },
@@ -35,6 +36,7 @@ const ESTADOS = {
   DENUNCIADO: "Denunciado",
   PRESENTADO: "Reclamo presentado",
   INSPECCION: "Inspección",
+  MEDIACION: "En mediación",
   LIQUIDACION: "En liquidación",
   CERRADO: "Cerrado",
 };
@@ -43,7 +45,7 @@ const ESTADOS = {
 const ABREVIATURAS = new Set(["av", "avda", "esq", "op", "dr", "dra", "sr", "sra", "gral", "pje", "bv", "dpto", "depto", "prov", "pcia", "tel", "nro", "sto", "sta", "ing", "lic", "cnel", "tte"]);
 
 // Etiquetas al principio del renglón que se ponen en negrita. Ej: "Tercero: …", "OJO: …".
-const RE_ETIQUETA = /^(⚠️\s*)?(ojo|atenci[oó]n|importante|falta|faltan|tercero|choque|presupuesto|fotos|lesiones|papeles|p[oó]liza|cobertura|pendiente|pr[oó]ximo|antes de presentar|cliente|montos?|oferta|convenio|cobro|contacto|lugar|fecha|denuncia|nota)\s*:\s*/i;
+const RE_ETIQUETA = /^(⚠️\s*)?(ojo|atenci[oó]n|importante|falta|faltan|tercero|choque|presupuesto|fotos|lesiones|papeles|p[oó]liza|cobertura|pendiente|pr[oó]ximo|antes de presentar|cliente|montos?|oferta|convenio|cobro|contacto|lugar|fecha|denuncia|audiencia|mediaci[oó]n|nota)\s*:\s*/i;
 const RE_OJO = /^(⚠️|ojo\b|atenci[oó]n\b|importante\b)/i;
 
 /** "a. B" corta solo si "a" no es abreviatura ni una letra suelta. */

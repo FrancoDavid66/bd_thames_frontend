@@ -259,15 +259,16 @@ export const removeFoto = createAsyncThunk(
  * ⚡ Evento rápido del reclamo (17/11/2026): Presentado, Oferta, Convenio, Cobrado…
  * El servidor guarda el monto, empuja el estado y anota la nota «RECLAMO · fecha · EVENTO».
  * Ej: dispatch(eventoReclamo({ id: 12, evento: "OFERTA", fecha: "2026-11-17", monto: 700000 }))
+ *     dispatch(eventoReclamo({ id: 25, evento: "MEDIACION", fecha: "2026-11-25", hora: "10:00" }))  ← 🏛️ día de la audiencia
  * Devuelve el siniestro actualizado (+ `nota`).
  */
 export const eventoReclamo = createAsyncThunk(
   'siniestros/eventoReclamo',
-  async ({ id, evento, fecha, monto, detalle }, { rejectWithValue }) => {
+  async ({ id, evento, fecha, monto, detalle, hora }, { rejectWithValue }) => {
     try {
       const response = await axios.post(
         `${BASE_URL}siniestros/${id}/evento/`,
-        { evento, fecha, monto, detalle },
+        { evento, fecha, monto, detalle, ...(hora ? { hora } : {}) },
         { headers: getAuthHeaders() }
       );
       return unwrapItem(response.data);

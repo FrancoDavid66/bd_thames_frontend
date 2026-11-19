@@ -220,7 +220,8 @@ async function copiar(texto) {
     }
   }
 }
-const CAMINO = ["PENDIENTE", "DENUNCIADO", "PRESENTADO", "INSPECCION", "LIQUIDACION", "CERRADO"];
+// 🏛️ 18/11: «En mediación» (pedido de Maxi) va entre la inspección y «Por cobrar».
+const CAMINO = ["PENDIENTE", "DENUNCIADO", "PRESENTADO", "INSPECCION", "MEDIACION", "LIQUIDACION", "CERRADO"];
 const DIAS_QUIETO = 15;
 
 const ESTADOS = {
@@ -229,6 +230,8 @@ const ESTADOS = {
   // ⚖️ 17/11: el reclamo ya se presentó en la compañía del tercero.
   PRESENTADO: { n: "Reclamo presentado", c: "#4f46e5" },
   INSPECCION: { n: "Esperando inspección", c: "#7c3aed" },
+  // 🏛️ 18/11: el abogado ya pactó la audiencia de mediación con el cliente.
+  MEDIACION: { n: "En mediación", c: "#c026d3" },
   LIQUIDACION: { n: "Por cobrar", c: "#0891b2" },
   CERRADO: { n: "Terminado", c: "#16a34a" },
   fin: { n: "Terminados", c: "#16a34a" },
@@ -251,6 +254,12 @@ function cuandoTxt(v) {
   const [d, h] = String(v).split("T");
   const [, m, dia] = d.split("-");
   return `${dia}/${m}${h ? ` a las ${h.slice(0, 5)}` : ""}`;
+}
+
+/** 🏛️ La audiencia: "25/11 a las 10:00" (o solo "25/11"). Sin audiencia → "". */
+function audienciaTxt(s) {
+  if (!s?.fecha_mediacion) return "";
+  return cuandoTxt(`${s.fecha_mediacion}${s.hora_mediacion ? `T${String(s.hora_mediacion).slice(0, 5)}` : ""}`);
 }
 
 /** Fecha y hora de ahora para la bitácora (como la manda el detalle). */
@@ -386,6 +395,9 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
       if (est === "PRESENTADO" && puedeReclamar(s))
         return [{ k: "monto", t: "plata", l: "¿Cuánto se reclama?", ayuda: "Si todavía no lo sabés, dejalo vacío", opcional: true }];
       if (est === "INSPECCION") return [{ k: "cuando", t: "fechaHora", l: "¿Cuándo es la inspección?", opcional: true }];
+      // 🏛️ La audiencia: el abogado / admin la tiene que poner (queda guardada y la ve el cliente).
+      if (est === "MEDIACION")
+        return [{ k: "cuando", t: "fechaHora", l: "¿Cuándo es la audiencia de mediación?", ayuda: "El día y la hora que pactaste", opcional: !puedeReclamar(s) }];
       if (est === "CERRADO")
         return [
           { k: "final", t: "chips", l: "¿Cómo terminó?", ops: ["La compañía pagó", "Lo arreglaron en el taller", "La compañía lo rechazó", "El cliente no siguió"] },
@@ -550,6 +562,7 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           return s.abogado_nombre ? `Lo lleva ${s.abogado_nombre}: presentar el reclamo.` : s.nro_reclamo_cia ? "Esperar que la compañía mande a inspeccionar." : "Cargar el N° de reclamo de la compañía.";
         if (s.estado === "PRESENTADO") return "Esperar la respuesta o la inspección de la compañía del tercero.";
         if (s.estado === "INSPECCION") return "Esperar que el perito vea el auto.";
+        if (s.estado === "MEDIACION") return s.fecha_mediacion ? `Audiencia de mediación: ${audienciaTxt(s)}.` : "Cargar el día de la audiencia de mediación.";
         if (s.estado === "LIQUIDACION") return "Esperar el pago o el arreglo, y confirmarlo.";
         return "Terminado.";
       },
@@ -608,6 +621,8 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
                       ? "Ya presentaste el reclamo al tercero"
                       : e === "INSPECCION"
                       ? "La compañía mandó a inspeccionar"
+                      : e === "MEDIACION"
+                      ? "Ya pactaste la audiencia de mediación"
                       : e === "LIQUIDACION"
                         ? "Ya lo inspeccionaron: falta que paguen"
                         : "",
@@ -675,13 +690,22 @@ export default function PlanillaSiniestros({ onEditar, onBorrar, isWebAdmin = fa
           invalidarCacheSiniestrosCliente(s.cliente);
           return op.ok;
         }
+        // 🏛️ «En mediación» del abogado / admin: evento rápido (guarda día y hora de la audiencia
+        //    y el cliente ve «Mediación prejudicial … audiencia fijada para el …» en su portal).
+        if (op.a === "MEDIACION" && puedeReclamar(s) && vals.cuando) {
+          const [dia, hora] = String(vals.cuando).split("T");
+          const r = await correr(eventoReclamo({ id, evento: "MEDIACION", fecha: dia, hora: hora ? hora.slice(0, 5) : null }));
+          if (r && r.id) frescos.current[r.id] = r;
+          invalidarCacheSiniestrosCliente(s.cliente);
+          return op.ok;
+        }
         const cambios = { estado: op.a };
         if (op.a === "DENUNCIADO" && vals.reclamo) cambios.nro_reclamo_cia = String(vals.reclamo).slice(0, 50);
         await guardar(id, cambios);
         // 📒 Queda anotado en la bitácora (para saber quién/cuándo, como un historial).
         const partes = [`Pasó a «${ESTADOS[op.a].n}».`];
         if (cambios.nro_reclamo_cia) partes.push(`N° de reclamo: ${cambios.nro_reclamo_cia}.`);
-        if (vals.cuando) partes.push(`Inspección: ${cuandoTxt(vals.cuando)}.`);
+        if (vals.cuando) partes.push(`${op.a === "MEDIACION" ? "Audiencia de mediación" : "Inspección"}: ${cuandoTxt(vals.cuando)}.`);
         if (vals.final) partes.push(`Terminó: ${vals.final}.`);
         if (Number(vals.monto) > 0) partes.push(`Monto: ${plata(vals.monto)}.`);
         await anotarEnBitacora(id, partes.join(" ")).catch(() => {});
