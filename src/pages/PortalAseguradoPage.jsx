@@ -164,7 +164,10 @@ export default function PortalAseguradoPage() {
   // 🔑 Portal único: sus siniestros y sus trámites de gestoría (si tiene).
   const siniestros = data?.siniestros || [];
   const tramites = data?.tramites || [];
-  const hayOtros = casosLegales.length + siniestros.length + tramites.length > 0;
+  // 🛡️ 18/11: la ficha de sus seguros sin cuponera (NRE), sin plata. Prueba con los
+  //    clientes que tienen un reclamo con el abogado (ver clientes/ficha_seguro.py).
+  const fichas = data?.seguros_ficha || [];
+  const hayOtros = casosLegales.length + siniestros.length + tramites.length + fichas.length > 0;
 
   // 🏷️ ¿De qué marca es este cliente? La de la oficina de lo primero que
   //    tenga: sus pólizas, después sus casos, siniestros y trámites.
@@ -453,14 +456,17 @@ export default function PortalAseguradoPage() {
             </p>
           </div>
           <OtrasCosas
+            fichas={fichas}
             siniestros={siniestros}
             tramites={tramites}
             casosLegales={casosLegales}
             nombreCliente={nombreCliente}
             onAbrirSiniestro={abrirSiniestro}
+            onVerDoc={abrirDoc}
           />
         </div>
         {detalleSiniestro}
+        {verDoc ? <VisorDocumento doc={verDoc} onCerrar={atras} /> : null}
       </div>
     );
   }
@@ -631,8 +637,11 @@ export default function PortalAseguradoPage() {
                 ))}
               </Lista>
 
-              {/* 🔑 Sus siniestros, trámites y casos legales (si tiene). */}
+              {/* 🔑 Sus otros seguros (ficha), siniestros, trámites y casos legales (si tiene). */}
               <OtrasCosas
+                fichas={fichas}
+                fichasSonOtros
+                onVerDoc={abrirDoc}
                 siniestros={siniestros}
                 tramites={tramites}
                 casosLegales={casosLegales}
@@ -723,11 +732,17 @@ export default function PortalAseguradoPage() {
 
 /* ══════════════════ 🔑 Siniestros, trámites y casos legales ══════════════════ */
 
-// Las tres listas juntas, en este orden (lo más urgente primero). Si no tiene
-// nada de una, esa sección no aparece.
-function OtrasCosas({ siniestros = [], tramites = [], casosLegales = [], onAbrirSiniestro }) {
+// Las listas juntas, en este orden: la ficha de su seguro (18/11), y lo más urgente.
+// Si no tiene nada de una, esa sección no aparece.
+function OtrasCosas({ fichas = [], fichasSonOtros = false, siniestros = [], tramites = [], casosLegales = [], onAbrirSiniestro, onVerDoc }) {
   return (
     <>
+      {fichas.length ? (
+        <>
+          <Seccion>{fichasSonOtros ? (fichas.length > 1 ? "Tus otros seguros" : "Tu otro seguro") : fichas.length > 1 ? "Tus seguros" : "Tu seguro"}</Seccion>
+          <FichasSeguro items={fichas} onVerDoc={onVerDoc} />
+        </>
+      ) : null}
       {siniestros.length ? (
         <>
           <Seccion>{siniestros.length > 1 ? "Tus siniestros" : "Tu siniestro"}</Seccion>
@@ -747,6 +762,49 @@ function OtrasCosas({ siniestros = [], tramites = [], casosLegales = [], onAbrir
         </>
       ) : null}
     </>
+  );
+}
+
+// 🛡️ La ficha de cada seguro sin cuponera (18/11/2026): qué auto, qué compañía, qué
+//    cobertura y hasta cuándo. SIN plata (ni cuotas ni deuda). Si la póliza está subida
+//    en PDF, al tocarla se abre. Ej:
+//      🚗 CHEVROLET CLASSIC 2010
+//         JKE029 · NRE Seguros
+//         Cobertura B1 · Vigente hasta el 15 de abril
+function FichasSeguro({ items, onVerDoc }) {
+  return (
+    <Lista>
+      {items.map((f, i) => {
+        const doc = (f.documentos || [])[0];
+        const cubre = (f.que_cubre || []).filter(Boolean).slice(0, 3);
+        return (
+          <Fila
+            key={f.id}
+            i={i}
+            primera={i === 0}
+            icono={<IconoTipo tipo={tipoIcono(f)} size={23} w={1.9} />}
+            tono="marca"
+            titulo={[nombreBien(f), f.anio].filter(Boolean).join(" ")}
+            sub={
+              <>
+                {[f.patente, f.compania].filter(Boolean).join(" · ")}
+                <span style={{ display: "block", marginTop: 1 }}>
+                  {[f.cobertura ? `Cobertura ${f.cobertura}` : "", f.vigente_hasta ? `Vigente hasta el ${fmtLargo(f.vigente_hasta)}` : ""]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                {f.numero_poliza ? <span style={{ display: "block", marginTop: 1 }}>Póliza N° {f.numero_poliza}</span> : null}
+                {cubre.length ? (
+                  <span style={{ display: "block", marginTop: 3, fontSize: 12.5 }}>Cubre: {cubre.join(" · ")}</span>
+                ) : null}
+              </>
+            }
+            derecha={doc ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--m)", flexShrink: 0 }}>Ver póliza</span> : null}
+            onClick={doc && onVerDoc ? () => onVerDoc({ url: doc.url, nombre: nombreLindoDoc(doc.tipo, doc.nombre) || "Tu póliza" }) : undefined}
+          />
+        );
+      })}
+    </Lista>
   );
 }
 
