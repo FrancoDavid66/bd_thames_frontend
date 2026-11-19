@@ -770,7 +770,8 @@ function OtrasCosas({ fichas = [], fichasSonOtros = false, siniestros = [], tram
 //    en PDF, al tocarla se abre. Ej:
 //      🚗 CHEVROLET CLASSIC 2010
 //         JKE029 · NRE Seguros
-//         Cobertura B1 · Vigente hasta el 15 de abril
+//         Cobertura B1 · Vence el 15/04/2027   (vencimiento de la póliza, no «cubierto hasta»:
+//         la cobertura depende de que pague las cuotas)
 function FichasSeguro({ items, onVerDoc }) {
   return (
     <Lista>
@@ -789,7 +790,7 @@ function FichasSeguro({ items, onVerDoc }) {
               <>
                 {[f.patente, f.compania].filter(Boolean).join(" · ")}
                 <span style={{ display: "block", marginTop: 1 }}>
-                  {[f.cobertura ? `Cobertura ${f.cobertura}` : "", f.vigente_hasta ? `Vigente hasta el ${fmtLargo(f.vigente_hasta)}` : ""]
+                  {[f.cobertura ? `Cobertura ${f.cobertura}` : "", f.vigente_hasta ? `Vence el ${fmt(f.vigente_hasta)}` : ""]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
