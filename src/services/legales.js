@@ -42,6 +42,9 @@ export const listarCerrados = (page = 1, params = {}) =>
   datos(api.get(`${B}expedientes/`, { params: { ...params, cerrados: 1, page } }));
 export const pedirCaso = (id) => datos(api.get(`${B}expedientes/${id}/`));
 export const crearCaso = (body) => datos(api.post(`${B}expedientes/`, body));
+// ⚡ 23/11/2026: «Consulta rápida» → «Para llamar» (las que nadie contactó todavía).
+export const pedirParaLlamar = () => datos(api.get(`${B}expedientes/para-llamar/`));
+export const marcarContactado = (id, body = {}) => datos(api.post(`${B}expedientes/${id}/contactado/`, body));
 export const editarCaso = (id, body) => datos(api.patch(`${B}expedientes/${id}/`, body));
 export const cambiarEstado = (id, body) => datos(api.post(`${B}expedientes/${id}/estado/`, body));
 export const asignarAbogado = (id, abogado) =>

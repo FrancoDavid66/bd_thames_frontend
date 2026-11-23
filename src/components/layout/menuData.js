@@ -73,7 +73,7 @@ export const QUICK_ACTIONS = [
   },
   {
     // ⚖️ Acceso directo a Legales: cargar una denuncia o dar un turno con el abogado.
-    to: "/legales", label: "Legales", sub: "Denuncia o turno con el abogado",
+    to: "/legales", label: "Legales", sub: "Consulta rápida, denuncia o turno",
     icon: "doc", bg: "var(--color-duo-violeta)", shadow: "var(--color-duo-violeta-sombra)",
   },
 ];

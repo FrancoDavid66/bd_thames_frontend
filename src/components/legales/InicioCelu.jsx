@@ -1,7 +1,8 @@
 // src/components/legales/InicioCelu.jsx
 //
 // 📱 "Hoy" — la pantalla de inicio de la oficina (pensada para el celu):
-//   - ¿Qué necesita el cliente? → "Cargar una denuncia" o "Pedir turno con el abogado".
+//   - ¿Qué necesita el cliente? → ⚡ "Consulta rápida" (23/11/2026), "Cargar una denuncia"
+//     o "Pedir turno con el abogado".
 //   - Buscar un caso por DNI o nombre.
 //   - Los turnos de hoy (con el botón "Llegó").
 //   - "Para hacer hoy": recordar turnos, dar turnos que faltan, casos quietos,
@@ -9,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { HiCalendar, HiCheck, HiChevronRight, HiDocumentAdd, HiSearch } from "react-icons/hi";
+import { HiCalendar, HiCheck, HiChevronRight, HiDocumentAdd, HiLightningBolt, HiSearch } from "react-icons/hi";
 
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { useLegales } from "./legalesContext";
@@ -100,6 +101,21 @@ export default function InicioCelu() {
           <p className="text-[15px] text-suave dark:text-suave-dark">Hola{nombre ? `, ${nombre}` : ""}</p>
           <h2 className="text-[24px] font-bold leading-tight text-titulo dark:text-titulo-dark">¿Qué necesita el cliente?</h2>
         </div>
+
+        {/* ⚡ 23/11/2026: el cliente solo PREGUNTA algo legal → 3 toques y Franco lo llama. */}
+        <button
+          type="button"
+          onClick={() => navigate("/legales/consulta")}
+          className="flex items-center gap-4 rounded-2xl bg-green-700 hover:bg-green-800 p-4 text-left text-white shadow-md"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/15">
+            <HiLightningBolt className="w-6 h-6" />
+          </span>
+          <span className="min-w-0">
+            <strong className="block text-[18px] leading-tight">Consulta rápida</strong>
+            <span className="block text-[13px] text-white/85">Pregunta algo legal (ART, escribanía, familia, penal…). 30 segundos y Franco lo llama.</span>
+          </span>
+        </button>
 
         <button
           type="button"

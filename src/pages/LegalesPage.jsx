@@ -18,6 +18,8 @@
 //   /legales/hoy           turnos de hoy y "Para hacer hoy"
 //   /legales/casos         Tablero (la planilla, igual que /legales)
 //   /legales/nuevo         Cargar una denuncia (7 pasos)
+//   /legales/consulta      ⚡ Consulta rápida (3 pasos, 23/11/2026): el cliente pregunta algo legal
+//                          (ART, escribanía, familia, penal…) → queda en «Para llamar» arriba del Tablero
 //   /legales/turno         Pedir turno con el abogado
 //   /legales/:id           ficha del caso
 //   /legales/abogados      (admin)
@@ -26,7 +28,7 @@
 //   /legales/listas        (admin) los estados, instancias y etiquetas del estudio
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { HiCalendar, HiDocumentAdd, HiScale } from "react-icons/hi";
+import { HiCalendar, HiDocumentAdd, HiLightningBolt, HiScale } from "react-icons/hi";
 
 import { useAuth } from "../context/AuthContext";
 import useDatosVivos from "../hooks/useDatosVivos";
@@ -38,6 +40,8 @@ import PlanillaLegales from "../components/legales/PlanillaLegales";
 import InicioCelu from "../components/legales/InicioCelu";
 import LegalesWizard from "../components/legales/LegalesWizard";
 import PedirTurno from "../components/legales/PedirTurno";
+import ConsultaRapida from "../components/legales/ConsultaRapida";
+import ParaLlamar from "../components/legales/ParaLlamar";
 import AbogadosPanel from "../components/legales/AbogadosPanel";
 import CerradosPanel from "../components/legales/CerradosPanel";
 import ComisionesLegales from "../components/legales/ComisionesLegales";
@@ -142,10 +146,12 @@ export default function LegalesPage() {
     <LegalesCtx.Provider value={ctx}>
       <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
         <Routes>
-          <Route index element={<ConCabecera><PlanillaLegales /></ConCabecera>} />
-          <Route path="hoy" element={<ConCabecera><InicioCelu /></ConCabecera>} />
-          <Route path="casos" element={<ConCabecera><PlanillaLegales /></ConCabecera>} />
+          {/* 📞 «Para llamar» (consultas rápidas sin contactar) arriba del Tablero y de Hoy. */}
+          <Route index element={<ConCabecera><ParaLlamar /><PlanillaLegales /></ConCabecera>} />
+          <Route path="hoy" element={<ConCabecera><ParaLlamar /><InicioCelu /></ConCabecera>} />
+          <Route path="casos" element={<ConCabecera><ParaLlamar /><PlanillaLegales /></ConCabecera>} />
           <Route path="nuevo" element={<LegalesWizard />} />
+          <Route path="consulta" element={<ConsultaRapida />} />
           <Route path="turno" element={<PedirTurno />} />
           <Route path="cerrados" element={<ConCabecera><CerradosPanel /></ConCabecera>} />
           <Route
@@ -217,6 +223,14 @@ function Cabecera() {
         </div>
         {/* 📱 09/10: también en el celu (antes estaban solo en «Hoy»). */}
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+          {/* ⚡ 23/11/2026: lo más usado — el cliente solo pregunta algo legal. */}
+          <button
+            type="button"
+            onClick={() => navigate("/legales/consulta")}
+            className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 rounded-lg bg-green-700 hover:bg-green-800 px-3 sm:px-4 py-2.5 text-[14px] font-semibold text-white"
+          >
+            <HiLightningBolt className="w-4 h-4 shrink-0" /> Consulta rápida
+          </button>
           <button
             type="button"
             onClick={() => navigate("/legales/turno")}

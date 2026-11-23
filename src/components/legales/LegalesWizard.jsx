@@ -24,6 +24,7 @@ import {
   HiHome,
   HiInformationCircle,
   HiMicrophone,
+  HiPencilAlt,
   HiPlus,
   HiPlusCircle,
   HiQuestionMarkCircle,
@@ -73,6 +74,7 @@ const ICONOS = {
   escudo: HiShieldExclamation,
   casa: HiHome,
   pregunta: HiQuestionMarkCircle,
+  firma: HiPencilAlt, // ✍️ 23/11/2026: «Escribanía o firmar algo»
 };
 const SOBRE = {
   CHOQUE: "el choque",
@@ -81,6 +83,7 @@ const SOBRE = {
   FAMILIA: "el tema de familia",
   ROBO: "lo que pasó",
   CASA: "la casa o el terreno",
+  FIRMAS: "lo que tiene que firmar",
 };
 
 const VACIO = {

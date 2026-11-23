@@ -239,6 +239,7 @@ export const MOTIVO_CORTO = {
   FAMILIA: "Familia",
   ROBO: "Robo o estafa",
   CASA: "Casa o terreno",
+  FIRMAS: "Escribanía", // ✍️ 23/11/2026
   OTRO: "Otra cosa",
 };
 
