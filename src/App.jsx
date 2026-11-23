@@ -82,6 +82,8 @@ const PanelPortalPage = lazyConReintento(() => import("./pages/PanelPortalPage")
 const MiCasoPage = lazyConReintento(() => import("./pages/MiCasoPage"));
 // 🚗 PÁGINA PÚBLICA: "Mi trámite" (seguimiento del trámite de gestoría, sin login)
 const MiTramitePage = lazyConReintento(() => import("./pages/MiTramitePage"));
+// 📲 "TUVE UN SINIESTRO" (sin login): el cliente avisa el siniestro apenas le pasa (23/11/2026).
+const AvisoSiniestroPage = lazyConReintento(() => import("./pages/AvisoSiniestroPage"));
 
 // 🎉 El logo de bienvenida ("Preparando tu entorno...") sale SOLO cuando
 //    recién iniciás sesión. La marca la pone el login (ver AuthContext) y
@@ -583,6 +585,18 @@ function App() {
       <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
         <Routes>
           <Route path="/mi-caso/:token" element={<MiCasoPage />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // 📲 "TUVE UN SINIESTRO" (sin login): /siniestro, /siniestro?of=2 o /siniestro?t=<token del portal>.
+  //    Ojo: es /siniestro (singular). La pantalla interna es /siniestros (plural).
+  if (location.pathname === "/siniestro" || location.pathname === "/siniestro/") {
+    return (
+      <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
+        <Routes>
+          <Route path="/siniestro" element={<AvisoSiniestroPage />} />
         </Routes>
       </Suspense>
     );

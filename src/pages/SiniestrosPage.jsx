@@ -17,6 +17,10 @@
 //   El mail con TODO el siniestro le llega solo (lo manda el servidor).
 //   🏢 Cualquier oficina puede cargar siniestros de pólizas de cualquier oficina.
 //
+// 📲 23/11/2026 · AVISOS DE CLIENTES: arriba de la planilla, lo que mandan los clientes desde el
+//   link «Tuve un siniestro» (/#/siniestro). Copiar el link, verlo y cargarlo como siniestro con
+//   un botón (sale el mismo «¡Siniestro cargado!»). Ver components/siniestros/AvisosClientes.jsx.
+//
 // ⚖️ 17/11/2026 · ABOGADO DE RECLAMOS: con el usuario de abogado (Maxi) esta página es
 //   «Mis reclamos»: solo sus casos, sin «Nuevo siniestro», sin «Editar todo» ni «Eliminar».
 //   El ADMIN ve arriba una tira con cada abogado: casos abiertos, cobrado y honorarios que se deben.
@@ -33,11 +37,13 @@ import {
   editSiniestro,
   removeSiniestro,
   addFoto,
+  getSiniestros,
   pedirAbogadosSiniestros,
 } from "../store/slices/siniestrosSlice";
 import { invalidarCacheSiniestrosCliente } from "../hooks/useSiniestrosCliente";
 
 import PlanillaSiniestros from "../components/siniestros/PlanillaSiniestros";
+import AvisosClientes from "../components/siniestros/AvisosClientes";
 import SiniestrosWizard from "../components/siniestros/SiniestrosWizard";
 import ModalDuo from "../components/ui/ModalDuo";
 import Boton3D from "../components/ui/Boton3D";
@@ -205,6 +211,23 @@ export default function SiniestrosPage() {
     setSp(p);
   };
 
+  // 📲 Un aviso de cliente se cargó como siniestro → la lista se actualiza y sale el
+  //    «¡Siniestro cargado!» de siempre (con el botón de WhatsApp a Franco).
+  const avisoCargado = (r) => {
+    dispatch(getSiniestros());
+    if (r?.siniestro_id && r?.aviso_whatsapp?.texto) {
+      setAvisado(false);
+      setCargado({ id: r.siniestro_id, aviso_whatsapp: r.aviso_whatsapp, cliente_label: r.aviso?.cliente?.nombre || r.aviso?.nombre });
+    }
+  };
+  const verSiniestro = (id) => {
+    if (!id) return;
+    const p = new URLSearchParams(sp);
+    p.delete("aviso");
+    p.set("ver", String(id));
+    setSp(p);
+  };
+
   const confirmarBorrado = async () => {
     if (!borrarSiniestro?.id || borrando) return;
     setBorrando(true);
@@ -260,6 +283,9 @@ export default function SiniestrosPage() {
 
       {/* ⚖️ Admin: cada abogado con sus casos y la plata (tocás uno → sus casos). */}
       {isWebAdmin && <TiraAbogados datos={abogadosInfo} onElegir={elegirAbogado} />}
+
+      {/* 📲 Avisos de clientes (el abogado no los ve: él no carga siniestros). */}
+      {!esAbogado && <AvisosClientes isWebAdmin={isWebAdmin} onCargado={avisoCargado} onVerSiniestro={verSiniestro} />}
 
       {/* ── La planilla de colores (con el panel del costado) ── */}
       <PlanillaSiniestros

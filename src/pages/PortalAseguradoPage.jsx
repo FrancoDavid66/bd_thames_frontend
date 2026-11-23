@@ -648,6 +648,34 @@ export default function PortalAseguradoPage() {
                 nombreCliente={nombreCliente}
                 onAbrirSiniestro={abrirSiniestro}
               />
+
+              {/* 📲 23/11/2026: «¿Tuviste un siniestro?» → el formulario, ya sabiendo quién es
+                  (saluda por el nombre y muestra sus autos). Ver pages/AvisoSiniestroPage.jsx. */}
+              <a
+                href={`#/siniestro?t=${encodeURIComponent(token || "")}`}
+                style={{
+                  marginTop: 16, width: "100%", textAlign: "left", textDecoration: "none",
+                  background: "var(--card)", border: "var(--lista-borde)", borderRadius: 18,
+                  boxShadow: "var(--lista-sombra)", padding: "14px 16px", display: "flex",
+                  gap: 14, alignItems: "center", fontFamily: "inherit", color: "var(--t1)",
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 46, height: 46, borderRadius: 14, flexShrink: 0, display: "flex",
+                    alignItems: "center", justifyContent: "center", fontSize: 22,
+                    background: "color-mix(in srgb, var(--m) 14%, transparent)",
+                  }}
+                >
+                  🚨
+                </span>
+                <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>¿Tuviste un siniestro?</span>
+                  <span style={{ fontSize: 13, color: "var(--t2)" }}>Avisanos acá en 2 minutos: choque, robo o lo que sea.</span>
+                </span>
+                <span aria-hidden="true" style={{ fontSize: 20, color: "var(--t3)" }}>›</span>
+              </a>
             </>
           )}
           </div>
