@@ -294,3 +294,36 @@ textarea {
     min-height: -webkit-fill-available;
   }
 }
+/* ✨ «NUEVO» en el menú (Franco 23/11/2026): el botón de algo recién estrenado brilla
+      suave (latido azul + un reflejo que lo cruza) hasta que la persona entra o vence la fecha.
+      Se activa con `nuevo: "AAAA-MM-DD"` en menuData.js. */
+@keyframes brillo-nuevo {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-duo-azul) 0%, transparent); }
+  50% { box-shadow: 0 0 14px 2px color-mix(in srgb, var(--color-duo-azul) 45%, transparent); }
+}
+@keyframes brillo-barrido {
+  0%, 35% { transform: translateX(-150%); }
+  100% { transform: translateX(300%); }
+}
+.menu-nuevo {
+  position: relative;
+  overflow: hidden;
+  animation: brillo-nuevo 2.2s ease-in-out infinite;
+  outline: 1px solid color-mix(in srgb, var(--color-duo-azul) 55%, transparent);
+  outline-offset: -1px;
+}
+.menu-nuevo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  animation: brillo-barrido 3s ease-in-out infinite;
+  pointer-events: none;
+}
+.punto-nuevo {
+  animation: brillo-nuevo 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-nuevo, .menu-nuevo::after, .punto-nuevo { animation: none; }
+}

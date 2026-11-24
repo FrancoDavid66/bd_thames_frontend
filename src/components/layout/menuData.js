@@ -77,6 +77,7 @@ export const QUICK_ACTIONS = [
     //    cliente: legales, ART, gestoría, escribanía, contratos, consumidor, papeles… (misma ruta /legales).
     to: "/legales", label: "Consultas", sub: "Legales, ART, gestoría, escribanía…",
     icon: "consulta", bg: "var(--color-duo-violeta)", shadow: "var(--color-duo-violeta-sombra)",
+    nuevo: "2026-12-07",
   },
 ];
 
@@ -136,7 +137,8 @@ export function buildMenuGroups({
         { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
         // 💬 Consultas (antes «Legales»): consulta rápida, casos, turnos con el abogado y "Cargar una denuncia"
         //    (badge = vencidas + demorados + para llamar).
-        { to: "/legales", label: "Consultas", icon: "consulta", badge: legalesAlertas, tone: "rojo" },
+        // ✨ nuevo: "AAAA-MM-DD" → brilla con el cartel «NUEVO» hasta esa fecha (o hasta que la persona entra).
+        { to: "/legales", label: "Consultas", icon: "consulta", badge: legalesAlertas, tone: "rojo", nuevo: "2026-12-07" },
         // 🚗 Gestoría: trámites del automotor derivados a gestores (badge = demorados).
         ...(veGestoria ? [{ to: "/gestoria", label: "Gestoría", icon: "truck", badge: gestoriaDemorados, tone: "rojo" }] : []),
       ],

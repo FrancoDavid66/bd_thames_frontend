@@ -13,6 +13,7 @@ import { useMarca } from "../../marca/MarcaContext";
 import { ICON_MAP, buildMenuGroups } from "./menuData";
 // 🧠 Memoria de los acordeones (arrancan cerrados; recuerda si el usuario los abre)
 import { useAccordionPrefs } from "../../hooks/useMenuPrefs";
+import useNuevo, { PillNuevo } from "./useNuevo";
 
 // 🎨 UN SOLO acento (azul) para lo activo. Antes cada sección tenía su
 //    propio color (azul/violeta/verde/amarillo a la vez) — se veía
@@ -66,6 +67,11 @@ export default function Sidebar({
   // 🧠 Acordeones con memoria: arrancan CERRADOS. Si el usuario abre uno, se
   //    guarda en localStorage y la próxima vez sigue abierto.
   const { isOpen: isGroupOpen, toggleGroup } = useAccordionPrefs();
+
+  // ✨ Lo recién estrenado (nuevo: "AAAA-MM-DD" en menuData) brilla con el cartel «NUEVO»
+  //    hasta que la persona entra una vez o vence la fecha. Ej.: «Consultas».
+  const todosLosItems = useMemo(() => menuGroups.flatMap((g) => g.items || []), [menuGroups]);
+  const { esNuevo } = useNuevo(todosLosItems, user?.username);
   const toggle = (id) => toggleGroup(id);
 
   return (
@@ -176,11 +182,13 @@ export default function Sidebar({
                     )}
                     {group.items.map(item => {
                       const Icon = ICON_MAP[item.icon] || HiHome;
+                      const nuevo = esNuevo(item);
                       return (
                         <NavLink key={item.to} to={item.to} end={item.to === "/"}
                           className={({ isActive }) => `
                             group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium
                             transition-colors mb-0.5 border
+                            ${nuevo && !isActive ? "menu-nuevo" : ""}
                             ${isActive
                               ? ACTIVE_CLS
                               : item.highlight
@@ -190,8 +198,9 @@ export default function Sidebar({
                           `}>
                           {({ isActive }) => (
                             <>
-                              <Icon className="w-4 h-4 shrink-0" />
+                              <Icon className={`w-4 h-4 shrink-0 ${nuevo && !isActive ? "text-duo-azul" : ""}`} />
                               <span className="flex-1 truncate">{item.label}</span>
+                              {nuevo && <PillNuevo />}
                               <Badge value={item.badge} tone={item.tone} />
                             </>
                           )}
@@ -231,11 +240,13 @@ export default function Sidebar({
                           <div className="pt-1 pl-1.5">
                             {group.items.map(item => {
                               const Icon = ICON_MAP[item.icon] || HiHome;
+                              const nuevo = esNuevo(item);
                               return (
                                 <NavLink key={item.to} to={item.to} end={item.to === "/"}
                                   className={({ isActive }) => `
                                     group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium
                                     transition-colors mb-0.5
+                                    ${nuevo && !isActive ? "menu-nuevo" : ""}
                                     ${isActive
                                       ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul"
                                       : "text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-titulo dark:hover:text-titulo-dark"
@@ -245,6 +256,7 @@ export default function Sidebar({
                                     <>
                                       <Icon className="w-3.5 h-3.5 shrink-0" />
                                       <span className="flex-1 truncate">{item.label}</span>
+                                      {nuevo && <PillNuevo />}
                                       <Badge value={item.badge} tone={item.tone} />
                                     </>
                                   )}
@@ -295,4 +307,4 @@ function GroupBadge({ items }) {
       {total}
     </span>
   );
-}
+}

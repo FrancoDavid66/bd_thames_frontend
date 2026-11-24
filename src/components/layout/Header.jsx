@@ -27,6 +27,7 @@ import AtencionBanner from "./AtencionBanner";
 
 // 📡 Datos en vivo: indicador "● EN VIVO" + avisos del cartero
 import IndicadorVivo from "./IndicadorVivo";
+import Noticias from "./Noticias";
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { disponible as vivoDisponible } from "../../services/vivo";
 
@@ -631,6 +632,16 @@ export default function Header({ sidebarOpen, isFooter = false, verificacionCoun
                   <span className="hidden md:inline">Precios</span>
                 </button>
               </div>
+
+              {/* 📣 Noticias: lo nuevo de la app (para todos, también vendedores) */}
+              <Noticias
+                usuario={user?.username}
+                rol={user?.perfil?.rol || user?.rol || ""}
+                onAbrir={() => {
+                  setShowNotifications(false);
+                  setMenuCuenta(false);
+                }}
+              />
 
               {/* Campana — oculta para vendedores */}
               {!isVendedor && (

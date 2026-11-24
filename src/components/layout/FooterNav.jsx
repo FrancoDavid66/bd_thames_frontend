@@ -24,6 +24,7 @@ import {
   ICON_MAP, FOOTER_TABS, buildMenuGroups,
 } from "./menuData";
 import { useEsEscritorio } from "../../hooks/useMediaQuery";
+import useNuevo from "./useNuevo";
 
 // 🎨 Mismo criterio que el Sidebar: UN SOLO acento (azul) para todo lo
 //    interactivo, en vez de un color distinto por tab/sección/acceso
@@ -105,6 +106,11 @@ export default function FooterNav({
     () => Object.values(badgeByRoute).reduce((a, b) => a + b, 0),
     [badgeByRoute]
   );
+
+  // ✨ Lo recién estrenado brilla en la hoja «Más» y el botón «Más» lleva un puntito azul
+  //    que late, para que en el celu también se note (ej.: «Consultas» nuevo).
+  const todosLosItems = useMemo(() => menuGroups.flatMap((g) => g.items || []), [menuGroups]);
+  const { esNuevo, hayNuevos } = useNuevo(todosLosItems, user?.username);
 
   return (
     <>
@@ -211,6 +217,12 @@ export default function FooterNav({
               >
                 <span className="relative flex h-7 w-12 items-center justify-center rounded-full transition-colors group-hover:bg-surface dark:group-hover:bg-surface-dark sm:w-14">
                   <HiDotsHorizontal className="h-5 w-5 text-titulo dark:text-titulo-dark" />
+                  {hayNuevos && (
+                    <span
+                      title="Hay algo nuevo"
+                      className="punto-nuevo absolute -top-0.5 left-1 h-2.5 w-2.5 rounded-full border-2 border-card bg-duo-azul dark:border-card-dark"
+                    />
+                  )}
                   {totalBadges > 0 && (
                     <span className="absolute -top-1 right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card bg-duo-rojo px-1 text-[10px] font-semibold leading-none text-white dark:border-card-dark">
                       {totalBadges > 99 ? "99+" : totalBadges}
@@ -289,21 +301,29 @@ export default function FooterNav({
                       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
                         {group.items.map(item => {
                           const Icon = ICON_MAP[item.icon] || HiHome;
+                          const nuevo = esNuevo(item);
                           return (
                             <NavLink key={item.to} to={item.to} end={item.to === "/"}
                               title={item.label}
                               className={({ isActive }) => `
                                 flex min-h-[48px] items-center gap-2.5 px-3 py-2 rounded-xl text-[14px] font-medium transition-colors border
+                                ${nuevo && !isActive ? "menu-nuevo" : ""}
                                 ${isActive
                                   ? ACTIVE_CLS
                                   : item.highlight
                                     ? (HIGHLIGHT_CLS[item.highlight] || HIGHLIGHT_CLS.azul)
                                     : INACTIVE_CLS
                                 }`}>
-                              {() => (
+                              {({ isActive }) => (
                                 <>
-                                  <Icon className="w-5 h-5 shrink-0" />
-                                  <span className="flex-1 line-clamp-2 leading-tight">{item.label}</span>
+                                  <Icon className={`w-5 h-5 shrink-0 ${nuevo && !isActive ? "text-duo-azul" : ""}`} />
+                                  {/* En la grilla no entra la píldora al lado: «NUEVO» va debajo del nombre. */}
+                                  <span className="flex min-w-0 flex-1 flex-col">
+                                    <span className="line-clamp-2 leading-tight">{item.label}</span>
+                                    {nuevo && (
+                                      <span className="mt-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-duo-azul">Nuevo</span>
+                                    )}
+                                  </span>
                                   <Badge value={item.badge} tone={item.tone} />
                                 </>
                               )}
