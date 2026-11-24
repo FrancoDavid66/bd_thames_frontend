@@ -55,6 +55,71 @@ function BotonSonido() {
   );
 }
 
+// 🗂️ SOLAPAS DE OFICINAS (panel y chats). Se acuerda en este navegador.
+//   · «Todas» → se ve todo.
+//   · Desde «Todas», tocar una oficina → se ve SOLO esa.
+//   · Tocar otra → se suma. Tocar una que está prendida → se oculta.
+//   Ej: Todas → toco KM39 (solo KM39) → toco Talita (KM39 + Talita) → toco KM39 (solo Talita).
+const CLAVE_SOLAPAS = "thames.whatsapp.solapas";
+
+function leerSolapas() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_SOLAPAS) || "[]");
+    return Array.isArray(v) ? v.filter((x) => Number.isInteger(x) && x > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function Solapas({ lineas, visibles, onTocar, onTodas }) {
+  if (lineas.length < 2) return null;
+  const todas = visibles.length === 0;
+  const contador = (n, rojo) => (
+    <span className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-bold ${
+      rojo ? "bg-duo-rojo text-white" : n ? "bg-duo-amarillo text-white" : "bg-surface dark:bg-surface-dark text-suave dark:text-suave-dark"}`}>
+      {n}
+    </span>
+  );
+  const base = "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] font-semibold transition-colors";
+  const prendida = "border-[#25D366] bg-[#25D366]/10 text-titulo dark:text-titulo-dark";
+  const apagada = "border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark";
+  const totalEsperando = lineas.reduce((a, l) => a + (l.sin_responder || []).length, 0);
+  const totalAtrasados = lineas.reduce((a, l) => a + (l.atrasados || 0), 0);
+  return (
+    <div className="mb-4">
+      <div role="tablist" aria-label="Oficinas" className="flex gap-2 overflow-x-auto pb-1">
+        <button type="button" role="tab" aria-selected={todas} onClick={onTodas} className={`${base} ${todas ? prendida : apagada}`}>
+          Todas {contador(totalEsperando, totalAtrasados > 0)}
+        </button>
+        {lineas.map((l) => {
+          const on = todas || visibles.includes(l.id);
+          const esperando = (l.sin_responder || []).length;
+          return (
+            <button
+              key={l.id}
+              type="button"
+              role="tab"
+              aria-selected={!todas && on}
+              onClick={() => onTocar(l.id)}
+              title={`${telefonoLindo(l.telefono)}${l.oficina ? ` · ${l.oficina}` : ""} · ${esperando} esperando`}
+              className={`${base} ${!todas && on ? prendida : apagada}`}
+            >
+              {!todas && on && <span className="h-2 w-2 rounded-full bg-[#25D366]" />}
+              {l.nombre?.startsWith("+") ? telefonoLindo(l.telefono) : l.nombre}
+              {contador(esperando, (l.atrasados || 0) > 0)}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1 text-[11px] text-suave dark:text-suave-dark">
+        {todas
+          ? "Tocá una oficina para ver solo esa."
+          : "Tocá otra oficina para sumarla, o tocá una prendida para ocultarla."}
+      </p>
+    </div>
+  );
+}
+
 const PERIODOS = [
   { dias: 1, label: "Hoy" },
   { dias: 7, label: "7 días" },
@@ -369,6 +434,15 @@ export default function WhatsAppPage() {
     setChatInicial({ linea, tel });
     setVista("chats");
   };
+  // 🗂️ Oficinas elegidas en las solapas ([] = todas).
+  const [solapas, setSolapas] = useState(leerSolapas);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLAVE_SOLAPAS, JSON.stringify(solapas));
+    } catch {
+      /* sin localStorage: igual funciona, solo no se acuerda */
+    }
+  }, [solapas]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -397,10 +471,31 @@ export default function WhatsAppPage() {
   //    minimizada) y, si se movió algo de WhatsApp, el panel se recarga solo
   //    (como mucho 1 vez cada 5 s; los chats se recargan por su cuenta).
   useAcelerarVivo(3000, 15000);
-  useDatosVivos(["whatsapp"], cargar, { siempre: true, cadaMs: 5000, activo: vista === "panel" });
+  //    También en «Chats», así los numeritos de las solapas están al día.
+  useDatosVivos(["whatsapp"], cargar, { siempre: true, cadaMs: 5000 });
+
+  // Líneas para las solapas (sin la fila «Sin línea»), en orden alfabético fijo.
+  const lineasSolapas = useMemo(
+    () => (datos?.lineas || []).filter((l) => l.id > 0).sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [datos],
+  );
+  // Si una línea elegida ya no existe, no cuenta (si no queda ninguna → «Todas»).
+  const visibles = useMemo(
+    () => (lineasSolapas.length ? solapas.filter((id) => lineasSolapas.some((l) => l.id === id)) : solapas),
+    [solapas, lineasSolapas],
+  );
+  const tocarSolapa = (id) => setSolapas(() => {
+    if (visibles.length === 0) return [id];                         // desde «Todas»: solo esa
+    if (visibles.includes(id)) return visibles.filter((x) => x !== id); // ocultarla (si era la última → Todas)
+    return [...visibles, id];                                       // sumarla
+  });
+  const lineasPanel = useMemo(
+    () => (visibles.length ? (datos?.lineas || []).filter((l) => visibles.includes(l.id)) : datos?.lineas || []),
+    [datos, visibles],
+  );
 
   const totales = useMemo(() => {
-    const lineas = datos?.lineas || [];
+    const lineas = lineasPanel;
     const respondidas = lineas.reduce((a, l) => a + (l.respondidas || 0), 0);
     const ponderado = lineas.reduce((a, l) => a + (l.promedio_respuesta_min || 0) * (l.respondidas || 0), 0);
     return {
@@ -410,7 +505,7 @@ export default function WhatsAppPage() {
       esperando: lineas.reduce((a, l) => a + (l.sin_responder || []).length, 0),
       atrasados: lineas.reduce((a, l) => a + (l.atrasados || 0), 0),
     };
-  }, [datos]);
+  }, [lineasPanel]);
 
   const config = datos?.config;
   const periodo = PERIODOS.find((p) => p.dias === dias)?.label.toLowerCase();
@@ -456,8 +551,15 @@ export default function WhatsAppPage() {
           </div>
         </div>
 
+        {/* 🗂️ Solapas: qué oficinas ver (vale para el panel y para los chats) */}
+        <Solapas lineas={lineasSolapas} visibles={visibles} onTocar={tocarSolapa} onTodas={() => setSolapas([])} />
+
         {vista === "chats" ? (
-          <ChatsWhatsApp key={chatInicial ? `${chatInicial.linea}-${chatInicial.tel}` : "lista"} inicial={chatInicial} />
+          <ChatsWhatsApp
+            key={chatInicial ? `${chatInicial.linea}-${chatInicial.tel}` : "lista"}
+            inicial={chatInicial}
+            soloLineas={visibles.length ? visibles : null}
+          />
         ) : (<>
         {/* Estado de la conexión con YCloud */}
         {config && (
@@ -510,12 +612,12 @@ export default function WhatsAppPage() {
             </div>
 
             <div className="flex flex-col gap-4">
-              {datos.lineas.length === 0 ? (
+              {lineasPanel.length === 0 ? (
                 <p className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-6 text-center text-[13px] text-suave dark:text-suave-dark">
-                  No hay líneas conectadas todavía.
+                  {datos.lineas.length ? "No hay oficinas elegidas: tocá «Todas»." : "No hay líneas conectadas todavía."}
                 </p>
               ) : (
-                datos.lineas.map((l) => <Linea key={l.id} l={l} umbral={umbral} onResponder={responder} onCambio={cargar} />)
+                lineasPanel.map((l) => <Linea key={l.id} l={l} umbral={umbral} onResponder={responder} onCambio={cargar} />)
               )}
             </div>
 

@@ -19,6 +19,7 @@
 // pregunte cada 3 s). Respaldo: cada 60 s igual (para los "espera X min").
 //
 //   <ChatsWhatsApp inicial={{ linea: 1, tel: "5491122334455" }} />
+//   <ChatsWhatsApp soloLineas={[3, 4]} />   // solapas: solo los chats de KM39 y 5 Esquinas
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
@@ -265,9 +266,8 @@ function useGrabadora() {
 }
 
 // ── Pantalla ────────────────────────────────────────────
-export default function ChatsWhatsApp({ inicial = null }) {
+export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
   const [lista, setLista] = useState({ lineas: [], conversaciones: [] });
-  const [filtroLinea, setFiltroLinea] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState(inicial); // { linea, tel }
   const [hilo, setHilo] = useState(null);
@@ -291,11 +291,11 @@ export default function ChatsWhatsApp({ inicial = null }) {
 
   const cargarLista = useCallback(async () => {
     try {
-      setLista(await pedirConversaciones(filtroLinea || undefined));
+      setLista(await pedirConversaciones());
     } catch {
       /* se reintenta solo */
     }
-  }, [filtroLinea]);
+  }, []);
 
   const cargarHilo = useCallback(async () => {
     if (!abierto) return;
@@ -354,11 +354,18 @@ export default function ChatsWhatsApp({ inicial = null }) {
     fondo.current?.scrollIntoView({ block: "end" });
   }, [cantidad, abierto]);
 
+  // 🗂️ Solapas de oficinas (las elige WhatsAppPage): solo los chats de esas líneas.
+  const clavesVisibles = soloLineas ? soloLineas.join(",") : "";
   const filtradas = useMemo(() => {
+    const visibles = clavesVisibles ? new Set(clavesVisibles.split(",").map(Number)) : null;
     const q = busqueda.trim().toLowerCase();
-    if (!q) return lista.conversaciones;
-    return lista.conversaciones.filter((c) => (c.cliente_nombre || "").toLowerCase().includes(q) || c.cliente_tel.includes(q.replace(/\D/g, "") || "§"));
-  }, [lista, busqueda]);
+    return lista.conversaciones.filter((c) => {
+      if (visibles && !visibles.has(c.linea)) return false;
+      if (!q) return true;
+      return (c.cliente_nombre || "").toLowerCase().includes(q) || c.cliente_tel.includes(q.replace(/\D/g, "") || "§");
+    });
+  }, [lista, busqueda, clavesVisibles]);
+  const variasLineas = soloLineas ? soloLineas.length > 1 : lista.lineas.length > 1;
 
   const agregar = (m) => setHilo((h) => (h ? { ...h, mensajes: [...h.mensajes, m] } : h));
   const errorDe = (e) => e?.response?.data?.detail || "No se pudo mandar. Probá de nuevo.";
@@ -516,21 +523,10 @@ export default function ChatsWhatsApp({ inicial = null }) {
             <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar nombre o teléfono"
               className="h-9 w-full bg-transparent text-[14px] outline-none placeholder:text-suave" />
           </label>
-          {lista.lineas.length > 1 && (
-            <div className="flex flex-wrap gap-1">
-              {[{ id: "", nombre: "Todas" }, ...lista.lineas].map((l) => (
-                <button key={l.id || "todas"} type="button" onClick={() => setFiltroLinea(String(l.id))}
-                  className={`rounded-full px-2.5 py-1 text-[12px] font-medium ${String(filtroLinea) === String(l.id)
-                    ? "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul" : "text-suave dark:text-suave-dark hover:bg-surface dark:hover:bg-surface-dark"}`}>
-                  {l.nombre}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <ul className="flex-1 overflow-y-auto">
           {filtradas.length === 0 && (
-            <li className="p-6 text-center text-[13px] text-suave dark:text-suave-dark">Todavía no hay chats. Cuando un cliente escriba, aparece acá.</li>
+            <li className="p-6 text-center text-[13px] text-suave dark:text-suave-dark">{soloLineas ? "No hay chats en las oficinas elegidas. Tocá «Todas» arriba para ver el resto." : "Todavía no hay chats. Cuando un cliente escriba, aparece acá."}</li>
           )}
           {filtradas.map((c) => {
             const activo = abierto && abierto.linea === c.linea && abierto.tel === c.cliente_tel;
@@ -556,7 +552,7 @@ export default function ChatsWhatsApp({ inicial = null }) {
                         <span className="shrink-0 rounded-full bg-duo-rojo px-1.5 py-0.5 text-[10px] font-bold text-white">espera {duracion(c.esperando_min)}</span>
                       )}
                     </span>
-                    {lista.lineas.length > 1 && <span className="text-[11px] text-suave dark:text-suave-dark">{c.linea_nombre}</span>}
+                    {variasLineas && <span className="text-[11px] text-suave dark:text-suave-dark">{c.linea_nombre}</span>}
                   </span>
                 </button>
               </li>
