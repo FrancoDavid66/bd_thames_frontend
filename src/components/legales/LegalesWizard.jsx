@@ -21,6 +21,7 @@ import {
   HiCamera,
   HiCheck,
   HiClock,
+  HiDocumentText,
   HiHome,
   HiInformationCircle,
   HiMicrophone,
@@ -29,6 +30,7 @@ import {
   HiPlusCircle,
   HiQuestionMarkCircle,
   HiShieldExclamation,
+  HiShoppingCart,
   HiTruck,
   HiUserGroup,
   HiX,
@@ -74,7 +76,9 @@ const ICONOS = {
   escudo: HiShieldExclamation,
   casa: HiHome,
   pregunta: HiQuestionMarkCircle,
-  firma: HiPencilAlt, // ✍️ 23/11/2026: «Escribanía o firmar algo»
+  firma: HiPencilAlt, // ✍️ 23/11/2026: «Escribanía y contratos»
+  documento: HiDocumentText, // 🚗 23/11/2026: «Papeles del auto (gestoría)»
+  carrito: HiShoppingCart, // 🛒 23/11/2026: «Defensa del consumidor»
 };
 const SOBRE = {
   CHOQUE: "el choque",
@@ -84,6 +88,8 @@ const SOBRE = {
   ROBO: "lo que pasó",
   CASA: "la casa o el terreno",
   FIRMAS: "lo que tiene que firmar",
+  AUTO_PAPELES: "los papeles del auto",
+  CONSUMIDOR: "el problema con la empresa",
 };
 
 const VACIO = {
@@ -495,7 +501,7 @@ export default function LegalesWizard() {
         <Aviso tono="azul" className="flex items-start gap-2">
           <HiInformationCircle className="w-5 h-5 shrink-0 mt-px" />
           <span>
-            Al guardar, el caso queda en Legales
+            Al guardar, el caso queda en Consultas
             {abogado ? `, ${conArticulo(nombreCorto(abogado.nombre))} lo ve en su celu` : ""}
             {d.turno ? " y vos le mandás el turno por WhatsApp." : " y vos le mandás el link por WhatsApp."}
           </span>

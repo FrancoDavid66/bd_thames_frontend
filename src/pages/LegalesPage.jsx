@@ -1,7 +1,8 @@
 // src/pages/LegalesPage.jsx
 //
-// ⚖️ LEGALES — los casos del estudio: qué abogado tiene cada uno, cómo va y
-// qué fechas vienen. Pensado para que la oficina (que no sabe de derecho) lo
+// ⚖️ LEGALES (en el menú se llama «CONSULTAS» desde el 23/11/2026: engloba todo lo que
+// pregunta el cliente — legales, ART, gestoría, escribanía, contratos, consumidor…) — los casos
+// del estudio: qué abogado tiene cada uno, cómo va y qué fechas vienen. Pensado para que la oficina (que no sabe de derecho) lo
 // use desde el celu con pasos guiados.
 //
 // Qué ve cada uno (lo decide el SERVIDOR, acá solo se acomoda la pantalla):
@@ -76,8 +77,8 @@ export default function LegalesPage() {
           sinAcceso && user?.perfil?.rol === "ABOGADO"
             ? "Todavía no tenés tu perfil de abogado cargado. Pedile a THAMES que lo complete y volvé a entrar."
             : sinAcceso
-              ? "Tu usuario no tiene acceso a Legales. Pedile al admin que te lo habilite."
-              : "No se pudo abrir Legales. Revisá la conexión y recargá."
+              ? "Tu usuario no tiene acceso a Consultas. Pedile al admin que te lo habilite."
+              : "No se pudo abrir Consultas. Revisá la conexión y recargá."
         );
       });
     return () => {
@@ -215,9 +216,9 @@ function Cabecera() {
         <div className="flex items-center gap-2.5 min-w-0">
           <HiScale className="w-5 h-5 text-sky-700 dark:text-sky-400 shrink-0" />
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-titulo dark:text-titulo-dark leading-tight">Legales</h1>
+            <h1 className="text-lg font-semibold text-titulo dark:text-titulo-dark leading-tight">Consultas</h1>
             <p className="hidden sm:block text-[13px] text-suave dark:text-suave-dark">
-              Los casos del estudio: qué abogado tiene cada uno, cómo va y qué fechas vienen.
+              Todo lo que pregunta el cliente: legales, ART, gestoría, escribanía, contratos, consumidor…
             </p>
           </div>
         </div>
@@ -259,7 +260,7 @@ function Cabecera() {
       </div>
       <nav
         className="flex gap-1 overflow-x-auto border-b border-linea dark:border-linea-dark scrollbar-hide"
-        aria-label="Secciones de Legales"
+        aria-label="Secciones de Consultas"
       >
         {tabs.map((t) => (
           <NavLink

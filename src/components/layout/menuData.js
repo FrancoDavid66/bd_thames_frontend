@@ -10,7 +10,7 @@ import {
   HiChartBar, HiClipboardList, HiClipboardCheck, HiRefresh,
   HiBan, HiCash, HiReceiptTax,
   HiShieldCheck, HiCog, HiViewGrid, HiStar,
-  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2, HiTruck,
+  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2, HiTruck, HiQuestionMarkCircle,
 } from "react-icons/hi";
 // 🎮 Ícono del minijuego (Heroicons v1 no trae un joystick)
 import { FaGamepad } from "react-icons/fa";
@@ -24,6 +24,7 @@ export const ICON_MAP = {
   pencil: HiPencilAlt, calc: HiCalculator, camera: HiCamera, chat: HiChatAlt2,
   game: FaGamepad,
   truck: HiTruck,
+  consulta: HiQuestionMarkCircle, // 💬 23/11/2026: «Consultas» (antes «Legales»)
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -72,9 +73,10 @@ export const QUICK_ACTIONS = [
     icon: "doc", bg: "var(--color-duo-rojo)", shadow: "var(--color-duo-rojo-sombra)",
   },
   {
-    // ⚖️ Acceso directo a Legales: cargar una denuncia o dar un turno con el abogado.
-    to: "/legales", label: "Legales", sub: "Consulta rápida, denuncia o turno",
-    icon: "doc", bg: "var(--color-duo-violeta)", shadow: "var(--color-duo-violeta-sombra)",
+    // 💬 23/11/2026: «Legales» pasó a llamarse «Consultas» y engloba todo lo que pregunta el
+    //    cliente: legales, ART, gestoría, escribanía, contratos, consumidor, papeles… (misma ruta /legales).
+    to: "/legales", label: "Consultas", sub: "Legales, ART, gestoría, escribanía…",
+    icon: "consulta", bg: "var(--color-duo-violeta)", shadow: "var(--color-duo-violeta-sombra)",
   },
 ];
 
@@ -132,8 +134,9 @@ export function buildMenuGroups({
         // 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp.
         { to: "/mensajes", label: "Mensajes", icon: "chat" },
         { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
-        // ⚖️ Legales: casos, turnos con el abogado y "Cargar una denuncia" (badge = vencidas + demorados).
-        { to: "/legales", label: "Legales", icon: "doc", badge: legalesAlertas, tone: "rojo" },
+        // 💬 Consultas (antes «Legales»): consulta rápida, casos, turnos con el abogado y "Cargar una denuncia"
+        //    (badge = vencidas + demorados + para llamar).
+        { to: "/legales", label: "Consultas", icon: "consulta", badge: legalesAlertas, tone: "rojo" },
         // 🚗 Gestoría: trámites del automotor derivados a gestores (badge = demorados).
         ...(veGestoria ? [{ to: "/gestoria", label: "Gestoría", icon: "truck", badge: gestoriaDemorados, tone: "rojo" }] : []),
       ],

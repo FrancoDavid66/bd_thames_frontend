@@ -240,6 +240,8 @@ export const MOTIVO_CORTO = {
   ROBO: "Robo o estafa",
   CASA: "Casa o terreno",
   FIRMAS: "Escribanía", // ✍️ 23/11/2026
+  AUTO_PAPELES: "Gestoría del auto",
+  CONSUMIDOR: "Consumidor",
   OTRO: "Otra cosa",
 };
 

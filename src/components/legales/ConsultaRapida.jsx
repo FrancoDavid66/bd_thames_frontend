@@ -22,12 +22,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   HiBriefcase,
   HiCheck,
+  HiDocumentText,
   HiHome,
   HiPencilAlt,
   HiPlusCircle,
   HiQuestionMarkCircle,
   HiReply,
   HiShieldExclamation,
+  HiShoppingCart,
   HiTruck,
   HiUserGroup,
 } from "react-icons/hi";
@@ -45,6 +47,8 @@ const ICONOS = {
   escudo: HiShieldExclamation,
   casa: HiHome,
   firma: HiPencilAlt,
+  documento: HiDocumentText,
+  carrito: HiShoppingCart,
   pregunta: HiQuestionMarkCircle,
 };
 const TIPOS_RAPIDOS_DEFECTO = ["opciones", "si_no", "si_no_ns", "cuando"];

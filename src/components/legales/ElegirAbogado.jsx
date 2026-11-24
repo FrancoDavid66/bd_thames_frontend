@@ -18,7 +18,7 @@ export default function ElegirAbogado({ abogados = [], temas = [], tema = "", va
   if (!activos.length) {
     return (
       <p className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-3 text-[13px] text-suave dark:text-suave-dark">
-        Todavía no hay abogados cargados. El admin los agrega en Legales → Abogados. Podés guardar el caso sin abogado.
+        Todavía no hay abogados cargados. El admin los agrega en Consultas → Abogados. Podés guardar el caso sin abogado.
       </p>
     );
   }

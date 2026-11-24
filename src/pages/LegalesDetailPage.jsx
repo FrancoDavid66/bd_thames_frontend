@@ -242,7 +242,7 @@ export default function LegalesDetailPage() {
     <div className="flex flex-col gap-3">
       <nav className="flex items-center gap-2 text-[13px] text-suave dark:text-suave-dark">
         <button type="button" onClick={() => volverOIr(navigate)} className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-400">
-          <HiArrowLeft className="w-4 h-4" /> {esAbogado ? "Mis casos" : "Legales"}
+          <HiArrowLeft className="w-4 h-4" /> {esAbogado ? "Mis casos" : "Consultas"}
         </button>
         <span>/</span>
         <span>{e.numero}</span>

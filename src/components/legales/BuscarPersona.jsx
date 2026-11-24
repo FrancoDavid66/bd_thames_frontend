@@ -147,7 +147,7 @@ export default function BuscarPersona({ valor, onChange, onVerCaso, mostrarCasos
             (c.casos?.length ? (
               <CasosAbiertos casos={c.casos} onVerCaso={onVerCaso} />
             ) : (
-              <span className="text-[13px] text-green-700 dark:text-green-400">No tiene otros casos en Legales.</span>
+              <span className="text-[13px] text-green-700 dark:text-green-400">No tiene otros casos en Consultas.</span>
             ))}
           <div className="flex flex-wrap items-center gap-2 border-t border-linea dark:border-linea-dark pt-3">
             <span className="flex-1 min-w-[140px] text-[14px] text-titulo dark:text-titulo-dark">¿El WhatsApp está bien?</span>

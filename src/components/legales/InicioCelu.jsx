@@ -113,7 +113,7 @@ export default function InicioCelu() {
           </span>
           <span className="min-w-0">
             <strong className="block text-[18px] leading-tight">Consulta rápida</strong>
-            <span className="block text-[13px] text-white/85">Pregunta algo legal (ART, escribanía, familia, penal…). 30 segundos y Franco lo llama.</span>
+            <span className="block text-[13px] text-white/85">Pregunta algo: ART, gestoría, escribanía, contratos, consumidor, familia… 30 segundos y Franco lo llama.</span>
           </span>
         </button>
 
