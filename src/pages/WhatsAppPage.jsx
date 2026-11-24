@@ -9,17 +9,50 @@
 //   · los mensajes que no se pudieron entregar.
 //
 // Ejemplo: «Siniestros · respondieron 12 en 8 min promedio · 2 esperando (1 hace 45 min)».
-// Se actualiza solo cada minuto mientras la pestaña está abierta.
+//
+// 📡 EN VIVO (sin F5): mientras esta pantalla está abierta, el cartero pregunta
+// cada 3 s (cada 15 s con la pestaña minimizada). Si entró o salió un mensaje,
+// el panel y los chats se recargan solos. 🔔 Suena un "ding" cuando escribe un
+// cliente (se apaga con el botón de la campanita). Respaldo: cada minuto.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 import {
-  HiArrowDown, HiArrowUp, HiCheckCircle, HiClock, HiExclamation, HiExternalLink,
+  HiArrowDown, HiArrowUp, HiBell, HiCheckCircle, HiClock, HiExclamation, HiExternalLink,
   HiChatAlt2, HiChartBar, HiLightningBolt, HiRefresh, HiReply, HiUser, HiXCircle,
 } from "react-icons/hi";
 
 import ChatsWhatsApp from "../components/whatsapp/ChatsWhatsApp";
-import { pedirResumen } from "../services/whatsapp";
+import useDatosVivos, { useAcelerarVivo } from "../hooks/useDatosVivos";
+import { ding, pedirResumen, setSonidoActivo, sonidoActivo } from "../services/whatsapp";
+
+// 🔔 Prender / apagar el ding de "entró un mensaje" (queda guardado en este navegador).
+function BotonSonido() {
+  const [on, setOn] = useState(sonidoActivo);
+  useEffect(() => {
+    const f = (e) => setOn(!!e.detail);
+    window.addEventListener("whatsapp-sonido", f);
+    return () => window.removeEventListener("whatsapp-sonido", f);
+  }, []);
+  const cambiar = () => {
+    setSonidoActivo(!on);
+    if (!on) ding(); // así escuchás cómo suena
+  };
+  return (
+    <button
+      type="button"
+      onClick={cambiar}
+      aria-pressed={on}
+      aria-label={on ? "Sonido prendido: tocá para apagarlo" : "Sonido apagado: tocá para prenderlo"}
+      title={on ? "Suena cuando escribe un cliente (tocá para apagar)" : "Sin sonido (tocá para prender)"}
+      className={`relative flex h-9 w-9 items-center justify-center rounded-lg border bg-card dark:bg-card-dark transition-colors ${
+        on ? "border-[#25D366]/50 text-[#128C4B] dark:text-[#25D366]" : "border-linea dark:border-linea-dark text-suave dark:text-suave-dark"}`}
+    >
+      <HiBell className="h-4 w-4" />
+      {!on && <span aria-hidden className="absolute h-[2px] w-5 rotate-45 rounded bg-current" />}
+    </button>
+  );
+}
 
 const PERIODOS = [
   { dias: 1, label: "Hoy" },
@@ -254,11 +287,18 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     cargar();
+    // Respaldo cada minuto: los "espera X min" cambian solos con el reloj.
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") cargar();
     }, 60000);
     return () => window.clearInterval(id);
   }, [cargar]);
+
+  // 📡 En vivo: con esta pantalla abierta el cartero pregunta cada 3 s (15 s
+  //    minimizada) y, si se movió algo de WhatsApp, el panel se recarga solo
+  //    (como mucho 1 vez cada 5 s; los chats se recargan por su cuenta).
+  useAcelerarVivo(3000, 15000);
+  useDatosVivos(["whatsapp"], cargar, { siempre: true, cadaMs: 5000, activo: vista === "panel" });
 
   const totales = useMemo(() => {
     const lineas = datos?.lineas || [];
@@ -291,6 +331,7 @@ export default function WhatsAppPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <BotonSonido />
             <div role="tablist" aria-label="Vista" className="inline-flex rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-0.5">
               {[["panel", "Panel", HiChartBar], ["chats", "Chats", HiChatAlt2]].map(([id, label, I]) => (
                 <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => { setVista(id); if (id === "chats") setChatInicial(null); }}

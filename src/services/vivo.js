@@ -17,6 +17,13 @@
 //   · Después de guardar algo (POST/PUT/PATCH/DELETE) pregunta enseguida:
 //     los contadores y las otras pantallas se ponen al día al toque.
 //
+// ⚡ ACELERAR (24/11/2026, WhatsApp): una pantalla que necesita enterarse al
+// toque (ej: los chats) le pide al cartero "preguntá cada 3 s" mientras está
+// abierta, y "cada 15 s aunque la pestaña esté minimizada" (para el "ding").
+// Al salir de esa pantalla, el cartero vuelve a sus 20 s de siempre.
+//   const soltar = acelerar(3000, 15000);  …  soltar();
+// (en React: useAcelerarVivo(3000, 15000) de src/hooks/useDatosVivos.js)
+//
 // Las pantallas se anotan con el hook src/hooks/useDatosVivos.js.
 // El indicador "● EN VIVO" del header lee el estado con escucharEstado().
 // Del lado del servidor: notificaciones/novedades.py.
@@ -192,9 +199,40 @@ let pronto = null;
 let activo = false;
 let ultimo404 = 0; // si el servidor no tiene el cartero, reintenta recién a los 5 min
 
+// ⚡ Pantallas que pidieron que el cartero pregunte más seguido.
+const aceleradores = new Map(); // id → { visible: ms|null, oculta: ms|null }
+let acelSeq = 0;
+
+const pestanaOculta = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+const preguntaOculta = () => [...aceleradores.values()].some((a) => a.oculta);
+
+// Cuánto esperar hasta la próxima pregunta: lo más rápido que pidió alguien
+// (según la pestaña esté a la vista o minimizada); si nadie pidió, 20 s.
+function demora() {
+  const oculta = pestanaOculta();
+  let ms = null;
+  aceleradores.forEach((a) => {
+    const v = oculta ? a.oculta : a.visible;
+    if (v && (ms === null || v < ms)) ms = v;
+  });
+  return ms === null ? CADA_MS : Math.min(ms, CADA_MS);
+}
+
+function programar() {
+  clearTimeout(timer);
+  timer = null;
+  if (!activo) return;
+  timer = setTimeout(async () => {
+    await revisar();
+    programar();
+  }, demora());
+}
+
 async function revisar() {
   if (!activo || comprobando) return;
-  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+  // Pestaña minimizada: no molestamos al servidor… salvo que una pantalla abierta
+  // lo haya pedido (ej: los chats de WhatsApp, para avisar que entró un mensaje).
+  if (pestanaOculta() && !preguntaOculta()) return;
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     setEstado({ modo: "sin_conexion" });
     return;
@@ -246,6 +284,24 @@ export function revisarPronto(ms = PRONTO_MS) {
 
 function alVolver() {
   if (document.visibilityState === "visible") revisar();
+  programar(); // a la vista / minimizada cambia cada cuánto se pregunta
+}
+
+/**
+ * ⚡ Pide que el cartero pregunte más seguido mientras esta pantalla esté abierta.
+ *   visibleMs: cada cuánto con la pestaña a la vista (ej: 3000).
+ *   ocultaMs:  cada cuánto con la pestaña minimizada (0 = no preguntar, como siempre).
+ * Devuelve la función para soltarlo (vuelve a los 20 s).
+ */
+export function acelerar(visibleMs, ocultaMs = 0) {
+  const id = ++acelSeq;
+  const v = Number(visibleMs) > 0 ? Math.max(1000, Number(visibleMs)) : null;
+  const o = Number(ocultaMs) > 0 ? Math.max(5000, Number(ocultaMs)) : null;
+  aceleradores.set(id, { visible: v, oculta: o });
+  programar();
+  return () => {
+    if (aceleradores.delete(id)) programar();
+  };
 }
 function alConectar() {
   revisar();
@@ -311,7 +367,7 @@ export function iniciar() {
   document.addEventListener("visibilitychange", alVolver);
   window.addEventListener("online", alConectar);
   window.addEventListener("offline", alDesconectar);
-  timer = setInterval(revisar, CADA_MS);
+  programar();
   revisar();
 }
 
@@ -319,7 +375,7 @@ export function iniciar() {
 export function detener() {
   if (!activo) return;
   activo = false;
-  clearInterval(timer);
+  clearTimeout(timer);
   clearTimeout(pronto);
   timer = null;
   pronto = null;
@@ -333,4 +389,4 @@ export function detener() {
   setEstado({ modo: "vivo", ultima: null, enEspera: 0 });
 }
 
-export default { iniciar, detener, suscribir, escucharEstado, getEstado, revisarPronto, hayFormularioAbierto, disponible };
+export default { iniciar, detener, suscribir, escucharEstado, getEstado, revisarPronto, hayFormularioAbierto, disponible, acelerar };

@@ -57,6 +57,7 @@ import { fetchContadoresServicios } from "./store/slices/serviciosSlice";
 import { invalidarCachesVivo } from "./store/slices/pagosSlice";
 import { invalidarCacheSiniestrosCliente } from "./hooks/useSiniestrosCliente";
 import { invalidarCacheAlertasCliente } from "./hooks/useAlertasCliente";
+import { ding, pedirPendientes as pedirWhatsAppPendientes, prepararSonido, sonidoActivo } from "./services/whatsapp";
 
 // 🚀 NUEVA APP: COTIZACIONES
 const CotizacionesPage = lazyConReintento(() => import("./pages/CotizacionesPage"));
@@ -109,6 +110,8 @@ function App() {
   const esAbogadoRol = user?.perfil?.rol === "ABOGADO";
   const veLegales = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   const soloUnModulo = esGestor || esAbogadoRol;
+  // 💬 WhatsApp (YCloud): por ahora solo lo ve el admin.
+  const veWhatsApp = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
 
   // 🎭 ENTRADA «TELÓN» (17/11/2026): reemplaza a la pantalla de bienvenida de antes.
   //    Arranca APAGADA. Solo se prende una vez por login (ver useEffect abajo) y para
@@ -167,6 +170,11 @@ function App() {
 
   // ⚖️ Contador Legales: fechas vencidas sin marcar + casos demorados (30 días sin novedades).
   const [legalesAlertas, setLegalesAlertas] = useState(0);
+
+  // 💬 Contador WhatsApp (solo admin): clientes que escribieron y esperan respuesta
+  //    (y todavía se les puede contestar: ventana de 24 h abierta).
+  const [whatsappEsperando, setWhatsappEsperando] = useState(0);
+  const ultimoEntranteRef = useRef(null); // último mensaje de un cliente que ya vimos (para el "ding")
 
   // ====== Helper: API ROOT ======
   const getApiRoot = () => {
@@ -363,6 +371,27 @@ function App() {
     }
   };
 
+  // 💬 ====== WhatsApp: esperando respuesta + "ding" (solo admin) ======
+  //    Ejemplo: entra «Hola, choqué» → el cartero avisa "whatsapp" → acá se pide
+  //    el contador (globito rojo en el menú), suena el ding y la pestaña dice «(1) THAMES».
+  const fetchWhatsAppPendientes = async () => {
+    if (!user || !veWhatsApp) {
+      setWhatsappEsperando(0);
+      return;
+    }
+    try {
+      const data = await pedirWhatsAppPendientes();
+      setWhatsappEsperando(Number(data?.esperando) || 0);
+      const id = Number(data?.ultimo_entrante?.id) || 0;
+      const antes = ultimoEntranteRef.current;
+      ultimoEntranteRef.current = Math.max(antes || 0, id);
+      // La primera vez solo anotamos dónde estamos (no suena por lo viejo).
+      if (antes !== null && id > antes && sonidoActivo()) ding();
+    } catch {
+      /* se reintenta con el próximo aviso */
+    }
+  };
+
   // 🚀 ====== Servicios Fijos: fetch (solo admin) ======
   const fetchServiciosCounters = async () => {
     if (!user) return;
@@ -432,6 +461,7 @@ function App() {
     fetchSiniestrosCount();
     fetchServiciosCounters();
     fetchControlDiarioCount();
+    fetchWhatsAppPendientes();
   };
   const refrescarSiViejoRef = useRef(() => {});
   refrescarSiViejoRef.current = (ms = 30_000) => {
@@ -452,9 +482,10 @@ function App() {
     if (toca("servicios")) fetchServiciosCounters();
     if (toca("gestoria")) fetchGestoriaCount();
     if (toca("legales")) fetchLegalesCount();
+    if (toca("whatsapp")) fetchWhatsAppPendientes();
   };
   useDatosVivos(
-    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios", "gestoria", "legales"],
+    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios", "gestoria", "legales", "whatsapp"],
     (temas) => refrescarPorTemaRef.current(temas),
     { activo: !!user && !soloUnModulo, siempre: true }
   );
@@ -476,6 +507,19 @@ function App() {
     },
     { activo: !!user && !soloUnModulo, siempre: true }
   );
+
+  // 💬 WhatsApp: el número de clientes esperando también va en la pestaña del
+  //    navegador («(2) THAMES»), así se ve aunque estés en otra pestaña.
+  //    Y se deja listo el parlante para el ding (los navegadores piden un clic antes).
+  useEffect(() => {
+    if (veWhatsApp) prepararSonido();
+    const n = veWhatsApp ? whatsappEsperando : 0; // al cerrar sesión se saca el número
+    const base = document.title.replace(/^\(\d+\) /, "");
+    document.title = n > 0 ? `(${n}) ${base}` : base;
+  }, [veWhatsApp, whatsappEsperando, marca?.tituloPestana]);
+  useEffect(() => {
+    if (!user) ultimoEntranteRef.current = null; // otra sesión: arranca de cero (sin ding por lo viejo)
+  }, [user]);
 
   // 📡 El cartero anda mientras haya sesión (1 solo para toda la app).
   useEffect(() => {
@@ -713,6 +757,7 @@ function App() {
           controlDiarioPendientes={controlDiarioPendientes}
           gestoriaDemorados={gestoriaDemorados}
           legalesAlertas={legalesAlertas}
+          whatsappEsperando={whatsappEsperando}
           user={user}
         />
 
@@ -832,6 +877,7 @@ function App() {
         controlDiarioPendientes={controlDiarioPendientes}
         gestoriaDemorados={gestoriaDemorados}
         legalesAlertas={legalesAlertas}
+        whatsappEsperando={whatsappEsperando}
       />
     </>
   );

@@ -22,10 +22,13 @@
 // Temas (los mismos del servidor, notificaciones/novedades.py):
 //   polizas · cupones · cuotas · pagos · caja · recaudacion · clientes ·
 //   solicitudes · siniestros · bajas · tareas · servicios · legales ·
-//   mensajes · ranking · cotizaciones
+//   mensajes · ranking · cotizaciones · whatsapp (solo admin)
+//
+// ⚡ useAcelerarVivo(3000, 15000): mientras la pantalla está abierta, el
+// cartero pregunta cada 3 s (y cada 15 s con la pestaña minimizada).
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from "react";
-import { suscribir } from "../services/vivo";
+import { acelerar, suscribir } from "../services/vivo";
 
 export default function useDatosVivos(dominios, recargar, opciones = {}) {
   const fnRef = useRef(recargar);
@@ -138,4 +141,16 @@ export function useResaltarNuevos(items, getKey, duracionMs = 8000) {
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   return { nuevos, marcar, olvidar };
+}
+
+/**
+ * ⚡ Mientras esta pantalla está abierta, el cartero pregunta más seguido.
+ *   useAcelerarVivo(3000, 15000)  → cada 3 s a la vista, cada 15 s minimizada.
+ * Al salir de la pantalla vuelve solo a los 20 s de siempre.
+ */
+export function useAcelerarVivo(visibleMs, ocultaMs = 0, activo = true) {
+  useEffect(() => {
+    if (!activo) return undefined;
+    return acelerar(visibleMs, ocultaMs);
+  }, [visibleMs, ocultaMs, activo]);
 }

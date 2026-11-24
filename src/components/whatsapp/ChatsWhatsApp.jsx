@@ -9,6 +9,11 @@
 // Regla de WhatsApp: se puede escribir libre hasta 24 h después del último
 // mensaje del cliente. Pasado eso, se avisa y se ofrece abrir el chat en el celu.
 //
+// 📡 EN VIVO: no hace falta F5. Cuando entra un mensaje (o lo contestan desde el
+// celu, o pasa a "leído"), el cartero avisa "whatsapp" y la lista y la charla
+// abierta se recargan solas (la pantalla de WhatsApp le pide al cartero que
+// pregunte cada 3 s). Respaldo: cada 60 s igual (para los "espera X min").
+//
 //   <ChatsWhatsApp inicial={{ linea: 1, tel: "5491122334455" }} />
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -19,6 +24,26 @@ import {
 } from "react-icons/hi";
 
 import { enviarAudio, enviarTexto, pedirConversaciones, pedirHilo, urlMedia } from "../../services/whatsapp";
+import useDatosVivos from "../../hooks/useDatosVivos";
+import { disponible as vivoDisponible } from "../../services/vivo";
+
+// Respaldo por si el cartero no anda: cada 60 s con el cartero, cada 8 s sin él.
+function useRespaldo(fn, activo = true) {
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+  useEffect(() => {
+    if (!activo) return undefined;
+    let ultima = Date.now();
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      const cada = vivoDisponible() ? 60000 : 8000;
+      if (Date.now() - ultima < cada) return;
+      ultima = Date.now();
+      fnRef.current();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [activo]);
+}
 
 // ── helpers ─────────────────────────────────────────────
 function telefonoLindo(t = "") {
@@ -201,6 +226,10 @@ export default function ChatsWhatsApp({ inicial = null }) {
   const [aviso, setAviso] = useState("");
   const fondo = useRef(null);
   const grab = useGrabadora();
+  // La charla que está abierta AHORA (si la respuesta de una recarga llega tarde
+  // y mientras tanto abriste otro chat, no la mostramos).
+  const abiertoRef = useRef(abierto);
+  abiertoRef.current = abierto;
 
   const cargarLista = useCallback(async () => {
     try {
@@ -213,7 +242,8 @@ export default function ChatsWhatsApp({ inicial = null }) {
   const cargarHilo = useCallback(async () => {
     if (!abierto) return;
     try {
-      setHilo(await pedirHilo(abierto.linea, abierto.tel));
+      const h = await pedirHilo(abierto.linea, abierto.tel);
+      if (abiertoRef.current === abierto) setHilo(h);
     } catch {
       /* se reintenta solo */
     }
@@ -221,17 +251,18 @@ export default function ChatsWhatsApp({ inicial = null }) {
 
   useEffect(() => {
     cargarLista();
-    const id = window.setInterval(() => document.visibilityState === "visible" && cargarLista(), 20000);
-    return () => window.clearInterval(id);
   }, [cargarLista]);
 
   useEffect(() => {
     setHilo(null);
     setAviso("");
     cargarHilo();
-    const id = window.setInterval(() => document.visibilityState === "visible" && cargarHilo(), 8000);
-    return () => window.clearInterval(id);
   }, [cargarHilo]);
+
+  // 📡 Entró / salió / cambió de estado un mensaje → recargamos en silencio.
+  useDatosVivos(["whatsapp"], () => Promise.all([cargarLista(), cargarHilo()]), { siempre: true });
+  useRespaldo(cargarLista);
+  useRespaldo(cargarHilo, !!abierto);
 
   const cantidad = hilo?.mensajes?.length || 0;
   useEffect(() => {
