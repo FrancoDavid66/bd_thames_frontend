@@ -134,8 +134,10 @@ export function buildMenuGroups({
         { to: "/polizas", label: "Pólizas", icon: "doc" },
         { to: "/solicitudes", label: "Altas", icon: "clipboard" },
         { to: "/pagos", label: "Gestión de Pagos", icon: "cash", highlight: "verde" },
-        // 📲 24/11/2026: «Mensajes» (no se usaba) le dejó su lugar al panel de WhatsApp.
-        //    Solo admin. La pantalla vieja sigue andando en /mensajes por si hace falta el reporte.
+        // 💬 Mensajes: reporte de contactos (PDF/Excel) + control de lo que se mandó por WhatsApp.
+        //    Lo usan los chicos para mandar los mensajes a mano → lo ven TODOS.
+        { to: "/mensajes", label: "Mensajes", icon: "chat" },
+        // 📲 WhatsApp (YCloud): panel y chats. Solo admin.
         ...(isAdmin ? [{ to: "/whatsapp", label: "WhatsApp", icon: "whatsapp", badge: whatsappEsperando, tone: "rojo", nuevo: "2026-12-08" }] : []),
         { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
         // 💬 Consultas (antes «Legales»): consulta rápida, casos, turnos con el abogado y "Cargar una denuncia"
