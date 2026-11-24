@@ -133,8 +133,9 @@ export function buildMenuGroups({
         { to: "/polizas", label: "Pólizas", icon: "doc" },
         { to: "/solicitudes", label: "Altas", icon: "clipboard" },
         { to: "/pagos", label: "Gestión de Pagos", icon: "cash", highlight: "verde" },
-        // 💬 Mensajes: reporte de contactos + control de lo que se mandó por WhatsApp.
-        { to: "/mensajes", label: "Mensajes", icon: "chat" },
+        // 📲 24/11/2026: «Mensajes» (no se usaba) le dejó su lugar al panel de WhatsApp.
+        //    Solo admin. La pantalla vieja sigue andando en /mensajes por si hace falta el reporte.
+        ...(isAdmin ? [{ to: "/whatsapp", label: "WhatsApp", icon: "whatsapp", nuevo: "2026-12-08" }] : []),
         { to: "/siniestros", label: "Siniestros", icon: "doc", badge: siniestrosAbiertos, tone: "rojo" },
         // 💬 Consultas (antes «Legales»): consulta rápida, casos, turnos con el abogado y "Cargar una denuncia"
         //    (badge = vencidas + demorados + para llamar).
@@ -164,8 +165,6 @@ export function buildMenuGroups({
       items: [
         { to: "/cotizaciones", label: "Cotizador", icon: "receipt" },
         { to: "/estadisticas", label: "Estadísticas", icon: "chart" },
-        // 📲 WhatsApp: quién espera respuesta y cuánto tardan (YCloud). Solo admin.
-        { to: "/whatsapp", label: "WhatsApp", icon: "whatsapp", nuevo: "2026-12-08" },
         { to: "/admin", label: "Configuración", icon: "cog" },
       ],
     }] : []),
