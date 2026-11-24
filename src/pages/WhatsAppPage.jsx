@@ -15,9 +15,10 @@ import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 import {
   HiArrowDown, HiArrowUp, HiCheckCircle, HiClock, HiExclamation, HiExternalLink,
-  HiLightningBolt, HiRefresh, HiUser, HiXCircle,
+  HiChatAlt2, HiChartBar, HiLightningBolt, HiRefresh, HiReply, HiUser, HiXCircle,
 } from "react-icons/hi";
 
+import ChatsWhatsApp from "../components/whatsapp/ChatsWhatsApp";
 import { pedirResumen } from "../services/whatsapp";
 
 const PERIODOS = [
@@ -116,7 +117,7 @@ function Tarjeta({ icono: Icono, titulo, valor, detalle, tono = "azul" }) {
   );
 }
 
-function Esperando({ c, umbral }) {
+function Esperando({ c, umbral, onResponder }) {
   const nombre = c.cliente_nombre || telefonoLindo(c.cliente_tel);
   return (
     <li className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center ${
@@ -150,20 +151,19 @@ function Esperando({ c, umbral }) {
             <HiUser className="h-3.5 w-3.5" /> Ficha
           </Link>
         )}
-        <a
-          href={`https://wa.me/${c.cliente_tel}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => onResponder(c)}
           className="inline-flex h-8 items-center gap-1 rounded-lg bg-[#25D366] px-2.5 text-[12px] font-semibold text-white hover:brightness-105"
         >
-          <FaWhatsapp className="h-3.5 w-3.5" /> Abrir chat
-        </a>
+          <HiReply className="h-3.5 w-3.5" /> Responder
+        </button>
       </div>
     </li>
   );
 }
 
-function Linea({ l, umbral }) {
+function Linea({ l, umbral, onResponder }) {
   const r = ritmo(l.promedio_respuesta_min);
   const esperando = l.sin_responder || [];
   return (
@@ -214,7 +214,7 @@ function Linea({ l, umbral }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {esperando.map((c) => (
-              <Esperando key={c.cliente_tel} c={c} umbral={umbral} />
+              <Esperando key={c.cliente_tel} c={c} umbral={umbral} onResponder={(x) => onResponder(l.id, x.cliente_tel)} />
             ))}
           </ul>
         )}
@@ -230,6 +230,13 @@ export default function WhatsAppPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [actualizado, setActualizado] = useState(null);
+  // 💬 «Panel» (números) o «Chats» (leer y responder). «Responder» en el panel abre ese chat.
+  const [vista, setVista] = useState("panel");
+  const [chatInicial, setChatInicial] = useState(null);
+  const responder = (linea, tel) => {
+    setChatInicial({ linea, tel });
+    setVista("chats");
+  };
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -284,6 +291,16 @@ export default function WhatsAppPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <div role="tablist" aria-label="Vista" className="inline-flex rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-0.5">
+              {[["panel", "Panel", HiChartBar], ["chats", "Chats", HiChatAlt2]].map(([id, label, I]) => (
+                <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => { setVista(id); if (id === "chats") setChatInicial(null); }}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold transition-colors ${
+                    vista === id ? "bg-[#25D366] text-white" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}>
+                  <I className="h-4 w-4" /> {label}
+                </button>
+              ))}
+            </div>
+            {vista === "panel" && (<>
             <Segmentos etiqueta="Período" opciones={PERIODOS} valor={dias} onChange={setDias} clave="dias" />
             <Segmentos etiqueta="Límite de espera" opciones={UMBRALES} valor={umbral} onChange={setUmbral} clave="min" />
             <button
@@ -295,9 +312,13 @@ export default function WhatsAppPage() {
             >
               <HiRefresh className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
             </button>
+            </>)}
           </div>
         </div>
 
+        {vista === "chats" ? (
+          <ChatsWhatsApp key={chatInicial ? `${chatInicial.linea}-${chatInicial.tel}` : "lista"} inicial={chatInicial} />
+        ) : (<>
         {/* Estado de la conexión con YCloud */}
         {config && (
           !config.ultimo_evento ? (
@@ -351,7 +372,7 @@ export default function WhatsAppPage() {
                   No hay líneas conectadas todavía.
                 </p>
               ) : (
-                datos.lineas.map((l) => <Linea key={l.id} l={l} umbral={umbral} />)
+                datos.lineas.map((l) => <Linea key={l.id} l={l} umbral={umbral} onResponder={responder} />)
               )}
             </div>
 
@@ -362,6 +383,7 @@ export default function WhatsAppPage() {
             </p>
           </>
         )}
+        </>)}
       </div>
     </div>
   );
