@@ -19,6 +19,17 @@
 
 export const NOVEDADES = [
   {
+    id: "2026-11-24-whatsapp",
+    fecha: "2026-11-24",
+    emoji: "📲",
+    titulo: "Nuevo: panel de WhatsApp",
+    texto:
+      "Ves quién está esperando respuesta en cada línea de WhatsApp y cuánto tardan en contestar. " +
+      "Si alguien espera más de 15 minutos, aparece en rojo. Por ahora está la línea de Siniestros; después se suman las oficinas.",
+    link: { to: "/whatsapp", texto: "Ver el panel" },
+    roles: ["ADMIN"],
+  },
+  {
     id: "2026-11-23-consultas",
     fecha: "2026-11-23",
     emoji: "💬",

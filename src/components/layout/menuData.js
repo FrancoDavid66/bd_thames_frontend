@@ -13,7 +13,7 @@ import {
   HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2, HiTruck, HiQuestionMarkCircle,
 } from "react-icons/hi";
 // 🎮 Ícono del minijuego (Heroicons v1 no trae un joystick)
-import { FaGamepad } from "react-icons/fa";
+import { FaGamepad, FaWhatsapp } from "react-icons/fa";
 
 export const ICON_MAP = {
   home: HiHome, users: HiUsers, doc: HiDocumentText, money: HiCurrencyDollar,
@@ -25,6 +25,7 @@ export const ICON_MAP = {
   game: FaGamepad,
   truck: HiTruck,
   consulta: HiQuestionMarkCircle, // 💬 23/11/2026: «Consultas» (antes «Legales»)
+  whatsapp: FaWhatsapp,            // 📲 24/11/2026: panel de WhatsApp (YCloud)
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -163,6 +164,8 @@ export function buildMenuGroups({
       items: [
         { to: "/cotizaciones", label: "Cotizador", icon: "receipt" },
         { to: "/estadisticas", label: "Estadísticas", icon: "chart" },
+        // 📲 WhatsApp: quién espera respuesta y cuánto tardan (YCloud). Solo admin.
+        { to: "/whatsapp", label: "WhatsApp", icon: "whatsapp", nuevo: "2026-12-08" },
         { to: "/admin", label: "Configuración", icon: "cog" },
       ],
     }] : []),

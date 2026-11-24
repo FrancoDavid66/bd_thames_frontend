@@ -50,6 +50,8 @@ const RecaudacionPage = lazyConReintento(() => import("./pages/RecaudacionPage")
 
 // 🚀 NUEVA APP: SERVICIOS Y GASTOS FIJOS
 const ServiciosPage = lazyConReintento(() => import("./pages/ServiciosPage"));
+// 📲 WhatsApp oficial (YCloud): panel de respuestas por línea — solo admin
+const WhatsAppPage = lazyConReintento(() => import("./pages/WhatsAppPage"));
 // 🚀 Thunk de contadores
 import { fetchContadoresServicios } from "./store/slices/serviciosSlice";
 import { invalidarCachesVivo } from "./store/slices/pagosSlice";
@@ -788,6 +790,12 @@ function App() {
 
                 {/* 🚀 NUEVA RUTA DE COTIZACIONES */}
                 <Route path="/cotizaciones" element={<CotizacionesPage />} />
+
+                {/* 📲 WHATSAPP: tiempos de respuesta y clientes esperando (Solo Admin) */}
+                <Route
+                  path="/whatsapp"
+                  element={user.perfil?.rol === 'ADMIN' ? <WhatsAppPage /> : <Navigate to="/" replace />}
+                />
 
                 {/* 🚀 RUTA PROTEGIDA PARA ADMIN PANEL */}
                 <Route
