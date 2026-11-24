@@ -294,8 +294,8 @@ export default function EstadisticasWhatsApp({ lineas = null, onAbrirChat }) {
                         <td className={`pr-1 text-[11px] ${suave}`}>{DIAS[d]}</td>
                         {fila.slice(7, 23).map((n, i) => (
                           <td key={i} title={`${DIAS[d]} ${i + 7}:00 → ${n} mensajes`}
-                            className="h-5 w-6 rounded-[3px]"
-                            style={{ background: n ? `rgba(37, 211, 102, ${0.12 + 0.88 * (n / maxHora)})` : "var(--color-surface, rgba(127,127,127,0.08))" }} />
+                            className={`h-5 w-6 rounded-[3px] ${n ? "" : "bg-surface dark:bg-surface-dark"}`}
+                            style={n ? { background: `rgba(37, 211, 102, ${0.15 + 0.85 * (n / maxHora)})` } : undefined} />
                         ))}
                       </tr>
                     ))}
