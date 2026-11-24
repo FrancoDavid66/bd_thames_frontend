@@ -9,6 +9,10 @@
 // Regla de WhatsApp: se puede escribir libre hasta 24 h después del último
 // mensaje del cliente. Pasado eso, se avisa y se ofrece abrir el chat en el celu.
 //
+// 📎 FOTOS Y PDF: tocar el clip, ARRASTRAR los archivos al chat o pegarlos con
+// Ctrl+V (ej: una captura). Se ven antes de mandar y se les puede poner un texto
+// abajo («Te mando la póliza»). Las fotos pesadas se achican solas a JPG.
+//
 // 📡 EN VIVO: no hace falta F5. Cuando entra un mensaje (o lo contestan desde el
 // celu, o pasa a "leído"), el cartero avisa "whatsapp" y la lista y la charla
 // abierta se recargan solas (la pantalla de WhatsApp le pide al cartero que
@@ -19,11 +23,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 import {
-  HiArrowLeft, HiCheck, HiDocumentText, HiExclamation, HiMicrophone, HiPaperAirplane,
-  HiPhotograph, HiPlay, HiSearch, HiStop, HiTrash, HiUser,
+  HiArrowLeft, HiCheck, HiDocumentText, HiDownload, HiExclamation, HiExternalLink, HiMicrophone,
+  HiPaperAirplane, HiPaperClip, HiPhotograph, HiPlay, HiSearch, HiStop, HiTrash, HiUpload, HiUser, HiX,
 } from "react-icons/hi";
 
-import { enviarAudio, enviarTexto, pedirConversaciones, pedirHilo, urlMedia } from "../../services/whatsapp";
+import {
+  enviarArchivo, enviarAudio, enviarTexto, pedirConversaciones, pedirHilo, pesoLindo, prepararAdjunto, urlMedia,
+} from "../../services/whatsapp";
 import useDatosVivos from "../../hooks/useDatosVivos";
 import { disponible as vivoDisponible } from "../../services/vivo";
 
@@ -76,6 +82,13 @@ function duracion(min) {
   if (min < 1440) return `${Math.floor(min / 60)} h`;
   return `${Math.floor(min / 1440)} d`;
 }
+// «[Imagen] Así quedó» → «📷 Así quedó» (como lo muestra WhatsApp en la lista).
+function vistaPrevia(t = "") {
+  const m = /^\[(Imagen|Documento|Audio|Video|Sticker)\]\s*(.*)$/s.exec(t || "");
+  if (!m) return t;
+  const [icono, solo] = { Imagen: ["📷", "Foto"], Documento: ["📄", "Archivo"], Audio: ["🎤", "Nota de voz"], Video: ["🎥", "Video"], Sticker: ["🙂", "Sticker"] }[m[1]];
+  return `${icono} ${m[2] || solo}`;
+}
 const letra = (nombre, tel) => ((nombre || "").trim()[0] || String(tel).slice(-2, -1) || "?").toUpperCase();
 
 // ── Audio / foto / documento de un mensaje ─────────────
@@ -84,8 +97,9 @@ function Adjunto({ m }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
   const tipo = m.tipo;
+  const caja = useRef(null);
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setCargando(true);
     setError("");
     try {
@@ -95,7 +109,21 @@ function Adjunto({ m }) {
     } finally {
       setCargando(false);
     }
-  };
+  }, [m.id]);
+
+  // 🖼️ Las fotos se cargan solas cuando aparecen en pantalla (como en WhatsApp).
+  const esFoto = tipo === "image" || tipo === "sticker";
+  useEffect(() => {
+    if (!esFoto || url || !caja.current || typeof IntersectionObserver === "undefined") return undefined;
+    const ob = new IntersectionObserver((entradas) => {
+      if (entradas.some((e) => e.isIntersecting)) {
+        ob.disconnect();
+        cargar();
+      }
+    }, { rootMargin: "200px" });
+    ob.observe(caja.current);
+    return () => ob.disconnect();
+  }, [esFoto, url, cargar]);
 
   if (tipo === "audio") {
     return url ? (
@@ -108,21 +136,42 @@ function Adjunto({ m }) {
       </button>
     );
   }
-  if (tipo === "image" || tipo === "sticker") {
+  if (esFoto) {
     return url ? (
-      <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Foto del chat" className="max-h-64 rounded-lg" /></a>
+      <a href={url} target="_blank" rel="noreferrer" title="Ver la foto grande">
+        <img src={url} alt="Foto del chat" className="max-h-64 max-w-full rounded-lg" />
+      </a>
     ) : (
-      <button type="button" onClick={cargar} disabled={cargando}
-        className="inline-flex items-center gap-2 rounded-full bg-black/5 dark:bg-white/10 px-3 py-1.5 text-[13px] font-medium">
-        <HiPhotograph className="h-4 w-4" /> {cargando ? "Cargando…" : "Ver foto"}
+      <button ref={caja} type="button" onClick={cargar} disabled={cargando}
+        className="inline-flex h-24 w-40 items-center justify-center gap-2 rounded-lg bg-black/5 dark:bg-white/10 text-[13px] font-medium">
+        <HiPhotograph className="h-5 w-5" /> {cargando ? "Cargando…" : error || "Ver foto"}
       </button>
     );
   }
+  // 📄 PDF / archivo: tarjeta con el nombre; «Ver» lo trae y después Abrir / Descargar.
+  const nombre = m.media_nombre || (tipo === "video" ? "Video" : "Archivo");
+  const esPdf = (m.media_mime || "").includes("pdf") || /\.pdf$/i.test(nombre);
   return (
-    <button type="button" onClick={async () => { await cargar(); }} disabled={cargando}
-      className="inline-flex items-center gap-2 rounded-full bg-black/5 dark:bg-white/10 px-3 py-1.5 text-[13px] font-medium">
-      <HiDocumentText className="h-4 w-4" /> {url ? <a href={url} target="_blank" rel="noreferrer">Abrir archivo</a> : cargando ? "Cargando…" : "Ver archivo"}
-    </button>
+    <div className="flex w-64 max-w-full items-center gap-2.5 rounded-lg bg-black/5 dark:bg-white/10 p-2">
+      <span className={`flex h-10 w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-bold text-white ${esPdf ? "bg-[#e5252a]" : "bg-[#54656f]"}`}>
+        {esPdf ? "PDF" : <HiDocumentText className="h-5 w-5" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium" title={nombre}>{nombre}</p>
+        {error ? (
+          <p className="text-[11px] text-duo-rojo">{error}</p>
+        ) : url ? (
+          <div className="flex gap-3 text-[12px] font-semibold text-[#027eb5] dark:text-[#53bdeb]">
+            <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5"><HiExternalLink className="h-3.5 w-3.5" /> Abrir</a>
+            <a href={url} download={nombre} className="inline-flex items-center gap-0.5"><HiDownload className="h-3.5 w-3.5" /> Descargar</a>
+          </div>
+        ) : (
+          <button type="button" onClick={cargar} disabled={cargando} className="text-[12px] font-semibold text-[#027eb5] dark:text-[#53bdeb]">
+            {cargando ? "Cargando…" : "Ver archivo"}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -138,7 +187,8 @@ function Burbuja({ m }) {
   const mio = m.direccion === "SALIENTE";
   const quien = !mio ? "" : m.origen === "APP" ? "celu" : m.enviado_por ? `THAMES · ${m.enviado_por}` : "THAMES";
   const conMedia = m.tiene_media && ["audio", "image", "sticker", "video", "document"].includes(m.tipo);
-  const textoVisible = conMedia && /^\[(Audio|Imagen|Sticker|Video|Documento)\]/.test(m.texto) ? m.texto.replace(/^\[[^\]]+\]\s*/, "") : m.texto;
+  let textoVisible = conMedia && /^\[(Audio|Imagen|Sticker|Video|Documento)\]/.test(m.texto) ? m.texto.replace(/^\[[^\]]+\]\s*/, "") : m.texto;
+  if (conMedia && m.media_nombre && textoVisible === m.media_nombre) textoVisible = ""; // el nombre ya está en la tarjeta
   return (
     <div className={`flex ${mio ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-[14px] shadow-sm sm:max-w-[70%] ${
@@ -230,6 +280,14 @@ export default function ChatsWhatsApp({ inicial = null }) {
   // y mientras tanto abriste otro chat, no la mostramos).
   const abiertoRef = useRef(abierto);
   abiertoRef.current = abierto;
+  // 📎 Fotos / PDF elegidos para mandar (se ven abajo antes de mandarlos).
+  const [adjuntos, setAdjuntos] = useState([]); // [{ id, archivo, tipo, nombre, url }]
+  const [progreso, setProgreso] = useState("");
+  const [arrastrando, setArrastrando] = useState(false);
+  const elegirArchivo = useRef(null);
+  const capasArrastre = useRef(0);
+  const adjuntosRef = useRef(adjuntos);
+  adjuntosRef.current = adjuntos;
 
   const cargarLista = useCallback(async () => {
     try {
@@ -258,6 +316,33 @@ export default function ChatsWhatsApp({ inicial = null }) {
     setAviso("");
     cargarHilo();
   }, [cargarHilo]);
+
+  // Al cambiar de chat (o salir) se descartan los adjuntos sin mandar.
+  const soltarAdjuntos = useCallback((lista) => lista.forEach((a) => a.url && URL.revokeObjectURL(a.url)), []);
+  useEffect(() => {
+    setAdjuntos((prev) => {
+      soltarAdjuntos(prev);
+      return [];
+    });
+    setArrastrando(false);
+    capasArrastre.current = 0;
+  }, [abierto, soltarAdjuntos]);
+  useEffect(() => () => soltarAdjuntos(adjuntosRef.current), [soltarAdjuntos]);
+
+  // 🛡️ Si se suelta un archivo FUERA del chat, Chrome lo abriría y te sacaría de
+  //    THAMES. Mientras esta pantalla está abierta, eso no pasa.
+  useEffect(() => {
+    const esArchivo = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+    const frenar = (e) => {
+      if (esArchivo(e)) e.preventDefault();
+    };
+    window.addEventListener("dragover", frenar);
+    window.addEventListener("drop", frenar);
+    return () => {
+      window.removeEventListener("dragover", frenar);
+      window.removeEventListener("drop", frenar);
+    };
+  }, []);
 
   // 📡 Entró / salió / cambió de estado un mensaje → recargamos en silencio.
   useDatosVivos(["whatsapp"], () => Promise.all([cargarLista(), cargarHilo()]), { siempre: true });
@@ -292,6 +377,92 @@ export default function ChatsWhatsApp({ inicial = null }) {
     } finally {
       setEnviando(false);
     }
+  };
+
+  // 📎 Sumar archivos (del clip, arrastrados o pegados). Máximo 10 por vez.
+  const agregarArchivos = async (lista) => {
+    const archivos = Array.from(lista || []);
+    if (!archivos.length) return;
+    setAviso("");
+    const lugar = 10 - adjuntosRef.current.length;
+    const errores = [];
+    if (archivos.length > lugar) errores.push("Se pueden mandar hasta 10 archivos por vez.");
+    const nuevos = [];
+    for (const f of archivos.slice(0, Math.max(0, lugar))) {
+      const a = await prepararAdjunto(f);
+      if (a.error) errores.push(a.error);
+      else nuevos.push({ ...a, id: `${Date.now()}-${Math.random()}`, url: a.tipo === "image" ? URL.createObjectURL(a.archivo) : "" });
+    }
+    if (nuevos.length) setAdjuntos((prev) => [...prev, ...nuevos]);
+    if (errores.length) setAviso(errores.join(" "));
+  };
+
+  const quitarAdjunto = (id) => setAdjuntos((prev) => {
+    const a = prev.find((x) => x.id === id);
+    if (a) soltarAdjuntos([a]);
+    return prev.filter((x) => x.id !== id);
+  });
+
+  // Se mandan de a uno (como en WhatsApp). El texto va abajo del primero.
+  const mandarAdjuntos = async () => {
+    const cola = [...adjuntosRef.current];
+    if (!cola.length || enviando || !abierto) return;
+    setEnviando(true);
+    setAviso("");
+    const leyenda = texto.trim();
+    try {
+      for (let i = 0; i < cola.length; i++) {
+        const a = cola[i];
+        const cual = cola.length > 1 ? ` ${i + 1} de ${cola.length}` : "";
+        setProgreso(`Mandando${cual}…`);
+        const m = await enviarArchivo(abierto.linea, abierto.tel, a.archivo, i === 0 ? leyenda : "",
+          (pct) => setProgreso(`Mandando${cual}… ${pct}%`));
+        agregar(m);
+        if (i === 0 && leyenda) setTexto("");
+        quitarAdjunto(a.id);
+      }
+      cargarLista();
+    } catch (e) {
+      setAviso(errorDe(e)); // los que no salieron quedan abajo para reintentar
+    } finally {
+      setEnviando(false);
+      setProgreso("");
+    }
+  };
+
+  const mandar = () => (adjuntos.length ? mandarAdjuntos() : mandarTexto());
+
+  // Arrastrar y soltar: el contador evita que el cartel parpadee al pasar por encima de las burbujas.
+  const conArchivos = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+  const puedeAdjuntar = !!(abierto && hilo?.ventana?.abierta && !grab.grabando);
+  const arrastre = {
+    onDragEnter: (e) => {
+      if (!conArchivos(e)) return;
+      e.preventDefault();
+      capasArrastre.current += 1;
+      setArrastrando(true);
+    },
+    onDragOver: (e) => {
+      if (!conArchivos(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = puedeAdjuntar ? "copy" : "none";
+    },
+    onDragLeave: (e) => {
+      if (!conArchivos(e)) return;
+      capasArrastre.current = Math.max(0, capasArrastre.current - 1);
+      if (!capasArrastre.current) setArrastrando(false);
+    },
+    onDrop: (e) => {
+      if (!conArchivos(e)) return;
+      e.preventDefault();
+      capasArrastre.current = 0;
+      setArrastrando(false);
+      if (!puedeAdjuntar) {
+        setAviso(hilo && !hilo.ventana?.abierta ? "Pasaron más de 24 h: este chat no acepta archivos desde THAMES." : "");
+        return;
+      }
+      agregarArchivos(e.dataTransfer.files);
+    },
   };
 
   const microfono = async () => {
@@ -379,7 +550,7 @@ export default function ChatsWhatsApp({ inicial = null }) {
                     </span>
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-[13px] text-suave dark:text-suave-dark">
-                        {c.ultimo_direccion === "SALIENTE" && "Vos: "}{c.ultimo_texto || "…"}
+                        {c.ultimo_direccion === "SALIENTE" && "Vos: "}{vistaPrevia(c.ultimo_texto) || "…"}
                       </span>
                       {c.esperando && (
                         <span className="shrink-0 rounded-full bg-duo-rojo px-1.5 py-0.5 text-[10px] font-bold text-white">espera {duracion(c.esperando_min)}</span>
@@ -395,7 +566,15 @@ export default function ChatsWhatsApp({ inicial = null }) {
       </aside>
 
       {/* Charla */}
-      <section className={`${abierto ? "flex" : "hidden lg:flex"} min-w-0 flex-1 flex-col`}>
+      <section {...(abierto ? arrastre : {})} className={`${abierto ? "flex" : "hidden lg:flex"} relative min-w-0 flex-1 flex-col`}>
+        {arrastrando && abierto && (
+          <div className={`pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-center backdrop-blur-[2px] ${
+            puedeAdjuntar ? "border-[#25D366] bg-[#25D366]/10 text-[#128C4B] dark:text-[#25D366]" : "border-duo-rojo bg-duo-rojo/10 text-duo-rojo"}`}>
+            <HiUpload className="h-9 w-9" />
+            <p className="text-[15px] font-semibold">{puedeAdjuntar ? "Soltá acá las fotos o el PDF" : "Este chat no acepta archivos (pasaron más de 24 h)"}</p>
+            {puedeAdjuntar && <p className="text-[12px] opacity-80">Fotos JPG / PNG o PDF · hasta 10 por vez</p>}
+          </div>
+        )}
         {!abierto ? (
           <div className="m-auto flex flex-col items-center gap-2 p-6 text-center text-suave dark:text-suave-dark">
             <FaWhatsapp className="h-10 w-10 text-[#25D366]" />
@@ -470,25 +649,76 @@ export default function ChatsWhatsApp({ inicial = null }) {
                   </button>
                 </div>
               ) : (
+                <>
+                {adjuntos.length > 0 && (
+                  <div className="mb-2">
+                    <div className="flex gap-3 overflow-x-auto pb-1 pr-2 pt-2">
+                      {adjuntos.map((a) => (
+                        <div key={a.id} className="relative shrink-0">
+                          {a.tipo === "image" ? (
+                            <img src={a.url} alt={a.nombre} className="h-20 w-20 rounded-lg border border-linea dark:border-linea-dark object-cover" />
+                          ) : (
+                            <div className="flex h-20 w-44 items-center gap-2 rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark p-2">
+                              <span className="flex h-10 w-9 shrink-0 items-center justify-center rounded-md bg-[#e5252a] text-[10px] font-bold text-white">PDF</span>
+                              <div className="min-w-0">
+                                <p className="truncate text-[12px] font-medium text-titulo dark:text-titulo-dark" title={a.nombre}>{a.nombre}</p>
+                                <p className="text-[11px] text-suave dark:text-suave-dark">{pesoLindo(a.archivo.size)}</p>
+                              </div>
+                            </div>
+                          )}
+                          {!enviando && (
+                            <button type="button" onClick={() => quitarAdjunto(a.id)} aria-label={`Sacar ${a.nombre}`}
+                              className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-titulo text-white shadow dark:bg-white dark:text-black">
+                              <HiX className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[12px] text-suave dark:text-suave-dark">
+                      {progreso || (
+                        <>
+                          {adjuntos.length === 1 ? "1 archivo listo" : `${adjuntos.length} archivos listos`}
+                          {" · "}el texto va abajo {adjuntos.length === 1 ? "del archivo" : "del primero"}
+                          <span className="hidden sm:inline"> · Enter para mandar</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-end gap-2">
+                  <input ref={elegirArchivo} type="file" multiple hidden accept="image/*,application/pdf,.pdf"
+                    onChange={(e) => { agregarArchivos(e.target.files); e.target.value = ""; }} />
+                  <button type="button" onClick={() => elegirArchivo.current?.click()} disabled={!hilo || enviando}
+                    aria-label="Adjuntar foto o PDF" title="Adjuntar foto o PDF (o arrastralos al chat)"
+                    className="flex h-11 w-9 shrink-0 items-center justify-center rounded-full text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark disabled:opacity-50">
+                    <HiPaperClip className="h-5 w-5 rotate-45" />
+                  </button>
                   <textarea
                     value={texto}
                     onChange={(e) => setTexto(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        mandarTexto();
+                        mandar();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      // Ctrl+V de una captura o de archivos copiados → se adjuntan
+                      if (e.clipboardData?.files?.length) {
+                        e.preventDefault();
+                        agregarArchivos(e.clipboardData.files);
                       }
                     }}
                     rows={1}
-                    placeholder={hilo ? "Escribí un mensaje (Enter para mandar)" : "Cargando…"}
+                    placeholder={!hilo ? "Cargando…" : adjuntos.length ? "Agregá un texto (opcional)" : "Escribí un mensaje (Enter para mandar)"}
                     disabled={!hilo || enviando}
                     className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-4 py-2.5 text-[14px] outline-none focus:border-duo-azul/50"
                   />
-                  {texto.trim() ? (
-                    <button type="button" onClick={mandarTexto} disabled={enviando} aria-label="Mandar mensaje"
+                  {texto.trim() || adjuntos.length ? (
+                    <button type="button" onClick={mandar} disabled={enviando} aria-label={adjuntos.length ? "Mandar archivos" : "Mandar mensaje"}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white disabled:opacity-60">
-                      <HiPaperAirplane className="h-5 w-5 rotate-90" />
+                      {enviando ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <HiPaperAirplane className="h-5 w-5 rotate-90" />}
                     </button>
                   ) : (
                     <button type="button" onClick={microfono} disabled={!hilo || enviando} aria-label="Grabar nota de voz" title="Grabar nota de voz"
@@ -497,6 +727,7 @@ export default function ChatsWhatsApp({ inicial = null }) {
                     </button>
                   )}
                 </div>
+                </>
               )}
             </footer>
           </>

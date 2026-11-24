@@ -8,6 +8,8 @@
 //   await enviarTexto(1, "5491122334455", "Hola! ya te ayudo");       // responder
 //   await enviarAudio(1, "5491122334455", blobGrabado);               // nota de voz
 //   const url = await urlMedia(123);                                  // escuchar un audio
+//   const a = await prepararAdjunto(file);  // foto → JPG ≤ 5 MB / PDF ≤ 16 MB (o a.error)
+//   await enviarArchivo(1, "5491122334455", a.archivo, "Te mando la póliza", (pct) => …);
 //   const { esperando, ultimo_entrante } = await pedirPendientes();   // globito del menú
 //   ding();                                                           // 🔔 sonó un mensaje nuevo
 // ============================================================
@@ -34,6 +36,91 @@ export const enviarAudio = (linea, tel, blob) => {
   fd.append("audio", blob, "nota-de-voz.webm");
   return datos(api.post("/whatsapp/enviar/", fd, { timeout: 90000 }));
 };
+
+// 📎 Foto o PDF (con un texto opcional abajo, como en WhatsApp).
+export const enviarArchivo = (linea, tel, archivo, texto = "", onProgreso) => {
+  const fd = new FormData();
+  fd.append("linea", linea);
+  fd.append("tel", tel);
+  fd.append("archivo", archivo, archivo.name || "archivo");
+  if (texto) fd.append("texto", texto);
+  return datos(api.post("/whatsapp/enviar/", fd, {
+    timeout: 120000,
+    onUploadProgress: (e) => onProgreso && e.total && onProgreso(Math.round((e.loaded / e.total) * 100)),
+  }));
+};
+
+// ── Preparar lo que se adjunta ──────────────────────────────────────────────
+// WhatsApp acepta fotos JPG/PNG de hasta 5 MB y PDF (acá hasta 16 MB).
+// Ejemplo: una foto del celu de 8 MB (o .webp) → se pasa a JPG de ~1 MB acá
+// mismo, en el navegador, antes de mandarla. Un .docx → "solo fotos o PDF".
+export const MAX_FOTO_BYTES = 5 * 1024 * 1024;
+export const MAX_PDF_BYTES = 16 * 1024 * 1024;
+
+export function pesoLindo(bytes = 0) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
+async function abrirImagen(file) {
+  if (window.createImageBitmap) {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch {
+      /* probamos con <img> */
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function aJpg(file) {
+  const img = await abrirImagen(file);
+  const w = img.width || img.naturalWidth;
+  const h = img.height || img.naturalHeight;
+  const base = (file.name || "foto").replace(/\.[^.]+$/, "") || "foto";
+  for (const [lado, calidad] of [[2560, 0.85], [1920, 0.8], [1600, 0.7], [1280, 0.6]]) {
+    const k = Math.min(1, lado / Math.max(w, h));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * k);
+    c.height = Math.round(h * k);
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff"; // las partes transparentes de un PNG quedan blancas
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", calidad));
+    if (blob && blob.size <= MAX_FOTO_BYTES) return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  }
+  throw new Error("La foto es demasiado grande.");
+}
+
+/** Devuelve { archivo, tipo: "image"|"document", nombre } o { error }. */
+export async function prepararAdjunto(file) {
+  const nombre = file?.name || "archivo";
+  const mime = (file?.type || "").toLowerCase();
+  if (mime === "application/pdf" || /\.pdf$/i.test(nombre)) {
+    if (file.size > MAX_PDF_BYTES) return { error: `«${nombre}» pesa ${pesoLindo(file.size)}: el máximo es 16 MB. Mandalo desde el celu.` };
+    return { archivo: file, tipo: "document", nombre };
+  }
+  const esFoto = mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(nombre);
+  if (!esFoto) return { error: `«${nombre}»: solo se pueden mandar fotos o PDF.` };
+  if ((mime === "image/jpeg" || mime === "image/png") && file.size <= MAX_FOTO_BYTES) {
+    return { archivo: file, tipo: "image", nombre };
+  }
+  try {
+    const jpg = await aJpg(file); // otro formato (webp, heic…) o más de 5 MB → JPG más liviano
+    return { archivo: jpg, tipo: "image", nombre: jpg.name };
+  } catch {
+    return { error: `«${nombre}»: no se pudo leer esa foto. Pasala a JPG y probá de nuevo.` };
+  }
+}
 
 // Los audios y fotos piden estar logueado: se bajan como blob y se arma una URL local.
 const cacheMedia = new Map();
