@@ -2,7 +2,8 @@
 //
 // 📲 WHATSAPP · PANEL DE CONTROL (solo admin) — Franco 24/11/2026
 //
-// Cada número conectado a YCloud (Siniestros, y después las oficinas) con:
+// Cada número conectado (Siniestros por YCloud; las oficinas directo por Meta) con:
+//   · de qué oficina es (✏️ «¿De qué oficina es?» le pone nombre y oficina),
 //   · cuántos mensajes entraron y salieron,
 //   · cuánto tardan en contestar (promedio y la más lenta),
 //   · los clientes que están ESPERANDO respuesta (en rojo si pasaron el límite),
@@ -19,12 +20,12 @@ import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 import {
   HiArrowDown, HiArrowUp, HiBell, HiCheckCircle, HiClock, HiExclamation, HiExternalLink,
-  HiChatAlt2, HiChartBar, HiLightningBolt, HiRefresh, HiReply, HiUser, HiXCircle,
+  HiChatAlt2, HiChartBar, HiLightningBolt, HiOfficeBuilding, HiPencil, HiRefresh, HiReply, HiUser, HiXCircle,
 } from "react-icons/hi";
 
 import ChatsWhatsApp from "../components/whatsapp/ChatsWhatsApp";
 import useDatosVivos, { useAcelerarVivo } from "../hooks/useDatosVivos";
-import { ding, pedirResumen, setSonidoActivo, sonidoActivo } from "../services/whatsapp";
+import { ding, guardarLinea, pedirLineas, pedirResumen, setSonidoActivo, sonidoActivo } from "../services/whatsapp";
 
 // 🔔 Prender / apagar el ding de "entró un mensaje" (queda guardado en este navegador).
 function BotonSonido() {
@@ -196,23 +197,121 @@ function Esperando({ c, umbral, onResponder }) {
   );
 }
 
-function Linea({ l, umbral, onResponder }) {
+// ✏️ Ponerle nombre a la línea y decir de qué oficina es.
+//    Ej: «+5491135858428» → nombre «KM39», oficina «KM39».
+function EditarLinea({ l, onCerrar, onGuardado }) {
+  const [nombre, setNombre] = useState(l.nombre?.startsWith("+") ? "" : l.nombre || "");
+  const [oficina, setOficina] = useState("");
+  const [oficinas, setOficinas] = useState([]);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let vivo = true;
+    pedirLineas()
+      .then((r) => {
+        if (!vivo) return;
+        setOficinas(r.oficinas || []);
+        const actual = (r.lineas || []).find((x) => x.id === l.id);
+        if (actual?.oficina) setOficina(String(actual.oficina.id));
+      })
+      .catch(() => vivo && setError("No se pudieron traer las oficinas."));
+    return () => { vivo = false; };
+  }, [l.id]);
+
+  const elegirOficina = (id) => {
+    setOficina(id);
+    // Si todavía no tiene nombre, le ponemos el de la oficina (se puede cambiar).
+    const o = oficinas.find((x) => String(x.id) === id);
+    if (o && !nombre.trim()) setNombre(o.nombre);
+  };
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    if (!nombre.trim()) return setError("Poné un nombre (ej: KM39).");
+    setGuardando(true);
+    setError("");
+    try {
+      await guardarLinea(l.id, { nombre: nombre.trim(), oficina: oficina ? Number(oficina) : null });
+      onGuardado();
+      onCerrar();
+    } catch (err) {
+      setError(err?.response?.data?.detail || "No se pudo guardar. Probá de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const campo = "h-9 w-full rounded-lg border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-3 text-[13px] text-titulo dark:text-titulo-dark focus:border-duo-azul focus:outline-none";
+  return (
+    <form onSubmit={guardar} className="flex flex-col gap-3 border-b border-linea dark:border-linea-dark bg-surface/60 dark:bg-surface-dark/60 px-4 py-3 sm:flex-row sm:items-end">
+      <label className="flex-1 text-[12px] font-medium text-suave dark:text-suave-dark">
+        Nombre en el panel
+        <input autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} placeholder="Ej: KM39" className={`mt-1 ${campo}`} />
+      </label>
+      <label className="flex-1 text-[12px] font-medium text-suave dark:text-suave-dark">
+        Oficina
+        <select value={oficina} onChange={(e) => elegirOficina(e.target.value)} className={`mt-1 ${campo}`}>
+          <option value="">— Sin oficina —</option>
+          {oficinas.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+        </select>
+      </label>
+      <div className="flex gap-2">
+        <button type="button" onClick={onCerrar} className="h-9 rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-3 text-[13px] font-medium text-titulo dark:text-titulo-dark">
+          Cancelar
+        </button>
+        <button type="submit" disabled={guardando} className="h-9 rounded-lg bg-duo-azul px-4 text-[13px] font-semibold text-white disabled:opacity-60">
+          {guardando ? "Guardando…" : "Guardar"}
+        </button>
+      </div>
+      {error && <p className="text-[12px] font-medium text-duo-rojo sm:basis-full">{error}</p>}
+    </form>
+  );
+}
+
+function Linea({ l, umbral, onResponder, onCambio }) {
   const r = ritmo(l.promedio_respuesta_min);
   const esperando = l.sin_responder || [];
+  const [editando, setEditando] = useState(false);
+  const sinNombre = !l.nombre || l.nombre.startsWith("+");
   return (
     <section className="rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-linea dark:border-linea-dark px-4 py-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
             <FaWhatsapp className="h-5 w-5" />
           </span>
-          <div>
-            <h2 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">{l.nombre}</h2>
-            <p className="text-[12px] text-suave dark:text-suave-dark">{telefonoLindo(l.telefono)}</p>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[15px] font-semibold text-titulo dark:text-titulo-dark">
+                {sinNombre ? "Número sin nombre" : l.nombre}
+              </h2>
+              {l.oficina && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] px-2 py-0.5 text-[11px] font-semibold text-duo-azul">
+                  <HiOfficeBuilding className="h-3 w-3" /> {l.oficina}
+                </span>
+              )}
+              {l.id > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEditando((v) => !v)}
+                  aria-label="Cambiar nombre u oficina"
+                  title="Cambiar nombre u oficina"
+                  className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium ${
+                    sinNombre ? "bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] text-[var(--color-duo-amarillo-sombra)] dark:text-duo-amarillo"
+                      : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}
+                >
+                  <HiPencil className="h-3.5 w-3.5" /> {sinNombre ? "¿De qué oficina es?" : ""}
+                </button>
+              )}
+            </div>
+            <p className="text-[13px] font-medium text-suave dark:text-suave-dark">{telefonoLindo(l.telefono)}</p>
           </div>
         </div>
         <span className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold ${r.cls}`}>{r.label}</span>
       </header>
+
+      {editando && <EditarLinea l={l} onCerrar={() => setEditando(false)} onGuardado={onCambio} />}
 
       <dl className="grid grid-cols-2 gap-px bg-linea dark:bg-linea-dark sm:grid-cols-5">
         {[
@@ -365,15 +464,18 @@ export default function WhatsAppPage() {
           !config.ultimo_evento ? (
             <div className="mb-5 flex items-start gap-2 rounded-xl border border-duo-amarillo/40 bg-duo-amarillo-soft dark:bg-[var(--color-duo-amarillo-soft-dark)] px-4 py-3 text-[13px] text-titulo dark:text-titulo-dark">
               <HiExclamation className="mt-0.5 h-4 w-4 shrink-0 text-duo-amarillo" />
-              <span>Todavía no llegó ningún mensaje desde YCloud. Mandá un WhatsApp de prueba a una línea conectada y tocá actualizar.</span>
+              <span>Todavía no llegó ningún mensaje. Mandá un WhatsApp de prueba a una línea conectada y tocá actualizar.</span>
             </div>
           ) : (
             <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-suave dark:text-suave-dark">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-duo-verde" /> Conectado a YCloud · último mensaje {haceCuanto(config.ultimo_evento)}
+                <span className="h-2 w-2 rounded-full bg-duo-verde" /> Conectado · último mensaje {haceCuanto(config.ultimo_evento)}
               </span>
               {!config.webhook_secret && (
-                <span className="text-duo-rojo">⚠️ Falta la firma de seguridad (YCLOUD_WEBHOOK_SECRET en Railway)</span>
+                <span className="text-duo-rojo">⚠️ Falta la firma de seguridad de YCloud (YCLOUD_WEBHOOK_SECRET en Railway)</span>
+              )}
+              {config.meta_token === false && (
+                <span className="text-duo-rojo">⚠️ Falta META_WA_TOKEN en Railway (no se puede responder por Meta)</span>
               )}
               {actualizado && <span>· actualizado {actualizado.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</span>}
             </p>
@@ -413,7 +515,7 @@ export default function WhatsAppPage() {
                   No hay líneas conectadas todavía.
                 </p>
               ) : (
-                datos.lineas.map((l) => <Linea key={l.id} l={l} umbral={umbral} onResponder={responder} />)
+                datos.lineas.map((l) => <Linea key={l.id} l={l} umbral={umbral} onResponder={responder} onCambio={cargar} />)
               )}
             </div>
 

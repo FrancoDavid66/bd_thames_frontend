@@ -25,6 +25,11 @@ export const pedirConversaciones = (linea) =>
 
 export const pedirPendientes = () => datos(api.get("/whatsapp/pendientes/"));
 
+// 🏢 De qué oficina es cada número: { lineas, oficinas } y cambiar nombre / oficina.
+//   await guardarLinea(3, { nombre: "KM39", oficina: 4 });
+export const pedirLineas = () => datos(api.get("/whatsapp/lineas/"));
+export const guardarLinea = (id, cambios) => datos(api.patch(`/whatsapp/lineas/${id}/`, cambios));
+
 export const pedirHilo = (linea, tel) => datos(api.get(`/whatsapp/conversaciones/${linea}/${tel}/`));
 
 export const enviarTexto = (linea, tel, texto) => datos(api.post("/whatsapp/enviar/", { linea, tel, texto }));
