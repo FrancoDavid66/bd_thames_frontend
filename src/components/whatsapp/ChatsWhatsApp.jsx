@@ -22,6 +22,7 @@
 //   <ChatsWhatsApp soloLineas={[3, 4]} />   // solapas: solo los chats de KM39 y 5 Esquinas
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import BotonObservacion from "./ObservacionesChat";
 import { FaWhatsapp } from "react-icons/fa";
 import {
   HiArrowLeft, HiCheck, HiDocumentText, HiDownload, HiExclamation, HiExternalLink, HiMicrophone,
@@ -578,7 +579,7 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
           </div>
         ) : (
           <>
-            <header className="flex items-center gap-3 border-b border-linea dark:border-linea-dark px-3 py-2.5">
+            <header className="relative flex items-center gap-3 border-b border-linea dark:border-linea-dark px-3 py-2.5">
               <button type="button" onClick={() => setAbierto(null)} aria-label="Volver a los chats"
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-suave hover:bg-surface dark:hover:bg-surface-dark lg:hidden">
                 <HiArrowLeft className="h-5 w-5" />
@@ -597,6 +598,8 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
                   <HiUser className="h-3.5 w-3.5" /> Ficha
                 </Link>
               )}
+              {/* 📝 Bien / Mejorable / Mal + nota, para el estudio de atención */}
+              <BotonObservacion linea={abierto.linea} tel={abierto.tel} />
             </header>
 
             <div className="flex-1 overflow-y-auto bg-[#efeae2] px-3 py-4 dark:bg-[#0b141a]">

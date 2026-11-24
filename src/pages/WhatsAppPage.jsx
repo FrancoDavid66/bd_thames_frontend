@@ -8,6 +8,7 @@
 //   · cuánto tardan en contestar (promedio y la más lenta),
 //   · los clientes que están ESPERANDO respuesta (en rojo si pasaron el límite),
 //   · los mensajes que no se pudieron entregar.
+//   📊 «Estadísticas»: estudio de atención (tiempos EN HORARIO, temas, más lentas, observaciones).
 //
 // Ejemplo: «Siniestros · respondieron 12 en 8 min promedio · 2 esperando (1 hace 45 min)».
 //
@@ -20,10 +21,11 @@ import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 import {
   HiArrowDown, HiArrowUp, HiBell, HiCheckCircle, HiClock, HiExclamation, HiExternalLink,
-  HiChatAlt2, HiChartBar, HiLightningBolt, HiOfficeBuilding, HiPencil, HiRefresh, HiReply, HiUser, HiXCircle,
+  HiChatAlt2, HiChartBar, HiChartPie, HiLightningBolt, HiOfficeBuilding, HiPencil, HiRefresh, HiReply, HiUser, HiXCircle,
 } from "react-icons/hi";
 
 import ChatsWhatsApp from "../components/whatsapp/ChatsWhatsApp";
+import EstadisticasWhatsApp from "../components/whatsapp/EstadisticasWhatsApp";
 import useDatosVivos, { useAcelerarVivo } from "../hooks/useDatosVivos";
 import { ding, guardarLinea, pedirLineas, pedirResumen, setSonidoActivo, sonidoActivo } from "../services/whatsapp";
 
@@ -527,7 +529,7 @@ export default function WhatsAppPage() {
           <div className="flex flex-wrap items-center gap-2">
             <BotonSonido />
             <div role="tablist" aria-label="Vista" className="inline-flex rounded-lg border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-0.5">
-              {[["panel", "Panel", HiChartBar], ["chats", "Chats", HiChatAlt2]].map(([id, label, I]) => (
+              {[["panel", "Panel", HiChartBar], ["chats", "Chats", HiChatAlt2], ["estadisticas", "Estadísticas", HiChartPie]].map(([id, label, I]) => (
                 <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => { setVista(id); if (id === "chats") setChatInicial(null); }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold transition-colors ${
                     vista === id ? "bg-[#25D366] text-white" : "text-suave dark:text-suave-dark hover:text-titulo dark:hover:text-titulo-dark"}`}>
@@ -554,7 +556,9 @@ export default function WhatsAppPage() {
         {/* 🗂️ Solapas: qué oficinas ver (vale para el panel y para los chats) */}
         <Solapas lineas={lineasSolapas} visibles={visibles} onTocar={tocarSolapa} onTodas={() => setSolapas([])} />
 
-        {vista === "chats" ? (
+        {vista === "estadisticas" ? (
+          <EstadisticasWhatsApp lineas={visibles.length ? visibles : null} onAbrirChat={responder} />
+        ) : vista === "chats" ? (
           <ChatsWhatsApp
             key={chatInicial ? `${chatInicial.linea}-${chatInicial.tel}` : "lista"}
             inicial={chatInicial}

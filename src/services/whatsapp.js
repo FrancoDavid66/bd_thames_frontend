@@ -30,6 +30,20 @@ export const pedirPendientes = () => datos(api.get("/whatsapp/pendientes/"));
 export const pedirLineas = () => datos(api.get("/whatsapp/lineas/"));
 export const guardarLinea = (id, cambios) => datos(api.patch(`/whatsapp/lineas/${id}/`, cambios));
 
+// 📊 Estudio de atención: tiempos EN HORARIO, temas, esperas, observaciones.
+//   await pedirEstadisticas({ desde: "2026-11-17", hasta: "2026-11-23", lineas: [2, 3] });
+export const pedirEstadisticas = ({ desde, hasta, lineas } = {}) =>
+  datos(api.get("/whatsapp/estadisticas/", {
+    params: { desde, hasta, ...(lineas && lineas.length ? { lineas: lineas.join(",") } : {}) },
+    timeout: 60000,
+  }));
+
+// 📝 Observaciones de un chat (Bien / Mejorable / Mal + nota).
+export const pedirObservaciones = (linea, tel) => datos(api.get("/whatsapp/observaciones/", { params: { linea, tel } }));
+export const crearObservacion = (linea, tel, calificacion, texto) =>
+  datos(api.post("/whatsapp/observaciones/", { linea, tel, calificacion, texto }));
+export const borrarObservacion = (id) => api.delete(`/whatsapp/observaciones/${id}/`);
+
 export const pedirHilo = (linea, tel) => datos(api.get(`/whatsapp/conversaciones/${linea}/${tel}/`));
 
 export const enviarTexto = (linea, tel, texto) => datos(api.post("/whatsapp/enviar/", { linea, tel, texto }));
