@@ -2,10 +2,10 @@
 //
 // 🎬 LA ESCENA 3D DEL LOGIN (25/11/2026) — la T de la web de Thames, en 3D y animada.
 //
-//   · Al abrir: las 7 piezas de la T vuelan y se arman (como en la web).
-//   · Después flota y gira suave; sigue al mouse (o al dedo).
-//   · Tocar la T: las piezas se abren y se vuelven a armar.
-//   · Mientras entra («Autenticando…»): la T gira rápido.  · Clave mal: la T se sacude.
+//   · Al abrir (cambio de Franco 25/11, «la intro se ve mal»): ya NO vuelan las piezas.
+//     La T aparece suave: se ilumina de a poco, se acerca un poquito y gira hasta quedar de frente.
+//   · Después flota y se mece despacio; sigue un poco al mouse (o al dedo).
+//   · Mientras entra («Entrando…»): da vueltas suaves.  · Clave mal: un temblorcito.
 //   · Marca MALVINAS: en vez de la T, una moneda 3D con su logo (verde y amarillo).
 //
 // Se carga aparte (lazy) para no hacer más pesada la app: three.js solo se baja en el login.
@@ -21,7 +21,6 @@ import {
   CanvasTexture,
   CylinderGeometry,
   DirectionalLight,
-  Euler,
   ExtrudeGeometry,
   Group,
   HemisphereLight,
@@ -46,17 +45,10 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 
 import { tSvgCompleto } from "./tThames";
 
-// Cómo entra cada pieza: demora (s), desde dónde viene (unidades del logo) y cuánto gira.
-const INTRO_T = [
-  { d: 0.0, off: [0, 1000, 0], rot: [0, 0, 0.2] },
-  { d: 0.1, off: [0, 1000, 0], rot: [0, 0, -0.2] },
-  { d: 0.2, off: [0, 1200, 0], rot: [0, 0.8, 0] },
-  { d: 0.45, off: [0, 0, -1700], rot: [0, 1.4, 0.3] },
-  { d: 0.7, off: [-800, -700, 0], rot: [0, 0, 1.2] },
-  { d: 0.76, off: [800, -700, 0], rot: [0, 0, -1.2] },
-  { d: 0.9, off: [0, -1100, 0], rot: [0.9, 0, 0.6] },
-];
-const INTRO_MONEDA = [{ d: 0.1, off: [0, 7, 0], rot: [0, Math.PI * 3, 0] }];
+// La entrada: cuánto dura (s) y desde dónde arranca (más atrás y girada).
+const ENTRADA_S = 1.9;
+const ENTRADA_GIRO = -0.75;
+const ENTRADA_Z = -2.2;
 
 const PALETAS = {
   thames: { pieza: "#C1121F", rim: 0xff2b3d, rim2: 0xff5060, fill: 0xff4655, polvo: "#FF4655", polvo2: "#FFFFFF", piso: "255,43,61" },
@@ -64,11 +56,7 @@ const PALETAS = {
 };
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
-const eOutBack = (t) => {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-};
+const eOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
 function texturaPunto() {
   const c = document.createElement("canvas");
@@ -197,7 +185,7 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
     renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
     const lienzo = renderer.domElement;
-    lienzo.style.cssText = "display:block;width:100%;height:100%;touch-action:pan-y;cursor:pointer";
+    lienzo.style.cssText = "display:block;width:100%;height:100%;touch-action:pan-y";
     lienzo.setAttribute("aria-hidden", "true");
     cont.appendChild(lienzo);
 
@@ -227,13 +215,13 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
     scene.add(raiz);
     const interior = new Group();
     raiz.add(interior);
-    const piezas = []; // { mesh, home, dir, cfg }
-    let escalaBase = 1;
+    const fundir = []; // materiales que aparecen de a poco (se vuelven opacos al terminar)
 
     if (modo === "malvinas") {
       const cara = texturaMoneda(logoUrl);
-      const caraMat = new MeshStandardMaterial({ map: cara, roughness: 0.4, metalness: 0.15 });
-      const cantoMat = new MeshPhysicalMaterial({ color: pal.pieza, metalness: 0.6, roughness: 0.25, clearcoat: 1 });
+      const caraMat = new MeshStandardMaterial({ map: cara, roughness: 0.4, metalness: 0.15, transparent: true, opacity: 0 });
+      const cantoMat = new MeshPhysicalMaterial({ color: pal.pieza, metalness: 0.6, roughness: 0.25, clearcoat: 1, transparent: true, opacity: 0 });
+      fundir.push(caraMat, cantoMat);
       const geo = new CylinderGeometry(2.4, 2.4, 0.36, 96);
       const moneda = new Mesh(geo, [cantoMat, caraMat, caraMat]);
       const giro = new Group();
@@ -241,7 +229,6 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
       moneda.rotation.y = -Math.PI / 2; // el logo derecho mirando a la cámara
       giro.add(moneda);
       interior.add(giro);
-      piezas.push({ mesh: giro, home: new Vector3(), dir: new Vector3(), cfg: INTRO_MONEDA[0], base: giro.rotation.clone(), escalaBoom: 0 });
       desechar.push(geo, caraMat, cantoMat, cara);
     } else {
       const t = armarT();
@@ -249,9 +236,10 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
         onFalla?.();
       } else {
         interior.rotation.x = Math.PI; // el SVG tiene la Y para abajo
-        escalaBase = 6 / t.ancho;
-        interior.scale.setScalar(escalaBase);
+        interior.scale.setScalar(6 / t.ancho);
         const mat = new MeshPhysicalMaterial({
+          transparent: true,
+          opacity: 0,
           color: pal.pieza,
           metalness: 0.55,
           roughness: 0.22,
@@ -260,11 +248,11 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
           envMapIntensity: 1.25,
         });
         desechar.push(mat);
-        t.piezas.forEach((p, i) => {
+        fundir.push(mat);
+        t.piezas.forEach((p) => {
           const m = new Mesh(p.geo, mat);
           m.position.copy(p.home);
           interior.add(m);
-          piezas.push({ mesh: m, home: p.home, dir: p.dir, cfg: INTRO_T[i], base: new Euler(), escalaBoom: 320 });
           desechar.push(p.geo);
         });
       }
@@ -272,7 +260,7 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
 
     // ── Brillo en el piso ──
     const pisoTex = texturaPiso(pal.piso);
-    const pisoMat = new MeshBasicMaterial({ map: pisoTex, transparent: true, depthWrite: false, blending: AdditiveBlending, toneMapped: false });
+    const pisoMat = new MeshBasicMaterial({ map: pisoTex, transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending, toneMapped: false });
     const pisoGeo = new PlaneGeometry(9, 2.2);
     const piso = new Mesh(pisoGeo, pisoMat);
     piso.position.set(0, -3.1, -0.6);
@@ -298,6 +286,8 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
       g.setAttribute("position", new BufferAttribute(pos, 3));
       const m = new PointsMaterial({ color, size, map: punto, transparent: true, opacity: opacidad, depthWrite: false, toneMapped: false });
       const p = new Points(g, m);
+      p.userData.opacidad = opacidad;
+      m.opacity = 0;
       scene.add(p);
       desechar.push(g, m);
       return p;
@@ -330,66 +320,67 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
     };
-    let boomDesde = -10;
-    const alTocar = () => {
-      boomDesde = performance.now() / 1000;
-    };
     window.addEventListener("pointermove", alMover, { passive: true });
-    lienzo.addEventListener("pointerdown", alTocar);
 
     // ── Animación ──
     let t0 = null;
+    let aparecida = false;
     let ultimo = 0;
     let giro = 0;
     let velGiro = 0;
     let raf = 0;
+    let cuadros = 0;
     const cuadro = (ms) => {
       const t = ms / 1000;
-      if (t0 === null) {
+      // El reloj de la entrada arranca recién cuando ya se dibujó el primer cuadro (armar los
+      // brillos la primera vez tarda; si no, la T aparecería de golpe, ya entera).
+      if (cuadros < 2) {
         t0 = t;
         ultimo = t;
       }
+      cuadros += 1;
       const dt = Math.min(0.05, t - ultimo);
       ultimo = t;
       const tt = quieto ? 0 : t;
       suave.x += (mouse.x - suave.x) * 0.06;
       suave.y += (mouse.y - suave.y) * 0.06;
 
-      // Entrando: gira rápido. Después vuelve sola a mirar al frente.
+      // Entrando: vueltas suaves. Después vuelve sola a mirar al frente.
       if (vivo.current.ocupado && !quieto) {
-        velGiro += (6 - velGiro) * Math.min(1, dt * 3);
+        velGiro += (3.2 - velGiro) * Math.min(1, dt * 2);
         giro += velGiro * dt;
       } else {
         velGiro = 0;
         const destino = Math.round(giro / (Math.PI * 2)) * Math.PI * 2;
-        giro += (destino - giro) * Math.min(1, dt * 4);
+        giro += (destino - giro) * Math.min(1, dt * 2.5);
       }
 
-      raiz.position.y = baseY + Math.sin(tt * 1.1) * 0.09;
-      raiz.rotation.y = Math.sin(tt * 0.5) * 0.3 + suave.x * 0.45 + giro;
-      raiz.rotation.x = 0.04 - suave.y * 0.18;
-      const ds = t - vivo.current.sacudir;
-      raiz.rotation.z = ds >= 0 && ds < 0.6 ? Math.sin(ds * 46) * 0.09 * (1 - ds / 0.6) : 0;
-      raiz.scale.setScalar(ajuste);
+      // Aparición: de 0 a 1 en ENTRADA_S segundos (con «reducir movimiento», ya está).
+      const ap = quieto ? 1 : eOutCubic(clamp((t - t0 - 0.15) / ENTRADA_S));
+      if (!aparecida) {
+        fundir.forEach((m) => {
+          m.opacity = ap;
+        });
+        pisoMat.opacity = ap;
+        polvoA.material.opacity = polvoA.userData.opacidad * ap;
+        polvoB.material.opacity = polvoB.userData.opacidad * ap;
+        if (ap >= 1) {
+          aparecida = true;
+          fundir.forEach((m) => {
+            m.transparent = false;
+            m.opacity = 1;
+            m.needsUpdate = true;
+          });
+        }
+      }
 
-      const db = (t - boomDesde) / 1.3;
-      const boom = db >= 0 && db < 1 ? 4 * db * (1 - db) : 0;
-      const introT = quieto ? 99 : t - t0;
-      piezas.forEach((p, i) => {
-        const k = eOutBack(clamp((introT - 0.15 - p.cfg.d) / 1.1));
-        const kk = 1 - k;
-        const lado = i % 2 ? 1 : -1;
-        p.mesh.position.set(
-          p.home.x + p.cfg.off[0] * kk + p.dir.x * boom * p.escalaBoom,
-          p.home.y + p.cfg.off[1] * kk + p.dir.y * boom * p.escalaBoom,
-          p.home.z + p.cfg.off[2] * kk + lado * boom * p.escalaBoom * 0.5
-        );
-        p.mesh.rotation.set(
-          p.base.x + p.cfg.rot[0] * kk + boom * 0.3 * lado,
-          p.base.y + p.cfg.rot[1] * kk + (p.escalaBoom ? 0 : boom * Math.PI),
-          p.base.z + p.cfg.rot[2] * kk + boom * 0.35 * ((i % 3) - 1)
-        );
-      });
+      raiz.position.y = baseY + Math.sin(tt * 0.9) * 0.07 * ap;
+      raiz.position.z = ENTRADA_Z * (1 - ap);
+      raiz.rotation.y = (Math.sin(tt * 0.35) * 0.22 + suave.x * 0.35) * ap + ENTRADA_GIRO * (1 - ap) + giro;
+      raiz.rotation.x = 0.04 - suave.y * 0.14 * ap;
+      const ds = t - vivo.current.sacudir;
+      raiz.rotation.z = ds >= 0 && ds < 0.5 ? Math.sin(ds * 30) * 0.05 * (1 - ds / 0.5) : 0;
+      raiz.scale.setScalar(ajuste * (0.9 + 0.1 * ap));
 
       polvoA.rotation.y = tt * 0.012;
       polvoA.position.y = Math.sin(tt * 0.2) * 0.3;
@@ -400,6 +391,11 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
       renderer.render(scene, camera);
       raf = requestAnimationFrame(cuadro);
     };
+    try {
+      renderer.compile(scene, camera); // prepara los brillos antes de arrancar
+    } catch {
+      /* si no se puede, se prepara solo en el primer cuadro */
+    }
     raf = requestAnimationFrame(cuadro);
 
     // Pestaña escondida: no gasta batería.
@@ -416,7 +412,6 @@ export default function EscenaLogin3D({ modo = "thames", logoUrl = "", ocupado =
       cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener("pointermove", alMover);
-      lienzo.removeEventListener("pointerdown", alTocar);
       document.removeEventListener("visibilitychange", alCambiarVista);
       desechar.forEach((x) => x.dispose?.());
       envTex.dispose();

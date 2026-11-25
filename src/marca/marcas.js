@@ -36,7 +36,7 @@ export const THAMES = {
   claves: [],                            // es la de fábrica: no se busca por nombre
   nombre: "Thames Seguros",              // sidebar
   nombreCorto: "THAMES",                 // header ("THAMES APP")
-  partesLogin: ["Thames", "Seguros"],    // login: "Thames" + "Seguros" en color
+  partesLogin: ["Grupo", "Thames"],      // login: "GRUPO" + "THAMES" en rojo (Franco 25/11/2026)
   lema: "Portal de gestión operativa",   // debajo del nombre en el login
   tituloPestana: "THAMES APLICACION",
   estudio: "Estudio Thames",             // "Constancia interna de Estudio Thames"

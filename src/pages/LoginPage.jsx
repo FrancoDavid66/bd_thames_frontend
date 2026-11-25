@@ -4,8 +4,9 @@
 //    escribana, gestora…): la T de la web de Thames en 3D, armándose sola y animada.
 //
 //   · Compu/celu con 3D: EscenaLogin3D (three.js, se baja solo en esta pantalla).
-//   · Sin 3D (compu vieja) o mientras carga: la T plana flotando. El login anda igual.
-//   · Entrando → la T gira. Clave mal → la T se sacude (y el aviso de siempre).
+//   · 25/11 (Franco): sin la T plana. Mientras carga el 3D queda el fondo solo y la T aparece
+//     suave. Sin 3D (compu muy vieja) queda el fondo con el brillo: el login anda igual.
+//   · Entrando → la T gira suave. Clave mal → un temblorcito (y el aviso de siempre).
 //   · Marca MALVINAS (su compu o su dirección web): verde y amarillo, con la moneda de su logo.
 //
 // Diseño: fondo negro con brillo rojo (como estudiothames.com), la T a la izquierda y la
@@ -18,7 +19,6 @@ import { useAuth } from "../context/AuthContext";
 // 🏷️ Logo y nombre de la MARCA: antes de entrar no hay usuario, así que sale de la
 //    dirección web o de la última marca que entró en esta compu.
 import { useMarca } from "../marca/MarcaContext";
-import { TPlana } from "../components/login/tThames";
 
 const EscenaLogin3D = lazy(() => import("../components/login/EscenaLogin3D"));
 
@@ -49,7 +49,7 @@ function useFuentesLogin() {
   }, []);
 }
 
-// Si el 3D explota (o no baja el archivo), queda la T plana: el login nunca se rompe.
+// Si el 3D explota (o no baja el archivo), queda el fondo solo: el login nunca se rompe.
 class SinRomper extends Component {
   constructor(props) {
     super(props);
@@ -59,26 +59,11 @@ class SinRomper extends Component {
     return { roto: true };
   }
   componentDidCatch(e) {
-    console.warn("Login 3D: queda la versión plana.", e);
+    console.warn("Login 3D: queda sin la T.", e);
   }
   render() {
-    return this.state.roto ? this.props.plano : this.props.children;
+    return this.state.roto ? null : this.props.children;
   }
-}
-
-/** La T plana (o el logo de Malvinas) flotando: sin 3D o mientras carga. */
-function Plano({ marca, estilo }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div className="login-flota w-[46%] max-w-[300px] min-w-[150px]">
-        {marca.id === "malvinas" ? (
-          <img src={marca.logo} alt="" className="w-full drop-shadow-[0_20px_40px_rgba(0,0,0,.6)]" />
-        ) : (
-          <TPlana color={estilo.acento} className="w-full drop-shadow-[0_24px_40px_rgba(193,18,31,.45)]" />
-        )}
-      </div>
-    </div>
-  );
 }
 
 export const LoginPage = () => {
@@ -116,7 +101,6 @@ export const LoginPage = () => {
     }
   };
 
-  const plano = <Plano marca={marca} estilo={estilo} />;
   const campo =
     "w-full rounded-xl border border-white/10 bg-white/[0.05] py-3 pl-11 pr-4 text-[15px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-[var(--login-brillo)] focus:bg-white/[0.08] focus:ring-2 focus:ring-[var(--login-acento)]/40";
 
@@ -126,11 +110,9 @@ export const LoginPage = () => {
       style={{ "--login-acento": estilo.acento, "--login-brillo": estilo.brillo }}
     >
       <style>{`
-        @keyframes loginFlota { 0%,100% { transform: translateY(0) rotate(-1.5deg) } 50% { transform: translateY(-14px) rotate(1.5deg) } }
-        .login-flota { animation: loginFlota 5s ease-in-out infinite }
         @keyframes loginEntra { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
         .login-entra { animation: loginEntra .7s cubic-bezier(.2,.8,.2,1) both }
-        @media (prefers-reduced-motion: reduce) { .login-flota, .login-entra { animation: none } }
+        @media (prefers-reduced-motion: reduce) { .login-entra { animation: none } }
       `}</style>
 
       {/* Brillos del fondo (como la web) */}
@@ -158,9 +140,9 @@ export const LoginPage = () => {
       <div className="relative z-10 grid min-h-[100dvh] grid-rows-[auto_1fr] lg:grid-cols-[1.15fr_1fr] lg:grid-rows-1">
         {/* ── La T 3D ── */}
         <section aria-hidden="true" className="relative h-[40dvh] min-h-[250px] lg:h-auto">
-          {con3D ? (
-            <SinRomper plano={plano}>
-              <Suspense fallback={plano}>
+          {con3D && (
+            <SinRomper>
+              <Suspense fallback={null}>
                 <EscenaLogin3D
                   modo={modo}
                   logoUrl={marca.logoPng || marca.logo}
@@ -170,8 +152,6 @@ export const LoginPage = () => {
                 />
               </Suspense>
             </SinRomper>
-          ) : (
-            plano
           )}
           <p
             className="pointer-events-none absolute inset-x-0 bottom-8 hidden text-center text-[15px] uppercase tracking-[0.35em] text-white/45 lg:block"

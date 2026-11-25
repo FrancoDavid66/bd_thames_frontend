@@ -1,9 +1,7 @@
-// src/components/login/tThames.jsx
+// src/components/login/tThames.js
 //
 // 🅣 LA «T» DE THAMES (la misma de la web nueva y de logo_thames.svg), en piezas.
 //    · La usa el login 3D (EscenaLogin3D.jsx): cada pieza se extruye y vuela a su lugar.
-//    · TPlana: la misma T dibujada en SVG, para cuando no hay 3D (compu vieja, sin WebGL)
-//      o mientras carga three.js. Flota suave con CSS.
 //
 // Orden de las piezas (importa para la animación de entrada):
 //   0 columna izq · 1 columna der · 2 columna centro · 3 viga con aros · 4 bandera izq · 5 bandera der · 6 corona
@@ -36,27 +34,5 @@ export function tSvgCompleto() {
     p(T_VIGA, ` transform="${T_VIGA_TRANSFORM}"`) +
     T_ARRIBA.map((d) => p(d)).join("") +
     "</svg>"
-  );
-}
-
-/** La T plana (sin 3D). `color` = relleno; `className` para tamaño y animación. */
-export function TPlana({ color = "#C1121F", className = "", titulo = "" }) {
-  return (
-    <svg
-      viewBox={T_VIEWBOX}
-      className={className}
-      role={titulo ? "img" : undefined}
-      aria-label={titulo || undefined}
-      aria-hidden={titulo ? undefined : true}
-      fill={color}
-    >
-      {T_COLUMNAS.map((d) => (
-        <path key={d} d={d} />
-      ))}
-      <path d={T_VIGA} transform={T_VIGA_TRANSFORM} />
-      {T_ARRIBA.map((d) => (
-        <path key={d} d={d} />
-      ))}
-    </svg>
   );
 }
