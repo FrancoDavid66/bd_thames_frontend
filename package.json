@@ -36,6 +36,7 @@
     "react-select": "^5.10.1",
     "react-toastify": "^11.0.5",
     "recharts": "^2.15.3",
+    "three": "^0.181.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

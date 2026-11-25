@@ -116,7 +116,7 @@ export default function AdminUsuarios() {
                   <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${
                     u.perfil?.rol === 'ADMIN' ? 'bg-[var(--color-tarjeta)]/20 text-[#d97706]' :
                     u.perfil?.rol === 'VENDEDOR' ? 'bg-[var(--color-transferencia)]/20 text-[var(--color-transferencia)]' :
-                    u.perfil?.rol === 'ABOGADO' ? 'bg-[#5b52e6]/15 text-[#5b52e6]' :
+                    u.perfil?.rol === 'ABOGADO' || u.perfil?.rol === 'ESCRIBANO' ? 'bg-[#5b52e6]/15 text-[#5b52e6]' :
                     u.perfil?.rol === 'GESTOR' ? 'bg-[#0f766e]/15 text-[#0f766e]' :
                     'bg-[var(--color-oficina)]/20 text-[var(--color-oficina-fuerte)]'
                   }`}>
@@ -183,6 +183,7 @@ export default function AdminUsuarios() {
                       <option value="OFICINA">Personal de oficina / cajero</option>
                       <option value="VENDEDOR">Vendedor externo</option>
                       <option value="ABOGADO">Abogado (módulo Legales)</option>
+                      <option value="ESCRIBANO">Escribano/a (módulo Legales)</option>
                       <option value="ADMIN">Administrador global</option>
                     </select>
                   )}
@@ -195,7 +196,7 @@ export default function AdminUsuarios() {
                     <option value="">
                       {formData.rol === 'ADMIN' ? '-- Acceso global (todas) --' :
                        formData.rol === 'VENDEDOR' ? '-- Independiente (sin sucursal) --' :
-                       formData.rol === 'ABOGADO' ? '-- No aplica (ve sus casos, no por oficina) --' :
+                       formData.rol === 'ABOGADO' || formData.rol === 'ESCRIBANO' ? '-- No aplica (ve sus casos, no por oficina) --' :
                        formData.rol === 'GESTOR' ? '-- No aplica (ve solo sus trámites) --' :
                        '-- Seleccionar oficina --'}
                     </option>

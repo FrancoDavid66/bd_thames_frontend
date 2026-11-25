@@ -45,9 +45,18 @@ const HORAS = (() => {
   return l;
 })();
 
+// ✍️ 25/11/2026: la escribana usa la MISMA app que el abogado (sus consultas y casos,
+//    turnos y honorarios). Solo cambia la palabra y que no entra a Siniestros.
+export const PROFESIONES = [
+  { id: "ABOGADO", txt: "Abogado/a", ej: "Ej: Dr. Martín Sosa", usuario: "msosa" },
+  { id: "ESCRIBANO", txt: "Escribano/a", ej: "Ej: Esc. Laura Pérez", usuario: "lperez" },
+];
+const profesionDe = (id) => PROFESIONES.find((p) => p.id === id) || PROFESIONES[0];
+
 const FORM_VACIO = {
   id: null,
-  user: null, // usuario que ya existe (rol ABOGADO sin perfil)
+  user: null, // usuario que ya existe (rol ABOGADO o ESCRIBANO sin perfil)
+  profesion: "ABOGADO",
   nombre: "",
   telefono: "",
   email: "",
@@ -95,7 +104,13 @@ export default function AbogadosPanel() {
   const inactivos = useMemo(() => (lista || []).filter((a) => !a.activo), [lista]);
 
   const nuevo = (user = null) => {
-    setForm({ ...FORM_VACIO, user: user ? user.id : null, nombre: user ? user.nombre : "", username: user ? user.username : "" });
+    setForm({
+      ...FORM_VACIO,
+      user: user ? user.id : null,
+      profesion: user?.profesion === "ESCRIBANO" ? "ESCRIBANO" : "ABOGADO",
+      nombre: user ? user.nombre : "",
+      username: user ? user.username : "",
+    });
     setFormAbierto(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -103,6 +118,7 @@ export default function AbogadosPanel() {
     setForm({
       ...FORM_VACIO,
       id: a.id,
+      profesion: a.profesion || "ABOGADO",
       nombre: a.nombre || "",
       telefono: a.telefono || "",
       email: a.email || "",
@@ -164,15 +180,15 @@ export default function AbogadosPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-[18px] font-bold text-titulo dark:text-titulo-dark">
-            Abogados <Candado />
+            Abogados y escribanos <Candado />
           </h2>
           <p className="text-[13px] text-suave dark:text-suave-dark">
-            Cada abogado entra con su usuario y ve <b>solo Legales</b> y <b>solo sus casos</b>. No ve pólizas, pagos ni Balances.
+            Cada uno entra con su usuario y ve <b>solo Legales</b> y <b>solo sus consultas y casos</b>. No ve pólizas, pagos ni Balances.
           </p>
         </div>
         {!formAbierto && (
           <button type="button" onClick={() => nuevo()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 px-4 py-2.5 text-[14px] font-semibold text-white">
-            <HiPlus className="w-4 h-4" /> Nuevo abogado
+            <HiPlus className="w-4 h-4" /> Nuevo abogado o escribano/a
           </button>
         )}
       </div>
@@ -182,7 +198,8 @@ export default function AbogadosPanel() {
           <span className="inline-flex items-center gap-2">
             <HiExclamation className="w-4 h-4 shrink-0" />
             <span>
-              El usuario <b>{u.username}</b> tiene rol ABOGADO pero no tiene perfil de abogado: hoy no ve ningún caso.
+              El usuario <b>{u.username}</b> tiene rol {u.profesion === "ESCRIBANO" ? "ESCRIBANO/A" : "ABOGADO"} pero no tiene su perfil
+              cargado: hoy no ve ningún caso.
             </span>
           </span>
           <button type="button" onClick={() => nuevo(u)} className="rounded-lg border border-amber-600/50 bg-card dark:bg-card-dark px-3 py-1.5 text-[13px] font-semibold text-amber-900 dark:text-amber-200">
@@ -297,6 +314,7 @@ function TarjetaAbogado({ a, temas, onEditar, onVer, onDesactivar, onCobrar, onD
         <span className="flex-1 min-w-0">
           <strong className="block text-[16px] text-titulo dark:text-titulo-dark">{a.nombre}</strong>
           <span className="mt-1 flex flex-wrap gap-1">
+            {a.profesion === "ESCRIBANO" && <Chip tono="violeta">✍️ Escribana/o</Chip>}
             {(a.especialidades || []).length ? (
               a.especialidades.map((t) => <Chip key={t}>{temasTxt([t], temas)}</Chip>)
             ) : (
@@ -394,10 +412,11 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
 
   const guardar = async () => {
     setError("");
-    if (!form.nombre.trim()) return setError("Poné el nombre (ej: Dr. Martín Sosa).");
+    if (!form.nombre.trim()) return setError(`Poné el nombre (${profesionDe(form.profesion).ej.toLowerCase()}).`);
     const pct = Number(form.comision_pct);
     if (!(pct >= 0 && pct <= 100)) return setError("El % de comisión va de 0 a 100.");
     const body = {
+      profesion: form.profesion || "ABOGADO",
       nombre: form.nombre.trim(),
       telefono: form.telefono.trim(),
       email: form.email.trim(),
@@ -431,7 +450,7 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
         toast.success(r?.aplicado_a ? `Guardado · el % nuevo se aplicó a ${r.aplicado_a} caso(s) sin cobrar` : "Guardado");
       } else {
         await crearAbogado(body);
-        toast.success("Abogado creado: ya puede entrar con su usuario");
+        toast.success(`${form.profesion === "ESCRIBANO" ? "Escribano/a creado/a" : "Abogado creado"}: ya puede entrar con su usuario`);
       }
       onListo();
     } catch (e) {
@@ -444,7 +463,9 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
   return (
     <div className="flex flex-col gap-3.5 rounded-xl border-2 border-sky-700/60 bg-card dark:bg-card-dark p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[16px] font-bold text-titulo dark:text-titulo-dark">{editando ? `Editar · ${form.nombre}` : "Nuevo abogado"}</h3>
+        <h3 className="text-[16px] font-bold text-titulo dark:text-titulo-dark">
+          {editando ? `Editar · ${form.nombre}` : `Nuevo ${form.profesion === "ESCRIBANO" ? "escribano/a" : "abogado"}`}
+        </h3>
         <button type="button" onClick={onCancelar} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-suave hover:text-titulo" aria-label="Cerrar">
           <HiX className="w-5 h-5" />
         </button>
@@ -479,9 +500,35 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
         </span>
       </div>
 
+      <div className={labelCls}>
+        Profesión
+        <div role="radiogroup" aria-label="Profesión" className="grid grid-cols-2 gap-2">
+          {PROFESIONES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={form.profesion === p.id}
+              onClick={() => set("profesion", p.id)}
+              className={`h-10 rounded-lg border text-[14px] font-semibold transition-colors ${
+                form.profesion === p.id
+                  ? "border-sky-700 bg-sky-700 text-white"
+                  : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark"
+              }`}
+            >
+              {p.id === "ESCRIBANO" ? "✍️ " : "⚖️ "}
+              {p.txt}
+            </button>
+          ))}
+        </div>
+        {form.profesion === "ESCRIBANO" && (
+          <span className="font-normal">Misma app que el abogado (sus consultas y casos, turnos y honorarios), pero sin Siniestros.</span>
+        )}
+      </div>
+
       <label className={labelCls}>
         Nombre y apellido
-        <input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Ej: Dr. Martín Sosa" className={inputCls} />
+        <input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder={profesionDe(form.profesion).ej} className={inputCls} />
       </label>
 
       <div className="flex flex-col gap-1.5">

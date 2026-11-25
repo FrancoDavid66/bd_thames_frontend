@@ -46,8 +46,12 @@ function useFuentes() {
 const ReclamosCtx = createContext({ total: null, abiertos: null });
 
 function useReclamos() {
-  const [r, setR] = useState({ total: null, abiertos: null });
+  const { user } = useAuth();
+  // ✍️ La escribana no lleva reclamos de siniestros: ni se pregunta (el servidor diría 403).
+  const sinReclamos = user?.perfil?.rol === "ESCRIBANO";
+  const [r, setR] = useState(sinReclamos ? { total: 0, abiertos: 0 } : { total: null, abiertos: null });
   useEffect(() => {
+    if (sinReclamos) return undefined;
     let vivo = true;
     const base = import.meta.env.VITE_API_URL;
     const token = localStorage.getItem("access_token") || localStorage.getItem("token");
@@ -61,7 +65,7 @@ function useReclamos() {
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [sinReclamos]);
   return r;
 }
 

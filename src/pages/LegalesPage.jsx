@@ -74,8 +74,8 @@ export default function LegalesPage() {
         if (!vivo) return;
         const sinAcceso = e?.response?.status === 403;
         setError(
-          sinAcceso && user?.perfil?.rol === "ABOGADO"
-            ? "Todavía no tenés tu perfil de abogado cargado. Pedile a THAMES que lo complete y volvé a entrar."
+          sinAcceso && ["ABOGADO", "ESCRIBANO"].includes(user?.perfil?.rol)
+            ? "Todavía no tenés tu perfil cargado. Pedile a THAMES que lo complete y volvé a entrar."
             : sinAcceso
               ? "Tu usuario no tiene acceso a Consultas. Pedile al admin que te lo habilite."
               : "No se pudo abrir Consultas. Revisá la conexión y recargá."
@@ -114,7 +114,7 @@ export default function LegalesPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 flex flex-col items-center gap-4 text-center text-[14px] text-duo-rojo">
         {error}
         {/* El abogado no tiene menú: sin esto no tendría cómo salir. */}
-        {user?.perfil?.rol === "ABOGADO" && (
+        {["ABOGADO", "ESCRIBANO"].includes(user?.perfil?.rol) && (
           <button
             type="button"
             onClick={logout}
@@ -196,7 +196,7 @@ function Cabecera() {
   const { logout } = useAuth();
   // Usuario con perfil de abogado pero que el servidor trata como admin (ej: un
   // superusuario): entra sin el menú de THAMES, así que acá tiene cómo salir.
-  const sinMenu = user?.perfil?.rol === "ABOGADO";
+  const sinMenu = ["ABOGADO", "ESCRIBANO"].includes(user?.perfil?.rol);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const raiz = pathname === "/legales" || pathname === "/legales/";

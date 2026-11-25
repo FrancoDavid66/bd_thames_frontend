@@ -35,6 +35,12 @@ function itemsPara(rol) {
       { id: "age", txt: "Agenda del día", url: "legales/agenda/" },
       novedades,
     ];
+  if (rol === "ESCRIBANO") // ✍️ la escribana: sus consultas y casos (sin reclamos)
+    return [
+      { id: "cas", txt: "Tus consultas y casos", url: "legales/resumen/" },
+      { id: "age", txt: "Agenda del día", url: "legales/agenda/" },
+      novedades,
+    ];
   if (rol === "GESTOR")
     return [{ id: "tra", txt: "Tus trámites", url: "gestoria/resumen/" }, novedades];
   return [

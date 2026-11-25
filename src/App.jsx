@@ -107,7 +107,9 @@ function App() {
   const esGestor = user?.perfil?.rol === "GESTOR";
   const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   // ⚖️ El ABOGADO también es de afuera: solo usa Legales (sus casos).
-  const esAbogadoRol = user?.perfil?.rol === "ABOGADO";
+  // ✍️ 25/11/2026: la ESCRIBANA usa la misma app del abogado (sin Siniestros).
+  const esEscribana = user?.perfil?.rol === "ESCRIBANO";
+  const esAbogadoRol = user?.perfil?.rol === "ABOGADO" || esEscribana;
   const veLegales = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   const soloUnModulo = esGestor || esAbogadoRol;
   // 💬 WhatsApp (YCloud): por ahora solo lo ve el admin.
@@ -724,7 +726,7 @@ function App() {
         <Suspense fallback={<CargandoPantalla />}>
           <Routes>
             <Route path="/legales/*" element={<LegalesPage />} />
-            <Route path="/siniestros" element={<SiniestrosPage />} />
+            {!esEscribana && <Route path="/siniestros" element={<SiniestrosPage />} />}
             <Route path="*" element={<InicioAbogado />} />
           </Routes>
         </Suspense>
