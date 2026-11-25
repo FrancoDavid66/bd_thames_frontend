@@ -477,9 +477,46 @@ const ETIQ_TEMA = {
 };
 
 // ═══════════════════════ ✍️ ORTOGRAFÍA Y TRATO ═══════════════════════
+// Mensajes guardados (el mismo texto mandado 5+ veces) que tienen detalles: corregirlos una vez arregla todos los envíos
+function Plantillas({ lista }) {
+  const [abierta, setAbierta] = useState(null);
+  if (!lista?.length) return null;
+  return (
+    <div className="mb-4 rounded-lg border border-duo-amarillo/60 bg-duo-amarillo/10 p-3">
+      <p className="mb-2 text-[13px] font-semibold text-titulo dark:text-titulo-dark">
+        📌 Mensajes guardados para corregir
+        <span className={`ml-1 font-normal ${suave}`}>— se mandan iguales muchas veces: arreglándolos una vez se corrigen todos</span>
+      </p>
+      <ul className="flex flex-col gap-2">
+        {lista.map((p, i) => (
+          <li key={i} className="rounded-lg bg-card dark:bg-card-dark p-2.5 text-[12px]">
+            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-semibold text-titulo dark:text-titulo-dark">{p.nombre}</span>
+              <span className={suave}>enviado <b className="text-titulo dark:text-titulo-dark">{p.veces}</b> veces · {p.problemas.length} detalles</span>
+            </div>
+            <p className={`whitespace-pre-line ${abierta === i ? "" : "line-clamp-2"} ${suave}`}>{p.texto}</p>
+            <button type="button" onClick={() => setAbierta(abierta === i ? null : i)} className="mt-1 text-[12px] font-medium text-duo-azul">
+              {abierta === i ? "Ver menos" : "Ver completo"}
+            </button>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {p.problemas.map((e) => (
+                <span key={`${e.tipo}-${e.palabra}`}
+                  className="rounded-full border border-linea dark:border-linea-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[12px] text-titulo dark:text-titulo-dark">
+                  <s className="opacity-70">{e.palabra}</s> → <b>{e.sugerencia}</b>
+                </span>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function OrtografiaTrato({ o }) {
   const [abierta, setAbierta] = useState(null);
   const filas = o.por_linea.filter((x) => x.revisados > 0);
+  const plantillas = o.total?.plantillas || o.por_linea.flatMap((x) => x.plantillas || []);
   return (
     <section className={`${caja} p-4`}>
       <h3 className={`${titulo} flex items-center gap-2`}><HiPencilAlt className="h-4 w-4" /> Ortografía y trato (de usted)</h3>
@@ -487,6 +524,7 @@ function OrtografiaTrato({ o }) {
         Revisión automática de lo que las oficinas les escriben a los clientes: palabras informales («sisi», «holis»),
         mal escritas («porfavor», «nose»), sin tilde, de vos en vez de usted y errores de tipeo. Es una ayuda: confirmalo en el chat.
       </p>
+      <Plantillas lista={plantillas} />
       {filas.length === 0 ? <p className={`text-[13px] ${suave}`}>Sin mensajes de las oficinas en este período.</p> : (
         <ul className="flex flex-col gap-3">
           {filas.map((x) => (
@@ -494,7 +532,8 @@ function OrtografiaTrato({ o }) {
               <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
                 <span className="font-semibold text-titulo dark:text-titulo-dark">{x.nombre}</span>
                 <span className={suave}>
-                  <b className="text-titulo dark:text-titulo-dark">{pct(x.pct_prolijo)}</b> prolijos · {x.con_problemas} de {x.revisados} con detalles · empiezan con mayúscula: {pct(x.pct_mayuscula)}
+                  <b className="text-titulo dark:text-titulo-dark">{pct(x.pct_prolijo)}</b> prolijos · {x.con_problemas} de {x.revisados} escritos a mano con detalles · empiezan con mayúscula: {pct(x.pct_mayuscula)}
+                  {x.mensajes_plantilla > 0 && <> · {x.mensajes_plantilla} con mensaje guardado</>}
                 </span>
               </div>
               <Barra valor={x.pct_prolijo || 0} maximo={100} titulo={`${x.pct_prolijo} % de los mensajes sin detalles`} />
