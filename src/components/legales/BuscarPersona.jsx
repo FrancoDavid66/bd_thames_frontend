@@ -2,7 +2,8 @@
 //
 // 🔎 "¿Quién es el cliente?": se busca por DNI (o nombre). Si es cliente de
 // THAMES, los datos salen solos (y se ven sus autos asegurados). Si no, se
-// cargan nombre, apellido y WhatsApp. Si ya tiene un caso abierto, avisa (así
+// cargan nombre, apellido y WhatsApp. El DNI es OPCIONAL si no es cliente
+// (Franco 25/11/2026): «No es cliente · cargar sin DNI» abre los datos sin buscar. Si ya tiene un caso abierto, avisa (así
 // no se carga dos veces lo mismo).
 //
 // `valor` (lo guarda la pantalla que lo usa):
@@ -89,13 +90,28 @@ export default function BuscarPersona({ valor, onChange, onVerCaso, mostrarCasos
             <span className="sm:hidden">{buscando ? "…" : "Buscar"}</span>
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setPorNombre((x) => !x)}
-          className="self-start text-[13px] font-semibold text-sky-700 dark:text-sky-400 hover:underline"
-        >
-          {porNombre ? "Buscar por DNI" : "¿No sabe el DNI? Buscá por nombre"}
-        </button>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button
+            type="button"
+            onClick={() => setPorNombre((x) => !x)}
+            className="text-[13px] font-semibold text-sky-700 dark:text-sky-400 hover:underline"
+          >
+            {porNombre ? "Buscar por DNI" : "¿No sabe el DNI? Buscá por nombre"}
+          </button>
+          {!p.buscado && (
+            <button
+              type="button"
+              onClick={() => {
+                setResultados(null);
+                setError("");
+                set({ buscado: true, cliente: null, telOk: null, casosSinCliente: [] });
+              }}
+              className="text-[13px] font-semibold text-sky-700 dark:text-sky-400 hover:underline"
+            >
+              No es cliente · cargar sin DNI
+            </button>
+          )}
+        </div>
         {error && <p className="text-[13px] font-semibold text-duo-rojo">{error}</p>}
       </div>
 
@@ -218,7 +234,9 @@ export default function BuscarPersona({ valor, onChange, onVerCaso, mostrarCasos
             />
           </label>
           <label className="flex flex-col gap-1 text-[13px] font-semibold text-suave dark:text-suave-dark">
-            DNI
+            <span>
+              DNI <span className="font-normal">(opcional)</span>
+            </span>
             <input inputMode="numeric" value={p.dni || ""} onChange={(e) => set({ dni: e.target.value })} className={inputCls} autoComplete="off" />
           </label>
           {!p.telefono.trim() && (
@@ -234,7 +252,7 @@ export default function BuscarPersona({ valor, onChange, onVerCaso, mostrarCasos
       {!p.buscado && (
         <p className="flex items-start gap-2 text-[13px] text-suave dark:text-suave-dark">
           <HiInformationCircle className="w-5 h-5 shrink-0" />
-          ¿No aparece? No pasa nada: cargás nombre, apellido y WhatsApp, y seguís.
+          ¿No es cliente? No hace falta el DNI: tocá «No es cliente · cargar sin DNI» y cargás nombre, apellido y WhatsApp.
         </p>
       )}
     </div>

@@ -13,6 +13,7 @@
 //     THAMES: ¿Es urgente?  · ¿Cuándo lo llamamos?  · ¿Algo más?
 //     THAMES: Así queda: … [Guardar]  →  «¡Listo! Ya le aparece a Franco en Para llamar».
 //
+//   El DNI es OPCIONAL si no es cliente (Franco 25/11/2026): «No es cliente · seguir sin DNI».
 //   Siempre hay «No sabe» y «↩ Cambiar la última respuesta». Las preguntas y los
 //   botones salen del catálogo del servidor (legales/catalogo.py: CONSULTA_RAPIDA,
 //   MOTIVOS[].preguntas, HORARIOS_LLAMADO). Al guardar queda en «Para llamar».
@@ -258,7 +259,7 @@ export default function ConsultaRapida() {
   const buscar = async (sinDni = false) => {
     const q = soloDigitos(dniTxt);
     if (!sinDni && q.length < 6) {
-      setError("Escribí el DNI completo (sin puntos), o tocá «No sabe el DNI».");
+      setError("Escribí el DNI completo (sin puntos), o tocá «No es cliente · seguir sin DNI».");
       return;
     }
     if (sinDni) {
@@ -323,7 +324,15 @@ export default function ConsultaRapida() {
 
   /* ── Texto de cada pregunta del chat (lo que dice THAMES) ── */
   const preguntaDe = (paso) => {
-    if (paso === "dni") return <>Primero, pedile el <b>DNI</b> al cliente y escribilo acá (sin puntos).</>;
+    if (paso === "dni")
+      return (
+        <>
+          Si ya es cliente, escribí su <b>DNI</b> (sin puntos) y lo buscamos.
+          <span className="mt-1 block text-[13px] font-normal text-suave dark:text-suave-dark">
+            Si no es cliente nuestro, el DNI no hace falta: tocá «No es cliente · seguir sin DNI».
+          </span>
+        </>
+      );
     if (paso === "elegir") return <>Encontré varias personas con ese dato. ¿Cuál es?</>;
     if (paso === "es_el") {
       const c = encontrados[0];
@@ -376,7 +385,7 @@ export default function ConsultaRapida() {
   /* ── Lo que contestó (la burbuja de la derecha) ── */
   const respuestaDe = (paso) => {
     const v = r[paso];
-    if (paso === "dni") return v?.texto ? `DNI ${v.texto}` : "No sabe el DNI";
+    if (paso === "dni") return v?.texto ? `DNI ${v.texto}` : "No es cliente · sin DNI";
     if (paso === "elegir") return v === NO_SABE ? "No es ninguno" : v?.nombre_completo;
     if (paso === "es_el") return v === "SI" ? "Sí, es" : "No, es otra persona";
     if (paso === "nombre") return `${v?.nombre || ""} ${v?.apellido || ""}`.trim();
@@ -417,7 +426,7 @@ export default function ConsultaRapida() {
             </Boton>
           </div>
           <Boton tono="suave" onClick={() => buscar(true)}>
-            No sabe el DNI
+            No es cliente · seguir sin DNI
           </Boton>
         </div>
       );
