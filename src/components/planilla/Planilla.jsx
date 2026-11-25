@@ -154,7 +154,7 @@ function Cargando() {
 function posicionGlobo(el) {
   if (!el || !el.isConnected) return null;
   const r = el.getBoundingClientRect();
-  const W = Math.min(340, window.innerWidth - 16);
+  const W = Math.min(320, window.innerWidth - 16);
   const left = Math.min(Math.max(8, r.left + r.width / 2 - W / 2), window.innerWidth - W - 8);
   const abajo = window.innerHeight - r.bottom - 14;
   const arriba = r.top - 14;
@@ -733,7 +733,7 @@ export default function Planilla({ a }) {
               <div
                 role="dialog"
                 aria-label="Cambiar estado"
-                className="fixed inset-x-0 bottom-0 z-[97] flex max-h-[88dvh] flex-col rounded-t-2xl border-t border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl"
+                className="fixed inset-x-0 bottom-0 z-[97] mx-auto flex max-h-[80dvh] w-full max-w-md flex-col rounded-t-2xl border-t border-linea dark:border-linea-dark bg-card dark:bg-card-dark shadow-xl sm:border-x"
                 style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
               >
                 <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-linea dark:bg-linea-dark" aria-hidden="true" />

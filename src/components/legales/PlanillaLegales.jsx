@@ -8,8 +8,10 @@
 //   Tocás el color →
 //     - ADMIN:    «Pasar a…» las etapas (lo que sigue primero).
 //     - ABOGADO:  «Pasar a…» SUS estados (los de «Estados y listas», con sus colores).
-//     - OFICINA:  el estado lo cambia el abogado; ella puede dar turno, elegir abogado,
+//     - OFICINA:  🆕 25/11/2026 (Franco) «Pasar a…» los estados del estudio (como el abogado)
+//                 en los casos de SU oficina, y «➕ Nuevo estado». Además: turno, abogado,
 //                 agendar una fecha, anotar o subir papeles.
+//     - Todos los que mueven: «➕ Nuevo estado» (lo crea y el caso pasa ahí).
 //     - Todos (menos la oficina): «Ya se hizo» la fecha vencida.
 //   Tocás el nombre → panel con Novedades (anotar), Datos, Papeles y «Ficha completa».
 // Las reglas las sigue validando el SERVIDOR (ej: sin abogado no pasa de «Consulta»).
@@ -34,6 +36,7 @@ import {
   borrarDocumento,
   cambiarEstado,
   cargarHonorarios,
+  crearOpcion,
   editarCaso,
   editarFecha,
   guardarDocumento,
@@ -42,6 +45,7 @@ import {
   mensajeError,
   moverCaso,
   pedirCaso,
+  pedirListas,
   subirArchivo,
 } from "../../services/legales";
 import ExpedienteDocumentosPanel from "./ExpedienteDocumentosPanel";
@@ -113,7 +117,24 @@ export default function PlanillaLegales({ vista, onVista }) {
   const app = ctxApp.cargar ? ctxApp : SIN_APP;
   const enApp = esAbogado && !!app.cargar;
   const navigate = useNavigate();
-  const puedeMover = rol === "ADMIN" || rol === "ABOGADO";
+  const esOficina = rol === "OFICINA";
+  // El abogado y la oficina ven y usan los ESTADOS del estudio («Juntando papeles», «Prueba»…);
+  // el admin, las etapas.
+  const usaPropios = esAbogado || esOficina;
+  const puedeMover = rol === "ADMIN" || rol === "ABOGADO" || esOficina;
+
+  // Las listas del estudio para la oficina (en la app del abogado ya las trae AppAbogado).
+  const [listasOfi, setListasOfi] = useState(null);
+  const cargarListasOfi = useCallback(async () => {
+    try {
+      setListasOfi(await pedirListas());
+    } catch {
+      /* sin listas: se usan las etapas */
+    }
+  }, []);
+  useEffect(() => {
+    if (!enApp && esOficina) cargarListasOfi();
+  }, [enApp, esOficina, cargarListasOfi]);
 
   const [propia, setPropia] = useState(null);
   const [errorPropio, setErrorPropio] = useState("");
@@ -133,7 +154,7 @@ export default function PlanillaLegales({ vista, onVista }) {
 
   const filas = enApp ? app.casos : propia;
   const error = enApp ? app.error : errorPropio;
-  const listas = enApp ? app.listas : null;
+  const listas = enApp ? app.listas : listasOfi;
   const recargar = useCallback(async () => {
     if (enApp) await app.cargar();
     else await cargarPropia();
@@ -171,9 +192,9 @@ export default function PlanillaLegales({ vista, onVista }) {
       estados: ESTADOS,
       grupos: ABIERTOS.map((e) => ({ id: e, n: ESTADOS[e].n, c: ESTADOS[e].c })),
       estadoDe: (e) => e.estado,
-      // El abogado ve SU estado (el de sus listas) con su color; la oficina y el admin, la etapa.
-      etiquetaEstado: (e) => (esAbogado && e.estado_propio?.nombre ? e.estado_propio.nombre : ESTADOS[e.estado]?.n || e.estado_nombre),
-      colorEstado: (e) => (esAbogado && e.estado_propio?.color ? HEX[e.estado_propio.color] || ESTADOS[e.estado]?.c : ESTADOS[e.estado]?.c),
+      // El abogado y la oficina ven el estado del estudio con su color; el admin, la etapa.
+      etiquetaEstado: (e) => (usaPropios && e.estado_propio?.nombre ? e.estado_propio.nombre : ESTADOS[e.estado]?.n || e.estado_nombre),
+      colorEstado: (e) => (usaPropios && e.estado_propio?.color ? HEX[e.estado_propio.color] || ESTADOS[e.estado]?.c : ESTADOS[e.estado]?.c),
       abierto: (e) => (puedeMover ? true : ABIERTOS.includes(e.estado)),
       terminados: {
         n: "Cerrados y desistidos",
@@ -287,12 +308,13 @@ export default function PlanillaLegales({ vista, onVista }) {
         let aviso = null;
         if (puedeMover) {
           const sinAbogado = !e.abogado;
-          // ABOGADO con sus listas: sus estados (moverCaso). ADMIN (o sin listas): las etapas.
-          if (esAbogado && estadosAbogado.length) {
+          // ABOGADO u OFICINA con listas: los estados del estudio (moverCaso). ADMIN (o sin listas): las etapas.
+          if (usaPropios && estadosAbogado.length) {
             const idx = estadosAbogado.findIndex((o) => String(o.id) === String(e.estado_propio?.id));
             const sig = estadosAbogado.slice(idx + 1).find((o) => !o.terminado);
             estadosAbogado.forEach((o) => {
               if (String(o.id) === String(e.estado_propio?.id)) return;
+              const necesitaAbogado = sinAbogado && o.etapa !== e.estado && !["CONSULTA", "CERRADO", "DESISTIDO"].includes(o.etapa);
               opciones.push({
                 id: `mover-${o.id}`,
                 mover: o.id,
@@ -300,7 +322,8 @@ export default function PlanillaLegales({ vista, onVista }) {
                 etiqueta: o.nombre,
                 color: HEX[o.color] || ESTADOS[o.etapa]?.c,
                 txt: o.terminado ? "Se termina el caso" : o.etapa_nombre || ESTADOS[o.etapa]?.n || "",
-                principal: !!sig && sig.id === o.id,
+                deshabilitado: necesitaAbogado ? "Primero elegí el abogado" : null,
+                principal: !!sig && sig.id === o.id && !necesitaAbogado,
                 ask: o.etapa === "COBRADO" && e.estado !== "COBRADO" ? askHonorarios(e) : null,
                 preg: `Pasar a «${o.nombre}»`,
                 confirmar: "Guardar",
@@ -331,6 +354,29 @@ export default function PlanillaLegales({ vista, onVista }) {
           }
           if (f && abierto && (f.vencida || diasHasta(f.fecha) <= 0)) {
             extras.push({ id: "hecha", ic: "☑️", txt: `Ya se hizo: ${f.titulo}`, sub: venceTxt(f), fecha: f.id, ok: "Hecho ✔" });
+          }
+          // ➕ 25/11/2026: un estado nuevo sin ir a «Estados y listas» (lo crea y el caso pasa ahí).
+          if (abierto && catalogo?.puede_crear_estado) {
+            const etapas = (sinAbogado ? ["CONSULTA"] : [...CAMINO.filter((x) => x !== "CERRADO")]).map((x) => ({ v: x, n: ESTADOS[x].n, avatar: false }));
+            extras.push({
+              id: "nuevoEstado",
+              ic: "➕",
+              txt: "Nuevo estado",
+              sub: "Lo creás y el caso pasa ahí",
+              ask: [
+                { k: "nombre", t: "linea", l: "¿Cómo se llama?", ph: "Ej: Esperando al perito" },
+                {
+                  k: "etapa",
+                  t: "elegir",
+                  l: "¿En qué parte del caso va?",
+                  ayuda: sinAbogado ? "Sin abogado elegido, solo puede ir en «Consulta»." : "Lo que ve el cliente en «Mi caso»",
+                  ops: etapas,
+                  def: etapas.some((x) => x.v === e.estado) ? e.estado : etapas[0]?.v,
+                },
+              ],
+              preg: "Nuevo estado",
+              confirmar: "Crear y pasar el caso",
+            });
           }
         } else {
           aviso = abierto ? "El estado lo cambia el abogado del caso. Vos podés:" : "El caso está cerrado.";
@@ -364,6 +410,15 @@ export default function PlanillaLegales({ vista, onVista }) {
           r = await moverCaso(id, { estado: op.mover, nota: "", visible: op.etapa !== e.estado });
         } else if (op.a) {
           r = await cambiarEstado(id, { estado: op.a, nota: "", visible: true });
+        } else if (op.id === "nuevoEstado") {
+          const nombre = String(vals.nombre || "").trim();
+          const creado = await crearOpcion({ tipo: "ESTADO", nombre, etapa: vals.etapa });
+          const nuevo = creado?.opcion?.id;
+          if (enApp) app.cargarListas?.();
+          else cargarListasOfi();
+          if (!nuevo) return `Creado «${nombre}»`;
+          await moverCaso(id, { estado: nuevo, nota: "", visible: vals.etapa !== e.estado });
+          return `Creado «${nombre}» y el caso pasó ahí`;
         } else if (op.id === "hecha") {
           await editarFecha(id, op.fecha, { cumplido: true });
           return op.ok;
@@ -539,7 +594,7 @@ export default function PlanillaLegales({ vista, onVista }) {
         ficha: { txt: esAbogado ? "Abrir el caso" : "Ficha completa", onClick: (e) => navigate(`/legales/${e.id}`) },
       },
     };
-  }, [esAdmin, esAbogado, esStaff, enApp, app, catalogo, abogados, filas, error, listas, recargar, navigate, vista, onVista, puedeMover]);
+  }, [esAdmin, esAbogado, esStaff, enApp, app, catalogo, abogados, filas, error, listas, recargar, navigate, vista, onVista, puedeMover, usaPropios, cargarListasOfi]);
 
   return <Planilla a={a} />;
 }

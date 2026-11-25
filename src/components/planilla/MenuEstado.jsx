@@ -8,6 +8,10 @@
 //   - Si lo elegido necesita un dato (ej: "¿Qué pidió el registro?"), el mismo
 //     menú se convierte en la pregunta, con Confirmar / Cancelar.
 // En la compu sale como un globo debajo del color; en el celu, como hoja de abajo.
+//
+// 25/11/2026 (Franco: «se ve muy grande y es incómodo»): cada estado es un renglón finito
+// (puntito de color + nombre + la etapa chiquita a la derecha). Solo «lo que sigue» va
+// pintado suave con su color. Antes eran bloques de color de 2 renglones: 10 estados no entraban.
 import { HiCheck } from "react-icons/hi";
 
 import { Avatar } from "../gestoria/Piezas";
@@ -169,19 +173,33 @@ export default function MenuEstado({ a, it, det = null, menu, onElegir, onVals, 
       {opciones.length > 0 && <small className="mb-1.5 ml-0.5 text-[10.5px] font-extrabold tracking-[0.08em] text-suave dark:text-suave-dark">PASAR A</small>}
       {opciones.map((op) => {
         const e = a.estados[op.a] || { n: op.etiqueta || op.txt, c: "#64748b" };
+        const color = op.color || e.c;
+        const nombre = op.etiqueta || e.n;
+        // La etapa de abajo solo si dice algo distinto (ej: «Sentencia · Sentencia» → sin repetir).
+        const sub = op.deshabilitado || (op.txt && op.txt !== nombre ? op.txt : "");
         return (
           <button
             key={op.id}
             type="button"
             onClick={() => onElegir(op)}
-            className={`mb-1.5 flex w-full flex-col items-start rounded-lg px-3 py-2.5 text-left text-white transition-[filter] hover:brightness-110 ${op.deshabilitado ? "opacity-45" : ""} ${op.principal ? "ring-2 ring-offset-2 ring-offset-card dark:ring-offset-card-dark" : ""}`}
-            style={{ background: op.color || e.c, ...(op.principal ? { "--tw-ring-color": op.color || e.c } : {}) }}
+            title={sub ? `${nombre} · ${sub}` : nombre}
+            className={`mb-0.5 flex min-h-[38px] w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
+              op.principal ? "" : "border-transparent hover:bg-surface dark:hover:bg-surface-dark"
+            } ${op.deshabilitado ? "opacity-45" : ""}`}
+            style={
+              op.principal
+                ? { background: `color-mix(in srgb, ${color} 14%, transparent)`, borderColor: `color-mix(in srgb, ${color} 55%, transparent)` }
+                : undefined
+            }
           >
-            <span className="flex w-full items-center gap-2">
-              <b className="flex-1 text-[14px]">{op.etiqueta || e.n}</b>
-              {op.principal && <span className="rounded-full bg-white/25 px-2 py-px text-[10.5px] font-extrabold tracking-wide">LO QUE SIGUE</span>}
-            </span>
-            <small className="text-[12px] opacity-95">{op.deshabilitado || op.txt}</small>
+            <span className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/10" style={{ background: color }} aria-hidden="true" />
+            <b className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-titulo dark:text-titulo-dark">{nombre}</b>
+            {op.principal && (
+              <span className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-extrabold tracking-wide text-white" style={{ background: color }}>
+                SIGUE
+              </span>
+            )}
+            {sub && <small className="max-w-[46%] shrink-0 truncate text-[11.5px] text-suave dark:text-suave-dark">{sub}</small>}
           </button>
         );
       })}
@@ -192,7 +210,7 @@ export default function MenuEstado({ a, it, det = null, menu, onElegir, onVals, 
           key={x.id}
           type="button"
           onClick={() => onElegir(x)}
-          className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2.5 text-left text-[13.5px] font-semibold hover:bg-surface dark:hover:bg-surface-dark ${
+          className={`flex min-h-[38px] w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] font-semibold hover:bg-surface dark:hover:bg-surface-dark ${
             x.peligro ? "text-duo-rojo" : "text-titulo dark:text-titulo-dark"
           }`}
         >
