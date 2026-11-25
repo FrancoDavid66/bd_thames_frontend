@@ -13,10 +13,10 @@
 //   <EstadisticasWhatsApp lineas={[2, 3]} onAbrirChat={(linea, tel) => …} />
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  HiChatAlt2, HiClock, HiExclamation, HiLightningBolt, HiMoon, HiRefresh, HiUserGroup,
+  HiBadgeCheck, HiChatAlt2, HiClock, HiExclamation, HiLightningBolt, HiMoon, HiPencilAlt, HiRefresh, HiUserGroup,
 } from "react-icons/hi";
 
-import { pedirEstadisticas } from "../../services/whatsapp";
+import { pedirEstadisticas, pedirOrtografia, pedirResolucion } from "../../services/whatsapp";
 
 // ── Fechas (hora de Argentina, la del navegador) ──
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -141,6 +141,8 @@ export default function EstadisticasWhatsApp({ lineas = null, onAbrirChat }) {
   const opciones = useMemo(periodos, []);
   const [periodo, setPeriodo] = useState("semana");
   const [datos, setDatos] = useState(null);
+  const [reso, setReso] = useState(null);      // ✅ ¿se resuelven rápido?
+  const [orto, setOrto] = useState(null);      // ✍️ ortografía y trato
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [abiertoTema, setAbiertoTema] = useState(null);
@@ -150,7 +152,15 @@ export default function EstadisticasWhatsApp({ lineas = null, onAbrirChat }) {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      setDatos(await pedirEstadisticas({ desde: p.desde, hasta: p.hasta, lineas: claveLineas ? claveLineas.split(",") : null }));
+      const filtro = { desde: p.desde, hasta: p.hasta, lineas: claveLineas ? claveLineas.split(",") : null };
+      const [e, r, o] = await Promise.all([
+        pedirEstadisticas(filtro),
+        pedirResolucion(filtro).catch(() => null),
+        pedirOrtografia(filtro).catch(() => null),
+      ]);
+      setDatos(e);
+      setReso(r);
+      setOrto(o);
       setError("");
     } catch (e) {
       setError(e?.response?.data?.detail || "No se pudieron cargar las estadísticas.");
@@ -320,6 +330,10 @@ export default function EstadisticasWhatsApp({ lineas = null, onAbrirChat }) {
             <Esperas titulo="Las respuestas más lentas (en horario)" filas={datos.mas_lentas} vacio="Sin respuestas en este período." onAbrirChat={onAbrirChat} />
           </div>
 
+          {reso && <Resolucion r={reso} onAbrirChat={onAbrirChat} />}
+          {orto && <OrtografiaTrato o={orto} onAbrirChat={onAbrirChat} />}
+          {datos.internos && <Internos i={datos.internos} />}
+
           {/* Observaciones */}
           <section className={`${caja} p-4`}>
             <h3 className={`${titulo} mb-1 flex items-center gap-2`}><HiChatAlt2 className="h-4 w-4" /> Tus observaciones</h3>
@@ -346,5 +360,194 @@ export default function EstadisticasWhatsApp({ lineas = null, onAbrirChat }) {
         </>
       )}
     </div>
+  );
+}
+
+
+// ═══════════════════════ ✅ ¿SE RESUELVEN RÁPIDO? ═══════════════════════
+const ESTADO = {
+  ABIERTA: { label: "Sin respuesta", cls: "bg-duo-rojo text-white" },
+  EN_CURSO: { label: "En curso", cls: "bg-duo-azul-soft dark:bg-[var(--color-duo-azul-soft-dark)] text-duo-azul" },
+  RESUELTA: { label: "Resuelta", cls: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde" },
+  CONFIRMADA: { label: "Confirmada", cls: "bg-duo-verde-soft dark:bg-[var(--color-duo-verde-soft-dark)] text-duo-verde" },
+};
+const pct = (v) => (v === null || v === undefined ? "—" : `${v} %`);
+
+function Resolucion({ r, onAbrirChat }) {
+  const t = r.total;
+  const filas = r.por_tema.filter((x) => x.consultas > 0);
+  return (
+    <section className={`${caja} p-4`}>
+      <h3 className={`${titulo} flex items-center gap-2`}><HiBadgeCheck className="h-4 w-4" /> ¿Se resuelven rápido?</h3>
+      <p className={`mb-3 text-[12px] ${suave}`}>
+        Cada consulta del cliente (un pago, un choque, una cotización…) desde su primer mensaje hasta que queda resuelta.
+        «Confirmada» = el cliente dijo gracias / ok. Tiempos contando solo el horario de cada oficina.
+      </p>
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
+        <Tarjeta icono={HiChatAlt2} label="Consultas" valor={t.consultas} detalle={`${t.confirmadas} confirmadas`} />
+        <Tarjeta icono={HiBadgeCheck} label="Resueltas" valor={pct(t.pct_resueltas)} detalle={`${t.abiertas} sin respuesta`} />
+        <Tarjeta icono={HiClock} label="Hasta resolver" valor={duracion(t.mediana_resolucion_min)} detalle="la mitad, en horario" />
+        <Tarjeta icono={HiLightningBolt} label="Resueltas en 1 hora" valor={pct(t.pct_en_1_hora)} detalle={`en el día: ${pct(t.pct_en_el_dia)}`} />
+        <Tarjeta icono={HiExclamation} label="Tuvo que insistir" valor={pct(t.pct_con_insistencia)} detalle={`${t.idas_y_vueltas ?? "—"} idas y vueltas`} />
+        <Tarjeta icono={HiUserGroup} label="Saludan al responder" valor={pct(t.pct_saluda)} detalle="«Hola / Buenos días»" />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-[13px]">
+          <thead>
+            <tr className={`border-y border-linea dark:border-linea-dark text-left text-[11px] uppercase tracking-wide ${suave}`}>
+              {["Tema", "Consultas", "Resueltas", "La mitad en", "9 de 10 en", "En 1 hora", "Idas y vueltas", "Insistió", "Sin respuesta"].map((h) => (
+                <th key={h} className="px-3 py-2 font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((x) => (
+              <tr key={x.tema} className="border-b border-linea/60 dark:border-linea-dark/60 last:border-0">
+                <td className="px-3 py-2 font-semibold text-titulo dark:text-titulo-dark">{x.etiqueta}</td>
+                <td className="px-3 py-2 text-titulo dark:text-titulo-dark">{x.consultas}</td>
+                <td className="px-3 py-2 text-titulo dark:text-titulo-dark">{pct(x.pct_resueltas)}</td>
+                <td className="px-3 py-2">
+                  <span className="font-semibold text-titulo dark:text-titulo-dark">{duracion(x.mediana_resolucion_min)}</span>{" "}
+                  <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${ritmo(x.mediana_resolucion_min).cls}`}>{ritmo(x.mediana_resolucion_min).label}</span>
+                </td>
+                <td className="px-3 py-2 text-titulo dark:text-titulo-dark">{duracion(x.p90_resolucion_min)}</td>
+                <td className="px-3 py-2 text-titulo dark:text-titulo-dark">{pct(x.pct_en_1_hora)}</td>
+                <td className="px-3 py-2 text-titulo dark:text-titulo-dark">{x.idas_y_vueltas ?? "—"}</td>
+                <td className={`px-3 py-2 ${x.pct_con_insistencia >= 20 ? "font-semibold text-duo-rojo" : "text-titulo dark:text-titulo-dark"}`}>{pct(x.pct_con_insistencia)}</td>
+                <td className={`px-3 py-2 font-semibold ${x.abiertas ? "text-duo-rojo" : "text-titulo dark:text-titulo-dark"}`}>{x.abiertas}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-lg bg-surface dark:bg-surface-dark p-3 text-[13px]">
+          <p className="mb-1 font-semibold text-titulo dark:text-titulo-dark">💳 Pagos cruzados con THAMES</p>
+          {r.pagos.con_cliente ? (
+            <p className="text-titulo dark:text-titulo-dark">
+              De <b>{r.pagos.con_cliente}</b> consultas de pago de clientes identificados, <b>{r.pagos.con_pago_en_thames}</b> terminaron con
+              el pago <b>registrado en THAMES</b>{r.pagos.mediana_hasta_registro_min !== null && <> (la mitad en <b>{duracion(r.pagos.mediana_hasta_registro_min)}</b>)</>}.
+            </p>
+          ) : <p className={suave}>No hay consultas de pago de clientes identificados en este período.</p>}
+          <p className={`mt-1 text-[11px] ${suave}`}>{r.pagos.consultas} consultas de pago en total (algunas de números que no están cargados como cliente).</p>
+        </div>
+        <ListaConsultas titulo="Siguen sin respuesta" filas={r.abiertas} campo="esperando_min" vacio="✅ Ninguna." onAbrirChat={onAbrirChat} />
+        <ListaConsultas titulo="El cliente tuvo que insistir" filas={r.insistieron} campo="resolucion_min" vacio="✅ Nadie tuvo que insistir." onAbrirChat={onAbrirChat} insistencias />
+      </div>
+    </section>
+  );
+}
+
+function ListaConsultas({ titulo: t, filas, campo, vacio, onAbrirChat, insistencias }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[13px] font-semibold text-titulo dark:text-titulo-dark">{t}</p>
+      {filas.length === 0 ? <p className={`text-[12px] ${suave}`}>{vacio}</p> : (
+        <ul className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
+          {filas.map((c) => (
+            <li key={`${c.linea}-${c.cliente_tel}-${c.desde}`} className="rounded-lg bg-surface dark:bg-surface-dark p-2 text-[12px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-semibold text-titulo dark:text-titulo-dark">{c.cliente_nombre || telefonoLindo(c.cliente_tel)}</span>
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${(ESTADO[c.estado] || ESTADO.RESUELTA).cls}`}>{(ESTADO[c.estado] || ESTADO.RESUELTA).label}</span>
+              </div>
+              <p className={`truncate ${suave}`}>{c.linea_nombre} · {ETIQ_TEMA[c.tema] || c.tema} · {insistencias ? `insistió ${c.insistencias} ${c.insistencias === 1 ? "vez" : "veces"}` : duracion(c[campo])}</p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className={`truncate ${suave}`}>«{c.texto_cliente || "…"}»</span>
+                {onAbrirChat && (
+                  <button type="button" onClick={() => onAbrirChat(c.linea, c.cliente_tel)}
+                    className="h-6 shrink-0 rounded-md border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-1.5 text-[11px] text-titulo dark:text-titulo-dark">
+                    Ver chat
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const ETIQ_TEMA = {
+  siniestro: "Siniestro", auxilio: "Grúa", baja: "Baja", pagos: "Pagos", cotizacion: "Cotización", modificacion: "Cambios",
+  gestoria: "Gestoría", renovacion: "Renovación", papeles: "Póliza / papeles", info: "Horarios", archivo: "Foto / archivo",
+  audio: "Audio", otros: "Otros",
+};
+
+// ═══════════════════════ ✍️ ORTOGRAFÍA Y TRATO ═══════════════════════
+function OrtografiaTrato({ o }) {
+  const [abierta, setAbierta] = useState(null);
+  const filas = o.por_linea.filter((x) => x.revisados > 0);
+  return (
+    <section className={`${caja} p-4`}>
+      <h3 className={`${titulo} flex items-center gap-2`}><HiPencilAlt className="h-4 w-4" /> Ortografía y trato (de usted)</h3>
+      <p className={`mb-3 text-[12px] ${suave}`}>
+        Revisión automática de lo que las oficinas les escriben a los clientes: palabras informales («sisi», «holis»),
+        mal escritas («porfavor», «nose»), sin tilde, de vos en vez de usted y errores de tipeo. Es una ayuda: confirmalo en el chat.
+      </p>
+      {filas.length === 0 ? <p className={`text-[13px] ${suave}`}>Sin mensajes de las oficinas en este período.</p> : (
+        <ul className="flex flex-col gap-3">
+          {filas.map((x) => (
+            <li key={x.id} className="rounded-lg bg-surface dark:bg-surface-dark p-3">
+              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
+                <span className="font-semibold text-titulo dark:text-titulo-dark">{x.nombre}</span>
+                <span className={suave}>
+                  <b className="text-titulo dark:text-titulo-dark">{pct(x.pct_prolijo)}</b> prolijos · {x.con_problemas} de {x.revisados} con detalles · empiezan con mayúscula: {pct(x.pct_mayuscula)}
+                </span>
+              </div>
+              <Barra valor={x.pct_prolijo || 0} maximo={100} titulo={`${x.pct_prolijo} % de los mensajes sin detalles`} />
+              {x.errores.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {x.errores.map((e) => (
+                    <span key={`${e.tipo}-${e.palabra}`} title={e.tipo}
+                      className="rounded-full border border-linea dark:border-linea-dark bg-card dark:bg-card-dark px-2 py-0.5 text-[12px] text-titulo dark:text-titulo-dark">
+                      <s className="opacity-70">{e.palabra}</s> → <b>{e.sugerencia}</b> <span className={suave}>×{e.veces}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {x.ejemplos.length > 0 && (
+                <button type="button" onClick={() => setAbierta(abierta === x.id ? null : x.id)} className="mt-2 text-[12px] font-medium text-duo-azul">
+                  {abierta === x.id ? "Ocultar ejemplos" : "Ver ejemplos"}
+                </button>
+              )}
+              {abierta === x.id && (
+                <ul className={`mt-1 flex flex-col gap-1 border-l-2 border-duo-amarillo/60 pl-3 text-[12px] ${suave}`}>
+                  {x.ejemplos.map((e, i) => (
+                    <li key={i}>
+                      «{e.texto}» → {e.problemas.map((p) => `${p.palabra} → ${p.sugerencia}`).join(" · ")}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ═══════════════════════ 👥 INTERNOS ═══════════════════════
+function Internos({ i }) {
+  if (!i.chats) return null;
+  return (
+    <section className={`${caja} p-4`}>
+      <h3 className={`${titulo} flex items-center gap-2`}><HiUserGroup className="h-4 w-4" /> Charlas internas</h3>
+      <p className={`mb-3 text-[12px] ${suave}`}>
+        {i.chats} charlas y {i.mensajes} mensajes entre oficinas, compañeros, el abogado o gestores. No cuentan en las métricas de arriba.
+        Se leen en <b>Chats → Internos</b>.
+      </p>
+      <ul className="grid gap-1.5 sm:grid-cols-2">
+        {i.contactos.map((c) => (
+          <li key={`${c.linea_id}-${c.telefono}`} className="flex items-center justify-between gap-2 rounded-lg bg-surface dark:bg-surface-dark px-3 py-2 text-[12px]">
+            <span className="truncate text-titulo dark:text-titulo-dark">{c.linea} ↔ <b>{c.nombre}</b></span>
+            <span className={`shrink-0 ${suave}`}>{c.mensajes} msj</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

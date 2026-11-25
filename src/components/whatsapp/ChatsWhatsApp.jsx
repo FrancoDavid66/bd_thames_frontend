@@ -22,6 +22,7 @@
 //   <ChatsWhatsApp soloLineas={[3, 4]} />   // solapas: solo los chats de KM39 y 5 Esquinas
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import BotonInterno from "./InternoChat";
 import BotonObservacion from "./ObservacionesChat";
 import { FaWhatsapp } from "react-icons/fa";
 import {
@@ -206,7 +207,33 @@ function Burbuja({ m }) {
           <Tildes m={m} />
         </div>
         {m.estado === "failed" && m.error && <p className="mt-1 text-[11px] font-medium text-duo-rojo">No llegó: {m.error}</p>}
+        {/* ✍️ Ortografía y trato (solo lo que mandó la oficina a un cliente) */}
+        {mio && m.ortografia?.length > 0 && <Ortografia problemas={m.ortografia} />}
       </div>
+    </div>
+  );
+}
+
+const TIPO_ORTO = { informal: "Informal", escritura: "Mal escrito", tilde: "Falta tilde", voseo: "Va de usted", tipeo: "Tipeo" };
+
+function Ortografia({ problemas }) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div className="mt-1 border-t border-black/10 pt-1 dark:border-white/10">
+      <button type="button" onClick={() => setAbierto((v) => !v)}
+        className="inline-flex items-center gap-1 rounded-full bg-duo-amarillo/90 px-1.5 py-0.5 text-[10px] font-bold text-white"
+        title="Ortografía y trato: tocá para ver cómo escribirlo">
+        ✍️ {problemas.length} {problemas.length === 1 ? "detalle" : "detalles"}
+      </button>
+      {abierto && (
+        <ul className="mt-1 flex flex-col gap-0.5 text-[11px]">
+          {problemas.map((p, i) => (
+            <li key={i}>
+              <span className="opacity-70">{TIPO_ORTO[p.tipo] || p.tipo}:</span> <s>{p.palabra}</s> → <b>{p.sugerencia}</b>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -357,15 +384,27 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
 
   // 🗂️ Solapas de oficinas (las elige WhatsAppPage): solo los chats de esas líneas.
   const clavesVisibles = soloLineas ? soloLineas.join(",") : "";
+  // 👥 Clientes / Internos (oficinas entre sí, compañeros, abogado…). Los internos no cuentan en las métricas.
+  const [grupo, setGrupo] = useState("clientes");
+  const cuantos = useMemo(() => {
+    const visibles = clavesVisibles ? new Set(clavesVisibles.split(",").map(Number)) : null;
+    const enOficinas = lista.conversaciones.filter((c) => !visibles || visibles.has(c.linea));
+    return {
+      clientes: enOficinas.filter((c) => !c.interno).length,
+      internos: enOficinas.filter((c) => c.interno).length,
+      esperando: enOficinas.filter((c) => !c.interno && c.esperando).length,
+    };
+  }, [lista, clavesVisibles]);
   const filtradas = useMemo(() => {
     const visibles = clavesVisibles ? new Set(clavesVisibles.split(",").map(Number)) : null;
     const q = busqueda.trim().toLowerCase();
     return lista.conversaciones.filter((c) => {
       if (visibles && !visibles.has(c.linea)) return false;
+      if (Boolean(c.interno) !== (grupo === "internos")) return false;
       if (!q) return true;
-      return (c.cliente_nombre || "").toLowerCase().includes(q) || c.cliente_tel.includes(q.replace(/\D/g, "") || "§");
+      return (c.cliente_nombre || c.interno_nombre || "").toLowerCase().includes(q) || c.cliente_tel.includes(q.replace(/\D/g, "") || "§");
     });
-  }, [lista, busqueda, clavesVisibles]);
+  }, [lista, busqueda, clavesVisibles, grupo]);
   const variasLineas = soloLineas ? soloLineas.length > 1 : lista.lineas.length > 1;
 
   const agregar = (m) => setHilo((h) => (h ? { ...h, mensajes: [...h.mensajes, m] } : h));
@@ -519,6 +558,20 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
       {/* Lista de chats */}
       <aside className={`${abierto ? "hidden lg:flex" : "flex"} w-full flex-col border-r border-linea dark:border-linea-dark lg:w-[340px]`}>
         <div className="flex flex-col gap-2 border-b border-linea dark:border-linea-dark p-3">
+          <div role="tablist" aria-label="Tipo de chat" className="grid grid-cols-2 gap-1 rounded-lg bg-surface dark:bg-surface-dark p-0.5">
+            {[["clientes", `Clientes (${cuantos.clientes})`], ["internos", `Internos (${cuantos.internos})`]].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={grupo === id} onClick={() => setGrupo(id)}
+                className={`h-8 rounded-md text-[13px] font-semibold ${grupo === id
+                  ? "bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark shadow-sm" : "text-suave dark:text-suave-dark"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {grupo === "internos" && (
+            <p className="text-[11px] text-suave dark:text-suave-dark">
+              Charlas entre oficinas, con compañeros, el abogado o gestores. No cuentan en las métricas de atención.
+            </p>
+          )}
           <label className="flex items-center gap-2 rounded-lg bg-surface dark:bg-surface-dark px-3">
             <HiSearch className="h-4 w-4 text-suave dark:text-suave-dark" />
             <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar nombre o teléfono"
@@ -527,7 +580,7 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
         </div>
         <ul className="flex-1 overflow-y-auto">
           {filtradas.length === 0 && (
-            <li className="p-6 text-center text-[13px] text-suave dark:text-suave-dark">{soloLineas ? "No hay chats en las oficinas elegidas. Tocá «Todas» arriba para ver el resto." : "Todavía no hay chats. Cuando un cliente escriba, aparece acá."}</li>
+            <li className="p-6 text-center text-[13px] text-suave dark:text-suave-dark">{grupo === "internos" ? "No hay charlas internas en estas oficinas." : soloLineas ? "No hay chats en las oficinas elegidas. Tocá «Todas» arriba para ver el resto." : "Todavía no hay chats. Cuando un cliente escriba, aparece acá."}</li>
           )}
           {filtradas.map((c) => {
             const activo = abierto && abierto.linea === c.linea && abierto.tel === c.cliente_tel;
@@ -537,12 +590,14 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
                   className={`flex w-full items-center gap-3 border-b border-linea/60 dark:border-linea-dark/60 px-3 py-3 text-left transition-colors ${
                     activo ? "bg-duo-azul-soft/60 dark:bg-[var(--color-duo-azul-soft-dark)]" : "hover:bg-surface dark:hover:bg-surface-dark"}`}>
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold ${
-                    c.esperando ? "bg-duo-rojo text-white" : "bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark"}`}>
+                    c.esperando && !c.interno ? "bg-duo-rojo text-white" : "bg-surface dark:bg-surface-dark text-titulo dark:text-titulo-dark"}`}>
                     {letra(c.cliente_nombre, c.cliente_tel)}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[14px] font-semibold text-titulo dark:text-titulo-dark">{c.cliente_nombre || telefonoLindo(c.cliente_tel)}</span>
+                      <span className="truncate text-[14px] font-semibold text-titulo dark:text-titulo-dark">
+                        {c.interno ? c.interno_nombre : (c.cliente_nombre || telefonoLindo(c.cliente_tel))}
+                      </span>
                       <span className={`shrink-0 text-[11px] ${c.esperando ? "font-semibold text-duo-rojo" : "text-suave dark:text-suave-dark"}`}>{cuando(c.ultimo_en)}</span>
                     </span>
                     <span className="flex items-center justify-between gap-2">
@@ -553,7 +608,11 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
                         <span className="shrink-0 rounded-full bg-duo-rojo px-1.5 py-0.5 text-[10px] font-bold text-white">espera {duracion(c.esperando_min)}</span>
                       )}
                     </span>
-                    {variasLineas && <span className="text-[11px] text-suave dark:text-suave-dark">{c.linea_nombre}</span>}
+                    {(variasLineas || c.interno) && (
+                      <span className="text-[11px] text-suave dark:text-suave-dark">
+                        {c.interno ? `👥 ${c.linea_nombre} ↔ ${c.interno_nombre}` : c.linea_nombre}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>
@@ -598,8 +657,10 @@ export default function ChatsWhatsApp({ inicial = null, soloLineas = null }) {
                   <HiUser className="h-3.5 w-3.5" /> Ficha
                 </Link>
               )}
+              {/* 👥 ¿Es cliente o interno (compañera, abogado, otra oficina)? */}
+              <BotonInterno tel={abierto.tel} interno={hilo?.interno} onCambio={() => { cargarHilo(); cargarLista(); }} />
               {/* 📝 Bien / Mejorable / Mal + nota, para el estudio de atención */}
-              <BotonObservacion linea={abierto.linea} tel={abierto.tel} />
+              {!hilo?.interno && <BotonObservacion linea={abierto.linea} tel={abierto.tel} />}
             </header>
 
             <div className="flex-1 overflow-y-auto bg-[#efeae2] px-3 py-4 dark:bg-[#0b141a]">

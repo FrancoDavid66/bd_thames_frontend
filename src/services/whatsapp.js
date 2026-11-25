@@ -220,3 +220,15 @@ export function ding() {
     /* sin sonido no pasa nada */
   }
 }
+
+// 👥 Números que no son clientes (oficinas, compañeros, abogado…): van a «Internos».
+export const pedirInternos = () => datos(api.get("/whatsapp/internos/"));
+export const marcarInterno = (telefono, nombre, tipo) => datos(api.post("/whatsapp/internos/", { telefono, nombre, tipo }));
+export const desmarcarInterno = (telefono) => api.delete(`/whatsapp/internos/${telefono}/`);
+
+// ✅ ¿Se resuelven rápido? y ✍️ ortografía (mismo período y oficinas que las estadísticas)
+const paramsEstudio = ({ desde, hasta, lineas } = {}) => ({
+  desde, hasta, ...(lineas && lineas.length ? { lineas: lineas.join(",") } : {}),
+});
+export const pedirResolucion = (p) => datos(api.get("/whatsapp/resolucion/", { params: paramsEstudio(p), timeout: 60000 }));
+export const pedirOrtografia = (p) => datos(api.get("/whatsapp/ortografia/", { params: paramsEstudio(p), timeout: 60000 }));
