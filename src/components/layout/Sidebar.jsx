@@ -52,7 +52,8 @@ export default function Sidebar({
   const location = useLocation();
   const isAdmin = user?.perfil?.rol === "ADMIN" || user?.rol === "ADMIN";
   const isVendedor = user?.perfil?.rol === "VENDEDOR";
-  const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
+  // 🚗 26/11/2026: Gestoría se unió a Consultas → la sección vieja queda SOLO para el admin (archivo y gestorías).
+  const veGestoria = user?.perfil?.rol === "ADMIN";
   const solTotal = (Number(solPendienteAlta) || 0) + (Number(solPendienteEnvio) || 0);
 
   const oficinaNombre = user?.perfil?.oficina_nombre || "Sucursal";

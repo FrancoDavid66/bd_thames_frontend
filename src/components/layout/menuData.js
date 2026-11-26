@@ -92,7 +92,7 @@ export function buildMenuGroups({
   bajasPendientes = 0, serviciosAlertas = 0, siniestrosAbiertos = 0,
   controlDiarioPendientes = 0,   // 🆕 tareas fijas de hoy sin hacer (badge Control diario)
   gestoriaDemorados = 0,         // 🚗 trámites de gestoría demorados (7 días o más sin moverse)
-  veGestoria = true,             // 🚗 admin y oficina (el abogado no)
+  veGestoria = true,             // 🚗 26/11/2026: solo el admin (Gestoría se unió a Consultas)
   legalesAlertas = 0,            // ⚖️ casos legales con fecha vencida sin marcar o demorados (30 días)
   whatsappEsperando = 0,         // 💬 clientes que escribieron y esperan respuesta (solo admin)
   quejasNuevas = 0,              // ⭐ quejas de clientes sin leer (solo admin)
@@ -147,7 +147,8 @@ export function buildMenuGroups({
         // ✨ nuevo: "AAAA-MM-DD" → brilla con el cartel «NUEVO» hasta esa fecha (o hasta que la persona entra).
         { to: "/legales", label: "Consultas", icon: "consulta", badge: legalesAlertas, tone: "rojo", nuevo: "2026-12-07" },
         // 🚗 Gestoría: trámites del automotor derivados a gestores (badge = demorados).
-        ...(veGestoria ? [{ to: "/gestoria", label: "Gestoría", icon: "truck", badge: gestoriaDemorados, tone: "rojo" }] : []),
+        // 26/11/2026: la gestoría nueva se carga en Consultas («Gestoría del auto»); esta queda de archivo (solo admin).
+        ...(veGestoria ? [{ to: "/gestoria", label: "Gestoría (archivo)", icon: "truck", badge: gestoriaDemorados, tone: "rojo" }] : []),
       ],
     },
     {

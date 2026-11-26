@@ -45,6 +45,15 @@ export const crearCaso = (body) => datos(api.post(`${B}expedientes/`, body));
 // ⚡ 23/11/2026: «Consulta rápida» → «Para llamar» (las que nadie contactó todavía).
 export const pedirParaLlamar = () => datos(api.get(`${B}expedientes/para-llamar/`));
 export const marcarContactado = (id, body = {}) => datos(api.post(`${B}expedientes/${id}/contactado/`, body));
+// 🚗 26/11/2026: Gestoría dentro de Consultas → «Para derivar» (solo admin).
+//   const r = await derivarGestoria(12, { gestor: 3, precio: "45000" }); // {wa_gestoria, wa_cliente, caso}
+export const pedirParaDerivar = () => datos(api.get(`${B}expedientes/para-derivar/`));
+export const derivarGestoria = (id, body) => datos(api.post(`${B}expedientes/${id}/derivar-gestoria/`, body));
+export const deshacerDerivacion = (id) => datos(api.post(`${B}expedientes/${id}/deshacer-derivacion/`, {}));
+export const guardarPlataGestoria = (id, body) => datos(api.patch(`${B}expedientes/${id}/plata-gestoria/`, body));
+export const pedirGestorias = () => datos(api.get(`${B}expedientes/gestorias/`));
+export const crearGestoria = (body) => datos(api.post(`${B}expedientes/gestorias/`, body));
+export const quitarGestoria = (id) => datos(api.delete(`${B}expedientes/gestorias/${id}/`));
 export const editarCaso = (id, body) => datos(api.patch(`${B}expedientes/${id}/`, body));
 export const cambiarEstado = (id, body) => datos(api.post(`${B}expedientes/${id}/estado/`, body));
 export const asignarAbogado = (id, abogado) =>

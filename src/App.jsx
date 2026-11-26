@@ -111,7 +111,8 @@ function App() {
   const marca = useMarca();
   // 🚗 El GESTOR es alguien de afuera: solo usa Gestoría (sin menú, sin contadores).
   const esGestor = user?.perfil?.rol === "GESTOR";
-  const veGestoria = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
+  // 🚗 26/11/2026: Gestoría se unió a Consultas → la sección vieja queda SOLO para el admin (archivo y gestorías).
+  const veGestoria = user?.perfil?.rol === "ADMIN";
   // ⚖️ El ABOGADO también es de afuera: solo usa Legales (sus casos).
   // ✍️ 25/11/2026: la ESCRIBANA usa la misma app del abogado (sin Siniestros).
   const esEscribana = user?.perfil?.rol === "ESCRIBANO";
@@ -864,7 +865,7 @@ function App() {
                 <Route path="/legales/*" element={<LegalesPage />} />
 
                 {/* 🚗 GESTORÍA: tablero, ficha, nuevo, gestores, entregados y comisiones */}
-                <Route path="/gestoria/*" element={<GestoriaPage />} />
+                <Route path="/gestoria/*" element={veGestoria ? <GestoriaPage /> : <Navigate to="/legales" replace />} />
 
                 <Route path="/cuponeras" element={<CuponerasPage />} />
                 <Route path="/estadisticas" element={<EstadisticasPage />} />

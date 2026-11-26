@@ -40,6 +40,7 @@ import { Cargando, Demorado, Punto, Seccion } from "../components/gestoria/Pieza
 import { EstadoPill, PasosCaso } from "../components/legales/PiezasLegales";
 import { Etiqueta } from "../components/legales/abogado/piezasAbogado";
 import ExpedienteDocumentosPanel from "../components/legales/ExpedienteDocumentosPanel";
+import { ModalDerivar, SeccionGestoria } from "../components/legales/DerivarGestoria";
 import {
   ComoVa,
   SeccionAbogado,
@@ -389,6 +390,10 @@ export default function LegalesDetailPage() {
   );
   const secAviso = staff ? <SeccionAvisoCliente e={e} onAvisado={registrarAviso} onCopiar={copiarLink} /> : null;
   const secBitacora = <SeccionBitacora e={e} compacta={celu} onAnotar={(body) => hacer(() => anotar(e.id, body), "Anotado")} />;
+  // 🚗 26/11/2026: consulta de «Gestoría del auto» → a quién se derivó (y el admin, la plata).
+  const secGestoria = e.gestoria ? (
+    <SeccionGestoria e={e} onDerivar={() => setModal("derivar")} onCambio={(nuevo) => nuevo?.id && setE(nuevo)} />
+  ) : null;
   const secPlata = e.ve_plata ? (
     <SeccionPlata
       e={e}
@@ -406,6 +411,7 @@ export default function LegalesDetailPage() {
 
   const modales = (
     <>
+      <ModalDerivar caso={e} abierto={modal === "derivar"} onCerrar={() => setModal(null)} onDerivado={(nuevo) => nuevo?.id && setE(nuevo)} />
       <ModalEstado e={e} catalogo={catalogo} abierto={modal === "estado"} inicial={estadoInicial} onCerrar={() => setModal(null)} onGuardar={guardarEstado} />
       <ModalNovedad e={e} abierto={modal === "novedad"} onCerrar={() => setModal(null)} onGuardar={guardarNovedad} />
       <ModalHonorarios
@@ -483,6 +489,7 @@ export default function LegalesDetailPage() {
         <ComoVa e={e} staff={staff} />
         {bannerCerrado}
         {bannerCliente}
+        {secGestoria}
         {secAbogado}
         {secFechas}
         {esAbogado && <SeccionCliente e={e} />}
@@ -539,6 +546,7 @@ export default function LegalesDetailPage() {
       {bannerCliente}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] items-start">
         <div className="flex flex-col gap-4 min-w-0">
+          {secGestoria}
           {secDatos}
           {secFechas}
           {papeles}

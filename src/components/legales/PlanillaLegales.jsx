@@ -205,7 +205,7 @@ export default function PlanillaLegales({ vista, onVista }) {
         },
       },
       nombre: (e) => (esAbogado ? caratulaCorta(e) : e.persona_nombre || "Sin nombre"),
-      sub: (e) => [e.motivo_titulo || e.tema_nombre, e.numero].filter(Boolean).join(" · "),
+      sub: (e) => [e.motivo_titulo || e.tema_nombre, e.gestoria_derivada_a ? `→ ${e.gestoria_derivada_a}` : null, e.numero].filter(Boolean).join(" · "),
       marcas: (e) =>
         [
           e.proxima_fecha?.vencida && { txt: "Fecha vencida", tono: "rojo" },
@@ -243,7 +243,7 @@ export default function PlanillaLegales({ vista, onVista }) {
       diasTitulo: "Última novedad",
       demorado: (e) => esDemorado(e),
       buscar: (e) =>
-        [e.persona_nombre, e.persona_dni, e.numero, e.caratula, e.contraparte, e.tema_nombre, e.motivo_titulo, e.abogado_nombre, e.juzgado, e.expediente_judicial, e.oficina_nombre]
+        [e.persona_nombre, e.persona_dni, e.numero, e.caratula, e.contraparte, e.tema_nombre, e.motivo_titulo, e.abogado_nombre, e.juzgado, e.expediente_judicial, e.oficina_nombre, e.gestoria_derivada_a]
           .filter(Boolean)
           .join(" "),
       buscarPh: esAbogado ? "Buscar carátula, cliente, DNI o expediente" : "Buscar cliente, DNI o N° de caso",
@@ -471,7 +471,7 @@ export default function PlanillaLegales({ vista, onVista }) {
       // 🗂️ El panel del costado.
       panel: {
         cargar: (id) => pedirCaso(id),
-        sub: (e) => [esAbogado ? e.persona_nombre : e.caratula && caratulaCorta(e) !== e.persona_nombre ? caratulaCorta(e) : null, e.motivo_titulo || e.tema_nombre, e.numero].filter(Boolean).join(" · "),
+        sub: (e) => [esAbogado ? e.persona_nombre : e.caratula && caratulaCorta(e) !== e.persona_nombre ? caratulaCorta(e) : null, e.motivo_titulo || e.tema_nombre, e.gestoria_derivada_a ? `→ ${e.gestoria_derivada_a}` : null, e.numero].filter(Boolean).join(" · "),
         novedades: (d) =>
           (d.movimientos || []).map((m) => ({
             id: m.id,

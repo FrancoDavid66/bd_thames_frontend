@@ -43,6 +43,7 @@ import LegalesWizard from "../components/legales/LegalesWizard";
 import PedirTurno from "../components/legales/PedirTurno";
 import ConsultaRapida from "../components/legales/ConsultaRapida";
 import ParaLlamar from "../components/legales/ParaLlamar";
+import ParaDerivar from "../components/legales/ParaDerivar";
 import AbogadosPanel from "../components/legales/AbogadosPanel";
 import CerradosPanel from "../components/legales/CerradosPanel";
 import ComisionesLegales from "../components/legales/ComisionesLegales";
@@ -148,9 +149,9 @@ export default function LegalesPage() {
       <div className="max-w-[1536px] mx-auto w-full px-3 sm:px-0 py-4 sm:py-6">
         <Routes>
           {/* 📞 «Para llamar» (consultas rápidas sin contactar) arriba del Tablero y de Hoy. */}
-          <Route index element={<ConCabecera><ParaLlamar /><PlanillaLegales /></ConCabecera>} />
-          <Route path="hoy" element={<ConCabecera><ParaLlamar /><InicioCelu /></ConCabecera>} />
-          <Route path="casos" element={<ConCabecera><ParaLlamar /><PlanillaLegales /></ConCabecera>} />
+          <Route index element={<ConCabecera><ParaLlamar /><ParaDerivar /><PlanillaLegales /></ConCabecera>} />
+          <Route path="hoy" element={<ConCabecera><ParaLlamar /><ParaDerivar /><InicioCelu /></ConCabecera>} />
+          <Route path="casos" element={<ConCabecera><ParaLlamar /><ParaDerivar /><PlanillaLegales /></ConCabecera>} />
           <Route path="nuevo" element={<LegalesWizard />} />
           <Route path="consulta" element={<ConsultaRapida />} />
           <Route path="turno" element={<PedirTurno />} />
