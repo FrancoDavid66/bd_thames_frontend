@@ -1,24 +1,63 @@
 /* src/pages/RankingPage.jsx
  *
- * 🏆 RANKING — dos pestañas:
+ * 🏆 RANKING — tres pestañas:
  *   · OFICINAS (la que abre por defecto): el podio de las oficinas con más
  *     pólizas nuevas del mes, estilo "estadio de noche" (RankingOficinas.jsx).
  *   · EQUIPO: el ranking de puntos de cada empleado, el de siempre
  *     (RankingEquipo.jsx).
+ *   · ATENCIÓN (25/11/2026): «Mejor atención», las estrellas que ponen los
+ *     clientes a cada empleado (RankingAtencion.jsx).
  *
  * Recuerda la última pestaña en este navegador. Si venís desde el cartel del
  * Inicio ("Ver ranking"), abre directo en Oficinas.
  */
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HiOfficeBuilding, HiUserGroup } from "react-icons/hi";
+import { HiOfficeBuilding, HiStar, HiUserGroup } from "react-icons/hi";
 
 import RankingOficinas from "../components/ranking/RankingOficinas";
 import RankingEquipo from "../components/ranking/RankingEquipo";
+import RankingAtencion from "../components/ranking/RankingAtencion";
 import { leerPref, guardarPref } from "../components/polizasNuevas/comun";
 
 const CLAVE_VISTA = "ranking.vista";
-const valida = (v) => (v === "equipo" ? "equipo" : "oficinas");
+const VISTAS = ["oficinas", "equipo", "atencion"];
+const valida = (v) => (VISTAS.includes(v) ? v : "oficinas");
+
+const PESTANAS = [
+  { id: "oficinas", txt: "Oficinas", Icono: HiOfficeBuilding },
+  { id: "equipo", txt: "Equipo", Icono: HiUserGroup },
+  { id: "atencion", txt: "Atención", Icono: HiStar },
+];
+
+function Selector({ vista, onCambiar }) {
+  return (
+    <div
+      role="group"
+      aria-label="Qué ranking ver"
+      className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1"
+    >
+      {PESTANAS.map(({ id, txt, Icono }) => {
+        const activa = vista === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={activa}
+            onClick={() => !activa && onCambiar(id)}
+            className={
+              activa
+                ? "flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-titulo text-[13px] font-semibold text-white dark:bg-titulo-dark dark:text-surface-dark"
+                : "flex min-h-[40px] items-center justify-center gap-2 rounded-lg text-[13px] font-semibold text-suave transition-colors hover:bg-surface dark:text-suave-dark dark:hover:bg-surface-dark"
+            }
+          >
+            <Icono className="h-4 w-4" /> {txt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function RankingPage() {
   const location = useLocation();
@@ -42,35 +81,7 @@ export default function RankingPage() {
     guardarPref(CLAVE_VISTA, nueva);
   };
 
-  if (vista === "equipo") {
-    return (
-      <RankingEquipo
-        selector={
-          <div
-            role="group"
-            aria-label="Qué ranking ver"
-            className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-linea dark:border-linea-dark bg-card dark:bg-card-dark p-1"
-          >
-            <button
-              type="button"
-              aria-pressed="false"
-              onClick={() => cambiar("oficinas")}
-              className="flex min-h-[40px] items-center justify-center gap-2 rounded-lg text-[13px] font-semibold text-suave transition-colors hover:bg-surface dark:text-suave-dark dark:hover:bg-surface-dark"
-            >
-              <HiOfficeBuilding className="h-4 w-4" /> Oficinas
-            </button>
-            <button
-              type="button"
-              aria-pressed="true"
-              className="flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-titulo text-[13px] font-semibold text-white dark:bg-titulo-dark dark:text-surface-dark"
-            >
-              <HiUserGroup className="h-4 w-4" /> Equipo
-            </button>
-          </div>
-        }
-      />
-    );
-  }
-
+  if (vista === "equipo") return <RankingEquipo selector={<Selector vista="equipo" onCambiar={cambiar} />} />;
+  if (vista === "atencion") return <RankingAtencion selector={<Selector vista="atencion" onCambiar={cambiar} />} />;
   return <RankingOficinas onCambiarVista={cambiar} />;
 }

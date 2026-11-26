@@ -262,7 +262,7 @@ export default function RankingOficinas({ onCambiarVista }) {
             <h1 className="text-[72px] leading-[0.88] tracking-[0.02em] text-slate-50 sm:text-[112px]" style={F_DISPLAY}>
               RANKING
             </h1>
-            <div role="group" aria-label="Qué ranking ver" className="mt-2 flex gap-2">
+            <div role="group" aria-label="Qué ranking ver" className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
                 aria-pressed="true"
@@ -279,6 +279,15 @@ export default function RankingOficinas({ onCambiarVista }) {
                 style={F_COND}
               >
                 EQUIPO
+              </button>
+              <button
+                type="button"
+                aria-pressed="false"
+                onClick={() => onCambiarVista?.("atencion")}
+                className="min-h-[44px] rounded-full border border-slate-700 px-5 text-[15px] font-bold tracking-[0.16em] text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-200"
+                style={F_COND}
+              >
+                ATENCIÓN
               </button>
             </div>
           </div>

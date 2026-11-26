@@ -10,7 +10,7 @@ import {
   HiChartBar, HiClipboardList, HiClipboardCheck, HiRefresh,
   HiBan, HiCash, HiReceiptTax,
   HiShieldCheck, HiCog, HiViewGrid, HiStar,
-  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2, HiTruck, HiQuestionMarkCircle,
+  HiPencilAlt, HiCalculator, HiCamera, HiChatAlt2, HiTruck, HiQuestionMarkCircle, HiEmojiHappy,
 } from "react-icons/hi";
 // 🎮 Ícono del minijuego (Heroicons v1 no trae un joystick)
 import { FaGamepad, FaWhatsapp } from "react-icons/fa";
@@ -26,6 +26,7 @@ export const ICON_MAP = {
   truck: HiTruck,
   consulta: HiQuestionMarkCircle, // 💬 23/11/2026: «Consultas» (antes «Legales»)
   whatsapp: FaWhatsapp,            // 📲 24/11/2026: panel de WhatsApp (YCloud)
+  atencion: HiEmojiHappy,          // ⭐ 25/11/2026: opiniones y quejas de los clientes
 };
 
 // 🎨 Color por SECCIÓN — tokens REALES de tu index.css (@theme duo-*).
@@ -94,6 +95,7 @@ export function buildMenuGroups({
   veGestoria = true,             // 🚗 admin y oficina (el abogado no)
   legalesAlertas = 0,            // ⚖️ casos legales con fecha vencida sin marcar o demorados (30 días)
   whatsappEsperando = 0,         // 💬 clientes que escribieron y esperan respuesta (solo admin)
+  quejasNuevas = 0,              // ⭐ quejas de clientes sin leer (solo admin)
 }) {
   if (isVendedor) {
     return [{
@@ -168,6 +170,8 @@ export function buildMenuGroups({
       items: [
         { to: "/cotizaciones", label: "Cotizador", icon: "receipt" },
         { to: "/estadisticas", label: "Estadísticas", icon: "chart" },
+        // ⭐ Atención: quejas de clientes (badge = nuevas), opiniones, QR de cada oficina y fotos.
+        { to: "/atencion", label: "Atención", icon: "atencion", badge: quejasNuevas, tone: "rojo", nuevo: "2026-12-09" },
         { to: "/admin", label: "Configuración", icon: "cog" },
       ],
     }] : []),

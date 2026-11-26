@@ -54,6 +54,7 @@ export default function FooterNav({
   gestoriaDemorados = 0,     // 🚗 badge de Gestoría (trámites demorados)
   legalesAlertas = 0,        // ⚖️ badge de Legales (fechas vencidas + demorados)
   whatsappEsperando = 0,     // 💬 badge de WhatsApp (clientes esperando respuesta, solo admin)
+  quejasNuevas = 0,              // ⭐ badge de Atención (quejas de clientes sin leer, solo admin)
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -89,9 +90,9 @@ export default function FooterNav({
     () => buildMenuGroups({
       isAdmin, isVendedor, solTotal, renovacionesPendientes,
       cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos,
-      gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando,
+      gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando, quejasNuevas,
     }),
-    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando]
+    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando, quejasNuevas]
   );
 
   // Badges totales por RUTA (para pintar el puntito en un tab si corresponde)

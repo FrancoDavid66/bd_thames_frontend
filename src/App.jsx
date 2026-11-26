@@ -52,12 +52,15 @@ const RecaudacionPage = lazyConReintento(() => import("./pages/RecaudacionPage")
 const ServiciosPage = lazyConReintento(() => import("./pages/ServiciosPage"));
 // 📲 WhatsApp oficial (YCloud): panel de respuestas por línea — solo admin
 const WhatsAppPage = lazyConReintento(() => import("./pages/WhatsAppPage"));
+// ⭐ Atención a clientes: quejas, opiniones, QR de cada oficina y fotos (solo admin, 25/11/2026).
+const AtencionPage = lazyConReintento(() => import("./pages/AtencionPage"));
 // 🚀 Thunk de contadores
 import { fetchContadoresServicios } from "./store/slices/serviciosSlice";
 import { invalidarCachesVivo } from "./store/slices/pagosSlice";
 import { invalidarCacheSiniestrosCliente } from "./hooks/useSiniestrosCliente";
 import { invalidarCacheAlertasCliente } from "./hooks/useAlertasCliente";
 import { ding, pedirPendientes as pedirWhatsAppPendientes, prepararSonido, sonidoActivo } from "./services/whatsapp";
+import { contarQuejasNuevas } from "./services/opiniones";
 
 // 🚀 NUEVA APP: COTIZACIONES
 const CotizacionesPage = lazyConReintento(() => import("./pages/CotizacionesPage"));
@@ -75,6 +78,7 @@ const JuegoPage = lazyConReintento(() => import("./pages/JuegoPage"));
 import CierreCajaReminder from "./components/recaudacion/CierreCajaReminder";
 // 💳 Cartel "esta póliza estaba dada de baja" al cobrarla (ver utils/pagos/avisoReactivacion.js)
 import AvisoPolizaReactivada from "./components/polizas/AvisoPolizaReactivada";
+import AvisoPedirOpinion from "./components/opiniones/AvisoPedirOpinion";
 
 // 🆕 PÁGINA PÚBLICA: cupones de robo (el cliente confirma su pago, sin login)
 const CuponPublicoPage = lazyConReintento(() => import("./pages/CuponPublicoPage"));
@@ -87,6 +91,8 @@ const MiCasoPage = lazyConReintento(() => import("./pages/MiCasoPage"));
 const MiTramitePage = lazyConReintento(() => import("./pages/MiTramitePage"));
 // 📲 "TUVE UN SINIESTRO" (sin login): el cliente avisa el siniestro apenas le pasa (23/11/2026).
 const AvisoSiniestroPage = lazyConReintento(() => import("./pages/AvisoSiniestroPage"));
+// ⭐ "¿CÓMO LO ATENDIMOS?" (sin login): el cliente puntúa la atención y puede dejar una queja (25/11/2026).
+const OpinarPage = lazyConReintento(() => import("./pages/OpinarPage"));
 
 // 🎉 El logo de bienvenida ("Preparando tu entorno...") sale SOLO cuando
 //    recién iniciás sesión. La marca la pone el login (ver AuthContext) y
@@ -176,6 +182,7 @@ function App() {
   // 💬 Contador WhatsApp (solo admin): clientes que escribieron y esperan respuesta
   //    (y todavía se les puede contestar: ventana de 24 h abierta).
   const [whatsappEsperando, setWhatsappEsperando] = useState(0);
+  const [quejasNuevas, setQuejasNuevas] = useState(0); // ⭐ quejas de clientes sin leer (solo admin)
   const ultimoEntranteRef = useRef(null); // último mensaje de un cliente que ya vimos (para el "ding")
 
   // ====== Helper: API ROOT ======
@@ -373,6 +380,20 @@ function App() {
     }
   };
 
+  // ⭐ ====== Quejas de clientes sin leer (solo admin) → globito en «Atención» ======
+  const fetchQuejasNuevas = async () => {
+    if (!user || !veWhatsApp) {
+      setQuejasNuevas(0);
+      return;
+    }
+    try {
+      const data = await contarQuejasNuevas();
+      setQuejasNuevas(Number(data?.nuevas) || 0);
+    } catch {
+      /* se reintenta con el próximo refresco */
+    }
+  };
+
   // 💬 ====== WhatsApp: esperando respuesta + "ding" (solo admin) ======
   //    Ejemplo: entra «Hola, choqué» → el cartero avisa "whatsapp" → acá se pide
   //    el contador (globito rojo en el menú), suena el ding y la pestaña dice «(1) THAMES».
@@ -464,6 +485,7 @@ function App() {
     fetchServiciosCounters();
     fetchControlDiarioCount();
     fetchWhatsAppPendientes();
+    fetchQuejasNuevas();
   };
   const refrescarSiViejoRef = useRef(() => {});
   refrescarSiViejoRef.current = (ms = 30_000) => {
@@ -485,9 +507,10 @@ function App() {
     if (toca("gestoria")) fetchGestoriaCount();
     if (toca("legales")) fetchLegalesCount();
     if (toca("whatsapp")) fetchWhatsAppPendientes();
+    if (toca("quejas")) fetchQuejasNuevas();
   };
   useDatosVivos(
-    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios", "gestoria", "legales", "whatsapp"],
+    ["solicitudes", "cupones", "polizas", "cuotas", "bajas", "siniestros", "tareas", "servicios", "gestoria", "legales", "whatsapp", "quejas"],
     (temas) => refrescarPorTemaRef.current(temas),
     { activo: !!user && !soloUnModulo, siempre: true }
   );
@@ -650,6 +673,17 @@ function App() {
     );
   }
 
+  // ⭐ "¿CÓMO LO ATENDIMOS?" (sin login): /opinar?t=<link personal> o /opinar?of=<QR de la oficina>.
+  if (location.pathname === "/opinar" || location.pathname === "/opinar/") {
+    return (
+      <Suspense fallback={<CargandoPantalla pantallaCompleta />}>
+        <Routes>
+          <Route path="/opinar" element={<OpinarPage />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
   // 🦉 LOADER DE INGRESO — mientras la app valida la sesión.
   //    Tu LOGO ORIGINAL en un cuadrado con el mismo diseño plano del resto de
   //    la app (sin relieve 3D). Claro/oscuro con los tokens de la app
@@ -760,6 +794,7 @@ function App() {
           gestoriaDemorados={gestoriaDemorados}
           legalesAlertas={legalesAlertas}
           whatsappEsperando={whatsappEsperando}
+          quejasNuevas={quejasNuevas}
           user={user}
         />
 
@@ -844,6 +879,12 @@ function App() {
                   element={user.perfil?.rol === 'ADMIN' ? <WhatsAppPage /> : <Navigate to="/" replace />}
                 />
 
+                {/* ⭐ ATENCIÓN: quejas de clientes, opiniones, QR y fotos (Solo Admin) */}
+                <Route
+                  path="/atencion"
+                  element={user.perfil?.rol === 'ADMIN' ? <AtencionPage /> : <Navigate to="/" replace />}
+                />
+
                 {/* 🚀 RUTA PROTEGIDA PARA ADMIN PANEL */}
                 <Route
                   path="/admin"
@@ -859,6 +900,7 @@ function App() {
 
           <CierreCajaReminder />
           <AvisoPolizaReactivada />
+          <AvisoPedirOpinion />
         </motion.div>
       </div>
 
@@ -880,6 +922,7 @@ function App() {
         gestoriaDemorados={gestoriaDemorados}
         legalesAlertas={legalesAlertas}
         whatsappEsperando={whatsappEsperando}
+        quejasNuevas={quejasNuevas}
       />
     </>
   );

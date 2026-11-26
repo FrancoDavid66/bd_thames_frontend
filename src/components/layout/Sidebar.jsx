@@ -45,6 +45,7 @@ export default function Sidebar({
   gestoriaDemorados = 0,         // 🚗 badge de Gestoría (trámites demorados)
   legalesAlertas = 0,            // ⚖️ badge de Legales (fechas vencidas + demorados)
   whatsappEsperando = 0,         // 💬 badge de WhatsApp (clientes esperando respuesta, solo admin)
+  quejasNuevas = 0,              // ⭐ badge de Atención (quejas de clientes sin leer, solo admin)
 }) {
   const { user } = useAuth();
   const marca = useMarca();
@@ -60,9 +61,9 @@ export default function Sidebar({
     () => buildMenuGroups({
       isAdmin, isVendedor, solTotal, renovacionesPendientes,
       cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos,
-      controlDiarioPendientes, gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando,
+      controlDiarioPendientes, gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando, quejasNuevas,
     }),
-    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, controlDiarioPendientes, gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando]
+    [isAdmin, isVendedor, solTotal, renovacionesPendientes, cuponVencidas, bajasPendientes, serviciosAlertas, siniestrosAbiertos, controlDiarioPendientes, gestoriaDemorados, veGestoria, legalesAlertas, whatsappEsperando, quejasNuevas]
   );
 
   // 🧠 Acordeones con memoria: arrancan CERRADOS. Si el usuario abre uno, se
