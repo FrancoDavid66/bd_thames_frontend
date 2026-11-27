@@ -170,17 +170,41 @@ export default function OpinarPage() {
     if (n <= 2) setConQueja(true);
   };
 
-  const faltaPersona = esQr && !empleado;
   const faltaTel = esQr && telefono.replace(/\D/g, "").length < 8;
-  const puedeEnviar = soloQueja
-    ? queja.trim().length >= 5 && !faltaTel
-    : estrellas > 0 &&
-      !(equipo.length && !persona) &&
-      !faltaTel &&
-      !(conQueja && queja.trim().length < 5);
+
+  // 🛠️ 27/11/2026 («se traba»): antes el botón quedaba apagado sin decir por qué y las estrellas no
+  // respondían hasta tocar la foto. Ahora todo responde siempre y, al tocar «Enviar», se avisa QUÉ falta
+  // y se lleva al cliente hasta ese lugar. Ej: sin WhatsApp → «Escriba su WhatsApp…» y lo enfoca.
+  const faltante = () => {
+    if (soloQueja) {
+      if (queja.trim().length < 5) return { codigo: "queja", texto: "Cuéntenos qué pasó (aunque sea en una línea).", id: "opn-queja" };
+      if (faltaTel) return { codigo: "telefono", texto: "Escriba su WhatsApp para poder responderle (ej: 11 5555-0000).", id: "opn-tel" };
+      return null;
+    }
+    if (equipo.length && !persona) return { codigo: "empleado", texto: "Primero toque la foto de quien lo atendió.", id: "opn-equipo" };
+    if (!estrellas) return { codigo: "estrellas", texto: "Toque las estrellas para puntuar la atención.", id: "opn-estrellas" };
+    if (faltaTel) return { codigo: "telefono", texto: "Escriba su WhatsApp (ej: 11 5555-0000). Es solo para que no se repita la opinión.", id: "opn-tel" };
+    if (conQueja && queja.trim().length < 5) return { codigo: "queja", texto: "Cuéntenos qué pasó en el reclamo (o toque «No quiero hacer un reclamo»).", id: "opn-queja" };
+    return null;
+  };
+
+  const llevarA = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) setTimeout(() => el.focus({ preventScroll: true }), 350);
+  };
+
+  const limpiarError = (codigo) => setError((e) => (e.codigo === codigo ? { texto: "", codigo: "" } : e));
 
   const mandar = async () => {
-    if (!puedeEnviar || enviando) return;
+    if (enviando) return;
+    const falta = faltante();
+    if (falta) {
+      setError({ texto: falta.texto, codigo: falta.codigo });
+      llevarA(falta.id);
+      return;
+    }
     setEnviando(true);
     setError({ texto: "", codigo: "" });
     const base = {
@@ -208,6 +232,8 @@ export default function OpinarPage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setError({ texto: e.message, codigo: e.codigo || "" });
+      const ids = { empleado: "opn-equipo", estrellas: "opn-estrellas", telefono: "opn-tel" };
+      if (ids[e.codigo]) llevarA(ids[e.codigo]);
     } finally {
       setEnviando(false);
     }
@@ -355,9 +381,13 @@ export default function OpinarPage() {
           autoComplete="tel"
           placeholder="11 5555-0000"
           value={telefono}
-          onChange={(e) => setTelefono(e.target.value)}
+          onChange={(e) => {
+            setTelefono(e.target.value);
+            limpiarError("telefono");
+          }}
           aria-invalid={error.codigo === "telefono"}
         />
+        {error.codigo === "telefono" ? <p className="avs-error">{error.texto}</p> : null}
       </div>
       <div className="avs-field">
         <label className="avs-label" htmlFor="opn-nom">
@@ -376,7 +406,7 @@ export default function OpinarPage() {
   ) : null;
 
   const elegirPersona = equipo.length ? (
-    <div className="avs-bloque">
+    <div className="avs-bloque" id="opn-equipo">
       <p className="avs-label">
         {soloQueja
           ? "¿Quién lo atendió? (opcional)"
@@ -389,7 +419,10 @@ export default function OpinarPage() {
             type="button"
             className="opn-persona"
             aria-pressed={empleado?.id === p.id}
-            onClick={() => setEmpleado(empleado?.id === p.id ? null : p)}
+            onClick={() => {
+              setEmpleado(empleado?.id === p.id ? null : p);
+              limpiarError("empleado");
+            }}
           >
             <Foto persona={p} />
             <span>{p.nombre.split(" ")[0]}</span>
@@ -408,7 +441,7 @@ export default function OpinarPage() {
         <button
           type="button"
           className="avs-btn avs-btn-red avs-btn-full"
-          disabled={!puedeEnviar || enviando}
+          disabled={enviando}
           onClick={mandar}
         >
           {enviando ? (
@@ -458,11 +491,15 @@ export default function OpinarPage() {
               maxLength={2000}
               placeholder="Ej: Esperé más de una hora y no me dieron una respuesta."
               value={queja}
-              onChange={(e) => setQueja(e.target.value)}
+              onChange={(e) => {
+                setQueja(e.target.value);
+                limpiarError("queja");
+              }}
             />
+            {error.codigo === "queja" ? <p className="avs-error">{error.texto}</p> : null}
           </div>
           {campoTelefono}
-          {error.texto && error.codigo !== "empleado" ? (
+          {error.texto && !["empleado", "estrellas", "telefono", "queja"].includes(error.codigo) ? (
             <div className="avs-alerta" role="alert">
               <LuTriangleAlert /> <span>{error.texto}</span>
             </div>
@@ -514,14 +551,9 @@ export default function OpinarPage() {
 
       {elegirPersona}
 
-      <div
-        className="avs-bloque"
-        style={
-          faltaPersona ? { opacity: 0.45, pointerEvents: "none" } : undefined
-        }
-      >
+      <div className="avs-bloque">
         <p className="avs-label">Puntúe la atención</p>
-        <div className="opn-estrellas" role="radiogroup" aria-label="Estrellas">
+        <div className="opn-estrellas" role="radiogroup" aria-label="Estrellas" id="opn-estrellas">
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
@@ -539,6 +571,7 @@ export default function OpinarPage() {
         <p className="opn-nota" aria-live="polite">
           {NOTAS[estrellas]}
         </p>
+        {error.codigo === "estrellas" ? <p className="avs-error">{error.texto}</p> : null}
       </div>
 
       {estrellas > 0 ? (
@@ -563,6 +596,7 @@ export default function OpinarPage() {
               </button>
             ))}
           </div>
+          {campoTelefono}
           <div className="avs-field">
             <label className="avs-label" htmlFor="opn-com">
               Comentario <small>(opcional)</small>
@@ -581,7 +615,6 @@ export default function OpinarPage() {
               onChange={(e) => setComentario(e.target.value)}
             />
           </div>
-          {campoTelefono}
 
           {conQueja ? (
             <div className="avs-card opn-queja">
@@ -595,8 +628,12 @@ export default function OpinarPage() {
                   maxLength={2000}
                   placeholder="Cuéntenos qué pasó. Lo lee personalmente el responsable de la oficina."
                   value={queja}
-                  onChange={(e) => setQueja(e.target.value)}
+                  onChange={(e) => {
+                    setQueja(e.target.value);
+                    limpiarError("queja");
+                  }}
                 />
+                {error.codigo === "queja" ? <p className="avs-error">{error.texto}</p> : null}
               </div>
               <button
                 type="button"
@@ -631,7 +668,7 @@ export default function OpinarPage() {
         </div>
       )}
 
-      {error.texto && error.codigo !== "empleado" ? (
+      {error.texto && !["empleado", "estrellas", "telefono", "queja"].includes(error.codigo) ? (
         <div className="avs-bloque">
           <div className="avs-alerta" role="alert">
             <LuTriangleAlert /> <span>{error.texto}</span>
