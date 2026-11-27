@@ -47,15 +47,20 @@ const HORAS = (() => {
 
 // ✍️ 25/11/2026: la escribana usa la MISMA app que el abogado (sus consultas y casos,
 //    turnos y honorarios). Solo cambia la palabra y que no entra a Siniestros.
+// 🚗 27/11/2026: la GESTORÍA también (misma app): ve solo lo que le derivás desde «Para derivar»,
+//    sin plata, sin turnos y sin las pólizas del cliente. Al crearla, queda en la lista de «Derivar».
 export const PROFESIONES = [
-  { id: "ABOGADO", txt: "Abogado/a", ej: "Ej: Dr. Martín Sosa", usuario: "msosa" },
-  { id: "ESCRIBANO", txt: "Escribano/a", ej: "Ej: Esc. Laura Pérez", usuario: "lperez" },
+  { id: "ABOGADO", txt: "Abogado/a", ej: "Ej: Dr. Martín Sosa", usuario: "msosa", icono: "⚖️ " },
+  { id: "ESCRIBANO", txt: "Escribano/a", ej: "Ej: Esc. Laura Pérez", usuario: "lperez", icono: "✍️ " },
+  { id: "GESTORIA", txt: "Gestoría", ej: "Ej: Gestoría López", usuario: "glopez", icono: "🚗 " },
 ];
+const PROFESION_DE_ROL = { ESCRIBANO: "ESCRIBANO", GESTOR: "GESTORIA" };
+const ROL_TXT = { ESCRIBANO: "ESCRIBANO/A", GESTOR: "GESTORÍA", ABOGADO: "ABOGADO" };
 const profesionDe = (id) => PROFESIONES.find((p) => p.id === id) || PROFESIONES[0];
 
 const FORM_VACIO = {
   id: null,
-  user: null, // usuario que ya existe (rol ABOGADO o ESCRIBANO sin perfil)
+  user: null, // usuario que ya existe (rol ABOGADO, ESCRIBANO o GESTOR sin perfil)
   profesion: "ABOGADO",
   nombre: "",
   telefono: "",
@@ -85,7 +90,7 @@ export default function AbogadosPanel() {
 
   const cargar = useCallback(async () => {
     try {
-      const [l, s] = await Promise.all([listarAbogados(), usuariosSinFicha()]);
+      const [l, s] = await Promise.all([listarAbogados({ con_gestorias: 1 }), usuariosSinFicha()]);
       setLista(l);
       setSinFicha(s);
       setError("");
@@ -107,7 +112,7 @@ export default function AbogadosPanel() {
     setForm({
       ...FORM_VACIO,
       user: user ? user.id : null,
-      profesion: user?.profesion === "ESCRIBANO" ? "ESCRIBANO" : "ABOGADO",
+      profesion: PROFESION_DE_ROL[user?.profesion] || "ABOGADO",
       nombre: user ? user.nombre : "",
       username: user ? user.username : "",
     });
@@ -188,7 +193,7 @@ export default function AbogadosPanel() {
         </div>
         {!formAbierto && (
           <button type="button" onClick={() => nuevo()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 px-4 py-2.5 text-[14px] font-semibold text-white">
-            <HiPlus className="w-4 h-4" /> Nuevo abogado o escribano/a
+            <HiPlus className="w-4 h-4" /> Nuevo abogado, escribano/a o gestoría
           </button>
         )}
       </div>
@@ -198,7 +203,7 @@ export default function AbogadosPanel() {
           <span className="inline-flex items-center gap-2">
             <HiExclamation className="w-4 h-4 shrink-0" />
             <span>
-              El usuario <b>{u.username}</b> tiene rol {u.profesion === "ESCRIBANO" ? "ESCRIBANO/A" : "ABOGADO"} pero no tiene su perfil
+              El usuario <b>{u.username}</b> tiene rol {ROL_TXT[u.profesion] || "ABOGADO"} pero no tiene su perfil
               cargado: hoy no ve ningún caso.
             </span>
           </span>
@@ -315,7 +320,9 @@ function TarjetaAbogado({ a, temas, onEditar, onVer, onDesactivar, onCobrar, onD
           <strong className="block text-[16px] text-titulo dark:text-titulo-dark">{a.nombre}</strong>
           <span className="mt-1 flex flex-wrap gap-1">
             {a.profesion === "ESCRIBANO" && <Chip tono="violeta">✍️ Escribana/o</Chip>}
-            {(a.especialidades || []).length ? (
+            {a.profesion === "GESTORIA" ? (
+              <Chip tono="azul">🚗 Gestoría · ve lo que le derivás</Chip>
+            ) : (a.especialidades || []).length ? (
               a.especialidades.map((t) => <Chip key={t}>{temasTxt([t], temas)}</Chip>)
             ) : (
               <Chip>Todos los temas</Chip>
@@ -450,7 +457,7 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
         toast.success(r?.aplicado_a ? `Guardado · el % nuevo se aplicó a ${r.aplicado_a} caso(s) sin cobrar` : "Guardado");
       } else {
         await crearAbogado(body);
-        toast.success(`${form.profesion === "ESCRIBANO" ? "Escribano/a creado/a" : "Abogado creado"}: ya puede entrar con su usuario`);
+        toast.success(`${{ ESCRIBANO: "Escribano/a creado/a", GESTORIA: "Gestoría creada" }[form.profesion] || "Abogado creado"}: ya puede entrar con su usuario`);
       }
       onListo();
     } catch (e) {
@@ -464,7 +471,7 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
     <div className="flex flex-col gap-3.5 rounded-xl border-2 border-sky-700/60 bg-card dark:bg-card-dark p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-[16px] font-bold text-titulo dark:text-titulo-dark">
-          {editando ? `Editar · ${form.nombre}` : `Nuevo ${form.profesion === "ESCRIBANO" ? "escribano/a" : "abogado"}`}
+          {editando ? `Editar · ${form.nombre}` : `Nuevo ${{ ESCRIBANO: "escribano/a", GESTORIA: "usuario de gestoría" }[form.profesion] || "abogado"}`}
         </h3>
         <button type="button" onClick={onCancelar} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-suave hover:text-titulo" aria-label="Cerrar">
           <HiX className="w-5 h-5" />
@@ -502,7 +509,7 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
 
       <div className={labelCls}>
         Profesión
-        <div role="radiogroup" aria-label="Profesión" className="grid grid-cols-2 gap-2">
+        <div role="radiogroup" aria-label="Profesión" className="grid grid-cols-3 gap-2">
           {PROFESIONES.map((p) => (
             <button
               key={p.id}
@@ -516,13 +523,19 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
                   : "border-linea dark:border-linea-dark bg-card dark:bg-card-dark text-titulo dark:text-titulo-dark"
               }`}
             >
-              {p.id === "ESCRIBANO" ? "✍️ " : "⚖️ "}
+              {p.icono}
               {p.txt}
             </button>
           ))}
         </div>
         {form.profesion === "ESCRIBANO" && (
           <span className="font-normal">Misma app que el abogado (sus consultas y casos, turnos y honorarios), pero sin Siniestros.</span>
+        )}
+        {form.profesion === "GESTORIA" && (
+          <span className="font-normal">
+            Misma app que el abogado, pero ve solo las consultas de gestoría que le derivás. Sin plata, sin turnos y sin las pólizas del
+            cliente. Queda en la lista de «Derivar».
+          </span>
         )}
       </div>
 
@@ -531,6 +544,7 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
         <input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder={profesionDe(form.profesion).ej} className={inputCls} />
       </label>
 
+      {form.profesion !== "GESTORIA" && (
       <div className="flex flex-col gap-1.5">
         <span className="text-[12px] font-semibold text-suave dark:text-suave-dark">Temas que lleva (sirve para sugerirlo al cargar un caso)</span>
         <div className="flex flex-wrap gap-2">
@@ -553,6 +567,7 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
           })}
         </div>
       </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2.5">
         <label className={labelCls}>
@@ -565,6 +580,8 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
         </label>
       </div>
 
+      {form.profesion !== "GESTORIA" && (
+      <>
       <div className="flex flex-col gap-2 rounded-lg border border-linea dark:border-linea-dark p-3">
         <span className="text-[13px] font-bold text-titulo dark:text-titulo-dark">Días y horarios para turnos</span>
         <span className="text-[11px] text-suave dark:text-suave-dark">Con esto la oficina le da turnos sin tener que llamarlo.</span>
@@ -632,6 +649,8 @@ function FormAbogado({ form, setForm, catalogo, sinFicha, onCancelar, onListo })
           </label>
         </div>
       </details>
+      </>
+      )}
 
       <label className={labelCls}>
         <span className="inline-flex items-center gap-1">

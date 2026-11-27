@@ -37,7 +37,6 @@ import AbogadoLayout, { InicioAbogado } from "./components/legales/AbogadoLayout
 import EntradaTelon from "./components/layout/EntradaTelon";
 // 🚗 NUEVA APP: GESTORÍA (trámites del automotor derivados a gestores)
 const GestoriaPage = lazyConReintento(() => import("./pages/GestoriaPage"));
-import GestorLayout from "./components/gestoria/GestorLayout";
 const ClienteProfilePage = lazyConReintento(() => import("./pages/ClienteProfilePage"));
 const PolizaDetails = lazyConReintento(() => import("./components/polizas/PolizaDetails"));
 const BalanzesPage = lazyConReintento(() => import("./pages/BalanzesPage"));
@@ -109,14 +108,15 @@ function App() {
   const { user, loading } = useAuth();
   // 🏷️ THAMES o MALVINAS (según la oficina del que entró)
   const marca = useMarca();
-  // 🚗 El GESTOR es alguien de afuera: solo usa Gestoría (sin menú, sin contadores).
+  // 🚗 El GESTOR es alguien de afuera. 27/11/2026: usa la app del abogado (Consultas, lo que le derivan).
   const esGestor = user?.perfil?.rol === "GESTOR";
   // 🚗 26/11/2026: Gestoría se unió a Consultas → la sección vieja queda SOLO para el admin (archivo y gestorías).
   const veGestoria = user?.perfil?.rol === "ADMIN";
   // ⚖️ El ABOGADO también es de afuera: solo usa Legales (sus casos).
   // ✍️ 25/11/2026: la ESCRIBANA usa la misma app del abogado (sin Siniestros).
   const esEscribana = user?.perfil?.rol === "ESCRIBANO";
-  const esAbogadoRol = user?.perfil?.rol === "ABOGADO" || esEscribana;
+  // 🚗 27/11/2026: la GESTORÍA también usa la app del abogado (Consultas: lo que le derivan), sin Siniestros.
+  const esAbogadoRol = user?.perfil?.rol === "ABOGADO" || esEscribana || esGestor;
   const veLegales = ["ADMIN", "OFICINA"].includes(user?.perfil?.rol);
   const soloUnModulo = esGestor || esAbogadoRol;
   // 💬 WhatsApp (YCloud): por ahora solo lo ve el admin.
@@ -734,23 +734,6 @@ function App() {
     );
   }
 
-  // 🚗 GESTOR: solo su pantalla de Gestoría, sin menú ni barra de abajo.
-  if (esGestor) {
-    return (
-      <>
-      {telon}
-      <GestorLayout>
-        <Suspense fallback={<CargandoPantalla />}>
-          <Routes>
-            <Route path="/gestoria/*" element={<GestoriaPage />} />
-            <Route path="*" element={<Navigate to="/gestoria" replace />} />
-          </Routes>
-        </Suspense>
-      </GestorLayout>
-      </>
-    );
-  }
-
   // ⚖️ ABOGADO: Legales (sus casos) y 🆕 17/11 Siniestros (los reclamos que tiene asignados),
   //    sin menú lateral ni barra de abajo. Arriba, la tira para pasar de uno a otro.
   if (esAbogadoRol) {
@@ -761,7 +744,7 @@ function App() {
         <Suspense fallback={<CargandoPantalla />}>
           <Routes>
             <Route path="/legales/*" element={<LegalesPage />} />
-            {!esEscribana && <Route path="/siniestros" element={<SiniestrosPage />} />}
+            {!esEscribana && !esGestor && <Route path="/siniestros" element={<SiniestrosPage />} />}
             <Route path="*" element={<InicioAbogado />} />
           </Routes>
         </Suspense>

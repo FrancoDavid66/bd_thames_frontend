@@ -17,6 +17,10 @@
 //   /legales/cerrados    Casos cerrados                                (pantalla completa)
 //   /legales/:id         El caso                                       (pantalla completa)
 //
+// 🚗 27/11/2026 · GESTORÍA (Franco: «un estándar para todos los de afuera»): la gestoría usa ESTA
+//   misma app. Ve solo las consultas de gestoría que el admin le derivó. Su barra es
+//   Inicio · Trámites · Agenda (sin ➕ ni Plata: no carga casos y la plata la ve solo el admin).
+//
 // Acá se piden sus casos abiertos, el resumen, lo que viene y las listas del estudio,
 // y los comparten todas las pantallas (useAbogado). Se actualizan solos si cambia algo
 // (datos en vivo) y al volver de un caso.
@@ -178,6 +182,7 @@ export default function AppAbogado() {
   useScrollPorPantalla(pathname);
 
   const yo = catalogo?.abogado || null;
+  const esGestoria = yo?.profesion === "GESTORIA";
   const ctx = useMemo(
     () => ({ catalogo, yo, casos, res, agenda, turnos, listas, setListas, error, cargar, cargarListas, busqueda, setBusqueda, filtro, setFiltro, abrirCasoNuevo: () => setCasoNuevo(true) }),
     [catalogo, yo, casos, res, agenda, turnos, listas, error, cargar, cargarListas, busqueda, filtro]
@@ -191,7 +196,7 @@ export default function AppAbogado() {
           <Route index element={<PlanillaApp vista="hoy" />} />
           <Route path="casos" element={<PlanillaApp vista="todos" />} />
           <Route path="agenda" element={<AgendaAbogado />} />
-          <Route path="plata" element={<PlataAbogado />} />
+          <Route path="plata" element={esGestoria ? <Navigate to="/legales" replace /> : <PlataAbogado />} />
           <Route path="perfil" element={<PerfilAbogado />} />
           <Route path="listas" element={<ListasAbogado />} />
           <Route path="cerrados" element={<Cerrados />} />
@@ -199,9 +204,9 @@ export default function AppAbogado() {
           <Route path="*" element={<Navigate to="/legales" replace />} />
         </Routes>
       </div>
-      {!completa && <MenuAbajo onNuevo={() => setCasoNuevo(true)} hoy={(agenda?.vencidas || []).length} />}
+      {!completa && <MenuAbajo onNuevo={() => setCasoNuevo(true)} hoy={(agenda?.vencidas || []).length} esGestoria={esGestoria} />}
       <HojaCasoNuevo
-        abierto={casoNuevo}
+        abierto={casoNuevo && !esGestoria}
         listas={listas}
         temas={catalogo?.temas || []}
         onCerrar={() => setCasoNuevo(false)}
@@ -216,22 +221,29 @@ export default function AppAbogado() {
   );
 }
 
-/** La barra de abajo, como en las apps: Inicio · Casos · ➕ · Agenda · Plata. */
-function MenuAbajo({ onNuevo, hoy = 0 }) {
-  const items = [
-    { to: "/legales", label: "Inicio", Icono: HiOutlineHome, IconoOn: HiHome, end: true, badge: hoy },
-    { to: "/legales/casos", label: "Casos", Icono: HiOutlineFolder, IconoOn: HiFolder },
-    { nuevo: true },
-    { to: "/legales/agenda", label: "Agenda", Icono: HiOutlineCalendarDays, IconoOn: HiCalendarDays },
-    { to: "/legales/plata", label: "Plata", Icono: HiOutlineBanknotes, IconoOn: HiBanknotes },
-  ];
+/** La barra de abajo, como en las apps: Inicio · Casos · ➕ · Agenda · Plata.
+ *  🚗 La gestoría: Inicio · Trámites · Agenda (no carga casos ni ve plata). */
+function MenuAbajo({ onNuevo, hoy = 0, esGestoria = false }) {
+  const items = esGestoria
+    ? [
+        { to: "/legales", label: "Inicio", Icono: HiOutlineHome, IconoOn: HiHome, end: true, badge: hoy },
+        { to: "/legales/casos", label: "Trámites", Icono: HiOutlineFolder, IconoOn: HiFolder },
+        { to: "/legales/agenda", label: "Agenda", Icono: HiOutlineCalendarDays, IconoOn: HiCalendarDays },
+      ]
+    : [
+        { to: "/legales", label: "Inicio", Icono: HiOutlineHome, IconoOn: HiHome, end: true, badge: hoy },
+        { to: "/legales/casos", label: "Casos", Icono: HiOutlineFolder, IconoOn: HiFolder },
+        { nuevo: true },
+        { to: "/legales/agenda", label: "Agenda", Icono: HiOutlineCalendarDays, IconoOn: HiCalendarDays },
+        { to: "/legales/plata", label: "Plata", Icono: HiOutlineBanknotes, IconoOn: HiBanknotes },
+      ];
   return (
     <nav
       aria-label="Menú"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-linea dark:border-linea-dark bg-card dark:bg-card-dark"
       style={{ paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}
     >
-      <div className="mx-auto grid min-h-[66px] w-full max-w-2xl grid-cols-5 items-end px-1.5 pb-2 pt-1.5">
+      <div className={`mx-auto grid min-h-[66px] w-full max-w-2xl ${esGestoria ? "grid-cols-3" : "grid-cols-5"} items-end px-1.5 pb-2 pt-1.5`}>
         {items.map((it) =>
           it.nuevo ? (
             <button

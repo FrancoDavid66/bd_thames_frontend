@@ -47,8 +47,8 @@ const ReclamosCtx = createContext({ total: null, abiertos: null });
 
 function useReclamos() {
   const { user } = useAuth();
-  // ✍️ La escribana no lleva reclamos de siniestros: ni se pregunta (el servidor diría 403).
-  const sinReclamos = user?.perfil?.rol === "ESCRIBANO";
+  // ✍️ La escribana (y 🚗 27/11 la gestoría) no llevan reclamos de siniestros: ni se pregunta (el servidor diría 403).
+  const sinReclamos = ["ESCRIBANO", "GESTOR"].includes(user?.perfil?.rol);
   const [r, setR] = useState(sinReclamos ? { total: 0, abiertos: 0 } : { total: null, abiertos: null });
   useEffect(() => {
     if (sinReclamos) return undefined;

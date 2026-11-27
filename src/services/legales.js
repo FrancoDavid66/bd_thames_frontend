@@ -115,7 +115,8 @@ export const pedirAgenda = (params = {}) => datos(api.get(`${B}agenda/`, { param
 export const calcularPlazo = (params) => datos(api.get(`${B}plazo/`, { params }));
 
 // ── abogados ──
-export const listarAbogados = () => datos(api.get(`${B}abogados/`));
+// 🚗 27/11/2026: las gestorías tienen ficha pero no son abogados para asignar: solo vienen con {con_gestorias: 1}.
+export const listarAbogados = (params = {}) => datos(api.get(`${B}abogados/`, { params }));
 export const pedirAbogado = (id) => datos(api.get(`${B}abogados/${id}/`));
 export const crearAbogado = (body) => datos(api.post(`${B}abogados/`, body));
 export const editarAbogado = (id, body) => datos(api.patch(`${B}abogados/${id}/`, body));

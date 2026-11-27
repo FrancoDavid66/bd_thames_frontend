@@ -164,6 +164,7 @@ export default function PlanillaLegales({ vista, onVista }) {
   const a = useMemo(() => {
     const estadosAbogado = (listas?.ESTADO || []).filter(Boolean);
     const yo = app.yo || catalogo?.abogado || null;
+    const esGestoriaApp = yo?.profesion === "GESTORIA";
     const clienteDe = (e) => primerNombre(e.persona_nombre) || "el cliente";
     const opsAbogado = (sin = null) =>
       abogados
@@ -180,12 +181,13 @@ export default function PlanillaLegales({ vista, onVista }) {
 
     return {
       clave: esAbogado ? "legales-abogado" : "legales",
-      titulo: "Mis casos",
-      icono: "⚖️",
+      // 🚗 27/11/2026: la gestoría ve «Mis trámites» (misma app, otra palabra).
+      titulo: esGestoriaApp ? "Mis trámites" : "Mis casos",
+      icono: esGestoriaApp ? "🚗" : "⚖️",
       color: COLOR,
       mostrarTitulo: enApp,
-      item: "caso",
-      items: "casos",
+      item: esGestoriaApp ? "trámite" : "caso",
+      items: esGestoriaApp ? "trámites" : "casos",
       filas,
       error,
       recargar,
@@ -205,7 +207,7 @@ export default function PlanillaLegales({ vista, onVista }) {
         },
       },
       nombre: (e) => (esAbogado ? caratulaCorta(e) : e.persona_nombre || "Sin nombre"),
-      sub: (e) => [e.motivo_titulo || e.tema_nombre, e.gestoria_derivada_a ? `→ ${e.gestoria_derivada_a}` : null, e.numero].filter(Boolean).join(" · "),
+      sub: (e) => [e.motivo_titulo || e.tema_nombre, e.gestoria_derivada_a && !esGestoriaApp ? `→ ${e.gestoria_derivada_a}` : null, e.numero].filter(Boolean).join(" · "),
       marcas: (e) =>
         [
           e.proxima_fecha?.vencida && { txt: "Fecha vencida", tono: "rojo" },
@@ -471,7 +473,7 @@ export default function PlanillaLegales({ vista, onVista }) {
       // 🗂️ El panel del costado.
       panel: {
         cargar: (id) => pedirCaso(id),
-        sub: (e) => [esAbogado ? e.persona_nombre : e.caratula && caratulaCorta(e) !== e.persona_nombre ? caratulaCorta(e) : null, e.motivo_titulo || e.tema_nombre, e.gestoria_derivada_a ? `→ ${e.gestoria_derivada_a}` : null, e.numero].filter(Boolean).join(" · "),
+        sub: (e) => [esAbogado ? e.persona_nombre : e.caratula && caratulaCorta(e) !== e.persona_nombre ? caratulaCorta(e) : null, e.motivo_titulo || e.tema_nombre, e.gestoria_derivada_a && !esGestoriaApp ? `→ ${e.gestoria_derivada_a}` : null, e.numero].filter(Boolean).join(" · "),
         novedades: (d) =>
           (d.movimientos || []).map((m) => ({
             id: m.id,
@@ -591,7 +593,7 @@ export default function PlanillaLegales({ vista, onVista }) {
           }
           return B;
         },
-        ficha: { txt: esAbogado ? "Abrir el caso" : "Ficha completa", onClick: (e) => navigate(`/legales/${e.id}`) },
+        ficha: { txt: esAbogado ? (esGestoriaApp ? "Abrir el trámite" : "Abrir el caso") : "Ficha completa", onClick: (e) => navigate(`/legales/${e.id}`) },
       },
     };
   }, [esAdmin, esAbogado, esStaff, enApp, app, catalogo, abogados, filas, error, listas, recargar, navigate, vista, onVista, puedeMover, usaPropios, cargarListasOfi]);

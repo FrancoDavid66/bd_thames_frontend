@@ -77,7 +77,9 @@ export default function PerfilAbogado() {
           <AvatarAbogado id={p?.id || yo?.id} nombre={nombre} foto={p?.foto_url || yo?.foto_url} size={64} />
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="break-words text-[22px] font-extrabold leading-tight text-titulo dark:text-titulo-dark">{nombre}</span>
-            <span className={`text-[14px] ${suave}`}>{temasTxt(p?.especialidades, catalogo?.temas || []) || "Todos los temas"}</span>
+            <span className={`text-[14px] ${suave}`}>
+              {yo?.profesion === "GESTORIA" ? "Gestoría" : temasTxt(p?.especialidades, catalogo?.temas || []) || "Todos los temas"}
+            </span>
             {user?.username ? <span className={`text-[13.5px] ${suave}`}>Usuario: {user.username}</span> : null}
           </span>
         </div>
@@ -94,7 +96,7 @@ export default function PerfilAbogado() {
               <Dato icono={HiOutlineEnvelope} label="Email" valor={p?.email} />
               <Dato icono={HiOutlineMapPin} label="Tu estudio" valor={p?.direccion} />
               <Dato icono={HiOutlineClock} label="Horario" valor={p?.horario} />
-              <Dato icono={HiOutlineCalendarDays} label="Días de turnos" valor={p?.agenda_txt} />
+              {yo?.profesion !== "GESTORIA" && <Dato icono={HiOutlineCalendarDays} label="Días de turnos" valor={p?.agenda_txt} />}
             </Tarjeta>
           )}
           <div className="grid grid-cols-2 gap-2">
@@ -115,10 +117,15 @@ export default function PerfilAbogado() {
               />
             </label>
           </div>
-          <span className={`px-0.5 text-[13.5px] ${suave}`}>Los días de turnos y tu % de comisión los cambia THAMES.</span>
+          {/* 🚗 La gestoría no tiene turnos ni ve el %: no se le habla de eso. */}
+          {yo?.profesion !== "GESTORIA" && (
+            <span className={`px-0.5 text-[13.5px] ${suave}`}>Los días de turnos y tu % de comisión los cambia THAMES.</span>
+          )}
         </section>
 
         <Tarjeta lista>
+          {/* 🚗 La gestoría no edita las listas del estudio (solo crea estados desde «Mover»). */}
+          {catalogo?.puede_listas !== false && (
           <Link to="/legales/listas" className={`flex min-h-[60px] items-center gap-3 px-3.5 ${foco} focus-visible:ring-inset focus-visible:ring-offset-0`}>
             <HiOutlineAdjustmentsHorizontal className={`h-5 w-5 ${suave}`} strokeWidth={2} aria-hidden="true" />
             <span className="flex flex-1 flex-col">
@@ -127,6 +134,7 @@ export default function PerfilAbogado() {
             </span>
             <HiOutlineChevronRight className="h-[18px] w-[18px] text-slate-400" aria-hidden="true" />
           </Link>
+          )}
           <button type="button" role="switch" aria-checked={isDark} onClick={toggleTheme} className={`flex min-h-[56px] w-full items-center justify-between gap-3 px-3.5 text-left ${foco} focus-visible:ring-inset focus-visible:ring-offset-0`}>
             <span className="flex items-center gap-3 text-[16px] font-bold text-titulo dark:text-titulo-dark">
               <HiOutlineMoon className={`h-5 w-5 ${suave}`} strokeWidth={2} aria-hidden="true" />
